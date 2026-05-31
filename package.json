@@ -1,0 +1,14 @@
+{
+  "name": "aidcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AIDCP 总览仓：DOM-first 浏览器自动化控制平面（边缘 aidcp-edge + 云端 aidcp-cloud）的架构与协议文档。",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [],
+  "scripts": {
+    "docs": "echo 'See README.md, docs/architecture.md, docs/protocol.md'"
+  }
+}
