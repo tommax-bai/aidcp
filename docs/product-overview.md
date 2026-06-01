@@ -95,35 +95,46 @@ mindmap
 
 ## 3. 各模块当前完成状态
 
-> 图例：✅ 已完成（有代码 + 测试） / ⚠️ 部分完成（设计或局部实现） / ❌ 未开始（仅规划）。
+### 统一状态口径
+
+本节统一引用 `./design-gaps-and-models.md` 中定义的双维状态标注法，避免把产品实现状态与文档成熟度混写在同一列。
+
+- 实现状态仅使用 `implemented / designed / planned`，用于描述能力是否已落地。
+- 文档成熟度仅使用 `draft / complete / authoritative`，用于描述文档是否可作为实现依据。
+- 原表中的“编写中”统一视为文档成熟度，不再作为实现状态使用。
+- 若某能力同时包含已实现与未实现子项，则在实现状态中按能力项拆分说明，不再用单一“部分完成”覆盖全部语义。
+
+> 图例：实现状态=`implemented / designed / planned`；文档成熟度=`draft / complete / authoritative`。
 > 路径说明：边缘端代码在 `aidcp-edge/`，云端代码在 `aidcp-cloud/`，文档在本仓 `docs/`。
 
 ### 3.1 技术架构
 
-| # | 模块 | 状态 | 已实现 / 文档与代码位置 | 缺口 |
-| --- | --- | --- | --- | --- |
-| 1 | 浏览器管理策略 | ⚠️ | 单机多实例已跑（多份 `edge*.log` / `cloud*.log` 为多实例运行痕迹）；`aidcp-edge/src/cdp/chrome-launcher.ts` 负责按参数拉起 Chrome | 分布式浏览器池、profile×指纹×IP 三元绑定的编排未做 |
-| 2 | 反检测与登录态 | ⚠️ | **stealth 注入已实现**：`aidcp-edge/src/cdp/stealth-injector.ts`（webdriver 抹除 / toString 伪装 / plugins / 权限对齐 / console.debug）；设计见 `docs/anti-detection.md` | Cookie/Session 持久化、住宅代理接入、WebRTC/DNS 防泄露、指纹画像表 未做 |
-| 3 | 容错与恢复机制 | ⚠️ | LocatingEngine **三道闸**已实现（`aidcp-edge/src/locating/engine.ts`）：后置校验 / 重试升级 / 反污染；守卫层清干扰（`guard.ts`） | CDP 断连自动重连、验证码/滑块识别、会话级 crash recovery 未做 |
-| 4 | Agent 拆分与通信 | ✅ | edge/cloud 双层 WS 架构已实现；协议 `aidcp-cloud/src/comm/protocol.ts` + `docs/protocol.md`；各 Agent（Locating/Planner/Orchestrator/Publish）边界清晰 | — |
+| # | 模块 | 实现状态 | 文档成熟度 | 已实现 / 文档与代码位置 | 缺口 |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 浏览器管理策略 | `implemented` | `complete` | 单机多实例已跑（多份 `edge*.log` / `cloud*.log` 为多实例运行痕迹）；`aidcp-edge/src/cdp/chrome-launcher.ts` 负责按参数拉起 Chrome | 分布式浏览器池、profile×指纹×IP 三元绑定的编排未做 |
+| 2 | 反检测与登录态 | `implemented`（stealth/拟人化）+ `designed`（代理/持久化/防泄露） | `complete` | **stealth 注入已实现**：`aidcp-edge/src/cdp/stealth-injector.ts`（webdriver 抹除 / toString 伪装 / plugins / 权限对齐 / console.debug）；设计见 `docs/anti-detection.md` | Cookie/Session 持久化、住宅代理接入、WebRTC/DNS 防泄露、指纹画像表 未做 |
+| 3 | 容错与恢复机制 | `implemented`（三道闸）+ `designed`（恢复闭环） | `complete` | LocatingEngine **三道闸**已实现（`aidcp-edge/src/locating/engine.ts`）：后置校验 / 重试升级 / 反污染；守卫层清干扰（`guard.ts`） | CDP 断连自动重连、验证码/滑块识别、会话级 crash recovery 未做 |
+| 4 | Agent 拆分与通信 | `implemented` | `authoritative` | edge/cloud 双层 WS 架构已实现；协议 `aidcp-cloud/src/comm/protocol.ts` + `docs/protocol.md`；各 Agent（Locating/Planner/Orchestrator/Publish）边界清晰 | — |
 
 ### 3.2 产品设计
 
-| # | 模块 | 状态 | 已实现 / 文档与代码位置 | 缺口 |
-| --- | --- | --- | --- | --- |
-| 5 | 多账号管理面板 | ❌ | 人设配置基础已有（`aidcp-cloud/src/soul/`，`soul.yaml` 可装载） | Web 管理面板、账号分组、状态一览、可视化全未做（`docs/product-dashboard.md` 编写中） |
-| 6 | 飞书交互设计 | ❌ | — | 消息卡片、审批流、多账号归属全未做（`docs/product-feishu.md` 编写中） |
-| 7 | 任务编排体验 | ⚠️ | 后端编排内核已有：`aidcp-cloud/src/orchestrator/session-orchestrator.ts` + 状态机；CLI 触发 `src/cli/trigger-like.ts`、`src/publish/trigger.ts` | 面向运营的指令下达 UI、批量操作、审批粒度未做（`docs/product-task.md` 编写中） |
-| 8 | 异常处理体验 | ❌ | 底层信号已有（后置校验失败 / 升级 `systemic_revision`） | 面向人的掉线恢复/告警/接管体验未做（`docs/product-exception.md` 编写中） |
+| # | 模块 | 实现状态 | 文档成熟度 | 已实现 / 文档与代码位置 | 缺口 |
+| --- | --- | --- | --- | --- | --- |
+| 5 | 多账号管理面板 | `planned` | `complete` | 人设配置基础已有（`aidcp-cloud/src/soul/`，`soul.yaml` 可装载） | Web 管理面板、账号分组、状态一览、可视化全未做（设计见 `docs/product-dashboard.md`） |
+| 6 | 飞书交互设计 | `planned` | `complete` | — | 消息卡片、审批流、多账号归属全未做（设计见 `docs/product-feishu.md`） |
+| 7 | 任务编排体验 | `implemented`（编排内核）+ `designed`（运营交互层） | `complete` | 后端编排内核已有：`aidcp-cloud/src/orchestrator/session-orchestrator.ts` + 状态机；CLI 触发 `src/cli/trigger-like.ts`、`src/publish/trigger.ts` | 面向运营的指令下达 UI、批量操作、审批粒度未做（设计见 `docs/product-task.md`） |
+| 8 | 异常处理体验 | `designed` | `complete` | 底层信号已有（后置校验失败 / 升级 `systemic_revision`） | 面向人的掉线恢复/告警/接管体验未做（设计见 `docs/product-exception.md`） |
 
 ### 3.3 运营策略
 
-| # | 模块 | 状态 | 已实现 / 文档与代码位置 | 缺口 |
-| --- | --- | --- | --- | --- |
-| 9 | 风控模型 | ⚠️ | **设计完整**：`docs/risk-control.md`（频率/作息/速度/去重/冷启动/状态机）。**拟人化执行层已实现**：`aidcp-edge/src/humanize/`（`timing` 对数正态停顿、`mouse-path` 贝塞尔、`keyboard-rhythm`、`scroll-physics`、`reading-time`、`session-rhythm` 疲劳曲线） | **频率计数器 / 档位 / 风控状态机（normal→warned→restricted→frozen）/ 时间窗口调度 未实现**（仅设计） |
-| 10 | 效果度量体系 | ❌ | `action.result` 上报通道已有（可作为过程指标数据源）；发布落库 `migrations/0001_publish_log.sql` | 过程/效果/健康三类指标的采集、聚合、看板全未做 |
-| 11 | 多账号协同与差异化 | ⚠️ | 单账号人设（Soul）+ 概念池演化已实现（`orchestrator/concept-extractor.ts`、`cache/concept-store.ts`）；多套 soul 可并存 | 矩阵号互动策略、账号梯队、跨号协同调度未做 |
-| 12 | 人机协作与止损 | ❌ | — | 自动化分级、冻结规则、效果归因全未做（依赖风控状态机 #9 与面板 #5） |
+| # | 模块 | 实现状态 | 文档成熟度 | 已实现 / 文档与代码位置 | 缺口 |
+| --- | --- | --- | --- | --- | --- |
+| 9 | 风控模型 | `implemented`（拟人化执行层）+ `designed`（控制器/状态机） | `complete` | **设计完整**：`docs/risk-control.md`（频率/作息/速度/去重/冷启动/状态机）。**拟人化执行层已实现**：`aidcp-edge/src/humanize/`（`timing` 对数正态停顿、`mouse-path` 贝塞尔、`keyboard-rhythm`、`scroll-physics`、`reading-time`、`session-rhythm` 疲劳曲线） | **频率计数器 / 档位 / 风控状态机（normal→warned→restricted→frozen）/ 时间窗口调度 未实现**（仅设计） |
+| 10 | 效果度量体系 | `planned` | `designed` | `action.result` 上报通道已有（可作为过程指标数据源）；发布落库 `migrations/0001_publish_log.sql` | 过程/效果/健康三类指标的采集、聚合、看板全未做；统一口径引用 `./design-gaps-and-models.md` 的效果指标字典 |
+| 11 | 多账号协同与差异化 | `implemented`（单账号人设）+ `planned`（跨号协同） | `draft` | 单账号人设（Soul）+ 概念池演化已实现（`orchestrator/concept-extractor.ts`、`cache/concept-store.ts`）；多套 soul 可并存 | 矩阵号互动策略、账号梯队、跨号协同调度未做 |
+| 12 | 人机协作与止损 | `planned` | `draft` | — | 自动化分级、冻结规则、效果归因全未做（依赖风控状态机 #9 与面板 #5） |
+
+补充口径：运营侧指标统一引用 `./design-gaps-and-models.md` 中的效果指标字典，按**过程指标 / 效果指标 / 健康指标**三类归口。本文只保留路线图层面的能力判断，不在此重复定义指标公式、归因规则与采集频率。
 
 ### 3.4 已交付的核心执行能力（横切多模块）
 
@@ -290,16 +301,17 @@ graph TB
 | [`docs/protocol.md`](protocol.md) | 边-云 WebSocket 协议（信封 / 消息类型 / 时序） | #4 通信方式 |
 | [`docs/risk-control.md`](risk-control.md) | 风控模型（频率/作息/速度/去重/冷启动/状态机） | #9 风控、#12 止损 |
 | [`docs/anti-detection.md`](anti-detection.md) | 反检测与登录态维持（指纹/网络/Cookie/行为指纹） | #2 反检测、#1 浏览器管理 |
+| [`docs/design-gaps-and-models.md`](design-gaps-and-models.md) | 统一状态口径、统一事件模型、统一审批对象模型、效果指标字典 | 跨文档统一口径 |
 | [`docs/product-overview.md`](product-overview.md) | **本文**——产品全景与文档索引 | 全部 |
 
 ### 编写中的产品文档
 
 | 文档 | 内容 | 对应模块 | 状态 |
 | --- | --- | --- | --- |
-| `docs/product-dashboard.md` | 多账号管理面板与状态监控 | #5 | 编写中 |
-| `docs/product-feishu.md` | 飞书交互设计（卡片/审批/归属） | #6 | 编写中 |
-| `docs/product-task.md` | 任务编排体验（指令/批量/审批粒度） | #7 | 编写中 |
-| `docs/product-exception.md` | 异常处理体验（掉线/告警/接管） | #8 | 编写中 |
+| `docs/product-dashboard.md` | 多账号管理面板与状态监控 | #5 | `complete` |
+| `docs/product-feishu.md` | 飞书交互设计（卡片/审批/归属） | #6 | `complete` |
+| `docs/product-task.md` | 任务编排体验（指令/批量/审批粒度） | #7 | `complete` |
+| `docs/product-exception.md` | 异常处理体验（掉线/告警/接管） | #8 | `complete` |
 
 ### 规划中的文档（建议补齐）
 
