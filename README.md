@@ -75,5 +75,6 @@ cd /Users/bears/codes/aidcp-cloud && npm install && npm test
 
 - [架构与数据流](docs/architecture.md)
 - [边-云 WebSocket 协议](docs/protocol.md)
+- [验收测试用例（全功能矩阵）](docs/acceptance-tests.md)
 - [风控模型设计](docs/risk-control.md)
 - [反检测与登录态维持方案](docs/anti-detection.md)
