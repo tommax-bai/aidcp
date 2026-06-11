@@ -114,24 +114,24 @@ mindmap
 | 1 | 浏览器管理策略 | `implemented` | `complete` | 单机多实例已跑（多份 `edge*.log` / `cloud*.log` 为多实例运行痕迹）；`aidcp-edge/src/cdp/chrome-launcher.ts` 负责按参数拉起 Chrome | 分布式浏览器池、profile×指纹×IP 三元绑定的编排未做 |
 | 2 | 反检测与登录态 | `implemented`（stealth/拟人化）+ `designed`（代理/持久化/防泄露） | `complete` | **stealth 注入已实现**：`aidcp-edge/src/cdp/stealth-injector.ts`（webdriver 抹除 / toString 伪装 / plugins / 权限对齐 / console.debug）；设计见 `docs/anti-detection.md` | Cookie/Session 持久化、住宅代理接入、WebRTC/DNS 防泄露、指纹画像表 未做 |
 | 3 | 容错与恢复机制 | `implemented`（三道闸）+ `designed`（恢复闭环） | `complete` | LocatingEngine **三道闸**已实现（`aidcp-edge/src/locating/engine.ts`）：后置校验 / 重试升级 / 反污染；守卫层清干扰（`guard.ts`） | CDP 断连自动重连、验证码/滑块识别、会话级 crash recovery 未做 |
-| 4 | Agent 拆分与通信 | `implemented` | `authoritative` | edge/cloud 双层 WS 架构已实现；协议 `aidcp-cloud/src/comm/protocol.ts` + `docs/protocol.md`；各 Agent（Locating/Planner/Orchestrator/Publish）边界清晰 | — |
+| 4 | Agent 拆分与通信 | `implemented` | `authoritative` | edge/cloud 双层 WS 架构已实现；协议 v2（40 消息类型）`aidcp-cloud/src/comm/protocol.ts` + `docs/protocol.md`；云端已重构为**事件驱动多 Agent**（`RoleDispatcher` + 15 角色 + `EventBus` + `command-bridge`），边缘 `LocatingEngine`/`BrowseSession` 与之协作 | — |
 
 ### 3.2 产品设计
 
 | # | 模块 | 实现状态 | 文档成熟度 | 已实现 / 文档与代码位置 | 缺口 |
 | --- | --- | --- | --- | --- | --- |
 | 5 | 多账号管理面板 | `planned` | `complete` | 人设配置基础已有（`aidcp-cloud/src/soul/`，`soul.yaml` 可装载） | Web 管理面板、账号分组、状态一览、可视化全未做（设计见 `docs/product-dashboard.md`） |
-| 6 | 飞书交互设计 | `planned` | `complete` | — | 消息卡片、审批流、多账号归属全未做（设计见 `docs/product-feishu.md`） |
-| 7 | 任务编排体验 | `implemented`（编排内核）+ `designed`（运营交互层） | `complete` | 后端编排内核已有：`aidcp-cloud/src/orchestrator/session-orchestrator.ts` + 状态机；CLI 触发 `src/cli/trigger-like.ts`、`src/publish/trigger.ts` | 面向运营的指令下达 UI、批量操作、审批粒度未做（设计见 `docs/product-task.md`） |
+| 6 | 飞书交互设计 | `implemented`（命令/记群/审批卡片）+ `designed`（完整审批闭环/归属） | `complete` | **已实现**：官方 SDK 长连接、`/status //pause //resume //bind` 命令路由、进退群自动入库、发布审批卡片 + 回调写信号文件（`aidcp-cloud/src/feishu/`） | 多账号消息归属、完整审批状态机、通知聚合待续（设计见 `docs/product-feishu.md`） |
+| 7 | 任务编排体验 | `implemented`（编排内核）+ `designed`（运营交互层） | `complete` | 后端编排内核已有：`aidcp-cloud/src/orchestrator/role-dispatcher.ts`（事件驱动 15 角色）+ `src/agents/`；CLI 触发 `src/cli/trigger-like.ts`、`src/cli/trigger-publish-temp.ts` | 面向运营的指令下达 UI、批量操作、审批粒度未做（设计见 `docs/product-task.md`） |
 | 8 | 异常处理体验 | `designed` | `complete` | 底层信号已有（后置校验失败 / 升级 `systemic_revision`） | 面向人的掉线恢复/告警/接管体验未做（设计见 `docs/product-exception.md`） |
 
 ### 3.3 运营策略
 
 | # | 模块 | 实现状态 | 文档成熟度 | 已实现 / 文档与代码位置 | 缺口 |
 | --- | --- | --- | --- | --- | --- |
-| 9 | 风控模型 | `implemented`（拟人化执行层）+ `designed`（控制器/状态机） | `complete` | **设计完整**：`docs/risk-control.md`（频率/作息/速度/去重/冷启动/状态机）。**拟人化执行层已实现**：`aidcp-edge/src/humanize/`（`timing` 对数正态停顿、`mouse-path` 贝塞尔、`keyboard-rhythm`、`scroll-physics`、`reading-time`、`session-rhythm` 疲劳曲线） | **频率计数器 / 档位 / 风控状态机（normal→warned→restricted→frozen）/ 时间窗口调度 未实现**（仅设计） |
+| 9 | 风控模型 | `implemented`（拟人化执行层 + 控制器/状态机） | `complete` | **设计完整**：`docs/risk-control.md`。**拟人化执行层已实现**：`aidcp-edge/src/humanize/`。**风控控制器已实现**：`aidcp-cloud/src/risk/`——`RiskController` + 状态机 `normal→warned→restricted→frozen`（恢复窗口 warned 7d/restricted 3d）+ 滑窗计数（分/时/日）+ 三档配额 + 冷启动 + 时间窗调度 + 会话预算 + 互动去重 + PG 持久化 | 状态迁移目前主要由配额触发；接入真实平台封号/限流信号（confirmed/fatal）驱动待补 |
 | 10 | 效果度量体系 | `planned` | `designed` | `action.result` 上报通道已有（可作为过程指标数据源）；发布落库 `migrations/0001_publish_log.sql` | 过程/效果/健康三类指标的采集、聚合、看板全未做；统一口径引用 `./design-gaps-and-models.md` 的效果指标字典 |
-| 11 | 多账号协同与差异化 | `implemented`（单账号人设）+ `planned`（跨号协同） | `draft` | 单账号人设（Soul）+ 概念池演化已实现（`orchestrator/concept-extractor.ts`、`cache/concept-store.ts`）；多套 soul 可并存 | 矩阵号互动策略、账号梯队、跨号协同调度未做 |
+| 11 | 多账号协同与差异化 | `implemented`（单账号人设）+ `planned`（跨号协同） | `draft` | 单账号人设（Soul）+ 概念池已实现（`cache/concept-store.ts` 持久化 + `concept.discovered` 事件驱动产出）；多套 soul 可并存 | 矩阵号互动策略、账号梯队、跨号协同调度未做 |
 | 12 | 人机协作与止损 | `planned` | `draft` | — | 自动化分级、冻结规则、效果归因全未做（依赖风控状态机 #9 与面板 #5） |
 
 补充口径：运营侧指标统一引用 `./design-gaps-and-models.md` 中的效果指标字典，按**过程指标 / 效果指标 / 健康指标**三类归口。本文只保留路线图层面的能力判断，不在此重复定义指标公式、归因规则与采集频率。
@@ -140,17 +140,21 @@ mindmap
 
 以下为已经**端到端跑通**的能力，构成 Phase 1 的实质内容：
 
-- ✅ **浏览执行层**：feed 滚动 + 弹窗控制 + 内容提取 + 搜索 + 自动浏览循环
-  （`aidcp-edge/src/browse/`：`feed-scroller` / `modal-controller` / `note-extractor` / `search-handler` / `browse-session`）。
-- ✅ **点赞/收藏 + Qwen 决策**：互动决策器按硬质量门槛 + LLM 判断
-  （`aidcp-cloud/src/orchestrator/engagement-decider.ts`），点赞执行 `aidcp-edge/src/client/like-runner.ts`。
-- ✅ **Publish Agent**：内容生成 + 后处理 + 发布 + 落库
-  （`aidcp-cloud/src/publish/`：`generator` / `post-processor` / `publisher` / `prompts`）。
-- ✅ **Soul 人设**：`soul.yaml` + 强类型装载（`soul/loader.ts`）+ 概念提取 + 浏览状态机
-  （`orchestrator/state-machine.ts`）。
+- ✅ **浏览执行层**：feed 滚动 + 弹窗控制 + 内容提取 + 搜索 + 卡片过滤 + 自动浏览循环
+  （`aidcp-edge/src/browse/`：`feed-scroller` / `modal-controller` / `note-extractor` / `search-handler` / `card-filter` / `browse-session`）。
+- ✅ **事件驱动互动决策 + Qwen**：`RoleDispatcher` 调度 15 角色，`ContentCuratorRole` 质量关卡 +
+  `InteractionAppraiserRole` 点赞/收藏决策（`aidcp-cloud/src/agents/`），点赞执行 `aidcp-edge/src/client/like-runner.ts`。
+- ✅ **风控控制器**：`RiskController` 状态机 + 滑窗配额 + 冷启动 + 会话预算（`aidcp-cloud/src/risk/`）。
+- ✅ **Publish Agent（6 角色管道）**：scout→creator→director→assembler→gatekeeper→executor + 万象配图 + 落库
+  （`aidcp-cloud/src/publish-agent/`），边缘发布六步 `aidcp-edge/src/flows/publish-post.ts` + 审批信号 `src/publish/approval-gate.ts`。
+- ✅ **飞书 Bot**：长连接 + 命令路由 + 自动记群 + 审批卡片信号（`aidcp-cloud/src/feishu/`）。
+- ✅ **Soul 人设**：`soul.yaml` + 强类型装载（`soul/loader.ts`），驱动各角色人格化决策。
+- ✅ **Electron 桌面打包**：系统托盘 + Chrome 网关 + 控制面板 UI（`aidcp-edge/src/electron/`）。
 
-> **重要校正**：相较早期规划，反检测的**行为拟人化层（humanize/）已落地**，
-> 风控的**策略/状态机层仍只有设计文档**。即"怎么做才像人"已做，"做多少、什么时候停"待做。
+> **重要校正（2026-06 更新）**：早期此处写"风控状态机仍只有设计文档"——该判断已过时。
+> 当前**行为拟人化层（`humanize/`）与风控控制器（`risk/` 的 `RiskController` + 状态机 + 配额 + 冷启动）均已实装**。
+> 即"怎么做才像人"与"做多少、什么时候停"在代码层都已落地；剩余缺口是让风控状态迁移由**真实平台信号**
+> （封号/限流/限流回执）驱动，而不仅是配额阈值触发。
 
 ---
 
@@ -171,12 +175,15 @@ graph LR
 
 **目标**：一个账号能长期、安全、自然地刷/赞/收/发，不被风控标记。
 
-- ✅ 边/云 WS 架构、DOM-first 定位三道闸、浏览执行层、Qwen 决策、Publish、Soul。
+- ✅ 边/云 WS 架构（协议 v2）、DOM-first 定位三道闸、浏览执行层、事件驱动 15 角色编排、Qwen 决策、Publish Agent、Soul。
 - ✅ stealth 注入 + 拟人化执行层（humanize）。
+- ✅ **风控控制器已实装**：`RiskController` 频率计数器 + 档位 + 状态机（`risk/`，对应 `risk-control.md §1/§6/§7`）。
+- ✅ 飞书 Bot（命令/记群/审批卡片）、Electron 桌面打包。
 - ⚠️ **本阶段关键缺口（最高优先级）**：
-  - **P0** 风控频率计数器 + 档位 + 状态机（`risk-control.md §1/§6/§7`）——决定账号能否"活下来"。
+  - **P0** 端到端真机发布联调收尾（云端管道 + 边缘 flow 已具备，待真机验证，见 `handoff-2026-06-05.md` 待办 A）。
+  - **P0** WS 重连状态机修复（sessionId/补发/初连重试，见 handoff 待办 C）。
   - **P0** Cookie/Session 持久化 + 住宅代理（`anti-detection.md §2/§3`）——决定登录态能否长期维持。
-  - **P1** CDP 断连重连、验证码/滑块处理。
+  - **P1** 风控状态迁移接入真实平台信号；CDP 断连重连、验证码/滑块处理。
 
 > **依赖**：风控状态机依赖"信号采集"（复用后置校验/重试升级，已有）；
 > 时间窗口调度依赖云端调度器（待建）。
@@ -221,19 +228,20 @@ graph TB
         OP["运营"]
     end
 
-    subgraph 交互["交互层（规划中）"]
-        WEB["Web 管理面板<br/>账号/状态/人设<br/>(Phase 2)"]
-        FS["飞书 Bot<br/>卡片/审批/告警<br/>(Phase 3)"]
+    subgraph 交互["交互层"]
+        WEB["Web 管理面板<br/>账号/状态/人设<br/>(Phase 2 · 规划中)"]
+        FS["飞书 Bot<br/>命令/记群/审批卡片<br/>(已实现)"]
     end
 
     subgraph cloud["aidcp-cloud（云端 · 重）"]
-        PLAN["Planner<br/>目标→步骤"]
-        ORCH["Orchestrator<br/>状态机+概念池+互动决策"]
-        PUB["Publish Agent<br/>生成+后处理+发布"]
+        DISP["RoleDispatcher<br/>事件驱动 15 角色"]
+        BUS["EventBus<br/>typed 解耦"]
+        PUB["PublishOrchestrator<br/>6 角色管道+配图"]
         LLM["QwenClient<br/>(DashScope)"]
         SOUL["Soul 人设<br/>soul.yaml"]
-        WS["EdgeCloudServer<br/>WS 服务端+路由"]
-        RISK["RiskController<br/>(规划中 · P0)"]
+        WS["EdgeCloudServer<br/>WS 服务端+路由+command-bridge"]
+        RISK["RiskController<br/>状态机+配额+冷启动"]
+        PLAN["SimplePlanner<br/>定向目标→步骤"]
     end
 
     PG[("PostgreSQL<br/>锚点缓存/概念池<br/>publish_log")]
@@ -254,18 +262,19 @@ graph TB
     WEB -.-> WS
     FS -.-> WS
 
-    PLAN --> WS
-    ORCH --> WS
+    DISP --> WS
     PUB --> WS
-    ORCH --> LLM
+    PLAN --> WS
+    DISP --> BUS
+    DISP --> LLM
     PUB --> LLM
-    ORCH --> SOUL
+    DISP --> SOUL
     PUB --> SOUL
-    RISK -.规划.-> ORCH
+    RISK --> DISP
     WS --> PG
-    ORCH --> PG
+    DISP --> PG
 
-    WS <==>|"边-云 WS 协议<br/>hello/plan/select/anchor/action"| ENG
+    WS <==>|"边-云 WS 协议 v2<br/>note.*/interaction.*/page.cards/risk.*/publish.*"| ENG
 
     ENG --> BROWSE
     ENG --> CDP
@@ -275,9 +284,7 @@ graph TB
     CDP <==>|"CDP over WS :9222"| CHROME
     CHROME --> XHS
 
-    style RISK stroke-dasharray: 5 5,fill:#fff3cd
     style WEB stroke-dasharray: 5 5
-    style FS stroke-dasharray: 5 5
     style cloud fill:#eef6ff
     style edge fill:#f0fff0
 ```
@@ -287,7 +294,8 @@ graph TB
 - **边轻云重**：边缘只做定位/执行/拟人化/反检测注入；规划、模型推理、状态、持久化在云端。
 - **接口不变、实现可换**：`DomProvider` / `ActionExecutor` 接口固定，CDP 层是其真实实现；
   未来切指纹浏览器时只换 CDP 连接目标，定位/执行逻辑零改动。
-- **虚线节点 = 规划中**：`RiskController`、Web 面板、飞书 Bot 尚未实现。
+- **虚线节点 = 规划中**：仅 Web 管理面板（Phase 2）尚未实现；`RiskController` 与飞书 Bot 均已落地。
+- **云端已是事件驱动多 Agent**：`RoleDispatcher` 注册 15 角色经 `EventBus` 协作，角色事件经 `command-bridge` 翻译为 v2 协议指令下发——不再是单体 `Planner→PlanStep[]`。
 
 ---
 
@@ -304,9 +312,9 @@ graph TB
 | [`docs/design-gaps-and-models.md`](design-gaps-and-models.md) | 统一状态口径、统一事件模型、统一审批对象模型、效果指标字典 | 跨文档统一口径 |
 | [`docs/product-overview.md`](product-overview.md) | **本文**——产品全景与文档索引 | 全部 |
 
-### 编写中的产品文档
+### 产品设计文档（设计完成，作为实现依据）
 
-| 文档 | 内容 | 对应模块 | 状态 |
+| 文档 | 内容 | 对应模块 | 文档成熟度 |
 | --- | --- | --- | --- |
 | `docs/product-dashboard.md` | 多账号管理面板与状态监控 | #5 | `complete` |
 | `docs/product-feishu.md` | 飞书交互设计（卡片/审批/归属） | #6 | `complete` |
@@ -325,13 +333,13 @@ graph TB
 | 仓库 | 角色 | 路径 |
 | --- | --- | --- |
 | **aidcp**（本仓） | 总览 / 文档 | 当前仓库 |
-| **aidcp-edge** | 边缘端：定位 / CDP / 浏览执行 / 拟人化 / 反检测 | `C:\Users\tianx\codes\aidcp-edge` |
-| **aidcp-cloud** | 云端：规划 / 编排 / 发布 / LLM / 缓存 / WS 服务 | `C:\Users\tianx\codes\aidcp-cloud` |
+| **aidcp-edge** | 边缘端：定位 / CDP / 浏览执行 / 拟人化 / 反检测 / 发布 / Electron | `/Users/bears/codes/aidcp-edge` |
+| **aidcp-cloud** | 云端：事件驱动编排 / 风控 / 发布 / LLM / 缓存 / WS 服务 / 飞书 | `/Users/bears/codes/aidcp-cloud` |
 
 ---
 
-> **下一步行动建议（按优先级）**：
-> 1. **P0** 落地风控 `RiskController`（频率计数器 + 档位 + 状态机）——决定账号存活。
-> 2. **P0** Cookie/Session 持久化 + 住宅代理——决定登录态维持。
-> 3. **P1** CDP 断连重连 + 验证码处理——决定运行稳定性。
+> **下一步行动建议（按优先级，2026-06 更新）**：
+> 1. **P0** 端到端真机发布联调收尾 + WS 重连状态机修复——见 `handoff-2026-06-05.md` 待办 A/C。
+> 2. **P0** Cookie/Session 持久化 + 住宅代理——决定登录态维持（风控 `RiskController` 已落地）。
+> 3. **P1** 风控状态迁移接入真实平台信号；CDP 断连重连 + 验证码处理。
 > 4. **P2** Web 管理面板 + 效果度量——进入多账号阶段的前置。

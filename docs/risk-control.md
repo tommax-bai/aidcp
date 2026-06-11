@@ -1,13 +1,22 @@
 # AIDCP 风控模型设计
 
 > 适用范围：aidcp 在小红书（XHS）场景下的 AI Agent 自动浏览 / 点赞 / 收藏 / 评论 /
-> 发布。当前实现为**单机单账号、Chrome + CDP 原生**，操作延迟仅有简单均匀随机等待，
-> 无频率限制、无时间窗口管理。本文给出一套可落地的风控模型，目标是：**在不被平台
+> 发布。早期实现仅有简单均匀随机等待、无频率限制与时间窗管理；**本文设计现已基本实装**
+> （见下方实现状态框）。本文给出一套可落地的风控模型，目标是：**在不被平台
 > 风控系统标记的前提下，让自动化账号长期存活**。
 >
 > 配套文档：[反检测与登录态维持方案](anti-detection.md)。两者关系：本文管"做什么、
 > 做多少、什么时候做"（行为节奏 / 频率 / 风险状态），反检测文档管"怎么做才不被识别为
 > 机器"（指纹 / 网络 / 行为拟人化的技术实现）。
+>
+> **实现状态（2026-06）**：本文风控模型**已基本实装**于云端 `aidcp-cloud/src/risk/`——
+> `RiskController`（动作许可 `explain()`）+ `RiskStateMachine`（`normal→warned→restricted→frozen`，
+> 恢复窗口 warned 7d / restricted 3d）+ `SlidingWindowCounter`（分/时/日滑窗）+ `quotas`（保守/正常/激进三档）
+> + `cold-start-planner`（冷启动养号）+ `time-scheduler`（作息时间窗）+ `session-budget`（会话预算）
+> + `interaction-dedup`（互动去重）+ `pg-risk-store`（PG 持久化，`migrations/0002_risk_control.sql`、
+> `0003_risk_interactions.sql`）。边缘行为拟人化见 `aidcp-edge/src/humanize/`。
+> 下文中"建议新增 / 落点"措辞多数**已落地**；剩余缺口是让状态迁移由真实平台封号/限流信号驱动
+> （当前主要由配额阈值触发）。
 
 ---
 

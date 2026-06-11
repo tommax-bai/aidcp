@@ -10,10 +10,11 @@
 | 仓库 | 角色 | 关键能力 |
 | --- | --- | --- |
 | **aidcp**（本仓） | 总览 / 文档 | 架构、协议、数据流文档 |
-| [**aidcp-edge**](../../codes/aidcp-edge) | 边缘端 | 定位层引擎（DOM-first）+ CDP（原生 WebSocket）页面接入 |
-| [**aidcp-cloud**](../../codes/aidcp-cloud) | 云端 | 任务规划 + Qwen LLM + PG 锚点缓存 + 边-云 WS 服务端 |
+| [**aidcp-edge**](../aidcp-edge) | 边缘端 | 定位层引擎（DOM-first）+ CDP（原生 WebSocket）页面接入 + 浏览执行 + 拟人化 + 发布 + Electron 打包 |
+| [**aidcp-cloud**](../aidcp-cloud) | 云端 | 事件驱动多 Agent 编排（RoleDispatcher + 15 角色）+ 风控状态机 + Qwen LLM + PG 锚点缓存 + 边-云 WS 服务端 + 飞书 Bot |
 
-> 物理路径：`C:\Users\tianx\codes\aidcp-edge`、`C:\Users\tianx\codes\aidcp-cloud`。
+> 物理路径：`/Users/bears/codes/aidcp-edge`、`/Users/bears/codes/aidcp-cloud`。
+> 部署铁律：cloud 只跑在 ECS（见 `docs/handoff-2026-06-05.md`），本地只起 edge 连 ECS。
 
 ## 设计主张
 
@@ -25,19 +26,31 @@
    - **后置校验**：操作后必须验证业务结果真的发生，否则判失败；
    - **重试上限 + 升级**：连续失败到顶 → 判系统性改版 → 停手升级，绝不静默成功；
    - **反污染回写**：LLM 新锚点先暂存，连续确认成功才晋升主缓存。
-4. **边轻云重**：边缘只做定位/执行/本地命中；规划、模型推理、持久化锚点在云端。
+4. **边轻云重**：边缘只做定位/执行/拟人化/本地命中；规划、事件驱动编排、模型推理、风控、持久化锚点在云端。
 5. **轻量优先**：CDP 走**原生 WebSocket**（不用 Playwright）；边-云通信用
-   **WebSocket**；不引入重型框架。
+   **WebSocket**（协议 v2）；不引入重型框架。
+6. **事件驱动而非单线规划**：浏览会话由云端 `RoleDispatcher` 调度 15 个角色经 `EventBus`
+   实时决策——边缘**结构化上报**（page.cards / note.detail），云端**逐动作下发**（interaction.like / page.scroll），
+   贴近真人"看一条想一下"的节奏。
 
 ## 端到端流程（简述）
 
+**浏览会话闭环（v2 主路径，事件驱动）**：
+
 ```
-用户高层目标
-   │  plan.request（WS）
-   ▼
-[云端 Planner] ──► 有序步骤 PlanStep[]（actionId / op / goal）
-   │  plan.response（WS）
-   ▼
+边缘 BrowseSession                          云端 RoleDispatcher + EventBus + 15 角色
+  page.cards 上报 ─────────────────────────► ContentEvaluator 评估价值
+  note.open / page.scroll  ◄──────────────── 有价值开卡 / 无价值翻页（command-bridge 翻译）
+  note.detail 上报 ────────────────────────► ContentCurator 质量关卡 → InteractionAppraiser 决策
+  interaction.like / navigation.back ◄────── 角色事件下发
+  action.completed 上报 ───────────────────► BackToFeed 续刷 / SessionMonitor 判结束
+  session.end ◄───────────────────────────── （穿插 risk.canDo 风控、publish.* 发布审批）
+```
+
+**定向定位（plan/anchor/select，每步循环，v1 兼容路径）**：
+
+```
+[云端 SimplePlanner] ──plan.response──► 有序 PlanStep[]
 [边缘 LocatingEngine] 逐步执行：
    守卫层 → 缓存命中? ──是──► 匹配消歧 ──► 执行 ──► 后置校验
                     └─否─► 取云端锚点(anchor.get) / 文本LLM选元素(select.request)
@@ -46,16 +59,16 @@
 ```
 
 详见 [`docs/architecture.md`](docs/architecture.md)（组件图 + 数据流）与
-[`docs/protocol.md`](docs/protocol.md)（边-云 WebSocket 协议）。
+[`docs/protocol.md`](docs/protocol.md)（边-云 WebSocket 协议 v2）。
 
 ## 各仓快速开始
 
 ```bash
-# 边缘端
-cd C:\Users\tianx\codes\aidcp-edge && npm install && npm test
+# 边缘端（本地只跑 edge）
+cd /Users/bears/codes/aidcp-edge && npm install && npm test
 
-# 云端
-cd C:\Users\tianx\codes\aidcp-cloud && npm install && npm test
+# 云端（本地仅做代码级验证；正式运行在 ECS，本地勿起 cloud）
+cd /Users/bears/codes/aidcp-cloud && npm install && npm test
 ```
 
 ## 文档索引

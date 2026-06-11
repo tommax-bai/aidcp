@@ -9,7 +9,13 @@
 > [异常处理体验](product-exception.md)。
 >
 > 设计基线：飞书 Bot **只与 aidcp-cloud 对话**，绝不直连边缘；所有指令最终由云端
-> 调度器转成对边缘的 `plan.request`（见 protocol.md），与面板走同一条指令通路。
+> 转成对边缘的协议指令（`plan.request` 或角色驱动指令，见 protocol.md），与面板走同一条指令通路。
+>
+> **实现状态（2026-06）**：飞书 Bot 已从设计走向**部分实装**——`aidcp-cloud/src/feishu/`：
+> 官方 SDK 长连接收事件、`/status //pause //resume //bind` 命令路由、机器人进退群自动入库
+> （`bot_chats` 表，`migrations/0002_bot_chats.sql`）、`/bind` 设默认群、发布审批卡片构建 +
+> 卡片回调写信号文件 `/tmp/aidcp-publish-approve-<requestId>.json`。**仍待实装**：完整审批状态机、
+> 多账号消息归属、通知聚合。下文能力表中标"规划中"的条目若与上述重叠，以本框为准。
 
 ---
 
