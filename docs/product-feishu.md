@@ -74,7 +74,7 @@
   推确认卡片：【确认降级】/【保持并人工观察】。P0/P1 级降级可设为"先自动执行、
   事后告知"，仅 P2/P3 模糊场景才走人工确认（与 product-exception.md §1/§5 对齐）。
 
-审批卡片状态：已实装为 `pending → approved | cancelled`（飞书审批卡片仅这三态，无 `rejected`/`expired`，驳回路径走 `cancelled`）。超时/`expired` 状态机属未实装项（见本文头部实现状态框）；超时未审默认按安全侧处理：发布默认不发、降级默认执行。
+审批卡片状态：当前实装仅 `pending → approved | cancelled`（`cards.ts` 的 `PublishApprovalTerminalState = 'approved' | 'cancelled'`，【驳回】按钮 action 暂落到 `cancelled`）。⚠️ 这是相对统一审批对象模型的**已知实装缺口**，并非稳态设计：按 `./design-gaps-and-models.md` §2.3，驳回的稳态终态应为 `rejected`（`cancelled` 仅表"业务对象已失效/被撤销"，语义不同），`rejected`/`expired` 状态机待补齐后与统一模型对齐（见本文头部实现状态框"完整审批状态机 仍待实装"）。超时未审默认按安全侧处理：发布默认不发、降级默认执行。
 
 ### 2.4 实时通知（系统 → 人，需尽快响应）
 

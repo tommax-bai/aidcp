@@ -93,7 +93,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 | **RiskStateMachine** | `src/risk/risk-state-machine.ts` | 账号状态机 `normal→warned→restricted→frozen`，含恢复窗口（warned 7d / restricted 3d）；信号种类 light/quota_exceeded/confirmed/fatal/recovered/manual_unfreeze |
 | 风控配套 | `src/risk/{sliding-window-counter,quotas,cold-start-planner,time-scheduler,session-budget,interaction-dedup,search-frequency-limiter,pg-risk-store}.ts` | 滑动窗口计数（分/时/日）、三档配额、冷启动养号、作息时间窗、会话预算、互动去重、搜索频控、PG 持久化 |
 | **PublishOrchestrator** | `src/publish-agent/publish-orchestrator.ts` | 发布角色管道：`ContentScout→ContentCreator→ImageDirector→ContentAssembler→ApprovalGatekeeper→PublishExecutor`，`pipeline-context` 串联，`wanxiang-client` 万象生图，`publish-log-store` 落库 |
-| **feishu Bot** | `src/feishu/{ws-receiver,messenger,commands,cards,bot-chat-events,handler,token}.ts` | 官方 SDK 长连接收事件；`/status //pause //resume //publish-test //bind` 命令路由；审批卡片构建 + 回调写信号文件；进退群自动入库 |
+| **feishu Bot** | `src/feishu/{ws-receiver,messenger,commands,cards,bot-chat-events,handler,token}.ts` | 官方 SDK 长连接收事件；`/status /pause /resume /publish-test /bind` 命令路由；审批卡片构建 + 回调写信号文件；进退群自动入库 |
 | **SimplePlanner** | `src/planner/simple-planner.ts` | 规则优先 + LLM 兜底，把"一句话目标"拆成 `PlanStep[]`（定向场景；浏览闭环走角色驱动） |
 | **QwenClient** | `src/llm/qwen.ts` | Qwen（DashScope 兼容 OpenAI）HTTP 客户端，仅用全局 `fetch` |
 | **Soul** | `src/soul/loader.ts` | 从 `soul.yaml` 装载人设（身份/兴趣/行为准则/会话上限），驱动各角色人格化决策 |

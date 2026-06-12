@@ -44,7 +44,7 @@
   note.detail 上报 ────────────────────────► ContentCurator 质量关卡 → InteractionAppraiser 决策
   interaction.like / navigation.back ◄────── 角色事件下发
   action.completed 上报 ───────────────────► BackToFeed 续刷 / SessionMonitor 判结束
-  session.end ◄───────────────────────────── （穿插 risk.canDo 风控、publish.* 发布审批）
+  session.end ◄───────────────────────────── （穿插 publish.* 发布审批；risk.canDo 风控通道已就绪、浏览闭环待接线）
 ```
 
 **定向定位（plan/anchor/select，每步循环，v1 兼容路径）**：

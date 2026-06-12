@@ -58,7 +58,7 @@ flowchart LR
 | **风控 RiskController + 状态机** | aidcp-cloud | **已实现**（旧盘点标"仅设计"，已过时）；状态机 `normal→warned→restricted→frozen` + 滑窗 + 配额 + 冷启动 + 时间窗 + 会话预算 + 去重 + PG 持久化 | `aidcp-cloud/src/risk/`（risk-controller/risk-state-machine/sliding-window-counter/quotas/cold-start-planner/time-scheduler/session-budget/interaction-dedup/pg-risk-store） |
 | 概念池 + PG anchor cache + Bot 群存储 | aidcp-cloud | 已实现 | `aidcp-cloud/src/cache/`（concept-store/pg-anchor-cache/bot-chat-store） |
 | **Publish Agent（6 角色管道）** | aidcp-cloud | 云端生成 / 配图 / 组装 / 审批 / 落库 / 下发链路已实现（重构为角色管道）；端到端真机发布仍待最终验证 | `aidcp-cloud/src/publish-agent/`（publish-orchestrator + roles/ 6 角色 + wanxiang-client + publish-log-store + pipeline-context）；`migrations/0001_publish_log.sql`、`0004_publish_agent.sql` |
-| **飞书 Bot** | aidcp-cloud | 已推进到 `/bind` + 自动记群 + 审批卡片信号（旧盘点标 planned，已过时）；`/status //pause //resume` 命令路由已具备 | `aidcp-cloud/src/feishu/`（ws-receiver/messenger/commands/cards/bot-chat-events/handler/token）；`migrations/0002_bot_chats.sql` |
+| **飞书 Bot** | aidcp-cloud | 已推进到 `/bind` + 自动记群 + 审批卡片信号（旧盘点标 planned，已过时）；`/status /pause /resume` 命令路由已具备 | `aidcp-cloud/src/feishu/`（ws-receiver/messenger/commands/cards/bot-chat-events/handler/token）；`migrations/0002_bot_chats.sql` |
 | 账号状态管理 | aidcp-cloud | 已实现（内存 active/paused） | `aidcp-cloud/src/account-state.ts` |
 
 ## 3. 文档与代码一致性现状

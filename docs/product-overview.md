@@ -121,7 +121,7 @@ mindmap
 | # | 模块 | 实现状态 | 文档成熟度 | 已实现 / 文档与代码位置 | 缺口 |
 | --- | --- | --- | --- | --- | --- |
 | 5 | 多账号管理面板 | `planned` | `complete` | 人设配置基础已有（`aidcp-cloud/src/soul/`，`soul.yaml` 可装载） | Web 管理面板、账号分组、状态一览、可视化全未做（设计见 `docs/product-dashboard.md`） |
-| 6 | 飞书交互设计 | `implemented`（命令/记群/审批卡片）+ `designed`（完整审批闭环/归属） | `complete` | **已实现**：官方 SDK 长连接、`/status //pause //resume //bind` 命令路由、进退群自动入库、发布审批卡片 + 回调写信号文件（`aidcp-cloud/src/feishu/`） | 多账号消息归属、完整审批状态机、通知聚合待续（设计见 `docs/product-feishu.md`） |
+| 6 | 飞书交互设计 | `implemented`（命令/记群/审批卡片）+ `designed`（完整审批闭环/归属） | `complete` | **已实现**：官方 SDK 长连接、`/status /pause /resume /bind` 命令路由、进退群自动入库、发布审批卡片 + 回调写信号文件（`aidcp-cloud/src/feishu/`） | 多账号消息归属、完整审批状态机、通知聚合待续（设计见 `docs/product-feishu.md`） |
 | 7 | 任务编排体验 | `implemented`（编排内核）+ `designed`（运营交互层） | `complete` | 后端编排内核已有：`aidcp-cloud/src/orchestrator/role-dispatcher.ts`（事件驱动 15 角色）+ `src/agents/`；CLI 触发 `src/cli/trigger-like.ts`、`src/cli/trigger-publish-temp.ts` | 面向运营的指令下达 UI、批量操作、审批粒度未做（设计见 `docs/product-task.md`） |
 | 8 | 异常处理体验 | `designed` | `complete` | 底层信号已有（后置校验失败 / 升级 `systemic_revision`） | 面向人的掉线恢复/告警/接管体验未做（设计见 `docs/product-exception.md`） |
 
