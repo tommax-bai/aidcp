@@ -114,7 +114,7 @@ mindmap
 | 1 | 浏览器管理策略 | `implemented` | `complete` | 单机多实例已跑（多份 `edge*.log` / `cloud*.log` 为多实例运行痕迹）；`aidcp-edge/src/cdp/chrome-launcher.ts` 负责按参数拉起 Chrome | 分布式浏览器池、profile×指纹×IP 三元绑定的编排未做 |
 | 2 | 反检测与登录态 | `implemented`（stealth/拟人化）+ `designed`（代理/持久化/防泄露） | `complete` | **stealth 注入已实现**：`aidcp-edge/src/cdp/stealth-injector.ts`（webdriver 抹除 / toString 伪装 / plugins / 权限对齐 / console.debug）；设计见 `docs/anti-detection.md` | Cookie/Session 持久化、住宅代理接入、WebRTC/DNS 防泄露、指纹画像表 未做 |
 | 3 | 容错与恢复机制 | `implemented`（三道闸）+ `designed`（恢复闭环） | `complete` | LocatingEngine **三道闸**已实现（`aidcp-edge/src/locating/engine.ts`）：后置校验 / 重试升级 / 反污染；守卫层清干扰（`guard.ts`） | CDP 断连自动重连、验证码/滑块识别、会话级 crash recovery 未做 |
-| 4 | Agent 拆分与通信 | `implemented` | `authoritative` | edge/cloud 双层 WS 架构已实现；协议 v2（40 消息类型）`aidcp-cloud/src/comm/protocol.ts` + `docs/protocol.md`；云端已重构为**事件驱动多 Agent**（`RoleDispatcher` + 15 角色 + `EventBus` + `command-bridge`），边缘 `LocatingEngine`/`BrowseSession` 与之协作 | — |
+| 4 | Agent 拆分与通信 | `implemented` | `authoritative` | edge/cloud 双层 WS 架构已实现；协议 v2（41 消息类型）`aidcp-cloud/src/comm/protocol.ts` + `docs/protocol.md`；云端已重构为**事件驱动多 Agent**（`RoleDispatcher` + 15 角色 + `EventBus` + `command-bridge`），边缘 `LocatingEngine`/`BrowseSession` 与之协作 | — |
 
 ### 3.2 产品设计
 
@@ -131,7 +131,7 @@ mindmap
 | --- | --- | --- | --- | --- | --- |
 | 9 | 风控模型 | `implemented`（拟人化执行层 + 控制器/状态机） | `complete` | **设计完整**：`docs/risk-control.md`。**拟人化执行层已实现**：`aidcp-edge/src/humanize/`。**风控控制器已实现**：`aidcp-cloud/src/risk/`——`RiskController` + 状态机 `normal→warned→restricted→frozen`（恢复窗口 warned 7d/restricted 3d）+ 滑窗计数（分/时/日）+ 三档配额 + 冷启动 + 时间窗调度 + 会话预算 + 互动去重 + PG 持久化 | 状态迁移目前主要由配额触发；接入真实平台封号/限流信号（confirmed/fatal）驱动待补 |
 | 10 | 效果度量体系 | `planned` | `designed` | `action.result` 上报通道已有（可作为过程指标数据源）；发布落库 `migrations/0001_publish_log.sql` | 过程/效果/健康三类指标的采集、聚合、看板全未做；统一口径引用 `./design-gaps-and-models.md` 的效果指标字典 |
-| 11 | 多账号协同与差异化 | `implemented`（单账号人设）+ `planned`（跨号协同） | `draft` | 单账号人设（Soul）+ 概念池已实现（`cache/concept-store.ts` 持久化 + `concept.discovered` 事件驱动产出）；多套 soul 可并存 | 矩阵号互动策略、账号梯队、跨号协同调度未做 |
+| 11 | 多账号协同与差异化 | `implemented`（单账号人设）+ `planned`（跨号协同） | `draft` | 单账号人设（Soul）已实现，多套 soul 可并存；概念池存储类已具备（`cache/concept-store.ts` 含 PG schema/持久化代码），但当前尚未接入运行链路（`ConceptStore` 未实例化，`concept.discovered` 仅在 `event-bus/types.ts` 声明、暂无角色发射），事件驱动产出待接通 | 矩阵号互动策略、账号梯队、跨号协同调度未做 |
 | 12 | 人机协作与止损 | `planned` | `draft` | — | 自动化分级、冻结规则、效果归因全未做（依赖风控状态机 #9 与面板 #5） |
 
 补充口径：运营侧指标统一引用 `./design-gaps-and-models.md` 中的效果指标字典，按**过程指标 / 效果指标 / 健康指标**三类归口。本文只保留路线图层面的能力判断，不在此重复定义指标公式、归因规则与采集频率。

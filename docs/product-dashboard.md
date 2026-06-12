@@ -141,8 +141,8 @@ risk-control.md §5.3 的判据，由后端校验）。
   "attempts": 1, "reason": "cache_hit_validated" }
 ```
 
-**操作时间线**：把 `action.result` 流按账号、按会话渲染成时间线，标注三道闸结果
-（缓存命中/LLM 选择/后置校验/重试升级），便于定位"为什么这步失败"。
+**操作时间线**：把 `action.result` 流按账号、按会话渲染成时间线，标注定位流水线各阶段与三道闸结果
+（定位阶段：缓存命中/LLM 选择；三道闸：后置校验/重试上限升级/反污染回写），便于定位"为什么这步失败"。
 
 **互动记录**：结构化展示去重后的互动（note_id 维度，对照 risk-control.md §4.1），
 字段：`accountId / noteId / action(like|collect|comment|follow|view) / ts / sessionId`。

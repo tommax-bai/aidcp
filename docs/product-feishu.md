@@ -12,7 +12,7 @@
 > 转成对边缘的协议指令（`plan.request` 或角色驱动指令，见 protocol.md），与面板走同一条指令通路。
 >
 > **实现状态（2026-06）**：飞书 Bot 已从设计走向**部分实装**——`aidcp-cloud/src/feishu/`：
-> 官方 SDK 长连接收事件、`/status //pause //resume //bind` 命令路由、机器人进退群自动入库
+> 官方 SDK 长连接收事件、`/status` `/pause` `/resume` `/publish-test` `/bind` 命令路由、机器人进退群自动入库
 > （`bot_chats` 表，`migrations/0002_bot_chats.sql`）、`/bind` 设默认群、发布审批卡片构建 +
 > 卡片回调写信号文件 `/tmp/aidcp-publish-approve-<requestId>.json`。**仍待实装**：完整审批状态机、
 > 多账号消息归属、通知聚合。下文能力表中标"规划中"的条目若与上述重叠，以本框为准。
@@ -74,8 +74,7 @@
   推确认卡片：【确认降级】/【保持并人工观察】。P0/P1 级降级可设为"先自动执行、
   事后告知"，仅 P2/P3 模糊场景才走人工确认（与 product-exception.md §1/§5 对齐）。
 
-审批卡片状态：`pending → approved | rejected | expired`（超时未审默认按安全侧处理：
-发布默认不发、降级默认执行）。
+审批卡片状态：已实装为 `pending → approved | cancelled`（飞书审批卡片仅这三态，无 `rejected`/`expired`，驳回路径走 `cancelled`）。超时/`expired` 状态机属未实装项（见本文头部实现状态框）；超时未审默认按安全侧处理：发布默认不发、降级默认执行。
 
 ### 2.4 实时通知（系统 → 人，需尽快响应）
 
@@ -121,7 +120,7 @@
 }
 ```
 
-**发布审批卡片**（带按钮回调，附 `value` 携带业务 id）：
+**发布审批卡片**（带按钮回调，实装回调 `behaviors[].value` 携带 `action`+`requestId`+内容 payload）：
 
 ```jsonc
 {
@@ -134,10 +133,10 @@
     { "tag": "action", "actions": [
       { "tag": "button", "text": { "tag": "plain_text", "content": "通过并发布" },
         "type": "primary",
-        "value": { "act": "approve_publish", "contentId": "c-101", "accountId": "acc-01" } },
+        "behaviors": [ { "type": "callback", "value": { "action": "approve", "requestId": "req-xxx", "payload": { "title": "…", "content": "…", "tags": ["…"] } } } ] }, // 实装回调形状
       { "tag": "button", "text": { "tag": "plain_text", "content": "驳回" },
         "type": "danger",
-        "value": { "act": "reject_publish", "contentId": "c-101" } },
+        "behaviors": [ { "type": "callback", "value": { "action": "cancel", "requestId": "req-xxx" } } ] }, // 驳回走 cancel
       { "tag": "button", "text": { "tag": "plain_text", "content": "去 Web 编辑" },
         "url": "https://console.aidcp.local/content/c-101" }
     ]}
@@ -237,7 +236,7 @@
 ```mermaid
 flowchart LR
   User[运营/群成员] -- @Bot 指令 / 点按钮 --> Feishu[飞书开放平台]
-  Feishu -- 事件订阅(回调) --> Webhook[aidcp-cloud<br/>飞书事件入口]
+  Feishu -- SDK 长连接推送(lark.WSClient) --> Webhook[aidcp-cloud<br/>飞书事件入口]
   Webhook -- 解析意图(结构化 / Qwen NL) --> Scheduler[云端调度器]
   Scheduler -- plan.request --> Edge[aidcp-edge]
   Cloud[aidcp-cloud 状态/告警] -- 消息发送API --> Feishu
@@ -246,7 +245,7 @@ flowchart LR
 
 | 集成点 | 飞书能力 | aidcp-cloud 落点 |
 | --- | --- | --- |
-| 接收指令/按钮回调 | **事件订阅**（消息事件 `im.message.receive_v1`、卡片回调 `card.action.trigger`） | 新增"飞书事件入口"，校验签名后转调度器 |
+| 接收指令/按钮回调 | **事件订阅**（消息事件 `im.message.receive_v1`、卡片回调 `card.action.trigger`、机器人进退群 `im.chat.member.bot.added_v1`/`deleted_v1`） | 飞书事件入口走官方 SDK 长连接（`lark.WSClient`，无公网 IP / 无 webhook），SDK 内部处理握手与幂等后转调度器 |
 | 主动发消息/卡片 | **消息发送 API**（`im/v1/messages`，`receive_id_type=chat_id/open_id`） | 告警/汇总/审批由云端事件总线驱动发送 |
 | 富文本卡片 | Interactive Card（§3） | 卡片模板集中维护，填充业务数据 |
 | 鉴权 | tenant_access_token（自建应用） | 云端缓存并自动续期 token |

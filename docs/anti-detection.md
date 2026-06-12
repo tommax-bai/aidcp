@@ -52,7 +52,8 @@ CDP 原生方案的"原罪"：连上 `--remote-debugging-port` 后，页面侧�
 
 > 关键：注入必须用 **`Page.addScriptToEvaluateOnNewDocument`**（CDP 原生支持），保证
 > 在页面任何脚本之前执行，避免被"先读后改"识破。aidcp 现有 `CdpClient`（`src/cdp/client.ts`）
-> 已是原生 WebSocket RPC，新增一个 `StealthInjector` 在每个 target attach 后调用即可。
+> 已是原生 WebSocket RPC；已落地的 `StealthInjector`（`src/cdp/stealth-injector.ts`）在每个
+> target attach 后由 `attachToPage`（`src/cdp/session.ts`）调用注入。
 
 ### 1.2 Canvas / WebGL 指纹一致性
 
@@ -142,8 +143,9 @@ WebRTC 会通过 STUN 暴露**真实本地/公网 IP**，绕过代理，是最�
 
 ## 3. Cookie 与登录态管理
 
-> 当前实现无 Cookie 持久化——每次重启都是"新设备首次登录"，这是登录态突变、被要求
-> 重新验证的直接原因。必须建立持久化与续期机制。
+> 当前已通过固定 `--user-data-dir`（默认 `~/.aidcp-chrome-profile`，见 `src/cdp/chrome-launcher.ts`）
+> 实现基础 Cookie/登录态持久化，重启后 profile 自然恢复。仍待实装：一账号一独立 profile
+> 的多账号隔离、Cookie 加密存储与云端备份/续期机制。
 
 ### 3.1 Cookie 持久化方案
 
@@ -323,14 +325,18 @@ Chrome (headful)
 + 一机一号一 IP，真实指纹不伪造
 ```
 
+> 现状：上方 stealth 注入（`webdriver=undefined` / 还原 `toString` / 一致性补丁）与行为层
+> （贝塞尔鼠标 + 对数正态键入 + 惯性滚动替换 `random(4,8)`）均已落地；唯 **WebRTC 关闭**
+> 与 **住宅代理** 仍待实装。
+
 ---
 
 ## 7. 实施路线图
 
 ### Phase 1（立即，1–3 天）：最小防护，堵住明显检测点
 
-- [ ] 启动参数整改：去 `--enable-automation`、加 `--disable-blink-features=AutomationControlled`、调试端口绑 `127.0.0.1`、headful。
-- [ ] `StealthInjector`（基于 `Page.addScriptToEvaluateOnNewDocument`）：`navigator.webdriver=undefined`、还原 `Function.prototype.toString`、WebRTC 关闭、`languages/plugins` 补齐。
+- [x] 启动参数整改：去 `--enable-automation`、加 `--disable-blink-features=AutomationControlled`/`--disable-infobars`、调试端口默认绑 `127.0.0.1`、headful（`buildChromeArgs`，`src/cdp/chrome-launcher.ts`）。
+- [x] `StealthInjector`（基于 `Page.addScriptToEvaluateOnNewDocument`）：`navigator.webdriver=undefined`、还原 `Function.prototype.toString`、`languages/plugins` 补齐已实装（`src/cdp/stealth-injector.ts`）；**WebRTC 关闭仍待实装**。
 - [ ] 固定 `--user-data-dir`，实现 Cookie/登录态持久化（§3.1）。
 - [ ] 配一个国内住宅代理，做到一账号一稳定 IP（§2.1/§2.2）。
 - [ ] WebRTC / DNS 泄露自检通过。
@@ -339,8 +345,8 @@ Chrome (headful)
 
 ### Phase 2（1–2 周）：行为指纹拟人化
 
-- [ ] 边缘端 `HumanizedInput` 模块：贝塞尔鼠标轨迹（§5.1）、对数正态键盘节奏（§5.2）、惯性滚动（§5.3）。
-- [ ] 用上述模块替换现有 `random(4,8)` 与瞬时 click/scroll，与 [风控文档 §3](risk-control.md) 的停顿/疲劳曲线对接。
+- [x] 边缘端拟人化模块 `src/humanize/`：贝塞尔鼠标轨迹（§5.1）、对数正态键盘节奏（§5.2）、惯性滚动（§5.3）、对数正态停顿与会话疲劳曲线。
+- [x] 已用上述模块替换 `random(4,8)` 与瞬时 click/scroll（`src/browse/cdp-util.ts`、`feed-scroller.ts`），并接入停顿/疲劳曲线。
 - [ ] 操作序列随机化 + 无目的动作注入（§5.5）。
 - [ ] 指纹一致性画像表（§1.5）：UA/平台/分辨率/字体/时区/语言/WebGL 锁定并按账号绑定。
 - [ ] Canvas/WebGL 策略确定（一机一号走真实暴露 §1.2 方案 A）。
@@ -364,7 +370,7 @@ Chrome (headful)
 | 能力 | 落点 | 说明 |
 | --- | --- | --- |
 | stealth 注入 / CDP 特征隐藏 | 边缘端，新增 `StealthInjector`，在 target attach 后经 `CdpClient` 调用 | 复用现有原生 WebSocket RPC（`src/cdp/client.ts`） |
-| 拟人化输入（鼠标/键盘/滚动） | 边缘端，新增 `HumanizedInput`，供 `CdpActionExecutor` 调用 | 替换现有瞬时操作与 `random(4,8)`（`src/cdp/action-executor.ts`） |
+| 拟人化输入（鼠标/键盘/滚动） | 边缘端 `src/humanize/`（贝塞尔鼠标/键盘节奏/惯性滚动），由浏览层 `src/browse/cdp-util.ts`（`dispatchClick`/`dispatchKeystrokes`）与 `feed-scroller.ts` 经 `Input.dispatchMouseEvent`/`Input.dispatchKeyEvent` 调用 | 已替换原 `random(4,8)` 与瞬时 click/scroll。注：`CdpActionExecutor`（`src/cdp/action-executor.ts`）仍走页面内 `el.click()`，未接入拟人化 |
 | 登录态检测 | 复用守卫层 `src/locating/guard.ts` | 已处理"登录过期"干扰，接到续期/状态机即可 |
 | 指纹画像 / 代理 / profile 绑定 | 云端配置下发 + 边缘按账号启动对应 Chrome | profile⨯指纹⨯IP 三元绑定存云端 PG |
 | 检测信号 → 降级 | 复用后置校验/重试升级，上报 [风控状态机](risk-control.md) | 与风控文档共用一套信号通道 |

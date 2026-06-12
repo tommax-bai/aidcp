@@ -86,9 +86,9 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 | 组件 | 文件 | 职责 |
 | --- | --- | --- |
 | **RoleDispatcher** | `src/orchestrator/role-dispatcher.ts` | 事件驱动角色调度器：注册 15 角色、`setup()` 订阅、`feed.entered` 启动闭环、把 Edge 上报喂数据层、把角色事件翻译成 `EdgeCommand` 下发 |
-| **15 个角色（Agent）** | `src/agents/*.ts` | 继承 `BaseRole`，各订阅/发布特定事件：`ContentEvaluator`（卡片价值）/`FeedScroller`/`SearchScroller`（翻页）/`NoteOpener`（开卡）/`DeepReader`（深读）/`ContentCuratorRole`（质量关卡）/`InteractionAppraiserRole`（点赞收藏决策）/`AuthorEvaluator`/`ProfileOpener`/`ProfileBrowser`/`FollowAgent`（主页与关注）/`SearchEvaluator`/`SearchExecutor`（搜索）/`BackToFeed`（返回）/`SessionMonitorRole`（会话守护 veto/gate） |
+| **15 个角色（Agent）** | `src/agents/*.ts` | 继承 `BaseRole`，各订阅/发布特定事件：`ContentEvaluator`（卡片价值）/`FeedScroller`/`SearchScroller`（翻页）/`NoteOpener`（开卡）/`DeepReader`（深读）/`ContentCuratorRole`（质量关卡）/`InteractionAppraiserRole`（点赞收藏决策）/`AuthorEvaluator`/`ProfileOpener`/`ProfileBrowser`/`FollowAgent`（主页与关注）/`SearchEvaluator`/`SearchExecutor`（搜索）/`BackToFeed`（返回）/`SessionMonitorRole`（会话守护：动作数/时长/预算超限即发 `session.should_end` 结束会话） |
 | **EventBus** | `src/event-bus/index.ts`、`types.ts` | 进程内 typed EventEmitter，`emit` fire-and-forget、`emitAsync` 等待、`onAny` 通配；角色间唯一通信渠道 |
-| **SessionContext** | `src/agents/session-context.ts` | 当前会话态（当前笔记/主页/已访问/预算），取代旧 Blackboard |
+| **SessionContext** | `src/agents/session-context.ts` | 当前会话态（当前笔记/来源页/已访问/连续滚动计数），取代旧 Blackboard；浏览预算（likes/collects/follows/searches）由 RoleDispatcher 持有 |
 | **RiskController** | `src/risk/risk-controller.ts` | 风控权威：`explain(action)` 判定 allow/deny；组合状态机 + 滑窗 + 配额 + 比例 |
 | **RiskStateMachine** | `src/risk/risk-state-machine.ts` | 账号状态机 `normal→warned→restricted→frozen`，含恢复窗口（warned 7d / restricted 3d）；信号种类 light/quota_exceeded/confirmed/fatal/recovered/manual_unfreeze |
 | 风控配套 | `src/risk/{sliding-window-counter,quotas,cold-start-planner,time-scheduler,session-budget,interaction-dedup,search-frequency-limiter,pg-risk-store}.ts` | 滑动窗口计数（分/时/日）、三档配额、冷启动养号、作息时间窗、会话预算、互动去重、搜索频控、PG 持久化 |
@@ -100,7 +100,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 | **PgAnchorCache / ConceptStore / BotChatStore** | `src/cache/*.ts` | PG 锚点主缓存 + 暂存晋升、概念池、Bot 群绑定 |
 | **AccountStateManager** | `src/account-state.ts` | 账号 active/paused 内存状态（暂停时跳过笔记处理） |
 | **EdgeCloudServer / DefaultMessageHandler / command-bridge** | `src/comm/{ws-server,handler,command-bridge}.ts` | WS 服务端 + 消息路由 + `EdgeCommand→Envelope` 翻译 |
-| protocol | `src/comm/protocol.ts` | 边-云消息类型（v2，40 个）+ 信封 + 解析/校验 |
+| protocol | `src/comm/protocol.ts` | 边-云消息类型（v2，41 个）+ 信封 + 解析/校验 |
 
 ### 2.2 边缘端 aidcp-edge
 
@@ -113,7 +113,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 | selector | `src/locating/selector.ts` | 缓存缺口时让文本 LLM"做选择题"，校验编号防幻觉 |
 | guard | `src/locating/guard.ts` | 操作前扫描并清除偶现干扰（弹窗/遮罩/登录过期…） |
 | **EdgeClient** | `src/client/edge-client.ts` | 边-云 WS 客户端：握手、命令路由、结果回传；`cloud-selector` 委托选元素、`like-runner` 点赞执行 |
-| **BrowseSession** | `src/browse/browse-session.ts` | 浏览会话编排：分发云端命令、结构化上报、拟人化；`feed-scroller`/`modal-controller`/`note-extractor`/`search-handler`/`card-filter` |
+| **BrowseSession** | `src/browse/browse-session.ts` | 浏览会话编排：分发云端命令、结构化上报、拟人化；`feed-scroller`/`modal-controller`/`note-extractor`/`search-handler`（`card-filter` 已 `@deprecated`，开/跳决策上移至云端 `ContentEvaluator`） |
 | **humanize** | `src/humanize/*.ts` | 拟人化：`timing` 对数正态停顿、`mouse-path` 贝塞尔、`keyboard-rhythm`、`scroll-physics`、`reading-time`、`session-rhythm` 疲劳曲线 |
 | **flows** | `src/flows/{anchors,like-post,publish-post}.ts` | 垂直业务流程：业务锚点常量、点赞流程、发布六步（进入→标题→正文→标签→提交→校验） |
 | **publish/approval-gate** | `src/publish/approval-gate.ts` | 发布审批：生成 requestId、构造/校验/轮询信号文件、等待授权 |
@@ -152,7 +152,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 1. **守卫层**：扫描 DOM 干扰，能清则清，不能清→升级 `guard_blocked`。
 2. **定位（缓存优先）**：
    - 本地 `AnchorCache` 命中 → `matcher` 在作用域内消歧；唯一且分差达标→拿到元素；
-   - 未命中 → 向云端 `anchor.get` 取主缓存锚点；仍无 → 走 LLM 选择。
+   - 未命中 → 走 LLM 选择（`select.request`）。（协议保留 `anchor.get` 取云端主缓存锚点，当前边缘使用进程内缓存，尚未接入云端 `anchor.get`。）
 3. **LLM 选择（缺口路径）**：把作用域内元素清单 `select.request` 发云端，Qwen 选编号，
    云端校验编号在范围内后回 `select.response`。
 4. **执行层**：`CdpActionExecutor` 把 `op` 落到真实页面（穿插 `humanize` 拟人化节奏）。
@@ -160,7 +160,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 6. **回写 / 上报**：
    - 缓存来源且校验通过 → `recordHit`；失败 → `recordFailure` 并强制下次走 LLM。
    - LLM 来源且校验通过 → 暂存候选锚点，连续确认才晋升（**第三道闸：反污染**）。
-   - 通过 `anchor.report` 把上述结果同步给云端 PG 主缓存。
+   - （规划中）`anchor.report` 协议消息可将命中/校验结果同步给云端 PG 主缓存；当前边缘 `LocatingEngine` 使用进程内 `AnchorCache`，尚未把锚点结果上报云端。
 7. **重试上限（第二道闸）**：连续失败到 `maxAttempts` → `escalated(systemic_revision)`，
    **绝不静默成功**。
 
@@ -181,7 +181,8 @@ LLM 新解析锚点 ──stage──► 暂存区(staging)
 
 - **风控**：边缘互动前可发 `risk.canDo`，`RiskController.explain()` 依据状态机（frozen/restricted）
   + 滑窗配额（minute/hour/day）+ 点赞比例（≤35%）判 allow/deny；成功后 `risk.record` 落账。
-  云端角色侧亦受 `SessionContext` 预算约束（likes/collects/follows/searches）。
+  云端角色侧亦受 `RoleDispatcher` 浏览预算约束（likes/collects/follows/searches），由各角色经 `consumeBudget()` 扣减、`SessionMonitorRole` 在 likes/collects/searches 耗尽时判定结束。
+  - **现状提示**：边缘 `EdgeClient` 已实现 `canDo`/`requestSessionBudget`/`recordRiskAction`，云端也实现了 `risk.canDo`/`risk.record` 响应与 `interaction.occurred→RiskController.record` 订阅；但当前事件驱动浏览闭环**尚未在边缘调用**这些方法、`interaction.occurred` **暂无发射点**——风控配额对浏览动作的实时拦截/记账尚未接通，浏览侧约束目前主要由上面的 RoleDispatcher 浏览预算承担（`risk.canDo`/`risk.record` 协议通道已就绪，待接线）。
 - **发布**：`PublishOrchestrator` 6 角色管道产出内容 → 下发 `publish.request` → 边缘发
   `publish.approval_request` → 云端飞书发审批卡片 → 运营点授权 → 卡片回调写信号文件
   `/tmp/aidcp-publish-approve-<requestId>.json` → 边缘读到 `approved=true` 执行

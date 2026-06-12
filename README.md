@@ -58,6 +58,9 @@
                                   执行 ──► 后置校验 ──► 反污染上报(anchor.report)
 ```
 
+> 注：当前边缘 `LocatingEngine` 使用进程内 `AnchorCache`，缓存未命中直接走 `select.request`
+> （文本 LLM 选元素）；`anchor.get`/`anchor.report` 为协议保留的云端主缓存同步通道，尚未在边缘接线。
+
 详见 [`docs/architecture.md`](docs/architecture.md)（组件图 + 数据流）与
 [`docs/protocol.md`](docs/protocol.md)（边-云 WebSocket 协议 v2）。
 

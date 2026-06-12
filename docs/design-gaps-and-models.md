@@ -19,9 +19,11 @@
 
 ### 缺口 1：阶段口径不同步
 
+> **状态：已基本收口（2026-06）**。下表为历史问题记录——当前 `docs/product-overview.md` 已采用「实现状态 + 文档成熟度」双维标注，且风控控制器/状态机（`aidcp-cloud/src/risk/`）已实装，本缺口核心诉求已落实。
+
 | 项 | 内容 |
 | --- | --- |
-| 现状描述 | `docs/product-overview.md` 在“各模块当前完成状态”与“重要校正”中明确写到：**行为拟人化层已落地，风控策略/状态机层仍只有设计文档**；但 `docs/anti-detection.md` 仍保留较多路线图/待办式表述，容易让读者把“拟人化能力”误判为整体反检测仍未落地。 |
+| 现状描述 | `docs/product-overview.md` 在“各模块当前完成状态”与“重要校正”中明确写到：**行为拟人化层与风控控制器/状态机（`aidcp-cloud/src/risk/`）均已落地**；但 `docs/anti-detection.md` 仍保留较多路线图/待办式表述，容易让读者把“拟人化能力”误判为整体反检测仍未落地。 |
 | 问题 | 当前文档把“已实现”“设计完成”“规划中”混写在同一层级，尤其在“反检测”主题下，技术实现层（stealth、humanize）与策略层（代理、持久化、WebRTC/DNS、防泄露）没有统一状态标签，导致 overview 与 anti-detection 的阶段判断不一致。 |
 | 建议补齐方向 | 建议在所有设计文档顶部统一增加**状态标注口径**：`implemented`（已有代码/运行痕迹）、`designed`（设计完成未实现）、`planned`（仅方向/待设计）。同时要求每个章节或能力表按“能力项”而非“文档整体”标状态，避免“反检测整体未完成”的误读。对于 `anti-detection`，应拆成“已实现：stealth 注入、行为拟人化；设计完成未实现：住宅代理、Cookie/Session 持久化、WebRTC/DNS 防泄露、指纹画像表”。 |
 | 优先级 | P0 |
@@ -29,16 +31,18 @@
 | 影响模块 | 产品总览、反检测与登录态、风控模型、路线图管理、对外沟通口径。 |
 
 **来源依据**
-- `docs/product-overview.md`：第 3.3 节与“重要校正”明确区分“拟人化执行层已实现”与“风控策略/状态机未实现”。
+- `docs/product-overview.md`：第 3.3 节 #9 与“重要校正（2026-06 更新）”已说明拟人化执行层与风控控制器/状态机（`aidcp-cloud/src/risk/` 的 `RiskController` + 状态机 + 配额 + 冷启动）均已实装。
 - `docs/anti-detection.md`：整体仍以方案/路线图方式描述反检测能力，未按能力项显式区分实现状态。
 
 ---
 
 ### 缺口 2：文档成熟度与状态标注张力
 
+> **状态：已收口（2026-06）**。`product-overview.md` §3.2 已改用双维标注（实现状态 + 文档成熟度），dashboard/feishu/task/exception 四份文档均标 `complete`；下表为历史记录。
+
 | 项 | 内容 |
 | --- | --- |
-| 现状描述 | `docs/product-dashboard.md`、`docs/product-feishu.md`、`docs/product-task.md`、`docs/product-exception.md` 均已形成完整的信息架构、状态机、接口与渐进式实现设计；但 `docs/product-overview.md` 第 3.2 节仍将这些模块标为“编写中”或“未做”，容易让读者误解为文档本身尚未成熟。 |
+| 现状描述 | `docs/product-dashboard.md`、`docs/product-feishu.md`、`docs/product-task.md`、`docs/product-exception.md` 均已形成完整的信息架构、状态机、接口与渐进式实现设计；早期 `docs/product-overview.md` 第 3.2 节曾把这些模块标为“编写中”，易让读者误解为文档尚未成熟；该口径现已修正——overview §3.2 已改用本文建议的双维标注（实现状态 + 文档成熟度），四份文档均标为 `complete`。 |
 | 问题 | “产品能力未实现”与“设计文档未完成”被混为一谈。overview 当前状态表中的“编写中”更像文档成熟度标签，但表头又是“各模块当前完成状态”，读者会自然理解为产品实现状态。 |
 | 建议补齐方向 | 建议把 overview 中的状态拆成两个维度：`实现状态` 与 `设计成熟度`。例如：面板/飞书/任务/异常可标为“实现状态=planned 或 designed；设计成熟度=complete”。若不想双列展示，至少在 overview 图例中明确：状态只描述**产品实现状态**，文档成熟度另在“文档索引”中标注 `draft / complete / authoritative`。 |
 | 优先级 | P1 |
@@ -46,7 +50,7 @@
 | 影响模块 | 产品总览、路线图沟通、项目管理、跨团队认知同步。 |
 
 **来源依据**
-- `docs/product-overview.md`：第 3.2 节仍写“`docs/product-dashboard.md` 编写中”“`docs/product-feishu.md` 编写中”等。
+- （历史依据）`docs/product-overview.md` 早期 §3.2 曾写各产品子文档“编写中”；当前版本已移除该写法（见 overview §3.2 的口径说明）。
 - `docs/product-dashboard.md`、`docs/product-feishu.md`、`docs/product-task.md`、`docs/product-exception.md`：均已具备完整结构化设计，不再符合“编写中”的阅读感知。
 
 ---
