@@ -306,18 +306,32 @@
 // page.scroll
 { "reason": "feed_scroll" }            // feed_scroll | search_scroll
 // interaction.like
-{ "noteId": "n123", "reason": "高质量内容" }
+{ "noteId": "n123", "reason": "高质量内容", "thinkMs": 900 }
 // interaction.collect
-{ "noteId": "n123", "reason": "值得收藏" }
+{ "noteId": "n123", "reason": "值得收藏", "thinkMs": 900 }
 // interaction.follow
-{ "authorId": "u456", "reason": "持续优质" } // authorId 可选
+{ "authorId": "u456", "reason": "持续优质", "thinkMs": 900 } // authorId 可选
 // navigation.back
-{ "reason": "quality_rejected", "targetPage": "feed" } // targetPage: feed | search
+{ "reason": "quality_rejected", "targetPage": "feed", "dwellMs": 2200 } // targetPage: feed | search
+// note.open
+{ "index": 0, "noteId": "n123", "reason": "值得打开", "thinkMs": 800 }
+// note.close
+{ "reason": "...", "dwellMs": 2200 }
 // note.browse_images
 { "noteId": "n123" }
 // note.scroll_comments
 { "noteId": "n123" }
 ```
+
+> **时间指令（timing directive，指令级节奏 Command Pacing）**：上列决策指令携带**可选**时间字段，
+> 由云端基于**已上报内容**（`note.detail.content` 长度）+ 风控状态（`tempo`：normal=1.0 /
+> warned=1.3 / restricted=1.6）+ 会话进度（疲劳曲线）算出的**中心值**：
+> - `thinkMs`：执行该动作**前**的犹豫 / 感知时间（`interaction.*` / `note.open`）；
+> - `dwellMs`：离开当前页前应达到的**总停留时间**（`navigation.back` / `note.close`），治详情页"秒退"。
+>
+> §3 时间系数收口在云端一处，**不下发系数**。边缘收到中心值后叠一层 lognormal 抖动（防确定性指纹）
+> 再执行：`thinkMs` → 动作前等待；`dwellMs` → 保证当前页实际停留达标（真实阅读已超过则不叠加）。
+> 字段缺失（旧云端 / 自主动作）→ 边缘走内置默认下限兜底，**绝不零延迟**。向后兼容（旧端忽略）。
 
 `EdgeCommand.action` → 协议 `type` 映射（`command-bridge.ts`）：
 `scroll→page.scroll`、`open_note→note.open`、`close_note→note.close`、
@@ -370,9 +384,16 @@
   "maxActions": 30,                // number  最多执行的动作数
   "quotaLevel": "normal",          // "conservative" | "normal" | "aggressive"
   "viewOnly": false,               // boolean  仅浏览不互动
-  "startedAt": 1717113600000       // number   会话开始时间戳
+  "startedAt": 1717113600000,      // number   会话开始时间戳
+  "pacing": {                      // object?  极薄节奏默认块（指令级节奏；仅边缘自主动作/断连兜底用）
+    "tempo": 1.0,                  //   number  全局节奏乘子（风控状态驱动）
+    "dwellFloorMs": { "min": 1200, "max": 2600 } // 详情页最小停留下限区间
+  }
 }
 ```
+> `pacing` 可选、向后兼容（旧端忽略）。它**只含兜底参数**（`tempo` / `dwellFloorMs`），**不含**
+> 内容相关的 read / pause / fatigue 系数——那些收口在云端，随决策指令以 `dwellMs`/`thinkMs` 下发
+> （见 §3.7 时间指令）。缺失时边缘用内置默认。
 
 **`risk.canDo`**（edge → cloud）：互动前请求许可
 ```jsonc
