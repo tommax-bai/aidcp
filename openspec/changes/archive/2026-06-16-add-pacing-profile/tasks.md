@@ -15,7 +15,7 @@
 - [x] 2.2 `src/risk/` + 评估角色：实现 `computeDwellMs(content, state, progress)` / `computeThinkMs(...)`——`(base+k_text·len+k_img·img)×tempo×fatigue`，系数取 §3 既定值；无价值路径取较小值但 ≥ 感知下限 <!-- aidcp-cloud 873ec05 src/risk/pacing.ts；glance 模式=0.35×read 作为无价值路径 -->
 - [x] 2.3 在 `command-bridge` / 指令装配处把算出的中心值挂到 `navigation.back`/`interaction.*`/`note.open` 等指令上 <!-- aidcp-cloud 873ec05 RoleDispatcher 决策点挂 params；command-bridge 已透传 params 无需改 -->
 - [x] 2.4 单测：长内容 dwell > 短内容；`normal/warned/restricted` 三态中心值单调放大；指令序列化含时间字段 <!-- aidcp-cloud 873ec05 test/risk-pacing.test.ts（9 用例）-->
-- [x] 2.5 `npm test` + `npm run typecheck` 通过 <!-- aidcp-cloud 873ec05 158 tests pass / typecheck clean -->
+- [x] 2.5 `npm test` + `npm run typecheck` 通过 <!-- aidcp-cloud 873ec05 158 tests pass / typecheck clean --> <!-- 2026-06-16 deployed ECS cloud=873ec05；备份 cloud.bak.20260616-180059.tar.gz；healthcheck 全过；edge 5278eb7 已 push 待本地重启生效 -->
 
 ## 3. aidcp-edge（边缘：消费指令 + 抖动 + 返回兜底）
 
