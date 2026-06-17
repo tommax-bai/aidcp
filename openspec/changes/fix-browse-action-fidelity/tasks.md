@@ -5,31 +5,30 @@
 
 ## 1. aidcp-edge — 评论滚动真执行（deep-read-fidelity）
 
-- [ ] 1.1 `src/browse/browse-session.ts` `scrollNoteComments`：单次 Runtime.evaluate 内按 overflow 能力上溯定位真正可滚动容器（评论节点祖先中首个 `scrollHeight>clientHeight && overflowY∈auto/scroll`），记录 `before` scrollTop → `scrollBy({top:360})`（去 smooth）→ 返回 `{before,after}`
-- [ ] 1.2 按实测位移如实回报：累计 `after>before` 的次数；有位移→`ok:true reason=scrolled=N/total`；全程无位移→`ok:false reason='no_scroll'`（区别 no_target）；logger 打真实次数
-- [ ] 1.3 滚动间隔由 `cardGapTiming` 改为 `TIMING_PRESETS.scroll`（保留入口 thinkBefore）
-- [ ] 1.4 CDP 真机现场核对评论区真正可滚动祖先（实测 scrollHeight/overflowY），校准上溯起点选择器
-- [ ] 1.5 测试：更新 mock 返回带 before/after scrollTop 的 JSON；新增「真实位移→scrolled=N」「命中不可滚→no_scroll」用例，去掉仅靠 includes 即 found 的夹具
+- [x] 1.1 `scrollNoteComments`：单次 eval 内 overflow 上溯定位真可滚动容器 + 记录 before → scrollBy(去 smooth) → 返回 {before,after} <!-- aidcp-edge fd01b7f -->
+- [x] 1.2 按实测位移如实回报：scrolled=N/total（有位移）/ no_scroll（命中不可滚）/ no_target（无容器）；logger 打真实次数 <!-- aidcp-edge fd01b7f -->
+- [x] 1.3 滚动间隔 cardGapTiming → TIMING_PRESETS.scroll <!-- aidcp-edge fd01b7f -->
+- [x] 1.4 运行时按 overflow 能力定位（无硬编码 class 需校准）；真容器最终核对并入 6.x 真机验收 <!-- aidcp-edge fd01b7f overflow-walk 取代硬编码，真机确认放 6.2 -->
+- [x] 1.5 测试：mock 返回 before/after scrollTop；新增 真实位移→scrolled / 命中不可滚→no_scroll 用例 <!-- aidcp-edge fd01b7f -->
 
 ## 2. 关注决策只用真实信号（follow-decision，both）
 
-- [ ] 2.0 比对 ECS 上 follow-agent.ts 是否已是 9e23bc9（确认是否还需清理 prompt 软化残留）
-- [ ] 2.1 aidcp-cloud `src/agents/follow-agent.ts`：prompt **移除"作品数"信号行**，改以 粉丝数 + 获赞与收藏 + 内容/作者相关性判定；不再以"作品数未知"为由 skip
-- [ ] 2.2 aidcp-edge `src/browse/browse-session.ts` `extractAuthorProfile`（主页统计抽取）：新增抽取"获赞与收藏"（`.user-interactions` 内 `shows==='获赞与收藏'` 对应 `.count`）
-- [ ] 2.3 协议两侧同步加可选字段 `likesCollects`：edge `src/comm/protocol.ts` `ProfileDetailPayload` + cloud `src/comm/protocol.ts` + cloud `src/event-bus/types.ts` `ProfileDetailData`/`ProfileBrowsedPayload`；ProfileBrowser 透传到 follow-agent 输入
-- [ ] 2.4 测试：edge profile 抽取夹具断言 likesCollects 被解析；cloud follow-agent 在 postsCount 未知但粉丝/获赞健康 + 相关 → verdict=visit/follow（不再 skip）
+- [x] 2.0 ECS follow-agent 状态核对 <!-- 部署版 d1d8a9b 含 9e23bc9 软化措辞，但 LLM 仍以"作品数未知"skip → 软化不够，本次彻底移除作品数 -->
+- [x] 2.1 aidcp-cloud `follow-agent.ts`：prompt **彻底移除"作品数"**（连负向措辞也不提，避免再 anchor），改以 粉丝数 + 获赞与收藏 + 相关性判定 <!-- aidcp-cloud 3e9b1be -->
+- [x] 2.2 aidcp-edge `extractAuthorProfile`：新增抽取"获赞与收藏"（label match /获赞|收藏/ 取 .count） <!-- aidcp-edge fd01b7f -->
+- [x] 2.3 协议两侧同步加可选 `likesCollects`：edge protocol + cloud protocol/types(ProfileDetailData/ProfileBrowsedPayload)；ProfileBrowser 透传 <!-- aidcp-edge fd01b7f / aidcp-cloud 3e9b1be -->
+- [x] 2.4 测试：edge profile 抽取断言 likesCollects；cloud follow prompt 不含作品数 + postsCount=0 但粉丝/获赞健康→follow <!-- aidcp-edge fd01b7f / aidcp-cloud 3e9b1be -->
 
 ## 3. aidcp — back 按页型返回 + 404 健壮（browse-loop-resilience 增量，both）
 
-- [ ] 3.1 aidcp-cloud `src/orchestrator/role-dispatcher.ts`：`feed.entered(back_to_feed)` 把 `payload.pageType` 透传为 `params.targetPage`
-- [ ] 3.2 aidcp-edge `src/browse/browse-session.ts` `navigateBack`：`search` 分支补 URL 校验 + 兜底（失配则重新发起搜索或回 explore，不再裸 history.back+sleep）
-- [ ] 3.3 aidcp-edge 新增 404/坏页探测（"笔记不见了/当前笔记暂时无法浏览"等标记 + 0 卡）：命中即 `Page.navigate(exploreUrl)` + `waitForVisibleCards` 健康校验后再 `reportVisibleCards`；倾向 search 来源或回退目标带 token 时直接 Page.navigate 跳过 history.back
-- [ ] 3.4 测试：cloud 断言 `feed.entered{pageType:'search'}` → `navigation.back{targetPage:'search'}`（pageType:'feed'→'feed'）；edge 断言坏页/0 卡→兜底导航而非静默
+- [x] 3.1 aidcp-cloud `role-dispatcher.ts`：`feed.entered(back_to_feed)` 把 `payload.pageType` 透传为 `params.targetPage` <!-- aidcp-cloud 3e9b1be -->
+- [x] 3.2 + 3.3 aidcp-edge `navigateBack` 统一硬化：在作者主页时跳过 history.back 直接整页导航（消除经过期笔记 404 闪现）；按"目标列表 URL + 有可见卡片"健康校验，不健康即 Page.navigate(exploreUrl) 兜底；search 不可达回退 explore（不卡死） <!-- aidcp-edge fd01b7f 用 URL+卡片健康校验取代单独的"笔记不见了"文本探测 -->
+- [x] 3.4 测试：cloud 断言 feed.entered{pageType:'search'}→navigation.back{targetPage:'search'}（feed→feed）；edge navigation.back 无 targetPage/水合路径回归（含上轮） <!-- aidcp-cloud 3e9b1be / aidcp-edge -->
 
 ## 4. aidcp-edge / aidcp-cloud — 校验
 
-- [ ] 4.1 edge `npm run typecheck` + `npm test` 通过
-- [ ] 4.2 cloud `npm run typecheck` + `npm test` 通过（本地仅代码级验证，不起 cloud）
+- [x] 4.1 edge `npm run typecheck` + `npm test` 通过 <!-- aidcp-edge fd01b7f 216→217 -->
+- [x] 4.2 cloud `npm run typecheck` + `npm test` 通过 <!-- aidcp-cloud 3e9b1be 167→169 -->
 
 ## 5. aidcp-cloud — 部署（安全序列，仅 cloud 改动后执行）
 
