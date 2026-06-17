@@ -13,16 +13,16 @@
 
 ## 2. aidcp-cloud — 续刷 + idle 看门狗（纵深）
 
-- [ ] 2.0 核对 `ContentEvaluator.evaluate` / `FeedScroller` 对空 `page.cards{cards:[]}` 的处理（安全 no-op / 触发 scroll / 还是误判 session.end），据此定 1.2 是否发空报
-- [ ] 2.1 `src/orchestrator/role-dispatcher.ts`：`action.completed{action:'back', ok:true}` 触发一次 `sendCommand(scroll, reason='rescan_after_back')`，使 back 自驱动；避开与 `follow`/`browse_images`/`scroll_comments` 的 `noRecoverScroll` 冲突
-- [ ] 2.2 `src/agents/session-monitor-role.ts`（+ dispatcher 接线）：新增 wall-clock idle 看门狗（`setInterval`），每次 edge 上报/命令刷新「最后活动时间戳」；超 N 秒发 `scroll` nudge、超 M 秒（M>N）发 `session.should_end`；会话结束/销毁时 `clearInterval`
-- [ ] 2.3 cloud `npm run typecheck` + `npm test` 通过（本地仅代码级验证，不起 cloud）
+- [x] 2.0 核对空 `page.cards{cards:[]}` 处理 <!-- 结论：SAFE。空卡 → page.cards.arrived → ContentEvaluator candidates=[] → content.no_valuable(all_cards_visited) → FeedScroller → feed.scrolled → scroll；从不触发 session.end（仅 SessionMonitor 经 session.should_end 才结束）。已有 role-dispatcher.test.ts 路径A 佐证。故 edge 显式空报本安全，但 1.2 仍只做重轮询不发空报（非必需，避免叠加） -->
+- [~] 2.1 ~~back+ok:true 无条件续扫~~ **经 scout 分析不实装** <!-- aidcp-cloud d1d8a9b 偏离：edge navigateBack 已在 back 回执前主动 reportVisibleCards 上报 page.cards、cloud 自动 evaluate；再无条件发 scroll 会多滚一屏跳过未评估卡 + 污染 SEARCH_THRESHOLD 计数器。停滞兜底改由 2.2 看门狗承担（仅真无活动时介入），更干净 -->
+- [x] 2.2 `src/agents/session-monitor-role.ts` + dispatcher 接线：wall-clock idle 看门狗 <!-- aidcp-cloud d1d8a9b 可注入 setIntervalFn/clock+unref；刷新事件 page.cards.arrived/note.detail.arrived/profile.detail.arrived/action.completed；idleNudgeMs 默认 130s(>pacing capMs 90s 防误触)→session.idle_nudge(节流)，idleEndMs 默认 240s→session.should_end；unsubscribe 清 interval。新增 RoleEventMap 'session.idle_nudge' → dispatcher 翻译为 scroll(idle_recover_nudge) -->
+- [x] 2.3 cloud `npm run typecheck` + `npm test` 通过 <!-- aidcp-cloud d1d8a9b typecheck 0 err；162→167（+4 单元 +1 集成）全过；本地未起 cloud -->
 
 ## 3. aidcp-edge — 抽取质量
 
-- [ ] 3.1 正文选择器抽成单一共享列表，`waitForNoteBody`（gate）与 `note-extractor.extractNoteContent`（extractor）复用；拓宽变体候选 `'.note-scroller .note-text'` / `'[class*="note-content"] .note-text'`，仍排除裸 `.note-content`/`[class*=content]`
-- [ ] 3.2 `waitForNoteBody` 超时 3500→~5500ms；超时日志按「modal 内是否仍有文本节点」区分「布局变体未命中（需补选择器）」与真·纯图文/视频
-- [ ] 3.3 点赞数选择器收紧：`feed-scroller.ts` 去掉末位 `[class*="count"]`（或约束到 `like-wrapper` 内）；`note-extractor.countNear` 先 `like-wrapper` 精确匹配再退 `like` 子串
+- [x] 3.1 正文选择器抽成共享常量 `NOTE_BODY_SELECTORS`，gate(`waitForNoteBody`) 与 extractor 复用；拓宽 `.note-scroller .note-text`/`[class*="note-content"] .note-text`/`.desc`，仍排除裸 `.note-content`/`[class*=content]` <!-- aidcp-edge 0c88fdd gate 把列表 JSON.stringify 进 CDP eval -->
+- [x] 3.2 `waitForNoteBody` 超时 3500→5500ms；超时日志按「modal 内 .note-scroller/[class*=note-content] 是否仍有文本」区分「布局变体未命中（需补 NOTE_BODY_SELECTORS）」与真·纯图文/视频 <!-- aidcp-edge 0c88fdd -->
+- [x] 3.3 `feed-scroller.ts` 去掉贪婪 `[class*="count"]` 末位兜底（仅取 like 作用域内计数）；`note-extractor.countNear` 改两遍扫描（先 `like-wrapper` 精确再退 `like` 子串） <!-- aidcp-edge 0c88fdd -->
 
 ## 4. aidcp-edge — 回归测试
 
@@ -30,8 +30,10 @@
 <!-- 注：4.1 已覆盖回 feed 的两条路径；4.2/4.3（note body 布局变体 + likes 口径）属抽取质量(task 3)，与 task 3 一起做 -->
 <!-- 验收已先行（edge 修复部分）：run#4 5 分钟真机 6 篇连续闭环、5 次 back 续刷全 <10s、无可见卡片静默 0；对应 6.1/6.2 的 edge 验证。完整 6.x 验收在 cloud 纵深(2.x)部署后再跑一次。 -->
 
-- [ ] 4.2 `test/browse/note-extractor.test.ts`：新增 `note-scroller`/`note-content`（无字面 `#detail-desc`）布局 fixture，断言正文非空且不含 title 前缀/「刚刚」时间串
-- [ ] 4.3 likes 口径一致回归：同一 fixture 下 feed 卡与 detail 点赞数口径一致
+- [x] 4.2 `test/browse/note-extractor.test.ts`：新增 `note-scroller`/`note-content`（无字面 `#detail-desc`）布局 fixture，断言正文非空且不含 title 前缀/「刚刚」 <!-- aidcp-edge 0c88fdd -->
+- [x] 4.3 likes 口径回归：同一 fixture 断言 `countNear` 两遍扫描取 like-wrapper(123) 而非靠前含 `like` 子串的 entry-like-tip(999) <!-- aidcp-edge 0c88fdd 注：feed/detail 严格一致需真机核对，单测覆盖选择器优先级 -->
+<!-- cloud 看门狗单元测试(4)+集成测试(1) 见 aidcp-cloud d1d8a9b test/agents/session-monitor-role.test.ts + test/integration/role-dispatcher.test.ts -->
+
 
 ## 5. aidcp-cloud — 部署（安全序列，仅 cloud 改动后执行）
 
