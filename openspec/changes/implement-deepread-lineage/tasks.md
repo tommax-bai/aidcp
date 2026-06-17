@@ -35,7 +35,7 @@
 - [x] 5.1 `src/browse/browse-session.ts` `browseNoteImages`：对照真实小红书详情页 DOM 校准图片轮播/翻页选择器；去掉 `count||1` 恒成功兜底 <!-- aidcp-edge 8b2b4b9。选择器为最佳推断，需 5.4 实机校准 -->
 - [x] 5.2 `browse_images` 的 `action.completed` 如实回报（翻图张数；未命中→`ok=false, reason='no_target'`） <!-- aidcp-edge 8b2b4b9。reason='browsed=N' / 'no_target' -->
 - [x] 5.3 `scrollNoteComments`：校准评论区选择器；`scroll_comments` 的 `action.completed` 如实回报（滚屏数/无评论/未命中） <!-- aidcp-edge 8b2b4b9。reason='scrolled=N' / 'no_target' -->
-- [ ] 5.4 本地在真实页面核对选择器命中（开一篇多图笔记 + 一篇有评论笔记验证） <!-- 需本地登录小红书 + 跑 edge 实机核对，留待用户 -->
+- [x] 5.4 本地在真实页面核对选择器命中（开一篇多图笔记 + 一篇有评论笔记验证） <!-- aidcp-edge cdcf657 2026-06-17 实机核对：翻图箭头真实为 .arrow-controller.right（非 .swiper-button-next），修后实测「浏览了 3/14 张」；评论区 .comments-container 命中、滚动 ok。CDP 实机抓 DOM 校准 -->
 
 ## 6. aidcp-edge — 进主页执行 + 作者资料抽取上报
 
@@ -43,7 +43,7 @@
 - [x] 6.2 新增作者主页 profile 抽取（`postsCount`/`followersCount` 的真实小红书选择器），复用 `parseCount` 数字解析 <!-- aidcp-edge 8b2b4b9。extractAuthorProfile；选择器需 6.5 实机校准 -->
 - [x] 6.3 进主页成功后调用 `client.reportProfileDetail({authorId, postsCount, followersCount, extracted:true})`（落实当前的死代码调用点） <!-- aidcp-edge 8b2b4b9 -->
 - [x] 6.4 抽取失败/超时仍上报 `profile.detail`（`extracted:false`），并兜底返回信息流不卡死 <!-- aidcp-edge 8b2b4b9。reportProfileFallback -->
-- [ ] 6.5 本地在真实页面核对：能进主页、能抽到非 0 粉丝/作品数 <!-- 需本地实机核对，留待用户 -->
+- [x] 6.5 本地在真实页面核对：能进主页、能抽到非 0 粉丝/作品数 <!-- aidcp-edge 8d36ffd+a85c9cf 2026-06-17 实机核对：进主页改 Page.navigate(a[href*="/user/profile/"] 的 href)（合成点击不触发 SPA 路由），.user-interactions 数据异步晚到→抽取轮询 5s 再取；实测抽到「作品0 粉丝456000」。重要发现：小红书主页不公开作品数，postsCount 恒 0=未知 -->
 
 ## 7. 测试与验收
 
@@ -51,7 +51,7 @@
 - [x] 7.2 cloud 集成测：`quality.pass → DeepReader → reading.images_done → comment_reviewer → reading.done → InteractionAppraiser` 整链跑通；`profile.entered → profile.open → profile.detail.arrived → profile.browsed → FollowAgent` 跑通 <!-- aidcp-cloud ab49d5c。路径 D/E/F 适配新链路（假边缘回执 browse_images/scroll_comments/profile_open） -->
 - [x] 7.3 edge 单测：browse_images/scroll_comments 未命中→`no_target` 不假报成功；profile 抽取夹具解析 postsCount/followersCount <!-- aidcp-edge 8b2b4b9 -->
 - [x] 7.4 双仓 `npm test` + `npm run typecheck` + `npm run test:acceptance` 通过 <!-- cloud 162+11 / edge 212+11，typecheck 均过 -->
-- [ ] 7.5 本地 edge 连 ECS `ws://121.89.85.150:8787` 跑一轮：人工观测看图/翻评论/进主页/`FollowAgent` 收到非 0 数据 <!-- 需本地实机联调，留待用户 -->
+- [x] 7.5 本地 edge 连 ECS `ws://121.89.85.150:8787` 跑一轮：人工观测看图/翻评论/进主页/`FollowAgent` 收到非 0 数据 <!-- 2026-06-17 实机联调通过：整条链路在 ECS cloud + 本地 edge 跑通——浏览了 3/14 张图 / 评论区滚动 ok / 进主页抽到粉丝456000 / FollowAgent 基于「主题+粉丝」判定 follow（不再因作品0拒绝）。连带修复：cloud follow-agent prompt 不再扣分 postsCount(9e23bc9，已重新部署 cloud) + edge 主页关注按钮 .user-info .follow-button(24c46db，CDP 实证 clickable) -->
 
 ## 8. 文档与部署
 
