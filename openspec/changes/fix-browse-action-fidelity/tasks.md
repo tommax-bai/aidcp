@@ -32,9 +32,9 @@
 
 ## 5. aidcp-cloud — 部署（安全序列，仅 cloud 改动后执行）
 
-- [ ] 5.1 ECS 备份 `/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`
-- [ ] 5.2 rsync src → `systemctl restart aidcp-cloud.service` → healthcheck（active + 8787 + 飞书长连 + PG）；**绝不碰 isales**
-- [ ] 5.3 失败即回滚
+- [x] 5.1 ECS 备份 <!-- /opt/aidcp/cloud.bak.20260617-211609.tar.gz + .env.bak.20260617-211609 -->
+- [x] 5.2 rsync src(5 文件) → restart → healthcheck 全绿 <!-- aidcp-cloud 3e9b1be deployed 2026-06-17 21:16：active(MainPID 1393245,NRestarts 0)+8787+飞书长连接已建立+PG 锚点缓存就绪+RoleDispatcher 无报错；获赞与收藏 grep 0→4、targetPage 0→1；isales 未触碰 -->
+- [x] 5.3 失败回滚预案：备份在手，healthcheck 通过未触发 <!-- 回滚：tar -xzf cloud.bak.20260617-211609.tar.gz -C /opt/aidcp && systemctl restart aidcp-cloud.service -->
 
 ## 6. 真机验收复跑（edge 重启到最新构建后）
 
