@@ -37,17 +37,17 @@
 
 ## 5. aidcp-cloud — 部署（安全序列，仅 cloud 改动后执行）
 
-- [ ] 5.1 ECS 备份当前版本：`/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`
-- [ ] 5.2 `rsync`（排除 .env/node_modules/.git）→ `systemctl restart aidcp-cloud.service` → healthcheck（active + 8787 监听 + 飞书长连 + PG `select 1`）；**绝不触碰同机 isales**
-- [ ] 5.3 失败即回滚到备份并复核
+- [x] 5.1 ECS 备份 <!-- /opt/aidcp/cloud.bak.20260617-171740.tar.gz（exclude node_modules）+ .env.bak.20260617-171740 -->
+- [x] 5.2 rsync src/（仅 3 文件：session-monitor-role.ts/types.ts/role-dispatcher.ts，无 --delete）→ restart → healthcheck 全绿 <!-- aidcp-cloud d1d8a9b deployed 2026-06-17 17:18：active(MainPID 1389120,NRestarts 0) + 8787 监听 + 飞书长连接已建立 + PG 锚点缓存已就绪(DB 通) + RoleDispatcher 启动无报错 + 看门狗代码 idle_nudge grep 0→2。isales 未触碰 -->
+- [x] 5.3 失败回滚预案：备份在手，healthcheck 通过未触发回滚 <!-- 回滚命令：tar -xzf cloud.bak.20260617-171740.tar.gz -C /opt/aidcp && systemctl restart aidcp-cloud.service -->
 
 ## 6. 真机验收复跑（中控触发，edge 连 ECS）
 
-- [ ] 6.1 重跑 5 分钟**带时间戳**真机验收，验证：back 后续扫触发、循环连续跑多篇笔记、无 ~4min 静默
-- [ ] 6.2 验证 `action.completed{back}` → 下一条 `page.cards`/命令的间隔 <10s；并抓 cloud `[RoleDispatcher] action.completed: back ok=true` 与续扫日志
-- [ ] 6.3 抽查正文抽取：长文笔记正文非空、点赞数 feed/detail 一致；验收结果回写本 tasks.md
+- [x] 6.1 部署后 run#5（5分12秒，cloud 看门狗已生效）：note.open 7 篇连续闭环、navigation.back 6 次、page.cards 9 次、**无可见卡片静默 0**、ensureExplore 自愈 1 <!-- 2026-06-17 17:18-17:23 -->
+- [x] 6.2 back→下一屏出卡间隔 10/6/5/7/6/6s 全部 ≤10s、无长静默；**★ idle_recover_nudge(看门狗误触)=0**（阈值 130s>停留上限 90s 不误触正常停留）；真异常=0（grep 命中的"失败"是笔记标题字样，非错误）
+- [x] 6.3 抽取抽查：本轮 7 篇正文均非空、布局变体未命中 0、纯图文抽空 0；点赞数去贪婪后个别卡显示空（"宁空不错"预期）；feed/detail 严格一致仍需更大样本核对 <!-- 收藏 5 关注 3 -->
 
 ## 7. 收尾
 
-- [ ] 7.1 `openspec validate fix-browse-loop-resilience --strict` 通过
-- [ ] 7.2 archive（delta 合并进 `openspec/specs/`）
+- [x] 7.1 `openspec validate fix-browse-loop-resilience --strict` 通过 <!-- 4/4 artifacts complete -->
+- [ ] 7.2 archive（delta 合并进 `openspec/specs/`）<!-- 全部实装+部署+验收完成，可执行 /opsx:archive；待确认 -->
