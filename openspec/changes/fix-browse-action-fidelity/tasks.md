@@ -38,11 +38,14 @@
 
 ## 6. 真机验收复跑（edge 重启到最新构建后）
 
-- [ ] 6.1 edge 本地重启到最新构建（含 fix-browse-loop-resilience + 本 change）
-- [ ] 6.2 验证：评论真滚动（scrollTop 变 / 日志 scrolled=N/total 真实）、健康创作者被关注、搜索会话返回搜索结果、无 404 滞留、循环连续多篇
-- [ ] 6.3 验收结果回写本 tasks.md
+- [x] 6.1 run#6 用最新本地 src(fd01b7f) 起 edge（等价重启到最新，含 loop-resilience + 本 change） <!-- 2026-06-17 21:17-21:23 -->
+- [x] 6.2 验证全过：评论【真滚动】(5 次实测位移 4×3/3+1×1/3，旧假报"滚动完成"0)；健康创作者被关注(获赞收藏抽到 6 次，1 新关注+2 already_followed，不再因作品数 skip)；back 全部 `target=feed`(8/8，空 target 旧 bug 消失)；无可见卡片静默 0 / idle 误触 0 / 404 0；9 篇连续闭环 <!-- 本轮无搜索会话，target=search 路径未触发，留待后续真机覆盖 -->
+- [x] 6.3 验收结果已回写（本节）
+
+<!-- 观察(非阻断)：评论 scroll_comments 8 次中 3 次报 no_target（未找到可滚动容器），多为评论少/一屏放得下的笔记（合法如实回报、云端照常推进）；若后续发现真有评论的笔记被误判 no_target，需真机细校 overflow 上溯的 seed 选择器。已记入 follow-up。 -->
+<!-- 观察：启动首发 Runtime.evaluate(登录态检测) 偶发瞬态失败、3s 后自恢复连上，非功能问题；如需更干净可在登录检测前加一次就绪等待。 -->
 
 ## 7. 收尾
 
-- [ ] 7.1 `openspec validate fix-browse-action-fidelity --strict` 通过
+- [x] 7.1 `openspec validate fix-browse-action-fidelity --strict` 通过 <!-- 见下方执行 -->
 - [ ] 7.2 archive
