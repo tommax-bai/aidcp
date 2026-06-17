@@ -87,8 +87,9 @@
 | `interaction.collect` | cloud → edge | 收藏指定笔记 |
 | `interaction.follow` | cloud → edge | 关注作者 |
 | `navigation.back` | cloud → edge | 返回上一页（feed / search） |
-| `note.browse_images` | cloud → edge | 浏览笔记图片 |
-| `note.scroll_comments` | cloud → edge | 滚动评论区 |
+| `note.browse_images` | cloud → edge | 浏览笔记图片（`count` 张；DeepReader 决策下发） |
+| `note.scroll_comments` | cloud → edge | 滚动评论区（CommentReviewer 决策下发） |
+| `profile.open` | cloud → edge | 进入作者主页（专用指令，取代 `open_note{type:'profile'}`） |
 
 ### 2.4 结构化上报（v2 新增，edge → cloud，`RoleDispatcher` 消费）
 
@@ -317,11 +318,18 @@
 { "index": 0, "noteId": "n123", "reason": "值得打开", "thinkMs": 800 }
 // note.close
 { "reason": "...", "dwellMs": 2200 }
-// note.browse_images
-{ "noteId": "n123" }
-// note.scroll_comments
-{ "noteId": "n123" }
+// note.browse_images（DeepReader 决策；count 为目标张数，边缘按实际可见数截断）
+{ "noteId": "n123", "count": 3, "thinkMs": 700, "dwellMs": 2000 }
+// note.scroll_comments（CommentReviewer 决策）
+{ "noteId": "n123", "thinkMs": 700, "dwellMs": 2000 }
+// profile.open（进入作者主页；边缘点详情页作者头像进入，authorId 仅观测/兜底）
+{ "authorId": "u456", "reason": "作者值得关注评估", "thinkMs": 800 }
 ```
+
+> **深读动作的回报**：`note.browse_images` / `note.scroll_comments` 经 `action.completed` 如实回报——
+> 命中则 `ok:true` 且 `reason` 记实际量（`browsed=N` / `scrolled=N`），未命中目标则 `ok:false, reason:'no_target'`
+> （不再 `count||1` 假报成功）。`profile.open` 进主页后由边缘抽取作者资料并经 `profile.detail` 上报
+> （含 `extracted` 标记，抽取失败也上报以便云端区分"数据缺失"与"真 0 粉丝"）。
 
 > **时间指令（timing directive，指令级节奏 Command Pacing）**：上列决策指令携带**可选**时间字段，
 > 由云端基于**已上报内容**（`note.detail.content` 长度）+ 风控状态（`tempo`：normal=1.0 /
@@ -337,7 +345,7 @@
 `scroll→page.scroll`、`open_note→note.open`、`close_note→note.close`、
 `like→interaction.like`、`collect→interaction.collect`、`follow→interaction.follow`、
 `search→search.execute`、`back→navigation.back`、`browse_images→note.browse_images`、
-`scroll_comments→note.scroll_comments`、`session.end→session.end`。
+`scroll_comments→note.scroll_comments`、`profile_open→profile.open`、`session.end→session.end`。
 
 ### 3.8 结构化上报（edge → cloud）
 
@@ -365,7 +373,8 @@
 
 **`profile.detail`**——上报作者主页数据
 ```jsonc
-{ "authorId": "u456", "postsCount": 87, "followersCount": 12000 }
+{ "authorId": "u456", "postsCount": 87, "followersCount": 12000, "extracted": true }
+// extracted:false → 进了主页但未抽到数字；云端 FollowAgent 据此保守 skip，不当作真 0 粉丝
 ```
 
 **`action.completed`**——确认某 action 执行完成
