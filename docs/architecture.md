@@ -100,7 +100,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 | **PgAnchorCache / ConceptStore / BotChatStore** | `src/cache/*.ts` | PG 锚点主缓存 + 暂存晋升、概念池、Bot 群绑定 |
 | **AccountStateManager** | `src/account-state.ts` | 账号 active/paused 内存状态（暂停时跳过笔记处理） |
 | **EdgeCloudServer / DefaultMessageHandler / command-bridge** | `src/comm/{ws-server,handler,command-bridge}.ts` | WS 服务端 + 消息路由 + `EdgeCommand→Envelope` 翻译 |
-| protocol | `src/comm/protocol.ts` | 边-云消息类型（v2，41 个）+ 信封 + 解析/校验 |
+| protocol | `src/comm/protocol.ts` | 边-云消息类型（v2，42 个）+ 信封 + 解析/校验 |
 
 ### 2.2 边缘端 aidcp-edge
 

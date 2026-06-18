@@ -114,7 +114,7 @@ mindmap
 | 1 | 浏览器管理策略 | `implemented` | `complete` | 单机多实例已跑（多份 `edge*.log` / `cloud*.log` 为多实例运行痕迹）；`aidcp-edge/src/cdp/chrome-launcher.ts` 负责按参数拉起 Chrome | 分布式浏览器池、profile×指纹×IP 三元绑定的编排未做 |
 | 2 | 反检测与登录态 | `implemented`（stealth/拟人化）+ `designed`（代理/持久化/防泄露） | `complete` | **stealth 注入已实现**：`aidcp-edge/src/cdp/stealth-injector.ts`（webdriver 抹除 / toString 伪装 / plugins / 权限对齐 / console.debug）；设计见 `docs/anti-detection.md` | Cookie/Session 持久化、住宅代理接入、WebRTC/DNS 防泄露、指纹画像表 未做 |
 | 3 | 容错与恢复机制 | `implemented`（三道闸）+ `designed`（恢复闭环） | `complete` | LocatingEngine **三道闸**已实现（`aidcp-edge/src/locating/engine.ts`）：后置校验 / 重试升级 / 反污染；守卫层清干扰（`guard.ts`） | CDP 断连自动重连、验证码/滑块识别、会话级 crash recovery 未做 |
-| 4 | Agent 拆分与通信 | `implemented` | `authoritative` | edge/cloud 双层 WS 架构已实现；协议 v2（41 消息类型）`aidcp-cloud/src/comm/protocol.ts` + `docs/protocol.md`；云端已重构为**事件驱动多 Agent**（`RoleDispatcher` + 15 角色 + `EventBus` + `command-bridge`），边缘 `LocatingEngine`/`BrowseSession` 与之协作 | — |
+| 4 | Agent 拆分与通信 | `implemented` | `authoritative` | edge/cloud 双层 WS 架构已实现；协议 v2（42 消息类型）`aidcp-cloud/src/comm/protocol.ts` + `docs/protocol.md`；云端已重构为**事件驱动多 Agent**（`RoleDispatcher` + 15 角色 + `EventBus` + `command-bridge`），边缘 `LocatingEngine`/`BrowseSession` 与之协作 | — |
 
 ### 3.2 产品设计
 

@@ -58,7 +58,7 @@ AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test
 | 业务流·发布六步 | 进入→标题→正文→标签→提交→postId | S | `flows/publish-post.test.ts` | — |
 | 发布·审批阻断 | approval gate 阻断、信号读写、超时/拒绝 | L/S | `flows/publish-post-approval.test.ts`、`publish/approval-gate.test.ts` | 未授权绝不发布 |
 | 发布·端到端 | FakeWebSocket 模拟云端、publish.request→result | S | `integration/publish-e2e.test.ts` | — |
-| **协议契约·边缘** | 版本=2、41 消息类型穷举、信封往返、坏帧 | L | `acceptance/protocol-contract.test.ts` `AC-PROTO-01..05` | 与云端契约逐字一致 |
+| **协议契约·边缘** | 版本=2、42 消息类型穷举、信封往返、坏帧 | L | `acceptance/protocol-contract.test.ts` `AC-PROTO-01..05` | 与云端契约逐字一致 |
 | **发布审批·跨层契约** | 信号路径格式、approved/拒绝/超时/串号 | L | `acceptance/publish-approval-contract.test.ts` `AC-PUB-01..06` | 路径与云端一致，未授权不发 |
 | **真机·边-云握手/心跳** | 连 ECS 发 hello 收 welcome、ping/pong | E | `acceptance/real-e2e.test.ts` `AC-E2E-01..02` | gated；真实连通 |
 
@@ -81,7 +81,7 @@ AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test
 | 风控·去重/频控/预算/PG | 互动去重、搜索频控、会话预算、持久化 | L | `risk-dedup`、`risk-session-scheduler`、`risk-pg-store.test.ts` | — |
 | 飞书·Token/卡片/命令/记群 | token 续期、卡片构建、命令路由、卡片回调写信号 | L/S | `feishu-token`、`feishu-cards`、`feishu-commands`、`feishu-ws-receiver.test.ts` | — |
 | 发布·6 角色管道 | scout→creator→director→assembler→gate→executor、超时/防重入 | S | `publish-agent/*.test.ts`（9 个）、`publish-post-processor.test.ts` | scout 否决则早停；禁用词检测 |
-| **协议契约·云端** | 版本=2、41 消息类型穷举、信封往返、坏帧 | L | `acceptance/protocol-contract.test.ts` `AC-PROTO-01..05` | 与边缘契约逐字一致 |
+| **协议契约·云端** | 版本=2、42 消息类型穷举、信封往返、坏帧 | L | `acceptance/protocol-contract.test.ts` `AC-PROTO-01..05` | 与边缘契约逐字一致 |
 | **风控·防自残安全闸** | 配额硬上限、状态降级链、致命冻结、record 拒绝返 false | L | `acceptance/risk-guard.test.ts` `AC-RISK-01..03` | 被禁止时绝不放行/不静默执行 |
 | **发布审批·跨层契约** | 信号路径格式、卡片回调解析 | L | `acceptance/publish-approval-contract.test.ts` `AC-PUB-01/07/08` | 路径与边缘一致 |
 | **真机·部署握手** | 连已部署 cloud 发 hello 收 welcome | E | `acceptance/real-e2e.test.ts` `AC-E2E-03` | gated；服务健康 |
@@ -90,7 +90,7 @@ AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test
 
 | 验收点 | 层 | 证据 | 通过判据 |
 | --- | --- | --- | --- |
-| 协议契约一致性 | L | 两仓 `acceptance/protocol-contract.test.ts` 各自穷举 41 消息类型 | 任一端漂移 → 该端 `typecheck` 失败 |
+| 协议契约一致性 | L | 两仓 `acceptance/protocol-contract.test.ts` 各自穷举 42 消息类型 | 任一端漂移 → 该端 `typecheck` 失败 |
 | 发布审批信号契约 | L | edge `buildPublishApprovalSignalPath` 与 cloud `getApprovalSignalPath` 同断言 `/tmp/aidcp-publish-approve-<id>.json` | 两端路径格式一致 |
 | 浏览闭环端到端 | S | cloud `integration/role-dispatcher.test.ts` + edge `browse-session.test.ts` | 上报→决策→下发指令链路成立 |
 | 发布端到端 | S | edge `integration/publish-e2e.test.ts` + cloud `publish-agent/publish-orchestrator.test.ts` | publish.request→approval→result |
@@ -100,7 +100,7 @@ AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test
 
 | 编号 | 名称 | 仓 | 守护的产品红线 |
 | --- | --- | --- | --- |
-| `AC-PROTO-01..05` | 协议契约一致性 | edge + cloud | 边/云两份 `protocol.ts` 不漂移（版本 2、41 消息类型、信封往返）；用 `Record<MessageType,true>` 穷举，漂移即 `typecheck` 失败 |
+| `AC-PROTO-01..05` | 协议契约一致性 | edge + cloud | 边/云两份 `protocol.ts` 不漂移（版本 2、42 消息类型、信封往返）；用 `Record<MessageType,true>` 穷举，漂移即 `typecheck` 失败 |
 | `AC-PUB-01..08` | 发布审批信号契约 | edge + cloud | 信号文件路径/结构两端一致；**未授权绝不静默发布**（拒绝/超时/串号都不发） |
 | `AC-RISK-01..03` | 风控防自残安全闸 | cloud | **绝不自残**：配额硬上限、状态降级（warned 停发布→restricted 停互动→frozen 全停）、致命信号一步冻结，被禁止时 `record` 返回 false |
 | `AC-E2E-01..03` | 真机联调（gated） | edge + cloud | 真实边-云连通、握手、心跳；默认跳过，`AIDCP_E2E=1` 触发 |
