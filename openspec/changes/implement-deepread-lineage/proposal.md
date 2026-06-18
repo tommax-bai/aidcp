@@ -24,5 +24,5 @@
 
 - **aidcp-cloud**：`src/agents/deep-reader.ts`（空壳→真实角色）、新增 `src/agents/comment-reviewer.ts`、`src/orchestrator/role-dispatcher.ts`（接线 `browse_images`/`scroll_comments`/`profile.open`、订阅 `profile.detail`）、`src/comm/handler.ts`（新增 `case 'profile.detail'`）、`src/comm/protocol.ts` 与 `command-bridge.ts`（新增 `profile.open`、可选回报字段）、`src/event-bus/types.ts`（事件/角色定义）。
 - **aidcp-edge**：`src/browse/browse-session.ts`（`browse_images`/`scroll_comments` 选择器校准与真实回报、新增进主页执行 case）、`src/browse/note-extractor.ts` 或新增 profile 抽取（`postsCount`/`followersCount`）、`src/client/edge-client.ts`（落实 `reportProfileDetail` 调用）、`src/comm/protocol.ts`（同步 `profile.open`）。
-- **ai-dcp（本中控仓）**：`docs/protocol.md` 增补 `profile.open` 指令与回报字段说明；本 change 的 spec delta。
+- **aidcp（本中控仓）**：`docs/protocol.md` 增补 `profile.open` 指令与回报字段说明；本 change 的 spec delta。
 - **风控**：`browse_images`/`scroll_comments` 属低风险浏览动作，复用既有节奏与预算；不触碰发评论/发布的高风险路径。

@@ -47,6 +47,6 @@
     `pacing` 默认）、`src/risk/` + 评估角色（算 `dwellMs`/`thinkMs`，应用 `tempo`/疲劳）。
   - `aidcp-edge`：`src/comm/protocol.ts`（同名投影）、拟人化 / 浏览执行（消费时间指令、叠抖动、返回达标、
     默认兜底）。
-  - `ai-dcp`：`docs/protocol.md §3.7/§3.9`（指令时间字段 + `session.budget` 默认）与 `docs/risk-control.md §3`
+  - `aidcp`：`docs/protocol.md §3.7/§3.9`（指令时间字段 + `session.budget` 默认）与 `docs/risk-control.md §3`
     （标注系数收口云端、经指令下发）回写。
 - 向后兼容：纯增量可选字段，旧边缘忽略时间字段并走默认兜底，行为不劣化。

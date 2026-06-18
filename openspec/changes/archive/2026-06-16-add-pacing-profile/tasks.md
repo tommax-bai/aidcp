@@ -2,12 +2,12 @@
 
 > 进度回写在本中控仓。代码改动落对应 sub-repo，标 `[x]` 时附 `<!-- <repo> <commit-sha> 备注 -->`。
 
-## 1. ai-dcp（中控：契约 / 文档）
+## 1. aidcp（中控：契约 / 文档）
 
-- [x] 1.1 `docs/protocol.md §3.7`：角色指令 payload 增可选时间字段——`navigation.back`/`note.close` 加 `dwellMs?`，`interaction.*`/`note.open` 加 `thinkMs?`，给出语义与示例 <!-- ai-dcp 本次提交 §3.7 增时间指令说明块 -->
-- [x] 1.2 `docs/protocol.md §3.9`：`session.budget` 增可选极薄 `pacing` 默认块（`tempo?`/`dwellFloorMs?`，仅兜底用） <!-- ai-dcp 本次提交 -->
-- [x] 1.3 `docs/risk-control.md §3`：标注 read/pause/fatigue 系数**收口云端**、经决策指令的 `dwellMs`/`thinkMs` 下发，`tempo` 为状态联动旋钮 <!-- ai-dcp 本次提交 §3 顶部加节奏归属说明 -->
-- [x] 1.4 校验 change：`openspec validate add-pacing-profile --strict` <!-- ai-dcp valid ✓ -->
+- [x] 1.1 `docs/protocol.md §3.7`：角色指令 payload 增可选时间字段——`navigation.back`/`note.close` 加 `dwellMs?`，`interaction.*`/`note.open` 加 `thinkMs?`，给出语义与示例 <!-- aidcp 本次提交 §3.7 增时间指令说明块 -->
+- [x] 1.2 `docs/protocol.md §3.9`：`session.budget` 增可选极薄 `pacing` 默认块（`tempo?`/`dwellFloorMs?`，仅兜底用） <!-- aidcp 本次提交 -->
+- [x] 1.3 `docs/risk-control.md §3`：标注 read/pause/fatigue 系数**收口云端**、经决策指令的 `dwellMs`/`thinkMs` 下发，`tempo` 为状态联动旋钮 <!-- aidcp 本次提交 §3 顶部加节奏归属说明 -->
+- [x] 1.4 校验 change：`openspec validate add-pacing-profile --strict` <!-- aidcp valid ✓ -->
 
 ## 2. aidcp-cloud（云端：算时长 + 随指令下发）
 

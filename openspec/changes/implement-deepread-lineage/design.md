@@ -2,7 +2,7 @@
 
 详情页深读链路的事件骨架已连通：`quality.pass → DeepReader → reading.done → InteractionAppraiser → interaction.completed → AuthorEvaluator → profile.worth_visiting → ProfileOpener → profile.entered → ProfileBrowser → profile.browsed → FollowAgent → profile.done`。问题在中段三处空接线（详见 proposal）：`DeepReader` 空壳直通、`comment_reviewer` 孤名、`profile.open` 未走通且 `profile.detail` 双向断链。协议类型与边缘执行器大多已预埋，本设计聚焦**事件拓扑接线 + 边缘选择器校准 + 数据链路修复**，不重构既有角色框架（`BaseRole`/EventBus/RoleDispatcher）。
 
-跨 aidcp-cloud（决策与编排）与 aidcp-edge（浏览器执行）两仓协同，契约与 spec 落在中控仓 ai-dcp。
+跨 aidcp-cloud（决策与编排）与 aidcp-edge（浏览器执行）两仓协同，契约与 spec 落在中控仓 aidcp。
 
 ## Goals / Non-Goals
 
@@ -62,7 +62,7 @@ quality.pass
 
 ## Migration Plan
 
-1. ai-dcp：合并 spec delta、更新 `docs/protocol.md`。
+1. aidcp：合并 spec delta、更新 `docs/protocol.md`。
 2. aidcp-cloud + aidcp-edge：按 tasks 实装，本地 `npm test`/`typecheck`/`test:acceptance` 通过。
 3. edge 本地连 ECS（`ws://121.89.85.150:8787`）跑通一轮浏览，人工观测：能看图、能翻评论、能进主页、`profile.detail` 上报且 `FollowAgent` 收到非 0 数据。
 4. cloud 部署按 ECS 安全序列（备份→rsync→restart→healthcheck→失败回滚）。

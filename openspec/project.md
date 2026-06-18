@@ -6,11 +6,11 @@ AIDCP（AI-Driven Control Plane）是一套 **DOM-first** 的浏览器自动化�
 
 ## 仓库拓扑（本仓为中控）
 
-- `ai-dcp`（本仓，`/Users/bears/codes/ai-dcp`，分支 `main`）：中控 / 总览。契约（架构 / 协议 /
+- `aidcp`（本仓，`.`，分支 `main`）：中控 / 总览。契约（架构 / 协议 /
   产品设计）+ openspec changes + 测试与部署编排。**不承载业务代码**。
-- `aidcp-edge`（`/Users/bears/codes/aidcp-edge`，分支 `master`）：边缘端。CDP 接入 / 定位引擎
+- `aidcp-edge`（`../aidcp-edge`，分支 `master`）：边缘端。CDP 接入 / 定位引擎
   三道闸 / 浏览执行 / 拟人化 / 反检测 / 发布 flow / Electron 打包。
-- `aidcp-cloud`（`/Users/bears/codes/aidcp-cloud`，分支 `master`）：云端。协议 / 事件驱动多 Agent
+- `aidcp-cloud`（`../aidcp-cloud`，分支 `master`）：云端。协议 / 事件驱动多 Agent
   编排（RoleDispatcher + 15 角色 + EventBus）/ 风控状态机 / Qwen LLM / PG 锚点缓存 / 飞书 Bot。
 
 边-云通过 `docs/protocol.md` 定义的 WebSocket 协议 v2 通信。

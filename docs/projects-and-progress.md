@@ -15,9 +15,9 @@
 
 ### 1.1 职责划分
 
-- `aidcp`：文档总览仓，位于 `/Users/bears/codes/ai-dcp`，用于沉淀架构、协议、产品设计等文档，定义系统契约，不承载业务代码实现。
-- `aidcp-edge`：边缘端代码仓，位于 `/Users/bears/codes/aidcp-edge`，负责连接 Chrome/CDP，执行定位、浏览、拟人化、反检测、发布流程等端侧能力。
-- `aidcp-cloud`：云端代码仓，位于 `/Users/bears/codes/aidcp-cloud`，负责协议、规划、事件驱动编排、风控、发布、概念池与飞书 Bot 等云侧能力。
+- `aidcp`：文档总览仓，位于 `.`，用于沉淀架构、协议、产品设计等文档，定义系统契约，不承载业务代码实现。
+- `aidcp-edge`：边缘端代码仓，位于 `../aidcp-edge`，负责连接 Chrome/CDP，执行定位、浏览、拟人化、反检测、发布流程等端侧能力。
+- `aidcp-cloud`：云端代码仓，位于 `../aidcp-cloud`，负责协议、规划、事件驱动编排、风控、发布、概念池与飞书 Bot 等云侧能力。
 
 整体关系是：`aidcp` 中的文档先定义契约与设计边界，`aidcp-edge` 与 `aidcp-cloud` 按文档分别实现边缘端与云端能力；边缘端与云端之间通过 `docs/protocol.md` 所定义的 WebSocket 协议（v2）通信。
 
@@ -25,9 +25,9 @@
 
 | 项目 | 本地路径 | GitHub |
 | --- | --- | --- |
-| aidcp | `/Users/bears/codes/ai-dcp` | `git@github.com:tommax-bai/aidcp.git` |
-| aidcp-edge | `/Users/bears/codes/aidcp-edge` | `git@github.com:tommax-bai/aidcp-edge.git` |
-| aidcp-cloud | `/Users/bears/codes/aidcp-cloud` | `git@github.com:tommax-bai/aidcp-cloud.git` |
+| aidcp | `.` | `git@github.com:tommax-bai/aidcp.git` |
+| aidcp-edge | `../aidcp-edge` | `git@github.com:tommax-bai/aidcp-edge.git` |
+| aidcp-cloud | `../aidcp-cloud` | `git@github.com:tommax-bai/aidcp-cloud.git` |
 
 > 部署口径不变：cloud 只部署在 ECS（见 `handoff-2026-06-05.md`），本地只跑 edge 连 ECS。
 
@@ -44,7 +44,7 @@ flowchart LR
 
 | 模块 | 所在仓 | 代码实际状态 | 代码路径或缺口 |
 | --- | --- | --- | --- |
-| 文档总览与契约定义 | aidcp | 已实现；仓内主要为 `docs/` 文档，不含业务代码 | `/Users/bears/codes/ai-dcp/docs/` |
+| 文档总览与契约定义 | aidcp | 已实现；仓内主要为 `docs/` 文档，不含业务代码 | `./docs/` |
 | CDP 接入 | aidcp-edge | 已实现 | `aidcp-edge/src/cdp/`（client/targets/dom-provider/action-executor/session/chrome-launcher/stealth-injector） |
 | 定位引擎三道闸（后置校验 / 重试升级 / 反污染） | aidcp-edge | 已实现；`guard.ts` 覆盖 `modal_dialog`/`overlay_mask`/`login_expired` | `aidcp-edge/src/locating/engine.ts`、`guard.ts` |
 | 浏览执行层 `browse` | aidcp-edge | 已实现；命令分发 + 结构化上报（开/跳决策已上移至 Cloud `ContentEvaluator`，`card-filter.ts` 已 `@deprecated` 未被调用） | `aidcp-edge/src/browse/`（browse-session/feed-scroller/modal-controller/note-extractor/search-handler；card-filter 为遗留模块） |

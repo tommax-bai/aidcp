@@ -55,7 +55,7 @@
 
 ## 8. 文档与部署
 
-- [x] 8.1 ai-dcp `docs/protocol.md`：增补 `profile.open` 指令与（如有）回报字段说明，更新 action→message 映射表 <!-- ai-dcp（本提交） -->
-- [x] 8.2 回写本 change `tasks.md` 进度（HTML 注释标 PR#/commit-sha/偏离说明） <!-- ai-dcp（本提交） -->
+- [x] 8.1 aidcp `docs/protocol.md`：增补 `profile.open` 指令与（如有）回报字段说明，更新 action→message 映射表 <!-- aidcp（本提交） -->
+- [x] 8.2 回写本 change `tasks.md` 进度（HTML 注释标 PR#/commit-sha/偏离说明） <!-- aidcp（本提交） -->
 - [x] 8.3 `openspec validate implement-deepread-lineage --strict` 通过 <!-- 见提交前校验 -->
 - [x] 8.4 cloud 按 ECS 安全序列部署（备份→rsync→restart→healthcheck→失败回滚），edge 本地发布；部署后追加 `<!-- <date> deployed -->` <!-- aidcp-cloud ab49d5c 2026-06-17 deployed：备份 /opt/aidcp/cloud.bak.20260617-141701.tar.gz + .env.bak.20260617，rsync src/（10 文件），restart aidcp-cloud.service active/NRestarts=0，healthcheck 全过（8787 监听 / 飞书长连接 / PG select 1 / isales 未触碰）。edge 本地发布待用户重启本机 edge（连 ws://121.89.85.150:8787），随 5.4/6.5/7.5 实机核对一并完成 -->

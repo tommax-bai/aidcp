@@ -333,8 +333,8 @@ graph TB
 | 仓库 | 角色 | 路径 |
 | --- | --- | --- |
 | **aidcp**（本仓） | 总览 / 文档 | 当前仓库 |
-| **aidcp-edge** | 边缘端：定位 / CDP / 浏览执行 / 拟人化 / 反检测 / 发布 / Electron | `/Users/bears/codes/aidcp-edge` |
-| **aidcp-cloud** | 云端：事件驱动编排 / 风控 / 发布 / LLM / 缓存 / WS 服务 / 飞书 | `/Users/bears/codes/aidcp-cloud` |
+| **aidcp-edge** | 边缘端：定位 / CDP / 浏览执行 / 拟人化 / 反检测 / 发布 / Electron | `../aidcp-edge` |
+| **aidcp-cloud** | 云端：事件驱动编排 / 风控 / 发布 / LLM / 缓存 / WS 服务 / 飞书 | `../aidcp-cloud` |
 
 ---
 

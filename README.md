@@ -13,7 +13,7 @@
 | [**aidcp-edge**](../aidcp-edge) | 边缘端 | 定位层引擎（DOM-first）+ CDP（原生 WebSocket）页面接入 + 浏览执行 + 拟人化 + 发布 + Electron 打包 |
 | [**aidcp-cloud**](../aidcp-cloud) | 云端 | 事件驱动多 Agent 编排（RoleDispatcher + 15 角色）+ 风控状态机 + Qwen LLM + PG 锚点缓存 + 边-云 WS 服务端 + 飞书 Bot |
 
-> 物理路径：`/Users/bears/codes/aidcp-edge`、`/Users/bears/codes/aidcp-cloud`。
+> 相对路径（三仓同级）：`../aidcp-edge`、`../aidcp-cloud`（可能尚未在当前机器 clone）。
 > 部署铁律：cloud 只跑在 ECS（见 `docs/handoff-2026-06-05.md`），本地只起 edge 连 ECS。
 
 ## 设计主张
@@ -68,10 +68,10 @@
 
 ```bash
 # 边缘端（本地只跑 edge）
-cd /Users/bears/codes/aidcp-edge && npm install && npm test
+cd ../aidcp-edge && npm install && npm test
 
 # 云端（本地仅做代码级验证；正式运行在 ECS，本地勿起 cloud）
-cd /Users/bears/codes/aidcp-cloud && npm install && npm test
+cd ../aidcp-cloud && npm install && npm test
 ```
 
 ## 文档索引
