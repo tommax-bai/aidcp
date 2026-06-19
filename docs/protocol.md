@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 15 角色）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> v2 共 **44 个消息类型**，下表按职能分组列全。
+> v2 共 **47 个消息类型**，下表按职能分组列全。
 
 ## 1. 信封（Envelope）
 
@@ -90,6 +90,7 @@
 | `note.browse_images` | cloud → edge | 浏览笔记图片（`count` 张；DeepReader 决策下发） |
 | `note.scroll_comments` | cloud → edge | 滚动评论区（CommentReviewer 决策下发） |
 | `profile.open` | cloud → edge | 进入作者主页（专用指令，取代 `open_note{type:'profile'}`） |
+| `notification.open` | cloud → edge | 去通知页查看「评论和@」（复合命令，仿 `profile.open`：导航+切 tab+抽取+上报 `notification.items`） |
 
 ### 2.4 结构化上报（v2 新增，edge → cloud，`RoleDispatcher` 消费）
 
@@ -99,6 +100,8 @@
 | `note.detail` | edge → cloud | 上报笔记详情（正文/作者/计数） |
 | `profile.detail` | edge → cloud | 上报作者主页数据（粉丝数/作品数） |
 | `action.completed` | edge → cloud | 确认某个 action 执行完成 |
+| `notification.detected` | edge → cloud | 检测到「消息」有未读（仅信号；`epoch` 每次由无变有 +1，去重用） |
+| `notification.items` | edge → cloud | 上报本次巡视抽取的评论/@ 项（用户名/内容/笔记标题/itemKey；是否通知由云端判） |
 
 ### 2.5 风控预算与互动判定（v2 新增）
 

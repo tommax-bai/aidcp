@@ -14,11 +14,11 @@
 
 ## 3. 协议三处同步（+3 消息，44→47）
 
-- [ ] 3.1 `aidcp-cloud/src/comm/protocol.ts`：加 `notification.detected` / `notification.open` / `notification.items` + 各 payload + `Record<MessageType,true>` 条目
-- [ ] 3.2 `aidcp-edge/src/comm/protocol.ts`：同上，与 cloud **逐字一致**
-- [ ] 3.3 `aidcp-cloud/src/comm/command-bridge.ts`：加 `open_notifications → notification.open` 映射
-- [ ] 3.4 `docs/protocol.md`：3 消息说明 + 头部计数 44→47 + §2 表
-- [ ] 3.5 两仓 `npm run typecheck` + `test:acceptance`：AC-PROTO-02 由 44 改 47、两端一致
+- [x] 3.1 `aidcp-cloud/src/comm/protocol.ts`：加 3 消息 + payload（含 `NotificationItem`）+ MessageMap <!-- aidcp-cloud c271c4c -->
+- [x] 3.2 `aidcp-edge/src/comm/protocol.ts`：与 cloud 逐字一致 <!-- aidcp-edge a11bcc9 -->
+- [x] 3.3 `command-bridge.ts`：`open_notifications → notification.open`；EdgeCommand action += open_notifications <!-- aidcp-cloud c271c4c -->
+- [x] 3.4 `docs/protocol.md`：3 消息行 + 头部计数 44→47 <!-- control repo -->
+- [x] 3.5 两仓 typecheck + acceptance（AC-PROTO-02=47，两端一致；cloud 18/18、edge 11/11） <!-- 2026-06-19 -->
 
 ## 4. aidcp-edge — 通知监测体 + 巡视命令
 
