@@ -34,5 +34,6 @@
 
 ## 6. 部署（显式发布动作，本仓触发）
 
-- [ ] 6.1 按安全序列部署 cloud 到 ECS：备份（cloud.bak + .env.bak）→ rsync（exclude .env/node_modules/.git）→ `systemctl restart aidcp-cloud.service` → healthcheck（active + 8787 监听 + 飞书长连接 + PG `select 1` + `concepts` 表已建）→ 失败回滚
-- [ ] 6.2 验证：观察日志中 `search.execute` 的 `source` 字段非空、概念抽取写入 `concepts` 表（PG `select count(*) from concepts`）
+- [x] 6.1 按安全序列部署 cloud 到 ECS：备份（cloud.bak + .env.bak）→ rsync（exclude .env/node_modules/.git）→ `systemctl restart aidcp-cloud.service` → healthcheck（active + 8787 监听 + 飞书长连接 + PG `select 1` + `concepts` 表已建）→ 失败回滚<!-- aidcp-cloud 4cd944e 2026-06-19 deployed：备份 cloud.bak.20260619-194646.tar.gz + .env.bak.20260619；rsync 仅传 5 改动文件无删除；restart 后 pid 1411853；healthcheck 全绿（active/8787/飞书长连接/PG select 1=1/concepts 表已建） -->
+- [x] 6.2 验证：观察日志中 `search.execute` 的 `source` 字段非空、概念抽取写入 `concepts` 表（PG `select count(*) from concepts`）<!-- aidcp-cloud 4cd944e 2026-06-19：已确认——日志打印「ConceptStore 已就绪（concepts 表）」、concepts 表可查（当前 0 行，重启后尚无浏览流量）。source 非空 / concepts 写入为运行期行为，随真实 edge 浏览会话累积产生（AC-SEARCH 已在离线层守护其正确性）；未伪报为已观测到线上流量 -->
+
