@@ -1,7 +1,7 @@
 ## 1. 证伪/证实偏置（gating，先做）
 
-- [ ] 1.1 查 cloud 决策日志（`base-role.ts decide()` verdict）：统计 appraiser 被调用次数、like/collect/both/pass 分布与样本量
-- [ ] 1.2 结论写入本 tasks 进度：是真偏置（like 明显偏低、样本足够）还是单篇样本噪声——据此定 D1 调参激进度（D2 收藏即点赞独立成立，照常做）
+- [x] 1.1 查 cloud 决策日志（`base-role.ts decide()` verdict）：统计 appraiser 被调用次数、like/collect/both/pass 分布与样本量 <!-- ECS journalctl 2026-06-19 查询（窗口 2700 行，至 2026-06-18T22:50:54）：40 次 appraiser 决策 → collect 22 / like 10 / pass 8 / both 0；实际执行 collect 22 / like 9 / follow 13 -->
+- [x] 1.2 结论写入本 tasks 进度：**确认是真偏置，非样本噪声**。40 样本下 collect(22) ≈ 2.2× like(10)，且 both 从未被选(0/40)——与 soul `style:收藏比点赞更稀有`（like 应 > collect）**相反**。like 链路正常（9 次真实点赞），原会话「零点赞」只是单会话小样本切片。→ D1（prompt 重平衡）+ D2（收藏即点赞，根治 both=0）+ D3（soul 文案）全量推进 <!-- 2026-06-19 gating done -->
 
 ## 2. aidcp-cloud — prompt 重平衡与确定性兜底
 
