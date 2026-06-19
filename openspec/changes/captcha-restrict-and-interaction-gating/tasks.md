@@ -40,5 +40,5 @@
 
 - [x] 6.1 aidcp-edge 验证码功能单独成 commit（与 chrome-launcher 分开）；aidcp-cloud 提交云端改动 <!-- aidcp-cloud 3c84ccf / aidcp-edge 9126e04；edge chrome-launcher 与 cloud recency-aware-revisit-pacing(并行在制) 均留工作区未提交 -->
 - [x] 6.2 本仓回写 tasks 进度（HTML 注释标 `[x]` + commit-sha + 偏离说明），按 sub-repo 分节
-- [ ] 6.3 ECS 部署（带安全闸，**显式动作待确认**）：先备份 → rsync(exclude .env/node_modules/.git) → `systemctl restart aidcp-cloud.service` → healthcheck（active + 8787 监听 + 飞书长连 + PG `select 1` + `risk_state`/`risk_counters` 可读）→ 失败回滚；部署后 tasks 追加 `<!-- <date> deployed -->`
-- [ ] 6.4 真机验证：人为触发一次验证码 → 确认云端置 `restricted` + 停下发 + 飞书卡（账号/机器/地址）+ DOM 清除后恢复；归档 change（`openspec validate --strict` → archive）
+- [x] 6.3 ECS 部署（带安全闸）：备份 → rsync(exclude .env/node_modules/.git) → `systemctl restart aidcp-cloud` → healthcheck 全过 <!-- aidcp-cloud 127567c 2026-06-19 deployed；backup /opt/aidcp/cloud.bak.20260619-165316.tar.gz + .env.bak.20260619-165316；journal "RiskController 已就绪（PgRiskStore 持久化）"，8787 监听，飞书长连，PG select 1=ok，risk_counters/risk_interactions/risk_state 表已建；isales 4 服务未受影响 -->
+- [ ] 6.4 真机验证（**待人工**）：人为触发一次验证码 → 确认云端置 `restricted` + 停下发 + 飞书卡（账号/机器/地址）+ DOM 清除后恢复；通过后 `openspec validate --strict` → archive。前置：edge 需带 `AIDCP_ACCOUNT_ID`/`AIDCP_MACHINE_LABEL`/`AIDCP_REMOTE_ADDR` 启动，卡片才有机器定位
