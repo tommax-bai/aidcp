@@ -1,19 +1,20 @@
-## 1. aidcp-cloud — 有界近期已评估集合 + thinkMs 熟悉折扣
+> ⚠️ **阻塞（并发开发）**：实装期间发现 **edge 与 cloud 两仓均有他人未提交的 captcha WIP**（edge: overlay-monitor/login-modal-watcher/protocol/executeFollow 复检；cloud: ws-server `pauseEdge/resumeEdge`、protocol Captcha payload、role-dispatcher `canInteract` 风控闸、protocol-contract.test）。cloud WIP 当前**令 `npm run typecheck` 失败**（`test/like-command.test.ts` 的 `FakePusher` 未实现新 `pauseEdge/resumeEdge`），非本 change 所致。故本 change 代码已落地+我的文件 typecheck 干净+定向测试全过，但**未提交**（避免与并发 WIP 纠缠 / 不在 broken 树上提交）。
 
-- [ ] 1.1 `src/agents/session-context.ts`：新增**有界近期已评估集合**（约最近 30，超出淘汰最旧）+ `markEvaluated(noteId)` / `isRecentlyEvaluated(noteId)`；`reset()` 不重置（跨轮保持）（D1）
-- [ ] 1.2 `src/agents/content-evaluator.ts`：在 `_evaluate` 评估候选时对其 `markEvaluated(noteId)`；**候选过滤保持 `!isVisited` 不变**（保留二次评估，不加 isEvaluated 排除）（D2）
-- [ ] 1.3 `src/risk/pacing.ts`：`computeThinkMs` 的 `ThinkInput` 增 `familiar?:boolean`（或 discount）；familiar 时中心值 ×`FAMILIAR_DISCOUNT(≈1/3)`，夹非零下限 `THINK_FLOOR_MS`；`computeDwellMs` 不接 familiar（dwell 不折扣）（D3）
-- [ ] 1.4 `src/orchestrator/role-dispatcher.ts`：`thinkNow(familiar?)` 透传；`content.valuable → open_note`（:374）按 `ctx.isRecentlyEvaluated(payload.noteId)` 传 familiar；评估批标记由 ContentEvaluator 负责（D3）
+- [x] 1.1 `src/agents/session-context.ts`：有界近期已评估集合（cap 30，淘汰最旧）+ `markEvaluated` / `isRecentlyEvaluated`；`reset()` 不重置（D1）<!-- aidcp-cloud uncommitted（并发 WIP 同树）-->
+- [x] 1.2 `src/agents/content-evaluator.ts`：`_evaluate` 在 emit 之后对本批候选 `markEvaluated`；**候选过滤 `!isVisited` 不变**（二次评估保留）（D2）<!-- aidcp-cloud uncommitted -->
+- [x] 1.3 `src/risk/pacing.ts`：`ThinkInput.familiar?`；familiar 时 `×FAMILIAR_DISCOUNT(1/3)` 夹 `THINK_FLOOR_MS(150)`；`computeDwellMs` 不接 familiar（D3）<!-- aidcp-cloud uncommitted -->
+- [x] 1.4 `src/orchestrator/role-dispatcher.ts`：`thinkNow(familiar)` + `content.valuable → open_note` 按 `isRecentlyEvaluated(noteId)` 传 familiar（emit 同步 → 首开全量、返回再开 1/3）（D3）<!-- aidcp-cloud uncommitted -->
 
 ## 2. aidcp-edge — 返回 back_to_feed 手势 + 落地折扣
 
-- [ ] 2.1 `src/browse/browse-session.ts` `navigateBack`：当 `reason==='back_to_feed'` 时，返回手势 `humanPause(actionTiming)` 用 ≈1/3 折扣停顿（带非零下限），并缩短 `history.back` 后的固定 `sleep(800)` / 冗余等待（D4）
-- [ ] 2.2 确认不碰 `ensureDetailDwell`（笔记 dwell）与 404/坏页健康校验兜底；非 back_to_feed 返回时序不变（D4）
+- [x] 2.1 `src/browse/browse-session.ts` `navigateBack(targetPage, reason)`：`reason==='back_to_feed' && !wantSearch` 时手势用 `cardGapTiming`（≈action 的 1/3、带抖动非零）+ `history.back` 后 sleep 800→300（D4）<!-- aidcp-edge uncommitted（并发 WIP 同树）-->
+- [x] 2.2 未碰 `ensureDetailDwell`（笔记 dwell）与 404/坏页兜底；非 back_to_feed / 回搜索路径时序不变（D4）<!-- aidcp-edge uncommitted -->
 
 ## 3. 验证
 
-- [ ] 3.1 cloud 单测：`computeThinkMs` familiar → ≈1/3 且 ≥ 下限；全新 → 全量；`computeDwellMs` 不受 familiar 影响；SessionContext 有界 recency（淘汰最旧 / isRecentlyEvaluated 命中与失效）；open_note 对近期已评估卡片下发折扣 thinkMs
-- [ ] 3.2 cloud 单测：返回后二次评估仍发生（候选过滤未排除 evaluated，content-evaluator 仍对未 visited 候选评估）
+- [x] 3.1 cloud 单测：`computeThinkMs` familiar→≈1/3 且 ≥150 下限、全新→全量、`computeDwellMs` 不受 familiar 影响（pacing 11/11）；定向跑 pacing+content-evaluator+role-dispatcher 30/30 全过 <!-- 我的文件 typecheck 干净；全量 typecheck 被并发 cloud WIP（FakePusher）阻塞 -->
+- [ ] 3.2 cloud 单测：返回后二次评估仍发生（候选过滤未排除 evaluated）<!-- 结构上已保留（仅新增 markEvaluated，未改 filter）；待补显式断言 -->
+- [ ] 3.2b 待并发 WIP 落定（FakePusher 修复、typecheck 恢复绿）后补 edge navigateBack 测试 + 全量回归
 - [ ] 3.3 edge 单测/acceptance：back_to_feed 手势停顿 ≈1/3 且非零、非 back_to_feed 不变、笔记 dwell/坏页兜底不回归；command-pacing「杜绝秒退」红线全过
 - [ ] 3.4 两仓 `npm run typecheck` → `npm run test:acceptance` → `npm test`
 
