@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 15 角色）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> v2 共 **42 个消息类型**，下表按职能分组列全。
+> v2 共 **44 个消息类型**，下表按职能分组列全。
 
 ## 1. 信封（Envelope）
 
@@ -110,6 +110,8 @@
 | `risk.canDo.result` | cloud → edge | — | allow / deny + 原因 |
 | `risk.record` | edge → cloud | `risk.record.result` | 互动成功后记录 action |
 | `risk.record.result` | cloud → edge | — | 记录结果 |
+| `risk.captcha_detected` | edge → cloud | — | 检测到验证码/未知阻断弹窗（已本地暂停），通知云端置风控态 + 停发命令 + 通知人工 |
+| `risk.captcha_cleared` | edge → cloud | — | 验证码/未知阻断弹窗已清除，已恢复浏览 |
 
 ### 2.6 发布编排（v2 新增，Publish Agent 驱动）
 
@@ -420,6 +422,23 @@
 **`risk.record`**（edge → cloud）：`{ "action": "like", "accountId": "acc-01" }`（accountId 可选）
 
 **`risk.record.result`**（cloud → edge）：`{ "action": "like", "recorded": true, "reason": "..." }`
+
+**`risk.captcha_detected`**（edge → cloud，fire-and-forget）：检测到验证码/未知阻断弹窗
+```jsonc
+{
+  "edgeId": "edge-1",            // string?  边缘标识
+  "kind": "captcha",            // 'captcha' | 'unknown'：unknown=可见阻断遮罩但本地未归类
+  "url": "https://...",        // string?  触发时页面 URL（best-effort）
+  "accountId": "acc-01",       // string?  关联账号
+  "reason": "..."              // string?  简短说明
+}
+```
+> 边缘旁路监测体在「类别翻转进 captcha/unknown」时发一次（已先本地暂停）。云端据此置归属账号
+> 风控态（captcha→restricted / unknown→warned）、按 edge 暂停下发、(edgeId,account) 去重后通知飞书。
+> 检测/暂停/恢复全在 edge 本地完成，本消息只是通知，云端从不回查边缘动作。
+
+**`risk.captcha_cleared`**（edge → cloud，fire-and-forget）：`{ "edgeId": "edge-1", "url": "...", "accountId": "acc-01" }`（均可选）
+> 边缘弹窗清除、已恢复浏览。云端解除该 edge 暂停；风控态不因清除自动回滚（由恢复窗口/人工恢复驱动）。
 
 ### 3.10 发布编排
 
