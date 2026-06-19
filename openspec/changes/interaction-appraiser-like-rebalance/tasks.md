@@ -13,9 +13,9 @@
 ## 3. 验证与归档
 
 - [x] 3.1 cloud 单测：collect+like 配额>0 → actions=[like,collect]；collect+like 配额=0 → [collect]；collect+collect 配额=0 → [like]；prompt 含重平衡框定；`npm run typecheck` + `npm run test:acceptance`（11/11，AC-PROTO/PUB/RISK 绿）+ `npm test`（172/172） <!-- aidcp-cloud 0fc9f0c 全绿 -->
-- [ ] 3.2 上线后用 `decide()` 日志对比改动前后 like/collect 比例，确认 D1/D2 实际生效（LLM 行为类改动须日志佐证）
-- [ ] 3.3 部署前确认 ECS 实际 soul 的 `like_principle`/`interests` 与仓库一致（否则改了不生效）
+- [ ] 3.2 上线后用 `decide()` 日志对比改动前后 like/collect 比例，确认 D1/D2 实际生效（LLM 行为类改动须日志佐证）<!-- 待新会话积累决策样本后比对（部署前基线：collect 22 / like 10 / pass 8 / both 0）-->
+- [x] 3.3 部署前确认 ECS 实际 soul 的 `like_principle`/`interests` 与仓库一致（否则改了不生效）<!-- 2026-06-19 部署前 ECS soul behavior_guidelines == 旧仓库版本（非手改），rsync 已覆盖为新版 -->
 - [x] 3.4 按 sub-repo 分节回写本 tasks.md 进度（`<!-- <repo> <commit-sha> 备注 -->`）
 - [x] 3.5 `openspec validate interaction-appraiser-like-rebalance --strict` 通过 <!-- 2026-06-19 valid -->
-- [ ] 3.6 cloud 改动按 §5 安全序列部署 ECS（含 healthcheck/回滚），部署后追加 `<!-- <date> deployed -->`
+- [x] 3.6 cloud 改动按 §5 安全序列部署 ECS（含 healthcheck/回滚）<!-- aidcp-cloud 0fc9f0c 2026-06-19 deployed：backup cloud.bak.20260619-095701.tar.gz + .env.bak.2026-06-19 → rsync → restart → healthcheck(active/8787/PG/飞书长连/isales不受影响)全过 -->
 - [ ] 3.7 `/opsx:archive` 归档（新建 `openspec/specs/interaction-appraisal`）
