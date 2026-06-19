@@ -10,7 +10,7 @@
 
 ## 2. aidcp-edge — 监测体清单
 
-- [ ] 2.1 新增小清单件持 `Watcher[]` + `startAll/stopAll`；替掉 `src/main.ts` 手工接线块（仅弹窗监测体，行为保持）（D3）
+- [x] 2.1 新增 `src/browse/watcher-supervisor.ts`（`register` + `startAll/stopAll`）；`main.ts` 手工接线块替为清单注册（弹窗回调逐字保留 + 通知监测体）（D3）<!-- aidcp-edge 52a5ce5 -->
 
 ## 3. 协议三处同步（+3 消息，44→47）
 
@@ -22,10 +22,10 @@
 
 ## 4. aidcp-edge — 通知监测体 + 巡视命令
 
-- [ ] 4.1 新 `src/browse/notification-monitor.ts`：按基类盯"消息"未读标记；软中断 + fail-open + sticky（探测失败保持上次、**绝不重置未读为 0**）；epoch=每次无→有翻转单调 +1；翻转只上报一次 `notification.detected`（D5/D7）
-- [ ] 4.2 清单登记通知监测体（一行）；`main.ts` 接 `notification.detected` 上报（D3）
-- [ ] 4.3 `src/browse/browse-session.ts`：加 `notification.open` 复合命令 handler（仿 `profile.open`）——导航通知页 → 切「评论和@」tab → 抽**原始** items（用户名/内容/笔记标题/itemKey）→ `notification.items` 上报；选择器 best-effort、标注待真机校准（D5/D9）
-- [ ] 4.4 edge 单测：通知监测体 sticky 不重置、翻转上报一次、epoch 单调；`notification.open` handler 抽取与上报形状
+- [x] 4.1 `src/browse/notification-monitor.ts`：`BackgroundWatcher<boolean>` 盯未读标记；软/fail-open/sticky（**绝不重置未读为 false**）；epoch 每次无→有 +1（`nextEpoch()`）；翻转只触发一次（D5/D7）<!-- aidcp-edge 52a5ce5 -->
+- [x] 4.2 清单登记通知监测体；`main.ts` 在无→有时 `client.send('notification.detected', {epoch,unreadCount})`（D3）<!-- aidcp-edge 52a5ce5 -->
+- [x] 4.3 `browse-session.ts` `notification.open` 复合 handler（仿 `profile.open`）：导航→「评论和@」→抽原始 items→`notification.items`；选择器 best-effort 标注待真机校准；失败也上报空 items（不静默吞）（D5/D9）<!-- aidcp-edge 52a5ce5 -->
+- [x] 4.4 edge 单测：监测体 sticky 不重置、翻转一次、epoch 单调；typecheck + 全量 254/254 <!-- aidcp-edge 52a5ce5 -->
 
 ## 5. aidcp-cloud — 通知协调器 + 软中断 + 看门狗感知
 
