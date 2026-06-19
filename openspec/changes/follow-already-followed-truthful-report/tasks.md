@@ -18,10 +18,10 @@
 ## 3. 收尾与归档
 
 - [x] 3.1 两仓回归全绿（含 AC-PROTO/PUB/RISK），按 sub-repo 分节回写本 tasks.md 进度 <!-- 2026-06-19 -->
-- [ ] 3.2 `openspec validate follow-already-followed-truthful-report --strict` 通过
-- [ ] 3.3 cloud 侧改动按 §5 安全序列部署 ECS（备份 → rsync → restart → healthcheck → 失败回滚），部署后追加 `<!-- <date> deployed -->`（**待确认**：cloud 半与旧 edge 也兼容，可独立部署）
-- [ ] 3.4 edge 半提交并随 edge 本地运行生效（**待用户决定**：与既有 WIP 的提交方式）
-- [ ] 3.5 `/opsx:archive` 归档（delta 合并进 `openspec/specs/follow-decision`）
+- [x] 3.2 `openspec validate follow-already-followed-truthful-report --strict` 通过 <!-- 2026-06-19 valid -->
+- [x] 3.3 cloud 侧改动按 §5 安全序列部署 ECS <!-- aidcp-cloud 678eab9 2026-06-19 deployed：backup cloud.bak.20260619-165030.tar.gz → rsync → restart → healthcheck(active/8787/PG/飞书长连/isales不受影响)全过；批量随问题1 + captcha 同次部署 -->
+- [x] 3.4 edge 半已提交并推送 <!-- aidcp-edge 9126e04：edge 改动（executeFollow already_followed→ok:true + aria-pressed + 2 测试）随并发 captcha WIP 提交者一并入库并推送 origin master；edge 本地运行即生效 -->
+- [ ] 3.5 `/opsx:archive` 归档（delta 合并进 `openspec/specs/follow-decision`）—— 待真机观察一次 already_followed 如实上报 + 配额不扣后归档
 
 ## 旁现（out of scope，建议后续 change）
 
