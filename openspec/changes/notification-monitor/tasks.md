@@ -1,9 +1,12 @@
 ## 1. aidcp-edge — 监测体基类（行为不变重构）+ 健壮性
 
-- [ ] 1.1 从 `src/browse/overlay-monitor.ts` 抽出统一后台监测体基类（自走时钟轮询、状态缓存、翻转 diff 只上报一次、启停幂等）；抽象点仅 `probe()` + 状态相等判定；容错旋钮 `onProbeError:'sticky'|'reset'` + 始终抛出的即时复检（D1）
-- [ ] 1.2 现有弹窗监测体改为子类，外部契约 `{state; probeNow(); start(onTransition); stop()}` 逐字不变；现有 edge 测试全过（行为护栏）（D1）
-- [ ] 1.3 基类加自身存活：记录"上次成功检测时间"，超 N×间隔未成功 → 暴露一个独立"看不见"态（degraded），不并入 none（D2）
-- [ ] 1.4 弹窗监测体加非对称去抖：进入阻塞态快、退出连续 2-3 次确认（内联每类计数，不做通用引擎）（D2）
+- [x] 1.1 从 `src/browse/overlay-monitor.ts` 抽出统一后台监测体基类 `BackgroundWatcher<S>`（自走时钟轮询、状态缓存、翻转 diff 只上报一次、启停幂等）；抽象点仅 `probe()` + `equals()`；容错旋钮 `onProbeError:'sticky'|'reset'` + 始终抛出的 `probeNow()`（D1）<!-- aidcp-edge 232bf2c -->
+- [x] 1.2 弹窗监测体改为 `BackgroundWatcher<OverlayKind>` 子类，外部契约 `{state; probeNow(); start; stop; tick}` 逐字不变；overlay+login 测试 17/17、typecheck 绿（D1）<!-- aidcp-edge 232bf2c -->
+- [x] 1.3 基类加自身存活 `msSinceLastOkTick()`（暴露度量，是否升级告警交上层）；不把"探测不了"并入 none（D2）<!-- aidcp-edge 232bf2c -->
+- [ ] 1.4 弹窗监测体加非对称去抖：进入阻塞态快、退出连续 2-3 次确认（内联每类计数）（D2）<!-- 改变 captcha 翻转时机，单独做、避免混进纯重构 Task 1；待 -->
+- [ ] 1.5 消费 `msSinceLastOkTick`：长时间看不见 → 上报"看不见"态（degraded 信号）<!-- 待，可与协议阶段合并 -->
+
+> Task 1 已落地核心（基类 + 子类化 + 心跳，行为不变、已验证）。1.4/1.5 为增量行为，单列。
 
 ## 2. aidcp-edge — 监测体清单
 
