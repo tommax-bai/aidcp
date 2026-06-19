@@ -39,6 +39,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 全局 CLI 可用（`/opt/homebrew/bin/openspec`，1.2.0，不在 package.json）。常用：`openspec list`（看 change 状态）、`openspec list --specs`、`openspec validate <change> --strict`、`openspec status --change <name>`、`openspec show <item>`。
 - 所有跨 spec 的功能改动都走 **openspec change 流程**，不要绕过 openspec 直接改 `openspec/specs/` 下的 spec 文件。
 - 新 change：`/opsx:propose "<想做什么>"`（探索 / 实装 / 归档用 `/opsx:explore` `/opsx:apply` `/opsx:archive`）。
+- **引入有复杂度 / 可扩展性诉求的新功能：先做「业界方案」设计，再 propose**。方法四步：① 在代码里坐实现状（现有实现 / 约束 / 痛点，带 `文件:行`）→ ② 多角度梳理业界成熟设计模式并映射到本系统 → ③ 综合出一套健壮 + 可扩展的设计 → ④ 一道对抗性评审（防过度设计、查约束违背与失败模式）。这一步可用多 agent workflow 编排（范例：2026-06-19 watcher / 通知监控设计）。产出设计后再落成 openspec change；务实优先、按 YAGNI 砍超前抽象、留干净扩展缝。
 - **实装前**：先 `openspec list` 看状态，再读 `openspec/changes/<active-change>/tasks.md` 定位当前 task；不凭空起 task。apply 流程靠 CLI 取上下文（`openspec status` / `openspec instructions apply --change <name> --json` 拿 contextFiles 与进度），不要硬编码文件名。
 - **实装中**：代码改动落对应 sub-repo（edge / cloud）；`tasks.md` 进度回写本仓，按 sub-repo 分节（如 `## 1. aidcp-cloud — …`）。
 - **实装后**：用 HTML 注释把 task 标 `[x]`，写清 commit-sha / 偏离说明，格式 `<!-- <repo> <commit-sha> 备注 -->`（部署后追加 `<!-- <date> deployed -->`）。
@@ -68,5 +69,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **默认主动 `git commit` + `git push` 到 origin**（本仓 + sub-repo 都适用），推各仓默认分支（本仓 `main`、edge/cloud `master`），不需每次问。commit message 末尾带 `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。**仍需先确认**：force-push、非 fast-forward、推到非默认 protected branch。
 - **语言**：正文默认中文；代码 / 注释 / commit / PR / 命令 / 文件名保持英文。
+- **问题 / 方案的说明方式（默认模式，用户偏好）**：讲逻辑、不用比喻；不点代码内部标识符（变量 / 类 / 函数 / 消息类型名），改用**功能性正文**描述组件与机制（如「执行端 / 决策端 / 监测体」「发命令给执行端的统一出口」「阻塞式 vs 临时离开式打断」）；分点、句子短、让非工程视角也能跟上；确需落到代码时再补具体 `文件:行`。
 - **不记敏感值**：文档 / 提交 / tasks.md 里不写任何 PostgreSQL 密码 / token / 私钥内容，只记路径、服务位置、命令用法、配置读取方式。
 - **每次对话收尾给一段「说人话」的总结**：用非技术语言讲清楚——这次做了什么、对系统有什么影响、下一步是什么。技术细节照常给，但总结那段要让非工程视角也看得懂。
