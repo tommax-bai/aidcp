@@ -58,14 +58,15 @@
 
 ## 8. aidcp-cloud — V1：风控写（串行化 + setQuotaLevel + 枚举信号）（console-write-operations 部分）
 
-- [ ] 8.1 `RiskController` 加每账号 async mutation 队列，环绕「迁移+saveState」「setQuotaLevel+saveState」原子；**所有**写者（live `record()`、验证码协调器、Web 写）经它；验收：并发 manual + `quota_exceeded` 无丢更新（D7，重构步骤 4）
-- [ ] 8.2 枚举化运营信号种类入 `RiskSignalKind` + `nextStatus` 分支：`manual_restrict`、`manual_freeze`、`operator_override_recover`（**需审计理由**、显式绕过恢复窗口）（D6，design 开放问题）
-- [ ] 8.3 新 `RiskController.setQuotaLevel(level)`：改+持久（`saveState`）+emit；单写；经 mutation 队列（D5）
-- [ ] 8.4 `POST /api/accounts/:id/risk/status`（`applySignal`、枚举种类、`getState()` 写回、拒绝可辨）+ `/risk/quota`（`setQuotaLevel`、写回）
+- [x] 8.1 `RiskController` 加每账号 async mutation 队列，环绕「迁移+saveState」「setQuotaLevel+saveState」原子；**所有**写者（live `record()`、验证码协调器、Web 写）经它；验收：并发 manual + `quota_exceeded` 无丢更新（D7，重构步骤 4）<!-- aidcp-cloud e967f36 enqueue(promise chain)；applySignal/setQuotaLevel 经它；测试并发 light+manual_freeze 串行无丢更新 -->
+- [x] 8.2 枚举化运营信号种类入 `RiskSignalKind` + `nextStatus` 分支：`manual_restrict`、`manual_freeze`、`operator_override_recover`（**需审计理由**、显式绕过恢复窗口）（D6，design 开放问题=要）<!-- aidcp-cloud e967f36 manual_restrict(normal/warned→restricted,已 restricted/frozen 不降)/manual_freeze(→frozen)/operator_override_recover(强制 normal+清零 signalCount/lastSignalAt)；reason 字段 -->
+- [x] 8.3 新 `RiskController.setQuotaLevel(level)`：改+持久（`saveState`）+emit；单写；经 mutation 队列（D5）<!-- aidcp-cloud e967f36 controller 单写 quotaLevel(状态机不碰)，经 enqueue -->
+- [x] 8.4 `POST /api/accounts/:id/risk/status`（`applySignal`、枚举种类、`getState()` 写回、拒绝可辨）+ `/risk/quota`（`setQuotaLevel`、写回）<!-- aidcp-cloud 32a664e panel 路由经 riskRegistry.getController(:id)；status 限枚举种类、override 需 reason、返回 state+statusBefore+changed(refused 可辨)；quota 经 setQuotaLevel；panel-server 路由测试。captcha-coordinator 写也经 controller.applySignal→自动经 queue -->
+
 
 ## 9. aidcp-cloud — V1：Registry + noteId + monitor/alerts + per-edge dispatcher
 
-- [ ] 9.1 `RiskControllerRegistry`（`Map<accountId, RiskController>` 懒加载）+ `listStates()`；按 `accountId` 路由 `interaction.occurred`（重构步骤 5）
+- [x] 9.1 `RiskControllerRegistry`（`Map<accountId, RiskController>` 懒加载）+ `listStates()`；按 `accountId` 路由 `interaction.occurred`（重构步骤 5）<!-- aidcp-cloud 32a664e 新 src/risk/risk-controller-registry.ts(懒加载+共享 PgRiskStore+listStates)；server.ts 现役用 registry default controller(单一来源)；record 按 evt.accountId 路由 -->
 - [ ] 9.2 在发射点填充已声明的 `noteId`；接线孤儿 `risk_interactions` 入互动完成路径；`GET /api/monitor/interactions`（重构步骤 6）
 - [ ] 9.3 `ALTER publish_log + concepts ADD COLUMN account_id TEXT NOT NULL DEFAULT 'default'`；概念查询保持账号无关（重构步骤 7）
 - [ ] 9.4 每边缘/账号 dispatcher 按 `account→machine` 映射（**非** god-object）；`POST /api/accounts/:id/dispatch {start|stop}` 回报真实 edge-online 事实（重构步骤 8）
