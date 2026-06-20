@@ -75,6 +75,6 @@
 
 ## 10. aidcp-console — V1：风控控件 + dispatch + monitor/alerts 页
 
-- [ ] 10.1 风控 STATUS 控件（枚举迁移）+ QUOTA-TIER 控件为**两个独立控件**接两个端点；「refused」与成功可辨；override 标特权/记录
+- [x] 10.1 风控 STATUS 控件（枚举迁移）+ QUOTA-TIER 控件为**两个独立控件**接两个端点；「refused」与成功可辨；override 标特权/记录<!-- aidcp-console 8d21677 RiskControls 组件：status Dropdown(restrict/freeze/override-modal 需 reason)+quota Select；非乐观 round-trip；refused(changed=false)区别于成功；接 /risk/status + /risk/quota。风控写端到端可用(后端 8.4 + 前端 10.1) -->
 - [ ] 10.2 dispatch 启停控件，回报真实 edge-online 事实
 - [ ] 10.3 Monitor 页：按笔记互动；Alerts 只读流；真按账号总览切片
