@@ -36,8 +36,9 @@ MUST 经一次运营机实机 CDP 校准确定后再锁定，校准前以 `no_ta
 云端 `executePublishSequence` SHALL 把 `upload_image` 失败（回 `ok:false` **或**该 kind 的超时/异常）特判为 **降级而非中断**：
 置 `imagesOk = false`、**继续**下发余下文字/元数据指令、跳过依赖该图的 `set_cover`，并把 `imagesOk` 带回 `PublishSequenceResult`。
 这是对逐步 fail-fast（其它任何 kind 失败 MUST 仍按序停止）的**唯一一处有意放宽，且仅限配图**——因为纯文字是诚实可接受的结果、而标题失败不是；
-该放宽 MUST 有显式注释与 AC 锁定，防止后人误"修"回中断。`set_cover` SHALL 为**执行期条件下发**（全部 `upload_image` 成功才下发），
-非构建期固定 emit。`PublishExecutor` 在 `imagesOk === false` 时 MUST **回正已预存的 `imageUrl`**（置空或标 `imagesAttached=false`），
+该放宽 MUST 有显式注释与 AC 锁定，防止后人误"修"回中断。`set_cover` MUST **仅在全部 `upload_image` 成功后才真实下发**；
+任一图失败 MUST NOT 下发 `set_cover`（封面依赖该图存在）——实现可入构建序列但执行期按 `imagesOk` 跳过，guarantee 等价。
+`PublishExecutor` 在 `imagesOk === false` 时 MUST **回正已预存的 `imageUrl`**（置空或标 `imagesAttached=false`），
 使 `publish_log` 不在纯文字帖上留下"有图"假信号。若实机校准证实发布页编辑器被"成功传图"门控（无图则标题/正文不可填），则**全图失败 MUST 转为诚实
 `failed` 而非纯文字帖**。
 

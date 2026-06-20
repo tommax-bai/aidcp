@@ -20,48 +20,48 @@
 
 ## 1. aidcp-cloud — CommandSequencer 配图 emit + 降级 + 落库回正
 
-- [ ] 1.1 `src/publish-agent/command-sequencer.ts:29-48` 给 `PublishSequenceInput` 加 `cover?: string`、`PublishSequenceResult` 加 `imagesOk: boolean`（**内部类型，非协议**）。验证：`npm run typecheck` 过、`src/comm/protocol.ts` 零改动
-- [ ] 1.2 `src/publish-agent/command-sequencer.ts:84-125` `buildCommandSequence` 按 `input.images` 在 `select_mode`（:92）后、`fill_field`（:93）前 emit `upload_image×N`（`params.imageUrl`，计数无关循环、前向兼容多图）；**此处不 emit `set_cover`**。验证：`images=[a,b]` 时序列含 `upload_image×2` 于正确位次且无 `set_cover`；`images` 为空时不 emit
-- [ ] 1.3 `src/publish-agent/command-sequencer.ts:128-155` `executePublishSequence` 特判 `kind==='upload_image'`：回 `ok:false` **或**该 kind 抛异常/超时 → 置 `imagesOk=false` 并 `continue`（**不**走 :140/:144 中断）；非配图 kind 仍 fail-fast。加显式注释标明这是**唯一一处 fail-fast 放宽、仅限配图**。验证：AC-MEDIA-DEGRADE——`upload_image ok:false` 与超时异常两路均不中断、非配图 `ok:false` 仍中断
-- [ ] 1.4 `src/publish-agent/command-sequencer.ts`（execute，配图块之后）`imagesOk` 仍真时才经 `sendAndWaitResult` 动态下发**一条** `set_cover`（`params.imageUrl=input.cover`），否则跳过；`imagesOk` 入 `PublishSequenceResult`。验证：仅全图成功才下发 `set_cover`；`result.imagesOk` 如实
-- [ ] 1.5 `src/publish-agent/command-sequencer.ts` 确保 `upload_image` 单指令超时预算 > 边缘"下载+CDP+后置校验"预算（提高 `upload_image` 的 `timeoutMs` 或文档化边缘上限），使边缘先返回干净 `ok:false`（:162-165）。验证：慢下载边缘桩在云端超时前先回 `image_fetch_failed`
-- [ ] 1.6 `src/publish-agent/roles/publish-executor.ts:129,192-211` `executePublishSequence` 后 `result.imagesOk===false` 时**回正预存 `imageUrl`**（置空 / 标 `imagesAttached=false`），使纯文字帖不留"有图"假信号。验证：降级一次落库无伪造有图信号
+- [x] 1.1 `src/publish-agent/command-sequencer.ts:29-48` 给 `PublishSequenceInput` 加 `cover?: string`、`PublishSequenceResult` 加 `imagesOk: boolean`（**内部类型，非协议**）。验证：`npm run typecheck` 过、`src/comm/protocol.ts` 零改动 <!-- aidcp-cloud ce016b1 cover? + imagesOk + uploadTimeoutMs；protocol.ts 零改动、AC-PROTO 54 -->
+- [x] 1.2 `src/publish-agent/command-sequencer.ts:84-125` `buildCommandSequence` 按 `input.images` 在 `select_mode`（:92）后、`fill_field`（:93）前 emit `upload_image×N`（`params.imageUrl`，计数无关循环、前向兼容多图）。验证：`images=[a,b]` 时序列含 `upload_image×2` 于正确位次；`images` 为空时不 emit <!-- aidcp-cloud ce016b1 AC-MEDIA-SEQ 测过 -->
+- [x] 1.3 `src/publish-agent/command-sequencer.ts:128-155` `executePublishSequence` 特判 `kind==='upload_image'`：回 `ok:false` **或**该 kind 抛异常/超时 → 置 `imagesOk=false` 并 `continue`（**不**中断）；非配图 kind 仍 fail-fast。显式注释标明唯一放宽、仅限配图。验证：AC-MEDIA-DEGRADE——`ok:false` 与超时异常两路均不中断、非配图 `ok:false` 仍中断 <!-- aidcp-cloud ce016b1 AC-MEDIA-DEGRADE 三测过（含非配图 fail-fast 红线） -->
+- [x] 1.4 `imagesOk` 仍真时才下发 `set_cover`（`params.imageUrl=input.cover`），否则跳过；`imagesOk` 入 `PublishSequenceResult`。验证：仅全图成功才下发 `set_cover`；`result.imagesOk` 如实 <!-- aidcp-cloud ce016b1 偏离：set_cover 入构建序列、执行期按 imagesOk 跳过（等价于"仅全图成功才下发"，免动态 seq 注入）；spec 已改为机制无关表述 -->
+- [x] 1.5 确保 `upload_image` 单指令超时预算 > 边缘"下载+CDP+后置校验"预算（`uploadTimeoutMs` 缺省 60s），使边缘先返回干净 `ok:false`。验证：慢下载边缘桩在云端超时前先回 `image_fetch_failed` <!-- aidcp-cloud ce016b1 sendAndWaitResult 按 kind 选 uploadTimeoutMs；AC-MEDIA-DEGRADE 超时路覆盖 -->
+- [x] 1.6 `src/publish-agent/roles/publish-executor.ts` `executePublishSequence` 后 `result.imagesOk===false` 时**回正预存 `imageUrl`**（标 `images_attached=false`），使纯文字帖不留"有图"假信号。验证：降级一次落库无伪造有图信号 <!-- aidcp-cloud ce016b1 markImagesAttached(false) + publish_log.images_attached 列；executor 降级测过。附带修 stage-4 server 适配器漏接（真血缘被 tags/[] 覆盖、recordMetadata 未接线）-->
 
 ## 2. aidcp-edge — upload_image（CDP 文件输入桥）
 
-- [ ] 2.1 `src/cdp/file-input-setter.ts`（新）定义 `FileInputSetter` 接口 + `CdpFileInputSetter`：`DOM.enable`（once、幂等守护）→ `Runtime.evaluate({returnByValue:false})` 取 input `objectId` → `cdp.send('DOM.setFileInputFiles',{objectId,files})`；stale-handle 单次有界重解析重试（不无限循环）；由 `session.cdp` 单例构建。验证：`typecheck` 过、最多一次重试
-- [ ] 2.2 `src/flows/image-uploader.ts`（新）`ImageUploader`：注入 `fetchImpl` + `FileInputSetter`；线性流程 URL 校验 → 下载到临时文件（**私有方法**，非单独 module）→ 解析+经 `FileInputSetter` 设置 → 后置校验控件成功态（绑定式轮询，**非仅 `input.files.length>0`**）→ `finally` 清理。验证：成功路径设文件+见缩略图+清理；各失败路径回正确分类 error 且仍清理
-- [ ] 2.3 `src/flows/image-uploader.ts` 下载私有方法：`globalThis.fetch`（注入 `fetchImpl`）+ `AbortController`/`AIDCP_IMAGE_DOWNLOAD_TIMEOUT_MS` + `redirect:'error'` + `Content-Length` 预检与流式字节上限（`AIDCP_*` env，默认 ~10MB）+ magic-byte（jpeg/png/webp）+ `mkdtemp` 于 `os.tmpdir()/aidcp-img-*` 随机名。验证：超时→`image_fetch_failed`；超限→`image_too_large`；非图→`image_format_unsupported`；非 https→`image_url_rejected`；3xx→`image_fetch_failed`
-- [ ] 2.4 `src/flows/anchors.ts` 加文件输入 / 缩略图成功态 anchors（goal/anchorHint，**来自 task 0 校准**）；未命中诚实 `no_target`。验证：jsdom fixture 定位命中；无 input → `no_target`
-- [ ] 2.5 `src/flows/publish-command-handlers.ts:210` 用 `ImageUploader` 替换 `upload_image` 的 `notImplemented` 桩，结果经 :245-249 verbatim 回报。验证：AC-MEDIA 成功→`ok:true`；各失败→`ok:false`+真实 error，绝不 `ok:true`
+- [x] 2.1 `src/cdp/file-input-setter.ts`（新）`FileInputSetter` 接口 + `CdpFileInputSetter`：`DOM.enable`（once）→ `Runtime.evaluate({returnByValue:false})` 取 `objectId` → `DOM.setFileInputFiles`；stale-handle 单次有界重试；由 `session.cdp` 单例构建。验证：`typecheck` 过、最多一次重试 <!-- aidcp-edge 07af4dd -->
+- [x] 2.2 `src/flows/image-uploader.ts`（新）`ImageUploader`：注入 `fetchImpl` + `FileInputSetter`；URL 校验 → 下载到临时文件（私有方法）→ 经 `FileInputSetter` 设置 → 后置校验控件成功态（绑定式轮询，**非仅 `input.files.length>0`**）→ `finally` 清理。验证：成功+见缩略图+清理；各失败回分类 error 且仍清理 <!-- aidcp-edge 07af4dd image-uploader.test.ts 7 测过（含红线反例 image_not_attached）-->
+- [x] 2.3 下载私有方法：注入 `fetchImpl` + `AbortController`/`AIDCP_IMAGE_DOWNLOAD_TIMEOUT_MS` + `redirect:'error'` + `Content-Length` 预检与流式字节上限（默认 ~10MB）+ magic-byte（jpeg/png/webp）+ `mkdtemp` 于 `os.tmpdir()/aidcp-img-*` 随机名。验证：超时→`image_fetch_failed`；超限→`image_too_large`；非图→`image_format_unsupported`；非 https→`image_url_rejected` <!-- aidcp-edge 07af4dd 五分类失败均有测 -->
+- [ ] 2.4 `src/flows/anchors.ts` 加文件输入 / 缩略图成功态真实 anchors（**来自 task 0 校准**）。<!-- 骨架占位已就位（CdpFileInputSetter 缺省 inputSelector=input[type=file]、image-uploader defaultHasThumbnail best-effort 选择器，均 inline 可注入覆盖）；真实小红书 DOM 锚点待 task-0 实机 CDP 校准后锁定。jsdom 单测经注入桩覆盖路径。 -->
+- [x] 2.5 `src/flows/publish-command-handlers.ts` 用 `ImageUploader` 替换 `upload_image` 的 `notImplemented` 桩（未注入 uploader 仍诚实 `kind_not_implemented`），结果 verbatim 回报。验证：成功→`ok:true`；各失败→`ok:false`+真实 error，绝不 `ok:true` <!-- aidcp-edge 07af4dd runUploadImage；AC-MEDIA 透传测过 -->
 
 ## 3. aidcp-edge — set_cover
 
-- [ ] 3.1 `src/flows/anchors.ts` 加封面入口 / 封面激活态 anchors（**来自 task 0 校准**）。验证：jsdom fixture 定位命中
-- [ ] 3.2 `src/flows/publish-command-handlers.ts:211` 用 `runAtom` + **封面专用 validator**（断言所选图真成为当前封面，非仅点到）替换 `set_cover` 的 `notImplemented` 桩。验证：点击未改封面态→`ok:false`；真改封面→`ok:true`
+- [ ] 3.1 `src/flows/anchors.ts` 加封面入口 / 封面激活态真实 anchors（**来自 task 0 校准**）。<!-- 骨架占位已就位（buildSetCoverRequest goal/anchorHint「封面」+ coverActiveValidator best-effort 选择器，inline）；真实锚点待 task-0 校准。jsdom 单测覆盖。 -->
+- [x] 3.2 `src/flows/publish-command-handlers.ts` 用 `runAtom` + **封面专用 validator**（断言所选图真成为当前封面，非仅点到）替换 `set_cover` 的 `notImplemented` 桩。验证：封面入口缺失→`ok:false`；定位+激活态→`ok:true` <!-- aidcp-edge 07af4dd coverActiveValidator；AC-MEDIA set_cover 两测过 -->
 
 ## 4. aidcp-edge — 放开 v1 带图硬拒（显式改道）
 
-- [ ] 4.1 `src/flows/publish-post.ts:294-296` 把"images are not supported in phase one"静默丢弃改为**显式报错指向指令路径**。验证：v1 `publishPost` 带图返回 `ok:false` + 改道 error（绝不静默丢图、绝不假成功）；不在 v1 加上传步骤
+- [x] 4.1 `src/flows/publish-post.ts:294-296` 把"images are not supported in phase one"静默丢弃改为**显式报错指向指令路径**。验证：v1 `publishPost` 带图返回 `ok:false` + 改道 error（绝不静默丢图、绝不假成功）；不在 v1 加上传步骤 <!-- aidcp-edge 07af4dd 改道 error "use command-driven path (upload_image)"；publish-post.test.ts 已更新 -->
 
 ## 5. aidcp-edge — 接线 + 临时目录清扫
 
-- [ ] 5.1 `src/main.ts:154-159` 由 `session.cdp` 构建 `CdpFileInputSetter` + `ImageUploader`（默认 `fetchImpl`）传入 `PublishCommandDispatcher`；复用既有 `session`/`cache`/`cdp` 单例。验证：dispatcher 正常构造；无重建 session/cdp
-- [ ] 5.2 `src/main.ts`（boot）启动时 best-effort `rm({recursive,force})` 清扫 `os.tmpdir()/aidcp-img-*` 残留。验证：植入的陈旧 `aidcp-img-*` 目录被清；清扫仅命中该前缀（绝不碰 isales/其它 tmp）
+- [x] 5.1 `src/main.ts` 由 `session.cdp` 构建 `CdpFileInputSetter` + `ImageUploader`（默认 `fetchImpl`）传入 `PublishCommandDispatcher`；复用既有 `session`/`cache`/`cdp` 单例。验证：dispatcher 正常构造；无重建 <!-- aidcp-edge 07af4dd 4th 参注入 uploader，复用 session.cdp -->
+- [x] 5.2 `src/main.ts`（boot）启动时 best-effort `rm({recursive,force})` 清扫 `os.tmpdir()/aidcp-img-*` 残留。验证：仅命中该前缀（绝不碰 isales/其它 tmp） <!-- aidcp-edge 07af4dd sweepImageTempDirs()，前缀限定 aidcp-img-* -->
 
 ## 6. 验收（中控触发，落 sub-repo 执行）
 
-- [ ] 6.1 edge AC-MEDIA：`test/flows/publish-command-handlers.test.ts:140-149` 删 `upload_image`/`set_cover` 的 `kind_not_implemented` 锁；加成功（`FakeFileInputSetter` 记录临时路径 + jsdom 渲染缩略图、fake fetch 返回合法字节）→ `ok:true`+清理。验证：通过
-- [ ] 6.2 edge AC-MEDIA 失败四路：下载超时→`image_fetch_failed`；非图→`image_format_unsupported`；无 input→`no_target`；**后置校验失败（红线反例：`FakeFileInputSetter` 设了 files 但不渲染缩略图）→ `image_not_attached`**。验证：各回精确 error，`input.files.length>0` 单独不被当成功
-- [ ] 6.3 cloud AC-MEDIA-SEQ：`images=[a,b]` 时 sequencer 在 `select_mode` 后 / `fill_field` 前 emit `upload_image×2`、随后条件 `set_cover`，提交/抓取仍受人审闸。验证：顺序与授权闸正确
-- [ ] 6.4 cloud AC-MEDIA-DEGRADE（两路）：`upload_image` 回 `ok:false` **与** 抛超时 → `imagesOk=false`、不下发 `set_cover`、文字/元数据照走、提交仍受人审、executor 回正 `imageUrl`。验证：两路均通过
-- [ ] 6.5 cloud AC-PUB 回归（精化）：在 **executor 授权闸**（`publish-executor.ts:184-190`）断言未授权时零下发；`buildCommandSequence` 截止作为冗余下层守护保留。验证：未授权发零指令
+- [x] 6.1 edge AC-MEDIA：删 `upload_image`/`set_cover` 的 `kind_not_implemented` 锁；加成功（`FakeFileInputSetter` + jsdom 缩略图、fake fetch）→ `ok:true`+清理。验证：通过 <!-- aidcp-edge 07af4dd image-uploader.test + handlers test -->
+- [x] 6.2 edge AC-MEDIA 失败路：下载超时→`image_fetch_failed`；非图→`image_format_unsupported`；无 input→`no_target`；**后置校验失败（红线反例：设了 files 但无缩略图）→ `image_not_attached`**。验证：各回精确 error，`files.length>0` 单独不被当成功 <!-- aidcp-edge 07af4dd 全覆盖 + url_rejected/too_large -->
+- [x] 6.3 cloud AC-MEDIA-SEQ：`images=[a,b]` 时在 `select_mode` 后 / `fill_field` 前 emit `upload_image×2`、随后条件 `set_cover`，提交/抓取仍受人审闸。验证：顺序与授权闸正确 <!-- aidcp-cloud ce016b1 含未授权 AC-PUB 第2闸子测 -->
+- [x] 6.4 cloud AC-MEDIA-DEGRADE（两路）：`ok:false` **与** 超时 → `imagesOk=false`、不下发 `set_cover`、文字照走、提交仍受人审、executor 回正。验证：两路均通过 <!-- aidcp-cloud ce016b1 sequencer 两路 + executor markImagesAttached(false) 测 -->
+- [x] 6.5 cloud AC-PUB 回归（精化）：在 **executor 授权闸**断言未授权时零下发（绝不调 executePublishSequence）；`buildCommandSequence` 截止作冗余下层守护保留。验证：未授权发零指令 <!-- aidcp-cloud ce016b1 publish-executor.test 新增 AC-PUB executor 闸测 -->
 
 ## 7. 双仓全量回归（先 acceptance 再全量再 typecheck）
 
-- [ ] 7.1 edge：`cd ../aidcp-edge && npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿；AC-PROTO-*（无协议漂移、消息数 54）、AC-PUB-*、AC-RISK-* 全过
-- [ ] 7.2 cloud：`cd ../aidcp-cloud && npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿；两份 protocol.ts MessageType 键仍不漂移
-- [ ] 7.3 中控：`openspec validate publish-media-upload --strict` 通过；确认 `docs/protocol.md` 头部计数仍 54、无需加表行（doc-only no-op）
+- [x] 7.1 edge：`test:acceptance`（11）→ `npm test`（279）→ `typecheck` 全绿；AC-PROTO-*（消息数 54）、AC-PUB-* 全过 <!-- aidcp-edge 07af4dd -->
+- [x] 7.2 cloud：`test:acceptance`（18）→ `npm test`（279）→ `typecheck` 全绿；两份 protocol.ts MessageType 键不漂移 <!-- aidcp-cloud ce016b1 -->
+- [x] 7.3 中控：`openspec validate publish-media-upload --strict` 通过；`docs/protocol.md` 头部计数仍 54、无需加表行（doc-only no-op） <!-- 2026-06-20 strict 通过；docs 无需改 -->
 
 ## 8. 部署（ECS 安全序列 + 实机；执行前先做 §0 前置检查；与 A 全阶段统一）
 
