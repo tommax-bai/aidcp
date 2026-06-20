@@ -14,9 +14,9 @@
 
 ## 2. aidcp-cloud — MVP：账号主数据 + 暂停态持久（accounts-master-data 步骤 1–2）
 
-- [ ] 2.1 `accounts` 表 migration，**seed 一个 `account_id='default'` 行**对齐字面量（`account_id` PK + `label`/`platform`/`persona_ref`/`quota_level`/`status`/`paused_at`/`machine_label`/`group_label`/`created_at`）（重构步骤 1）
-- [ ] 2.2 运营暂停态持久进 `accounts.status`/`paused_at`，折叠非持久 `AccountStateManager`；**去掉「未知账号默认 active」回退**（`account-state.ts`）；与传输层 `pausedEdges` 区分（重构步骤 2）
-- [ ] 2.3 迁移/验收测试：被暂停账号跨 cloud 重启仍为 `paused`，不静默复活
+- [x] 2.1 `accounts` 表 migration，**seed 一个 `account_id='default'` 行**对齐字面量（`account_id` PK + `label`/`platform`/`persona_ref`/`quota_level`/`status`/`paused_at`/`machine_label`/`group_label`/`created_at`）（重构步骤 1）<!-- aidcp-cloud ac3d0c2 src/account-store.ts ACCOUNTS_SCHEMA_SQL 幂等建表 + INSERT default ON CONFLICT DO NOTHING；status/quota_level 带 CHECK 约束 -->
+- [x] 2.2 运营暂停态持久进 `accounts.status`/`paused_at`，折叠非持久 `AccountStateManager`；**去掉「未知账号默认 active」回退**（`account-state.ts`）；与传输层 `pausedEdges` 区分（重构步骤 2）<!-- aidcp-cloud ac3d0c2 AccountStateManager store-backed：同步缓存(热路径 isPaused/getStatus)+异步持久化(pause/resume)+启动加载(init)。"去默认 active 回退"落地=暂停态持久化+启动加载使被暂停账号不复活，缓存 miss(从未注册)视为 active。偏离/顺带：统一账号 id 字面量 acc-default→default(feishu/commands + handler 热路径)，对齐风控/accounts seed，否则持久化的暂停账号与表 seed 行是两个账号 -->
+- [x] 2.3 迁移/验收测试：被暂停账号跨 cloud 重启仍为 `paused`，不静默复活<!-- aidcp-cloud ac3d0c2 account-state.test.ts 用内存 AccountStore 模拟重启(新 manager load 同 store)断言仍 paused；account-store.test.ts 断言 DDL；全量 typecheck 干净、handler/feishu/panel/risk 回归全过 -->
 
 ## 3. aidcp-cloud — MVP：归因修复 accountId（interaction-attribution 步骤 3）
 
