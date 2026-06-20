@@ -18,21 +18,21 @@ repo 取值：aidcp-cloud / aidcp-edge / aidcp（本中控仓）。代码改动�
 
 ### 1.1 aidcp-cloud — protocol.ts（权威源）
 
-- [ ] 1.1.1 `src/comm/protocol.ts`：`MessageType` union +2：`| 'publish.command'`（cloud→edge）、`| 'publish.command.result'`（edge→cloud）。**验证**：`grep -n "publish.command" src/comm/protocol.ts` 见两条
-- [ ] 1.1.2 新增类型：`PublishCommandKind`（E1-E10 十枚举 `navigate_entry`/`select_mode`/`upload_image`/`set_cover`/`fill_field`/`add_with_candidate`/`set_option`/`set_schedule`/`submit_publish`/`capture_postId`）、`PublishCommandParams`（按 kind 联合类型，元数据维度先占位预留）、`PublishCommandPayload {recordId,seq,kind,params,timeoutMs?,reason?}`、`PublishCommandResultPayload {recordId,seq,kind,ok,value?,error?,details?}`（`details:{actionId?,outcome?,attempts?,durationMs?}`）。**验证**：`npm run typecheck` 编译通过
-- [ ] 1.1.3 `PayloadMap`（`Record<MessageType,…>` 穷举表）+2 条目映射两条新消息。**验证**：`npm run typecheck`（穷举表缺项即编译失败）
+- [x] 1.1.1 `src/comm/protocol.ts`：`MessageType` union +2：`| 'publish.command'`（cloud→edge）、`| 'publish.command.result'`（edge→cloud）。**验证**：`grep -n "publish.command" src/comm/protocol.ts` 见两条 <!-- aidcp-cloud db250e5 与并发 notification 共用 protocol.ts，我的 publish.command 被并发会话 commit 一并 staged 入库；union 54 -->
+- [x] 1.1.2 新增类型：`PublishCommandKind`（E1-E10 十枚举 `navigate_entry`/`select_mode`/`upload_image`/`set_cover`/`fill_field`/`add_with_candidate`/`set_option`/`set_schedule`/`submit_publish`/`capture_postId`）、`PublishCommandParams`（按 kind 联合类型，元数据维度先占位预留）、`PublishCommandPayload {recordId,seq,kind,params,timeoutMs?,reason?}`、`PublishCommandResultPayload {recordId,seq,kind,ok,value?,error?,details?}`（`details:{actionId?,outcome?,attempts?,durationMs?}`）。**验证**：`npm run typecheck` 编译通过
+- [x] 1.1.3 `PayloadMap`（`Record<MessageType,…>` 穷举表）+2 条目映射两条新消息。**验证**：`npm run typecheck`（穷举表缺项即编译失败）
 
 ### 1.2 aidcp-edge — protocol.ts（与 cloud 逐字一致）
 
-- [ ] 1.2.1 `src/comm/protocol.ts`：镜像 1.1 的 `MessageType` +2 / 四个新类型 / `PayloadMap` +2，与 cloud **逐字一致**。**验证**：`diff -u ../aidcp-cloud/src/comm/protocol.ts ../aidcp-edge/src/comm/protocol.ts` 的 MessageType/Payload/PayloadMap 块无差异；edge `npm run typecheck`
+- [x] 1.2.1 `src/comm/protocol.ts`：镜像 1.1 的 `MessageType` +2 / 四个新类型 / `PayloadMap` +2，与 cloud **逐字一致**。**验证**：`diff -u ../aidcp-cloud/src/comm/protocol.ts ../aidcp-edge/src/comm/protocol.ts` 的 MessageType/Payload/PayloadMap 块无差异；edge `npm run typecheck`
 
 ### 1.3 aidcp-cloud — command-bridge.ts（核查，无需改）
 
-- [ ] 1.3.1 `src/comm/command-bridge.ts`：**核查无需为 publish.command 登记映射**——`publish.command` 由 `CommandSequencer` 直接 `makeEnvelope('publish.command', …)` 下发，不经 command-bridge（command-bridge 只服务 RoleDispatcher 浏览指令）。确认无漂移。**验证**：`grep -n publish src/comm/command-bridge.ts` 无发布指令映射条目；`npm run typecheck`
+- [x] 1.3.1 `src/comm/command-bridge.ts`：**核查无需为 publish.command 登记映射**——`publish.command` 由 `CommandSequencer` 直接 `makeEnvelope('publish.command', …)` 下发，不经 command-bridge（command-bridge 只服务 RoleDispatcher 浏览指令）。确认无漂移。**验证**：`grep -n publish src/comm/command-bridge.ts` 无发布指令映射条目；`npm run typecheck`
 
 ### 1.4 中控 — docs/protocol.md（人工维护，勿滞后）
 
-- [ ] 1.4.1 `docs/protocol.md`：头部 `共 47 个消息类型` → `共 49 个消息类型`；§2 表 +2 行（`publish.command` / `publish.command.result`）；补 `kind` 枚举映射（E1-E10）+ 「`recordId+seq` 为业务级永久关联键、`envelope.id` 仅日志」+ 「`requestId`（AC-PUB 审批键，字符串）≠ `recordId`（指令关联键，数字）」澄清。**验证**：`grep -n "49 个消息类型" docs/protocol.md` 命中；人工核对 §2 表两行齐备
+- [x] 1.4.1 `docs/protocol.md`：头部 `共 47 个消息类型` → `共 49 个消息类型`；§2 表 +2 行（`publish.command` / `publish.command.result`）；补 `kind` 枚举映射（E1-E10）+ 「`recordId+seq` 为业务级永久关联键、`envelope.id` 仅日志」+ 「`requestId`（AC-PUB 审批键，字符串）≠ `recordId`（指令关联键，数字）」澄清。**验证**：`grep -n "49 个消息类型" docs/protocol.md` 命中；人工核对 §2 表两行齐备
 
 ## 2. 边缘指令运行时（每 kind 处理器 + 后置校验 + 逐条回报，复用定位引擎）— 第 ② 组（依赖 ①）
 
@@ -86,7 +86,7 @@ repo 取值：aidcp-cloud / aidcp-edge / aidcp（本中控仓）。代码改动�
 
 ### 4.1 aidcp-cloud / aidcp-edge — AC-PROTO 扩到 49（不回归）
 
-- [ ] 4.1.1 两仓 `test/acceptance/protocol-contract.test.ts`：`ALL_MESSAGE_TYPES` 穷举扩到 **49**，断言 `ALL_MESSAGE_TYPES.length === 49`、`Object.keys(PayloadMap).length === 49`、两数相等；含两条新消息。**验证**：双仓 `npm run test:acceptance` AC-PROTO 全过
+- [x] 4.1.1 两仓 `test/acceptance/protocol-contract.test.ts`：`ALL_MESSAGE_TYPES` 穷举扩到 **49**，断言 `ALL_MESSAGE_TYPES.length === 49`、`Object.keys(PayloadMap).length === 49`、两数相等；含两条新消息。**验证**：双仓 `npm run test:acceptance` AC-PROTO 全过
 - [ ] 4.1.2（可选）追加 `diff -u` 两份 `protocol.ts` 的 CI/pre-commit 检查（V1）。**验证**：脚本本地跑无差异输出
 
 ### 4.2 aidcp-edge — AC-CMD 诚实失败（边缘面）

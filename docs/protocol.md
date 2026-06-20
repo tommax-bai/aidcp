@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 15 角色）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> v2 共 **52 个消息类型**，下表按职能分组列全。
+> v2 共 **54 个消息类型**，下表按职能分组列全。
 
 ## 1. 信封（Envelope）
 
@@ -127,7 +127,9 @@
 | --- | --- | --- |
 | `publish.request` | cloud → edge | 请求在浏览器中发布一篇帖子 |
 | `publish.approval_request` | edge → cloud | 请求云端发送发布审批卡片（飞书） |
-| `publish.result` | edge → cloud | 发布结果回传（ok / postId / error） |
+| `publish.result` | edge → cloud | 发布结果回传（ok / postId / error；v1 整页路径） |
+| `publish.command` | cloud → edge | 下发一条参数化发布原子指令（A 阶段1 指令驱动；`recordId+seq` 关联键，`kind` ∈ E1-E10） |
+| `publish.command.result` | edge → cloud | 单条发布指令执行结果回传（按 `recordId+seq` 关联；`ok/value/error/details`，红线不静默假成功） |
 
 ## 3. 各消息 payload 定义
 
