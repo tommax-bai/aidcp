@@ -13,15 +13,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **edge / cloud 两个 sub-repo 可能未在当前机器 clone**（中控仓只承载文档与契约）。涉及 edge/cloud 代码、测试或 ECS 部署前，**先 `ls -d ../aidcp-edge ../aidcp-cloud` 确认是否存在**；缺失则停手，向用户确认实际位置或先 clone，**绝不盲目照搬路径执行命令**。
 - **部署私钥 `~/codes/isales-4.pem` 可能未在当前机器**。执行任何 `ssh` / `rsync` 到 ECS 前，**先确认私钥存在且 `chmod 600`**；缺失则停手告知用户。
 
-## 1. 三仓关系
+## 1. 四仓关系（原三仓 + 管理后台前端 aidcp-console）
 
 | 仓 | 路径 | 默认分支 | 角色 |
 | --- | --- | --- | --- |
 | **aidcp**（本仓，中控） | `.` | `main` | 契约 / 文档 / openspec changes / 测试与部署编排 |
 | **aidcp-edge** | `../aidcp-edge` | `master` | 边缘端：CDP / 定位 / 浏览 / 拟人化 / 反检测 / 发布 / Electron |
-| **aidcp-cloud** | `../aidcp-cloud` | `master` | 云端：协议 / 事件驱动编排 / 风控 / 发布 / 概念池 / 飞书 Bot |
+| **aidcp-cloud** | `../aidcp-cloud` | `master` | 云端：协议 / 事件驱动编排 / 风控 / 发布 / 概念池 / 飞书 Bot / **面板 API 层（管理后台后端 `src/panel/`）** |
+| **aidcp-console** | `../aidcp-console` | `master` | 管理后台前端（统一 Web 控制台）：React+Vite+TS+AntD；**只读云端面板 API + 经 `/api` 下发指令，绝不直连边缘**。本机可能尚未 clone / 尚无 GitHub remote（首版本地起） |
 
-中控仓定义契约与变更；代码改动落到对应 sub-repo，进度回写本仓 openspec change。edge 与 cloud 经 `docs/protocol.md` 定义的 **WebSocket 协议 v2** 通信。
+中控仓定义契约与变更；代码改动落到对应 sub-repo，进度回写本仓 openspec change。edge 与 cloud 经 `docs/protocol.md` 定义的 **WebSocket 协议 v2** 通信；console 经 cloud **进程内面板 API 层**（HTTP `/api` + 浏览器 WS `/ws`，独立端口、与 8787 边-云 ws 物理隔离）取数与下发，见 change `aidcp-console-panel-mvp`。**部署形态**（2026-06-20 首次上线）：ECS 上 cloud 面板层监听 `127.0.0.1:8090`、Nginx `aidcp-console.conf` 在 `8088` serve console 静态 + 反代 `/api`/`/ws`，与同机 isales（80/8000/四服务）隔离。
 
 ## 2. 架构大局（需跨文件才能拼出的上位约束）
 

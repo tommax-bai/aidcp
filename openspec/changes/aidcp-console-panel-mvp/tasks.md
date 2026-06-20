@@ -49,12 +49,12 @@
 
 ## 7. aidcp[deploy] — MVP：ECS 部署（安全序列 + 红线盘点）
 
-- [ ] 7.1 ECS 红线盘点：`ss -ltnp` + 查现有 nginx sites；确认 `AIDCP_PANEL_PORT` 空闲 vs `8787/5432/8788/isales`；据盘点把最终端口写入 `.env`（D12，design 开放问题）
-- [ ] 7.2 Nginx：**给现有安装加 server block**（不另起 Nginx）；serve `/opt/aidcp/console` 的 `dist`（SPA `try_files` fallback）；反代 `/api` 与 `/ws`(panel) 到 `127.0.0.1:AIDCP_PANEL_PORT`；**不暴露 8787**
-- [ ] 7.3 `vite build` → rsync `dist/` 到 `/opt/aidcp/console`（**非** cloud 目录）
-- [ ] 7.4 cloud 按 CLAUDE.md §5 安全序列部署：备份（`cloud.bak.<ts>.tar.gz` + `.env.bak`）→ rsync（`--exclude .env/node_modules/.git`）→ `systemctl restart aidcp-cloud.service`
-- [ ] 7.5 Healthcheck：`active(running)` + 8787 监听 + 飞书长连 + PG `select 1` + **新面板端口监听** + **isales 仍在**；任一失败回滚
-- [ ] 7.6 本仓回写：三仓关系文档（CLAUDE.md §1）补 `aidcp-console`；`docs/product-dashboard.md` 实现进度；如需新 edge 数据另起协议 change
+- [x] 7.1 ECS 红线盘点：`ss -ltnp` + 查现有 nginx sites；确认 `AIDCP_PANEL_PORT` 空闲 vs `8787/5432/8788/isales`；据盘点把最终端口写入 `.env`（D12，design 开放问题）<!-- 2026-06-20 deployed 盘点：8090 空闲选为面板端口；isales 占 80+8000+四服务+isales.conf；AIDCP_PANEL_PORT=8090 + JWT secret + admin 用户 + FORBIDDEN_PORTS=8000,80,443 写入 ECS .env -->
+- [x] 7.2 Nginx：**给现有安装加 server block**（不另起 Nginx）；serve `/opt/aidcp/console` 的 `dist`（SPA `try_files` fallback）；反代 `/api` 与 `/ws`(panel) 到 `127.0.0.1:AIDCP_PANEL_PORT`；**不暴露 8787**<!-- 2026-06-20 deployed /etc/nginx/conf.d/aidcp-console.conf listen 8088、root /opt/aidcp/console、/api+/ws→127.0.0.1:8090、SPA fallback；nginx -t 通过、reload；isales.conf 不动 -->
+- [x] 7.3 `vite build` → rsync `dist/` 到 `/opt/aidcp/console`（**非** cloud 目录）<!-- 2026-06-20 deployed mkdir /opt/aidcp/console + rsync dist（index.html+assets） -->
+- [x] 7.4 cloud 按 CLAUDE.md §5 安全序列部署：备份（`cloud.bak.<ts>.tar.gz` + `.env.bak`）→ rsync（`--exclude .env/node_modules/.git`）→ `systemctl restart aidcp-cloud.service`<!-- 2026-06-20 deployed 从干净 git master(91cd937) git archive 部署(绕开并发 dirty 工作区)；备份 cloud.bak.20260620-180315.tar.gz + .env.bak；rsync 不用 --delete(避免删 .env.bak)；package.json 内容未变无需 npm install；restart 成功 -->
+- [x] 7.5 Healthcheck：`active(running)` + 8787 监听 + 飞书长连 + PG `select 1` + **新面板端口监听** + **isales 仍在**；任一失败回滚<!-- 2026-06-20 deployed cloud active；8787+8090 监听；ConceptStore/AccountStore(seed default)/RiskController 就绪；飞书长连接重建；/api/version 正确；console nginx 8088 http=200；E2E 登录+summary(真实 PG 聚合)+401 通过；isales 四服务全 active -->
+- [x] 7.6 本仓回写：三仓关系文档（CLAUDE.md §1）补 `aidcp-console`；`docs/product-dashboard.md` 实现进度；如需新 edge 数据另起协议 change<!-- 2026-06-20 CLAUDE.md §1 三仓→四仓 + aidcp-console + 部署形态（8090/8088）；product-dashboard 进度由本 change 记录；面板未引入新 edge 数据（accountId 已在协议线上） -->
 
 ## 8. aidcp-cloud — V1：风控写（串行化 + setQuotaLevel + 枚举信号）（console-write-operations 部分）
 
