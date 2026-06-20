@@ -1,46 +1,59 @@
-## 1. aidcp-edge — 监测体基类（行为不变重构）+ 健壮性
+> 设计已收敛到最终版（见 design.md）：云端 12 角色、按分类拆浏览、各自命令、无巡视计时器、resumer 收敛终止；赞收藏/新增关注 v1 看一眼清未读不发飞书。边缘侧基类/清单/监测体已实现；`notification.open` 复合 handler 与协议需按最终版调整。
 
-- [x] 1.1 从 `src/browse/overlay-monitor.ts` 抽出统一后台监测体基类 `BackgroundWatcher<S>`（自走时钟轮询、状态缓存、翻转 diff 只上报一次、启停幂等）；抽象点仅 `probe()` + `equals()`；容错旋钮 `onProbeError:'sticky'|'reset'` + 始终抛出的 `probeNow()`（D1）<!-- aidcp-edge 232bf2c -->
-- [x] 1.2 弹窗监测体改为 `BackgroundWatcher<OverlayKind>` 子类，外部契约 `{state; probeNow(); start; stop; tick}` 逐字不变；overlay+login 测试 17/17、typecheck 绿（D1）<!-- aidcp-edge 232bf2c -->
-- [x] 1.3 基类加自身存活 `msSinceLastOkTick()`（暴露度量，是否升级告警交上层）；不把"探测不了"并入 none（D2）<!-- aidcp-edge 232bf2c -->
-- [ ] 1.4 弹窗监测体加非对称去抖：进入阻塞态快、退出连续 2-3 次确认（内联每类计数）（D2）<!-- 改变 captcha 翻转时机，单独做、避免混进纯重构 Task 1；待 -->
-- [ ] 1.5 消费 `msSinceLastOkTick`：长时间看不见 → 上报"看不见"态（degraded 信号）<!-- 待，可与协议阶段合并 -->
+## 1. aidcp-edge — 监测体基类（已完成）
 
-> Task 1 已落地核心（基类 + 子类化 + 心跳，行为不变、已验证）。1.4/1.5 为增量行为，单列。
+- [x] 1.1 抽 `BackgroundWatcher<S>`（轮询/缓存/翻转/启停/心跳）<!-- aidcp-edge 232bf2c -->
+- [x] 1.2 弹窗监测体子类化，外部契约不变；overlay+login 17/17 <!-- aidcp-edge 232bf2c -->
+- [x] 1.3 基类 `msSinceLastOkTick()` 心跳 <!-- aidcp-edge 232bf2c -->
+- [ ] 1.4 弹窗监测体非对称去抖（增量，单列，待）
+- [ ] 1.5 消费心跳上报"看不见"态（增量，待）
 
-## 2. aidcp-edge — 监测体清单
+## 2. aidcp-edge — 监测体清单（已完成）
 
-- [x] 2.1 新增 `src/browse/watcher-supervisor.ts`（`register` + `startAll/stopAll`）；`main.ts` 手工接线块替为清单注册（弹窗回调逐字保留 + 通知监测体）（D3）<!-- aidcp-edge 52a5ce5 -->
+- [x] 2.1 `watcher-supervisor.ts` + `main.ts` 清单注册 <!-- aidcp-edge 52a5ce5 -->
 
-## 3. 协议三处同步（+3 消息，44→47）
+## 3. 协议（已落 +3；需扩到最终集）
 
-- [x] 3.1 `aidcp-cloud/src/comm/protocol.ts`：加 3 消息 + payload（含 `NotificationItem`）+ MessageMap <!-- aidcp-cloud c271c4c -->
-- [x] 3.2 `aidcp-edge/src/comm/protocol.ts`：与 cloud 逐字一致 <!-- aidcp-edge a11bcc9 -->
-- [x] 3.3 `command-bridge.ts`：`open_notifications → notification.open`；EdgeCommand action += open_notifications <!-- aidcp-cloud c271c4c -->
-- [x] 3.4 `docs/protocol.md`：3 消息行 + 头部计数 44→47 <!-- control repo -->
-- [x] 3.5 两仓 typecheck + acceptance（AC-PROTO-02=47，两端一致；cloud 18/18、edge 11/11） <!-- 2026-06-19 -->
+- [x] 3.1–3.5 首批 3 消息（`detected`/`open`/`items`）两端逐字一致 + 计数 44→47 + docs + AC-PROTO <!-- cloud c271c4c / edge a11bcc9 -->
+- [ ] 3.6 **扩到最终集**：`notification.open` 改语义为"仅导航通知首页"；新增 `notification.home`（边缘报各类未读）、`notification.browse_comments` / `browse_likes` / `browse_follows`、`notification.back_home`；两份 `protocol.ts` 逐字一致 + payload + MessageMap + `command-bridge` 各 action 映射 + AC-PROTO 计数（47→约 52）+ `docs/protocol.md` 同步（D9）
 
-## 4. aidcp-edge — 通知监测体 + 巡视命令
+## 4. aidcp-edge — 通知监测体（已完成）+ 巡视 handler（需重构）
 
-- [x] 4.1 `src/browse/notification-monitor.ts`：`BackgroundWatcher<boolean>` 盯未读标记；软/fail-open/sticky（**绝不重置未读为 false**）；epoch 每次无→有 +1（`nextEpoch()`）；翻转只触发一次（D5/D7）<!-- aidcp-edge 52a5ce5 -->
-- [x] 4.2 清单登记通知监测体；`main.ts` 在无→有时 `client.send('notification.detected', {epoch,unreadCount})`（D3）<!-- aidcp-edge 52a5ce5 -->
-- [x] 4.3 `browse-session.ts` `notification.open` 复合 handler（仿 `profile.open`）：导航→「评论和@」→抽原始 items→`notification.items`；选择器 best-effort 标注待真机校准；失败也上报空 items（不静默吞）（D5/D9）<!-- aidcp-edge 52a5ce5 -->
-- [x] 4.4 edge 单测：监测体 sticky 不重置、翻转一次、epoch 单调；typecheck + 全量 254/254 <!-- aidcp-edge 52a5ce5 -->
+- [x] 4.1 `notification-monitor.ts` 盯未读、sticky 不重置、epoch 单调 <!-- aidcp-edge 52a5ce5 -->
+- [x] 4.2 `main.ts` 无→有上报 `notification.detected` <!-- aidcp-edge 52a5ce5 -->
+- [~] 4.3 **重构**：把已提交的 `notification.open` 复合 handler 拆成——`notification.open`(仅导航首页+上报 `notification.home` 各类未读)、`browse_comments`(进评论和@+滚动+抽取→`notification.items`)、`browse_likes`/`browse_follows`(进入+看一眼清未读，v1 不抽取)、`back_home`(返回通知首页+重报未读)；选择器 best-effort 待真机校准；失败均如实回执/上报空（不静默吞）（D4/D5/D9）<!-- 原 52a5ce5 为复合版，待重构 -->
+- [x] 4.4 监测体单测（sticky/翻转/epoch）<!-- aidcp-edge 52a5ce5 -->
+- [ ] 4.5 各分类 handler 单测（导航/抽取/回执形状；失败上报空）
 
-## 5. aidcp-cloud — 通知协调器 + 软中断 + 看门狗感知
+## 5. aidcp-cloud — 基础设施 + 12 角色 + 看门狗兜底
 
-- [ ] 5.1 `src/orchestrator/role-dispatcher.ts`：在统一命令出口（`sendCommand`/`pushToEdges` funnel）加 browse 抑制开关 + 命令来源标记（browse/excursion）；暴露 `isHardPaused(edgeId)` 读（D4）
-- [ ] 5.2 新通知协调器（EventBus 订阅者，注册进 roles[]）：收 `notification.detected` → 若未硬停 → 置"正在巡视"布尔 + 挂抑制 → 等当前动作报完成 → 发 `notification.open` → 收 `notification.items` → 评论/@ 去重后飞书 → 发 `navigation.back` 回 feed；`try/finally` + 总超时保证"解除抑制 + 回 feed + 清布尔"（D4/D5）
-- [ ] 5.3 已通知水位/已见集合**仅在确认收到 items 后推进**；超时/失败不推进（D7）
-- [ ] 5.4 `src/agents/session-monitor-role.ts`：巡视期间视为有意暂停——不发 nudge、不结束会话，结束后恢复计时（**correctness blocker**，须先于 5.2 生效）（D6）
-- [ ] 5.5 `src/feishu/`：评论/@ 通知卡；从验证码协调器抽出统一告警发送（去重/冷却）复用（D5）
-- [ ] 5.6 cloud 单测：detected→巡视一次（重复 epoch 不并发）；巡视任意出口都解除抑制+回 feed；巡视期看门狗不开火；失败不推进已通知水位；巡视不迁移风控态
+### 5.A 基础设施（非角色）
+- [ ] 5.A1 **发命令统一暂停出口**：`role-dispatcher` 把 `sendCommand` 包成 `send(cmd, 来源:'browse'|'excursion')`，所有 ~10 翻译块 + 失败兜底滚动都走它；巡视期（`ctx.excursion.active`）扣 browse、放 excursion；登记可清理（D7）
+- [ ] 5.A2 `isHardPaused(edgeId)` 注入闭包（包 ws-server pausedEdges）；`handler.ts` 加 `notification.detected/home/items → *.arrived` 入口转换（D7/D9）
+- [ ] 5.A3 `SessionContext` 加 `excursion`（active/epoch/phase/lastHandledEpoch/perCategoryUnread/processedCategories/seenItemKeys）；`reset/endSession/restartSession` **显式清瞬时态 + 暂停开关**、保留 seenItemKeys（D2，断连不冻结=最高优先）
+- [ ] 5.A4 从验证码协调器抽出共享飞书告警原语（resolveChatId+sendCard+冷却），供发飞书角色注入复用（D8）
+
+### 5.B 12 角色（各为 BaseRole，注册进 roles[]，逐个单测：喂入事件→断言出事件/命令）
+- [ ] 5.B1 `notification_gatekeeper` 准入（同步无 LLM；硬停/在跑/epoch 三查；admit 写 ctx.excursion）
+- [ ] 5.B2 `browse_suspender` 暂停浏览（翻 ctx.excursion 暂停开关）
+- [ ] 5.B3 `notification_home_opener` 打开通知首页（安全点 → `notification.open`）
+- [ ] 5.B4 `notification_triage` 分诊（按优先级挑未读未处理类；记 processedCategories；无则 `triage_done`）
+- [ ] 5.B5 `notification_comment_browser` 评论和@浏览（→ `browse_comments`）
+- [ ] 5.B6 `notification_like_browser` 赞和收藏浏览（→ `browse_likes`，v1 看一眼 → `category_handled`）
+- [ ] 5.B7 `notification_follow_browser` 新增关注浏览（→ `browse_follows`，v1 看一眼 → `category_handled`）
+- [ ] 5.B8 `notification_classifier` 内容分类（评论 items → worthy/empty/failed，校验 epoch）
+- [ ] 5.B9 `notification_deduper` 去重（仅成功路径推进 seenItemKeys）
+- [ ] 5.B10 `notification_notifier` 发飞书（复用 5.A4，失败不吞，仍报）
+- [ ] 5.B11 `notification_return_home` 返回首页（→ `back_home`，触发分诊下一轮）
+- [ ] 5.B12 `excursion_resumer` 恢复浏览（收敛 `triage_done`+各失败终止 → 关暂停 + `feed.entered{back_to_feed}`，ctx.excursion.active 幂等）
+
+### 5.C 看门狗兜底（改现有角色，不新增）
+- [ ] 5.C1 `session-monitor-role`：确认健康巡视靠每步 `action.completed` 续会话命；只在边缘真死挂（无事件）才结束会话；idle_nudge 的滚动属 browse 来源、被 5.A1 暂停出口扣住。**不设巡视级计时器**（D6）
 
 ## 6. 验证与部署
-
-- [ ] 6.1 两仓 `npm run typecheck` → `test:acceptance`（AC-PROTO 47、AC-RISK/AC-PUB 红线）→ `test`
-- [ ] 6.2 按 sub-repo 分节回写本 tasks.md 进度（`<!-- <repo> <commit-sha> 备注 -->`）；**不碰 edge 残留 WIP（chrome-launcher）**
-- [ ] 6.3 `openspec validate notification-monitor --strict` 通过
-- [ ] 6.4 cloud 改动按 §5 安全序列部署 ECS（备份→rsync→restart→healthcheck→回滚），部署后追加 `<!-- <date> deployed -->`
-- [ ] 6.5 真机校准：通知页/「评论和@」选择器、去抖阈值、巡视总超时；确认评论/@ 发飞书、赞/藏/关注忽略、巡视后浏览恢复
-- [ ] 6.6 `/opsx:archive` 归档（delta 合并进 `notification-monitoring` + `browse-loop-resilience`）
+- [ ] 6.1 两仓 `typecheck` → `test:acceptance`（AC-PROTO 新计数、AC-RISK/AC-PUB 红线）→ `test`
+- [ ] 6.2 按 sub-repo 分节回写进度；**不碰 edge 残留 WIP（chrome-launcher）**
+- [ ] 6.3 `openspec validate notification-monitor --strict`
+- [ ] 6.4 cloud 改动按 §5 安全序列部署 ECS，部署后追加 `<!-- <date> deployed -->`
+- [ ] 6.5 真机校准：通知首页各类未读探测、三类列表选择器、优先级、"看一眼是否真清未读"、评论/@ 发飞书、巡视后浏览恢复、断连后无残留暂停
+- [ ] 6.6 `/opsx:archive` 归档（合并进 `notification-monitoring` + `browse-loop-resilience`）
