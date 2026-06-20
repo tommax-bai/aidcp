@@ -26,10 +26,10 @@
 
 ## 4. aidcp-cloud — MVP：写操作（审批 first-writer-wins + 账号命令）（console-write-operations 部分）
 
-- [ ] 4.1 从 `feishu/ws-receiver.ts` 抽唯一 `writeApprovalSignal(requestId, approved, payload)`：写逐字节一致 `/tmp/aidcp-publish-approve-<requestId>.json`；**first-writer-wins**（temp+rename / `O_EXCL`）；返回 `{written}`/`{alreadyDecided}`，**绝不 `{published}`**（D8）
-- [ ] 4.2 飞书卡处理器与 `POST /api/publish/:requestId/approve` 共用 4.1，用同一 `requestId`；**不接** `publish-executor.ts:148` 那条缺 `requestId` 的孤儿分支（D8）
-- [ ] 4.3 抽共享 `CommandActions`（pause/resume）：飞书命令路由与 `POST /api/accounts/:id/command` 共用；durable 经 `accounts.status`、与 `pausedEdges` 区分；回报真实下发边缘数（绝不乐观）
-- [ ] 4.4 验收：审批 first-writer-wins（二次决定返 `alreadyDecided` 不覆盖）；审批返 `written` 非 `published`；暂停回报真实下发事实
+- [x] 4.1 从 `feishu/ws-receiver.ts` 抽唯一 `writeApprovalSignal(requestId, approved, payload)`：写逐字节一致 `/tmp/aidcp-publish-approve-<requestId>.json`；**first-writer-wins**（temp+rename / `O_EXCL`）；返回 `{written}`/`{alreadyDecided}`，**绝不 `{published}`**（D8）<!-- aidcp-cloud 0b7c032 用 writeFile flag 'wx'(O_EXCL)；EEXIST 读回既有决定返 alreadyDecided；非 EEXIST 上抛不静默吞 -->
+- [x] 4.2 飞书卡处理器与 `POST /api/publish/:requestId/approve` 共用 4.1，用同一 `requestId`；**不接** `publish-executor.ts:148` 那条缺 `requestId` 的孤儿分支（D8）<!-- aidcp-cloud 0b7c032 handleCardAction 重构调 writeApprovalSignal(飞书测试兼容)；panel 路由用同函数；未接孤儿分支 -->
+- [x] 4.3 抽共享 `CommandActions`（pause/resume）：飞书命令路由与 `POST /api/accounts/:id/command` 共用；durable 经 `accounts.status`、与 `pausedEdges` 区分；回报真实下发边缘数（绝不乐观）<!-- aidcp-cloud 0b7c032 PanelDeps.commandActions(pause/resume) 复用 accountState(与飞书 actions 同底层)+server.resumeEdgesForAccount；resume 返回真实 resumedEdges -->
+- [x] 4.4 验收：审批 first-writer-wins（二次决定返 `alreadyDecided` 不覆盖）；审批返 `written` 非 `published`；暂停回报真实下发事实<!-- aidcp-cloud 0b7c032 approval-signal(4)+panel-server 写路由测试(written 非 published/命令真实结果/鉴权)；typecheck 干净 -->
 
 ## 5. aidcp-cloud — MVP：只读接口 + 面板 WS + edge 心跳（console-panel-api 部分）
 
