@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 15 角色）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> v2 共 **54 个消息类型**，下表按职能分组列全。
+> v2 共 **55 个消息类型**，下表按职能分组列全。
 
 ## 1. 信封（Envelope）
 
@@ -86,6 +86,7 @@
 | `interaction.like` | cloud → edge | 点赞指定笔记 |
 | `interaction.collect` | cloud → edge | 收藏指定笔记 |
 | `interaction.follow` | cloud → edge | 关注作者 |
+| `interaction.comment` | cloud → edge | 在当前笔记发评论（`text` 正文；云端已撰写/去AI味/人审通过） |
 | `navigation.back` | cloud → edge | 返回上一页（feed / search） |
 | `note.browse_images` | cloud → edge | 浏览笔记图片（`count` 张；DeepReader 决策下发） |
 | `note.scroll_comments` | cloud → edge | 滚动评论区（CommentReviewer 决策下发） |
@@ -324,6 +325,8 @@
 { "noteId": "n123", "reason": "值得收藏", "thinkMs": 900 }
 // interaction.follow
 { "authorId": "u456", "reason": "持续优质", "thinkMs": 900 } // authorId 可选
+// interaction.comment
+{ "noteId": "n123", "text": "今天的分享很有启发", "thinkMs": 900 } // text 必填
 // navigation.back
 { "reason": "quality_rejected", "targetPage": "feed", "dwellMs": 2200 } // targetPage: feed | search
 // note.open
@@ -355,7 +358,7 @@
 
 `EdgeCommand.action` → 协议 `type` 映射（`command-bridge.ts`）：
 `scroll→page.scroll`、`open_note→note.open`、`close_note→note.close`、
-`like→interaction.like`、`collect→interaction.collect`、`follow→interaction.follow`、
+`like→interaction.like`、`collect→interaction.collect`、`follow→interaction.follow`、`comment→interaction.comment`、
 `search→search.execute`、`back→navigation.back`、`browse_images→note.browse_images`、
 `scroll_comments→note.scroll_comments`、`profile_open→profile.open`、`session.end→session.end`。
 

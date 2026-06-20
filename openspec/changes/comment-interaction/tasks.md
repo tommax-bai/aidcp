@@ -28,16 +28,21 @@
 
 ## 3. 协议（edge + cloud 三处同步）
 
-- [ ] 3.1 两份 `src/comm/protocol.ts` 逐字一致新增 `interaction.comment` + `CommentPayload{noteId,text,thinkMs?}`
-- [ ] 3.2 `aidcp-cloud/src/comm/command-bridge.ts` 加 `comment → interaction.comment` 映射；`EdgeCommand.action` 并集加 `comment`
-- [ ] 3.3 两份 `test/acceptance/protocol-contract.test.ts` 的 `ALL_MESSAGE_TYPES` + 计数断言 54→55
-- [ ] 3.4 `docs/protocol.md` 头部计数 + §2 表同步
+- [x] 3.1 两份 `src/comm/protocol.ts` 逐字一致新增 `interaction.comment` + `CommentPayload{noteId,text,thinkMs?}` <!-- aidcp-edge / aidcp-cloud：MessageType + InteractionCommentPayload + PayloadMap 三处同步 -->
+- [x] 3.2 `aidcp-cloud/src/comm/command-bridge.ts` 加 `comment → interaction.comment` 映射；`EdgeCommand.action` 并集加 `comment` <!-- aidcp-cloud -->
+- [x] 3.3 两份 `test/acceptance/protocol-contract.test.ts` 的 `ALL_MESSAGE_TYPES` + 计数断言 54→55 <!-- AC-PROTO 全过（edge 5/5、cloud 5/5） -->
+- [x] 3.4 `docs/protocol.md` 头部计数 + §2 表同步 <!-- 计数 55 + 表行 + payload 示例 + command-bridge 映射 -->
 
 ## 4. aidcp-edge — 执行端发评论动作
 
-- [ ] 4.1 `src/browse/browse-session.ts` 新增 `interaction.comment` 命令分支 + `executeComment()`：激活折叠入口 → 点编辑器本体落 caret → `dispatchKeystrokes` 拟人输入 → `captchaPresentFresh` 自检 → 点 `button.btn.submit`
-- [ ] 4.2 后置校验（探针坐实）：编辑器清空 且 自己的评论作为顶部新 `div#comment-<id>` 行出现 → `reportActionCompleted{ok:true}`；否则 `no_target` / `state_unchanged` / `blocked_by_captcha`，绝不假成功
-- [ ] 4.3 复用 `LocatingEngine` 三道闸 / `dispatchKeystrokes` / `captchaPresentFresh` / `reportActionCompleted`，不破坏接口
+- [x] 4.1 `src/browse/browse-session.ts` 新增 `interaction.comment` 命令分支 + `executeComment()`：激活折叠入口 → 点编辑器本体落 caret → `dispatchKeystrokes` 拟人输入 → `captchaPresentFresh` 自检 → 点 `button.btn.submit` <!-- aidcp-edge -->
+- [x] 4.2 后置校验（探针坐实）：编辑器清空 且 自己的评论作为顶部新 `[id^="comment-"]` 行出现 → `reportActionCompleted{ok:true}`；否则 `no_target` / `state_unchanged` / `blocked_by_captcha`，绝不假成功 <!-- aidcp-edge -->
+- [x] 4.3 复用 `dispatchKeystrokes` / `captchaPresentFresh` / `reportActionCompleted` / `dispatchClick`，不破坏接口 <!-- 偏离说明：浏览侧互动（like/collect/follow）本就用直接 inline-JS 定位+后置校验、不走 LocatingEngine 三道闸；executeComment 对齐 executeLikeOrCollect 的同一形态，而非 publish 的 LocatingEngine 路径 -->
+- [x] 4.4 executeComment 单测：ok / no_target / state_unchanged 三例（不静默假成功） <!-- aidcp-edge test/browse/browse-session.test.ts；全量 edge 280→283 全绿 -->
+
+> **本阶段（协议 + 执行端）已落地、edge+cloud 全量测试与 typecheck 全绿、零回归。**
+> <!-- aidcp-edge 3722e45（协议+executeComment+单测，edge 283 全绿）；aidcp-cloud 10bbc70（协议镜像+command-bridge+EdgeCommand 并集，cloud 281 全绿） -->
+> 下面 §1/§2/§5（云端四角色 + 每日上限配置 + console UI）为行为层，排在 `follow-already-followed-truthful-report` 与 `interaction-appraiser-like-rebalance` 归档后再动（同改调度回执记账区域）。
 
 ## 5. aidcp-console — 后台配置 UI
 
