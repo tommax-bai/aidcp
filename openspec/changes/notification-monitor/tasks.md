@@ -57,6 +57,6 @@
 - [x] 6.1 两仓回归全绿：cloud typecheck✓ / test:acceptance 18/18 / 全量 208/208（含 16 通知例）；edge typecheck✓ / test:acceptance 11/11 / 全量 259/259（含 5 通知例）<!-- aidcp-cloud db250e5 / aidcp-edge dbf1ba2 -->
 - [x] 6.2 按 sub-repo 分节回写进度；edge WIP（chrome-launcher）未触碰 <!-- 本仓 -->
 - [x] 6.3 `openspec validate notification-monitor --strict` → valid
-- [ ] 6.4 cloud 改动按 §5 安全序列部署 ECS，部署后追加 `<!-- <date> deployed -->`
-- [ ] 6.5 真机校准：通知首页各类未读探测、三类列表选择器、优先级、"看一眼是否真清未读"、评论/@ 发飞书、巡视后浏览恢复、断连后无残留暂停
-- [ ] 6.6 `/opsx:archive` 归档（合并进 `notification-monitoring` + `browse-loop-resilience`）
+- [x] 6.4 cloud 按 §5 安全序列部署 ECS：备份(cloud.bak.20260620-134048.tar.gz + .env.bak)→rsync(排除 .env/node_modules/.git，40 文件)→restart→健康检查全过（active / 8787 监听 / accounts 表自建 seed / RiskController·ConceptStore·AccountStore 就绪=PG 通 / RoleDispatcher 12 通知角色就绪 / 飞书长连接已建立 / 无 error / isales 未触碰）。**决策：用户选全量部署当前主干**——本次连带把面板(默认禁用)·账号主表·此前已合并主干一起上线，非仅 notification。<!-- aidcp-cloud db250e5 --> <!-- 2026-06-20 deployed -->
+- [ ] 6.5 真机校准（本机，下一步）：本机 edge 连 ECS（ws://121.89.85.150:8787）跑真实小红书，校准——通知首页各类未读探测、三类列表选择器、优先级、"看一眼是否真清未读"、评论/@ 发飞书、巡视后浏览恢复、断连后无残留暂停
+- [ ] 6.6 `/opsx:archive` 归档（合并进 `notification-monitoring` + `browse-loop-resilience`）← 真机验收通过后
