@@ -30,7 +30,9 @@
 ### 5.A 基础设施（非角色）
 - [ ] 5.A1 **发命令统一暂停出口**：`role-dispatcher` 把 `sendCommand` 包成 `send(cmd, 来源:'browse'|'excursion')`，所有 ~10 翻译块 + 失败兜底滚动都走它；巡视期（`ctx.excursion.active`）扣 browse、放 excursion；登记可清理（D7）
 - [ ] 5.A2 `isHardPaused(edgeId)` 注入闭包（包 ws-server pausedEdges）；`handler.ts` 加 `notification.detected/home/items → *.arrived` 入口转换（D7/D9）
-- [ ] 5.A3 `SessionContext` 加 `excursion`（active/epoch/phase/lastHandledEpoch/perCategoryUnread/processedCategories/seenItemKeys）；`reset/endSession/restartSession` **显式清瞬时态 + 暂停开关**、保留 seenItemKeys（D2，断连不冻结=最高优先）
+- [x] 5.A3 `SessionContext` 加 `excursion`（active/epoch/phase/lastHandledEpoch/processedCategories）+ browseSuspended + notifiedItemKeys；`reset()` 清瞬时态 + 暂停开关、保留 notified/visited（D2，断连不冻结）<!-- aidcp-cloud d20f10e -->
+- [x] 5.A0 事件契约：event-bus/types.ts 加 11 RoleName + ~16 通知事件（*.arrived 入口 + 角色间衔接）+ NotificationCategory <!-- aidcp-cloud d20f10e -->
+- [ ] 5.A2b `handler.ts` 加 `notification.detected/home/items → *.arrived` 入口转换
 - [ ] 5.A4 从验证码协调器抽出共享飞书告警原语（resolveChatId+sendCard+冷却），供发飞书角色注入复用（D8）
 
 ### 5.B 12 角色（各为 BaseRole，注册进 roles[]，逐个单测：喂入事件→断言出事件/命令）
