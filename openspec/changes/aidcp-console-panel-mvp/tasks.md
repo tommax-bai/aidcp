@@ -33,7 +33,7 @@
 
 ## 5. aidcp-cloud — MVP：只读接口 + 面板 WS + edge 心跳（console-panel-api 部分）
 
-- [ ] 5.1 只读接口（全部走索引点查/范围查询、非阻塞）：`GET /api/version`（含 live enum 值）、`/api/dashboard/summary`、`/api/accounts(+/:id)`、`/api/content/queue`、`/api/content/published`、`/api/analytics/like-rate`
+- [x] 5.1 只读接口（全部走索引点查/范围查询、非阻塞）：`GET /api/version`（含 live enum 值）、`/api/dashboard/summary`、`/api/accounts(+/:id)`、`/api/content/queue`、`/api/content/published`、`/api/analytics/like-rate`<!-- aidcp-cloud 1bce85b src/panel/panel-store.ts 只读 PG 查询层(纯 SELECT，不经 RiskController/不碰 edge)；summary=totals(SUM(count) 全局, attributionPending=true)+edgesOnline+likeRate(15-35% 带)+accounts(accounts⨝risk_state，operator 态与 risk 态分开)；content/queue 读 orchestrator.getStatus；panel-store(8 fake-pool)+panel-server http 集成测试，typecheck 干净 -->
 - [ ] 5.2 面板 WS：一个通配处理器订阅事件总线，过滤面板事件、归一化为 `docs/product-dashboard.md §2.3` 帧，**单一全局流 + 客户端过滤**；纯只读扇出、绝不碰 edge；JWT（query/首帧）（红线：边-云隔离）
 - [ ] 5.3 edge 心跳：在已有 `ping`/`pong`（`protocol.ts:74`）之上加主动探活定时器 + 每入站帧戳 `last_seen`；`online = inMap AND (now-last_seen < N×interval)`（D9）——**云内、不碰协议**
 - [x] 5.4 `/api/version` 暴露 live 风控状态/档位/告警分级枚举，作 console 漂移哨兵（D11）<!-- aidcp-cloud 3752240 task 1 顺带完成：暴露 RISK_STATUSES/RISK_QUOTA_LEVELS/RISK_ACTIONS（types.ts 补 runtime const 单源）；告警分级枚举待 V1 alerts 落地补 -->
