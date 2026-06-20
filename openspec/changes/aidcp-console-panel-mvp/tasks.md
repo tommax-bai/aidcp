@@ -44,7 +44,7 @@
 - [x] 6.2 committed `src/types/aidcp-enums.ts`（`RiskStatus`/`RiskQuotaLevel`/`RISK_ACTIONS`）+ 一个对 live `/api/version` 断言的漂移测试（D11）<!-- aidcp-console 7964521 镜像枚举固定值单测 + against-live(AIDCP_PANEL_URL gated) -->
 - [x] 6.3 鉴权：登录页 → `POST /api/auth/login`；token 优先**同站 httpOnly cookie**（面板 Nginx-public 且有写权限）而非 localStorage；fetch 拦截器挂 Bearer；401 → 登录（design 开放问题：JWT 存储）<!-- aidcp-console 7964521 骨架：AuthContext + client(Bearer/401→UnauthorizedError) + 路由守卫 RequireAuth；MVP 先内存 token(刷新重登)，cookie 为开放问题留缝(setToken/getToken) -->
 - [ ] 6.4 TanStack Query 管所有 `/api` 读；独立 panel-WS 客户端喂 live 日志/告警流 → `invalidateQueries`/`setQueryData`<!-- 部分(aidcp-console 7964521)：TanStack Query 已配(useVersion/useDashboardSummary)；panel-WS 客户端待 task 5.2 后端 WS -->
-- [ ] 6.5 页面镜像 `docs/product-dashboard.md §1`（Dashboard/Accounts/Content）+ 顶层布局 + 全局账号筛选器；`status` 与 `quota_level` 渲染为**两个独立徽标**<!-- 部分(aidcp-console 7964521)：App shell+导航+全局筛选器+各页占位+Dashboard(edgesOnline+归因 banner)已起；接真数据/两徽标渲染待 task 5 只读接口 -->
+- [x] 6.5 页面镜像 `docs/product-dashboard.md §1`（Dashboard/Accounts/Content）+ 顶层布局 + 全局账号筛选器；`status` 与 `quota_level` 渲染为**两个独立徽标**<!-- aidcp-console 64a9fa8 接 task 5.1 真数据：Dashboard(今日 totals 卡+like-rate 带+账号状态表 severity 排序)+Accounts(列表)+Content(in-flight 队列+发布历史诚实回执列 no-receipt vs platform_post_id)；AccountsTable 复用 RiskStatusBadge+QuotaTierBadge 两独立徽标；typecheck/build 绿。全局账号筛选器暂占位(仅 All accounts，真过滤待多账号+归因落地，design §3.1) -->
 - [ ] 6.6 写：发布审批 approve/reject + 账号 pause/resume——**绝不乐观更新**、永远 round-trip；诚实渲染 `{written}`/`{alreadyDecided}`、「已记录、0 个在线 edge」、原因说明（D10）
 
 ## 7. aidcp[deploy] — MVP：ECS 部署（安全序列 + 红线盘点）
