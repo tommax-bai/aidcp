@@ -1,0 +1,148 @@
+<!--
+进度回写格式：完成后用 HTML 注释把 [ ] 改 [x]，并按格式记 <!~~ <repo> <commit-sha> 备注 ~~>（部署后追加 <!~~ <date> deployed ~~>）。
+repo 取值：aidcp-cloud / aidcp-edge / aidcp（本中控仓）。代码改动落对应 sub-repo，进度回写本仓本文件。
+依赖序（务必按组推进）：① 协议三处同步 → ② 边缘指令运行时 → ③ 云端 CommandSequencer → ④ 验收（新增 AC-CMD/AC-PUB 序列版 + 不回归 AC-PROTO/AC-PUB）→ ⑤ 全量回归 → ⑥ 部署。
+回归铁律：协议/风控/发布改动后先 `npm run test:acceptance` 再全量 `npm test` 再 `npm run typecheck`；AC-PROTO-* / AC-PUB-* 安全红线必须全过。
+前置检查（§0）：edge/cloud 两 sub-repo 须在本机（`ls -d ../aidcp-edge ../aidcp-cloud`）；部署前私钥 `~/codes/isales-4.pem` 须存在且 `chmod 600`。
+红线：MUST NOT 静默假成功（找不到报 no_target、后置校验失败报 post_validation_failed）；两份 protocol.ts 逐字一致；submit_publish 前强制 AC-PUB；PROTOCOL_VERSION 仍为 2、协议 +2 向后兼容。
+行号约定：design.md 的 file:line 随提交漂移，实施前以 grep / openspec status 复核，不硬编码行号。
+-->
+
+## 0. 前置确认（中控）
+
+- [ ] 0.1 确认 sub-repo 在机：`ls -d ../aidcp-edge ../aidcp-cloud` 均存在；记两份 `src/comm/protocol.ts` 的 `MessageType` 基线（**47**，目标 **49**）。**验证**：`openspec validate publish-edge-command-runtime --strict` 当前可过；`openspec list` 仅本 change 活跃
+
+## 1. 协议三处同步（+2 消息、`kind` 枚举）— 第 ① 组
+
+> 铁律：两份 `src/comm/protocol.ts` 逐字一致 + `command-bridge.ts` 映射 + `docs/protocol.md`。**新增消息恰 +2（47→49），非 +10**（一条通用消息 + `kind` 参数）。漂移由 `Record<MessageType,true>` 穷举 + `AC-PROTO-*` 暴露。
+
+### 1.1 aidcp-cloud — protocol.ts（权威源）
+
+- [ ] 1.1.1 `src/comm/protocol.ts`：`MessageType` union +2：`| 'publish.command'`（cloud→edge）、`| 'publish.command.result'`（edge→cloud）。**验证**：`grep -n "publish.command" src/comm/protocol.ts` 见两条
+- [ ] 1.1.2 新增类型：`PublishCommandKind`（E1-E10 十枚举 `navigate_entry`/`select_mode`/`upload_image`/`set_cover`/`fill_field`/`add_with_candidate`/`set_option`/`set_schedule`/`submit_publish`/`capture_postId`）、`PublishCommandParams`（按 kind 联合类型，元数据维度先占位预留）、`PublishCommandPayload {recordId,seq,kind,params,timeoutMs?,reason?}`、`PublishCommandResultPayload {recordId,seq,kind,ok,value?,error?,details?}`（`details:{actionId?,outcome?,attempts?,durationMs?}`）。**验证**：`npm run typecheck` 编译通过
+- [ ] 1.1.3 `PayloadMap`（`Record<MessageType,…>` 穷举表）+2 条目映射两条新消息。**验证**：`npm run typecheck`（穷举表缺项即编译失败）
+
+### 1.2 aidcp-edge — protocol.ts（与 cloud 逐字一致）
+
+- [ ] 1.2.1 `src/comm/protocol.ts`：镜像 1.1 的 `MessageType` +2 / 四个新类型 / `PayloadMap` +2，与 cloud **逐字一致**。**验证**：`diff -u ../aidcp-cloud/src/comm/protocol.ts ../aidcp-edge/src/comm/protocol.ts` 的 MessageType/Payload/PayloadMap 块无差异；edge `npm run typecheck`
+
+### 1.3 aidcp-cloud — command-bridge.ts（核查，无需改）
+
+- [ ] 1.3.1 `src/comm/command-bridge.ts`：**核查无需为 publish.command 登记映射**——`publish.command` 由 `CommandSequencer` 直接 `makeEnvelope('publish.command', …)` 下发，不经 command-bridge（command-bridge 只服务 RoleDispatcher 浏览指令）。确认无漂移。**验证**：`grep -n publish src/comm/command-bridge.ts` 无发布指令映射条目；`npm run typecheck`
+
+### 1.4 中控 — docs/protocol.md（人工维护，勿滞后）
+
+- [ ] 1.4.1 `docs/protocol.md`：头部 `共 47 个消息类型` → `共 49 个消息类型`；§2 表 +2 行（`publish.command` / `publish.command.result`）；补 `kind` 枚举映射（E1-E10）+ 「`recordId+seq` 为业务级永久关联键、`envelope.id` 仅日志」+ 「`requestId`（AC-PUB 审批键，字符串）≠ `recordId`（指令关联键，数字）」澄清。**验证**：`grep -n "49 个消息类型" docs/protocol.md` 命中；人工核对 §2 表两行齐备
+
+## 2. 边缘指令运行时（每 kind 处理器 + 后置校验 + 逐条回报，复用定位引擎）— 第 ② 组（依赖 ①）
+
+> 复用 `src/locating/engine.ts` 的 `LocatingEngine.resolveAndAct` + 三道闸（R1 后置校验不晋升、R2 重试上限→escalated、R3 反污染 stage→confirm），**不在发布层另起硬编码整页流程**。红线：`!result.ok` 或 validator 失败立即回 `ok:false` + 真实 error，MUST NOT 伪造 ok:true / `count||1`。
+
+### 2.1 aidcp-edge — PublishCommandDispatcher 骨架
+
+- [ ] 2.1.1 新增 `src/flows/publish-command-handlers.ts`：`PublishCommandDispatcher`（`kind → 处理器` Map + `dispatch(payload)`），处理器统一接口 `{buildRequest()→ActionRequest, buildValidator()→后置校验, run(ctx)→PublishCommandResultPayload}`。**验证**：edge `npm run typecheck`；单测 dispatcher 按 kind 路由命中
+- [ ] 2.1.2 公共 `run()` 红线骨架：`engine.resolveAndAct(buildRequest())` 取 `result`；`!result.ok` → 立即 `{ok:false, error:result.reason, details:{actionId,outcome,attempts}}`；`result.ok` 后读 DOM 由 `buildValidator()` 后置校验，失败 → `{ok:false, error:'post_validation_failed', details}`，**绝不伪造 ok:true**。**验证**：单测覆盖「定位失败」「后置校验失败」两路均回 `ok:false`（见 4.2）
+
+### 2.2 aidcp-edge — 最小可端到端处理器集
+
+> 地基阶段最小集（Decision 6 / Open Q1）：`navigate_entry` / `select_mode` / `fill_field` / `add_with_candidate` / `set_schedule` / `submit_publish` / `capture_postId`。
+
+- [ ] 2.2.1 `NavigateEntryHandler`（E1）：定位进创作页，`buildValidator` 校验已在发布页。**验证**：edge 单测；实机未命中如实 `no_target`
+- [ ] 2.2.2 `SelectModeHandler`（E2）：选发布模式（图文等），后置校验模式已选中。**验证**：edge 单测
+- [ ] 2.2.3 `FillFieldHandler`（E5）：按 `params.fieldType`（title/content）构造 `ActionRequest`，`buildValidator` 读 DOM 校验刚填入内容存在。**验证**：edge 单测（填入成功 / 校验失败两路）
+- [ ] 2.2.4 `AddWithCandidateHandler`（E6）：tag 候选由 cloud 预生成随 `params.candidates` 下发，边缘只定位点击，`buildValidator` 本阶段简化（只校验「标签已加上」，不精确到 selectedIndex）。**验证**：edge 单测
+- [ ] 2.2.5 `SetScheduleHandler`（E8）：按 `params.publishTime`（毫秒时间戳，Open Q3）设定时，后置校验定时已设；`publishTime` 缺省时此 kind 由 cloud 不下发。**验证**：edge 单测
+- [ ] 2.2.6 `SubmitPublishHandler`（E9）：点发布按钮，后置校验提交已触发；**边缘无权自造 submit，完全依赖 cloud 序列下发**。**验证**：edge 单测
+- [ ] 2.2.7 `CapturePostIdHandler`（E10）：抓真实 postId，抓不到如实 `no_target`，**MUST NOT `postId||fake`**。**验证**：edge 单测（抓不到回 `ok:false`）
+- [ ] 2.2.8 协议层已登记但本阶段不实装的 kind（`upload_image` / `set_cover` / `set_option`，Open Q1）：dispatcher 收到未实装 kind 回 `{ok:false, error:'kind_not_implemented'}`，**MUST NOT 假成功**。**验证**：edge 单测
+
+### 2.3 aidcp-edge — main.ts 接线（新旧路径并行）
+
+- [ ] 2.3.1 `src/main.ts`：新增 `publish.command` 监听分发到 `PublishCommandDispatcher`，每条执行后 `client.send('publish.command.result', {recordId,seq,kind,ok,value?,error?,details?})`（带相同 `recordId+seq`）；**保留** `publish.request → publishPost()` 旧路径并行（Decision 6 / Open Q4，地基阶段不删 temp 口）。**验证**：edge `npm run typecheck`；单测两路径互不干扰
+- [ ] 2.3.2 复用 `src/publish/approval-gate.ts` `buildPublishApprovalSignalPath(requestId)` 审批信号路径，**两端契约不漂移**（本阶段提交闸由 cloud sequencer 主导，edge 不自造提交授权）。**验证**：与 cloud `getApprovalSignalPath` 路径一致（见 4.4.1）
+
+## 3. 云端 CommandSequencer（生成序列 + 驱动 + 人审闸 + 取代 executor 接线）— 第 ③ 组（依赖 ①②）
+
+> `send→await result→advance`；失败到重试上限 escalate（诚实失败、不续发、不假成功）。AC-PUB 双重闸：第 1 道在 `PublishExecutor`（文件检查），第 2 道在 `buildCommandSequence`（提交前截止）。pending map 键 `recordId:seq` + 超时清理防泄漏。
+
+### 3.1 aidcp-cloud — CommandSequencer 组件
+
+- [ ] 3.1.1 新增 `src/publish-agent/command-sequencer.ts`：`CommandSequencer` 类骨架（`buildCommandSequence` / `executePublishSequence` / `sendAndWaitResult` / `onResult`）+ pending map（键 `${recordId}:${seq}`，条目 `{recordId,seq,commandId(仅日志),sentAt,timeoutMs,resolve,reject,timeoutHandle}`）。**验证**：cloud `npm run typecheck`
+- [ ] 3.1.2 `buildCommandSequence(input)`：终稿 +（占位）元数据 → 有序序列 `navigate_entry → [select_mode] → fill_field(title) → fill_field(content) → add_with_candidate(tag)×N → [set_schedule? if publishTime] → submit_publish → capture_postId`；tag candidates 在此预生成后随 `params` 下发（Decision 2/3，V8）。**验证**：cloud 单测序列结构（含「有图才传 / 有 publishTime 才 set_schedule」条件分支）
+- [ ] 3.1.3 **AC-PUB 第 2 道**：加入 `submit_publish` 前检查 `input.approvedByUser`，未授权 → `return cmds`（序列截止于提交前，调用方再试也生成不出提交指令）。**验证**：cloud 单测「未授权时序列不含 submit_publish」
+- [ ] 3.1.4 `executePublishSequence`：`for cmd of sequence: await sendAndWaitResult(cmd); if !result.ok → return {ok:false, failedAt:{seq,kind,error}}`，后续指令 MUST NOT 下发；全过 → `{ok:true, postId}`。**验证**：cloud 单测「第 5 条失败 → 6-10 不下发、返回 failedAt」
+- [ ] 3.1.5 `sendAndWaitResult(cmd, timeoutMs=30000)`：下发 `publish.command`、注册 promise + `setTimeout` 超时 reject + `pending.delete(key)`（防泄漏，V2/V3）。**验证**：cloud 单测超时 reject + 清理
+- [ ] 3.1.6 `onResult(payload, envelopeId)`：按 `${payload.recordId}:${payload.seq}` 查 pending → `clearTimeout` → `pending.delete` → `resolve(payload)`；`envelopeId` 仅日志不参与查找。**验证**：cloud 单测「recordId+seq 配对 resolve、envelope.id 变化不影响」「resolve 后 pending 删除不残留」
+
+### 3.2 aidcp-cloud — PublishExecutor 取代接线
+
+- [ ] 3.2.1 `src/publish-agent/roles/publish-executor.ts`：`HandlerDeps` +1 字段 `sequencer: CommandSequencer`。**验证**：cloud `npm run typecheck`
+- [ ] 3.2.2 `handleAutoPublish` 末段改写：**AC-PUB 第 1 道**保留——读 `getApprovalSignalPath(requestId)` → `JSON.parse` → `approved === true` 严格相等；文件缺失/解析失败 → `approvedByUser=false` → `status='failed'` 返回、不下发、记 warn 日志。授权通过则改调 `sequencer.executePublishSequence(input)` **取代** `pusher.pushToEdges(publish.request)` + 无等待。**验证**：cloud 单测「未授权→status='failed' 不下发」「已授权→走 sequencer」
+- [ ] 3.2.3 `src/comm/handler.ts`：`HandlerDeps` +1 字段 `commandSequencer?: CommandSequencer`；switch 新增 `case 'publish.command.result': this.deps.commandSequencer?.onResult(env.payload, env.id); return null;`。**验证**：cloud `npm run typecheck` + 结果消息路由到 `onResult` 单测
+
+## 4. 验收（新增 AC-CMD-* / AC-PUB 序列版 + 不回归 AC-PROTO/AC-PUB）— 第 ④ 组（依赖 ①②③）
+
+> 双仓 `test:acceptance`。**安全红线必须全过**：`AC-PROTO-*`（两份 protocol.ts 不漂移）、`AC-PUB-*`（未授权不发布、两端审批路径契约一致）。新增发布层 AC-CMD：诚实失败 / 按序停止 / 关联回报 / 超时清理。
+
+### 4.1 aidcp-cloud / aidcp-edge — AC-PROTO 扩到 49（不回归）
+
+- [ ] 4.1.1 两仓 `test/acceptance/protocol-contract.test.ts`：`ALL_MESSAGE_TYPES` 穷举扩到 **49**，断言 `ALL_MESSAGE_TYPES.length === 49`、`Object.keys(PayloadMap).length === 49`、两数相等；含两条新消息。**验证**：双仓 `npm run test:acceptance` AC-PROTO 全过
+- [ ] 4.1.2（可选）追加 `diff -u` 两份 `protocol.ts` 的 CI/pre-commit 检查（V1）。**验证**：脚本本地跑无差异输出
+
+### 4.2 aidcp-edge — AC-CMD 诚实失败（边缘面）
+
+- [ ] 4.2.1 新增 `test/flows/publish-command-handlers.test.ts`：`FillFieldHandler` 后置校验失败 → 回 `{ok:false, error:'post_validation_failed'}` 不伪造 ok:true（红线反例 Scenario）。**验证**：edge `npm test` / `npm run test:acceptance`
+- [ ] 4.2.2 找不到目标 → 回 `{ok:false, error:'no_target'}`，MUST NOT `count||1` / `postId||fake` 兜底（`CapturePostIdHandler` 抓不到回 `ok:false`）。**验证**：edge 单测
+- [ ] 4.2.3 处理器复用而非绕开定位引擎：断言 `fill_field` 经 `LocatingEngine.resolveAndAct`（非自写 querySelector 整页脚本）。**验证**：edge 单测（mock engine 被调用）
+
+### 4.3 aidcp-cloud — AC-CMD 编排驱动（云端面）
+
+- [ ] 4.3.1 新增 `test/publish-agent/command-sequencer.test.ts`：终稿 → 有序序列结构正确（含条件分支）。**验证**：cloud `npm run test:acceptance`
+- [ ] 4.3.2 失败按序停止：第 5 条 `ok:false` → 6-10 不下发、返回 `{ok:false, failedAt:{seq:5,kind,error}}`（红线反例：中途失败不报发布成功、不跑到 submit_publish）。**验证**：cloud 单测
+- [ ] 4.3.3 关联回报：`recordId+seq` 配对 resolve、`envelope.id` 变化不影响；resolve 后 pending 删除；超时 reject + 自动清理不泄漏。**验证**：cloud 单测
+- [ ] 4.3.4 红线反例——绕开 sequencer 整页下发：新路径 MUST 走逐条 `send→await→advance`，不得保留无等待的 `pushToEdges(publish.request)`。**验证**：cloud 单测断言新路径不直接整页 `pushToEdges`
+
+### 4.4 aidcp-cloud / aidcp-edge — AC-PUB 序列版（不回归 + 新增）
+
+- [ ] 4.4.1 两仓 `test/acceptance/publish-approval-contract.test.ts`：两端审批信号路径契约一致——cloud `getApprovalSignalPath(requestId)` === edge `buildPublishApprovalSignalPath(requestId)` === `/tmp/aidcp-publish-approve-<requestId>.json`（不漂移）。**验证**：双仓 `npm run test:acceptance` AC-PUB 全过
+- [ ] 4.4.2 cloud 新增/扩展 AC-PUB：审批文件缺失/解析失败/`approved !== true` → `submit_publish` 不入序列、`status='failed'`（红线反例：缺省直发禁止，严格相等判定 + 提交前截止）。**验证**：cloud 单测「未授权三种情形均不下发 submit」
+- [ ] 4.4.3 已授权（`approved === true`）→ `submit_publish` 入序列并下发，随后 `capture_postId` 抓真实 postId。**验证**：cloud 单测
+
+## 5. 全量回归（edge + cloud 各 test:acceptance → test → typecheck）— 第 ⑤ 组（依赖 ④）
+
+> 回归纪律：**先 `test:acceptance` 再全量 `test` 再 `typecheck`**。两仓都跑。安全红线（AC-PROTO / AC-PUB / 诚实失败）必须全过。
+
+### 5.1 aidcp-edge — 回归
+
+- [ ] 5.1.1 `cd ../aidcp-edge && npm run test:acceptance`（AC-PROTO 49 / AC-PUB 路径一致 / AC-CMD 诚实失败全过）。**验证**：退出码 0
+- [ ] 5.1.2 `cd ../aidcp-edge && npm test`（全量绿）。**验证**：退出码 0
+- [ ] 5.1.3 `cd ../aidcp-edge && npm run typecheck`（`Record<MessageType,true>` 穷举无漂移）。**验证**：退出码 0
+
+### 5.2 aidcp-cloud — 回归
+
+- [ ] 5.2.1 `cd ../aidcp-cloud && npm run test:acceptance`（AC-PROTO 49 / AC-PUB 序列版 / AC-CMD 编排驱动全过）。**验证**：退出码 0
+- [ ] 5.2.2 `cd ../aidcp-cloud && npm test`（全量绿）。**验证**：退出码 0
+- [ ] 5.2.3 `cd ../aidcp-cloud && npm run typecheck`（两份 protocol.ts 不漂移）。**验证**：退出码 0
+
+## 6. 部署（cloud ECS 安全序列；edge 本地）— 第 ⑥ 组（依赖 ⑤ 全绿）
+
+> **部署铁律**：cloud 只跑 ECS `121.89.85.150`，本地永不起 cloud；**同机 isales 绝不触碰**。执行前先做 §0 私钥检查（`~/codes/isales-4.pem` 存在且 `chmod 600`）。逐条命令 / 版本台账见 `docs/handoff-2026-06-05.md` 顶部最新注记块与 `aidcp-cloud/docs/deployment-ecs.md`。
+
+### 6.1 aidcp-cloud — ECS 安全序列
+
+- [ ] 6.1.1 ① sub-repo 测试已通过（第 ⑤ 组全绿，前置）。**验证**：5.2 全退出码 0
+- [ ] 6.1.2 ② ECS 先备份：`/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`。**验证**：ECS 上 `ls -l` 见备份文件
+- [ ] 6.1.3 ③ `rsync`（`--exclude .env --exclude node_modules --exclude .git`）推送 cloud。**验证**：rsync 退出码 0
+- [ ] 6.1.4 ④ `systemctl restart aidcp-cloud.service`。**验证**：命令无报错
+- [ ] 6.1.5 ⑤ healthcheck：`active (running)` + 8787 监听 + 飞书长连接已建立 + PG `select 1` + **isales 未触碰**（独立服务/目录/端口仍正常）。**验证**：逐项核对全过
+- [ ] 6.1.6 ⑥ 失败即回滚（解 `.bak.<ts>.tar.gz` + 重启 + 重新 healthcheck）。**验证**：回滚后 healthcheck 复绿
+
+### 6.2 aidcp-edge — 本地发布
+
+- [ ] 6.2.1 edge 本地跑、连 `ws://121.89.85.150:8787`；新 `publish.command` 路径与旧 `publish.request` 并行，现有 temp 口触发烟测：navigate→fill→（AC-PUB 已授权）submit→capture 全链逐条回报、诚实失败可见。**验证**：观察 `publish.command.result` 逐条 `ok/value/error`；AC-PUB 未授权时序列截止于提交前
+
+## 7. 收尾（中控）
+
+- [ ] 7.1 各 task 用 HTML 注释标 `[x]` + commit-sha + 偏离说明；部署后追加 `<!-- <date> deployed -->`。**验证**：本文件各 task 带注释
+- [ ] 7.2 提交回写：本仓 tasks.md/docs 推 `main`，edge/cloud 代码各推默认分支 `master`（commit message 末尾带 Co-Authored-By 行）。**验证**：三仓 `git status` 干净、已 push
+- [ ] 7.3 `openspec validate publish-edge-command-runtime --strict` 通过 → `openspec archive publish-edge-command-runtime`（delta 合并进 `openspec/specs/publish-pipeline/`，归档目录 `<YYYY-MM-DD>-publish-edge-command-runtime/`）。**验证**：archive 后 `openspec list` 无活跃 change、`openspec list --specs` 含 `publish-pipeline`
