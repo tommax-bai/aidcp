@@ -20,9 +20,9 @@
 
 ## 3. aidcp-cloud — MVP：归因修复 accountId（interaction-attribution 步骤 3）
 
-- [ ] 3.1 给 `interaction.occurred` 的 EventMap 条目加 `accountId`，在发射点（`handler.ts:203`）从 `session.accountId` 填——**云内类型改动、不碰 `protocol.ts`**（D3，重构步骤 3）
-- [ ] 3.2 undefined-accountId 显式回退：路由到保留键 `default` **并**在投影标 `unattributed`；不抛错、不静默并入真名账号（D4）
-- [ ] 3.3 验收测试：缺 `accountId` 的事件被标 `unattributed` 而非误并；面板按账号切片在归因流通前标「全部账号 / 归因待补」
+- [x] 3.1 给 `interaction.occurred` 的 EventMap 条目加 `accountId`，在发射点（`handler.ts:242`）从 `session.accountId` 填——**云内类型改动、不碰 `protocol.ts`**（D3，重构步骤 3）<!-- aidcp-cloud 91cd937 event-bus/types.ts interaction.occurred 加 accountId?；handler action.completed emit 点从 session.accountId 填 -->
+- [x] 3.2 undefined-accountId 显式回退：路由到保留键 `default` **并**在投影标 `unattributed`；不抛错、不静默并入真名账号（D4）<!-- aidcp-cloud 91cd937 emit 点 session.accountId ?? 'default'（回退保留键，不误并真名账号）；投影侧 panel summary attributionPending=true 已诚实标注，去标待 V1 registry -->
+- [x] 3.3 验收测试：缺 `accountId` 的事件被标 `unattributed` 而非误并；面板按账号切片在归因流通前标「全部账号 / 归因待补」<!-- aidcp-cloud 91cd937 handler-attribution(3)：accountId 从 session / 缺失回退 default / 失败不 emit；panel summary attributionPending 已测 -->
 
 ## 4. aidcp-cloud — MVP：写操作（审批 first-writer-wins + 账号命令）（console-write-operations 部分）
 
