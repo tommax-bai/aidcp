@@ -67,14 +67,16 @@
 ## 9. aidcp-cloud — V1：Registry + noteId + monitor/alerts + per-edge dispatcher
 
 - [x] 9.1 `RiskControllerRegistry`（`Map<accountId, RiskController>` 懒加载）+ `listStates()`；按 `accountId` 路由 `interaction.occurred`（重构步骤 5）<!-- aidcp-cloud 32a664e 新 src/risk/risk-controller-registry.ts(懒加载+共享 PgRiskStore+listStates)；server.ts 现役用 registry default controller(单一来源)；record 按 evt.accountId 路由 -->
-- [ ] 9.2 在发射点填充已声明的 `noteId`；接线孤儿 `risk_interactions` 入互动完成路径；`GET /api/monitor/interactions`（重构步骤 6）
-- [ ] 9.3 `ALTER publish_log + concepts ADD COLUMN account_id TEXT NOT NULL DEFAULT 'default'`；概念查询保持账号无关（重构步骤 7）
-- [ ] 9.4 每边缘/账号 dispatcher 按 `account→machine` 映射（**非** god-object）；`POST /api/accounts/:id/dispatch {start|stop}` 回报真实 edge-online 事实（重构步骤 8）
-- [ ] 9.5 `alerts` 表在飞书卡发送点写入（复用 P0–P3 枚举）；验证码清除点 set `resolved_at`；`GET /api/alerts`
-- [ ] 9.6 移除按账号切片的「归因待补」标，上真按账号数字
+- [x] 9.2 在发射点填充已声明的 `noteId`；接线孤儿 `risk_interactions` 入互动完成路径；`GET /api/monitor/interactions`（重构步骤 6）<!-- aidcp-cloud 710fe7a EdgeSession.currentNoteId 随 note.detail/note.content 戳，action.completed emit 点填 noteId（云内、不碰 protocol）；panel listInteractions + GET /api/monitor/interactions。43a0370 PgRiskStore 提升为共享单例，interaction.occurred 消费端按 like/collect 落 risk_interactions（ON CONFLICT 去重）。偏离：用 store.recordInteraction 直调而非 InteractionDedup 包装（单账号 wrapper 不合多账号录入）。test: handler-attribution +2 -->
+- [x] 9.3 `ALTER publish_log + concepts ADD COLUMN account_id TEXT NOT NULL DEFAULT 'default'`；概念查询保持账号无关（重构步骤 7）<!-- aidcp-cloud 710fe7a migrations/0005_account_id_columns.sql（ADD COLUMN IF NOT EXISTS 幂等、DEFAULT 'default' 自动回填 + 按账号索引）；概念查询账号无关、零 store 改动（避开并发 publish-log-store.ts）。部署须跑该 migration。 -->
+- [x] 9.4 每边缘/账号 dispatcher 按 `account→machine` 映射（**非** god-object）；`POST /api/accounts/:id/dispatch {start|stop}` 回报真实 edge-online 事实（重构步骤 8）<!-- aidcp-cloud 710fe7a POST /api/accounts/:id/dispatch 路由 + commandActions.dispatch/dispatchActive（panel/types）。43a0370 server 闭包切现役单全局 RoleDispatcher start/endSession、回报 server.onlineEdgeCount()、no-op 以 changed=false 诚实可辨。**偏离（按 handoff/​design 步骤 8）**：单全局 dispatcher（非 per-edge），accountId 信息性；per-edge 多路复用拆分留到真多账号场景（未碰 role-dispatcher 结构、不破坏现役浏览闭环）。test: panel-server dispatch -->
+- [x] 9.5 `alerts` 表在飞书卡发送点写入（复用 P0–P3 枚举）；验证码清除点 set `resolved_at`；`GET /api/alerts`<!-- aidcp-cloud 710fe7a 新 src/alerts/alert-store.ts（PgAlertStore raise/resolveByEdge/list）+ migrations/0006_alerts.sql；captcha-coordinator 在卡发送点 raise(P0/P1，与飞书投递解耦——无群/发送失败仍落库)、清除点 resolveByEdge；panel listAlerts + GET /api/alerts + summary.alerts 真数据；/api/version 暴露 alertSeverity 枚举（task 5.4 follow-up）。43a0370 server 建 PgAlertStore+init 注入 captcha。test: alert-store(5) + captcha +2。部署须跑 0006 migration（store.init 亦幂等建表）。 -->
+- [x] 9.6 移除按账号切片的「归因待补」标，上真按账号数字<!-- aidcp-cloud 710fe7a panel-store.todayTotalsByAccount（GROUP BY account_id,action）；summary 去 attributionPending(=false)+加 totalsByAccount（归因已流通，record 按 evt.accountId 记）。aidcp-console 181e47b 删 AttributionPendingBanner、Dashboard/Monitor 渲染真按账号 AccountTotalsTable。 -->
+<!-- 部署提示：9.3/9.5 含新 migration（migrations/0005,0006），部署时须 tsx scripts/run-migration.ts 逐个跑（或依赖 store.init 幂等建表——0006 alerts 经 AlertStore.init 自动建；0005 account_id 列须显式跑）。 -->
+
 
 ## 10. aidcp-console — V1：风控控件 + dispatch + monitor/alerts 页
 
 - [x] 10.1 风控 STATUS 控件（枚举迁移）+ QUOTA-TIER 控件为**两个独立控件**接两个端点；「refused」与成功可辨；override 标特权/记录<!-- aidcp-console 8d21677 RiskControls 组件：status Dropdown(restrict/freeze/override-modal 需 reason)+quota Select；非乐观 round-trip；refused(changed=false)区别于成功；接 /risk/status + /risk/quota。风控写端到端可用(后端 8.4 + 前端 10.1) -->
-- [ ] 10.2 dispatch 启停控件，回报真实 edge-online 事实
-- [ ] 10.3 Monitor 页：按笔记互动；Alerts 只读流；真按账号总览切片
+- [x] 10.2 dispatch 启停控件，回报真实 edge-online 事实<!-- aidcp-console 181e47b DispatchControl（全局决策引擎启停，放 Dashboard）：非乐观 round-trip、回报真实 edgesOnline、no-op 以 changed=false 诚实可辨。偏离（对齐后端 9.4）：单全局 dispatcher 现实下为全局控件、非按账号行按钮（避免「每行一个按钮却都改全局」的假按账号语义）。 -->
+- [x] 10.3 Monitor 页：按笔记互动；Alerts 只读流；真按账号总览切片<!-- aidcp-console 181e47b Monitor 页加：按笔记互动表(/api/monitor/interactions)、未解决告警只读流(/api/alerts + AlertSeverityBadge P0-P3)、真按账号总览(AccountTotalsTable, totalsByAccount)——与现役单全局 WS 流并列。typecheck/vitest/build 绿。 -->
