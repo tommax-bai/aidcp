@@ -36,30 +36,32 @@ repo 取值：aidcp-cloud / aidcp-edge / aidcp（本中控仓）。代码改动�
 
 ## 2. 边缘指令运行时（每 kind 处理器 + 后置校验 + 逐条回报，复用定位引擎）— 第 ② 组（依赖 ①）
 
+<!-- aidcp-edge 8c7a9fd §2 实装：PublishCommandDispatcher + 6 处理器(navigate_entry/select_mode/fill_field/add_with_candidate/submit_publish/capture_postId) + edge-client publish.command 路由 + main.ts 接线(与旧 publish.request 并行)；edge 全量 264 绿、typecheck 净。set_schedule 与 upload_image/set_cover/set_option 本阶段诚实回 kind_not_implemented（2.2.5 延后）。select_mode 锚点为最佳推断、待实机 CDP 校准。 -->
+
 > 复用 `src/locating/engine.ts` 的 `LocatingEngine.resolveAndAct` + 三道闸（R1 后置校验不晋升、R2 重试上限→escalated、R3 反污染 stage→confirm），**不在发布层另起硬编码整页流程**。红线：`!result.ok` 或 validator 失败立即回 `ok:false` + 真实 error，MUST NOT 伪造 ok:true / `count||1`。
 
 ### 2.1 aidcp-edge — PublishCommandDispatcher 骨架
 
-- [ ] 2.1.1 新增 `src/flows/publish-command-handlers.ts`：`PublishCommandDispatcher`（`kind → 处理器` Map + `dispatch(payload)`），处理器统一接口 `{buildRequest()→ActionRequest, buildValidator()→后置校验, run(ctx)→PublishCommandResultPayload}`。**验证**：edge `npm run typecheck`；单测 dispatcher 按 kind 路由命中
-- [ ] 2.1.2 公共 `run()` 红线骨架：`engine.resolveAndAct(buildRequest())` 取 `result`；`!result.ok` → 立即 `{ok:false, error:result.reason, details:{actionId,outcome,attempts}}`；`result.ok` 后读 DOM 由 `buildValidator()` 后置校验，失败 → `{ok:false, error:'post_validation_failed', details}`，**绝不伪造 ok:true**。**验证**：单测覆盖「定位失败」「后置校验失败」两路均回 `ok:false`（见 4.2）
+- [x] 2.1.1 新增 `src/flows/publish-command-handlers.ts`：`PublishCommandDispatcher`（`kind → 处理器` Map + `dispatch(payload)`），处理器统一接口 `{buildRequest()→ActionRequest, buildValidator()→后置校验, run(ctx)→PublishCommandResultPayload}`。**验证**：edge `npm run typecheck`；单测 dispatcher 按 kind 路由命中
+- [x] 2.1.2 公共 `run()` 红线骨架：`engine.resolveAndAct(buildRequest())` 取 `result`；`!result.ok` → 立即 `{ok:false, error:result.reason, details:{actionId,outcome,attempts}}`；`result.ok` 后读 DOM 由 `buildValidator()` 后置校验，失败 → `{ok:false, error:'post_validation_failed', details}`，**绝不伪造 ok:true**。**验证**：单测覆盖「定位失败」「后置校验失败」两路均回 `ok:false`（见 4.2）
 
 ### 2.2 aidcp-edge — 最小可端到端处理器集
 
 > 地基阶段最小集（Decision 6 / Open Q1）：`navigate_entry` / `select_mode` / `fill_field` / `add_with_candidate` / `set_schedule` / `submit_publish` / `capture_postId`。
 
-- [ ] 2.2.1 `NavigateEntryHandler`（E1）：定位进创作页，`buildValidator` 校验已在发布页。**验证**：edge 单测；实机未命中如实 `no_target`
-- [ ] 2.2.2 `SelectModeHandler`（E2）：选发布模式（图文等），后置校验模式已选中。**验证**：edge 单测
-- [ ] 2.2.3 `FillFieldHandler`（E5）：按 `params.fieldType`（title/content）构造 `ActionRequest`，`buildValidator` 读 DOM 校验刚填入内容存在。**验证**：edge 单测（填入成功 / 校验失败两路）
-- [ ] 2.2.4 `AddWithCandidateHandler`（E6）：tag 候选由 cloud 预生成随 `params.candidates` 下发，边缘只定位点击，`buildValidator` 本阶段简化（只校验「标签已加上」，不精确到 selectedIndex）。**验证**：edge 单测
+- [x] 2.2.1 `NavigateEntryHandler`（E1）：定位进创作页，`buildValidator` 校验已在发布页。**验证**：edge 单测；实机未命中如实 `no_target`
+- [x] 2.2.2 `SelectModeHandler`（E2）：选发布模式（图文等），后置校验模式已选中。**验证**：edge 单测
+- [x] 2.2.3 `FillFieldHandler`（E5）：按 `params.fieldType`（title/content）构造 `ActionRequest`，`buildValidator` 读 DOM 校验刚填入内容存在。**验证**：edge 单测（填入成功 / 校验失败两路）
+- [x] 2.2.4 `AddWithCandidateHandler`（E6）：tag 候选由 cloud 预生成随 `params.candidates` 下发，边缘只定位点击，`buildValidator` 本阶段简化（只校验「标签已加上」，不精确到 selectedIndex）。**验证**：edge 单测
 - [ ] 2.2.5 `SetScheduleHandler`（E8）：按 `params.publishTime`（毫秒时间戳，Open Q3）设定时，后置校验定时已设；`publishTime` 缺省时此 kind 由 cloud 不下发。**验证**：edge 单测
-- [ ] 2.2.6 `SubmitPublishHandler`（E9）：点发布按钮，后置校验提交已触发；**边缘无权自造 submit，完全依赖 cloud 序列下发**。**验证**：edge 单测
-- [ ] 2.2.7 `CapturePostIdHandler`（E10）：抓真实 postId，抓不到如实 `no_target`，**MUST NOT `postId||fake`**。**验证**：edge 单测（抓不到回 `ok:false`）
-- [ ] 2.2.8 协议层已登记但本阶段不实装的 kind（`upload_image` / `set_cover` / `set_option`，Open Q1）：dispatcher 收到未实装 kind 回 `{ok:false, error:'kind_not_implemented'}`，**MUST NOT 假成功**。**验证**：edge 单测
+- [x] 2.2.6 `SubmitPublishHandler`（E9）：点发布按钮，后置校验提交已触发；**边缘无权自造 submit，完全依赖 cloud 序列下发**。**验证**：edge 单测
+- [x] 2.2.7 `CapturePostIdHandler`（E10）：抓真实 postId，抓不到如实 `no_target`，**MUST NOT `postId||fake`**。**验证**：edge 单测（抓不到回 `ok:false`）
+- [x] 2.2.8 协议层已登记但本阶段不实装的 kind（`upload_image` / `set_cover` / `set_option`，Open Q1）：dispatcher 收到未实装 kind 回 `{ok:false, error:'kind_not_implemented'}`，**MUST NOT 假成功**。**验证**：edge 单测
 
 ### 2.3 aidcp-edge — main.ts 接线（新旧路径并行）
 
-- [ ] 2.3.1 `src/main.ts`：新增 `publish.command` 监听分发到 `PublishCommandDispatcher`，每条执行后 `client.send('publish.command.result', {recordId,seq,kind,ok,value?,error?,details?})`（带相同 `recordId+seq`）；**保留** `publish.request → publishPost()` 旧路径并行（Decision 6 / Open Q4，地基阶段不删 temp 口）。**验证**：edge `npm run typecheck`；单测两路径互不干扰
-- [ ] 2.3.2 复用 `src/publish/approval-gate.ts` `buildPublishApprovalSignalPath(requestId)` 审批信号路径，**两端契约不漂移**（本阶段提交闸由 cloud sequencer 主导，edge 不自造提交授权）。**验证**：与 cloud `getApprovalSignalPath` 路径一致（见 4.4.1）
+- [x] 2.3.1 `src/main.ts`：新增 `publish.command` 监听分发到 `PublishCommandDispatcher`，每条执行后 `client.send('publish.command.result', {recordId,seq,kind,ok,value?,error?,details?})`（带相同 `recordId+seq`）；**保留** `publish.request → publishPost()` 旧路径并行（Decision 6 / Open Q4，地基阶段不删 temp 口）。**验证**：edge `npm run typecheck`；单测两路径互不干扰
+- [x] 2.3.2 复用 `src/publish/approval-gate.ts` `buildPublishApprovalSignalPath(requestId)` 审批信号路径，**两端契约不漂移**（本阶段提交闸由 cloud sequencer 主导，edge 不自造提交授权）。**验证**：与 cloud `getApprovalSignalPath` 路径一致（见 4.4.1）
 
 ## 3. 云端 CommandSequencer（生成序列 + 驱动 + 人审闸 + 取代 executor 接线）— 第 ③ 组（依赖 ①②）
 
