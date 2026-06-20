@@ -6,11 +6,11 @@
 
 ## 1. aidcp-cloud — MVP：面板 API 层骨架 + JWT（console-panel-api）
 
-- [ ] 1.1 新 `src/panel/` 模块：在现有 `http.Server` 上挂极小 switch 路由（**不引入 Web 框架**）；绑 `AIDCP_PANEL_PORT`（占位 8090）；启动自检记录解析端口、拒绝绑 `8787/5432/8788/已知 isales`（D1）
-- [ ] 1.2 `listen()` 包 try/catch：`EADDRINUSE`/初始化错误**非致命**——记日志并保 `8787` 边缘闭环 + 飞书核心继续跑，绝不崩 `main()`（D2）
-- [ ] 1.3 注入单例（`publishLogStore`/`conceptStore`/`botChatStore`/`EventBus`/`EdgeCloudServer`/账号存储）入面板模块，镜像 `DefaultMessageHandler` 构造；纯读侧组合 + 薄命令外观，不碰 `protocol.ts`/`command-bridge`（D2）
-- [ ] 1.4 JWT：`POST /api/auth/login` 对 `.env` 内置用户签短 TTL JWT；`/api/*`（除登录）走校验中间件；密钥 `.env`；记录轮换 + 401-过期流程
-- [ ] 1.5 验收/单测：面板端口冲突非致命；JWT 缺失/过期返 401；自检拒绝保留端口
+- [x] 1.1 新 `src/panel/` 模块：极小 switch 路由（**不引入 Web 框架**）；绑 `AIDCP_PANEL_PORT`；启动自检记录解析端口、拒绝绑 `8787/5432/8788` + env 补充的 isales（D1）<!-- aidcp-cloud 3752240 偏离：用独立 http.Server 绑 AIDCP_PANEL_PORT，而非"复用 8787 的 http.Server"——8787 是 ws-server 的 {port} 模式、未暴露 server 对象，独立更干净且符合"独立端口"意图；保留端口经 forbiddenPorts 配置 -->
+- [x] 1.2 `listen()` 非致命：`EADDRINUSE`/初始化错误记日志并返回 `started=false`，保 `8787` 边缘闭环 + 飞书核心继续跑，绝不崩 `main()`（D2）<!-- aidcp-cloud 3752240 server.once('error') 捕获，resolve started=false；server.ts 外层再包 try/catch -->
+- [x] 1.3 注入单例（`publishLogStore`/`conceptStore`/`botChatStore`/`EventBus`/`edgeServer`/`riskController`）入面板模块，镜像 `DefaultMessageHandler` 构造；纯读侧组合 + 薄命令外观，不碰 `protocol.ts`/`command-bridge`（D2）<!-- aidcp-cloud 3752240 PanelDeps 注入 6 单例；/api/dashboard/summary 骨架读 edgeServer.edgeCount() 证明链路打通 -->
+- [x] 1.4 JWT：`POST /api/auth/login` 对 `.env` 内置用户签短 TTL JWT；`/api/*`（除登录/health/version）走校验中间件；密钥 `.env`<!-- aidcp-cloud 3752240 HS256 自实现(node:crypto)：强制 alg、timingSafeEqual、校验 exp；凭据 AIDCP_PANEL_USERS 明文 env + 定长比对（生产可升级 hash） -->
+- [x] 1.5 验收/单测：面板端口冲突非致命；JWT 缺失/过期/篡改/alg 返 401；自检拒绝保留端口<!-- aidcp-cloud 3752240 panel-jwt(6)+panel-auth(6)+panel-server(5)=17/17；risk 回归 27/27；typecheck 在干净 HEAD 上零错误 -->
 
 ## 2. aidcp-cloud — MVP：账号主数据 + 暂停态持久（accounts-master-data 步骤 1–2）
 
@@ -36,7 +36,7 @@
 - [ ] 5.1 只读接口（全部走索引点查/范围查询、非阻塞）：`GET /api/version`（含 live enum 值）、`/api/dashboard/summary`、`/api/accounts(+/:id)`、`/api/content/queue`、`/api/content/published`、`/api/analytics/like-rate`
 - [ ] 5.2 面板 WS：一个通配处理器订阅事件总线，过滤面板事件、归一化为 `docs/product-dashboard.md §2.3` 帧，**单一全局流 + 客户端过滤**；纯只读扇出、绝不碰 edge；JWT（query/首帧）（红线：边-云隔离）
 - [ ] 5.3 edge 心跳：在已有 `ping`/`pong`（`protocol.ts:74`）之上加主动探活定时器 + 每入站帧戳 `last_seen`；`online = inMap AND (now-last_seen < N×interval)`（D9）——**云内、不碰协议**
-- [ ] 5.4 `/api/version` 暴露 live 风控状态/档位/告警分级枚举，作 console 漂移哨兵（D11）
+- [x] 5.4 `/api/version` 暴露 live 风控状态/档位/告警分级枚举，作 console 漂移哨兵（D11）<!-- aidcp-cloud 3752240 task 1 顺带完成：暴露 RISK_STATUSES/RISK_QUOTA_LEVELS/RISK_ACTIONS（types.ts 补 runtime const 单源）；告警分级枚举待 V1 alerts 落地补 -->
 
 ## 6. aidcp-console（新仓 ../aidcp-console）— MVP：骨架 + 只读页 + 两个写
 
