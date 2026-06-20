@@ -15,13 +15,13 @@
 ## 3. 协议（已落 +3；需扩到最终集）
 
 - [x] 3.1–3.5 首批 3 消息（`detected`/`open`/`items`）两端逐字一致 + 计数 44→47 + docs + AC-PROTO <!-- cloud c271c4c / edge a11bcc9 -->
-- [ ] 3.6 **扩到最终集**：`notification.open` 改语义为"仅导航通知首页"；新增 `notification.home`（边缘报各类未读）、`notification.browse_comments` / `browse_likes` / `browse_follows`、`notification.back_home`；两份 `protocol.ts` 逐字一致 + payload + MessageMap + `command-bridge` 各 action 映射 + AC-PROTO 计数（47→约 52）+ `docs/protocol.md` 同步（D9）
+- [x] 3.6 **扩到最终集**：`notification.open`→"仅导航首页"；加 `notification.home`/`browse_comments`/`browse_likes`/`browse_follows`/`back_home`；两份 `protocol.ts` 逐字一致 + payload + MessageMap + `command-bridge` 各 action + EdgeCommand action + `docs/protocol.md`；AC-PROTO 实为 **54**（并发 publish.command/result 已并入）<!-- cloud e5b7f60 / edge 52bdcb2 / docs -->（D9）
 
 ## 4. aidcp-edge — 通知监测体（已完成）+ 巡视 handler（需重构）
 
 - [x] 4.1 `notification-monitor.ts` 盯未读、sticky 不重置、epoch 单调 <!-- aidcp-edge 52a5ce5 -->
 - [x] 4.2 `main.ts` 无→有上报 `notification.detected` <!-- aidcp-edge 52a5ce5 -->
-- [~] 4.3 **重构**：把已提交的 `notification.open` 复合 handler 拆成——`notification.open`(仅导航首页+上报 `notification.home` 各类未读)、`browse_comments`(进评论和@+滚动+抽取→`notification.items`)、`browse_likes`/`browse_follows`(进入+看一眼清未读，v1 不抽取)、`back_home`(返回通知首页+重报未读)；选择器 best-effort 待真机校准；失败均如实回执/上报空（不静默吞）（D4/D5/D9）<!-- 原 52a5ce5 为复合版，待重构 -->
+- [x] 4.3 **重构完成**：复合 handler 拆为 `openNotificationsHome`(导航+上报 `notification.home`)、`browseNotificationComments`(进评论和@+滚动+抽取→`notification.items`)、`viewNotificationCategory`(likes/follows 看一眼清未读)、`notification.back_home`→复用 home；选择器 best-effort 待真机校准；失败如实回执/上报空。edge typecheck + 全量 254/254 <!-- aidcp-edge 52bdcb2 -->（D4/D5/D9）
 - [x] 4.4 监测体单测（sticky/翻转/epoch）<!-- aidcp-edge 52a5ce5 -->
 - [ ] 4.5 各分类 handler 单测（导航/抽取/回执形状；失败上报空）
 
