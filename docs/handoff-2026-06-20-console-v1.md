@@ -55,7 +55,7 @@
 
 ## 6. 部署形态 + 部署后 TODO
 
-- **ECS** `121.89.85.150`（私钥 `~/codes/isales-4.pem`，chmod 600）：cloud `/opt/aidcp/cloud`（systemd `aidcp-cloud.service`，边-云 8787，面板 `127.0.0.1:8090`）；console `/opt/aidcp/console`；Nginx `/etc/nginx/conf.d/aidcp-console.conf`（listen **8088**、serve console、反代 `/api`+`/ws`→8090）。面板 env 在 cloud `.env`：`AIDCP_PANEL_PORT=8090` / `AIDCP_PANEL_JWT_SECRET` / `AIDCP_PANEL_USERS=admin:<部署时生成的临时密码>` / `AIDCP_PANEL_FORBIDDEN_PORTS=8000,80,443`。
+- **ECS** `121.89.85.150`（私钥 `~/codes/isales-4.pem`，chmod 600）：cloud `/opt/aidcp/cloud`（systemd `aidcp-cloud.service`，边-云 8787，面板 `127.0.0.1:8090`）；console `/opt/aidcp/console`；Nginx `/etc/nginx/conf.d/aidcp-console.conf`（listen **8088** + **80 `server_name aidcp.tommax.cc`**〔2026-06-21 加，域名走 :80；**未备案前打不开**、用 :8088 / IP〕、serve console、反代 `/api`+`/ws`→8090）。**该 conf 已纳管 `aidcp-console/deploy/aidcp-console.conf`**（原手写在 box、无版本控制；rsync 部署不覆盖它，改后须手动 scp + `nginx -t && reload`）。面板 env 在 cloud `.env`：`AIDCP_PANEL_PORT=8090` / `AIDCP_PANEL_JWT_SECRET` / `AIDCP_PANEL_USERS=admin:<部署时生成的临时密码>` / `AIDCP_PANEL_FORBIDDEN_PORTS=8000,80,443`。
 - **TODO**（见 memory `aidcp-console-mvp-deployed`）：① 改 admin 临时密码（ECS `.env`）；② 确认 ECS 安全组开放 8088（仅验证过机器内 http=200）；③ 续做 V1 后重新部署（带上当前 V1 风控写，需 dry-run 暴露范围）。
 
 ## 7. 续做第一步建议
