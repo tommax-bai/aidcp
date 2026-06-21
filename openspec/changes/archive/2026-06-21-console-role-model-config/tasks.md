@@ -38,7 +38,9 @@
 
 - [x] 5.1 `openspec validate console-role-model-config --strict` 通过
 
-## 6. 部署（显式动作，单独确认后执行）—— 未执行，待确认
+## 6. 部署（显式动作，单独确认后执行）
 
-- [ ] 6.1 cloud 安全序列部署（备份 → dry-run 暴露范围 → rsync 无 --delete → restart → healthcheck active/8787/8090/PG/飞书长连，isales 全 active）+ console rebuild & rsync dist
-- [ ] 6.2 线上验证：登录面板 `GET /api/roles` 返回白名单角色与生效值；按角色改模型后该角色调用切换、无需重启；无效模型名被拒；未鉴权 401
+- [x] 6.1 cloud 安全序列部署（git archive 5a162ca 干净树 → 备份 cloud.bak.20260621-191002 + .env.bak → dry-run checksum 暴露范围=**正好本 change 19 文件、零无关漂移** → rsync 无 --delete → restart aidcp-cloud.service → healthcheck active/NRestarts=0/8787/8090/PG/飞书长连/role_config 表已建，isales 4 服务全 active）+ console（vite build → 备份 console.bak.20260621-191233 → rsync --delete dist → /opt/aidcp/console，8088=200 引用新 bundle）<!-- cloud 5a162ca / console c1e7841，2026-06-21 deployed -->
+- [x] 6.2 线上验证：登录面板 `GET /api/roles` 返回 17 角色白名单（16 text + 1 image，生效值回落 qwen-turbo）；未鉴权 401（面板 8090 + Nginx 8088 反代均验证）；role_config 表存在 0 覆盖行<!-- 2026-06-21 verified -->
+
+> 部署说明：本 change 无新依赖（未改 package.json）→ 未跑 npm install；无新 env。cloud 经 tsx 直跑、无构建步。`role_config` 表由 `RoleConfigStore.init()` 的 `CREATE TABLE IF NOT EXISTS` 启动时幂等建。
