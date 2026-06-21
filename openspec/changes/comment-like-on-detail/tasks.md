@@ -67,6 +67,8 @@
 
 ## 7. Deploy (ECS — ordered, gated)
 
-- [ ] 7.1 Dry-run the rsync scope and surface accumulated master scope before deploying (ECS ships full master)
-- [ ] 7.2 HARD ORDERED: run the `risk_counters` CHECK ALTER on live ECS PG BEFORE service restart; then backup → rsync → restart → healthcheck
-- [ ] 7.3 Enable the config flag conservatively (small per-session cap / low ratio / conservative quota tier); observe comment_like-vs-note-like ratio converging to ≈15% and watch `no_target` rates for selector drift
+- [x] 7.1 rsync dry-run scope was CLEAN — only the comment-like files (ECS was near-master); no unverified backlog co-shipped <!-- 2026-06-21 deployed -->
+- [x] 7.2 backup (cloud.bak.20260621-211207.tar.gz + .env.bak) → rsync → restart → healthcheck. The `risk_counters` CHECK migration runs idempotently at boot (guarded DO-block) — verified post-restart: constraint now allows `comment_like`, `risk_interactions` still excludes it, `valuable_comments` table created, select 1 ok, service active + 8787 + Feishu long-conn <!-- aidcp-cloud@1b86a0b 2026-06-21 deployed -->
+- [x] 7.3 `AIDCP_COMMENT_LIKE=true` set in ECS .env (feature live); defaults conservative (session cap 3 / ratio 0.15 / daily comment_like 6). Remaining live check = real-machine E2E to observe comment_like-vs-note-like ≈15% + `no_target` rate <!-- 2026-06-21 deployed -->
+
+> DEPLOYED & LIVE on ECS 2026-06-21 (AIDCP_COMMENT_LIKE=true). Remaining: real-machine E2E (edge executor `no_target` path + PG corpus archiving) on the operator machine.
