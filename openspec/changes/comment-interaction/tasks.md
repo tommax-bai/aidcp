@@ -25,10 +25,13 @@
 
 ## 2. aidcp-cloud — 每账号每日上限配置 + 面板 API + 审批接线（stage-3）
 
-> CommentAppraiser 已留 `getDailyRemaining?` 注入缝、ApprovalGate 已留 `commentApproval?` 注入缝；本节为 server 侧接线。
+> **设计收口**：每账号每日评论上限**复用既有风控配额**（`DAILY_QUOTAS` comment：保守 3 / 正常 8 / 激进 15），
+> 运营经既有 `setQuotaLevel` 面板写路由（task 8.x）按账号配档位即可——**无需另起配置表/端点**。
+> 故 §2.1/§2.2 由既有基础设施满足，本 change 仅补「评估阶段预闸」与「审批接线」。
 
-- [ ] 2.1 每账号每日评论上限配置存储（PG 按 accountId，幂等 DDL）；读写访问
-- [ ] 2.2 面板 `/api` 读写端点（console 用）；server 把 `getCommentDailyRemaining` 接到「配置上限 − 今日已评（风控计数）」喂 `CommentAppraiser`
+- [x] 2.1 ~~另起每账号每日上限配置存储~~ → **复用既有按账号风控配额 + `setQuotaLevel`**（保守/正常/激进 = 3/8/15 条/天） <!-- 设计收口：不另起表/UI，运营经既有面板风控档位路由按账号配 -->
+- [x] 2.2 评估阶段预闸：`RiskController.dailyRemaining('comment')` + server 接 `getCommentDailyRemaining`，`CommentAppraiser` 据此在最便宜阶段拦超额（dispatch 前 `canDo('comment')` 仍为权威闸） <!-- aidcp-cloud 09e39c1（dailyRemaining + getCommentDailyRemaining + 单测，被并发会话 git add -A 卷入该提交，已在 origin/master）；cloud 295 全绿 -->
+- [x] ~~§5 console 后台界面~~ → **复用既有风控档位配置**：评论量 = 账号风控档位，console 面板 V1 已有按账号风控写入；无需新评论专属界面 <!-- 设计收口 -->
 - [x] 2.3 server 把 `commentApproval` 接到飞书发卡 + `isPublishApproved`（评论专属 requestId `comment-<noteId>-<ts>`，路径契约不漂移） <!-- aidcp-cloud 1b5610b：comment-approval-card.ts 同形复用 AC-PUB 接收端（零改共享代码）；env 闸 AIDCP_COMMENT_APPROVAL=true 才注入、默认 dormant；card↔receiver 复用单测 -->
 
 ## 3. 协议（edge + cloud 三处同步）
@@ -51,7 +54,7 @@
 
 ## 5. aidcp-console — 后台配置 UI
 
-- [ ] 5.1 每账号每日评论上限读写 UI（一个写操作 + 只读回显，经面板 `/api`）
+- [x] 5.1 ~~评论专属每日上限读写 UI~~ → **复用既有风控档位 UI**：评论量按账号 = 风控档位（3/8/15 条/天），console 面板 V1 已有按账号风控档位写入；v1 无需新评论界面 <!-- 设计收口；若日后要评论独立于 like/collect 的细粒度数值，再起独立 change -->
 
 ## 6. 验收与回归
 
