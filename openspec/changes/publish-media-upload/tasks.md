@@ -20,7 +20,7 @@
 - [x] 0.1 文件输入形态。验证：图文模式下页面唯一 `input.upload-input[type=file]`（accept jpg/png/webp、multiple、hidden），**点击前即在=静态**；`DOM.setFileInputFiles` 实测真填充并触发 SPA 渲染缩略图+编辑器。→ PRIMARY 路径成立、**无需 FileChooser 兜底**。<!-- 发布页默认在「上传视频」标签，select_mode 须先点「上传图文」（现有 anchor text「图文」命中，已确认）。选择器锁定注入 main.ts -->
 - [x] 0.2 编辑器是否被传图门控。验证：上传前 editables=0、上传后 editables=4（标题 input.d-text「填写标题会有更多赞哦」、正文 div.tiptap.ProseMirror）→ **图文帖必须有图**。已反哺：sequencer 全图失败→诚实 `failed`（`all_images_failed`），不假装纯文字。<!-- aidcp-cloud command-sequencer all-images-failed guard -->
 - [x] 0.3 成功态节点 +「files.length 不可信」。验证：上传成功后 `input.files.length===0`（XHS 消费 FileList），真实成功态=`div.img-preview-area` 内带 src 的缩略图（img.img.preview / #creator-preview-image-0）。已锁定 hasThumbnail 注入 main.ts。封面：单图自动取该图、无独立设封面控件 → set_cover 仅多图下发。<!-- 多图 cover-active 选择器待多图启用再校准 -->
-- [ ] 0.4 DashScope URL 直链无 3xx。<!-- 本机无 WANXIANG_API_KEY、无真实 URL 可测；redirect:'error' 守卫保留，部署 E2E（task 8.4）对真实 URL 验证 -->
+- [x] 0.4 DashScope 图 URL 直链无 3xx。验证：ECS 实测结果 URL host = dashscope-result-bj.oss-cn-beijing.aliyuncs.com（直链 OSS），edge `redirect:'error'` 不会误拒。<!-- 2026-06-21 -->
 
 ## 0b. 校准结论落码（locked from task-0）
 
@@ -75,12 +75,13 @@
 ## 8. 部署（ECS 安全序列 + 实机；执行前先做 §0 前置检查；与 A 全阶段统一）
 
 - [x] 8.1 §0 前置检查：私钥 `~/codes/isales-4.pem` 存在且 `600`、sub-repo 在；cloud 本机 == origin/master（63128e6，无落后/regress）。<!-- 2026-06-21 通过 -->
-- [x] 8.2 ECS 确认 `WANXIANG_API_KEY`：**UNSET**（值未记录）→ 本配图能力**「已合入、休眠待 key」**（无 key→无图→图文编辑器门控→/publish 会诚实失败，不假发）。DASHSCOPE_API_KEY 已设；AIDCP_PUBLISH_AUTO 未设（仅手动 /publish）。<!-- 2026-06-21 设 WANXIANG_API_KEY 后配图链路即可用 -->
+- [x] 8.2 图片生成 key：**无需单独 WANXIANG_API_KEY**——通义万相与 Qwen 同属阿里云百炼、同一 DashScope key。代码改为 `WANXIANG_API_KEY ?? DASHSCOPE_API_KEY`（cloud c8cc284，已部署）。ECS 实测该 key 提交 wanx-v1 任务 → SUCCEEDED → 真实 OSS 图。→ **配图能力已激活、不再休眠**。AIDCP_PUBLISH_AUTO 未设（仅手动 /publish）。<!-- 2026-06-21 deployed -->
 - [x] 8.3 ECS 部署 cloud 安全序列：备份（cloud.bak.20260621-091931.tar.gz + .env.bak.20260621-091931）→ dry-run 暴露范围（全 master 快照，net-new=并发 comment agents + 本 change）→ rsync（--exclude .env/node_modules/.git/*.zip）→ npm install（up to date）→ restart → healthcheck 全过（active+NRestarts=0、8787、PG select 1、image_url/images_attached 列+liked_notes 已建、飞书长连接已建立）；**isales 未碰**。<!-- aidcp-cloud 63128e6 2026-06-21 deployed -->
-- [ ] 8.4 运营机 edge 跑、连 `ws://121.89.85.150:8787`，gated `AIDCP_E2E` 实机验证配图端到端。<!-- 需先在 ECS 设 WANXIANG_API_KEY（否则无图、图文发不出）；edge 本机已就位（profile 已登录、5d32ff9）。运营触发：飞书 /publish → 人审 → 配图上传 → 真实发布 -->
+- [ ] 8.4 运营机 edge 跑、连 `ws://121.89.85.150:8787` 实机验证配图端到端（飞书 /publish → 人审 → 配图上传 → 真实发布）。<!-- 不再卡 key（已用 DASHSCOPE_API_KEY 激活）；edge 本机已就位（profile 已登录、5d32ff9）。剩纯运营动作：真发一条确认端到端。 -->
 
-> <!-- 2026-06-21 deployed：cloud 63128e6 上线 ECS（全 master 快照），配图链路代码就绪但 **休眠待 WANXIANG_API_KEY**。
-> 设 key 后即活；edge 本机就位。剩余 8.4 = 设 key 后运营机一次真机端到端验证（含 0.4 DashScope redirect 校验）。 -->
+> <!-- 2026-06-21 deployed + 激活：cloud c8cc284 上线 ECS（全 master 快照）。配图链路**已激活**——
+> 图片生成复用已设的 DASHSCOPE_API_KEY（百炼同 key，ECS 实测 wanx-v1 → SUCCEEDED → OSS 图）。
+> 剩余仅 8.4（运营机真机发一条端到端确认）+ 3.1（多图封面，单图产品用不到）。 -->
 
 ## 备注（设计已明确排除/延后，非本 change 范围）
 
