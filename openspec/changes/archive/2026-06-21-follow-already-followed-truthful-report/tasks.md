@@ -21,7 +21,7 @@
 - [x] 3.2 `openspec validate follow-already-followed-truthful-report --strict` 通过 <!-- 2026-06-19 valid -->
 - [x] 3.3 cloud 侧改动按 §5 安全序列部署 ECS <!-- aidcp-cloud 678eab9 2026-06-19 deployed：backup cloud.bak.20260619-165030.tar.gz → rsync → restart → healthcheck(active/8787/PG/飞书长连/isales不受影响)全过；批量随问题1 + captcha 同次部署 -->
 - [x] 3.4 edge 半已提交并推送 <!-- aidcp-edge 9126e04：edge 改动（executeFollow already_followed→ok:true + aria-pressed + 2 测试）随并发 captcha WIP 提交者一并入库并推送 origin master；edge 本地运行即生效 -->
-- [ ] 3.5 `/opsx:archive` 归档（delta 合并进 `openspec/specs/follow-decision`）—— 待真机观察一次 already_followed 如实上报 + 配额不扣后归档
+- [ ] 3.5 `/opsx:archive` 归档（delta 合并进 `openspec/specs/follow-decision`）—— 真机观察一次 already_followed 如实上报 + 配额不扣 <!-- DEFERRED 2026-06-21 归档时真机观察未做；债务台账 docs/deferred-verification-2026-06-21.md -->
 
 ## 旁现（out of scope，建议后续 change）
 

@@ -65,8 +65,10 @@
 
 ## 6. 验收与回归
 
-- [ ] 6.1 cloud 单测：四角色脱 LLM / 脱风控可单测；评论支线终结都汇到"是否进主页评估"且只一次；失败/超时/拒绝不死锁
-- [ ] 6.2 协议红线：`AC-PROTO-*`（计数 55、两份 protocol.ts 不漂移）、`AC-PUB-*`（未授权/超时不发评论）、`AC-RISK-*`（被拒诚实跳过、计数挂真回执、终态单写）
-- [ ] 6.3 边缘：`executeComment` 后置校验如实回报（jsdom 桩 + 真机 smoke）；绝不静默假成功
-- [ ] 6.4 已关注作者验收：主页被 `skip-profile-visit-if-followed` 跳过时评论仍正常、仍走"是否进主页评估"出口
-- [ ] 6.5 `npm run test:acceptance` → `npm test` → `npm run typecheck`（edge + cloud 各自）；`openspec validate comment-interaction --strict`
+> ⚠️ **2026-06-21 显式归档时本块整块未跑**（用户决定先归档、验证后补）。含安全红线 `AC-PUB-*`/`AC-RISK-*`/`AC-PROTO-*`，**视为未经安全验证**，上真机/扩量前务必补齐。债务台账见 `docs/deferred-verification-2026-06-21.md`。
+
+- [ ] 6.1 cloud 单测：四角色脱 LLM / 脱风控可单测；评论支线终结都汇到"是否进主页评估"且只一次；失败/超时/拒绝不死锁 <!-- DEFERRED 2026-06-21 归档时未跑 -->
+- [ ] 6.2 协议红线：`AC-PROTO-*`（计数 55、两份 protocol.ts 不漂移）、`AC-PUB-*`（未授权/超时不发评论）、`AC-RISK-*`（被拒诚实跳过、计数挂真回执、终态单写） <!-- DEFERRED 2026-06-21 归档时未跑 -->
+- [ ] 6.3 边缘：`executeComment` 后置校验如实回报（jsdom 桩 + 真机 smoke）；绝不静默假成功 <!-- DEFERRED 2026-06-21 归档时未跑 -->
+- [ ] 6.4 已关注作者验收：主页被 `skip-profile-visit-if-followed` 跳过时评论仍正常、仍走"是否进主页评估"出口 <!-- DEFERRED 2026-06-21 归档时未跑 -->
+- [ ] 6.5 `npm run test:acceptance` → `npm test` → `npm run typecheck`（edge + cloud 各自）；`openspec validate comment-interaction --strict` <!-- DEFERRED 2026-06-21 归档时未跑 -->
