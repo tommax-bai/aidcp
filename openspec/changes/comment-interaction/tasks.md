@@ -9,22 +9,26 @@
 
 ## 1. aidcp-cloud — 评论支线接线与角色
 
-- [ ] 1.1 新增 `comment.*` 事件族（`src/event-bus/types.ts`）：`comment.appraised` / `comment.composed` / `comment.cleared` / `comment.approved` / `comment.held` / `comment.done` / `comment.skipped`
-- [ ] 1.2 `CommentAppraiser`（`src/agents/comment-appraiser.ts`）：消费 `interaction.completed`；过精品门槛 + min(每日上限配置, 风控配额) + `canDo('comment')`；判定要不要评，emit `comment.appraised` / `comment.skipped`（不产文本）
-- [ ] 1.3 `CommentComposer`（`src/agents/comment-composer.ts`）：消费 `comment.appraised`，LLM 产评论文本；空/超长/跨笔记近似去重/避开裸 `@`；emit `comment.composed` / `comment.skipped`
-- [ ] 1.4 `CommentDeAiFlavor`（`src/agents/comment-de-ai-flavor.ts`）：消费 `comment.composed`，复用 `PostProcessor.process` + 合规声明判定（确定性、无 LLM、不抛）；emit `comment.cleared` / `comment.skipped`
-- [ ] 1.5 `CommentApprovalGate`（`src/agents/comment-approval-gate.ts`）：消费 `comment.cleared`；进入「等评论审批」暂停态、发飞书审批卡（带拟发文本）、轮询评论 requestId 的 `/tmp` 授权信号、短超时；授权 emit `comment.approved`，超时/拒绝 emit `comment.skipped`
-- [ ] 1.6 `RoleDispatcher`：注册四角色；新增 `comment.approved → comment` 命令翻译分支（`canInteract('comment')` 闸 → `sendCommand` → 真回执 `consumeBudget`）
-- [ ] 1.7 `RoleDispatcher`：`freshBudget()` 加 `comments`、`consumeBudget` 加 `comment` 分支、`canInteract` 并集加 `comment`
-- [ ] 1.8 `RoleDispatcher`：**`AuthorEvaluator` 触发改挂** `comment.done` / `comment.skipped`（取代直接消费 `interaction.completed`）；保证每篇只触发一次"是否进主页评估"出口
-- [ ] 1.9 「等评论审批」按-edge 暂停的进入/退出（复用 captcha pause 通道）；看门狗按"有意暂停"处理、`session.end` 仍可达
-- [ ] 1.10 `src/comm/handler.ts`：`interaction.occurred` 过滤与事件类型加 `comment`（真回执 `ok:true` 才计数 → `RiskController.record('comment')`）
+> **stage-2 已落地** <!-- aidcp-cloud fc9e1f5：四角色 + 事件族 + 调度接线 + AuthorEvaluator 改挂 + 风控计数；cloud 293 全绿（含 11 条 lane 单测）、typecheck 净、零回归。lane 默认 dormant-safe：审批未接线时一律诚实跳过、绝不裸发。 -->
 
-## 2. aidcp-cloud — 每账号每日上限配置 + 面板 API
+- [x] 1.1 新增 `comment.*` 事件族（`src/event-bus/types.ts`）：`comment.appraised` / `comment.composed` / `comment.cleared` / `comment.approved` / `comment.done` / `comment.skipped` <!-- aidcp-cloud fc9e1f5（held 并入 skipped 语义，未单列） -->
+- [x] 1.2 `CommentAppraiser`：消费 `interaction.completed`；精品门槛 + 会话评论预算 + 可选每日上限闸（评估阶段就拦，过不了不付撰写成本） <!-- aidcp-cloud fc9e1f5 -->
+- [x] 1.3 `CommentComposer`：消费 `comment.appraised`，LLM 产文本；空/超长拦截 + 剥裸 `@`；emit `comment.composed` / `comment.skipped` <!-- aidcp-cloud fc9e1f5（跨笔记去重待 stage-3 接持久层） -->
+- [x] 1.4 `CommentDeAiFlavor`：消费 `comment.composed`，复用 `PostProcessor.process`（确定性、脱 LLM 可跑、不抛）；emit `comment.cleared` / `comment.skipped` <!-- aidcp-cloud fc9e1f5 -->
+- [x] 1.5 `CommentApprovalGate`：消费 `comment.cleared`；循环内人审端口（发卡 + 轮询 /tmp 授权 + 短超时）；授权 emit `comment.approved`，超时/拒绝/**未接线** emit `comment.skipped`（绝不裸发，AC-PUB） <!-- aidcp-cloud fc9e1f5；审批端口经 RoleDispatcherOptions.commentApproval 注入，server 接线属 stage-3 -->
+- [x] 1.6 `RoleDispatcher`：注册四角色；`comment.approved → comment` 命令翻译（`canInteract('comment')` 闸 → `sendCommand` → 真回执 `consumeBudget`） <!-- aidcp-cloud fc9e1f5 -->
+- [x] 1.7 `RoleDispatcher`：`freshBudget()` 加 `comments:2`、`consumeBudget` 加 `comment`、`canInteract` 并集加 `comment` <!-- aidcp-cloud fc9e1f5 -->
+- [x] 1.8 `RoleDispatcher`：**`AuthorEvaluator` 改挂** `comment.done` / `comment.skipped`，每篇只触发一次"是否进主页评估" <!-- aidcp-cloud fc9e1f5；含 pendingComment 桥 action.completed{comment}→comment.done -->
+- [ ] 1.9 「等评论审批」按-edge 暂停的进入/退出（复用 captcha pause 通道）；看门狗按"有意暂停"处理、`session.end` 仍可达 <!-- 延后 stage-3：当前 gate 有短超时兜底；ws-server pause 集成（防审批等待期 idle nudge）待接 -->
+- [x] 1.10 `src/comm/handler.ts`：`interaction.occurred` 过滤与事件类型加 `comment`（真回执 `ok:true` 才计数 → `RiskController.record('comment')`） <!-- aidcp-cloud fc9e1f5 -->
+
+## 2. aidcp-cloud — 每账号每日上限配置 + 面板 API + 审批接线（stage-3）
+
+> CommentAppraiser 已留 `getDailyRemaining?` 注入缝、ApprovalGate 已留 `commentApproval?` 注入缝；本节为 server 侧接线。
 
 - [ ] 2.1 每账号每日评论上限配置存储（PG 按 accountId，幂等 DDL）；读写访问
-- [ ] 2.2 面板 `/api` 读写端点（console 用）；`CommentAppraiser` 读取配置 + 今日已评数（风控计数）做 `min(配置, 风控配额)` 闸
-- [ ] 2.3 飞书审批卡：评论专属 requestId 命名空间（复用 `writeApprovalSignal` / `isPublishApproved`，路径契约不漂移）
+- [ ] 2.2 面板 `/api` 读写端点（console 用）；server 把 `getCommentDailyRemaining` 接到「配置上限 − 今日已评（风控计数）」喂 `CommentAppraiser`
+- [ ] 2.3 server 把 `commentApproval` 接到飞书发卡 + `isPublishApproved`（评论专属 requestId 命名空间，路径契约不漂移）
 
 ## 3. 协议（edge + cloud 三处同步）
 
