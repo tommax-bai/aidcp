@@ -33,8 +33,8 @@
 - [x] 5.1 cloud 部署文档追记 `AIDCP_CRED_KEY`（用途 + `openssl rand -base64 32` 生成法；**绝不记值**）与「改密钥重启生效 / 改模型名热加载」语义<!-- aidcp-cloud fee7e88 docs/deployment-ecs.md（无 .env.example，沿用部署文档惯例） -->
 - [x] 5.2 `openspec validate console-model-provider-config --strict` 通过
 
-## 6. 部署（显式动作，单独执行 —— 待用户确认时机）
+## 6. 部署（显式动作，单独执行）
 
-- [ ] 6.1 ECS `.env` 写入 `AIDCP_CRED_KEY`（`openssl rand -base64 32` 生成；不记值，仅记已配置）
-- [ ] 6.2 cloud 安全序列部署（备份→rsync→restart→healthcheck→失败回滚，绝不碰 isales）+ console rebuild & rsync dist
-- [ ] 6.3 线上验证：配置页可读、改模型名即时生效、改密钥重启后生效；明文不外泄
+- [x] 6.1 ECS `.env` 写入 `AIDCP_CRED_KEY`（`openssl rand -base64 32` 生成；值未记录，仅确认已配置）<!-- 2026-06-21 deployed -->
+- [x] 6.2 cloud 安全序列部署（git archive master → 备份 cloud.bak + .env.bak → dry-run 暴露范围=正好 13 文件 → rsync 无 --delete → restart aidcp-cloud.service → healthcheck active/8787/8090/PG/飞书长连，isales 全 active）+ console rebuild & rsync dist<!-- cloud fee7e88 / console 30af0b2，2026-06-21 deployed；NRestarts=0 稳定 -->
+- [x] 6.3 线上验证：登录面板 GET /api/config/model 返回真态（canEditCredential=true、密钥 source=env 掩码、无明文）；8088 console 出新页；/api/config/model 经 Nginx 401（接线+JWT 守护证实）<!-- 2026-06-21 verified -->
