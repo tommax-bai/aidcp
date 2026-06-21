@@ -74,10 +74,13 @@
 
 ## 8. 部署（ECS 安全序列 + 实机；执行前先做 §0 前置检查；与 A 全阶段统一）
 
-- [ ] 8.1 §0 前置检查：`ls -d ../aidcp-edge ../aidcp-cloud` + 私钥 `~/codes/isales-4.pem` 存在且 `chmod 600`；缺失即停手告知
-- [ ] 8.2 ECS 经 SSH 确认 `/opt/aidcp/cloud/.env` 是否设 `WANXIANG_API_KEY`（**不记录值**）。验证：已设则部署后配图路径可被触达；未设则本能力标"已合入、休眠待 key"而非"已上线"
-- [ ] 8.3 ECS 部署 cloud 安全序列（备份 → dry-run rsync 暴露范围 → `rsync --exclude .env/node_modules/.git` → `systemctl restart aidcp-cloud.service` → healthcheck active+8787+飞书+PG → 失败回滚）；**绝不碰 isales**
-- [ ] 8.4 运营机 edge 跑、连 `ws://121.89.85.150:8787`，gated `AIDCP_E2E` 实机验证配图端到端：锚点 + 控件成功态 + `redirect:'error'` + 降级真相落库
+- [x] 8.1 §0 前置检查：私钥 `~/codes/isales-4.pem` 存在且 `600`、sub-repo 在；cloud 本机 == origin/master（63128e6，无落后/regress）。<!-- 2026-06-21 通过 -->
+- [x] 8.2 ECS 确认 `WANXIANG_API_KEY`：**UNSET**（值未记录）→ 本配图能力**「已合入、休眠待 key」**（无 key→无图→图文编辑器门控→/publish 会诚实失败，不假发）。DASHSCOPE_API_KEY 已设；AIDCP_PUBLISH_AUTO 未设（仅手动 /publish）。<!-- 2026-06-21 设 WANXIANG_API_KEY 后配图链路即可用 -->
+- [x] 8.3 ECS 部署 cloud 安全序列：备份（cloud.bak.20260621-091931.tar.gz + .env.bak.20260621-091931）→ dry-run 暴露范围（全 master 快照，net-new=并发 comment agents + 本 change）→ rsync（--exclude .env/node_modules/.git/*.zip）→ npm install（up to date）→ restart → healthcheck 全过（active+NRestarts=0、8787、PG select 1、image_url/images_attached 列+liked_notes 已建、飞书长连接已建立）；**isales 未碰**。<!-- aidcp-cloud 63128e6 2026-06-21 deployed -->
+- [ ] 8.4 运营机 edge 跑、连 `ws://121.89.85.150:8787`，gated `AIDCP_E2E` 实机验证配图端到端。<!-- 需先在 ECS 设 WANXIANG_API_KEY（否则无图、图文发不出）；edge 本机已就位（profile 已登录、5d32ff9）。运营触发：飞书 /publish → 人审 → 配图上传 → 真实发布 -->
+
+> <!-- 2026-06-21 deployed：cloud 63128e6 上线 ECS（全 master 快照），配图链路代码就绪但 **休眠待 WANXIANG_API_KEY**。
+> 设 key 后即活；edge 本机就位。剩余 8.4 = 设 key 后运营机一次真机端到端验证（含 0.4 DashScope redirect 校验）。 -->
 
 ## 备注（设计已明确排除/延后，非本 change 范围）
 
