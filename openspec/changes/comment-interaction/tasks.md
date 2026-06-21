@@ -19,7 +19,8 @@
 - [x] 1.6 `RoleDispatcher`：注册四角色；`comment.approved → comment` 命令翻译（`canInteract('comment')` 闸 → `sendCommand` → 真回执 `consumeBudget`） <!-- aidcp-cloud fc9e1f5 -->
 - [x] 1.7 `RoleDispatcher`：`freshBudget()` 加 `comments:2`、`consumeBudget` 加 `comment`、`canInteract` 并集加 `comment` <!-- aidcp-cloud fc9e1f5 -->
 - [x] 1.8 `RoleDispatcher`：**`AuthorEvaluator` 改挂** `comment.done` / `comment.skipped`，每篇只触发一次"是否进主页评估" <!-- aidcp-cloud fc9e1f5；含 pendingComment 桥 action.completed{comment}→comment.done -->
-- [ ] 1.9 「等评论审批」按-edge 暂停的进入/退出（复用 captcha pause 通道）；看门狗按"有意暂停"处理、`session.end` 仍可达 <!-- 延后 stage-3：当前 gate 有短超时兜底；ws-server pause 集成（防审批等待期 idle nudge）待接 -->
+- [x] 1.9 ~~「等评论审批」按-edge 暂停~~ → **设计上免做**：审批超时 90s < idle 看门狗 `idleNudgeMs`(130s)，等待期不会触发 idle nudge；AuthorEvaluator 等 `comment.done`/`comment.skipped` 时浏览闭环自然挂起，故 v1 无需显式暂停态 <!-- aidcp-cloud 1b5610b：timeoutMs:90_000 -->
+
 - [x] 1.10 `src/comm/handler.ts`：`interaction.occurred` 过滤与事件类型加 `comment`（真回执 `ok:true` 才计数 → `RiskController.record('comment')`） <!-- aidcp-cloud fc9e1f5 -->
 
 ## 2. aidcp-cloud — 每账号每日上限配置 + 面板 API + 审批接线（stage-3）
@@ -28,7 +29,7 @@
 
 - [ ] 2.1 每账号每日评论上限配置存储（PG 按 accountId，幂等 DDL）；读写访问
 - [ ] 2.2 面板 `/api` 读写端点（console 用）；server 把 `getCommentDailyRemaining` 接到「配置上限 − 今日已评（风控计数）」喂 `CommentAppraiser`
-- [ ] 2.3 server 把 `commentApproval` 接到飞书发卡 + `isPublishApproved`（评论专属 requestId 命名空间，路径契约不漂移）
+- [x] 2.3 server 把 `commentApproval` 接到飞书发卡 + `isPublishApproved`（评论专属 requestId `comment-<noteId>-<ts>`，路径契约不漂移） <!-- aidcp-cloud 1b5610b：comment-approval-card.ts 同形复用 AC-PUB 接收端（零改共享代码）；env 闸 AIDCP_COMMENT_APPROVAL=true 才注入、默认 dormant；card↔receiver 复用单测 -->
 
 ## 3. 协议（edge + cloud 三处同步）
 
