@@ -35,7 +35,7 @@
 - 合并两套角色为统一形状：`{ roleId, displayName, group: 'browse' | 'publish', llmKind: 'text' | 'image' | 'none', tunable: { temperature: boolean } }`。
 - `roleId` 加前缀防撞键：`browse:content_evaluator` / `publish:ContentCreator`。
 - **白名单制**：只导出现役且 `llmKind !== 'none'` 的角色；纯规则、v1 遗留角色不进 catalog（从源头防止运营误把遗留路径当现役配）。
-- `tunable.temperature = true` 仅给生成/改写类：`comment_composer`、`comment_de_ai_flavor`、`concept_extractor`、`ContentCreator`、`ImagePlanner`；判定类为 false。
+- `tunable.temperature = true` 仅给生成/改写类：`comment_composer`、`comment_de_ai_flavor`、`ContentCreator`、`ImagePlanner`；判定类与结构化抽取类（含 `concept_extractor`，输出 JSON 数组要确定性）为 false。
 - catalog 在 `server.ts` 装配后注入 panel（panel 层不直接 import 角色实现，保持薄）。
 - **不照搬文档的「15 角色」**（计数滞后于代码），以代码 `RoleName` / 实例 `roles.map(r => r.roleName)` 为真源。
 
