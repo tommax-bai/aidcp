@@ -150,6 +150,10 @@ repo 取值：aidcp-cloud / aidcp-edge / aidcp（本中控仓）。代码改动�
 ### 6.2 aidcp-edge — 本地发布
 
 - [ ] 6.2.1 edge 本地跑、连 `ws://121.89.85.150:8787`；新 `publish.command` 路径与旧 `publish.request` 并行，现有 temp 口触发烟测：navigate→fill→（AC-PUB 已授权）submit→capture 全链逐条回报、诚实失败可见。**验证**：观察 `publish.command.result` 逐条 `ok/value/error`；AC-PUB 未授权时序列截止于提交前
+<!-- 真机校准发现（2026-06-21，飞书 publish-10 路径）：submit_publish 反复 post_validate_failed，根因=ContentCreator 生成的标题超 20 字（小红书硬上限），超限时「发布」按钮静默失效（按钮在、点击无效、editor 不重置），非按钮坐标问题。修复：edge runFillField 填标题前强制截断至 20 字（aidcp-edge 472cda1，最后一公里确定性兜底）+ cloud ContentCreator prompt 约束 ≤18 字、parseOutput 截断至 20（aidcp-cloud 9630364）。手动直驱 CDP 截断标题后即发布成功（→ /publish/success）。飞书全链烟测仍待新一轮跑通后再勾 6.2.1。 -->
+<!-- 注：小红书发布页关键校准锚点已坐实——上传图文 tab=`div.creator-tab`；图片 input=`input.upload-input`；标题=`input[placeholder="填写标题会有更多赞哦"]`（React 受控，须 Input.insertText）；正文=`.tiptap.ProseMirror`；发布按钮=闭合 shadow 内 `button.ce-btn.bg-red`（DOM.getDocument pierce + getBoxModel 取中心坐标点击）；发布成功信号=URL 跳 `/publish/success` 或 body 现「发布成功」。 -->
+<!-- 旁支：add_with_candidate(tag)×N / set_option 在真机经 best-effort 跳过（guard_persist 失败不阻断发布，已验证不影响 submit），edge 锚点尚未校准，留后续 change。 -->
+
 
 ## 7. 收尾（中控）
 
