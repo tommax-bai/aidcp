@@ -31,28 +31,34 @@ MUST 经一次运营机实机 CDP 校准确定后再锁定，校准前以 `no_ta
 - **WHEN** 边缘收到 `set_cover` 并点击目标图为封面
 - **THEN** 处理器 MUST 后置校验该图已处于封面激活态才回 `ok:true`；点击未改变封面态 MUST 回 `ok:false`
 
-### Requirement: 配图上传失败是唯一的 fail-fast 放宽且落库回正
+### Requirement: 图文全图失败诚实 failed（编辑器被传图门控）且落库回正
 
-云端 `executePublishSequence` SHALL 把 `upload_image` 失败（回 `ok:false` **或**该 kind 的超时/异常）特判为 **降级而非中断**：
-置 `imagesOk = false`、**继续**下发余下文字/元数据指令、跳过依赖该图的 `set_cover`，并把 `imagesOk` 带回 `PublishSequenceResult`。
-这是对逐步 fail-fast（其它任何 kind 失败 MUST 仍按序停止）的**唯一一处有意放宽，且仅限配图**——因为纯文字是诚实可接受的结果、而标题失败不是；
-该放宽 MUST 有显式注释与 AC 锁定，防止后人误"修"回中断。`set_cover` MUST **仅在全部 `upload_image` 成功后才真实下发**；
-任一图失败 MUST NOT 下发 `set_cover`（封面依赖该图存在）——实现可入构建序列但执行期按 `imagesOk` 跳过，guarantee 等价。
-`PublishExecutor` 在 `imagesOk === false` 时 MUST **回正已预存的 `imageUrl`**（置空或标 `imagesAttached=false`），
-使 `publish_log` 不在纯文字帖上留下"有图"假信号。若实机校准证实发布页编辑器被"成功传图"门控（无图则标题/正文不可填），则**全图失败 MUST 转为诚实
-`failed` 而非纯文字帖**。
+云端 `executePublishSequence` SHALL 如实处理配图失败，并在图文帖全图失败时诚实 `failed`、绝不假装纯文字成功。
+依据 task-0 实机校准：小红书图文帖发布页编辑器被"先传图"门控——未上传任何图片前标题/正文控件根本不存在，
+上传成功后 `input.files` 还会被平台清零（故 `files.length` 绝非成功依据），因此本产品的图文帖**必须有图**。
+具体：`upload_image` 回 `ok:false` 或超时/异常 → 置 `imagesOk=false`、
+跳过依赖该图的 `set_cover`；**请求了配图（`images` 非空）而全部失败 MUST 在进 `fill_field` 前即诚实 `failed`（`error:'all_images_failed'`），
+绝不进编辑/提交假装纯文字成功**（红线）。非配图指令任一失败仍 MUST 逐步 fail-fast。`imagesOk` MUST 带回 `PublishSequenceResult`。
+`set_cover` MUST **仅在多图时下发**（选哪张当封面）；**单图封面自动取该图，MUST NOT 下发 `set_cover`**——发布页无独立设封面控件，
+强发会 `no_target`→fail-fast 拖垮整条发布。`PublishExecutor` 在 `imagesOk === false` 时 MUST **回正已预存的 `imageUrl`**
+（标 `images_attached=false`），使 `publish_log` 不在失败/无图帖上留下"有图"假信号。
+（前向兼容：未请求配图的无图流——若未来启用——仍可走"无图直发"路径，不受本条约束。）
 
-#### Scenario: 配图失败降级纯文字、imagesOk 如实、落库回正
-- **WHEN** `upload_image` 回 `ok:false`（或该指令超时）
-- **THEN** sequencer MUST 置 `imagesOk=false`、不下发 `set_cover`、继续文字/元数据指令至 `submit`（仍受人审闸），`PublishExecutor` MUST 回正预存 `imageUrl` 使落库记录为纯文字真相
+#### Scenario: 图文全图失败 → 诚实 failed，不进编辑/提交
+- **WHEN** 请求了配图，但 `upload_image` 全部回 `ok:false`（或超时）
+- **THEN** sequencer MUST 置 `imagesOk=false`、不下发 `set_cover`、在 `fill_field` 前返回 `ok:false` + `failedAt.error='all_images_failed'`，绝不下发 `submit_publish`；`PublishExecutor` MUST 标 `images_attached=false`
+
+#### Scenario: 单图不下发 set_cover，多图才下发
+- **WHEN** `images.length === 1`
+- **THEN** 序列 MUST NOT 含 `set_cover`（封面自动取该图）；仅当 `images.length > 1` 才下发 `set_cover` 选封面
 
 #### Scenario: 非配图指令失败仍 fail-fast
-- **WHEN** `fill_field(title/content)` 或 `set_option` 回 `ok:false`
-- **THEN** sequencer MUST 仍按既有逐步 fail-fast 停止于该步、记 `failedAt`，**MUST NOT** 套用配图的降级继续语义
+- **WHEN** `fill_field(title/content)` 或 `set_option` 回 `ok:false`（此前配图已成功）
+- **THEN** sequencer MUST 仍按既有逐步 fail-fast 停止于该步、记 `failedAt`，`imagesOk` 不被误标
 
-#### Scenario: 红线反例——降级回正缺失致观测面假成功（禁止）
-- **WHEN** 配图失败已降级纯文字，但 `publish_log` 仍保留生成的 `imageUrl`，下游据此判定该帖"有图"
-- **THEN** MUST 视为违规、不予合入；降级 MUST 伴随 `imageUrl` 回正 / `imagesAttached=false`，杜绝纯文字帖被读成带图
+#### Scenario: 红线反例——失败/无图帖留有图假信号（禁止）
+- **WHEN** 配图失败，但 `publish_log` 仍保留生成的 `imageUrl` 且 `images_attached` 未回正，下游据此判定该帖"有图"
+- **THEN** MUST 视为违规、不予合入；MUST 伴随 `images_attached=false` 回正，杜绝失败/无图帖被读成带图
 
 ### Requirement: 配图 URL 下载安全封套与临时文件生命周期
 

@@ -11,12 +11,21 @@
 >
 > **红线**：MUST NOT 静默假成功（失败/不可校验 → `ok:false` + 真实 error，绝不伪造有图）；后置校验 MUST NOT 以 `input.files.length>0` 为充分条件；配图失败降级 MUST 伴随落库回正；AC-PUB 不变（提交仍由 `approved===true` 把闸）；复用持久化单例不重建；不碰同机 isales。
 
-## 0. 实机校准探针（BLOCKS 模块形状；运营机、gated AIDCP_E2E）
+## 0. 实机校准探针（BLOCKS 模块形状；本机已跑）
 
-- [ ] 0.1 在运营机对真实小红书发布页跑 CDP，确认文件输入是**点击前即在的静态隐藏 `<input type=file>`** 还是懒加载/拖拽区。验证：`Runtime.evaluate({returnByValue:false})` 能解析到 input 的 `objectId` 且 `DOM.setFileInputFiles` 真填充 `input.files`；若为懒加载则改走 `Page.setInterceptFileChooserDialog` + `fileChooserOpened` 兜底（仍经 `FileInputSetter` 接口，先于编写 uploader 决定形状）
-- [ ] 0.2 同探针：确认发布页**编辑器是否被"成功传图"门控**（无图时标题/正文是否可填）。验证：若门控，则记录"全图失败 MUST 转 `failed`（非纯文字帖）"并反哺 §1.3 降级决策；若不门控，纯文字降级成立
-- [ ] 0.3 同探针：定位该图的**控件成功态节点**（缩略图/预览/进度完成）与**封面激活态节点**。验证：两者均可经 `LocatingEngine` 定位、且与"仅 `input.files` 有值"可区分（后置校验红线的实锚点来源）
-- [ ] 0.4 同探针：取一个真实 DashScope 结果 URL，确认是**直链 CDN 无 3xx 重定向**。验证：`redirect:'error'` 不会误拒合法图（若有跳转则调整安全策略并记录）
+> <!-- 2026-06-20 本机实机校准完成（创作平台发布页，CDP，只读+一次测试图上传从未发布、草稿已丢弃）。
+> 探针脚本：aidcp-edge/scripts/calibrate-publish-probe.ts / calibrate-imgtab-probe.ts / calibrate-upload-probe.ts。
+> 结论详见 design.md「Task-0 calibration results」。 -->
+
+- [x] 0.1 文件输入形态。验证：图文模式下页面唯一 `input.upload-input[type=file]`（accept jpg/png/webp、multiple、hidden），**点击前即在=静态**；`DOM.setFileInputFiles` 实测真填充并触发 SPA 渲染缩略图+编辑器。→ PRIMARY 路径成立、**无需 FileChooser 兜底**。<!-- 发布页默认在「上传视频」标签，select_mode 须先点「上传图文」（现有 anchor text「图文」命中，已确认）。选择器锁定注入 main.ts -->
+- [x] 0.2 编辑器是否被传图门控。验证：上传前 editables=0、上传后 editables=4（标题 input.d-text「填写标题会有更多赞哦」、正文 div.tiptap.ProseMirror）→ **图文帖必须有图**。已反哺：sequencer 全图失败→诚实 `failed`（`all_images_failed`），不假装纯文字。<!-- aidcp-cloud command-sequencer all-images-failed guard -->
+- [x] 0.3 成功态节点 +「files.length 不可信」。验证：上传成功后 `input.files.length===0`（XHS 消费 FileList），真实成功态=`div.img-preview-area` 内带 src 的缩略图（img.img.preview / #creator-preview-image-0）。已锁定 hasThumbnail 注入 main.ts。封面：单图自动取该图、无独立设封面控件 → set_cover 仅多图下发。<!-- 多图 cover-active 选择器待多图启用再校准 -->
+- [ ] 0.4 DashScope URL 直链无 3xx。<!-- 本机无 WANXIANG_API_KEY、无真实 URL 可测；redirect:'error' 守卫保留，部署 E2E（task 8.4）对真实 URL 验证 -->
+
+## 0b. 校准结论落码（locked from task-0）
+
+- [x] 0b.1 aidcp-edge `src/main.ts` 注入校准选择器：CdpFileInputSetter inputSelector=`input.upload-input[type=file]`（fallback `input[type=file]`）；ImageUploader hasThumbnail=`.img-preview-area img / #creator-preview-image-0` 带 src。验证：typecheck 过、edge 全量绿
+- [x] 0b.2 aidcp-cloud `command-sequencer.ts`：set_cover 仅 `images.length>1` 下发（单图封面自动）；请求了配图而全失败 → 进 fill_field 前诚实 `failed`（`all_images_failed`），非配图失败仍 fail-fast。验证：AC-MEDIA-DEGRADE/SEQ 更新后全过
 
 ## 1. aidcp-cloud — CommandSequencer 配图 emit + 降级 + 落库回正
 
@@ -32,12 +41,12 @@
 - [x] 2.1 `src/cdp/file-input-setter.ts`（新）`FileInputSetter` 接口 + `CdpFileInputSetter`：`DOM.enable`（once）→ `Runtime.evaluate({returnByValue:false})` 取 `objectId` → `DOM.setFileInputFiles`；stale-handle 单次有界重试；由 `session.cdp` 单例构建。验证：`typecheck` 过、最多一次重试 <!-- aidcp-edge 07af4dd -->
 - [x] 2.2 `src/flows/image-uploader.ts`（新）`ImageUploader`：注入 `fetchImpl` + `FileInputSetter`；URL 校验 → 下载到临时文件（私有方法）→ 经 `FileInputSetter` 设置 → 后置校验控件成功态（绑定式轮询，**非仅 `input.files.length>0`**）→ `finally` 清理。验证：成功+见缩略图+清理；各失败回分类 error 且仍清理 <!-- aidcp-edge 07af4dd image-uploader.test.ts 7 测过（含红线反例 image_not_attached）-->
 - [x] 2.3 下载私有方法：注入 `fetchImpl` + `AbortController`/`AIDCP_IMAGE_DOWNLOAD_TIMEOUT_MS` + `redirect:'error'` + `Content-Length` 预检与流式字节上限（默认 ~10MB）+ magic-byte（jpeg/png/webp）+ `mkdtemp` 于 `os.tmpdir()/aidcp-img-*` 随机名。验证：超时→`image_fetch_failed`；超限→`image_too_large`；非图→`image_format_unsupported`；非 https→`image_url_rejected` <!-- aidcp-edge 07af4dd 五分类失败均有测 -->
-- [ ] 2.4 `src/flows/anchors.ts` 加文件输入 / 缩略图成功态真实 anchors（**来自 task 0 校准**）。<!-- 骨架占位已就位（CdpFileInputSetter 缺省 inputSelector=input[type=file]、image-uploader defaultHasThumbnail best-effort 选择器，均 inline 可注入覆盖）；真实小红书 DOM 锚点待 task-0 实机 CDP 校准后锁定。jsdom 单测经注入桩覆盖路径。 -->
+- [x] 2.4 文件输入 / 缩略图成功态真实选择器（**来自 task 0 校准**）。<!-- 偏离：选择器在 main.ts 组合根注入（非 anchors.ts 常量）——库模块保持 fail-closed/通用、XHS 具体选择器集中在组合根。inputSelector=input.upload-input[type=file]；hasThumbnail=.img-preview-area img 带 src。库默认仍 fail-closed（uncalibrated 即诚实失败）。 -->
 - [x] 2.5 `src/flows/publish-command-handlers.ts` 用 `ImageUploader` 替换 `upload_image` 的 `notImplemented` 桩（未注入 uploader 仍诚实 `kind_not_implemented`），结果 verbatim 回报。验证：成功→`ok:true`；各失败→`ok:false`+真实 error，绝不 `ok:true` <!-- aidcp-edge 07af4dd runUploadImage；AC-MEDIA 透传测过 -->
 
 ## 3. aidcp-edge — set_cover
 
-- [ ] 3.1 `src/flows/anchors.ts` 加封面入口 / 封面激活态真实 anchors（**来自 task 0 校准**）。<!-- 骨架占位已就位（buildSetCoverRequest goal/anchorHint「封面」+ coverActiveValidator best-effort 选择器，inline）；真实锚点待 task-0 校准。jsdom 单测覆盖。 -->
+- [ ] 3.1 封面入口 / 封面激活态真实 anchors（**来自 task 0 校准**；多图才需，本 change 单图不触发）。<!-- task-0 实测：单图封面自动取该图、发布页无独立设封面控件 → set_cover 仅多图下发，当前单图产品不触发。多图 cover-active 真实选择器待多图能力启用时再校准；coverActiveValidator 保持 fail-closed 占位、handler+测试就位（前向兼容）。本 change 单图路径无需此校准。 -->
 - [x] 3.2 `src/flows/publish-command-handlers.ts` 用 `runAtom` + **封面专用 validator**（断言所选图真成为当前封面，非仅点到）替换 `set_cover` 的 `notImplemented` 桩。验证：封面入口缺失→`ok:false`；定位+激活态→`ok:true` <!-- aidcp-edge 07af4dd coverActiveValidator；AC-MEDIA set_cover 两测过 -->
 
 ## 4. aidcp-edge — 放开 v1 带图硬拒（显式改道）
@@ -61,7 +70,7 @@
 
 - [x] 7.1 edge：`test:acceptance`（11）→ `npm test`（279）→ `typecheck` 全绿；AC-PROTO-*（消息数 54）、AC-PUB-* 全过 <!-- aidcp-edge 07af4dd -->
 - [x] 7.2 cloud：`test:acceptance`（18）→ `npm test`（279）→ `typecheck` 全绿；两份 protocol.ts MessageType 键不漂移 <!-- aidcp-cloud ce016b1 -->
-- [x] 7.3 中控：`openspec validate publish-media-upload --strict` 通过；`docs/protocol.md` 头部计数仍 54、无需加表行（doc-only no-op） <!-- 2026-06-20 strict 通过；docs 无需改 -->
+- [x] 7.3 中控：`openspec validate publish-media-upload --strict` 通过；本 change **新增 0 个消息类型**（upload_image/set_cover/imageUrl 仍在 publish.command 信封内），`docs/protocol.md` 无需因本 change 改表行 <!-- 2026-06-20 strict 通过。注：协议绝对计数已由并发会话从 54→55（非本 change），两端一致、AC-PROTO 全过；本 change 对协议零改动 -->
 
 ## 8. 部署（ECS 安全序列 + 实机；执行前先做 §0 前置检查；与 A 全阶段统一）
 

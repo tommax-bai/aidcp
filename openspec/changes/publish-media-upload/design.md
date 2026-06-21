@@ -105,6 +105,17 @@ New AC cases: AC-MEDIA upload success / download-timeout / non-image / no-target
 
 The existing `kind_not_implemented` lock (`test:140-149`) is replaced. No real Chrome needed for unit tests; real-machine CDP calibration of the anchors + widget success-state selector + redirect verification is the separate gated `AIDCP_E2E` task 0.
 
+## Task-0 calibration results (2026-06-20, on-device CDP against creator.xiaohongshu.com/publish/publish)
+
+Ran read-only probes + one real `DOM.setFileInputFiles` upload of a test image (never published; draft discarded). Scripts: `aidcp-edge/scripts/calibrate-publish-probe.ts`, `calibrate-imgtab-probe.ts`, `calibrate-upload-probe.ts`.
+
+- **0.1 — file input is STATIC + hidden (not lazy).** After clicking the「上传图文」tab, the page has exactly one `input[type=file]`: `input.upload-input`, `accept=.jpg,.jpeg,.png,.webp`, `multiple`, `hidden=true`, present BEFORE any upload click. → PRIMARY `DOM.setFileInputFiles` confirmed; `FileChooser` fallback NOT needed. The publish page defaults to the「上传视频」tab (its lone file input is `accept=.mp4,...`) — `select_mode` must click「上传图文」first (existing anchor text「图文」matches; confirmed). Locked selector (injected in `main.ts`): `input.upload-input[type=file]` (fallback `input[type=file]`).
+- **0.1 end-to-end validated.** `DOM.setFileInputFiles` on that input really populated and the SPA reacted: thumbnails + the full editor rendered.
+- **0.2 — editor IS image-gated.** Before upload `editables=0` (only the dropzone「上传图片，或写文字生成图片」); after upload `editables=4`: title `input.d-text` (placeholder「填写标题会有更多赞哦」, matches existing anchor), content `div.tiptap.ProseMirror[contenteditable=true]`. → A 图文 post REQUIRES ≥1 image; all-images-failed CANNOT yield a valid post → must be honest `failed`, NOT text-only. This is now encoded: `executePublishSequence` aborts `failed`(`all_images_failed`) before `fill_field` when images were requested and all failed.
+- **0.3 — success-state node confirmed; `input.files` is NOT a success signal.** After a successful upload `input.files.length === 0` (XHS consumes the FileList into its own state) — vindicates the fail-closed "never trust `files.length`" rule. Real success node: a rendered thumbnail `img` with a `src` inside `div.img-preview-area` (e.g. `img.img.preview` blob:, `img#creator-preview-image-0`). Locked `hasThumbnail` (injected in `main.ts`): an `img` with non-empty `src` under `.img-preview-area` / `#creator-preview-image-0`.
+- **set_cover finding.** Single-image cover is automatic (the uploaded image IS the cover) — there is no independent "set cover" control; the only cover-ish entry is「获取封面建议」(`div.cover-detect`/`.get-cover-suggest`, an AI suggestion, not selection). → `set_cover` is now emitted ONLY for multi-image (`images.length > 1`); single-image emits none (a stray `set_cover` would `no_target`→fail-fast and kill the publish). Multi-image cover-active selector remains pending a future multi-image calibration.
+- **0.4 — NOT run locally** (`WANXIANG_API_KEY` not on this machine, so no real DashScope URL to test `redirect:'error'` against). The `redirect:'error'` guard stays; verify against a real DashScope URL during deploy E2E (task 8.4).
+
 ## Open decisions (defaults chosen; flag to override)
 
 - **XHS DOM shape** (static hidden `<input type=file>` vs lazy/dropzone): build PRIMARY first; resolve via the calibration spike (task 0) BEFORE locking the uploader shape. Fallback (`FileChooser` interception) slots behind `FileInputSetter` if the spike shows a lazy input. Do NOT pre-build drag-drop.
