@@ -2,6 +2,13 @@
 
 > 进度按 sub-repo 分节回写本仓。实装后用 HTML 注释标 `[x]` 并记 `<!-- <repo> <commit-sha> 备注 -->`。
 > 排期：cloud 部分排在 `follow-already-followed-truthful-report` 与 `interaction-appraiser-like-rebalance` 归档之后再动（同改调度区域）。
+>
+> **✅ 已上线（2026-06-21 deployed）**：ECS `aidcp-cloud` 现役代码已含全功能（master 09e39c1，另会话已部署），
+> 本次仅置 `AIDCP_COMMENT_APPROVAL=true` + `systemctl restart aidcp-cloud`，healthcheck 全过
+> （active / 8787 listening / 飞书长连接已建立 / 0 fatal）；isales 四服务未碰。备份：`/opt/aidcp/cloud/.env.bak.20260621-102946` +
+> `/opt/aidcp/cloud.bak.20260621-102946.tar.gz`。回滚 = 恢复 .env 备份 + 重启。
+> **现役行为**：高热度高价值笔记被点赞/收藏后 → 精品评估 → 撰写 → 去AI味 → **飞书审批卡**（人点同意才发，90s 超时）→ 执行端发评论+后置校验 → 进主页评估。
+> 每账号每日上限 = 风控档位（3/8/15）。关掉 = `.env` 删该行 / 置 false + 重启。
 
 ## 0. 先决调研（执行端探针）
 
