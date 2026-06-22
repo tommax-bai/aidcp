@@ -58,5 +58,7 @@
 - [x] 6.2 按 sub-repo 分节回写进度；edge WIP（chrome-launcher）未触碰 <!-- 本仓 -->
 - [x] 6.3 `openspec validate notification-monitor --strict` → valid
 - [x] 6.4 cloud 按 §5 安全序列部署 ECS：备份(cloud.bak.20260620-134048.tar.gz + .env.bak)→rsync(排除 .env/node_modules/.git，40 文件)→restart→健康检查全过（active / 8787 监听 / accounts 表自建 seed / RiskController·ConceptStore·AccountStore 就绪=PG 通 / RoleDispatcher 12 通知角色就绪 / 飞书长连接已建立 / 无 error / isales 未触碰）。**决策：用户选全量部署当前主干**——本次连带把面板(默认禁用)·账号主表·此前已合并主干一起上线，非仅 notification。<!-- aidcp-cloud db250e5 --> <!-- 2026-06-20 deployed -->
-- [ ] 6.5 真机校准（本机，下一步）：本机 edge 连 ECS（ws://121.89.85.150:8787）跑真实小红书，校准——通知首页各类未读探测、三类列表选择器、优先级、"看一眼是否真清未读"、评论/@ 发飞书、巡视后浏览恢复、断连后无残留暂停
+- [ ] 6.5 真机校准（本机，进行中）：本机 edge 连 ECS（ws://121.89.85.150:8787）跑真实小红书，校准——通知首页各类未读探测、三类列表选择器、优先级、"看一眼是否真清未读"、评论/@ 发飞书、巡视后浏览恢复、断连后无残留暂停
+  - [x] 6.5.1 **接线漏修（首个校准发现）**：边缘入口 `edge-client.ts` 的 onMessage 主动命令白名单漏接 5 个 `notification.*`（open/browse_comments/browse_likes/browse_follows/back_home），命令在到达 `browseHandler` 前于"其他主动消息暂忽略"被静默丢弃 → 巡视无回执 → `excursion_resumer` 永不收敛 → 浏览永挂 → 会话级看门狗 idle≈240s 杀整会话（真机日志：count=0 触发巡视=fail-open 设计，非 bug；挂死才是 bug）。修：白名单补 5 个类型放行到 browseHandler（处理分支 4.3 / 协议 3.6 / command-bridge 映射均早已就位，唯入口路由漏同步）；加回归断言守"离开流程命令不得入口静默丢弃"红线（对齐 browse-loop-resilience spec §"放行该离开流程自身的命令"）。edge typecheck✓ / acceptance 11/11 / 全量 288/288（含 5 新通知路由例）<!-- aidcp-edge 0c28e32 -->
+  - [ ] 6.5.2 余下校准项（未读探测 / 三类选择器 / 优先级 / 清未读 / 飞书 / 恢复闭环端到端）继续在真机走
 - [ ] 6.6 `/opsx:archive` 归档（合并进 `notification-monitoring` + `browse-loop-resilience`）← 真机验收通过后
