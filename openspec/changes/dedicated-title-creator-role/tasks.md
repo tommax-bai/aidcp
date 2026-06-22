@@ -62,8 +62,10 @@
 
 ## 7. 部署与真机验证
 
-- [ ] 7.1 云端部署（与 edge 同批）：§0 私钥/子仓前置检查 → ECS 备份 `.bak.<ts>.tar.gz` → rsync **仅本 change 文件**（dry-run surface scope，不带并发会话的 protocol.ts） → `systemctl restart aidcp-cloud.service` → healthcheck（active + 8787 + 飞书长连接 + PG + isales 未触碰）→ 失败回滚。**验证**：healthcheck 全过 + 启动日志含 TitleCreator
-- [ ] 7.2 edge 本地重启连 `ws://121.89.85.150:8787`（新代码：无标题截断）。**验证**：`已连接云端 … 等待命令`
+- [x] 7.1 云端部署（与 edge 同批）：§0 私钥/子仓前置检查 → ECS 备份 `.bak.<ts>.tar.gz` → rsync **仅本 change 文件**（dry-run surface scope，不带并发会话的 protocol.ts） → `systemctl restart aidcp-cloud.service` → healthcheck（active + 8787 + 飞书长连接 + PG + isales 未触碰）→ 失败回滚。**验证**：healthcheck 全过 + 启动日志含 TitleCreator
+<!-- cloud ee8ef6f 2026-06-22 deployed。备份 /opt/aidcp/cloud.bak.20260622-171437.tar.gz(13.4MB)+.env.bak.20260622。dry-run surface scope=恰本 change 14 文件（comment-like 已先期在 ECS、未额外 co-ship）。healthcheck：active + 8787 监听 + 启动日志「PublishOrchestrator 已就绪，角色: … ContentAssembler, TitleCreator, TopicStrategist …」+ 飞书长连接已建立 + PG select 1=1 + isales 4 服务(api/engine/scheduler/worker) 全 active 未触碰。 -->
+- [x] 7.2 edge 本地重启连 `ws://121.89.85.150:8787`（新代码：无标题截断）。**验证**：`已连接云端 … 等待命令`
+<!-- edge 8cb8d01 2026-06-22 后台启动（AIDCP_AUTO_BROWSE=false）：Chrome 就绪 CDP 9222、复用 ~/.aidcp-chrome-profile 小红书登录态、握手 sess-1、日志「已连接云端 ws://121.89.85.150:8787，等待命令」。 -->
 - [ ] 7.3 真机端到端：飞书 `/publish` → 审批卡**标题栏为真实 ≤18 字标题** → 通过 → 发布成功（URL `/publish/success`）→ 核对 `publish_log.title` == 平台显示标题（≤18、未切碎、records==published）。**验证**：三方一致
 
 ## 8. 收尾（中控）
