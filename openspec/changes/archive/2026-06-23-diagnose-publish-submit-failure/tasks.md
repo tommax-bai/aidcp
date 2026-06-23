@@ -1,5 +1,8 @@
 # Tasks — diagnose-publish-submit-failure
 
+> **2026-06-23 闭幕（前提被诊断推翻 → 归档）**：mock 自驱真机复跑（publish-14 干净 fresh edge）**端到端发布成功**，submit 成功诊断健康（按钮未禁用 / 点击落按钮 / 未遮挡）。**`submit_publish post_validate_failed`（publish-12）八成是「旧代码残留 edge + 隔夜 Chrome 页面」的环境锅、非硬 submit bug**——干净 edge 上 submit 可靠成功（id 11/14）。**Step 1 诊断目的已达成**：edge `runSubmit` 观测已部署（edge b2d69f7）并验证成功路径；`AC-TITLE` 标题保真也借 id 14 端到端坐实（含==平台真实显示）。**真正可复现的脆点 = 配图超时 → 无图 → fill_field no_target**（publish-13），与 submit 无关 → **移交新 change** 做「无图诚实失败 + 配图给足时间」。Step 2 修复任务（5/6/7）在本 change 内 moot（submit 未坏）；`command-sequencer.ts:129` 硬必选 best-effort 矛盾移交新 change 一并修。详见 `docs/handoff-publish-submit-failure-2026-06-22.md` §3.5。
+
+
 回归铁律：发布链改动后先 `npm run test:acceptance` 再全量 `npm test` 再 `npm run typecheck`；红线 `AC-PUB-*`/`AC-PROTO-*`/`AC-RISK-*` 必过。
 提交纪律：并发会话在同仓有 WIP；**精确 `git add` 仅本 change 文件、不 `-A`**；改前按符号定位（行号可能漂移）。
 红线：MUST NOT 静默假成功**双向**——既不掩盖真失败、也不把未真发的帖误报成功；边缘只忠实执行不加兜底启发式；策略收口云端。背景见 `docs/handoff-publish-submit-failure-2026-06-22.md`。
