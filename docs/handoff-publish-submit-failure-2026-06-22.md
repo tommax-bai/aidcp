@@ -36,6 +36,21 @@
 
 **Step 3 — 诚实修（收口云端，边缘不加策略）：** 据诊断结果，若是硬必选字段缺失 → `command-sequencer.ts` 把 visibility 等硬必选步骤的 `guard_persist` **判致命而非跳过**，让系统**响亮失败**而不是去点发不出去的按钮；若是风控/拦截 → 加发布前云端检查并诚实 `failed`。**边缘禁止**加 disabled 启发式/重试/放宽窗口等可能掩盖真失败的兜底。
 
+## 3.5 突破：mock 自驱真机复跑（2026-06-23）翻转结论
+
+用 env-guarded mock 触发（`AIDCP_MOCK_PUBLISH=true` + `touch /tmp/aidcp-mock-publish-trigger`，等价飞书 /publish）+ 信号文件自动审批，**干净 fresh edge（新诊断码）自驱复跑**：
+
+- **publish-14 端到端发布成功**（`status=published`、has_img、`images_attached`、title="智能体老犯傻？可能是提示词没写对" 16 可见字）→ **标题保真红线端到端彻底验证（含==平台真实显示这一腿）**；真帖已上账号。
+- **submit 成功路径诊断**（`[publish-submit-diag] after-click`）：`button '发布' class="ce-btn bg-red" disabled=false`、`atPoint="XHS-PUBLISH-BTN"`（点击落在按钮、未被遮挡）、仅一个空 `el-overlay-dialog` + "原创声明" 提示 → 提交成功。`capture_postId no_target`(seq12) 为非致命（帖已提交、只是没抓到 postId）。
+- **翻转结论**：**publish-12 的 submit `post_validate_failed` 八成是「旧代码残留 edge + day-old Chrome 页面」的环境锅**（见 §1：当时跑在 50418 旧 edge 上），**不是硬 submit bug**——干净 edge 上 submit 可靠成功（id 14、id 11）。**唯一可复现的真实脆点 = 配图超时**（publish-13）：wan2.7-image-pro 慢于 90s（万相 18 轮）→ ImageGenerator 降级无图 → `input.images` 空 → 图文编辑器「先传图门控」下标题框不渲染 → `fill_field no_target` → 整帖 failed。
+
+**修复方向收敛（据此翻转）**：
+1. **主修：配图超时 → 无图的诚实失败 / 给足时间**。已做 env 缓解 `AIDCP_WANXIANG_MAX_POLL`（ECS 已设 23≈115s，受 ImageGenerator 角色闸 120s 上限约束）。正解应在 PublishExecutor/sequencer：**无图（imageUrl 缺）→ 诚实 failed（无有效图文帖），不进 fill_field 去 no_target**（红线：不静默走必然失败的纯文字路径）；或让配图更可靠/可重试。
+2. **submit 诚实性（次要）**：成功路径已验证健康；若未来再现间歇 post_validate_failed，诊断日志（已部署 edge b2d69f7）会落实是风控 toast / 慢往返；**绝不盲目放宽 15s 或放松成功正则**。
+3. `command-sequencer.ts:129` 可见范围「硬必选」却 best-effort 跳过的矛盾仍应修（独立成立）。
+
+> mock 基建现状（ECS）：cloud 跑 master `c8cad82`（并发会话部署，含 role-category + 我的 mock-trigger）；`.env` 有 `AIDCP_MOCK_PUBLISH=true` + `AIDCP_WANXIANG_MAX_POLL=23`。**mock 触发是 file-gated 后门**（仅 `touch /tmp/aidcp-mock-publish-trigger` 才发），用完应 `AIDCP_MOCK_PUBLISH` 移除 + 重启清理。同机多会话部署会竞态覆盖/打断 run（实测 15:34 撞 c8cad82），错峰。
+
 ## 4. 指针
 
 - 评审 workflow 全量结果：本会话 task `w8iuswnhq` 输出（`.../tasks/w8iuswnhq.output`）。
