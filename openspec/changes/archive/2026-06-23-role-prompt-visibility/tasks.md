@@ -40,4 +40,4 @@
 - [x] 6.2 `openspec validate role-prompt-visibility --strict` 通过。<!-- 2026-06-23 valid -->
 - [x] 6.3 cloud + console 按 §5 安全序列部署 ECS（备份 → rsync → restart → healthcheck；console → 8088）；**部署后复查关键文件内容 + 新启动日志**。<!-- 2026-06-23 deployed：dry-run 范围=仅本change 17文件(无并发捎带)；备份 cloud.bak.20260623-171817 + console.bak.20260623-172024；rsync 17文件；复查 role-prompt-preview.ts present/server.ts createRolePromptProvider/panel /prompt 路由/agent previewPrompt 均在；restart→active/8787起/飞书/PG select1/分类存储仍在；console 新包 index-CHYJJPhO.js 上 8088 -->
 - [x] 6.4 上线后核对：后台逐个角色「查看 Prompt」能看到真实 prompt（逐 roleId GET /api/roles/:id/prompt available:true）；渲染失败角色优雅降级。<!-- 2026-06-23 E2E：11/11 浏览角色 available:true 且 prompt 非空(真实 buildPrompt+真人设渲染全部成功，示例数据零抛错)；publish:ContentCreator/ImageGenerator available:false 如设计。浏览器内点测留用户 -->
-- [ ] 6.5 `/opsx:archive` 归档（delta 合并进 `openspec/specs/role-llm-config`）。
+- [x] 6.5 `/opsx:archive` 归档（delta 合并进 `openspec/specs/role-llm-config`）。<!-- 2026-06-23 archived：delta ADDED「角色 prompt 只读可见」并入 openspec/specs/role-llm-config；目录移至 archive/2026-06-23-role-prompt-visibility -->
