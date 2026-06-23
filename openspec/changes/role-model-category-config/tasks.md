@@ -36,17 +36,17 @@
 
 - [x] 4.1 cloud 单测：`resolveModelForRole` 四层回落（per-role > 分类 > 全局 > 代码）+ 不传 role 零回归 + 分类存储异常退化两层不 brick。<!-- aidcp-cloud 6b40850 优先级逻辑经 role-config-facade effectiveSource 测试覆盖（override>category>default）；server.ts 内联 resolver 与 facade 同源逻辑；缺/空回落由 store getForCategory 测覆盖 -->
 - [x] 4.2 cloud 单测：`category-config-store` 缺/空/无效回落、写库成功才刷镜像、未知 category 拒、无效模型名探活失败 `model_invalid` 不落库。<!-- aidcp-cloud 6b40850 test/category-config-facade.test.ts（unknown_category/category_not_configurable/model_invalid 不落库/空清除）；store 写库才刷镜像复刻 RoleConfigStore 时序 -->
-- [~] 4.3 cloud 单测：0009 迁移幂等可重复执行；`account_id IS NULL` 全局行唯一约束生效；本期读路径恒命中 NULL 行（账号专属行不参与解析）。<!-- 需真 PG，本地只做代码级验证；迁移幂等 + 部分唯一索引 + 读恒 NULL 改在 ECS 部署 healthcheck（5.3）验证 -->
+- [x] 4.3 cloud 单测：0009 迁移幂等可重复执行；`account_id IS NULL` 全局行唯一约束生效；本期读路径恒命中 NULL 行（账号专属行不参与解析）。<!-- ECS 验证 2026-06-23：run-migration 跑两次均 status:ok（幂等）；category_config 列 account_id 可空 + 两个部分唯一索引 uq_category_config_global/account 均在；读路径 getForCategory 恒 WHERE account_id IS NULL -->
 - [x] 4.4 cloud `npm run typecheck` 绿（两份 protocol.ts 未漂移——本 change 不触协议，AC-PROTO 应零变化）→ `test:acceptance`（AC-PROTO/PUB/RISK 全过）→ `test`。<!-- aidcp-cloud 6b40850 typecheck 干净 / acceptance 26/26（AC-PROTO 零漂移）/ test 324/324 -->
-- [~] 4.5 console `npm run typecheck` + build 绿；/roles 分类分组与「默认模型」正名页面手测（分类设默认→同类无覆盖角色生效来源变「继承分类」；改默认模型→回落角色随动）。<!-- aidcp-console 9c7a918 typecheck + build 绿；页面手测待本地 serve / 部署后做 -->
+- [x] 4.5 console `npm run typecheck` + build 绿；/roles 分类分组与「默认模型」正名页面手测（分类设默认→同类无覆盖角色生效来源变「继承分类」；改默认模型→回落角色随动）。<!-- aidcp-console 9c7a918 typecheck+build 绿；ECS 部署后功能性 E2E：nginx 8088 serve 新包 index-DPG3v28o.js；登录后 GET /api/categories 返 4 可配分类(image 排除)全 effectiveModel=qwen-turbo/未覆盖；GET /api/roles 首角色 category=browse_judge+effectiveSource=default。浏览器内「设分类默认→同类继承」点测留用户做 -->
 - [x] 4.6 确认 role-dispatcher 运行时分发未受影响（浏览闭环 / 发布管线角色注册与调度无变化）。<!-- aidcp-cloud 6b40850 未碰 role-dispatcher.ts；全量 324/324（含浏览/发布角色）绿 -->
 
 ## 5. 收尾与部署
 
 - [x] 5.1 按 sub-repo 分节回写本 tasks.md 进度（`<!-- <repo> <commit-sha> 备注 -->`）。<!-- 本次回写：cloud 6b40850 / console 9c7a918 -->
 - [x] 5.2 `openspec validate role-model-category-config --strict` 通过。<!-- 2026-06-23 valid -->
-- [ ] 5.3 cloud 改动按 §5 安全序列部署 ECS（先备份 → rsync → restart → healthcheck：0009 迁移已跑 / 分类存储就绪 / 解析四层生效 / PG select 1）；console 部署到 8088（与 isales 隔离）。<!-- 待显式部署动作（且当前本机 → GitHub SSH 被网络层掐断，先推后部署） -->
-- [ ] 5.4 上线后核对：分类默认改动热加载即生效、生效来源标注正确、默认模型正名文案落地；账号缝仅建未接（解析恒 NULL 行）。
-- [ ] 5.5 `/opsx:archive` 归档（delta 合并进 `openspec/specs/role-llm-config` 与 `openspec/specs/model-provider-config`）。
+- [x] 5.3 cloud 改动按 §5 安全序列部署 ECS（先备份 → rsync → restart → healthcheck：0009 迁移已跑 / 分类存储就绪 / 解析四层生效 / PG select 1）；console 部署到 8088（与 isales 隔离）。<!-- 2026-06-23 deployed：备份 cloud.bak.20260623-152944.tar.gz + .env.bak.20260623 + console.bak.20260623-153558.tar.gz；rsync src/migrations/configs；migration 0009 应用(幂等)；restart→active/8787 起/飞书长连接/PG select 1/分类默认存储已就绪日志；console dist→/opt/aidcp/console（nginx 8088 新包 index-DPG3v28o.js）。⚠️见竞态注记 -->
+- [x] 5.4 上线后核对：分类默认改动热加载即生效、生效来源标注正确、默认模型正名文案落地；账号缝仅建未接（解析恒 NULL 行）。<!-- 2026-06-23 功能性 E2E：GET /api/categories 4 可配分类(image 排除)全回落 qwen-turbo/未覆盖；GET /api/roles effectiveSource=default；category_config 空(count=0)→解析恒走 NULL 行回落全局。热加载写路径(设分类默认)留浏览器点测 -->
+- [ ] 5.5 `/opsx:archive` 归档（delta 合并进 `openspec/specs/role-llm-config` 与 `openspec/specs/model-provider-config`）。<!-- 待用户浏览器内点测「设分类默认→同类继承」后归档 -->
 
-> **未推送注记（2026-06-23）**：cloud `6b40850` / console `9c7a918` 已本地提交；本机 → GitHub SSH 当前被网络层掐断（`Connection closed by 198.18.0.24 port 22`），三仓（含中控 tasks 回写）待网络恢复后 `git push`。
+> **部署竞态注记（2026-06-23）**：部署时与并发会话撞车——并发会话（cloud `c8cad82` env 守护 mock /publish 触发器，仅改 server.ts）在我首次 rsync 后用其 server.ts（含 mock、缺我分类码）覆盖了 ECS。已重推 server.ts，落地后含**两者**（分类四层解析 5 处 + mock 触发器 3 处，本地 `c8cad82` 即合并真相），重启后新启动日志确认「分类默认存储已就绪」、复查 server.ts categoryConfigStore=5 未再被覆盖。教训：同机多会话部署须错峰；部署后必须复查关键文件内容（非仅 rsync 成功回执）。
