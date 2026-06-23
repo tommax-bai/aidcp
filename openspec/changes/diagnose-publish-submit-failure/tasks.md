@@ -6,15 +6,20 @@
 
 ## 0. 前置坐实（BLOCKING）
 
-- [ ] 0.1 坐实改点：读 edge `publish-command-handlers.ts` 的 `runSubmit` / `findShadowButtonCenter` / 后置校验（成功正则 + URL 判定 + 15s 窗口）与 cloud `command-sequencer.ts` 的硬必选（可见范围 `:129-130/:164/:216-218`）与 `failedAt` 构造，记录确切插入点与现役成功 URL/正则于本 task HTML 注释。**验证**：结论带 `文件:行`
+- [x] 0.1 坐实改点：读 edge `publish-command-handlers.ts` 的 `runSubmit` / `findShadowButtonCenter` / 后置校验（成功正则 + URL 判定 + 15s 窗口）与 cloud `command-sequencer.ts` 的硬必选（可见范围 `:129-130/:164/:216-218`）与 `failedAt` 构造，记录确切插入点与现役成功 URL/正则于本 task HTML 注释。**验证**：结论带 `文件:行`
+<!-- edge publish-command-handlers.ts：findShadowButtonCenter:413-451（取「发布」节点盒模型中心、多命中取最靠下；闭合 shadow 经 DOM.getDocument{pierce}）；runSubmit:457-498（ensureInputEnabled→findShadowButtonCenter('发布')→Input.dispatchMouseEvent 原始坐标点击:478-480→后置校验）；后置校验 CHECK 正则 /发布成功|发布中|笔记已?发布|成功发布|稍后可在/ **或** !location.href.includes('/publish/publish')（:486，弱条件）；deadline=clock()+15_000（:487）；超时 post_validate_failed（:495）。cloud command-sequencer.ts：bestEffort Set=['add_with_candidate','set_option','set_schedule']（:164）；失败/异常 best-effort 跳过 continue（:197/:217）；核心步失败 failedAt return（:201/:221）；可见范围「硬必选」注释（:129）却 set_option best-effort（:130）。诊断插入点=findShadowButtonCenter 末（按钮属性）+ runSubmit 点击后/超时（页面状态）。 -->
+- [x] 0.1b 真机已确认排除 (c) 假阴性：用户核账号「帖子没法出去」=真没发出（非已发只是没检测到）→ 真实失败属 (a) 风控/拦截 或 (b) 按钮禁用，靠 Step 1 诊断区分。
 
 ## 1. aidcp-edge — Step 1：提交诊断（只观测、零行为变更）
 
-- [ ] 1.1 `runSubmit`：点击前用 `Runtime.evaluate`（只读取值、不派发事件、不改主路径）采集并日志化：点击中心坐标、命中「发布」元素 tag/class + `disabled`/`aria-disabled`/`pointer-events`、`document.elementFromPoint(x,y)` 命中元素及最近 `[role=dialog]`/`[aria-modal]`、页面是否存在 `role=dialog`/`aria-modal`；后置校验超时时日志 `location.href` + `document.body.innerText` 头 ~200 字。只含公开状态、不打敏感值。**验证**：`npm run typecheck`；主路径（点击/校验/回报）行为不变的单测
-- [ ] 1.2 edge 回归：`npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿。**验证**：三命令退出码 0
+- [x] 1.1 `runSubmit`：点击前用 `Runtime.evaluate`（只读取值、不派发事件、不改主路径）采集并日志化：点击中心坐标、命中「发布」元素 tag/class + `disabled`/`aria-disabled`/`pointer-events`、`document.elementFromPoint(x,y)` 命中元素及最近 `[role=dialog]`/`[aria-modal]`、页面是否存在 `role=dialog`/`aria-modal`；后置校验超时时日志 `location.href` + `document.body.innerText` 头 ~200 字。只含公开状态、不打敏感值。**验证**：`npm run typecheck`；主路径（点击/校验/回报）行为不变的单测
+<!-- edge：findShadowButtonCenter 末加 DOM.getAttributes 记按钮 class/disabled/aria-disabled（区分 b 禁用）；新增 logSubmitDiag(x,y,when) 经 Runtime.evaluate 只读捕获 elementFromPoint/role=dialog/toast/href/bodyHead，在 runSubmit 'after-click'（deadline 前、不占 15s 窗）与 'timeout' 各调一次；console.warn `[publish-submit-diag]`。只观测、主路径点击/校验/回报逻辑零变更（cdp 路径，no-cdp 单测不受影响）。typecheck 干净。 -->
+- [x] 1.2 edge 回归：`npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿。**验证**：三命令退出码 0
+<!-- edge：typecheck 0 err；publish-command-handlers 单测 13/13；test:acceptance 11/11；test 292/292 全绿。 -->
 
 ## 2. aidcp-cloud — Step 1：`failedAt` 带 guard 跳过计数
 
+<!-- 暂缓（2026-06-23）：① cloud 工作树当前被并发会话 role-model-category-config WIP 占用且 typecheck 已坏（role-config-facade/panel 缺 category/getCategoryModel），不宜此时叠改纠缠；② 对定位 (a)/(b)/(c) 价值低——edge 诊断（task 1.1）已足够区分，且 edge 在本地跑、本诊断无需部署云端。待 cloud 树干净后再补 2.1/2.2。 -->
 - [ ] 2.1 `command-sequencer.ts`：`submit_publish` 失败的 `failedAt` 上下文带出本次 best-effort 跳过的步骤数量/项（让运营一眼区分「6/6 元数据 guard 噪声」vs「硬必选真缺」）。**验证**：单测「failedAt 含跳过计数」
 - [ ] 2.2 cloud 回归：`npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿。**验证**：三命令退出码 0
 
