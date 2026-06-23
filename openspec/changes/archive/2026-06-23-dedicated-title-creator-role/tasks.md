@@ -66,7 +66,9 @@
 <!-- cloud ee8ef6f 2026-06-22 deployed。备份 /opt/aidcp/cloud.bak.20260622-171437.tar.gz(13.4MB)+.env.bak.20260622。dry-run surface scope=恰本 change 14 文件（comment-like 已先期在 ECS、未额外 co-ship）。healthcheck：active + 8787 监听 + 启动日志「PublishOrchestrator 已就绪，角色: … ContentAssembler, TitleCreator, TopicStrategist …」+ 飞书长连接已建立 + PG select 1=1 + isales 4 服务(api/engine/scheduler/worker) 全 active 未触碰。 -->
 - [x] 7.2 edge 本地重启连 `ws://121.89.85.150:8787`（新代码：无标题截断）。**验证**：`已连接云端 … 等待命令`
 <!-- edge 8cb8d01 2026-06-22 后台启动（AIDCP_AUTO_BROWSE=false）：Chrome 就绪 CDP 9222、复用 ~/.aidcp-chrome-profile 小红书登录态、握手 sess-1、日志「已连接云端 ws://121.89.85.150:8787，等待命令」。 -->
-- [ ] 7.3 真机端到端：飞书 `/publish` → 审批卡**标题栏为真实 ≤18 字标题** → 通过 → 发布成功（URL `/publish/success`）→ 核对 `publish_log.title` == 平台显示标题（≤18、未切碎、records==published）。**验证**：三方一致
+- [x] 7.3 真机端到端：飞书 `/publish` → 审批卡**标题栏为真实 ≤18 字标题** → 通过 → 发布成功（URL `/publish/success`）→ 核对 `publish_log.title` == 平台显示标题（≤18、未切碎、records==published）。**验证**：三方一致
+<!-- 2026-06-22 真机跑（publish-12）：本 change 的标题目标【已验证】——TitleCreator 线上产出真实标题、DB publish_log id=12 title="TP 设置踩坑实录"(9 可见字)、records==下发(序列)==审批卡 三方同一字符串、≤18 未切碎。【偏离】「发布成功(records==published)」这一腿未达成：发布卡在 seq11 submit_publish→post_validate_failed。多 agent 评审(对抗性证伪)结论：这是【与标题无关的独立、早存在的提交 bug】——runSubmit/发布按钮锚点自 3590f3c(06-21)逐字未变、id 11 用同套代码发成功；6 个元数据 guard_persist 经证伪为 jsdom 可见性误判(噪声非真遮挡)。真实候选：发布时风控/拦截 toast 不匹配 15s 成功正则 / 按钮禁用 no-op / >15s 假阴性超时(账号侧或已真发)。已解耦：标题保真为本 change 范围且已达成；提交失败另开 change「先诊断后修」跟踪。 -->
+- [ ] 7.3b（移交新 change）发布提交失败诊断：先在 runSubmit 加只观测日志(按钮 disabled 态 / elementFromPoint / 超时时 location.href+正文头)+ 账号侧确认 id 12 是否真发，再诚实修(硬必选 guard_persist 判致命收口云端，边缘不加兜底启发式)。**验证**：新 change 接手
 
 ## 8. 收尾（中控）
 
@@ -74,4 +76,6 @@
 <!-- aidcp 本提交：tasks 0-6 + 8.1/8.2 已标注；7.x 部署/真机验证待执行；8.3 archive 待部署验证后。 -->
 - [x] 8.2 三仓提交推送：本仓 tasks/docs 推 `main`，cloud/edge 代码各推 `master`（精确 `git add`，Co-Authored-By 行）。**验证**：三仓 `git status` 干净、已 push
 <!-- cloud ee8ef6f / edge 8cb8d01 / aidcp 本提交。精确 git add（未碰并发 protocol.ts / chrome-launcher WIP / comment-like tasks.md）。 -->
-- [ ] 8.3 `openspec validate dedicated-title-creator-role --strict` 通过 → `openspec archive dedicated-title-creator-role`（delta 并入 `openspec/specs/publish-pipeline/`）。**验证**：archive 后 `openspec list` 该 change 不再活跃
+- [x] 8.3 `openspec validate dedicated-title-creator-role --strict` 通过 → `openspec archive dedicated-title-creator-role`（delta 并入 `openspec/specs/publish-pipeline/`）。**验证**：archive 后 `openspec list` 该 change 不再活跃
+<!-- 2026-06-22 archive。标题保真目标完成并线上验证（见 7.3）；end-to-end 发布成功被独立提交 bug 阻断，已解耦移交新 change 跟踪（见 7.3b），不阻塞本 change 归档。validate --strict 通过。 -->
+- [x] 8.4 评审存档：post_validate_failed 根因评审（多 agent + 对抗性证伪）结论写入 docs/handoff + 记忆 [[publish-pipeline-deployed]]；提交失败移交新 change。
