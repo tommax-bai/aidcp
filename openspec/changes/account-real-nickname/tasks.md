@@ -28,7 +28,7 @@
 
 - [ ] 4.1 `src/types/api.ts`：`PanelAccount` 加 `nickname: string | null`（APPEND）
 - [ ] 4.2 `src/components/AccountsTable.tsx`：账号列改 `r.nickname ?? r.label ?? r.accountId`
-- [ ] 4.3 `src/components/AccountTotalsTable.tsx`：账号列由原始 `accountId` 改为真名优先回落链。注意 `AccountTotals` 类型当前只有 `{accountId, totals}`，**没有 label/nickname 字段**——必须先在 totals 数据源（cloud `panel/queries.ts` 总表查询 join `accounts.nickname`）+ `AccountTotals` 类型上带出 `nickname`，渲染才能 `r.nickname ?? r.accountId`（`label` 不在此行，故不进此处回落链）
+- [ ] 4.3 `src/components/AccountTotalsTable.tsx`：账号列由原始 `accountId` 改为真名优先回落链。注意 `AccountTotals` 类型当前只有 `{accountId, totals}`，**没有 label/nickname 字段**——必须先在 totals 数据源（cloud `src/panel/panel-store.ts` 的 `todayTotalsByAccount` 总表查询 join `accounts.nickname`）+ `AccountTotals` 类型上带出 `nickname`，渲染才能 `r.nickname ?? r.accountId`（`label` 不在此行，故不进此处回落链）
 
 ## 5. 验证（协议红线 + 回归）
 

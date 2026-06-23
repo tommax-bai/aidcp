@@ -59,7 +59,7 @@ export interface AccountIdentityPayload {
 
 - `PanelAccount`（`../aidcp-console/src/types/api.ts:27`）新增 `nickname: string | null`。
 - `AccountsTable.tsx:18` 账号列：`r.nickname ?? r.label ?? r.accountId`。
-- `AccountTotalsTable.tsx:12` 账号列：由原始 `accountId` 改为真名优先回落。`AccountTotals`（`types/api.ts:55`）当前只有 `{accountId, totals}`，**无 label/nickname**——须先在 totals 查询（cloud `panel/queries.ts`）join `accounts.nickname` 并扩 `AccountTotals` 类型带出 `nickname`，渲染 `r.nickname ?? r.accountId`（此行无 `label`，不入回落链）。
+- `AccountTotalsTable.tsx:12` 账号列：由原始 `accountId` 改为真名优先回落。`AccountTotals`（`types/api.ts:55`）当前只有 `{accountId, totals}`，**无 label/nickname**——须先在 totals 查询（cloud `src/panel/panel-store.ts` 的 `todayTotalsByAccount`）join `accounts.nickname` 并扩 `AccountTotals` 类型带出 `nickname`，渲染 `r.nickname ?? r.accountId`（此行无 `label`，不入回落链）。
 - **为何回落链**：真名最优、其次运营 `label`、最后 `accountId` 兜底——保证无昵称账号仍可读，符合「不伪造」（NULL 时显示运营标识而非假名）。
 
 ## 协议四处同步清单（本 change 唯一协议改动方，逐项打勾后才算不漂移）
