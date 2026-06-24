@@ -23,5 +23,7 @@
 
 ## 4. 部署与收尾
 
-- [ ] 4.1 按 ECS 安全序列部署 cloud（备份 → rsync → 重启 → healthcheck → 失败回滚）；部署后 grep 关键文件内容 + 看新启动日志确认新码生效
-- [ ] 4.2 回写本仓 tasks 进度（commit-sha / 偏离说明）；`openspec validate return-to-feed-on-follow-block --strict` 通过后归档
+- [x] 4.1 已上线 ECS 并验证生效 <!-- 2026-06-24 deployed: 并发会话(token-usage)把含本修 7f59fbb 的干净 master HEAD 部署并重启(ActiveEnter 20:28:39 > 文件 mtime 20:18，运行进程已加载新码)。本会话已独立验证: ECS 上 role-dispatcher/back-to-feed/event-bus-types 三文件与本地干净 HEAD 快照 md5 逐字节一致; healthcheck 全绿(active running / 8787 listening / 飞书长连接已建立 / PG select 1 / 启动日志无错)。本会话未自行 rsync(避免与并发部署竞态覆盖)，仅先做了全量备份 cloud.bak.20260624-2032.tar.gz + .env.bak.20260624。co-ship 范围: return-to-feed + safety-quota(0010) + prompt-viewer + token-usage(迁移0013由其属主已跑、healthcheck绿)。 -->
+- [ ] 4.2 真机回归(task 3)后 `openspec validate return-to-feed-on-follow-block --strict` → 归档 <!-- task 3 真机回归未做，归档≠已验证(见 archived-unverified)，暂不归档 -->
+
+> 现状：代码+测试+评审+部署已完成且线上验证生效；仅剩 **task 3 真机回归**（重起干净边端连 ECS、复现一次「关注被风控拦截」、确认会话干净回到信息流不再卡主页）。
