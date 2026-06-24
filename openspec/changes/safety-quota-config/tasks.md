@@ -44,6 +44,17 @@
 - [ ] 5.5 cloud：`npm run test:acceptance`（安全红线全过：`AC-RISK-*` 绝不自残、`AC-PROTO-*` 协议不漂移——本 change 不动协议应天然不影响）→ 全量 `npm test` → `npm run typecheck`
 - [ ] 5.6 console：限额页 build/typecheck 通过；保存路径走 JWT、非乐观刷新
 
+## 7. 会话上限收口本层（范围追加 2026-06-24 用户决策；详细 schema 待 apply 时设计）
+
+> 见 proposal.md「范围补充」。把「单场会话上限」从人设（soul.session_limits）搬到安全限额层：按账号 + 三档可配、热加载、never-brick。死字段（session_limits 里除时长外的 max_likes/max_searches/… 当前无处读取）顺带清理。
+
+- [ ] 7.1 设计单场上限的存储形态（扩 `quota_config` 还是另立 `session_config`：单场时长 by tier + 单场互动预算 by (tier,action)），与日/分/时配额同源；写死默认（`session-budget.ts` `SESSION_LIMITS` + `freshBudget()` 现值）作 never-brick 回落
+- [ ] 7.2 cloud：单场时长上限接管 `max_duration_min` 来源 —— `role-dispatcher.ts` / `session-monitor-role.ts` 由读 `this.soul.session_limits` 改为读本层提供者（保留惰性解析的热加载形态）
+- [ ] 7.3 cloud：单场互动预算接管 `role-dispatcher.ts` `freshBudget()` 写死值 —— 改为按当前账号 / 档位从本层读取
+- [ ] 7.4 console：`/quotas` 页加单场上限编辑区（时长 + 单场互动预算），同样非乐观写
+- [ ] 7.5 配套 F 清理：人设（soul / persona）停止承载 `session_limits`——删除死字段或在人设页隐藏，`max_duration_min` 改由本层供给（与 F 协调，见 F design.md「留的缝」）
+- [ ] 7.6 验证：改单场上限即时生效（热加载）；缺值回落写死默认不 brick；人设页不再出现「能改却无效」的限额字段
+
 ## 6. 收尾与归档
 
 - [ ] 6.1 按 sub-repo 分节回写本 tasks.md 进度（`<!-- <repo> <sha> 备注 -->`）
