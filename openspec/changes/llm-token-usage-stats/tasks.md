@@ -48,13 +48,13 @@
 - [x] 6.1 cloud `npm run typecheck` 绿；console `npm run typecheck` + 生产 `npm run build` 绿（echarts 打包通过） <!-- c78b894 / 92a81bc -->
 - [x] 6.2 cloud 新增覆盖：成功记真实 token、**已计费但失败不清零**、真缺 usage 记 0、untagged/probe 缺省、flush 失败不抛进调用路径不二次累加、同/异维度聚合（test/qwen-token-usage.test.ts + test/token-usage-store.test.ts，9 用例全绿）；全量 `npm test` **640/640**（连跑 3 次稳定） <!-- aidcp-cloud c78b894 -->
 - [x] 6.3 cloud `npm run test:acceptance` **26/26**（AC-PROTO/PUB/RISK 不受影响——本流不碰协议/发布/风控） <!-- aidcp-cloud c78b894 -->
-- [ ] 6.4 console 本地起 `npm run dev` 目检 `/usage`：曲线 + 表渲染、角色中文标签、空态、筛选联动、时区显示（待真机/本地连 ECS 面板验证）
+- [~] 6.4 console `/usage`：接线已验（ECS nginx 8088=200、新包 index-CxyWaiW9.js、`/api/llm-usage` 未带 JWT=401 证明路由+代理+JWT 闸+tokenUsage 注入全通）；登录后视觉目检 + 出数待真机浏览流量 <!-- 接线已验, 视觉/数据待 7.5 -->
 
 ## 7. 收尾与部署
 
 - [x] 7.1 按 sub-repo 分节回写本 tasks.md 进度（cloud c78b894 / console 92a81bc） <!-- aidcp main 待提交 -->
 - [ ] 7.2 `openspec validate llm-token-usage-stats --strict` 通过（验证后提交本仓）
-- [ ] 7.3 cloud 按 CLAUDE.md §5 安全序列部署 ECS（先备份 → rsync → 迁移 0013 → restart → healthcheck：active + 8787 + 飞书长连 + PG `select 1` + `\d llm_token_usage` 确认表/PK/索引 + 「token 用量记账已就绪」日志）；部署前 dry-run surface scope（[[ecs-deploy-scope-full-master]]：会连带 master 上所有累积 WIP）——**待用户确认部署**
-- [ ] 7.4 console dist 构建 + rsync → `/opt/aidcp/console`（nginx 8088），登录后 `/usage` round-trip 验证——**待用户确认部署**
-- [ ] 7.5 真机验证：跑一段浏览闭环 → PG `llm_token_usage` 有真实行 → `/usage` 表格 + 曲线出数；探活记 `system:model_probe`
-- [ ] 7.6 `/opsx:archive` 归档（delta 合并进新 capability `openspec/specs/llm-token-usage-stats`）
+- [x] 7.3 cloud 按 §5 安全序列部署 ECS <!-- 2026-06-24 deployed。备份 cloud.bak.20260624-202639.tar.gz(572K,code) + .env.bak.20260624；dry-run surface scope=60 文件(c7abc67→7f59fbb 连带 safety-quota 0010+quota-config-store/risk* / return-to-feed back-to-feed/role-dispatcher / prompt-viewer persona / 本流 token-usage)；rsync(no --delete, exclude .env/node_modules/.git)；显式跑 0010+0013 迁移(status ok)；restart；healthcheck 全绿：active+8787 LISTENING+「token 用量记账已就绪（llm_token_usage）」+「安全限额存储已就绪」+面板8090+飞书长连接已建立；内容校验非仅信回执(grep server.ts tokenUsage=5/qwen usage capture=1/metrics dir 在 ECS)；psql \d llm_token_usage 确认 10 列+PK(bucket_start,account_id,role,model)+idx_account_bucket+全 BIGINT NOT NULL DEFAULT 0；PG select 1；quota_config 建表(空=回落默认)。isales :80=200 未碰。[[deploy-verify-content-after-rsync]] -->
+- [x] 7.4 console dist 构建 + rsync → `/opt/aidcp/console` <!-- 2026-06-24 deployed。fresh build→index-CxyWaiW9.js；rsync --delete(删旧 index-m0WYD_WH.js)；nginx 8088=200 serve 新包；/api/llm-usage 未带 JWT=401 unauthorized 证明路由+代理+JWT闸+tokenUsage 注入全通(非 404/503)。console master 92a81bc(含并发会话 RolesPage 等连带) -->
+- [ ] 7.5 真机验证：跑一段浏览闭环 → PG `llm_token_usage` 有真实行 → 登录 `/usage` 表格 + 曲线出数；探活记 `system:model_probe`（需边缘连上 + 浏览/调模型产生流量）
+- [ ] 7.6 `/opsx:archive` 归档（待 7.5 真机出数后；delta 合并进新 capability `openspec/specs/llm-token-usage-stats`）

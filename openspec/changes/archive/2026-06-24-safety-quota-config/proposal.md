@@ -45,13 +45,8 @@
 - **迁移号**：预留 `0010`（C=0009 / D=0010 / F=0011 / B=0012；本 change 为 D）。
 - **红线 / 保留**：风控状态单写（`setQuotaLevel` / `applySignal` / `risk_state`）不动；缺行 / 非法值绝不 brick；`canDo` 拒绝路径与「被拒不假成功 / 不扣 budget」语义不变。
 
-## 范围补充：会话上限收口本层（2026-06-24 用户决策）
+## 范围说明：会话上限收口已移出本 change（2026-06-24）
 
-起因：实装 stream F（account-persona-config）时发现「会话硬上限」`session_limits` 被放在人设（soul）里，但它是**限额 / 风控**性质、不是人设性质。用户拍板——**会话上限归本层（安全限额），不留在人设**；做本 change 时一并搬。
+曾计划把「会话硬上限」`session_limits`（单场时长 + 单场互动预算 `freshBudget()` 写死值）从人设搬进本安全限额层（用户决策：会话上限属限额/风控、不属人设）。**该工作已从本 change 移出、单开新 change 做**（用户决定单立一个 session-limits 迁移 change，不并入本归档）。本 change 归档范围 = **三档 × 动作 × 三窗口的日/分/时配额可配**（§1–6）。
 
-代码现状（坐实，供本 change 实装时参考）：
-- `soul.session_limits` 里**只有 `max_duration_min` 真在用**（`session-monitor-role.ts` 单场到点结束 + `role-dispatcher.ts` 节奏疲劳估算）；`max_likes` / `max_searches` / `max_collects` / `cooldown_between_actions_sec` **解析了但运行时无处读取——死配置**。
-- 真正卡「单场最多点几个赞 / 收藏 / 搜几次」的是 `role-dispatcher.ts` `freshBudget()` **写死的单场预算**（`{likes:10,collects:5,follows:3,searches:5,comments:2,comment_likes:3}`），既不来自人设也不来自风控档位。
-- `src/risk/session-budget.ts` 已有按档位的单场上限（`SESSION_LIMITS` conservative 15min/30动作…），但挂在 v1 兼容路径（`comm/handler.ts`），非现役事件驱动闭环。
-
-本 change 因此**扩容**：把「单场会话上限」也做成安全限额层的一部分——按账号 + 三档可配、热加载、never-brick，与日 / 分 / 时配额同源治理。具体覆盖：① 单场时长上限（接管 `max_duration_min` 的来源，取代人设里的那一项）；② 单场互动预算（接管 `freshBudget()` 写死值）。**配套**：人设侧（F）停止承载 `session_limits`——删除 / 隐藏死字段，`max_duration_min` 改由本层提供（见 F design.md「留的缝」）。详细 schema（是否扩 `quota_config` 还是另立 `session_config`）留本 change apply 时设计；写死默认仍作 never-brick 回落。
+决策与代码坐实（供新 change 参考）：`soul.session_limits` 里只有 `max_duration_min` 真在用（session-monitor 单场到点 + dispatcher 节奏疲劳）；`max_likes`/`max_searches`/`max_collects`/`cooldown` 解析了但运行时无处读取（死配置）；真正卡单场互动的是 `role-dispatcher.ts` `freshBudget()` 写死值；`src/risk/session-budget.ts` 有按档单场上限但挂 v1 兼容路径。详见 F design.md「留的缝」。
