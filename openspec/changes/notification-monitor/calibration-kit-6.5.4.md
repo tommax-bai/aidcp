@@ -154,3 +154,27 @@ Both confirmed. The `await evalRawFn<boolean>(...)` return value at line 1465 is
 10. `cd ../aidcp-edge && npm test && npm run test:acceptance && npm run typecheck` 与 cloud 同三件套全绿（含 `AC-PROTO-*` 两份 protocol.ts 不漂移）。
 
 > **说人话总结**：这是给你上真机前的「先别急着信、先验再修」清单。最要命的两件事——一是**通知页一断网就假报"没有未读/没有消息"还绕过自动重连**（红线级，必须先修），二是**6.5.3 修掉的那个"把品牌红图标误当未读红点"的老毛病，原样又藏在通知首页的三类计数里**（会让系统没未读也乱跳通知页、优先级全是假的）。另有"点一下就算清了未读但其实没验证""飞书里把整行文字糊成一团"等若干内容质量问题。我已把每个真 bug 的确切位置和改法、以及你能直接粘到浏览器跑的探针都列好；按清单跑完真机、确认并修完 7 类问题、测试全绿，6.5.4 才能勾掉。
+---
+
+## 6. 真机校准结果（2026-06-24，活页面 CDP dump 坐实）
+
+经 bot 专用 profile 的调试 Chrome + CDP 只读探针，真实 DOM 结构与最终选择器：
+
+**评论/@ 列表（「评论和@」tab）**
+- 行：`div.tabs-content-container > div.container`（每条一行）
+- 头像（**忽略**）：`a.user-avatar[href=/user/profile/]`（文本空 → 旧 `[class*="user"]`/`[class*="item"]` 在此误命中）
+- 昵称：`.user-info a`（own-text = 昵称）
+- 动作标签：`span`（评论了你的笔记 / 回复了你的评论 / 提到了你 → 定 kind）
+- 时间：`span.interaction-time`（「2天前」或日期「05-15」，**独立元素、不在正文里**）
+- 正文：`div.interaction-content`（回复型另有 `div.quote-info`=被引原评论，不取）
+- itemKey：行 `note-id` 属性（赞类行有、评论类无）→ 否则非 profile 链 → 否则留空走 `用户名|正文` 回退
+- 笔记标题：行内**无**该元素 → 不产出 noteTitle
+
+**首页 per-tab 未读**
+- 真实 tab：`div.reds-tab-item.tab-item`（激活态加 `.active`），结构 `> div.badge-container > span(标签) + div(角标数字)`；无未读时角标位 = 空注释槽 `<!---->`
+- 包裹容器（**排除**）：`reds-tabs-list` / `sticky-tab` / `tabs-content-container` 也含 `[class*="tab"]`、拼接文本=三标签 → tab 范围必须收到 `[class*="tab-item"]`（NM-2）
+- 入口整体角标：`a[href*="/notification"] .badge-container` 内图标 svg 之外的可见元素（6.5.3 判据，已验仍正确）
+
+**(c) 看一眼清未读**：点击分类 tab 后该 tab 角标 div 立即消失（变空槽）→ 「看一眼清未读」成立。
+
+**黄金验证**：生产 `buildNotificationItemsJs` 活页面抽 8 条评论全干净；`buildNotificationHomeJs` 有未读→`likes:1`、看一眼后→`0`、清空→全 0。落码 edge `6637c3b` / cloud `61af1b1`。
