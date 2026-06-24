@@ -50,6 +50,6 @@
 
 ## 8. 部署与真机验证
 
-- [ ] 8.1 cloud 迁移 `0014` + 按 §5 安全序列部署（备份→rsync→restart→healthcheck→失败回滚）；部署后 grep 关键文件确认新码生效、看新启动日志 <!-- gated：ECS 部署是显式动作 + co-ship 全量 master（含并发 multi-account WIP，当前其 typecheck 未净），需用户确认时机 -->
+- [x] 8.1 cloud 迁移 `0014` + 按 §5 安全序列部署（备份→rsync→restart→healthcheck→失败回滚）；部署后 grep 关键文件确认新码生效、看新启动日志 <!-- cloud 497d1bc 2026-06-24 deployed：用户「整包提交」决定 co-ship 并发 multi-account WIP 一起部署。备份 /opt/aidcp/cloud.bak.20260624-214703.tar.gz + .env.bak.20260624-214703；rsync src+migrations（无删除/无新依赖）；restart 新 pid 1521276；healthcheck 全绿（active+8787+飞书长连+面板8090+isales 未碰）；schema 经 init() 自动迁移（post_url ALTER + session_config）；grep 确认 post_url/resolveEdgeIdForAccount/result.postUrl/migration 0014 已生效。**重大注记**：co-shipped 多租户内核已激活且会拒绝无 accountId 的边缘握手——现网 edge 须以 AIDCP_ACCOUNT_ID 启动否则握手被拒、浏览闭环不起；部署时无 edge 在线、未观测到真实握手；回滚就绪（解包 cloud.bak 即回旧单租户码）。 -->
 - [ ] 8.2 真机：以非 `default` 账号发帖 → 历史显示真实账号 + 完整正文 + 可点开的小红书详情页链接；无在线节点账号触发 → 诚实失败 <!-- gated：需一台登录非 default 账号、声明 AIDCP_ACCOUNT_ID 的在线边缘节点 -->
 - [ ] 8.3 进度回写本仓 tasks.md（HTML 注释标 `<repo> <commit-sha>`，部署后追加 `<date> deployed`） <!-- 1-7 已回写本文件（cloud 497d1bc / edge 842ff30 / console 771378e）；部署后追加 deployed 注记 -->
