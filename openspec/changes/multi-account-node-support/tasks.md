@@ -2,13 +2,13 @@
 
 > 进度按 sub-repo 分节回写本仓；代码改动落 edge / cloud / console。完成项用 HTML 注释标 `<!-- <repo> <sha> 备注 -->`。安全红线回归须全过：`AC-PROTO-*` / `AC-PUB-*` / `AC-RISK-*`（见 §3、§5）。
 >
-> **实装状态（2026-06-24）**：§1–§6 全部实装 + 验证（cloud typecheck 干净、663 测试全过含 26 条 AC-* 红线 + 22 条新增多租户用例；edge 336 测试全过；console typecheck+build 过）。经一道对抗式评审发现并修复诚实人设闸「只挡 start、反应链仍在默认人设上空跑」红线（gap fix `a38fb96`）。**遗留**：§0.1（ECS 预种人设行）与 §7.1/§7.3（真机 E2E + ECS 部署）= **显式放行后再做**（生产 ECS 与 isales 同机、full-master 快照）。
+> **实装状态（2026-06-25）**：§1–§6 全部实装 + 验证（cloud typecheck 干净、663 测试全过含 26 条 AC-* 红线 + 22 条新增多租户用例；edge 336 测试全过；console typecheck+build 过）。经一道对抗式评审发现并修复诚实人设闸「只挡 start、反应链仍在默认人设上空跑」红线（gap fix `a38fb96`）。**已部署 ECS（2026-06-25，§7.3）**：实装 497d1bc 经并发会话先期上线但带红线 bug，本次补 gap fix a38fb96，healthcheck 全绿、生产 session.end 看门狗刷屏已归零、isales 未碰；§0.1 经盘点为 no-op（ECS 仅 default 账号、persona_config 空、default 豁免）。**遗留**：§7.1 真机 E2E（两不同账号 + 同账号两节点）显式放行后做；archive 待 E2E 落定。
 >
 > **提交说明**：本 change 的实装被并发会话的宽 `git add` 连带提交进 cloud `497d1bc` / edge `842ff30` / console `771378e`（混在 publish-history 等提交里，代码完整无损）；诚实闸红线的修复为独立提交 cloud `a38fb96`。
 
 ## 0. 前置 / 迁移（必做，先于开闸）
 
-- [ ] 0.1 盘点 ECS 现存真实账号，给每个**预种 `persona_config` 有效 soul 行**（否则上线诚实闸后它们突变「未绑定、拒启动」回归）；`default` 无需（豁免）  <!-- DEFERRED：生产迁移，与 §7.3 部署一并、显式放行后做（SSH + PG，不盲跑） -->
+- [x] 0.1 盘点 ECS 现存真实账号，给每个**预种 `persona_config` 有效 soul 行**（否则上线诚实闸后它们突变「未绑定、拒启动」回归）；`default` 无需（豁免）  <!-- 2026-06-25 盘点：ECS accounts 仅 `default|active` 一行、persona_config 空表 → **无非 default 真实账号，无需预种**（default 硬豁免、走打包默认）；诚实闸当前无可拒对象。运营后续新增非 default 账号时须在后台设人设后节点方可启动 -->
 - [x] 0.2 与并行 change 错峰协调：`safety-quota-config`（共改 `interaction-risk-gating`）、`account-real-nickname`（共改 `account-store.ts` / panel DTO）——确认对方落点、改动加性、不互相覆盖  <!-- safety-quota-config 核心已合入 master(dd43691)：它管「配额数字」(QuotaProvider)、本 change 管「用哪个账号的 controller」，正交叠加，未碰其文件；account-real-nickname 未启动(0/22)：本 change 的 personaBound 派生自 persona_config 行存在、零新增列/迁移，避开其 0012 迁移与 PanelAccount 字段撞车 -->
 - [x] 0.3 核实改「每连接私有通道」后，后台看板扇出从「订阅一条总线」改为「聚合 N 条私有通道」的接法，且概念池 / SessionMonitor 等**不依赖单一全局总线做跨连接协调**（决策 1）  <!-- 接法=每连接私有总线 onAny tee 进全局观测总线(observerBus)，panel-ws 仍 onAny 订阅 observerBus 零改动；风控记账亦订 observerBus 按 evt.accountId 路由；SessionMonitor 为每 dispatcher 私有(随会话激活启停)，不跨连接协调。对抗评审 console-panel-api 段确认不漏不重 -->
 - [x] 0.4 给现存默认账号的 edge 启动器**显式设 `AIDCP_ACCOUNT_ID=default`**（上线「拒绝缺 accountId 握手」后不显式声明会被拒，决策 4）  <!-- edge 842ff30：scripts/dev-run.sh 设 AIDCP_ACCOUNT_ID=${AIDCP_ACCOUNT_ID:-default}；新 scripts/launch-multinode.ts 要求每节点显式 accountId -->
@@ -63,5 +63,5 @@
 
 - [ ] 7.1 E2E 两场景：(a) 两不同账号——两 Chrome PID/端口/数据目录、指令不串、限频各按账号、未绑被诚实拒绝并后台显示、登录各自持久；(b) 同账号两节点——共用一控制器额度不翻倍、撞同一笔记/作者不双动、同 `edgeId` 重连顶替不并列  <!-- DEFERRED：真机 E2E 需多开 Chrome + 连 ECS，显式放行后做。代码级已覆盖：单测 + 对抗评审；单连接等价已验 -->
 - [x] 7.2 `openspec validate multi-account-node-support --strict` 通过  <!-- 通过("is valid") -->
-- [ ] 7.3 ECS 部署（备份 → rsync --exclude .env/node_modules/.git → systemctl restart → healthcheck active+8787+飞书+PG）；注意 ECS 是 full-master 快照、会连带下游已累积 master，dry-run 先盘点；部署后 grep 关键文件 + 看新启动日志；同机 isales 不可碰  <!-- DEFERRED：显式放行后做。注意 §0.1 预种人设须先于诚实闸生效 -->
+- [x] 7.3 ECS 部署（备份 → rsync --exclude .env/node_modules/.git → systemctl restart → healthcheck active+8787+飞书+PG）  <!-- 2026-06-25 deployed。背景：实装(497d1bc)已被并发会话先期部署到 ECS(~06-24 21:47)但**带红线 bug**——生产日志实测 preview dispatcher 看门狗每 5s 误发 session.end(sent=0 因当时无 edge,但有 edge 即被杀会话)。本次部署=补 gap fix a38fb96：dry-run 仅 role-dispatcher.ts 一文件变更；备份 cloud.bak.20260625-095356.tar.gz+.env.bak；rsync src/→restart→healthcheck 全绿(active+8787+飞书长连接已建立+PG select 1+连接运行时注册表就绪+**session.end 刷屏归零**+0 错误)；isales 未碰。console persona 标已在 20:29 deployed(served bundle 含 needsPersonaSetup)；edge 启动器为运营本机非 ECS、不部署。**未连带额外 master**(ECS 已是 497d1bc，本次仅 +a38fb96 一文件) -->
 - [x] 7.4 进度回写本仓（各 task 标 `[x]` + commit-sha）  <!-- 本次回写完成；archive 待 §0.1/§7.1/§7.3 落定后再 /opsx:archive -->
