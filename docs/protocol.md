@@ -383,7 +383,9 @@
 {
   "noteId": "n123", "title": "周末好去处", "content": "完整正文…",
   "author": "小张", "authorId": "u456",       // author / authorId 可选
-  "likeCount": 1234, "collectCount": 200
+  "likeCount": 1234, "collectCount": 200,
+  "authorFollowed": true                       // 可选：作者区关注按钮当下真实态（已关注/互关→true）。
+                                               // 边缘在 note.open 探测、只读取上报；云端据此在评估进主页前短路已关注作者。缺省→回退原流程。
 }
 ```
 
