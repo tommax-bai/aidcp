@@ -4,12 +4,12 @@
 
 ## 0. 前置验证（gated，先于动手）
 
-- [ ] 0.1 **成败手**：实地验证登录后能否可靠读出**稳定**账号 id（小红书 userid 类，非昵称）——确认读取位置（页面状态 / 个人主页链接 / cookie）与跨版本稳定性。**读不出即停、回到设计**，绝不退化成静默 default
+- [ ] 0.1 **成败手（已查实可行，降级为校准）**：核心已坐实——`browse-session.ts:1589` 早已用 `location.href.match(/\/user\/profile\/([A-Za-z0-9]+)/)` 抽作者 userid（URL 结构性、生产已验），登录探测又已定位到自己头像。**只需一次性现场校准**：确认导航栏自己头像 `href` = `/user/profile/<id>`，并选定"就地读 href"或"进我的主页读 URL"。读不出/不像 → 诚实失败，绝不退化成静默 default
 - [ ] 0.2 与并行 change 错峰协调：迭代 `multi-account-node-support` 的 D4（其 `persona-gated-session-start` / `chrome-instance-isolation` spec 未归档，对齐待其归档后做）；与 `account-real-nickname`（昵称=显示名）确认落点不撞
 
 ## 1. aidcp-edge — 身份确立（登录后读稳定 id）
 
-- [ ] 1.1 新增「登录后读出稳定账号 id」能力（CDP 读页面/cookie，与现有登录态探测同源）；**读不出诚实失败、不回落 default**
+- [ ] 1.1 新增「登录后读出稳定账号 id」能力：**复用** `extractAuthorProfile` 的 URL 正则 + `evalUrl`/`evalRaw` CDP 助手 + 登录探测已定位的自己头像；读 `href`（结构性）、**不读 cookie 当 id、不读 class 文本拼 id**；一并读昵称/小红书号作显示名；**读不出诚实失败、不回落 default**
 - [ ] 1.2 `main.ts` 身份来源改为登录后读出（`AIDCP_ACCOUNT_ID` 降级为**可选覆盖**：设了用之、未设走登录推导；覆盖值与真实 id 不一致时诚实告警）；保持「登录在前、握手在后」，握手携带真实 id
 - [ ] 1.3 节点初始化 ⇄ 身份确立分离：身份失效 → 退回**无身份态**、仅重跑身份确立（**不重启浏览器、不重分端口/目录**）
 - [ ] 1.4 身份持续校验：检测登出 / session 过期 / 同目录换登别的账号 → 退回无身份态、断连重连触发云端按新 id 重建（加节流，防抖动误退）
