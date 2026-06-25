@@ -1,70 +1,73 @@
 # Tasks — edge-own-chrome-supervised-recycle
 
 > 改动落 sub-repo(edge 为主 / cloud 仅回归测试),进度回写本仓。顺序遵循 design.md 迁移计划:**§1 看护杀进程模型修复(BLOCKER③)最先做**。
+>
+> 实装提交:edge `7b893cd`(核心:诚实下线/快判/杀进程确认/退出码/在途发布) + `a260588`(看护:杀进程模型/spawnNode/重起预算/测试,rebase 到已提交的 slot 模型 launcher);cloud `7af05da`(回归测试,零业务码)。验证全绿:edge full 360 + acceptance 11 + typecheck;cloud 回收回归 3 + 触及区 integration 11 + 该区 typecheck。
+> **迁移说明**:并发会话已将 launcher 从「按账号」重写为「按 slot(node-<n> profile,账号登录读出)」并提交;本 change 的看护逻辑 rebase 到该 slot 模型之上(spec「复用同一登录目录」不依赖命名,仍成立;原 design 的 `<accountId>-<n>` 命名以实际 `node-<n>` 为准)。
 
 ## 1. aidcp-edge — 看护进程杀进程模型修复(BLOCKER③,前置)
 
-- [ ] 1.1 改 `scripts/launch-multinode.ts` 子进程拉起方式:去掉 npm/shell 外壳层(直跑 tsx)或改进程组负 PID 信号,使停止/重起信号真正送达执行体而非只停在 `/bin/sh`(`launch-multinode.ts:97-102`)
-- [ ] 1.2 验证停止路径:看护进程 SIGINT/SIGTERM → 各子节点 `main.ts` shutdown 真正运行 → 真杀其独占 Chrome(`launch-multinode.ts:110-116`)
-- [ ] 1.3 加测试 / 手验:看护进程收到终止信号后 **零孤儿 edge 进程、零孤儿 Chrome 进程**,各节点调试端口与登录锁均释放(ps + 端口探测)
+- [x] 1.1 改 `scripts/launch-multinode.ts` 子进程拉起方式:直接 spawn tsx 执行体(去 npm/shell 外壳层)+ detached 自成进程组,停止/重起对整组发信号(`process.kill(-pid)`) <!-- edge a260588 -->
+- [x] 1.2 验证停止路径:整组信号必达执行体 `main.ts` shutdown → 真杀其独占 Chrome(killAndConfirmDead) <!-- edge a260588 7b893cd -->
+- [ ] 1.3 真机验:看护进程终止信号后零孤儿 edge / 零孤儿 Chrome(进程组级行为,**gated 真机**,单测覆盖不到)
 
 ## 2. aidcp-edge — 可重起单元与退出码契约
 
-- [ ] 2.1 从 `launch-multinode.ts:79-108` 抽出 `spawnNode(spec, i)`,按**固定 index i** 决定端口/登录目录/edgeId/accountId(重起复用同一槽位,勿用漂移的循环下标)
-- [ ] 2.2 在 `spawnNode` 内**快照冻结**每节点 env、并保持删除复用开关;重起时复用该快照,勿重新展开看护进程活动 env(防复用开关漂移泄漏,D10)
-- [ ] 2.3 参数化 `main.ts` shutdown(exitCode):真关机(SIGINT/SIGTERM)退 0=不重起;回收(终态)退非零=请重起(`main.ts:328-342`);保留 `shuttingDown` 幂等卫
+- [x] 2.1 抽出 `spawnNode(plan)`,按固定槽位(端口/目录/edgeId)决定参数,重起复用同一计划 <!-- edge a260588 -->
+- [x] 2.2 `spawnNode` 内**冻结 env 快照**、保持删除复用开关;重起复用快照不重新展开活 env(防漂移) <!-- edge a260588 -->
+- [x] 2.3 参数化 `main.ts` shutdown(exitCode):关机 0 / 回收非零(EXIT_RECYCLE=75);保留 shuttingDown 幂等卫 <!-- edge 7b893cd -->
 
 ## 3. aidcp-edge — 终态分类与诚实下线(BLOCKER① + 快判)
 
-- [ ] 3.1 在 page-WS 断连**进入有界重连之前**加浏览器进程级探测(GET /json/version)做终态快判:端口拒连=进程级终态→立即回收;探测通但页面 target 持续归零=终态→立即回收;否则走既有有界重连(D3,`client.ts:248-283` / `chrome-launcher.ts:159-171`)
-- [ ] 3.2 替换 `main.ts:316-319` 的 `cdp.unrecoverable` 处理:保留 `supervisor.stopAll()`,改为「诚实下线 + 回收 + 退出」入口
-- [ ] 3.3 诚实下线改异步:**await 边-云连接 `close` 事件(带 ~1-2s 上限)再 `process.exit`**,勿同步立即退出(BLOCKER①);`EdgeClient.close()` 返回可 await 的 Promise(`edge-client.ts:276-279`)
-- [ ] 3.4 加测试:终态时云端侧观察到的是**干净关闭(非超时/RST)**,掉线清理即时生效
+- [x] 3.1 进有界重连**之前**加终态快判(/json/version 进程级 + 页面 target):无可用 target 即立即放弃回收、不磨满重连 <!-- edge 7b893cd (client.ts classify + session.ts wiring), tested a260588 -->
+- [x] 3.2 替换 `cdp.unrecoverable` 处理为「诚实下线 + 回收 + 退出」入口(autoBrowse 与否都接) <!-- edge 7b893cd -->
+- [x] 3.3 诚实下线改异步:await 边-云连接 `close` 事件(有界~1.5s)再退,EdgeClient.closeAndWait <!-- edge 7b893cd -->
+- [x] 3.4 测试:closeAndWait 等真关闭后才 resolve + 超时兜底 <!-- edge a260588 test/client/edge-client-closewait.test.ts -->
 
 ## 4. aidcp-edge — 回收前确认旧浏览器真死(BLOCKER②)
 
-- [ ] 4.1 回收路径退出前:真杀本进程独占的 Chrome 后,**轮询调试端口探测到空**再退;优雅终止超时则升级 SIGKILL(D5,`chrome-launcher.ts:690-703`)
-- [ ] 4.2 确认屏障置于**仍活着的旧进程**内(勿依赖已退出进程或仅信 kill 返回值)
-- [ ] 4.3 加测试:端口/登录锁未释放时不退出(防新进程被 `clearStaleSingletonLock` 诚实拒启致烧光预算,`chrome-launcher.ts:239-244`)
+- [x] 4.1 ChromeInstance.killAndConfirmDead:杀后轮询端口探测到空再退;优雅 SIGTERM 超时升级 SIGKILL <!-- edge 7b893cd -->
+- [x] 4.2 确认屏障置于仍活着的退出中进程内(不依赖已退出进程/不仅信 kill 返回) <!-- edge 7b893cd -->
+- [x] 4.3 测试:SIGTERM 即释放→不升级;未释放→升级 SIGKILL 后确认;复用实例 no-op <!-- edge a260588 test/cdp/recycle-kill-confirm.test.ts -->
 
 ## 5. aidcp-edge — 看护重起预算 / 退避 / 诚实放弃(MAJOR⑥)
 
-- [ ] 5.1 `launch-multinode.ts:104-106` 改 log-only 为有界重起:**连续失败计数**(非墙钟滑动窗口)+ 指数退避;仅非零/异常退出重起,clean SIGINT/SIGTERM 不重起
-- [ ] 5.2 健康清零:节点重起后进入 ACTIVE 并健康存活 ≥ min-uptime 才把连续失败计数清零
-- [ ] 5.3 连续失败到上限 → **诚实放弃**:打可识别「已放弃」日志、留节点下线、不无限重起、兄弟节点不受影响
-- [ ] 5.4 收紧重起子进程登录等待到 ~30-60s(headless 无 TTY,登录态应秒级命中,否则按崩溃快速计入预算,`chrome-launcher.ts:497-532`)
-- [ ] 5.5 新增 env 配置:`AIDCP_EDGE_RESPAWN_MAX` / `_BACKOFF_BASE_MS` / `_MAX_MS` / 健康清零 min-uptime / 重起登录等待上限(读取有缺省、缺失不 brick)
+- [x] 5.1 重起决策收口纯函数 `respawn-policy.ts`:**连续失败计数**(非墙钟窗口)+ 指数退避;仅非零退出重起 <!-- edge a260588 src/supervise/respawn-policy.ts -->
+- [x] 5.2 健康清零:节点重起后健康存活 ≥ min-uptime 才把连续失败计数清零 <!-- edge a260588 -->
+- [x] 5.3 连续失败到上限 → 诚实放弃(日志 + 留下线,兄弟节点不受影响) <!-- edge a260588 -->
+- [x] 5.4 收紧重起子进程登录等待(launcher 注入 ~45s,main.ts 读 AIDCP_CHROME_LOGIN_TIMEOUT_MS 接 launchChrome) <!-- edge 7b893cd a260588 -->
+- [x] 5.5 新增 env 配置:RESPAWN_MAX / BACKOFF_BASE/MAX_MS / HEALTHY_UPTIME_MS / CHILD_LOGIN_TIMEOUT_MS(有缺省、缺失不 brick) <!-- edge a260588 -->
 
 ## 6. aidcp-edge — 回收 vs 真关机仲裁(MAJOR⑤)
 
-- [ ] 6.1 看护进程收到 SIGINT/SIGTERM 即置「正在关机」,`child.on('exit')` 期间**无条件抑制重起**(任意退出码,关机优先)
-- [ ] 6.2 边缘侧用 `recycleRequested` 标记,确保真终态即便终止信号撞入也以请重起码退出(勿被掩成 clean exit)
-- [ ] 6.3 加测试覆盖两种时序:关机先到(不误重起)/ 回收先到(不被掩成 clean exit)
+- [x] 6.1 看护进程收到信号即置 shuttingDown,`child.on('exit')` 期间无条件抑制重起(决策纯函数 stop 分支) <!-- edge a260588 -->
+- [x] 6.2 边缘 recycleRequested 标记,确保真终态即便信号撞入也以回收码退出 <!-- edge 7b893cd -->
+- [x] 6.3 测试:重起策略 shuttingDown/清零/退避/放弃多时序(respawn-policy.test.ts 8 例) <!-- edge a260588 -->
 
 ## 7. aidcp-edge — 在途发布回收契约(MAJOR④,选项 A)
 
-- [ ] 7.1 回收路径检测在途发布:若有未提交的发布在执行中,先把该次发布**诚实判失败**上报再退(让审批/通知侧看到失败而非半成品)
-- [ ] 7.2 确认/坐实「提交」是发布链最后一个不可逆动作,使回收发生在提交前不留半张帖
-- [ ] 7.3 验证新进程握手后 **MUST NOT 自动重放**断连前的在途发布 / 互动命令(复用既有「重连不重放半截动作」约束)
+- [x] 7.1 回收前检测在途发布 → 诚实判失败上报(关 WS 之前发,按 publish.result / publish.command.result 各自形状) <!-- edge 7b893cd -->
+- [x] 7.2 核实「提交」是发布链最后不可逆步:submit_publish 为最后一步(publish-post.ts:375 / publish-command-handlers.ts:209),之前不在平台留帖 <!-- edge 已核实 -->
+- [x] 7.3 验证新进程握手后不自动重放:发布为定向手动命令、云端不自动重发;浏览侧复用既有「重连不重放半截动作」约束 <!-- 设计保证 -->
 
 ## 8. aidcp-edge — 复用模式 / 独占断言(隔离)
 
-- [ ] 8.1 终态处理按「是否复用」分支:复用外部浏览器模式只**诚实下线 + 退出**,不尝试回收本进程不拥有的浏览器(`chrome-launcher.ts:593-618` 复用分支 kill 为空操作)
-- [ ] 8.2 回收能力节点断言本进程**自启并独占**浏览器;检测到复用开关泄漏到独占节点即拒回收并诚实失败(勿把空操作终止当成已回收)
-- [ ] 8.3 验证单机裸跑 `npm start` 终态只诚实退出一次、无看护重起(行为与多节点一致)
+- [x] 8.1 终态按 chrome.reused 分支:复用模式只诚实下线+退出,不回收外部浏览器(killAndConfirmDead no-op) <!-- edge 7b893cd, tested a260588 -->
+- [x] 8.2 回收路径独占判据:!chrome.reused 才杀+确认;复用即跳过(空操作不当成已回收) <!-- edge 7b893cd -->
+- [x] 8.3 单机裸跑终态只诚实退出一次、无看护重起(行为一致;单机无 supervisor) <!-- edge 7b893cd -->
 
 ## 9. aidcp-edge — 测试与回归
 
-- [ ] 9.1 单测:终态快判分类(端口死 vs 页面归零 vs 可重连)/ 诚实下线时序(等关闭再退)/ 回收前端口释放确认 / 看护重起预算+退避+诚实放弃 / 多节点回收隔离(回收 i 不碰 j)
-- [ ] 9.2 `npm run test:acceptance`(安全红线优先)→ 全量 `npm test` → `npm run typecheck` 全过
+- [x] 9.1 单测:终态快判分类 / 诚实下线时序 / 杀进程端口确认 / 重起预算+退避+诚实放弃(15 例全绿) <!-- edge a260588 -->
+- [x] 9.2 `test:acceptance`(11 绿,含 AC-PUB) → 全量 `npm test`(360 绿) → `typecheck`(绿)全过 <!-- edge a260588 -->
 
 ## 10. aidcp-cloud — 回归测试守不变量(零业务码改动)
 
-- [ ] 10.1 加回归测试:高频回收下同 edgeId 快速重连 → 干净掉线 teardown + 新握手 restartSession,**只活一个会话运行时**、`resolveEdgeIdForAccount` 解析到新连接、**不广播 session.end**(守 a38fb96 不变量,`ws-server.ts` / `role-dispatcher.ts` / `connection-runtime.ts`)
-- [ ] 10.2 `npm run test:acceptance` → 全量 `npm test` → `npm run typecheck` 全过(确认零业务码改动不破现状)
+- [x] 10.1 回归测试:回收(断连)拆除运行时 + 同槽位重连干净起新 + 回收一节点不广播结束给兄弟(a38fb96) + 同 edgeId 顶替收敛单运行时(3 例绿) <!-- cloud 7af05da test/integration/recycle-reconnect.test.ts -->
+- [x] 10.2 我的回归 3 绿 + 触及区 connection-runtime integration 11 绿 + 该区 typecheck 通过;**注**:cloud 全量 typecheck/test 当前被并发会话 publish-multi-image / model-provider WIP 半成品阻断(非本 change,我的区域干净) <!-- cloud 7af05da -->
 
 ## 11. aidcp(中控)— 校验与归档
 
-- [ ] 11.1 `openspec validate edge-own-chrome-supervised-recycle --strict` 通过
-- [ ] 11.2 sub-repo 任务全绿后,按 HTML 注释标 `[x]` 并记 commit-sha / 偏离说明
-- [ ] 11.3 全部完成 → archive(delta 合并进 `openspec/specs/`)
+- [x] 11.1 `openspec validate edge-own-chrome-supervised-recycle --strict` 通过
+- [x] 11.2 sub-repo 任务标 `[x]` + commit-sha 回写(本节)
+- [ ] 11.3 全部完成 → archive(delta 合并进 `openspec/specs/`)。**留待**:§1.3 真机零孤儿验证 gated;归档≠真机验证(参照债务台账惯例)
