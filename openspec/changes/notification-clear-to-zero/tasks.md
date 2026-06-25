@@ -31,7 +31,7 @@
 
 ## 6. 部署与收尾
 
-- [ ] 6.1 dry-run 暴露随附 master 增量范围（ECS 全量快照口径），向用户确认后再部署 <!-- gated：需显式部署授权 -->
-- [ ] 6.2 部署 cloud（先备份 → rsync `--exclude .env/node_modules/.git` → 重启 `aidcp-cloud.service` → healthcheck） <!-- gated -->
-- [ ] 6.3 部署后 grep 关键文件内容确认新码生效 + 看新启动日志（非仅信 rsync 回执） <!-- gated -->
-- [ ] 6.4 归档顺序：本 change 的 spec delta 依赖 `notification-monitor` 先归档；`openspec validate notification-clear-to-zero --strict` 通过后再 archive <!-- gated：notification-monitor 仍 active -->
+- [x] 6.1 dry-run 暴露随附 master 增量范围（ECS 全量快照口径），向用户确认后再部署 <!-- 06-25 ECS 实测处于 a38fb96（pre-change：lastHandledEpoch×6/categoryAttempts×0）→ 生产代码增量恰为 f9b2092 一笔（我的 5 src）；其余皆滞后 test/ 文件，不被 tsx src/server.ts 加载、无害 -->
+- [x] 6.2 部署 cloud（先备份 → rsync `--exclude .env/node_modules/.git` → 重启 `aidcp-cloud.service` → healthcheck） <!-- 06-25 备份 cloud.bak.20260625-104620.tar.gz + .env.bak.20260625 → rsync(az,excl env/nm/git/dist) → restart(ActiveEnter 10:47:54) → healthcheck 全绿：active running + :8787 监听 + 飞书长连接已建立 + PG(锚点缓存/RiskController PgRiskStore)就绪 + 无 error；isales 未碰 -->
+- [x] 6.3 部署后 grep 关键文件内容确认新码生效 + 看新启动日志（非仅信 rsync 回执） <!-- 06-25 grep 实测：session-context/gatekeeper lastHandledEpoch=0、triage incrementCategoryAttempts=1、categoryAttempts=7（新码已生效）；启动日志干净 -->
+- [ ] 6.4 归档顺序：本 change 的 spec delta 依赖 `notification-monitor` 先归档；`openspec validate notification-clear-to-zero --strict` 通过后再 archive <!-- gated：notification-monitor 仍 active；且等真机验收 5.3/5.4 后再归档 -->
