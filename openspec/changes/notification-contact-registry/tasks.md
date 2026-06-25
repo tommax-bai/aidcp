@@ -63,10 +63,10 @@
 
 ## 8. 部署 + 真机（gated，显式发布才做）
 
-- [ ] 8.1 ECS 跑迁移 0016；cloud 按 §5 安全序列部署（备份→rsync→restart→healthcheck，grep 新码确认生效）
-- [ ] 8.2 console 构建 + 部署到 8088（与 isales 隔离）
-- [ ] 8.3 真机校准：点赞/关注两栏 DOM 行结构 + 主页ID 解析校准（评论栏已校准、这两栏 best-effort 待真机 dump 收口）；验「同人同篇两评论 = 两行事件」
-- [ ] 8.4 真机 E2E：在某绑定账号触发真实 评论/点赞/关注 → 联系人页对应账号出现该人、原因/昵称/时间正确、加标签不改次数
+- [x] 8.1 ECS 跑迁移 0016；cloud 按 §5 安全序列部署 <!-- 2026-06-25 deployed。备份 /opt/aidcp/cloud.bak.20260625-155258.tar.gz(252K,code)+.env.bak.20260625-155258；部署范围实证=本流单 commit 5118a0b（git log f9b2092..5118a0b 仅一条、rsync itemize 仅 7 文件+0016）；rsync src/migrations(no --delete, exclude .env/node_modules/.git)；显式跑 0016（node_modules/.bin/tsx run-migration，status ok）；restart aidcp-cloud(新 pid 1527361)；healthcheck 全绿：active+8787/8090 LISTENING+「NotificationContactStore 已就绪」+「连接运行时多租户就绪」+飞书长连接已建立+面板路由 GET/PUT 401(route+proxy+JWT 闸通,非404)；内容校验非仅信回执(grep server.ts NotificationContactStore=11 + store 文件 12KB 在 ECS)；psql \d 确认两表+列(tags TEXT[] DEFAULT '{}'/wechat/sender_key/account_id)；投影 SQL 真机执行 0 行无错(GROUP BY/array_agg/LEFT JOIN 语法在该 PG 版本有效)。isales 4 服务 active+:80=200 全程未碰。[[deploy-verify-content-after-rsync]] -->
+- [x] 8.2 console 构建 + 部署到 8088（与 isales 隔离） <!-- 2026-06-25 deployed。fresh build→index-BXxMrUS9.js；rsync --delete(删旧 index-CxyWaiW9.js)；nginx 8088 root=200 / /notification-contacts SPA=200；served bundle==on-disk bundle==index-BXxMrUS9.js -->
+- [ ] 8.3 真机校准（gated，需真机浏览器/账号）：点赞/关注两栏 DOM 行结构 + 主页ID 解析校准（评论栏已校准、这两栏 best-effort 待真机 dump 收口）；验「同人同篇两评论 = 两行事件」
+- [ ] 8.4 真机 E2E（gated，需本地 edge 连 ECS + 真实账号浏览）：触发真实 评论/点赞/关注 → 联系人页对应账号出现该人、原因/昵称/时间正确、加标签不改次数
 
 ## 9. 收尾
 
