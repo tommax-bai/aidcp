@@ -23,3 +23,10 @@
 
 ## follow-already-followed-truthful-report（已关注真实回报）
 - [ ] 3.5（验证部分）真机观察一次 `already_followed` 如实上报 + 配额不扣
+
+## notification-contact-registry（通知联系人名册）—— 已部署 ECS（06-25），真机校准/E2E 未补
+代码级全绿（cloud 679/679+26/26、edge 326/326+11/11、console build；对抗评审 wiring+red-lines PASS）且**已部署上线**
+（cloud 5118a0b/edge 521dff0/console 00bd821，迁移 0016 + 页面在 8088，healthcheck 全绿）。归档（2026-06-25）≠真机已验。
+评论/@ 抽取沿用已校准选择器、上线即生效；点赞/关注两栏抽取为 best-effort、**未真机校准**。
+- [ ] 8.3 真机校准：「赞和收藏」「新增关注」两栏真实行 DOM dump → 收口 `buildNotificationCategoryItemsJs` 选择器 + 主页ID 解析；验「同人同篇两评论 = 两行事件」（前置：本地 edge 跑新码 + 真实账号）
+- [ ] 8.4 真机 E2E：绑定账号触发真实 评论/点赞/关注 → 联系人页对应账号出现该人、原因/昵称/时间正确、加标签不改互动次数
