@@ -41,5 +41,5 @@
 
 ## 6. 部署与真机验证（显式动作，按 §5 安全序列；gated）
 
-- [ ] 6.1 部署 `aidcp-cloud` 到 ECS（备份 → rsync → restart → healthcheck）；部署后 `grep` 关键文件确认新码生效（见 memory `deploy-verify-content-after-rsync`）
+- [x] 6.1 部署 `aidcp-cloud` 到 ECS（备份 → rsync → restart → healthcheck）；部署后 `grep` 关键文件确认新码生效（见 memory `deploy-verify-content-after-rsync`） <!-- cloud 755baa9 deployed 2026-06-25: clean-master rsync ECS 5118a0b→755baa9 仅本change(WIP排除); backup cloud.bak.20260625-233507; healthcheck全绿(active/8787/飞书长连接/PG stores就绪/新码grep确认COOLDOWN_MS×4·cooldownGate×8·below_comment_threshold×1/isales三服务未碰) -->
 - [ ] 6.2 真机一轮观察：互动密度明显下降（冷却生效——赞 ~2min 一次、关注 ~10min、评论 ~30min）；评论仅出现在高热度笔记（>1000 赞 & >300 收藏）；粗筛 / 点赞 / 进主页 / 关注更挑剔；全程无 `no_target` / 假成功
