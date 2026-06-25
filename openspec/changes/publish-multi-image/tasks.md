@@ -1,7 +1,7 @@
 ## 0. 实装前坐实（验证任务，未坐实前不下"无需新风控约束"结论）
 
 - [ ] 0.1 坐实发布命令序列执行期（多图 ≈ 张数×上传，数分钟）边缘浏览闭环看门狗 / `SessionMonitor` 是否对该 edge 暂停判活；若否，补"发布期看门狗豁免"约束（防 N 大被误判 idle 杀会话，见 CLAUDE.md §2 看门狗杀会话类 bug）
-- [ ] 0.2 坐实 张数×上传总时长是否落在同账号 N:1 多节点 `interaction-guard` 的 in-flight 去重/超时窗口内；若否，把窗口随发布动作放大
+- [ ] 0.2 确认发布路径仍在 `interaction-guard` 之外（已初步核：guard 仅接线浏览闭环 `role-dispatcher.ts:302`、发布路径零引用 → 去重窗口大概率不适用；实装时确认而非加固）
 
 ## 1. aidcp-cloud — 数据模型与迁移（types + publish-log-store + 0017）
 
@@ -16,7 +16,7 @@
 - [ ] 2.1 `prompts.ts`：拆两套提示词——选题（正文→张数+每张主题，业务语言）、配图指令（主题→一条万相 prompt）；抽出**固定风格基底**为模板常量（无文字/无真人/英文/统一风格），MUST NOT 由 LLM 产
 - [ ] 2.2 新增 `roles/image-set-planner.ts`（`ImageSetPlanner`）：watch `createdContent` → 写 `imageSetPlan`；张数 `clamp(1, AIDCP_PUBLISH_MAX_IMAGES≤9)`，降级朝"更少图"退（默认 1 张+通用主题），不调图源
 - [ ] 2.3 新增 `roles/image-prompt-composer.ts`（`ImagePromptComposer`）：watch `imageSetPlan` → 每主题一条各异 prompt + 共享风格基底，写 `imagePlan(imagePrompts[])`；去重护栏命中即丢但**永远保住第 0 张**（保证 `wantImage:true → ≥1`）；不调图源
-- [ ] 2.4 升级 `roles/image-generator.ts`：watch `imagePlan` 逐张顺序出图→累积成功 URL 进 `imageUrls`；**每张独立超时**（循环内 `Promise.race(generate, AIDCP_PUBLISH_PER_IMAGE_TIMEOUT_MS)`，单张超时只丢该张续下一张）；角色级总闸设为绝对兜底（≫ 张数×单图预算）且超时也用已累积构造产出、绝不清零已成功；失败那张不进数组（不补不复用）；订正 `:8` 陈旧"34×5=170s"注释为实际 18×5=90s
+- [ ] 2.4 升级 `roles/image-generator.ts`：watch `imagePlan` **并行**出图（`Promise.allSettled`，每张 `Promise.race(generate, AIDCP_PUBLISH_PER_IMAGE_TIMEOUT_MS)`），settle 后按规划顺序收成功 URL 进 `imageUrls`（[0]=封面位）；**每张独立超时**只丢该张不影响其余；并发上限 `AIDCP_PUBLISH_IMAGE_CONCURRENCY`；角色级总闸设 ≈ 每图超时+余量（wall-clock=max 非 sum）且超时也用已 settle 成功构造产出、绝不清零；失败那张不进数组（不补不复用）；订正 `:8` 陈旧"34×5=170s"注释为实际 18×5=90s
 - [ ] 2.5 两个新决策角色注册进 publish orchestrator（`publish-agent` 自有编排器，不动浏览/通知 35 角色）；接入 `role_config`（可后台按角色配模型/温度——选题配强模型、指令配便宜的）
 
 ## 3. aidcp-cloud — 封面与组装
@@ -28,13 +28,13 @@
 
 - [ ] 4.1 `roles/publish-executor.ts`：无图判据 `:212` 从 `!imageUrl` 改 `imageUrls.length===0`；下发 `:308-312` 改 `images: imageUrls` / `cover: imageUrls[0]`；落 `markImagesAttached(id, K)`；`roleTimeoutMs` 按张数上调（env，覆盖审批240s+张数×上传60s+余量）；`submit_publish` 成功后任何超时 MUST NOT 翻 `failed`
 - [ ] 4.2 `command-sequencer.ts`：all-or-nothing `imagesOk` 改为计数 `K`（真实上传成功条数）；**早停判据 `:178`** 从 `!imagesOk` 改 `K===0`（K≥1 即有效帖、照发 K 张）；`set_cover` skip 判据 `:183` 随之；**保持** set_cover 触发仅 `images.length>1`（本期不改）
-- [ ] 4.3 env 接线 + 充足默认：`AIDCP_PUBLISH_MAX_IMAGES`（默认 3、夹 ≤9）、`AIDCP_PUBLISH_PER_IMAGE_TIMEOUT_MS`；每图超时 > 单图轮询总预算
+- [ ] 4.3 env 接线 + 充足默认：`AIDCP_PUBLISH_MAX_IMAGES`（默认 3、夹 ≤9）、`AIDCP_PUBLISH_PER_IMAGE_TIMEOUT_MS`（每图超时 > 单图轮询总预算）、`AIDCP_PUBLISH_IMAGE_CONCURRENCY`（并发上限，默认=张数上限）
 
 ## 5. aidcp-cloud — 单测与回归（三向隔离 + 红线）
 
 - [ ] 5.1 `ImageSetPlanner` 单测（仅桩 LLM）：张数 clamp 边界、越界夹回、`wantImage:true→≥1`、降级朝更少图、不依赖图源
 - [ ] 5.2 `ImagePromptComposer` 单测（仅桩 LLM）：去重保住第 0 张、近似项丢弃不补不复用、不依赖图源
-- [ ] 5.3 `ImageGenerator` 单测（仅桩图源）：某张超时只丢该张续生成、**总闸超时返回已累积不清零**（反例红线）、失败那张不进数组不伪造、M=0 空产出
+- [ ] 5.3 `ImageGenerator` 单测（仅桩图源）：并行 `allSettled` 收集部分成功、某张超时只丢该张不影响其余、保序（[0]=封面位）、**总闸超时返回已 settle 不清零**（反例红线）、失败那张不进数组不伪造、M=0 空产出
 - [ ] 5.4 部分成功语义测：M≥1 发 M 张、M=0 诚实 failed、上传 K 计数记账、`images_attached_count` 等于真实 K、`submit_publish` 后不翻 failed
 - [ ] 5.5 封面 / 组装测：多图恒取首张、无图诚实空封面、`assembledContent` 含 `imageUrls`、`imageUrl` 派生=首张
 - [ ] 5.6 数据模型兼容测：旧路径读 `imageUrl` 拿首图零回归、迁移 0017 幂等可重入 + `images IS NULL` 兜底
@@ -52,7 +52,7 @@
 - [ ] 7.1 迁移 0017 上 ECS：先备份 → 应用 → 验 `images`/`images_attached_count` 列存在 + `images IS NULL` 已兜底
 - [ ] 7.2 全 master rsync 部署（先 dry-run surface scope，连带 master 累积改动）→ restart → healthcheck（active + 8787 + 飞书长连 + PG select 1）→ 失败回滚
 - [ ] 7.3 部署后 grep 关键文件确认新码生效 + 看新启动日志（不仅信 rsync 回执）
-- [ ] 7.4 真机 E2E：飞书 `/publish [accountId]` 触发，验多图真出图、逐张计时、M/K 记账、封面=成功序列首张、真帖多图上账号；edge"一命令一图"多图上传通道复用正确（edge 零改动）
+- [ ] 7.4 真机 E2E：飞书 `/publish [accountId]` 触发，验多图真出图（并行、wall-clock≈最慢单张）、M/K 记账、封面=成功序列首张、真帖多图上账号；edge"一命令一图"多图上传通道复用正确（edge 零改动）
 
 ## 8. 归档
 

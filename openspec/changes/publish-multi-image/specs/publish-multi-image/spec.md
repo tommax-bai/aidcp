@@ -32,21 +32,21 @@
 - **WHEN** 为 `ImagePromptComposer` 写单测
 - **THEN** 只需桩话术 LLM、无需桩图源；其依赖中不含 `ImageProvider`（决策/执行解耦红线）
 
-### Requirement: 逐张出图且每张独立计时绝不清零已成功图
+### Requirement: 并行出图且每张独立计时绝不清零已成功图
 
-配图生成角色 `ImageGenerator` SHALL 按 `imagePlan.imagePrompts` **逐张顺序**调图源生成，把成功的真实 URL 累积进 `imageDirective.imageUrls`。计时 SHALL **下沉到每张图**：每张图独立超时（env `AIDCP_PUBLISH_PER_IMAGE_TIMEOUT_MS`），某张超时 / 失败 SHALL 只丢该张、继续下一张，MUST NOT 把已成功生成的图整体清零。角色级总闸 SHALL 设为远大于 `N × 单图轮询预算` 的绝对兜底，且即便触发 SHALL 用"已累积 `imageUrls`"构造产出、MUST NOT 因总闸超时把已成功图丢弃。失败那张 MUST NOT 进入 `imageUrls`（不补空、不复用别张 URL）。
+配图生成角色 `ImageGenerator` SHALL 按 `imagePlan.imagePrompts` **并行**调图源生成（`Promise.allSettled`），全部 settle 后把成功的真实 URL 按**规划顺序**收进 `imageDirective.imageUrls`（[0] 为钩子图/封面位）。计时 SHALL **下沉到每张图**：每张独立超时（env `AIDCP_PUBLISH_PER_IMAGE_TIMEOUT_MS`），某张超时 / 失败 SHALL 只丢该张、不影响其余张，MUST NOT 把已成功生成的图整体清零。并发上限 SHALL 可经 env `AIDCP_PUBLISH_IMAGE_CONCURRENCY` 配置（防图源突发限流）。角色级总闸 SHALL 设为 ≈ 每图超时 + 余量（并行下 wall-clock 为最慢单张、非各张相加），且即便触发 SHALL 用"已 settle 的成功 URL"构造产出、MUST NOT 返回空产出丢弃已成功图。失败那张 MUST NOT 进入 `imageUrls`（不补空、不复用别张 URL）。
 
 #### Scenario: 部分图超时只丢该张、保留已成功
-- **WHEN** 逐张生成中第 k 张超时 / 失败，其余张成功
-- **THEN** `imageDirective.imageUrls` 含所有成功张的真实 URL、不含第 k 张，生成继续到末张，不因单张失败中断或清零
+- **WHEN** 并行生成中第 k 张超时 / 失败，其余张成功
+- **THEN** `imageDirective.imageUrls` 含所有成功张的真实 URL（按规划顺序）、不含第 k 张，不因单张失败清零或中断其余张
 
 #### Scenario: 红线——总闸超时清零已成功图（反例）
-- **WHEN** 任一实现把 N 张循环交给角色级总闸 `Promise.race`、总闸到点即返回空产出，丢弃已生成成功的 URL
-- **THEN** MUST 视为违规、不予合入（已成功图绝不被外层超时清零；超时须返回已累积结果）
+- **WHEN** 任一实现让角色级总闸 `Promise.race` 在 `allSettled` 结算前到点即返回空产出，丢弃已生成成功的 URL
+- **THEN** MUST 视为违规、不予合入（已成功图绝不被外层超时清零；总闸须 ≥ 每图超时 + 余量、超时也返回已 settle 结果）
 
 #### Scenario: 生成角色单测只桩图源
 - **WHEN** 为 `ImageGenerator` 写单测
-- **THEN** 只需桩图源、无需桩任何 LLM；逐张计时与累积逻辑可脱离真实图源验证
+- **THEN** 只需桩图源、无需桩任何 LLM；并行计时、保序累积、部分成功收集逻辑可脱离真实图源验证
 
 ### Requirement: 部分成功诚实发已成图全失败诚实失败并记真实附着数
 

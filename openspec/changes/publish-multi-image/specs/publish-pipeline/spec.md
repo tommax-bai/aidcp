@@ -2,7 +2,7 @@
 
 ### Requirement: 配图链路决策与执行解耦（ImagePlanner / ImageGenerator）
 
-配图链路 SHALL 拆为**三个**独立角色，决策与执行解耦、两类决策再分职：`ImageSetPlanner`（图集选题，**决策**）watch `createdContent` 决定要不要图 / 张数 / 每张主题 / 风格倾向，写新键 `imageSetPlan`；`ImagePromptComposer`（配图指令，**决策**）watch `imageSetPlan` 把每个主题翻成一条万相 prompt（共享固定风格基底），写键 `imagePlan`（`imagePrompts: string[]` / `imageStyle` / `imageCount` / `fallbackStrategy`）；`ImageGenerator`（**执行**）watch `imagePlan` 逐张调通义万相（复用现有 `WanxiangClient` / `ImageProvider`）生成 URL，写 `imageDirective`（`imageUrls: string[]`）。生图失败那张 `ImageGenerator` MUST 如实不计入 `imageUrls`（不补空、不复用上次 URL、不伪造）；全失败时按 `fallbackStrategy` 如实表示无图。两个决策角色（`ImageSetPlanner` / `ImagePromptComposer`）MUST NOT 调图源；只有 `ImageGenerator` 调图源。单个角色 MUST NOT 同时承担"配图决策"与"调图源生图"，且决策侧 MUST NOT 由一个角色同时承担"选题"与"话术指令"。
+配图链路 SHALL 拆为**三个**独立角色，决策与执行解耦、两类决策再分职：`ImageSetPlanner`（图集选题，**决策**）watch `createdContent` 决定要不要图 / 张数 / 每张主题 / 风格倾向，写新键 `imageSetPlan`；`ImagePromptComposer`（配图指令，**决策**）watch `imageSetPlan` 把每个主题翻成一条万相 prompt（共享固定风格基底），写键 `imagePlan`（`imagePrompts: string[]` / `imageStyle` / `imageCount` / `fallbackStrategy`）；`ImageGenerator`（**执行**）watch `imagePlan` **并行**调通义万相（复用现有 `WanxiangClient` / `ImageProvider`）生成 URL，写 `imageDirective`（`imageUrls: string[]`）。生图失败那张 `ImageGenerator` MUST 如实不计入 `imageUrls`（不补空、不复用上次 URL、不伪造）；全失败时按 `fallbackStrategy` 如实表示无图。两个决策角色（`ImageSetPlanner` / `ImagePromptComposer`）MUST NOT 调图源；只有 `ImageGenerator` 调图源。单个角色 MUST NOT 同时承担"配图决策"与"调图源生图"，且决策侧 MUST NOT 由一个角色同时承担"选题"与"话术指令"。
 
 #### Scenario: 选题、指令、生图分属三角色、各自可独立单测
 
@@ -14,10 +14,10 @@
 - **WHEN** `imagePlan.wantImage === false` 或 `imagePlan.imagePrompts` 为空
 - **THEN** `ImageGenerator` 不调图源，直接写 `imageDirective` 且 `imageUrls` 为空数组、`fallbackStrategy` 为 `imagePlan.fallbackStrategy`，如实表示"本帖无图"
 
-#### Scenario: 逐张生图失败如实不计入且不伪造
+#### Scenario: 单张生图失败如实不计入且不伪造
 
-- **WHEN** `imagePlan.wantImage === true`，逐张生成中某张 `imageProvider.generate` 返回空 URL / 抛错
-- **THEN** `ImageGenerator` 跳过该张（不进 `imageUrls`、不补空、不复用别张），继续其余张；最终 `imageUrls` 仅含真实成功 URL，全链不出现伪造图
+- **WHEN** `imagePlan.wantImage === true`，并行生成中某张 `imageProvider.generate` 返回空 URL / 抛错
+- **THEN** `ImageGenerator` 跳过该张（不进 `imageUrls`、不补空、不复用别张），其余张不受影响；最终 `imageUrls` 仅含真实成功 URL，全链不出现伪造图
 
 #### Scenario: 红线——生图失败谎报有图或决策角色调图源（反例）
 
