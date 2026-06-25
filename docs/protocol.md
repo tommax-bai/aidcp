@@ -94,8 +94,8 @@
 | `profile.open` | cloud → edge | 进入作者主页（专用指令，取代 `open_note{type:'profile'}`） |
 | `notification.open` | cloud → edge | 导航到通知首页（仅导航；落地后边缘上报 `notification.home`） |
 | `notification.browse_comments` | cloud → edge | 进「评论和@」+ 滚动加载 + 抽取（→ `notification.items`） |
-| `notification.browse_likes` | cloud → edge | 进「赞和收藏」（v1 看一眼清未读，不抽取） |
-| `notification.browse_follows` | cloud → edge | 进「新增关注」（v1 看一眼清未读，不抽取） |
+| `notification.browse_likes` | cloud → edge | 进「赞和收藏」（清未读 + 抽取点赞/收藏发送者 → `notification.items`） |
+| `notification.browse_follows` | cloud → edge | 进「新增关注」（清未读 + 抽取关注者 → `notification.items`） |
 | `notification.back_home` | cloud → edge | 返回通知首页（重报各类未读） |
 
 ### 2.4 结构化上报（v2 新增，edge → cloud，`RoleDispatcher` 消费）
@@ -108,7 +108,7 @@
 | `action.completed` | edge → cloud | 确认某个 action 执行完成 |
 | `notification.detected` | edge → cloud | 检测到「消息」有未读（仅信号；`epoch` 每次由无变有 +1，去重用） |
 | `notification.home` | edge → cloud | 通知首页各类未读快照（评论/赞收藏/关注计数，喂分诊） |
-| `notification.items` | edge → cloud | 上报本次巡视抽取的评论/@ 项（用户名/内容/笔记标题/itemKey；是否通知由云端判） |
+| `notification.items` | edge → cloud | 上报本次巡视抽取的通知项（`NotificationItem`：`kind`=comment/mention/like/collect/follow、`fromUser`昵称、`fromUserId?`主页ID稳定身份、`content`、`noteTitle?`、`itemKey?`；是否通知由云端判，发送者沉淀进通知联系人名册） |
 
 ### 2.5 风控预算与互动判定（v2 新增）
 
