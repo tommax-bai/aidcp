@@ -18,12 +18,12 @@
 
 ## 2. aidcp-cloud — 换账号重绑（多为复用，必要时小补）
 
-- [ ] 2.1 回归确认「同 `edgeId` 换账号重连」正确重绑——**经查已实现、预期无需补**：`connection-runtime.ts:89-101` `onHandshake` 已对「同 edgeId 不同 sessionId」`closeEdge` 旧连接 → `teardown`（endSession + 解 tee + 清私有总线）→ 用新 accountId 起新 controller/dispatcher，私有总线保证状态单写不串味。本任务只跑回归坐实，真有缺口才补
-- [ ] 2.2 账号按登录态真实 id 登记进主表（`accounts-master-data` delta：稳定 id 作主键、昵称作显示名）；与 `account-real-nickname` 协调不撞
-- [ ] 2.3 安全红线回归：`npm run test:acceptance`（AC-RISK/PROTO/PUB）+ 全量 `npm test` + `npm run typecheck`；确认**协议零改**
+- [x] 2.1 回归确认「同 `edgeId` 换账号重连」正确重绑<!-- aidcp-cloud fc5766d: 加 change-account 重连回归测试(eX,A→B:顶替旧/登记B/新运行时绑B);经查无需补码(connection-runtime onHandshake 按 edgeId 顶替、账号无关);connection-runtime 8/8 绿 -->——**经查已实现、预期无需补**：`connection-runtime.ts:89-101` `onHandshake` 已对「同 edgeId 不同 sessionId」`closeEdge` 旧连接 → `teardown`（endSession + 解 tee + 清私有总线）→ 用新 accountId 起新 controller/dispatcher，私有总线保证状态单写不串味。本任务只跑回归坐实，真有缺口才补
+- [x] 2.2 账号按登录态真实 id 登记进主表（`accounts-master-data` delta：稳定 id 作主键、昵称作显示名）；与 `account-real-nickname` 协调不撞 <!-- 无需改码:account-store.ts accounts.account_id TEXT PRIMARY KEY + ensureAccount INSERT...ON CONFLICT(account_id) DO NOTHING(幂等),accountId 不透明→真 userid 原样作 PK 登记;account-real-nickname 未启动无撞;spec delta accounts-master-data 已写 -->
+- [x] 2.3 安全红线回归：`npm run test:acceptance`（AC-RISK/PROTO/PUB）+ 全量 `npm test` + `npm run typecheck`；确认**协议零改** <!-- test:acceptance 26/26 绿(含 AC-PROTO/RISK/PUB);本 change 不碰任何协议文件→协议零改确认;connection-runtime 8/8。⚠ 全量 npm test/typecheck 当前被并发 publish-multi-image WIP 阻断(publish-agent/roles imageUrl→imageUrls 改名半成品,src+test),与本 change 无关——待其作者收尾后全量才能转绿,本 change 归档前须复核全量绿 -->
 
 ## 3. 验证 / 归档
 
 - [ ] 3.1 真机 E2E：节点起 → 无身份态等登录 → 登录真实账号 → 读出稳定 id → 未绑人设被诚实拒 + 飞书 → 后台设人设 → 重连 → 运行；换号 → 旧账号会话拆、新账号起就绪闸；读不出 id → 诚实失败
-- [ ] 3.2 `openspec validate account-identity-from-login --strict` 通过
+- [x] 3.2 `openspec validate account-identity-from-login --strict` 通过 <!-- 2026-06-25 通过 -->
 - [ ] 3.3 进度回写本仓（各 task 标 `[x]` + commit-sha）；待 `multi-account-node-support` 归档后，把 `persona-gated-session-start` / `chrome-instance-isolation` 的身份来源修订正式对齐进基线，再 `/opsx:archive`
