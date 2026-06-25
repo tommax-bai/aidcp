@@ -47,12 +47,14 @@ profile 换号场景：同一节点（同 edgeId、同用户数据目录）登�
 边缘：登录后读身份 → 用真实 id 当握手身份（取代 env 标签）；身份失效则退回无身份态重连。握手字段与时序不变。
 云端：经查实，`accountId` 在云端**全程是不透明字符串、无任何格式/形态校验**（仅查空）——handler 原样落连接、按连接运行时 / 风控控制器 / accounts 主表主键 / 人设存储全都直接消费它（`connection-runtime.ts`、`risk-controller.ts`、`account-store.ts`、`persona-store.ts`）。故把身份**来源**从 env 标签换成真 userid，对整条云端**透明**：协议零改、迁移零改、内核零改。云端**唯一需验证**的是"同 `edgeId` 换账号重连"经已部署的顶替机制正确重绑（拆旧账号会话、起新账号就绪闸）。
 
-### D8. 身份读取来源与定序（已查实，复用现成）
-经代码查实：边缘浏览时**早已在读这个 userid**——`browse-session.ts:1589` 用 `location.href.match(/\/user\/profile\/([A-Za-z0-9]+)/)` 抽作者 userid（URL 结构性、生产已验）；登录探测又**已定位到导航栏自己的头像**（`chrome-launcher.ts:409-415`），其 href 即 `/user/profile/<自己id>`。故读自己的 userid = 复用同一条正则、换个对象。读取来源按"结构性优先（DOM-first 漂移纪律）"定序：
-1. **导航栏自己头像的 `href`**（`/user/profile/<id>`，**结构性、就地读、不跳转**）—— 首选；
-2. **进"我的主页" → 读 `location.href`**（确定，但有一次跳转副作用）—— 兜底；
+### D8. 身份读取来源与定序（技术成立，但"读自己"的首选路径未坐实）
+**已坐实(代码证明)**：从 URL 抽 userid 的捕获正则 `location.href.match(/\/user\/profile\/([A-Za-z0-9]+)/)` 生产在用——`browse-session.ts:1619`（`extractAuthorProfile` 内，注意是 **1619 非 1589**；1589 只是 `url.includes('/user/profile/')` 渲染门），但它读的是 `location.href`，即**人已站在某个 `/user/profile/<id>` 页面上**才抽得到（作者 id 之所以成立，是浏览流程先导航进了作者主页）；另一处"从锚点 href 抽 id"在 `notification-monitor.ts:180`（`a[href*="/user/profile/"]` 上 `match(/\/user\/profile\/([^/?#]+)/)`）。
+**未坐实(设计假设)**：登录探测定位到的是 `chrome-launcher.ts:410` 的 `img[class*="avatar"]`——一个 **`<img>`、无 href**，且只回布尔 `hasAvatar`。"顶栏自己头像 href 即 `/user/profile/<自己id>`"**没有任何代码证明**：小红书顶栏头像可能是点开下拉菜单、未必裸露自己的 profile 锚点。故"就地读头像 href"是**待验证的优化路径**，不是已查实的首选。
+读取来源定序（**校准结论以 0.1 为准**）：
+1. **进"我的主页" → 读 `location.href` → 复用 `extractAuthorProfile:1619` 的正则**（**唯一被代码证明可行的路**：导航后 URL 必含自己的 id；代价=一次跳转）—— **首选**；
+2. **就地从顶栏 self-profile 锚点的 `href` 读**（结构性、不跳转）—— **仅当 0.1 验证到顶栏确有指向 `/user/profile/<自己id>` 的锚点时**才采用为优化；验不到即放弃此路、走 1；
 3. **不读 cookie 当 id**：`web_session`/`a1` 是会话/设备不透明 token、无可解 userid（这正是"cookie 值 ≠ 页面值"的来源）；**不读 class 文本拼 id**（改版即漂）。
-昵称/小红书号另读（DOM 文本即可），作显示名/副标识。读出的 userid 应**校验形态**（像不像那个 token），读不出/不像 → 诚实失败（D3）。
+昵称/小红书号另读（DOM 文本即可），作显示名/副标识。读出的 userid **必须过硬形态闸**（如 `/^[A-Za-z0-9]{20,}$/` 一类的真实 userid 形态），**不匹配即诚实失败**——因为云端对 accountId 故意零校验（D5），边缘这道形态闸是**防"非空但畸形 id"污染主表的唯一防线**。读不出/不匹配 → 诚实失败（D3）。
 
 ### D6. 启动器只分配节点槽位；env 标签降级为可选覆盖
 多节点启动器只分配**节点槽位**（端口 / 用户数据目录 / `edgeId`），**不再分配 accountId**；用户数据目录按 `node-<n>` 命名（账号未在登录前已知，是"谁登进这个槽位"的产物）。`AIDCP_ACCOUNT_ID` 保留为**可选显式覆盖**（预置/特殊场景）：设了则用它、不设则走登录推导。
@@ -62,22 +64,22 @@ profile 换号场景：同一节点（同 edgeId、同用户数据目录）登�
 
 ## Risks / Trade-offs
 
-- **[成败手——已查实可行，降级]** 稳定 id 读取：核心可行性已坐实（`browse-session.ts:1589` 早已用 URL 正则抽作者 userid、生产已验，自己只是换对象；登录探测已定位到自己头像）。**仅剩一次性现场校准**——确认导航栏自己头像的 `href` 是否就是 `/user/profile/<id>`。读不出/不像 → 诚实失败（不退化成静默 default）。
-- **[`default` 地雷]** 字面量 `default` 在云端约 15 处 + ws-server 兼容分支 + 面板 needsPersonaSetup 闸 + accounts seed 都当 catch-all/seed。**真 userid 万一读成空，绝不能塌回 `default`**（会把一个真账号并进大杂烩账号 = 跨账号污染）。守住"读不出即诚实失败、握手缺 id 即拒、绝不偷映射 default"。
+- **[成败手——技术成立，但"读自己"那条首选未坐实]** 已坐实的只是 **URL 抽 id 的正则**（`browse-session.ts:1619` 生产已验）和"导航进自己主页后 `location.href` 含自己 id"这条路；**未坐实**的是 design 原先主推的"就地读顶栏头像 href"——登录探测拿到的是无 href 的 `<img>`（`chrome-launcher.ts:410`），顶栏是否裸露 self-profile 锚点没有代码证明。故残余风险不是"校准 href 形态"而是"就地读这条到底存不存在"：**0.1 先验证；存在则当优化、不存在则跳转读 URL 为正式路径**。读不出/形态不匹配 → 诚实失败（不退化成静默 default）。
+- **[`default` 地雷]** 字面量 `default` 在云端 **63 处**（`?? 'default'` 热路径回落见 `server.ts:449/464`、`handler.ts:189/275`）+ ws-server 兼容分支 + 面板 needsPersonaSetup 闸 + accounts seed 都当 catch-all/seed。**真 userid 万一读成空，绝不能塌回 `default`**（会把一个真账号并进大杂烩账号 = 跨账号污染）。**已有两道闸守住**：① 边缘读不出即诚实失败、绝不空 id 握手；② 云端握手层独立拒空——`connection-runtime.ts:80-87` `onHandshake` 在 accountId 空时 `return { ok:false, code:'missing_account_id' }`（注释原文"绝不偷映射成 default 开跑"），`handler.ts:307-319` 接为拒握手、不建会话；那些 `?? 'default'` 都在**已验证身份之后**的事件兜底，不是空 id 跑 default 的口子。**真正剩的尖角=非空但畸形的 id 能同骗两闸**（云端故意零校验、任何非空都收）——唯一防线是 D8 的边缘硬形态闸。
 - **[换号重绑残窗] profile 换登别的账号** → 身份翻转期间若云端未及时拆旧账号会话，可能短暂串账号。缓解：身份失效即退回无身份态、断连重连触发云端按新 id 重建运行时（状态单写）。
 - **[env 覆盖误用] 显式覆盖与实际登录不一致** → 又回到错配。缓解：覆盖是逃生阀、默认登录推导；可在边缘对"覆盖值 ≠ 读出的真实 id"诚实告警。
 - **[无身份态可观测性弱] 节点已连未登录在后台看不见** → v1 接受（无身份不上报、不占账号视图）；后续如需"节点已上线待登录"再补。
 
 ## Migration Plan
 
-1. **校准 id 读取**（apply 第一项）：核心已查实可行（复用 `browse-session.ts:1589` 的 URL 正则 + 登录探测已定位的自己头像）；只需一次性现场确认"自己头像 href = `/user/profile/<id>`"，再选定"就地读 href" 或 "进我的主页读 URL"。
-2. **边缘改造**：登录后读身份 → 握手用真实 id；env 降级为可选覆盖；身份失效退回无身份态重连；启动器改按节点槽位。
-3. **云端**：确认"同 edgeId 换账号重连"正确重绑（多为复用，必要时小补）。
+1. **校准 id 读取**（apply 第一项）：技术核心已查实（`extractAuthorProfile:1619` 的 URL 正则）；**待定的是"就地读头像 href"是否存在**——先验证顶栏有无 self-profile 锚点，有则当优化、无则定"进我的主页读 `location.href`"为正式路径（见 D8）。一并定形态闸正则。
+2. **边缘改造**：登录后读身份 → 握手用真实 id；env 降级为可选覆盖；身份失效退回无身份态重连；启动器改按节点槽位。**注意目录改名代价**：启动器用户数据目录从 `<base>-<accountId>-<n>` 改为 `node-<n>`（任务 1.5），会让**现有已登录 profile 按旧名找不到、被迫重新扫码**；cutover 须接受这次一次性重登，或为存量节点保留旧目录名/做一次目录迁移。
+3. **云端**：经查**已实现、无需补**——`connection-runtime.ts:89-101` `onHandshake` 已对"同 edgeId 不同 sessionId"`closeEdge` 旧连接→`teardown`（endSession+解 tee+清私有总线）→用新 accountId 起新 controller/dispatcher，私有总线保证不串味。2.1 只是回归确认。
 4. **平滑性**：当前 ECS 仅 `default` 账号、persona_config 空——新模型上线后，节点登录真实账号即按真实 id 登记进主表、过就绪闸（未绑→飞书叫人去后台设人设）。现有"default 节点"可用 env 覆盖 `AIDCP_ACCOUNT_ID=default` 继续工作。
 5. **回滚**：边缘身份来源可回退为纯 env 标签（保留覆盖路径即天然回滚阀）。
 
 ## Open Questions（待 apply 时定）
-1. ~~稳定 id 读取位置~~ **已查实**（见 D8）：首选导航栏自己头像 `href`（`/user/profile/<id>`，就地读、复用现成正则），兜底进我的主页读 URL，不读 cookie/class。仅剩一次性现场校准 href 形态。
+1. ~~稳定 id 读取位置~~ **部分查实**（见 D8）：URL 抽 id 的正则已坐实；**待 0.1 验证**"就地读顶栏头像 href"是否存在——存在当优化、否则以"进我的主页读 `location.href`"为正式路径。不读 cookie/class。一并定形态闸正则。
 2. env 覆盖：保留为长期逃生阀，还是仅过渡期保留、后续移除？（倾向保留，因预置/回滚有用。）
 3. 身份失效的检测口径与节流（多久判一次、连续几次判失效才退回），避免抖动误退。
 4. profile 换号重绑：靠"断连重连"还是新增一条"身份变更"内部信号（倾向断连重连，零协议改动）。
