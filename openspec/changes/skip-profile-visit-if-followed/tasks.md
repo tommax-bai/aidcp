@@ -21,7 +21,7 @@
 
 - [x] 4.1 两仓 `npm run typecheck` → `test:acceptance`（AC-PROTO 不漂移）→ `test` <!-- edge: typecheck 绿 + acceptance 11/11 + full 362/362。cloud: 受并发 WIP（publish-multi-image/session-limits 未编译）阻塞、无法全量绿；本改动 my-files type-clean，scoped 全绿：AC-PROTO 5/5、author-evaluator + role-dispatcher 集成 + profile-opener + back-to-feed 42/42、agents+integration 全量 185/185 -->
 - [x] 4.2 按 sub-repo 分节回写本 tasks.md 进度（`<!-- <repo> <commit-sha> 备注 -->`） <!-- 本次 -->
-- [ ] 4.3 `openspec validate skip-profile-visit-if-followed --strict` 通过
-- [ ] 4.4 cloud 改动按 §5 安全序列部署 ECS（含 healthcheck/回滚），部署后追加 `<!-- <date> deployed -->`
+- [x] 4.3 `openspec validate skip-profile-visit-if-followed --strict` 通过 <!-- "Change 'skip-profile-visit-if-followed' is valid" -->
+- [x] 4.4 cloud 改动按 §5 安全序列部署 ECS（含 healthcheck/回滚），部署后追加 `<!-- <date> deployed -->` <!-- aidcp-cloud d84de12 2026-06-26 deployed：ECS 原在 c1e00b0，仅本改动为运行时 delta；外科 rsync 4 src 文件（clean export，未带并发 WIP，ECS sessionLimitProvider=0 已验）；备份 cloud.bak.20260626-094923.tar.gz + .env.bak.20260626-094923；healthcheck 全绿（active/NRestarts=0/8787/飞书长连接 onReady/PG select 1/无启动错误）；新码 grep 实测生效（role-dispatcher authorFollowed=1） --> <!-- 2026-06-26 deployed -->
 - [ ] 4.5 真机确认：打开一篇已关注作者的笔记 → 互动后不再进主页/不再尝试关注（日志无 profile.open / follow）
 - [ ] 4.6 `/opsx:archive` 归档（delta 合并进 `openspec/specs/author-profile-visit`）
