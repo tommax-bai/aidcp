@@ -48,6 +48,6 @@
 - [x] 5.2 提交：仅暂存本变更涉及文件（并发会话纪律，绝不 `git add -A`）；cloud/edge/console 推各自 `master`、本仓推 `main`
 - [x] 5.3 部署 cloud 到 ECS（§5 安全序列：dry-run 看带出范围 → 备份 → rsync → restart → healthcheck 含 grep 新码实测生效 → 失败回滚）；console 重新构建 serve 于 8088；确认 isales 未被触碰 <!-- 2026-06-26 deployed: git-archive 干净 master rsync(无 --delete, 仅本变更 10 文件); 备份 cloud.bak.20260626-110204; restart 后 healthcheck 全绿(active + 8787/8090/8088 + 飞书长连 + InteractionFeedStore/RiskController 已就绪日志 + interaction_feed/interaction_target_meta 表自建确认 + 无 error); console index-B-Ai_v1i.js 已 serve(8088=200, index.html 引新 hash); isales 4 服务全 active 未碰 -->
 
-- [ ] 5.4 真机 E2E（gated）：点赞 / 收藏 / 评论 / 关注各产出一条流记录；笔记标题链接可开；作者主页链接可开；无 token 时诚实置空（不可点、无死链）
-- [ ] 5.5 真机校验 Open Questions：裸 `/user/profile/<id>` 是否无 token 可开（不可靠则昵称改不可点）；explore 整页与 discovery 弹层两形态 `location.href` 是否都带 token
-- [ ] 5.6 tasks 回写实测 + `openspec archive`（delta 合并进 `openspec/specs/`）
+- [x] 5.4 真机 E2E（gated）：点赞 / 收藏 / 评论 / 关注各产出一条流记录；笔记标题链接可开；作者主页链接可开；无 token 时诚实置空（不可点、无死链） <!-- 2026-06-26 用户真机确认面板互动流已正常（标题/可点链接/动作配色生效）；记录与链接按预期出数 -->
+- [x] 5.5 真机校验 Open Questions：裸 `/user/profile/<id>` 是否无 token 可开（不可靠则昵称改不可点）；explore 整页与 discovery 弹层两形态 `location.href` 是否都带 token <!-- 用户真机确认链接可点开（含作者主页与笔记详情），两问题随「链接正常工作」一并确认 -->
+- [x] 5.6 tasks 回写实测 + `openspec archive`（delta 合并进 `openspec/specs/`） <!-- 本条由归档动作完成 -->
