@@ -34,7 +34,7 @@
 
 ## MODIFIED Requirements
 
-### Requirement: API 密钥按厂商加密落库，明文绝不外泄
+### Requirement: API 密钥加密落库，明文绝不外泄
 
 系统 SHALL 把**各文本厂商**的 API 密钥经认证加密（AES-256-GCM）后落 PostgreSQL `provider_credentials`（`PK(provider, field)`，存密文 + iv + authTag + 写时算好的掩码提示），主加密密钥 MUST 来自环境变量 `AIDCP_CRED_KEY`、MUST NOT 入库 / 入仓 / 写日志。写凭据接口 SHALL 接受 `(provider, field, value)`，且 `(provider, field)` MUST 命中由 provider 注册表派生的白名单（如 `dashscope:dashscope_api_key`、`volcengine:volcengine_api_key`），未命中 MUST 诚实拒绝（非静默忽略）。任何读路径 MUST NOT 返回明文密钥，只返回每厂商的「是否已配置 + 掩码提示 + 来源」。
 
@@ -50,7 +50,7 @@
 - **WHEN** 请求 `GET /api/config/model`
 - **THEN** 返回的每厂商凭据字段只含 `configured` / `maskedHint` / `source`，绝不含明文密钥
 
-### Requirement: 模型名与文本厂商可配且运行时热加载，密钥变更重启生效
+### Requirement: 模型名可配且运行时热加载，密钥变更重启生效
 
 文本模型名、**全局文本厂商**（`text_provider`）与图片模型名 SHALL 落 PostgreSQL 单行配置（缺省回退云端代码默认值），文本 LLM 客户端 MUST 在调用时从共享内存配置解析当前模型名与 provider，使 `PUT /api/config/model` 后**无需重启即生效**（热加载）。各厂商 API 密钥变更 SHALL 在下次进程启动时被捕获生效（重启生效），前端文案 MUST 诚实告知此差异。图片模型名 SHALL 钉死走 DashScope（万相），MUST NOT 经文本 provider 解析路由。
 
