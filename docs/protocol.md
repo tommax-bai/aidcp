@@ -384,14 +384,19 @@
   "noteId": "n123", "title": "周末好去处", "content": "完整正文…",
   "author": "小张", "authorId": "u456",       // author / authorId 可选
   "likeCount": 1234, "collectCount": 200,
-  "authorFollowed": true                       // 可选：作者区关注按钮当下真实态（已关注/互关→true）。
+  "authorFollowed": true,                      // 可选：作者区关注按钮当下真实态（已关注/互关→true）。
                                                // 边缘在 note.open 探测、只读取上报；云端据此在评估进主页前短路已关注作者。缺省→回退原流程。
+  "url": "https://www.xiaohongshu.com/explore/n123?xsec_token=…"
+                                               // 可选（change interaction-feed-enrichment）：带 xsec_token 的详情页链接，供面板「按笔记互动」可点跳转。
+                                               // 诚实置空：地址栏无 token 时不带、绝不用裸 id 拼假链。
 }
 ```
 
 **`profile.detail`**——上报作者主页数据
 ```jsonc
-{ "authorId": "u456", "postsCount": 87, "followersCount": 12000, "extracted": true }
+{ "authorId": "u456", "postsCount": 87, "followersCount": 12000, "extracted": true,
+  "nickname": "小张",                          // 可选（change interaction-feed-enrichment）：主页真实昵称，供面板关注记录显示真名；抓不到则置空。
+  "url": "https://www.xiaohongshu.com/user/profile/u456" } // 可选：作者主页链接，供面板关注记录可点跳转；抓不到则置空。
 // extracted:false → 进了主页但未抽到数字；云端 FollowAgent 据此保守 skip，不当作真 0 粉丝
 ```
 
