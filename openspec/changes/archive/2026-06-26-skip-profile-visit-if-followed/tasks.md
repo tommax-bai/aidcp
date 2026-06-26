@@ -23,5 +23,6 @@
 - [x] 4.2 按 sub-repo 分节回写本 tasks.md 进度（`<!-- <repo> <commit-sha> 备注 -->`） <!-- 本次 -->
 - [x] 4.3 `openspec validate skip-profile-visit-if-followed --strict` 通过 <!-- "Change 'skip-profile-visit-if-followed' is valid" -->
 - [x] 4.4 cloud 改动按 §5 安全序列部署 ECS（含 healthcheck/回滚），部署后追加 `<!-- <date> deployed -->` <!-- aidcp-cloud d84de12 2026-06-26 deployed：ECS 原在 c1e00b0，仅本改动为运行时 delta；外科 rsync 4 src 文件（clean export，未带并发 WIP，ECS sessionLimitProvider=0 已验）；备份 cloud.bak.20260626-094923.tar.gz + .env.bak.20260626-094923；healthcheck 全绿（active/NRestarts=0/8787/飞书长连接 onReady/PG select 1/无启动错误）；新码 grep 实测生效（role-dispatcher authorFollowed=1） --> <!-- 2026-06-26 deployed -->
-- [ ] 4.5 真机确认：打开一篇已关注作者的笔记 → 互动后不再进主页/不再尝试关注（日志无 profile.open / follow）
-- [ ] 4.6 `/opsx:archive` 归档（delta 合并进 `openspec/specs/author-profile-visit`）
+- [x] 4.5 真机确认：打开一篇已关注作者的笔记 → 互动后不再进主页/不再尝试关注（日志无 profile.open / follow） <!-- 2026-06-26 真机验收 PASS（本地 edge 连 ECS d84de12）：已关注作者「飞轮」笔记 6a2c1ab7 → edge note.detail 带 [已关注] → 云端 content_curator/comment_reviewer/interaction_appraiser 照常→互动(like)后 author_evaluator **未调 LLM**、直接 back 返回 feed，全程**无 profile_open、无 follow**。对照：未关注「克劳得Everything」author_evaluator 调 LLM→skip；未关注「九棵树」author_evaluator→visit→profile_open→follow（原路径保留）。三态齐验 -->
+- [x] 4.6 `/opsx:archive` 归档（delta 合并进 `openspec/specs/author-profile-visit`） <!-- 2026-06-26 archived -->
+
