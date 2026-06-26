@@ -9,7 +9,9 @@
 
 - [x] 1.1 改 `scripts/launch-multinode.ts` 子进程拉起方式:直接 spawn tsx 执行体(去 npm/shell 外壳层)+ detached 自成进程组,停止/重起对整组发信号(`process.kill(-pid)`) <!-- edge a260588 -->
 - [x] 1.2 验证停止路径:整组信号必达执行体 `main.ts` shutdown → 真杀其独占 Chrome(killAndConfirmDead) <!-- edge a260588 7b893cd -->
-- [ ] 1.3 真机验:看护进程终止信号后零孤儿 edge / 零孤儿 Chrome(进程组级行为,**gated 真机**,单测覆盖不到)
+- [x] 1.3 真机验:看护进程 SIGTERM 后零孤儿 edge / 零孤儿 Chrome、端口释放——已真机通过(06-26, 隔离 9300/9301+headless+不连云;2 节点各起 Chrome→SIGTERM→两节点 code=143 整组退出、不重起、9300/9301 全 FREE、零残留;连带实锤 §1.1 进程组杀达执行体 + §6.1 关机优先抑制重起) <!-- real-machine verified 2026-06-26 -->
+
+> §1.3 真机零孤儿验证 PASS(06-26):看护日志「收到 SIGTERM,停止全部节点(关机优先、不再重起)」→ 两节点 code=143(信号达执行体)→ 零孤儿、端口释放。**唯一仍 gated 的是「登录态真账号连云的完整回收 E2E」**(需 live 节点 + prod 云端,改动 prod,显式放行才做);核心进程模型/关机仲裁已真机坐实。
 
 ## 2. aidcp-edge — 可重起单元与退出码契约
 
