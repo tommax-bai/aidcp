@@ -72,4 +72,6 @@
 
 - [x] 11.1 `openspec validate edge-own-chrome-supervised-recycle --strict` 通过
 - [x] 11.2 sub-repo 任务标 `[x]` + commit-sha 回写(本节)
-- [ ] 11.3 全部完成 → archive(delta 合并进 `openspec/specs/`)。**留待**:§1.3 真机零孤儿验证 gated;归档≠真机验证(参照债务台账惯例)
+- [x] 11.3 全部完成 → archive(delta 合并进 `openspec/specs/`,06-26)。§1.3 真机零孤儿已验证;**唯一仍 gated**=登录态真账号连云的完整回收 E2E(动 prod,显式放行才做),记入债务认知(归档≠完整 E2E) <!-- archived 2026-06-26 -->
+
+> **归档时已验证**:代码三仓全绿(edge full 360+acc 11+tc / cloud 回收回归 3+integration 11);真机零孤儿 + 进程组杀 + 关机优先抑制重起 PASS(本仓 88fc77c)。**遗留(显式放行才做)**:登录态真账号、连生产云端的完整回收 E2E。
