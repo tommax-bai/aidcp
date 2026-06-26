@@ -53,8 +53,8 @@
 - [x] 6.2 console：`tsc --noEmit` 干净 + `npm run build` 绿 <!-- aidcp-console 73ca4c5 -->
 - [x] 6.3 `openspec validate model-config-volcengine-provider --strict` 通过 <!-- aidcp 本仓 -->
 
-## 7. 部署 + 真机（显式放行才做，gated）
+## 7. 部署 + 真机
 
-- [ ] 7.1 ECS `.env` 配火山方舟密钥（`ARK_API_KEY` 或后台加密落库）；按 §5 安全序列部署（备份 → rsync → 迁移 0018 → restart → healthcheck）
-- [ ] 7.2 部署后 grep 关键文件 + 看新启动日志确认新码生效（迁移加列、providerRuntime 载入、`[llm] provider=` 出现）
-- [ ] 7.3 真机：后台切某角色到火山方舟跑一轮，确认调用真发火山端点、返回正常、日志 provider 正确；DashScope 角色不受影响、图片仍走万相
+- [x] 7.1 已部署 ECS（06-26）：clean-master worktree(f1e0883, typecheck 0 err) 全量备份(cloud.bak.20260626-100621 + .env.bak) → `ARK_API_KEY` 加 `/opt/aidcp/cloud/.env`(server 侧, 未入仓) → rsync src+migrations → restart → healthcheck 全绿(active/8787/飞书长连接/PG select1/无错)。**连带上线另一会话已提交的 session-limits a015253**(用户放行)。console 73ca4c5 dist 部署 8088(HTTP200, isales 未碰) <!-- aidcp-cloud f1e0883 / console 73ca4c5 — 2026-06-26 deployed -->
+- [x] 7.2 部署后 grep 实测：providers.ts/migration0018/session-config-facade 落地、qwen/server/panel 含 provider 码；自愈 ALTER 实测三表 provider 列已建(count 不报错)；model_config 空=系统仍 dashscope(零回归), 火山为休眠能力 <!-- 06-26 deployed -->
+- [~] 7.3 真机：**火山 key+端点+模型已直连实测通**(账号 2104170962, `doubao-1-5-pro-32k-250115` 返回内容+usage)；但**尚未经部署系统切 provider 真跑一轮**(切全局/角色文本厂商=火山是行为变更, 留用户判定)。激活法：设置页全局文本厂商→火山方舟 + 模型填 `doubao-1-5-pro-32k-250115`(key 已载, 保存即探活通过)
