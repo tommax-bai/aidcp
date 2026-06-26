@@ -42,7 +42,7 @@
 - [ ] 6.4 实机：打包 app 起一次走通 Chrome→扫码登录→连云→状态更新→断云验证崩溃可见——GATED（需人扫码登录，无法自动化）。**已大幅去风险**：打包产物的 edge 子进程从 asar 加载已实测通过（见 2.4），仅剩「装 dmg + 扫码登录 + 肉眼看面板/断云通知」的人值守一遍
 - [x] 6.5 自检：无新协议消息、无 DB 迁移、未碰两份 `protocol.ts`/`command-bridge`/edge 白名单/`docs/protocol.md` <!-- aidcp-edge 0bcd47a 改动仅 package.json/tsconfig.build.json/electron.cjs/approval-gate.ts/2 测试/OPERATOR.md -->
 
-## 7. 跨 change 协调（非本 change 实装，仅转达/登记）
+## 7. 多开静默接管缝（用户拍板：本 change 先做「诚实拒绝」安全半）
 
-- [ ] 7.1 把「多开隔离 + Electron `.cjs` 启动器静默接管缝」转达 `account-identity-from-login` 负责人——已登记于 proposal/design/memory + OPERATOR §3 警告；待人对人转达确认
-- [ ] 7.2 确认该 `.cjs` 启动器被纳入 `account-identity-from-login` 的多开隔离范围——**经核实该缝仍开**：master 上 `src/electron/chrome-launcher.cjs` 端口仍写死 9222（:6）、profile 仍共用 `userData/chrome-profile`（:31-32）、仍「端口有 Chrome 就盲目复用」（:58-59）；身份 change 只动了 CLI/核心路径（`launch-multinode.ts`/`src/cdp`/`main.ts`），未碰此 `.cjs`。且身份 change 已 code-complete(12/14)、窗口将关 → **需决策：折进本 change 修，还是仍交身份 change（风险=可能没人接）**
+- [x] 7.1 安全半（红线）：Electron 外壳加单实例锁——同机第二个实例诚实拒绝（弹「已在运行」+退出），不再静默接管第一个账号的浏览器；锁随退出释放，不影响同应用重启重连自身浏览器；主实例收到第二次启动 → 窗口前台+通知。OPERATOR §3 改为「应用主动拒绝多开」。**已验证**：双探针 `requestSingleInstanceLock` 恰一胜（true/false）+node --check+typecheck+acceptance 11/11 <!-- aidcp-edge f2de9ad -->
+- [ ] 7.2 真·多开（每实例独立端口/profile，让多账号真能同机并行）——仍归 `account-identity-from-login`（与其节点槽位模型强耦合）。**经核实** master 上 `src/electron/chrome-launcher.cjs` 端口仍写死 9222（:6）/ 共用 profile（:31-32）/ 盲目复用（:58-59）；身份 change 只动 CLI/核心路径未碰此 `.cjs`。已登记于 proposal/design/memory + OPERATOR；待该 change 纳入或后续专门处理（当前已被 7.1 的诚实拒绝兜住红线，非紧急）

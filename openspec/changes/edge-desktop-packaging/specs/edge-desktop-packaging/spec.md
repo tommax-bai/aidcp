@@ -61,6 +61,11 @@ edge 运行时 MUST NOT 依赖 POSIX-only 的硬编码路径。发布审批信�
 - **WHEN** 实现连云失败处理
 - **THEN** 采用「快速失败 + 可见」，MUST NOT 引入无限/退避重试来掩盖未连通状态
 
+#### Scenario: 同机第二个实例诚实拒绝（不静默接管）
+
+- **WHEN** 在同一台机器上已有一个实例运行时再启动第二个实例（多开隔离尚未实现）
+- **THEN** 第二个实例 MUST 诚实拒绝（明确提示「已在运行」并退出），MUST NOT 静默接管第一个实例/账号的浏览器；该单实例保护 MUST NOT 影响「同一应用退出后重启、重连其自身浏览器」
+
 ### Requirement: 不捆绑 Chrome、缺失时诚实报错
 
 桌面应用 MUST NOT 捆绑分发 Google Chrome，运行 MUST 依赖目标机系统已安装的 Chrome。当 Chrome 不存在时，应用 MUST 诚实报错并提示安装，MUST NOT 静默继续或伪装成功。运维文档 MUST 写明「前置须安装 Google Chrome」。
