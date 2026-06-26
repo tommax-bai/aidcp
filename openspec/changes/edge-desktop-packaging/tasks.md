@@ -10,7 +10,7 @@
 
 - [x] 2.1 `package.json` build 段新增 `mac`：`dmg`+`zip`、`x64`+`arm64`、`category`、`hardenedRuntime:true`、`identity:null`（未签名内部）；entitlements 占位（不做实际公证） <!-- aidcp-edge 0bcd47a -->
 - [x] 2.2 `scripts` 拆 `electron:build:win`/`electron:build:mac`，`electron:build` 去掉写死的 `--win`（按当前平台） <!-- aidcp-edge 0bcd47a -->
-- [ ] 2.3 补应用图标资源（`.icns`/`.ico`）——未做（实测用 electron-builder **默认 Electron 图标**可正常出包；待真实图标设计稿后补；非阻断）
+- [x] 2.3 补应用图标资源（`.icns`/`.ico`）——✅ 设计了 AIDCP 品牌标（控制面 hub 编排边缘节点 + 顶点 coral 节点呼应所驱动平台，蓝色 squircle）。`build/icon.svg` 矢量母版 → `icon.icns`(mac)/`icon.ico`(win)/`icon.png`(1024)；electron-builder `mac.icon`/`win.icon` 接线；系统托盘标替换旧「AE」。**与管理后台共用同一标**（console `public/favicon.svg`+png）。实测：`electron:build:mac` 已把 `icon.icns` 嵌进 .app（字节一致）<!-- aidcp-edge abf2de2 + console 3e54965 -->
 - [x] 2.4 在本机（darwin）实跑 `electron:build:mac` 产出 dmg/zip——✅ 出 4 件：`AIDCP-0.1.0.dmg`(x64)/`-arm64.dmg`/`-mac.zip`/`-arm64-mac.zip`，签名按 `identity:null` 跳过。**并验证打包产物可运行**：`ELECTRON_RUN_AS_NODE=1` 下从 `app.asar` 内跑 `dist/*` 通过（asar 读 OK + 相对 `.js` import OK + bare `ws` 解析 OK）→ 证实打包后 edge 子进程能从 asar 加载（不需 asar:false） <!-- aidcp-edge 0bcd47a 配置 + 本会话实测 build -->
 
 
