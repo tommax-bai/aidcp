@@ -355,7 +355,7 @@ Chrome (headful)
 
 ### Phase 3（规模化前）：多账号隔离 + 代理池 + 指纹浏览器
 
-- [ ] 评估并接入指纹浏览器（方案 B），把 profile/指纹/代理隔离交给产品能力；aidcp 经其本地调试端口接入，复用现有 CDP 层。
+- [~] 评估并接入指纹浏览器（方案 B），把 profile/指纹/代理隔离交给产品能力；aidcp 经其本地调试端口接入，复用现有 CDP 层。**已落地（AdsPower，change `adspower-browser-provider`）**：`aidcp-edge/src/cdp/browser-provider.ts` 的 `AdsPowerProvider`（`AIDCP_BROWSER_PROVIDER=adspower` opt-in，默认仍 self 真实指纹）经 AdsPower 本地 API 拿 `debug_port` 喂现成 `attachToPage`；接缝由 `aidcp-edge/scripts/adspower-poc.ts` 真机验证（C1 attach / C3 cdp_mask+stealth-off，2026-06-27）。adspower 模式由 cdp_mask 独占指纹层、edge 自研 stealth 经 `AIDCP_STEALTH` 默认关。**剩余**：住宅代理池 + 三元绑定持久化 + 多 profile 编排。
 - [ ] 住宅代理池 + 会话级粘性（§2.2），profile ⨯ 指纹 ⨯ IP 三元绑定持久化。
 - [ ] 多账号进程/端口隔离编排，Cookie 物理隔离（§3.3）。
 - [ ] 接入 [风控文档 §7](risk-control.md) 风控状态机：检测到限流自动降级，登录态失效告警人工。
@@ -376,4 +376,6 @@ Chrome (headful)
 | 检测信号 → 降级 | 复用后置校验/重试升级，上报 [风控状态机](risk-control.md) | 与风控文档共用一套信号通道 |
 
 > 与"边轻云重 / 接口不变实现可换"一致：**指纹画像与代理配置在云端，注入与拟人化执行
-> 在边缘**；未来切换到指纹浏览器时，仅 CDP 连接目标变化，定位/执行逻辑无需改动。
+> 在边缘**；切换到指纹浏览器时，仅 CDP 连接目标变化，定位/执行逻辑无需改动。
+> **此承诺已由 change `adspower-browser-provider` 兑现**：`AdsPowerProvider` 只替换「启动/生命周期」层，
+> `attachToPage` 及以下零改动（PoC 真机验证 C1/C3，2026-06-27）。
