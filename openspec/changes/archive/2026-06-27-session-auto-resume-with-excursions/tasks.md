@@ -49,6 +49,5 @@
 
 - [x] 8.1 **已部署 ECS（2026-06-27）**：cloud（pristine origin/master worktree 472a2f8 + 内容级 checksum dry-run 仅本变更 15 文件零co-ship → 备份 → rsync 排除 .env/node_modules/.git 无 --delete → restart）healthcheck 全绿（active + 8787/8090 listening + 面板 /api/health ok + 启动日志「续场配置存储已就绪 resume_config」无错 + resume_config 表已建 0 行=零回归 + grep server.ts resumeConfig=5 新码生效 + types.ts imageUrls=0 未带 multi-image WIP + isales 4/4 未碰）；console（pristine master 0d4308a build → 备份 → rsync dist，served index-DN-LhXrz.js + 8088→200 + nginx ok）。**console 从 master HEAD 构建，附带co-ship 已提交但他会话 deploy-gated 的 prompt-preview 人设选择 UI（4e35cbf）+ nav 改名（a5e35d2），纯加性无回归** <!-- cloud 472a2f8 deployed / console 0d4308a deployed 2026-06-27 -->
 <!-- 部署后生产即 feature ON：缺配置默认 rest10%/全天窗口/不限/轻推~2min/放弃1h = 24/7 连刷，运营须经 console「自动续场与看门狗」设活跃时段窗口才不连轴转 -->
-- [ ] 8.2 真机校准（operator-driven）：正常结束→歇 10%→续场；过活跃窗口/达每日上限/风控受限不续；发布触发→会话结束→发布跑完→新场起、无撞页；巡视耗时不计入单场、巡视不被时限掐断；看门狗 1h 生效 + 后台改阈值下场即生效
-- [ ] 8.2 真机校准：正常结束→歇 10%→续场；过活跃窗口/达每日上限/风控受限不续；发布触发→会话结束→发布跑完→新场起、无撞页；巡视耗时不计入单场、巡视不被时限掐断；看门狗 1h 生效 + 后台改阈值下场即生效
-- [ ] 8.3 `openspec validate --strict` 终检 → archive（delta 合并进 `openspec/specs/`，归档目录 `<YYYY-MM-DD>-session-auto-resume-with-excursions/`）
+- [~] 8.2 真机校准（operator-driven）—— **DEFERRED：用户拍板「先归档，真机验收后续统一做一次全面的」（归档≠已验证，[[archived-unverified-2026-06-21]] 同纪律）**：正常结束→歇 10%→续场；过活跃窗口/达每日上限/风控受限不续；发布触发→会话结束→发布跑完→新场起、无撞页；巡视耗时不计入单场、巡视不被时限掐断；看门狗 1h 生效 + 后台改阈值下场即生效
+- [x] 8.3 `openspec validate --strict` 通过 → `openspec archive -y`（3 delta 合并进 `openspec/specs/`：新 session-auto-resume + browse-loop-resilience MODIFIED看门狗+ADDED excursion扣时 + publish-pipeline ADDED让位；归档目录 `2026-06-27-session-auto-resume-with-excursions/`）
