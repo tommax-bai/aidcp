@@ -51,5 +51,5 @@
 
 - [x] 6.1 按 sub-repo 分节回写进度（本文件 + shas） <!-- 本仓 -->
 - [x] 6.2 `openspec validate account-real-nickname --strict` 通过 <!-- 06-27 valid -->
-- [ ] 6.3 cloud 按 CLAUDE.md §5 安全序列部署 ECS（干净 origin/master + 内容级 dry-run + 备份 + 重启 + healthcheck 确认 nickname 列已加 + default 行 NULL；绝不碰 isales） <!-- GATED：显式部署动作 -->
+- [x] 6.3 cloud 已部署 ECS（06-27, fix sha `4c7fea2`）：干净 worktree + 内容级 dry-run + 备份 cloud.bak.20260627-093301 + 仅 rsync 本 change 6 文件（不co-ship gated 的 prompt-preview）+ 重启 + healthcheck 全绿（active/8787/飞书长连接/select 1/**nickname 列已加 + default 与真实 24hex 行 nickname 均 NULL=零回归**/isales 未碰）。**事故+修复**：首次部署失败致 prod down ~1min——`git add server.ts` 把并发 session-auto-resume WIP（resume-config-store import 等）裹进 95f3db6 → master 的 server.ts 引用 master 不存在的文件 → ERR_MODULE_NOT_FOUND 启动失败；即时回滚恢复 → 修 master（server.ts 还原为 bab4339+本change，剔除 resume WIP，其 WIP 还原为他人未提交工作树）→ push 4c7fea2 → 干净 master worktree typecheck 0 错 → 重部署成功。**console(b8484ce) 尚未部署**——账号列要显真名还须部署 console（8088 静态）+ 跑新 edge <!-- cloud 4c7fea2 deployed; console deploy + 真机 pending -->
 - [ ] 6.4 `/opsx:archive` 归档（delta 合并进 `openspec/specs/accounts-master-data`） <!-- 待 6.3 + 5.4 -->
