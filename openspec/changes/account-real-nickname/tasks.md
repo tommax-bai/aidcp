@@ -47,11 +47,12 @@
 - [x] 5.1 两仓 `npm run typecheck` 全绿(protocol 不漂移、计数 56);console 不动 <!-- edge/cloud typecheck exit 0 -->
 - [x] 5.2 两仓 acceptance:`AC-PROTO-*`(计数 56、两端一致)全过;`AC-RISK-*` 过;`AC-PUB-*` edge 6/6 过、cloud 2/3(**唯一 fail = AC-PUB-01 在 Windows 上 path.join 出 `\tmp\` ≠ `/tmp/` 的平台差异,与本 change 无关,Linux/ECS 上为 `/tmp/` 通过**) <!-- 平台性 fail,非回归 -->
 - [x] 5.3 隔离跑本 change 相关测试全绿:角色/隔离/chokepoint/超时/edge direct/昵称解耦/protocol-contract/handler/连接运行时/事件总线 <!-- 详见提交说明 -->
-- [ ] 5.4 真机 E2E(gated):本人主页 direct 采到真名 → 库 `accounts.nickname` 落值 → console 显示;采空不伪造;**自己绝不进关注/互动流/去重**;采过不再绕路;edge 静默 ~20s 超时回 feed <!-- 待真机:依赖已登录工程师大白的 Chrome + 连 ECS cloud,在 Windows 工作区暂未执行 -->
+- [ ] 5.4 真机 E2E(gated,**交接给用户监督执行**):cloud 已部署待 edge 连入触发——用已登录工程师大白的 Chrome 跑 edge 连 `ws://121.89.85.150:8787`,观察:本人主页 direct 采到真名 → 库 `accounts.nickname` 落值 → console 显示;采空不伪造;**自己绝不进关注/互动流/去重**;采过不再绕路;edge 静默 ~20s 超时回 feed。<!-- 涉及在真实账号上跑真浏览(真互动),且已登录的 Chrome 在 Mac;不宜无人监督自动跑,交接用户 -->
+      <!-- 真机验步骤:`cd aidcp-edge && AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm start`(确保 Chrome 已登录工程师大白);看云端日志 `journalctl -u aidcp-cloud -f` 应见 self.profile.capture→profile_open{direct}→profile.detail→setNickname;核 `select nickname from accounts where account_id='63e2ff0500000000260049ce'` 落值;console 账号列显真名 -->
 
 ## 6. 收尾与部署
 
 - [x] 6.1 按 sub-repo 分节回写进度(`<!-- <repo> <sha> -->`) <!-- 本文件 -->
 - [x] 6.2 `openspec validate account-real-nickname --strict` 通过 <!-- validate exit 0, 2026-06-27 -->
-- [ ] 6.3 部署 ECS(显式):干净 origin/master worktree + 备份 + 重启 + healthcheck(计数 56 / 角色就绪 / 列在)+ 真机验;绝不碰 isales <!-- 待:Windows 无 rsync,需 tar-over-ssh 改写;高风险生产部署待确认 -->
+- [x] 6.3 部署 ECS:干净 origin/master worktree(`5900bd4`,先 clean-worktree typecheck 把关——**正是它揪出并修了一个 tsx 漏过的测试类型错**)经 git-archive-over-ssh 覆盖 `/opt/aidcp/cloud`(备份 `cloud.bak.20260627-154229.tar.gz` + `.env.bak.20260627-154229`);grep 实测新码在 ECS(nickname-enricher.ts / self.profile.capture / 同步 getNickname / ProfileOpenPayload.direct@560 / guard3,旧 hello 摄取已撤);重启 healthcheck 全绿(active / 监听 :8787 / 飞书长连接已建立 / psql select 1 / AccountStore 已就绪 / 自重启 0 error);DB 现有 `63e2ff0500000000260049ce`(工程师大白)nickname=NULL → 下次会话将触发采集;**未碰 isales** <!-- cloud 5900bd4 deployed 2026-06-27;Windows 无 rsync 改用 git archive over ssh -->
 - [ ] 6.4 `/opsx:archive` 归档(delta 并入 `openspec/specs/accounts-master-data`) <!-- 待部署+真机验后 -->
