@@ -33,7 +33,9 @@
 - [x] 4.1 新增 `test/integration/role-dispatcher-end-dedup.test.ts`：经真实 `SessionMonitorRole.triggerEnd`（emit + onSessionEnd）驱动时长超限结束 → 断言休息计时器「已武装且未被取消」（faithful 计时器桩：`getCleared()===0`）、到点 `fire()` 真续场 <!-- aidcp-cloud 90a03cf 用 d.bus.emit('action.completed') 驱真实监测体；bug 路径下 cleared==1 + fire no-op 会如实失败 -->
 - [x] 4.2 同文件：续场重开后断言云端下发 `scroll(reason='resume_redrive')` <!-- aidcp-cloud 90a03cf 在 dedup 测试 A② 用例断言 -->
 
-> §1–§4 备注（stream A）：committed cloud `90a03cf` + edge `c1591ab`，**尚未 push**（推 master 被安全分类器拦下，待用户授权）。验证：cloud typecheck 0、全量 test 仅 `AC-PUB-01` 失败（Windows `\tmp\` vs POSIX `/tmp/` 路径分隔符的既有环境问题，与 stream A 无关、云端 Linux 上为绿，本 change 未碰发布路径）；edge typecheck 0 / acceptance 11 pass / 全量含新 2 用例全绿。precise git add：cloud 只提 role-dispatcher.ts + 新测试（未裹挟并发 WIP nickname-enricher.ts）；edge 只提 browse-session.ts / main.ts / browse-session.test.ts（未裹挟 feed-scroller 等 WIP）。
+> §1–§4 备注（stream A）：committed + pushed cloud `90a03cf`（origin master）+ edge `c1591ab`（origin master）。验证：cloud typecheck 0、全量 test 仅 `AC-PUB-01` 失败（Windows `\tmp\` vs POSIX `/tmp/` 路径分隔符的既有环境问题，与 stream A 无关、云端 Linux 上为绿，本 change 未碰发布路径）；edge typecheck 0 / acceptance 11 pass / 全量含新 2 用例全绿。precise git add：cloud 只提 role-dispatcher.ts + 新测试（未裹挟并发 WIP nickname-enricher.ts，后者已由并发会话提交为 de0d094/115912e）；edge 只提 browse-session.ts / main.ts / browse-session.test.ts（未裹挟 feed-scroller 等 WIP）。
+>
+> **stream A 已部署 ECS（2026-06-27 19:34）**：因本机无 rsync，改用 `git archive HEAD | ssh tar -xzf -C /opt/aidcp/cloud`（只送 committed HEAD `90a03cf`、不含 .env/node_modules/.git；无新依赖、无迁移，未跑 npm install）。部署前备份 `cloud.bak.20260627-193118.tar.gz` + `.env.bak.20260627-193118`。`systemctl restart aidcp-cloud` 后 healthcheck 全绿：active / 8787 LISTEN / `select 1`→1 / 飞书长连接已建立；ECS 上已核 `resume_redrive` 存在且 session.should_end 处理器无 endSession。edge 本地运行（不上 ECS），真机验证见 §10.3 待用户。绝未碰同机 isales。
 
 ## 5. aidcp-cloud — stream B：存储收敛全局单例 + 迁移
 
