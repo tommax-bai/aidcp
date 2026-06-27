@@ -93,6 +93,8 @@
 
 ### 缺口 5：审批流接口未闭合
 
+> **状态：部分已落地（2026-06）**。**发布**审批的端到端闭环已实装：edge 在发布前发 `publish.approval_request`（以 `requestId` 标识，见 `aidcp-cloud/src/comm/protocol.ts` 的 `PublishApprovalRequestPayload`）→ cloud 发飞书审批卡片并按回调写信号文件（`aidcp-cloud/src/comm/handler.ts` 的 `onPublishApprovalRequest` + `aidcp-cloud/src/feishu/`）→ edge 据此决定是否发布。本缺口仍开放的部分是**跨类型统一审批对象模型**（发布 / 降级 / 批量 / 升档 / 恢复共用一套对象、状态机、超时与回写接口），即下方模型 2 仍为设计待实现。下表为历史问题记录。
+
 | 项 | 内容 |
 | --- | --- |
 | 现状描述 | `docs/product-dashboard.md`、`docs/product-feishu.md`、`docs/product-task.md` 都提到审批：发布内容审核、风控降级确认、批量任务确认、高风险指令确认；并强调 Web 与飞书共享同一审批状态。 |

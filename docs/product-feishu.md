@@ -136,7 +136,7 @@
         "behaviors": [ { "type": "callback", "value": { "action": "approve", "requestId": "req-xxx", "payload": { "title": "…", "content": "…", "tags": ["…"] } } } ] }, // 实装回调形状
       { "tag": "button", "text": { "tag": "plain_text", "content": "驳回" },
         "type": "danger",
-        "behaviors": [ { "type": "callback", "value": { "action": "cancel", "requestId": "req-xxx" } } ] }, // 驳回走 cancel
+        "behaviors": [ { "type": "callback", "value": { "action": "cancel", "requestId": "req-xxx", "payload": { "title": "…", "content": "…", "tags": ["…"] } } } ] }, // 驳回走 cancel（同样携带 payload）
       { "tag": "button", "text": { "tag": "plain_text", "content": "去 Web 编辑" },
         "url": "https://console.aidcp.local/content/c-101" }
     ]}
@@ -252,7 +252,7 @@ flowchart LR
 | 身份映射 | open_id ↔ AIDCP 用户 | 在 Settings 绑定（§4） |
 
 实现要点：
-- **幂等**：飞书回调可能重试，按 `event_id`/卡片 `token` 去重，避免重复执行指令；
+- **幂等**：飞书回调可能重试——长连接事件去重由 SDK 按 `event_id` 内置保证（无需自维护 SeenSet）；发布审批回调按 `requestId` first-writer-wins 去重（信号文件以 `O_EXCL` 写入，见头部实现状态与 §3），避免重复点击/重试造成多次发布；
 - **异步回执**：指令受理后先回"已收到"，执行完再更新卡片状态（飞书支持卡片更新）；
 - **最小权限**：应用仅申请 IM 收发与群信息读取权限。
 

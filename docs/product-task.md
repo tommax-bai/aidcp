@@ -255,8 +255,8 @@ flowchart LR
 
 | 编排能力 | 落点 | 协议/组件 |
 | --- | --- | --- |
-| Campaign/Schedule/Task 模型与持久化 | 云端，新增"调度器"+ 任务表（复用 PG） | architecture.md §2.2 |
-| 任务 → 步骤拆解 | 复用 `SimplePlanner`（规则优先 + Qwen 兜底） | architecture.md §3.1 |
+| Campaign/Schedule/Task 模型与持久化 | 云端，新增"调度器"+ 任务表（复用 PG） | architecture.md §2.1 |
+| 任务 → 步骤拆解 | 复用 `SimplePlanner`（规则优先 + Qwen 兜底） | architecture.md §3.2 |
 | 步骤下发 / 执行 | `plan.request` / `plan.response` / `action.result` | protocol.md §3.2/§3.5 |
 | 上线裁决 / 会话预算 / 档位 | `RiskController` + 时间窗口调度 | risk-control.md §8 |
 | 手动触发 / 批量 / 审批入口 | Web + 飞书 | product-dashboard.md、product-feishu.md |

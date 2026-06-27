@@ -114,15 +114,15 @@ mindmap
 | 1 | 浏览器管理策略 | `implemented` | `complete` | 单机多实例已跑（多份 `edge*.log` / `cloud*.log` 为多实例运行痕迹）；`aidcp-edge/src/cdp/chrome-launcher.ts` 负责按参数拉起 Chrome | 分布式浏览器池、profile×指纹×IP 三元绑定的编排未做 |
 | 2 | 反检测与登录态 | `implemented`（stealth/拟人化）+ `designed`（代理/持久化/防泄露） | `complete` | **stealth 注入已实现**：`aidcp-edge/src/cdp/stealth-injector.ts`（webdriver 抹除 / toString 伪装 / plugins / 权限对齐 / console.debug）；设计见 `docs/anti-detection.md` | Cookie/Session 持久化、住宅代理接入、WebRTC/DNS 防泄露、指纹画像表 未做 |
 | 3 | 容错与恢复机制 | `implemented`（三道闸）+ `designed`（恢复闭环） | `complete` | LocatingEngine **三道闸**已实现（`aidcp-edge/src/locating/engine.ts`）：后置校验 / 重试升级 / 反污染；守卫层清干扰（`guard.ts`） | CDP 断连自动重连、验证码/滑块识别、会话级 crash recovery 未做 |
-| 4 | Agent 拆分与通信 | `implemented` | `authoritative` | edge/cloud 双层 WS 架构已实现；协议 v2（42 消息类型）`aidcp-cloud/src/comm/protocol.ts` + `docs/protocol.md`；云端已重构为**事件驱动多 Agent**（`RoleDispatcher` + 15 角色 + `EventBus` + `command-bridge`），边缘 `LocatingEngine`/`BrowseSession` 与之协作 | — |
+| 4 | Agent 拆分与通信 | `implemented` | `authoritative` | edge/cloud 双层 WS 架构已实现；协议 v2（56 消息类型）`aidcp-cloud/src/comm/protocol.ts` + `docs/protocol.md`；云端已重构为**事件驱动多 Agent**（`RoleDispatcher` + 约 32 角色 + `EventBus` + `command-bridge`，角色数以 `src/event-bus/types.ts` 的 `RoleName` 为准），边缘 `LocatingEngine`/`BrowseSession` 与之协作 | — |
 
 ### 3.2 产品设计
 
 | # | 模块 | 实现状态 | 文档成熟度 | 已实现 / 文档与代码位置 | 缺口 |
 | --- | --- | --- | --- | --- | --- |
 | 5 | 多账号管理面板 | `planned` | `complete` | 人设配置基础已有（`aidcp-cloud/src/soul/`，`soul.yaml` 可装载） | Web 管理面板、账号分组、状态一览、可视化全未做（设计见 `docs/product-dashboard.md`） |
-| 6 | 飞书交互设计 | `implemented`（命令/记群/审批卡片）+ `designed`（完整审批闭环/归属） | `complete` | **已实现**：官方 SDK 长连接、`/status /pause /resume /bind` 命令路由、进退群自动入库、发布审批卡片 + 回调写信号文件（`aidcp-cloud/src/feishu/`） | 多账号消息归属、完整审批状态机、通知聚合待续（设计见 `docs/product-feishu.md`） |
-| 7 | 任务编排体验 | `implemented`（编排内核）+ `designed`（运营交互层） | `complete` | 后端编排内核已有：`aidcp-cloud/src/orchestrator/role-dispatcher.ts`（事件驱动 15 角色）+ `src/agents/`；CLI 触发 `src/cli/trigger-like.ts`、`src/cli/trigger-publish-temp.ts` | 面向运营的指令下达 UI、批量操作、审批粒度未做（设计见 `docs/product-task.md`） |
+| 6 | 飞书交互设计 | `implemented`（命令/记群/审批卡片）+ `designed`（完整审批闭环/归属） | `complete` | **已实现**：官方 SDK 长连接、`/status /pause /resume /bind /publish-test` 命令路由、进退群自动入库、发布审批卡片 + 回调写信号文件（`aidcp-cloud/src/feishu/`） | 多账号消息归属、完整审批状态机、通知聚合待续（设计见 `docs/product-feishu.md`） |
+| 7 | 任务编排体验 | `implemented`（编排内核）+ `designed`（运营交互层） | `complete` | 后端编排内核已有：`aidcp-cloud/src/orchestrator/role-dispatcher.ts`（事件驱动约 32 角色）+ `src/agents/`；CLI 触发 `src/cli/trigger-like.ts`、发布触发 `src/publish-agent/publish-scheduler.ts`（概念阈值/风控窗口/飞书命令三扳机） | 面向运营的指令下达 UI、批量操作、审批粒度未做（设计见 `docs/product-task.md`） |
 | 8 | 异常处理体验 | `designed` | `complete` | 底层信号已有（后置校验失败 / 升级 `systemic_revision`） | 面向人的掉线恢复/告警/接管体验未做（设计见 `docs/product-exception.md`） |
 
 ### 3.3 运营策略
@@ -142,10 +142,10 @@ mindmap
 
 - ✅ **浏览执行层**：feed 滚动 + 弹窗控制 + 内容提取 + 搜索 + 卡片过滤 + 自动浏览循环
   （`aidcp-edge/src/browse/`：`feed-scroller` / `modal-controller` / `note-extractor` / `search-handler` / `card-filter` / `browse-session`）。
-- ✅ **事件驱动互动决策 + Qwen**：`RoleDispatcher` 调度 15 角色，`ContentCuratorRole` 质量关卡 +
+- ✅ **事件驱动互动决策 + Qwen**：`RoleDispatcher` 调度约 32 角色，`ContentCuratorRole` 质量关卡 +
   `InteractionAppraiserRole` 点赞/收藏决策（`aidcp-cloud/src/agents/`），点赞执行 `aidcp-edge/src/client/like-runner.ts`。
 - ✅ **风控控制器**：`RiskController` 状态机 + 滑窗配额 + 冷启动 + 会话预算（`aidcp-cloud/src/risk/`）。
-- ✅ **Publish Agent（6 角色管道）**：scout→creator→director→assembler→gatekeeper→executor + 万象配图 + 落库
+- ✅ **Publish Agent（约 22 角色的多阶段角色图）**：内容侦察→创作→配图规划（ImagePlanner）/生成（ImageGenerator）→清洗评分→组装→话题/合规/可见性等决策→审批→执行 + 万象配图 + 落库
   （`aidcp-cloud/src/publish-agent/`），边缘发布六步 `aidcp-edge/src/flows/publish-post.ts` + 审批信号 `src/publish/approval-gate.ts`。
 - ✅ **飞书 Bot**：长连接 + 命令路由 + 自动记群 + 审批卡片信号（`aidcp-cloud/src/feishu/`）。
 - ✅ **Soul 人设**：`soul.yaml` + 强类型装载（`soul/loader.ts`），驱动各角色人格化决策。
@@ -175,7 +175,7 @@ graph LR
 
 **目标**：一个账号能长期、安全、自然地刷/赞/收/发，不被风控标记。
 
-- ✅ 边/云 WS 架构（协议 v2）、DOM-first 定位三道闸、浏览执行层、事件驱动 15 角色编排、Qwen 决策、Publish Agent、Soul。
+- ✅ 边/云 WS 架构（协议 v2）、DOM-first 定位三道闸、浏览执行层、事件驱动约 32 角色编排、Qwen 决策、Publish Agent、Soul。
 - ✅ stealth 注入 + 拟人化执行层（humanize）。
 - ✅ **风控控制器已实装**：`RiskController` 频率计数器 + 档位 + 状态机（`risk/`，对应 `risk-control.md §1/§6/§7`）。
 - ✅ 飞书 Bot（命令/记群/审批卡片）、Electron 桌面打包。
@@ -234,10 +234,10 @@ graph TB
     end
 
     subgraph cloud["aidcp-cloud（云端 · 重）"]
-        DISP["RoleDispatcher<br/>事件驱动 15 角色"]
+        DISP["RoleDispatcher<br/>事件驱动 ~32 角色"]
         BUS["EventBus<br/>typed 解耦"]
-        PUB["PublishOrchestrator<br/>6 角色管道+配图"]
-        LLM["QwenClient<br/>(DashScope)"]
+        PUB["PublishOrchestrator<br/>~22 角色多阶段图+配图"]
+        LLM["QwenClient<br/>(DashScope/火山方舟)"]
         SOUL["Soul 人设<br/>soul.yaml"]
         WS["EdgeCloudServer<br/>WS 服务端+路由+command-bridge"]
         RISK["RiskController<br/>状态机+配额+冷启动"]
@@ -295,7 +295,7 @@ graph TB
 - **接口不变、实现可换**：`DomProvider` / `ActionExecutor` 接口固定，CDP 层是其真实实现；
   未来切指纹浏览器时只换 CDP 连接目标，定位/执行逻辑零改动。
 - **虚线节点 = 规划中**：仅 Web 管理面板（Phase 2）尚未实现；`RiskController` 与飞书 Bot 均已落地。
-- **云端已是事件驱动多 Agent**：`RoleDispatcher` 注册 15 角色经 `EventBus` 协作，角色事件经 `command-bridge` 翻译为 v2 协议指令下发——不再是单体 `Planner→PlanStep[]`。
+- **云端已是事件驱动多 Agent**：`RoleDispatcher` 注册约 32 角色经 `EventBus` 协作，角色事件经 `command-bridge` 翻译为 v2 协议指令下发——不再是单体 `Planner→PlanStep[]`。
 
 ---
 

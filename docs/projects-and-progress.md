@@ -5,10 +5,10 @@
 本文档用于盘点三个仓库之间的职责关系，以及基于已核验代码结果的真实实现进度。内容仅记录当前确认事实，不对未证实能力做扩展性表述。
 
 > **本次盘点更新（2026-06-11）**：关联代码仓经过数次重构，本文已据**当前代码结构**重新核验。
-> 重点变化：①云端从"单线 Planner→PlanStep[]"重构为**事件驱动多 Agent**（`RoleDispatcher` + 15 角色 + `EventBus`），
+> 重点变化：①云端从"单线 Planner→PlanStep[]"重构为**事件驱动多 Agent**（`RoleDispatcher` + 约 32 角色 + `EventBus`），
 > 旧文件 `session-orchestrator.ts`/`state-machine.ts`/`engagement-decider.ts`/`concept-extractor.ts`/`src/blackboard/`/`src/publish/` **已不存在**；
 > ②`RiskController` 风控状态机已**完整实装**（不再是"仅设计"）；③飞书 Bot 已推进到 `/bind` + 自动记群 + 审批卡片信号；
-> ④边缘端 publish flow（`flows/publish-post.ts`）已实现，发布审批链路打通；⑤协议已升级到 **v2（42 个消息类型）**，
+> ④边缘端 publish flow（`flows/publish-post.ts`）已实现，发布审批链路打通；⑤协议已升级到 **v2（56 个消息类型）**，
 > `docs/protocol.md` 已同步。本次核验基于代码结构与源码阅读，**未重新执行 `npm test`**，测试数字以各仓 CI 为准。
 
 ## 1. 三项目关系
@@ -52,12 +52,12 @@ flowchart LR
 | stealth 注入 | aidcp-edge | 已实现，有测试 | `aidcp-edge/src/cdp/stealth-injector.ts` |
 | **边缘 publish flow** | aidcp-edge | **已实现**（推翻旧盘点"尚未看到"）；发布六步 + 审批信号等待 | `aidcp-edge/src/flows/publish-post.ts`、`src/publish/approval-gate.ts` |
 | Electron 打包 | aidcp-edge | 已实现；系统托盘 + Chrome 网关 + 控制面板 UI | `aidcp-edge/src/electron/`（main/preload/chrome-launcher.cjs + renderer/） |
-| 协议层 `protocol` | aidcp-cloud | 已实现 **v2（42 个消息类型）**；`docs/protocol.md` 已同步 | `aidcp-cloud/src/comm/protocol.ts`（边侧 `aidcp-edge/src/comm/protocol.ts` 为投影） |
-| **事件驱动编排** | aidcp-cloud | **已实现（重构）**；`RoleDispatcher` 注册 15 角色，`EventBus` 解耦，`SessionContext` 存态 | `aidcp-cloud/src/orchestrator/role-dispatcher.ts`、`src/agents/*.ts`、`src/event-bus/`、`src/comm/command-bridge.ts` |
+| 协议层 `protocol` | aidcp-cloud | 已实现 **v2（56 个消息类型，以 `MessageType` 穷举为准）**；`docs/protocol.md` 已同步 | `aidcp-cloud/src/comm/protocol.ts`（边侧 `aidcp-edge/src/comm/protocol.ts` 为投影） |
+| **事件驱动编排** | aidcp-cloud | **已实现（重构）**；`RoleDispatcher` 注册约 32 角色（另有评论点赞 2 角色 / 概念抽取 1 角色按开关条件注册；角色名以 `src/event-bus/types.ts` 的 `RoleName` 穷举为准），`EventBus` 解耦，`SessionContext` 存态 | `aidcp-cloud/src/orchestrator/role-dispatcher.ts`、`src/agents/*.ts`、`src/event-bus/`、`src/comm/command-bridge.ts` |
 | Planner（规则 + LLM 兜底） | aidcp-cloud | 已实现；服务定向"一句话目标"场景（浏览闭环改走角色驱动） | `aidcp-cloud/src/planner/simple-planner.ts` |
 | **风控 RiskController + 状态机** | aidcp-cloud | **已实现**（旧盘点标"仅设计"，已过时）；状态机 `normal→warned→restricted→frozen` + 滑窗 + 配额 + 冷启动 + 时间窗 + 会话预算 + 去重 + PG 持久化 | `aidcp-cloud/src/risk/`（risk-controller/risk-state-machine/sliding-window-counter/quotas/cold-start-planner/time-scheduler/session-budget/interaction-dedup/pg-risk-store） |
 | 概念池 + PG anchor cache + Bot 群存储 | aidcp-cloud | 已实现 | `aidcp-cloud/src/cache/`（concept-store/pg-anchor-cache/bot-chat-store） |
-| **Publish Agent（6 角色管道）** | aidcp-cloud | 云端生成 / 配图 / 组装 / 审批 / 落库 / 下发链路已实现（重构为角色管道）；端到端真机发布仍待最终验证 | `aidcp-cloud/src/publish-agent/`（publish-orchestrator + roles/ 6 角色 + wanxiang-client + publish-log-store + pipeline-context）；`migrations/0001_publish_log.sql`、`0004_publish_agent.sql` |
+| **Publish Agent（多阶段角色图）** | aidcp-cloud | 云端生成 / 配图 / 组装 / 审批 / 落库 / 下发链路已实现（重构为多阶段角色图，约 22 个角色继承 `BasePublishRole`，配图拆为 `ImagePlanner` + `ImageGenerator`）；端到端真机发布仍待最终验证 | `aidcp-cloud/src/publish-agent/`（publish-orchestrator + roles/ 约 22 角色 + wanxiang-client + publish-log-store + pipeline-context）；`migrations/0001_publish_log.sql`、`0004_publish_agent.sql` |
 | **飞书 Bot** | aidcp-cloud | 已推进到 `/bind` + 自动记群 + 审批卡片信号（旧盘点标 planned，已过时）；`/status /pause /resume` 命令路由已具备 | `aidcp-cloud/src/feishu/`（ws-receiver/messenger/commands/cards/bot-chat-events/handler/token）；`migrations/0002_bot_chats.sql` |
 | 账号状态管理 | aidcp-cloud | 已实现（内存 active/paused） | `aidcp-cloud/src/account-state.ts` |
 
@@ -65,7 +65,7 @@ flowchart LR
 
 > 旧盘点列出的四项不一致，本次更新已逐条处理：
 
-1. **协议文档落后** → **已修复**。`docs/protocol.md` 已从 v1 重写为 v2，补齐浏览编排、角色驱动指令、结构化上报、风控预算、发布审批共 42 个消息类型。
+1. **协议文档落后** → **已修复**。`docs/protocol.md` 已从 v1 重写为 v2，补齐浏览编排、角色驱动指令、结构化上报、风控预算、发布审批、通知巡视等共 56 个消息类型（以 `protocol.ts` 的 `MessageType` 穷举为准）。
 2. **飞书被低估** → **已修正**。本文与 `product-overview.md` 已将飞书从 planned 改为"部分实现"（`/bind`/记群/审批卡片已落地；多账号归属、完整审批闭环待续）。
 3. **架构文档停留在单体 Planner** → **已修复**。`docs/architecture.md` 已重画为事件驱动多 Agent，并补齐边缘端 `browse`/`humanize`/`flows`/`electron`。
 4. **风控仅设计** → **已修正**。`RiskController` 全套已实装，相关文档状态从 `designed` 改为 `implemented`。

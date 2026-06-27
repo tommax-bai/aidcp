@@ -337,7 +337,7 @@ Chrome (headful)
 
 - [x] 启动参数整改：去 `--enable-automation`、加 `--disable-blink-features=AutomationControlled`/`--disable-infobars`、调试端口默认绑 `127.0.0.1`、headful（`buildChromeArgs`，`src/cdp/chrome-launcher.ts`）。
 - [x] `StealthInjector`（基于 `Page.addScriptToEvaluateOnNewDocument`）：`navigator.webdriver=undefined`、还原 `Function.prototype.toString`、`languages/plugins` 补齐已实装（`src/cdp/stealth-injector.ts`）；**WebRTC 关闭仍待实装**。
-- [ ] 固定 `--user-data-dir`，实现 Cookie/登录态持久化（§3.1）。
+- [x] 固定 `--user-data-dir`（默认 `~/.aidcp-chrome-profile`，`buildChromeArgs`），实现 Cookie/登录态**基础**持久化（§3.1，重启后 profile 自然恢复；加密存储 / 多账号隔离仍待实装）。
 - [ ] 配一个国内住宅代理，做到一账号一稳定 IP（§2.1/§2.2）。
 - [ ] WebRTC / DNS 泄露自检通过。
 

@@ -214,8 +214,8 @@ risk-control.md §5.3 的判据，由后端校验）。
 | 部署 | 与 aidcp-cloud 同机/同网，Nginx 反代静态资源 + `/api` 代理 | 内网工具，无需公网 CDN |
 | 鉴权 | 云端签发 JWT，按用户/分组做数据权限 | 1–5 人小团队，RBAC 可后置 |
 
-> 部署形态：面板是 aidcp-cloud 的一个前端子项目，**不引入新后端**——所有数据来自
-> 云端新增的 HTTP/WS 聚合 API（见 §4）。
+> 部署形态：面板前端是独立子仓 `aidcp-console`（React+Vite+TS），**不引入新后端**——所有数据来自
+> 云端面板 API 层（`../aidcp-cloud/src/panel`）新增的 HTTP/WS 聚合 API（见 §4）。
 
 ---
 

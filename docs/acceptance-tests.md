@@ -1,6 +1,6 @@
 # AIDCP 验收测试用例
 
-本文是三仓（aidcp-edge / aidcp-cloud / 协议契约）的**验收测试主索引**：把已有的 ~90 个
+本文是三仓（aidcp-edge / aidcp-cloud / 协议契约）的**验收测试主索引**：把两仓既有的大量
 可执行测试与新增的验收用例，按**功能域 × 环境层级**组织成可追溯矩阵，作为联调与交付的
 checklist。验收用例以**可执行测试脚本**为主交付，本文做编号、归口与判据说明。
 
@@ -58,7 +58,7 @@ AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test
 | 业务流·发布六步 | 进入→标题→正文→标签→提交→postId | S | `flows/publish-post.test.ts` | — |
 | 发布·审批阻断 | approval gate 阻断、信号读写、超时/拒绝 | L/S | `flows/publish-post-approval.test.ts`、`publish/approval-gate.test.ts` | 未授权绝不发布 |
 | 发布·端到端 | FakeWebSocket 模拟云端、publish.request→result | S | `integration/publish-e2e.test.ts` | — |
-| **协议契约·边缘** | 版本=2、42 消息类型穷举、信封往返、坏帧 | L | `acceptance/protocol-contract.test.ts` `AC-PROTO-01..05` | 与云端契约逐字一致 |
+| **协议契约·边缘** | 版本=2、56 消息类型穷举、信封往返、坏帧 | L | `acceptance/protocol-contract.test.ts` `AC-PROTO-01..05` | 与云端契约逐字一致 |
 | **发布审批·跨层契约** | 信号路径格式、approved/拒绝/超时/串号 | L | `acceptance/publish-approval-contract.test.ts` `AC-PUB-01..06` | 路径与云端一致，未授权不发 |
 | **真机·边-云握手/心跳** | 连 ECS 发 hello 收 welcome、ping/pong | E | `acceptance/real-e2e.test.ts` `AC-E2E-01..02` | gated；真实连通 |
 
@@ -75,14 +75,16 @@ AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test
 | 人设 Soul | soul.yaml 装载、行为准则/会话上限 | L | `soul.test.ts` | — |
 | 缓存·锚点指纹 | fingerprint 一致性、schema | L | `cache.test.ts`、`concept-store.test.ts` | — |
 | 事件驱动编排 | 6 条浏览闭环路径 + SessionMonitor 配额终止 | S | `integration/role-dispatcher.test.ts` | 事件链回到 feed.entered；超预算终止 |
-| 15 角色 | 各角色订阅/产出事件正确 | L/S | `agents/*.test.ts`（14 个） | — |
+| 事件驱动各角色 | 各角色订阅/产出事件正确（角色名以 `event-bus/types.ts` 的 `RoleName` + `role-dispatcher.ts` 注册为准） | L/S | `agents/*.test.ts`（18 个） | — |
 | 风控·控制器 | 三档配额、分/时/日窗口、点赞率 35% | L | `risk-controller.test.ts` | 超限拒绝 |
 | 风控·状态机 | normal→warned→restricted→frozen、恢复窗口 | L | `risk-state-machine.test.ts` | 迁移与恢复正确 |
 | 风控·去重/频控/预算/PG | 互动去重、搜索频控、会话预算、持久化 | L | `risk-dedup`、`risk-session-scheduler`、`risk-pg-store.test.ts` | — |
 | 飞书·Token/卡片/命令/记群 | token 续期、卡片构建、命令路由、卡片回调写信号 | L/S | `feishu-token`、`feishu-cards`、`feishu-commands`、`feishu-ws-receiver.test.ts` | — |
-| 发布·6 角色管道 | scout→creator→director→assembler→gate→executor、超时/防重入 | S | `publish-agent/*.test.ts`（9 个）、`publish-post-processor.test.ts` | scout 否决则早停；禁用词检测 |
-| **协议契约·云端** | 版本=2、42 消息类型穷举、信封往返、坏帧 | L | `acceptance/protocol-contract.test.ts` `AC-PROTO-01..05` | 与边缘契约逐字一致 |
+| 发布·多阶段角色图 | scout→creator→image-planner/generator→assembler→approval-gate→executor 等 ~22 角色多阶段编排、超时/防重入 | S | `publish-agent/*.test.ts`（29 个）、`publish-post-processor.test.ts` | scout 否决则早停；禁用词检测 |
+| **协议契约·云端** | 版本=2、56 消息类型穷举、信封往返、坏帧 | L | `acceptance/protocol-contract.test.ts` `AC-PROTO-01..05` | 与边缘契约逐字一致 |
 | **风控·防自残安全闸** | 配额硬上限、状态降级链、致命冻结、record 拒绝返 false | L | `acceptance/risk-guard.test.ts` `AC-RISK-01..03` | 被禁止时绝不放行/不静默执行 |
+| **搜索智能·概念池** | 关键词取自 seed ∪ 概念池候选、来源如实标注、预算+限频两道闸被拦即诚实跳过、已搜词跨会话去重 | L | `acceptance/search-intelligence.test.ts` `AC-SEARCH-01..07` | 不假成功：被闸拦时不下发/不扣预算/不 markSearched |
+| **评论点赞·红线** | comment_like 独立配额（不并入 like / 比率闸、受限清零）、早场不点且预闸不过不调 LLM、弃权不默认挑第一条、撞车护栏 | L | `acceptance/comment-like.test.ts` `AC-CLIKE-*` | 仅 `AIDCP_COMMENT_LIKE=true` 生效；红线绝不静默 |
 | **发布审批·跨层契约** | 信号路径格式、卡片回调解析 | L | `acceptance/publish-approval-contract.test.ts` `AC-PUB-01/07/08` | 路径与边缘一致 |
 | **真机·部署握手** | 连已部署 cloud 发 hello 收 welcome | E | `acceptance/real-e2e.test.ts` `AC-E2E-03` | gated；服务健康 |
 
@@ -90,7 +92,7 @@ AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test
 
 | 验收点 | 层 | 证据 | 通过判据 |
 | --- | --- | --- | --- |
-| 协议契约一致性 | L | 两仓 `acceptance/protocol-contract.test.ts` 各自穷举 42 消息类型 | 任一端漂移 → 该端 `typecheck` 失败 |
+| 协议契约一致性 | L | 两仓 `acceptance/protocol-contract.test.ts` 各自穷举 56 消息类型 | 任一端漂移 → 该端 `typecheck` 失败 |
 | 发布审批信号契约 | L | edge `buildPublishApprovalSignalPath` 与 cloud `getApprovalSignalPath` 同断言 `/tmp/aidcp-publish-approve-<id>.json` | 两端路径格式一致 |
 | 浏览闭环端到端 | S | cloud `integration/role-dispatcher.test.ts` + edge `browse-session.test.ts` | 上报→决策→下发指令链路成立 |
 | 发布端到端 | S | edge `integration/publish-e2e.test.ts` + cloud `publish-agent/publish-orchestrator.test.ts` | publish.request→approval→result |
@@ -100,12 +102,14 @@ AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test
 
 | 编号 | 名称 | 仓 | 守护的产品红线 |
 | --- | --- | --- | --- |
-| `AC-PROTO-01..05` | 协议契约一致性 | edge + cloud | 边/云两份 `protocol.ts` 不漂移（版本 2、42 消息类型、信封往返）；用 `Record<MessageType,true>` 穷举，漂移即 `typecheck` 失败 |
+| `AC-PROTO-01..05` | 协议契约一致性 | edge + cloud | 边/云两份 `protocol.ts` 不漂移（版本 2、56 消息类型、信封往返）；用 `Record<MessageType,true>` 穷举，漂移即 `typecheck` 失败 |
 | `AC-PUB-01..08` | 发布审批信号契约 | edge + cloud | 信号文件路径/结构两端一致；**未授权绝不静默发布**（拒绝/超时/串号都不发） |
 | `AC-RISK-01..03` | 风控防自残安全闸 | cloud | **绝不自残**：配额硬上限、状态降级（warned 停发布→restricted 停互动→frozen 全停）、致命信号一步冻结，被禁止时 `record` 返回 false |
+| `AC-SEARCH-01..07` | 概念池驱动搜索智能 | cloud | 搜索词取自 seed ∪ 概念池候选、来源（new_concept/random_from_interests）如实标注、预算+限频两闸被拦即诚实跳过、已搜词跨会话去重（change wire-concept-pool-search-intelligence） |
+| `AC-CLIKE-*` | 评论点赞红线 | cloud | 详情页评论点赞：独立配额不混入 like、早场不点（预闸不过不调 LLM）、解析失败/选都不点/已赞=弃权不默认第一条、发评论撞车护栏（change comment-like-on-detail） |
 | `AC-E2E-01..03` | 真机联调（gated） | edge + cloud | 真实边-云连通、握手、心跳；默认跳过，`AIDCP_E2E=1` 触发 |
 
-当前自动化层（L+S）合计 **22 个新增用例 + ~90 个既有测试**，`npm test` 全绿即视为离线/模拟集成层验收通过。
+当前新增验收用例分 **AC-PROTO / AC-PUB / AC-RISK / AC-SEARCH / AC-CLIKE / AC-E2E** 六族（约 30 个 AC 编号用例，逐项守护点与判据以各 `test/acceptance/*.test.ts` 顶部 JSDoc 为准），叠加两仓既有的大量单元/集成测试（edge + cloud 合计 160+ 个 `*.test.ts`）。`npm test` 全绿即视为离线/模拟集成层验收通过。
 
 ## 4. 真机联调验收清单（人工执行，对应 Phase 1 收尾 / handoff 待办 A）
 

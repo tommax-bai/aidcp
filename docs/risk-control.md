@@ -401,12 +401,12 @@ normal ──────────► warned ──────────�
 进入 `warned`/`restricted` 时，调度器自动执行：
 
 1. **限频**：所有每日上限 ×0.7（warned）或互动归零（restricted）；
-2. **降速**（设计目标，未实装）：停顿分布 `μ` ×1.3，会话时长上限 ×0.6，会话数 −1；当前 `RiskController.effectiveQuotas()` 仅做配额缩放（warned ×0.7 / restricted 互动归零），停顿/会话预算降速尚未接线；
+2. **降速**：停顿/思考时长按风控状态放大（warned `tempo`×1.3 / restricted ×1.6，见 §3 节奏归属）——**已实装并接线**（`pacing.ts` 的 `tempoForStatus` → `computeThinkMs` / `computeDwellMs`，随决策指令以 `thinkMs` / `dwellMs` 下发）；但**会话时长上限 ×0.6、会话数 −1 仍未接线**（`RiskController.effectiveQuotas()` 只缩放配额，`session-budget` / `session-limits` 不随风控状态缩放）；
 3. **停发**：暂停发布；
 4. **拉长冷却**：会话间冷却翻倍；
 5. **告警**：`frozen` 时输出告警事件，停止自动操作，等待人工。
 
-降级应是**自动且即时**的——不依赖人工发现。当前 `RiskController` 已自动执行配额降档（warned ×0.7 / restricted 互动归零 / frozen 停手告警），但上面第 2/4 条的停顿降速、会话预算与冷却拉长尚未接线，仍是待补齐的一环。
+降级应是**自动且即时**的——不依赖人工发现。当前 `RiskController` 已自动执行配额降档（warned ×0.7 / restricted 互动归零 / frozen 停手告警），且停顿/思考时长已随风控状态 `tempo` 放大（已接线）；但上面第 2 条后半的会话预算缩放（时长 ×0.6 / 会话数 −1）与第 4 条的会话间冷却拉长仍未接线，是待补齐的一环。
 
 ---
 
