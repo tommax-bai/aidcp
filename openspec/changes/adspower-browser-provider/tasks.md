@@ -46,3 +46,15 @@
 - [x] 6.2 self 专属路径钉回 self：`scripts/launch-multinode.ts` 冻结 env 设 `AIDCP_BROWSER_PROVIDER='self'`（槽位=端口+目录 self 专属）；`src/electron/main.cjs` spawn env 钉 self（`'self'` 在前、`...process.env` 可覆盖）<!-- aidcp-edge 3653a0a -->
 - [x] 6.3 更新单测（默认 adspower 缺 user_id 报错 / 默认 adspower 全配 / 显式 self）；typecheck 0 / 全量 380 / acceptance 11 全绿 <!-- aidcp-edge 3653a0a -->
 - [x] 6.4 spec / proposal / design 同步「默认 adspower + BREAKING + self 专属路径钉回」措辞 <!-- aidcp 本提交 -->
+
+## 7. aidcp-edge — adspower 多开编排（resolve design OQ#1）
+
+- [x] 7.1 `scripts/launch-multinode.ts` 加 adspower 分支：`AIDCP_ADS_USER_IDS="prof1,prof2"` → 每 profile 一个 adspower 节点；端口/用户数据目录/指纹/IP 由 AdsPower 自管、无需分配；edgeId 默认 `ads-<profileId>`；`AIDCP_ADS_API_KEY/BASE` 随父环境继承 <!-- aidcp-edge da5ba98 -->
+- [x] 7.2 未设 `AIDCP_ADS_USER_IDS` 仍走原 self 多节点（行为不变）；看护/重起/信号两模式共用；新增 `AIDCP_MULTINODE_PRINT=1` 干跑 <!-- aidcp-edge da5ba98；干跑实测 adspower 2 profile / self 2 槽位计划正确，scoped typecheck 0 错 -->
+- [x] 7.3 前提确认：云端多租户 `multi-account-node-support` 已部署 ECS（2026-06-25，cloud 497d1bc+a38fb96）→ 两 edge 两账号不串号；非 default 账号须先后台配人设否则诚实人设闸拒启 <!-- 据 multi-account-node-support tasks §7.3/§2 -->
+- [ ] 7.4 真机灰度：起 ≥2 个 adspower 节点（各登不同小红书测试号 + 各配人设）跑通双号并行闭环 <!-- 待：需 ≥2 个已登录且已配人设的 AdsPower profile -->
+
+## 8. 待办（延后/可选）
+
+- [ ] 8.1 5.1a：`multi-account-node-support` 归档时复核软化措辞并入 baseline（见 5.1a）
+- [ ] 8.2 单账号完整 cloud 闭环真机灰度（`AIDCP_BROWSER_PROVIDER=adspower npm start` 连生产云，可选）

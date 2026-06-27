@@ -76,6 +76,6 @@ edge 今天**自己 spawn 真实 Chrome** 并经 CDP 接入：`launchChrome`（`
 
 ## Open Questions
 
-1. 多 AdsPower profile 的同机并行编排是否纳入现有 `launch-multinode.ts`（加 `adspower` 分支：用 `user_id` 列表替代端口 / 目录分配），还是本 change 只做单 provider、编排留后续？（倾向：本 change 只做 provider 抽象 + 单实例 opt-in，多 profile 编排另起。）
+1. ~~多 AdsPower profile 的同机并行编排是否纳入 `launch-multinode.ts`？~~ **已解决（2026-06-27，edge `da5ba98`）**：`launch-multinode.ts` 加 `adspower` 分支——设 `AIDCP_ADS_USER_IDS="prof1,prof2"` 即每 profile 一个 adspower 节点；端口/用户数据目录/指纹/IP 由 AdsPower 按 profile 自管、无需分配（self 多开撞 9222 / SingletonLock 的问题天然消失）。看护/重起/信号两模式共用；`AIDCP_MULTINODE_PRINT=1` 干跑核对。前提：各 profile 已登录目标小红书号；非 default 账号须先在后台配人设（multi-account-node-support 诚实人设闸，已部署 ECS 2026-06-25）。
 2. `AdsPowerProvider` 的 API base / api-key / user_id 经哪些 env 暴露（`AIDCP_ADS_API_BASE` / `AIDCP_ADS_API_KEY` / `AIDCP_ADS_USER_ID`），api-key 的读取与不落库纪律（沿用「不记敏感值」铁律：只记读取方式、不写值）。
 3. 代理是否完全交给 AdsPower profile，还是 edge 侧也要暴露逃生阀——倾向完全交给 AdsPower（D6），edge 不碰代理。
