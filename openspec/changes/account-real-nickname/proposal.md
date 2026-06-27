@@ -1,39 +1,36 @@
 ## Why
 
-后台「账号」列显示的是占位/运营字符串（实测单租户下就是 `default`），而不是登录账号的小红书真实昵称（如「工程师大白」）。坐实现状：
+后台「账号」列要显示登录账号的小红书真实昵称（如「工程师大白」），而不是占位串 / 24 位 userid。
 
-- `accounts` 主表（`../aidcp-cloud/src/account-store.ts`）只有 `account_id`(PK) / `label` / `platform` / `quota_level` / `status` / `machine_label` / `group_label`，**没有 nickname 列**；seed 行是 `('default','default')`，`label` 只是 `account_id` 的副本（ECS 实测全表仅 `default|default|xiaohongshu` 一行）。
-- console 渲染 `r.label ?? r.accountId`（`../aidcp-console/src/components/AccountsTable.tsx:19`），多处账号面直接显示原始 `accountId`。
-- `accountId` 现在来自**登录态读出的真实稳定 userid**（24 位 hex；`account-identity-from-login` 已落），`AIDCP_ACCOUNT_ID` 仅作可选覆盖——是稳定 ID、**不是平台昵称**。
-- 协议里的 `author` / `authorId`（`note.detail` / `profile.detail`）描述的是**被浏览**对象，**不是当前登录的操作账号**。
+**初版（已部分实装+部署）走错了架构,本提案纠正它。** 初版让 **edge 在握手时读昵称 + 写「诚实闸」判定要不要发**——这违背铁律「**edge 只执行原子操作、绝不做任何决策;一切决策/编排/数据判定收口云端、由云端角色驱动**」(CLAUDE.md §2,[[edge-execute-only-cloud-roles-decide]])。而且真机坐实:**昵称根本不在 feed 页 DOM 里,只在账号自己的主页才读得到**;初版「就地读 ID 一次成功→永不走进主页那条路」,所以实际永远采不到昵称。
 
-结论：**当前登录账号自身的真实昵称在系统里任何地方都没有被采集**。要让后台显真名，必须新增「边缘采集登录账号自身昵称 → 上报 → 持久化 → 展示」这条链路。
-
-> 本提案经一道多 agent 对抗评审（CLAUDE.md §3）打磨，相对初稿有重大纠偏（含一条红线 BLOCKER 修复），详见 design.md「Drift corrections」。
+纠正方向(经 §3 业界方案 + 3 路对抗评审,0 BLOCKER / 7 MAJOR 全收敛):**由一个云端角色驱动一次「访问自己主页」来采集昵称**。云端早有现成链路——角色 emit `profile_open{authorId}` → edge 纯执行打开 `/user/profile/<id>`、原样报 `profile.detail{nickname}`(抓不到诚实置空)。账号 ID 即 userid 即主页 id,故**云端拿自己连接的 accountId 当 authorId 下发即可**;edge 对「自己」与「他人」主页一视同仁、只执行。
 
 ## What Changes
 
-- **edge（采集，DOM-first + 诚实失败 + 红线：可证明属己）**：复用确立身份（握手 / 重确立身份）这一刻——边缘**本就**在 `readSelfIdentity` 里读账号信息——读取登录账号**自身**昵称。**关键修复**：必须**限定在自己头像所在的导航容器作用域内**读名字（与可靠读出自己 ID 同一作用域），**绝不**用现有那段无作用域全局查询（在推荐流页上会抓成被浏览作者的名字、配自己的 ID 存库 = 错配身份红线）。读不到 / 非自作用域 / override 与真实 id 不一致 → **省略昵称字段**，绝不伪造。
-- **协议 v2（本 change 是协议唯一改动方）**：**不新增消息类型**——在**已有的握手消息 `HelloPayload`** 上加一个可选字段 `nickname?`（握手在身份可变的两个时刻自动重发）。消息计数**保持 56 不变**；不碰 `command-bridge`、不碰 `onMessage` 白名单。
-- **cloud（持久化 + 消费 + 暴露）**：`accounts` 表新增可空列 `nickname`——**本仓无迁移执行器**，靠 store `init()` 的**幂等自愈 DDL**（`CREATE TABLE` 加列 + 追加 `ALTER TABLE … ADD COLUMN IF NOT EXISTS`，照 model-config 0018 先例；迁移号 **0021** 仅文档伴随）。握手处理里**按已认证连接账号、不阻塞握手、ON CONFLICT 自愈 upsert、非空才写**地持久化；`PanelAccount` 暴露 `nickname`。
-- **console（展示）**：建一个纯诚实回落 helper `accountDisplayName(nickname, label, accountId) => nickname || label || accountId`，账号名各面统一走它。MVP：账号表 + 总表（客户端 join，不动 GROUP-BY）+ 发布历史（云端 label 折叠）+ 发布筛选 + 通知联系人选择器；人设页与监控/配额/用量等次要面 DEFER。
+- **新增云端角色 `nickname_enricher`(按连接)**:握手时同步算一次「需采集」(accountId 是真实 userid 非 `default` 且库内 `nickname IS NULL`)→ 会话开始(`feed.entered{session_start}`)时,若需采集则**暂停自主浏览 + 置在途标记 + 武装 ~20s 兜底超时**,emit 云端内部事件 `self.profile.capture{accountId}`;翻译为现成命令 `profile_open{authorId=accountId, direct:true}`;收到本人的 `profile.detail` 后 `setNickname` 持久化(非空才写)、清标记、恢复浏览、emit `feed.entered{back_to_feed}` 干净回 feed。**只在库内昵称为空时采,一旦写入此后不再绕路**(无放大、无持久 flag)。
+- **隔离(红线:自己绝不进社交管线)**:本人主页访问**绝不**产生 `profile.browsed` / 关注决策 / 关注命令 / `interaction_feed` / 去重行。判据 `detail.authorId === 连接 accountId`(race-free),四处守卫:ProfileBrowser 本人早退、profile.done 关注自跳过、`server.ts` 全局观测 upsertMeta 自跳过、note-scoped 链对直驱自访问天然不触发。
+- **edge(净缩,但非零;全部纯执行)**:
+  - **revert 初版 28ba097 的昵称传输与决策**(`HelloPayload.nickname`、edge-client 透传/`setNickname`、`main.ts` 诚实闸、`self-identity` 自作用域昵称读)——就地路径 `displayName/redId` 置 `null`(**不**恢复无作用域 `readDisplay`,那会复活「feed 抓成被浏览作者名」的错配 bug)。
+  - **新增一个通用纯执行能力** `ProfileOpenPayload.direct?: boolean`:`direct===true` 时 edge 直接 `Page.navigate` 到 `/user/profile/<authorId>`(而非在当前页 scrape 第一个作者链接);缺省/false 维持已部署 scrape 路径逐字不变(关注链路零回归)。edge 不带任何「这是自己」标志——云端独知。
+  - **把昵称读与「数字渲染门」解耦**:`profile.detail` 即便 `extracted===false` 也带上 `.user-name`/`.user-nickname` + `document.title`(「<名> - 小红书」去尾)兜底,使昵称不依赖粉丝/获赞数渲染即可采到。
+- **cloud revert 初版 hello 摄取**:`HelloPayload.nickname`、`handler.onHello` 摄取 + `recordAccountNickname` 依赖 + `server.ts` 接线——改由角色经注入的 `setNickname` 写。
+- **保留(都在云端/展示层,复用)**:`accounts.nickname` 列 + 自愈 ALTER + 迁移 0021(均已部署)、`AccountStore.setNickname` 单写、panel-store 暴露 + 发布历史折叠、console `accountDisplayName` helper、`ProfileDetailPayload.nickname`(interaction-feed-enrichment 既有字段,角色直接消费)、`dev-run.sh` 去强制 default(身份引导,仅删过时注释)。
 
 ## Capabilities
 
-### New Capabilities
-<!-- 无新增 capability -->
-
 ### Modified Capabilities
-- `accounts-master-data`: 新增一条要求「账号的平台真实昵称由边缘**诚实且可证明属己地**采集、随握手带回、持久化到账号行、并经面板 API + console 展示（读不到不伪造、绝不错配他人昵称）」。
+- `accounts-master-data`: 「账号真实昵称」要求改为**由云端角色驱动一次本人主页访问采集**(edge 纯执行),并明确隔离(自己不进社交管线)、幂等(仅库内空时采)、风控中性、诚实失败、有界回 feed。废止初版「随握手由 edge 判定带回」。
 
 ## Impact
 
-- **协议（本中控仓 + 两 sub-repo）**：
-  - `../aidcp-edge/src/comm/protocol.ts` 与 `../aidcp-cloud/src/comm/protocol.ts`：`HelloPayload` 加可选 `nickname?: string`（两份**逐字一致**含注释）。**无新 MessageType 成员** → `Record<MessageType,true>` 穷举不变、计数不变。
-  - `../aidcp-cloud/src/comm/command-bridge.ts`：**无改动**（hello 是握手、非动作 verb→message 映射）。
-  - `docs/protocol.md`（本仓）：§3 hello payload 加 `nickname` 字段说明；**头部计数保持 56**（无新消息类型，`AC-PROTO-02` 无需改）。
-- **edge（aidcp-edge）**：`src/cdp/self-identity.ts`（自作用域昵称读）；`src/client/edge-client.ts`（透传 + `setNickname` setter）；`src/main.ts`（握手 + 重确立身份按诚实闸传入）。
-- **cloud（aidcp-cloud）**：`src/account-store.ts`（CREATE 加列 + 幂等 ALTER + `setNickname` 单写）；`src/comm/handler.ts`（onHello 非阻塞持久化，按 session.accountId）；`src/panel/panel-store.ts`（`PanelAccount.nickname` + 发布历史 accountLabel 折叠）+ `src/panel/types.ts`（镜像）；`migrations/0021_account_nickname.sql`（文档伴随）。
-- **console（aidcp-console）**：`src/types/api.ts`（`PanelAccount.nickname`）；新增 `accountDisplayName` helper；`AccountsTable.tsx` / `AccountTotalsTable.tsx`（客户端 join）/ 发布筛选 / 通知联系人选择器走回落链。
-- **红线 / 保留**：诚实失败（读不到不写、不伪造）；**可证明属己**（不把被浏览作者昵称误报/错存）；单写、不阻塞握手；不动 `account_id` 作为 PK 与已 keyed 子表；不引入 cloud→edge 新命令（不碰 onMessage 白名单）。
-- **并发**：cloud 有并发 WIP（publish-multi-image 等）——只暂存本 change 自己的文件；迁移号落地前再核 0021 仍空；部署用干净 origin/master + 内容级 dry-run，绝不碰 isales。
+- **协议(两 sub-repo + docs,消息计数恒 56)**:
+  - 两份 `protocol.ts`:`HelloPayload.nickname` **删除**;`ProfileOpenPayload.direct?: boolean` **新增**(逐字一致)。均为字段增删、**无新 MessageType**,`Record<MessageType,true>` 穷举与 `AC-PROTO-02` 计数 56 不变。
+  - `self.profile.capture` 是**云端内部事件**(EventBus/RoleEventMap),**不是协议消息**——无 `protocol.ts` 面、无四处同步。
+  - `command-bridge.ts`:`profile_open` 已映射,`params` 原样透传 `direct`,无新增映射。
+  - `docs/protocol.md`:hello payload 去 `nickname`、profile.open payload 加 `direct`;头部计数仍 56。
+- **edge(aidcp-edge)**:`src/comm/protocol.ts`(删 hello.nickname / 加 profile.open.direct)、`src/client/edge-client.ts`(revert 昵称透传)、`src/main.ts`(revert 诚实闸)、`src/cdp/self-identity.ts`(in-place displayName/redId→null,撤日志装饰)+ 其测试、`src/browse/browse-session.ts`(direct 直navi 分支 + 昵称读解耦数字门)、`scripts/dev-run.sh`(删过时注释)。
+- **cloud(aidcp-cloud)**:`src/comm/protocol.ts`(同 edge);`src/comm/handler.ts` + `src/server.ts`(revert hello 摄取/接线);`src/event-bus/types.ts`(RoleName + RoleEventMap 加 self.profile.capture);新 `src/agents/nickname-enricher.ts`;`src/orchestrator/role-dispatcher.ts`(注册角色 + session_start 钩子 + self.profile.capture 翻译 + chokepoint 限定放行 + profile.done 关注自跳过)、`SessionContext`(pendingNicknameCapture / selfCaptureInFlight / 尝试计数 / 超时);`src/agents/profile-browser.ts`(本人早退);`src/account-store.ts`(加 `getNickname`);`server.ts`(注入 get/setNickname 进 dispatcher、握手算 pending)。
+- **console**:零改(复用 helper)。
+- **红线/保留**:edge 纯执行;自己绝不进社交管线(无自关注/自互动流);单写 + 诚实空不覆盖;风控/预算/节奏中性;有界回 feed(~20s 超时 + K=3 尝试上限)、绝不困死会话。
+- **并发**:cloud 满并发(且 session-auto-resume / prompt-preview 近期已部署进 master)——精确 git add、提交后核 commit diff 只含自己改动、部署用干净 origin/master worktree。

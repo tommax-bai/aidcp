@@ -1,55 +1,55 @@
-> **本 change = 协议唯一改动方**，但 add-to-hello 下协议改动极小（`HelloPayload` 加一个可选字段，**无新 MessageType**，计数不变 56）。仅本 change 可改两份 `protocol.ts` 的 `HelloPayload` + `docs/protocol.md`。
-> **迁移号 0021**（`migrations/` 已有 0001-0011、0013-0019；**不用 0012**——低于当前最大号的空号会误导；**0020 已被并发 session-auto-resume 的 `0020_resume_config` 占用**，故取 0021）。本仓**无迁移执行器**，真正生效靠 `account-store init()` 的幂等 ALTER，`.sql` 仅文档伴随。
-> **并发纪律**：cloud / 本仓有并发 WIP（publish-multi-image、session-auto-resume 等）。提交只暂存本 change 自己的文件（见 [[precise-git-add-concurrent-sessions]]）；实测已精确暂存、未裹挟他人 WIP。
->
-> **进度（2026-06-27）**：代码全落 + 隔离验证全绿。edge `28ba097` / cloud `95f3db6` / console `b8484ce` / 本仓本 commit。剩真机探针(0.1) + 真机 E2E(5.4) + 部署(6.3) + 归档(6.4)，均 gated/显式动作。
+> **架构纠正提案**:初版把「读昵称+诚实闸判定」放 edge=违铁律,且真机证明 feed 页无昵称、初版永不采集。改为**云端角色 `nickname_enricher` 驱动一次本人主页访问采集,edge 纯执行**。经 §3 workflow + 3 路对抗评审(0 BLOCKER / 7 MAJOR 全收敛)。
+> **协议计数恒 56**:删 `HelloPayload.nickname` + 加 `ProfileOpenPayload.direct?` 均字段增删、无新 MessageType;`self.profile.capture` 是云端内部事件、不入协议。
+> **已部署现状**:edge 28ba097(待 revert)/ cloud 4c7fea2(hello 摄取待 revert;列+setNickname+panel-store 保留=已部署)/ console b8484ce(保留=已部署)。
+> **并发纪律**:cloud 满并发(session-auto-resume/prompt-preview 近期已部署进 master)——精确 git add、提交后核 commit diff 只含自己改动、部署用干净 origin/master worktree。
 
-## 0. 真机前置探针（决定 edge 采集形态）
+## 0. KEEP(已部署/复用,不动)
 
-- [ ] 0.1 跑只读探针 `../aidcp-edge/scripts/self-identity-probe.ts`（已登录工程师大白、独立 Chrome on 9222），确认：网页左栏/顶部账号区头像旁**是否暴露登录用户昵称文本**。命中 → 就地零跳转自作用域读；不命中 → 仅 navigate/重确立路径读，并在 5.4 验收标准诚实写明命中场景 <!-- GATED：需真机已登录账号 -->
+- [x] 0.1 `accounts.nickname` 列 + 自愈 ALTER + 迁移 0021 + `AccountStore.setNickname`(单写拒空)+ 其测试 <!-- cloud 4c7fea2 已部署 -->
+- [x] 0.2 panel-store nickname 暴露 + 发布历史折叠;console `accountDisplayName` helper <!-- cloud 4c7fea2 / console b8484ce 已部署 -->
+- [x] 0.3 `ProfileDetailPayload.nickname`(interaction-feed-enrichment 既有,角色消费,**勿动**);`dev-run.sh` 去强制 default(身份引导,仅删过时昵称注释) <!-- 既有 -->
 
-## 1. aidcp-edge — 登录账号自身昵称采集（DOM-first、自作用域、诚实失败） <!-- edge 28ba097 -->
+## 1. REVERT 初版错放(edge 决策 + cloud hello 摄取)
 
-- [x] 1.1 `src/comm/protocol.ts`：`HelloPayload` 加 `nickname?: string` + 注释；与 cloud 逐字一致；**不**新增 MessageType <!-- edge 28ba097 -->
-- [x] 1.2 `src/cdp/self-identity.ts`：昵称读改**自作用域**——`IN_PLACE_SCAN_JS` 在 `navScope` 内取 nickname/redId；in-place 返回用 `signals.nickname`，**不调**无作用域 `readDisplay`；navigate 路径在自己主页读保留作兜底 <!-- edge 28ba097 红线修复 -->
-- [x] 1.3 `src/client/edge-client.ts`：`EdgeClientOptions` 加 `nickname?`；hello 携带；`setNickname()` setter <!-- edge 28ba097 -->
-- [x] 1.4 `src/main.ts`：握手 + 重确立身份按诚实闸传入 nickname（`idRes.ok && displayName 非空 && decision.kind==='use' && !mismatch`） <!-- edge 28ba097 -->
-- [x] 1.5 确认 edge→cloud 握手、不引入 cloud→edge 命令 → **未改** onMessage 白名单 <!-- edge 28ba097 确认无改 -->
+- [ ] 1.1 cloud + edge `src/comm/protocol.ts`:删 `HelloPayload.nickname`(两份逐字一致)
+- [ ] 1.2 cloud `src/comm/handler.ts`:删 onHello nickname 摄取(~:330-337)+ `HandlerDeps.recordAccountNickname`(~:94-97)+ 3 个 handler 昵称测试;`src/server.ts`:删 `recordAccountNickname` 接线(~:695-696)
+- [ ] 1.3 edge `src/client/edge-client.ts`:revert nickname 透传 + `setNickname`;`src/main.ts`:revert nickname var + 诚实闸
+- [ ] 1.4 edge `src/cdp/self-identity.ts`:in-place 路径 `displayName=null`/`redId=null`(**不**恢复无作用域 `readDisplay`,避免复活 feed-author-as-self 错配)+ 撤 displayName 日志装饰 + 撤对应 self-identity.test.ts 用例
+- [ ] 1.5 edge `scripts/dev-run.sh`:删过时的昵称闸注释(~:39-41,保留文件本身)
 
-## 2. aidcp-cloud — 持久化（自愈 DDL）+ 消费 + 面板暴露 <!-- cloud 95f3db6 -->
+## 2. aidcp-edge — 通用纯执行能力(direct 直navi + 昵称读解耦数字门)
 
-- [x] 2.1 `src/comm/protocol.ts`：`HelloPayload` 同步加 `nickname?`，与 edge 逐字一致；穷举不变 <!-- cloud 95f3db6 -->
-- [x] 2.2 `src/comm/command-bridge.ts`：**确认无改动**（hello 是握手、非动作映射） <!-- cloud 95f3db6 未改、确认 -->
-- [x] 2.3 `src/account-store.ts`：`CREATE TABLE` 加 `nickname TEXT` + 追加幂等 `ALTER … ADD COLUMN IF NOT EXISTS nickname TEXT`（init() 自愈） <!-- cloud 95f3db6 -->
-- [x] 2.4 `src/account-store.ts`：`setNickname` 单写 `INSERT … ON CONFLICT DO UPDATE`，拒空白 + 防御性长度上限 <!-- cloud 95f3db6 -->
-- [x] 2.5 `src/comm/handler.ts` onHello：按 `session.accountId` 持久化、仅非空写、**try/catch fire-and-forget 不阻塞握手**；`recordAccountNickname` 依赖经 server.ts 接线 <!-- cloud 95f3db6 -->
-- [x] 2.6 `src/panel/panel-store.ts`：`PanelAccount`/`AccountJoinRow`/`toAccount` 加 `nickname`，`ACCOUNT_SELECT` 加 `a.nickname`（无新 join）；发布历史 accountLabel 折叠 `nickname ?? label ?? account_id`。（`panel/types.ts` 无 PanelAccount，API 直接返回 panel-store 类型，无需镜像） <!-- cloud 95f3db6 -->
-- [x] 2.7 `migrations/0021_account_nickname.sql`：文档伴随（非执行） <!-- cloud 95f3db6 -->
+- [ ] 2.1 `src/comm/protocol.ts`:加 `ProfileOpenPayload.direct?: boolean`(与 cloud 逐字一致)+ 注释「云端指定时直接 Page.navigate 到该主页 id、不 scrape 当前页」
+- [ ] 2.2 `src/browse/browse-session.ts` `openAuthorProfile`(~:1577):`direct===true && authorId` → 直接 `Page.navigate` 到 `https://www.xiaohongshu.com/user/profile/<authorId>`;缺省/false 维持 scrape 路径**逐字不变**;edge **不带** isSelf 标志
+- [ ] 2.3 `src/browse/browse-session.ts`(~:1696):昵称读与数字门解耦——`extracted===false` 也报 `.user-name`/`.user-nickname` + `document.title`(「<名> - 小红书」去尾)兜底
+- [ ] 2.4 测试:by-id open 导航到 `/user/profile/<id>`、不 scrape;昵称在 counts 缺失时仍被带回
 
-## 3. docs — 协议文档同步（本仓） <!-- 本仓本 commit -->
+## 3. aidcp-cloud — nickname_enricher 角色 + 隔离 + 时序
 
-- [x] 3.1 `docs/protocol.md`：§3 hello payload 加 `nickname` 字段说明 <!-- 本仓 -->
-- [x] 3.2 `docs/protocol.md`：头部 v2 消息计数**保持 56 不变**（无新 MessageType）——已确认不改 <!-- 本仓 -->
+- [ ] 3.1 `src/comm/protocol.ts`:加 `ProfileOpenPayload.direct?`(与 edge 逐字);`command-bridge` 确认 `params` 原样透传 `direct`(无新映射)
+- [ ] 3.2 `src/account-store.ts`:加 `getNickname(accountId)` 读 API
+- [ ] 3.3 `src/server.ts` / `buildDispatcher`:握手同步算 `pendingNicknameCapture`(非 'default' && getNickname IS NULL),存 `SessionContext`;注入 `getNickname`+`setNickname` 进 dispatcher(非 hello 路径)
+- [ ] 3.4 `SessionContext`:加 `pendingNicknameCapture`(同步布尔)、`selfCaptureInFlight` 标记(reset() 清)、每连接尝试计数(K=3)、~20s 超时句柄
+- [ ] 3.5 `src/event-bus/types.ts`:`RoleName` 加 `nickname_enricher`;`RoleEventMap` 加云端内部事件 `self.profile.capture{accountId}`(**不**入 protocol)
+- [ ] 3.6 新 `src/agents/nickname-enricher.ts`:订阅 `feed.entered{session_start}`(同步:若 pending && !inFlight → suspend+marker+武装超时+emit self.profile.capture);订阅 `profile.detail.arrived`(`detail.authorId===evt.accountId` 时:取消超时 → `setNickname`(非空)→ 清 marker → resume → emit `feed.entered{back_to_feed}`;空则尝试计数++仍回 feed);在 `setup()` roles[] 注册
+- [ ] 3.7 `src/orchestrator/role-dispatcher.ts`:`setupCommandTranslation` 加 `self.profile.capture` → `sendCommand({action:'profile_open', params:{authorId, direct:true, thinkMs}})`(**不**复用 profile.entered);chokepoint(~:357-364)限定放行 `selfCaptureInFlight && action==='profile_open'`(非 blanket)
+- [ ] 3.8 隔离守卫(均必需):`profile-browser.ts`(:34 透 accountId,本人 `detail.authorId===accountId` 早退、不 emit profile.browsed);profile.done 关注自跳过(~:973);`server.ts:583` upsertMeta 自跳过(`d.authorId===evt.accountId` return)
+- [ ] 3.9 测试:门控(非 default & NULL 才采)/幂等(非空不再绕)/非空才写;ProfileBrowser 自跳过回归(合法他访问仍 emit profile.browsed,与角色注册序无关);server 自 meta 跳过;无自关注命令;chokepoint 丢 open_note 但放自 profile_open;超时恢复回 feed
 
-## 4. aidcp-console — 账号名展示真名（统一回落 helper） <!-- console b8484ce -->
+## 4. docs — 协议同步(计数 56)
 
-- [x] 4.1 `src/types/api.ts`：`PanelAccount` 加 `nickname: string | null` <!-- console b8484ce -->
-- [x] 4.2 新增 `src/types/accountDisplay.ts`：`accountDisplayName(nickname,label,accountId) => nickname||label||accountId`（绝不造假） <!-- console b8484ce -->
-- [x] 4.3 `src/components/AccountsTable.tsx`：账号列走 helper（覆盖 Dashboard + Accounts） <!-- console b8484ce -->
-- [x] 4.4 `src/components/AccountTotalsTable.tsx`：**客户端 join**（`DashboardSummary.accounts` → 名）渲染 `nickname ?? accountId`，**未**加宽服务端 GROUP-BY；两处调用站点（Dashboard/Monitor）已传 accounts <!-- console b8484ce -->
-- [x] 4.5 Tier2：发布筛选下拉、通知联系人页**账号选择器**走 helper（**未**碰联系人「昵称」列）；发布历史列/抽屉由 2.6 云端折叠覆盖、console 零改 <!-- console b8484ce -->
-- [ ] 4.6 DEFER（记录、不做）：人设页 DTO 加宽 + 监控/Dashboard 告警与互动列 + 配额页 + 用量页（accountId-only DTO） <!-- DEFER (YAGNI) -->
+- [ ] 4.1 `docs/protocol.md`:hello payload 去 `nickname`、profile.open payload 加 `direct`;头部 v2 计数**保持 56**(无新 MessageType)
 
-## 5. 验证（红线 + 回归）
+## 5. 验证(红线 + 回归)
 
-- [x] 5.1 typecheck：edge `npm run typecheck` 全绿；cloud 本 change 6 源文件 typecheck 干净（全项 typecheck 受并发 WIP publish-agent/role-dispatcher 污染、非本 change）；console `tsc --noEmit && vite build` 绿 <!-- 06-27 -->
-- [x] 5.2 acceptance：edge 11/11；cloud 26/26（`AC-PROTO-*` 计数仍 56、两端一致 / `AC-RISK-*` / publish-approval / search 全过） <!-- 06-27 -->
-- [x] 5.3 测试：edge `npm test` 365/365（含 3 新 self-identity 红线用例）；cloud 隔离跑本 change 相关 41+23 用例（account-store/handler/handler-attribution/panel-server/panel-store + 新增 setNickname/onHello 持久化/不阻塞握手）全绿。cloud 全量 `npm test` 受并发 WIP 阻塞（publish-agent/role-dispatcher 半成品），非本 change <!-- 06-27 隔离验证 -->
-- [ ] 5.4 真机 E2E（gated）：登录账号自作用域采到真名 → 随 hello 上报 → PG `accounts.nickname` 落值 → console 显示真名；读不到不伪造、不错配。**归档以真机命中率为闸** <!-- GATED -->
+- [ ] 5.1 两仓 `npm run typecheck`(protocol 不漂移、计数 56);console 不动
+- [ ] 5.2 两仓 `npm run test:acceptance`:`AC-PROTO-*`(计数 56、两端一致)/ `AC-RISK-*` / `AC-PUB-*` 必过
+- [ ] 5.3 两仓 `npm test` 全量绿(隔离跑本 change 相关:角色/隔离/chokepoint/超时/edge direct/昵称解耦);并发 WIP 阻塞全量时用干净 worktree 验
+- [ ] 5.4 真机 E2E(gated):本人主页 direct 采到真名 → 库 `accounts.nickname` 落值 → console 显示;采空不伪造;**自己绝不进关注/互动流/去重**;采过不再绕路;edge 静默 ~20s 超时回 feed
 
-## 6. 收尾与归档
+## 6. 收尾与部署
 
-- [x] 6.1 按 sub-repo 分节回写进度（本文件 + shas） <!-- 本仓 -->
-- [x] 6.2 `openspec validate account-real-nickname --strict` 通过 <!-- 06-27 valid -->
-- [x] 6.3 cloud 已部署 ECS（06-27, fix sha `4c7fea2`）：干净 worktree + 内容级 dry-run + 备份 cloud.bak.20260627-093301 + 仅 rsync 本 change 6 文件（不co-ship gated 的 prompt-preview）+ 重启 + healthcheck 全绿（active/8787/飞书长连接/select 1/**nickname 列已加 + default 与真实 24hex 行 nickname 均 NULL=零回归**/isales 未碰）。**事故+修复**：首次部署失败致 prod down ~1min——`git add server.ts` 把并发 session-auto-resume WIP（resume-config-store import 等）裹进 95f3db6 → master 的 server.ts 引用 master 不存在的文件 → ERR_MODULE_NOT_FOUND 启动失败；即时回滚恢复 → 修 master（server.ts 还原为 bab4339+本change，剔除 resume WIP，其 WIP 还原为他人未提交工作树）→ push 4c7fea2 → 干净 master worktree typecheck 0 错 → 重部署成功。**console(b8484ce) 已部署(06-27)**：干净 worktree build（`index--UkkCngi.js`，bundle 校验排除 gated 的 prompt-preview/resume UI——续场=0/互动联系人=0）+ 备份 console.bak.20260627-094943 + rsync dist→/opt/aidcp/console（不动 /downloads 独立 alias）+ verify（index.html 引新 bundle / 200 / /api 200 / nginx ok）。账号列现按 nickname→label→accountId 显示：default 行显 default、真实 24hex 行 `63e2ff05…0049ce` 显其 ID（nickname 待新 edge 自作用域采）。**剩**：跑新 edge(28ba097)登录工程师大白 + 真机探针 0.1 + E2E 5.4 + 归档 6.4 <!-- cloud 4c7fea2 + console 已部署; 真机 pending -->
-- [ ] 6.4 `/opsx:archive` 归档（delta 合并进 `openspec/specs/accounts-master-data`） <!-- 待 6.3 + 5.4 -->
+- [ ] 6.1 按 sub-repo 分节回写进度(`<!-- <repo> <sha> -->`)
+- [ ] 6.2 `openspec validate account-real-nickname --strict` 通过
+- [ ] 6.3 部署 ECS(显式):干净 origin/master worktree + 内容级 dry-run + 备份 + 重启 + healthcheck(计数 56 / 角色就绪 / 列在)+ 真机验;绝不碰 isales
+- [ ] 6.4 `/opsx:archive` 归档(delta 并入 `openspec/specs/accounts-master-data`)
