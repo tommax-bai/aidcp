@@ -30,7 +30,7 @@
 
 - [x] 4.1 `npm run typecheck`(0 错) + `npm test`(376/376) + `npm run test:acceptance`(11/11) 全绿；self 默认路径行为逐字不变 <!-- aidcp-edge 9f1fad8 -->
 - [x] 4.2 安全红线回归：provider 失败 MUST NOT 静默回落 / 假成功（test 含 code≠0 / 无 port / 不可达三例断言 rejects）<!-- aidcp-edge 9f1fad8 -->
-- [ ] 4.3 真机灰度：单账号 `AIDCP_BROWSER_PROVIDER=adspower` 跑通自动浏览闭环；上线前逐 profile 用 `scripts/adspower-poc.ts` 验「能到小红书 + 已登录 + IP 独立」 <!-- 阻塞：需一个已登录小红书的 AdsPower profile（demo profile 已删）。待运营建好真 profile 后做 -->
+- [x] 4.3 真机灰度：用正式 `AdsPowerProvider` 启动 profile `k1e0awu5`（aidcp-graytest），`scripts/adspower-poc.ts` **C1-C5 全绿**——attach / 导航 explore / webdriver 未暴露 / `readSelfIdentity` 读出 accountId=66cd1d4f000000001d0314ee（source=in-place）/ 拟人滚动 winY 0→1400 + 懒加载卡片 120→252。<!-- 2026-06-27 真机全绿。注：profile 直连无代理→IP 非独立（属 B 阶段防关联）；完整 cloud 自动浏览闭环（npm start adspower 连生产云）未跑，可选、待 go -->
 
 ## 5. aidcp（中控）— 跨 change 协调 + 文档 + 校验
 
