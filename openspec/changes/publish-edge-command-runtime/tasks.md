@@ -10,7 +10,7 @@ repo 取值：aidcp-cloud / aidcp-edge / aidcp（本中控仓）。代码改动�
 
 ## 0. 前置确认（中控）
 
-- [ ] 0.1 确认 sub-repo 在机：`ls -d ../aidcp-edge ../aidcp-cloud` 均存在；记两份 `src/comm/protocol.ts` 的 `MessageType` 基线（**47**，目标 **49**）。**验证**：`openspec validate publish-edge-command-runtime --strict` 当前可过；`openspec list` 仅本 change 活跃
+- [ ] 0.1 确认 sub-repo 在机：`ls -d ../aidcp-edge ../aidcp-cloud` 均存在；记两份 `src/comm/protocol.ts` 的 `MessageType` 基线（**47**，目标 **49**）。**验证**：`openspec validate publish-edge-command-runtime --strict` 当前可过；`openspec list` 仅本 change 活跃 <!-- 注：基线 47→49 为本 change 单独口径；协议已随并发 change 共同演进到 56（本 change 自身 +2 publish.command/result 已落两份 protocol.ts，见 1.1.1/1.2.1）。判据「openspec list 仅本 change 活跃」已过时（当前多 change 并发），勿据此自动勾选 -->
 
 ## 1. 协议三处同步（+2 消息、`kind` 枚举）— 第 ① 组
 

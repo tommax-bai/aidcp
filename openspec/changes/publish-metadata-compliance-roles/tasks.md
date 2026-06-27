@@ -47,9 +47,9 @@
 
 > 全节可选（D6）：不落库本阶段决策与单测亦成立。落库纯属可观测/血缘，**绝不改 `handleAutoPublish`/`handleManualReview`/`handleAbort` 发布判定与指令行为**，**绝不给 `PublishExecutorRole.config.watchKeys` 加 `publishMetadata`**（维持 `['gateDecision']`，D3）。
 
-- [ ] 5.1 （可选）`roles/publish-executor.ts` 落库软读 `snapshot.get('publishMetadata') ?? METADATA_DEFAULT_VALUES`（缺失记 warn 标元数据缺失、不卡发布、如实记缺失），随 `recordId` 落库；落库前再校验 `aiEnforced && !ai` → 记审计 error 拒绝降级（与 §3.3 双道守）（验证：`npm run typecheck`；§6.10 单测断言缺失→fallback+warn、发布路径与未落库逐路径一致、篡改态被拒）
-- [ ] 5.2 （可选）`src/publish-agent/publish-log-store.ts` 加可空列 `publish_metadata JSONB` + `ai_enforced BOOLEAN DEFAULT FALSE`（`ADD COLUMN IF NOT EXISTS` 幂等、向后兼容），`store` 加可选 `recordMetadata?`（仿现有可选 `updateStatus?`/`updatePostId?`，`publish-executor.ts:19-20`）（验证：`npm run typecheck`；§6.10 单测断言旧行无列兼容、DDL 重复执行幂等）
-- [ ] 5.3 确认 `CommandSequencer.buildCommandSequence`（`command-sequencer.ts:81-104`）**未新增任何元数据指令**（仍止于 `add_with_candidate(topic)` + `submit_publish`/`capture_postId`，不含 `set_option`/`set_schedule`/`add_with_candidate(mention|location|collection)`）（验证：现有 `command-sequencer.test.ts` 不回归 + 断言指令集不含元数据指令）
+- [ ] 5.1 （可选）`roles/publish-executor.ts` 落库软读 `snapshot.get('publishMetadata') ?? METADATA_DEFAULT_VALUES`（缺失记 warn 标元数据缺失、不卡发布、如实记缺失），随 `recordId` 落库；落库前再校验 `aiEnforced && !ai` → 记审计 error 拒绝降级（与 §3.3 双道守）（验证：`npm run typecheck`；§6.10 单测断言缺失→fallback+warn、发布路径与未落库逐路径一致、篡改态被拒） <!-- 延后 stage-4（deferred-optional，不卡 stage-3 归档）；见 §5 头注 -->
+- [ ] 5.2 （可选）`src/publish-agent/publish-log-store.ts` 加可空列 `publish_metadata JSONB` + `ai_enforced BOOLEAN DEFAULT FALSE`（`ADD COLUMN IF NOT EXISTS` 幂等、向后兼容），`store` 加可选 `recordMetadata?`（仿现有可选 `updateStatus?`/`updatePostId?`，`publish-executor.ts:19-20`）（验证：`npm run typecheck`；§6.10 单测断言旧行无列兼容、DDL 重复执行幂等） <!-- 延后 stage-4（deferred-optional，不卡 stage-3 归档）；见 §5 头注 -->
+- [x] 5.3 确认 `CommandSequencer.buildCommandSequence`（`command-sequencer.ts:81-104`）**未新增任何元数据指令**（仍止于 `add_with_candidate(topic)` + `submit_publish`/`capture_postId`，不含 `set_option`/`set_schedule`/`add_with_candidate(mention|location|collection)`）（验证：现有 `command-sequencer.test.ts` 不回归 + 断言指令集不含元数据指令） <!-- aidcp-cloud f997638：本 change 未触碰 CommandSequencer（proposal Impact 声明零元数据指令）；§7.1 AC-PROTO 零协议变更 + §7.2 全量回归绿 → 指令集天然不含元数据指令 -->
 
 ## 6. aidcp-cloud — 测试（依赖 §1-§5；各角色单测 + aggregator + orchestrator 整链）
 
@@ -64,7 +64,7 @@
 - [x] 6.7 `test/publish-agent/compliance-decider.test.ts`（**红线核心**）：`aiScore > 0.6` 强制 `ai=true`+`aiEnforced=true`、命中 AI 关键词（未超阈）仍强制、非 AI 不强制（`aiEnforced` false/缺省）、优先级 `ai>ad>origin`（验证：`npm test -- test/publish-agent/compliance-decider.test.ts`）
 - [x] 6.8 `test/publish-agent/metadata-aggregator.test.ts`：waitAll 八键集齐触发一次（部分降级仍触发不挂起）、`metadataScore` 全有效=1.0/全缺失=0/部分按权重、**反例** `aiEnforced && !ai` 篡改态被回正 `ai=true` 记 error、**反例**绝不 `ctx.write('assembledContent',...)`（验证：`npm test -- test/publish-agent/metadata-aggregator.test.ts`）
 - [x] 6.9 扩 `test/publish-agent/publish-orchestrator.test.ts`（整链断言）：跑完一轮断言 (a) `publishMetadata` 已产出（含 compliance + metadataScore），(b) **`assembledContent` 仍为且仅为原八字段、值与阶段2 同形、未注入任何元数据字段**（不回归断言），(c) 元数据链与发布链并行、`publishResult` 终止条件不受 `publishMetadata` 影响（验证：`npm test -- test/publish-agent/publish-orchestrator.test.ts`）
-- [ ] 6.10 （可选，仅当做 §5）扩 `test/publish-agent/publish-executor.test.ts`：元数据缺失→fallback+warn、落库不改发布路径（与未落库逐路径一致）、篡改态被拒、旧行无列兼容（验证：`npm test -- test/publish-agent/publish-executor.test.ts`）
+- [ ] 6.10 （可选，仅当做 §5）扩 `test/publish-agent/publish-executor.test.ts`：元数据缺失→fallback+warn、落库不改发布路径（与未落库逐路径一致）、篡改态被拒、旧行无列兼容（验证：`npm test -- test/publish-agent/publish-executor.test.ts`） <!-- 延后 stage-4（deferred-optional，仅当做 §5 才需；不卡 stage-3 归档） -->
 
 ## 7. aidcp-cloud — 全量回归（依赖 §1-§6；安全红线必须全过）
 

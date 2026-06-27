@@ -25,7 +25,7 @@
 - [x] 3.1 `src/server.ts`：**APPEND**（不改 C 的 model-resolver 块）—— 装配 `PersonaStore`（`init()` 建表 + reload；PG 不可用则不建、人设全程回落打包默认、不 brick）+ `PersonaFacade`，把 `resolvePersona` / `getSoul` 注入 `RoleDispatcher` 与 `PublishScheduler` <!-- cloud c7abc67 personaStore.init() 放在 accountState.init() 之后（FK 依赖 accounts 先建好）、RoleDispatcher 构造之前；init 失败 try/catch 全程回落不 brick；删除原 `const soul = loadSoul()`、两处注入改 getSoul -->
 - [x] 3.2 `src/panel/panel-server.ts`：按 C→D→F→B 顺序**追加**人设路由 `GET /api/persona`、`GET /api/persona/:accountId`、`PUT /api/persona/:accountId`（受现有 JWT 守护；`PUT` 经 facade、写非乐观回真态、`persona_invalid` 诚实拒绝）<!-- cloud c7abc67 追加于 prompt-preview 块后、404 兜底前；persona_invalid→400 / unknown_account→404 / persona_type→400；未注入→503。注：D(quotas) 尚未落地，本流 F 当前排在 C 之后、B 之前（独立 if 块、顺序不影响正确性） -->
 - [x] 3.3 `src/panel/types.ts`：按序**追加**人设面板类型（账号人设视图 / 写结果 / `reason` 联合含 `persona_invalid`），不改他流类型 <!-- cloud c7abc67 PersonaSource / PersonaConfigRowView / PersonaConfigCatalogView / PersonaDetailView / PersonaSetResult(reason: unknown_account|persona_invalid) / PanelPersonaConfig + PanelDeps.persona? -->
-- [~] 3.4 `src/account-store.ts`：与 stream B 协调，激活 `persona_ref` 语义（标记账号是否有自定义人设）——**加性**，不删 B 的昵称字段 <!-- cloud c7abc67 **刻意不做（偏离设计）**：persona_config 行存在与否即「是否有自定义人设」的单一真相源；写 persona_ref 是冗余双写、会与 persona_config 漂移，违「状态单写」纪律。account-store.ts 未改（也避开与 stream B 的共享文件冲突）。persona_ref 列保持保留。 -->
+- [x] 3.4 `src/account-store.ts`：与 stream B 协调，激活 `persona_ref` 语义（标记账号是否有自定义人设）——**加性**，不删 B 的昵称字段 <!-- cloud c7abc67 **刻意不做（偏离设计）**：persona_config 行存在与否即「是否有自定义人设」的单一真相源；写 persona_ref 是冗余双写、会与 persona_config 漂移，违「状态单写」纪律。account-store.ts 未改（也避开与 stream B 的共享文件冲突）。persona_ref 列保持保留。 -->
 
 ## 4. aidcp-console — 人设页（路由 + 导航 + 非乐观写）
 

@@ -14,7 +14,7 @@
 
 - [x] 3.1 cloud 单测：`computeThinkMs` familiar→≈1/3 且 ≥150 下限、全新→全量、`computeDwellMs` 不受 familiar 影响（pacing 11/11）；定向跑 pacing+content-evaluator+role-dispatcher 30/30 全过 <!-- 我的文件 typecheck 干净；全量 typecheck 被并发 cloud WIP（FakePusher）阻塞 -->
 - [ ] 3.2 cloud 单测：返回后二次评估仍发生（候选过滤未排除 evaluated）<!-- 结构上已保留（仅新增 markEvaluated，未改 filter）；待补显式断言 -->
-- [ ] 3.2b 待并发 WIP 落定（FakePusher 修复、typecheck 恢复绿）后补 edge navigateBack 测试 + 全量回归
+- [ ] 3.2b 待并发 WIP 落定（FakePusher 修复、typecheck 恢复绿）后补 edge navigateBack 测试 + 全量回归 <!-- 并发 WIP 已落定（cloud 3c84ccf / edge 9126e04，typecheck 恢复绿）、全量回归已绿（见 3.4，2026-06-19 cloud 185/185 + edge 251/251）；仅余 navigateBack 专项单测（与 3.3 重复） -->
 - [~] 3.3 edge navigateBack 显式单测未补（同文件交织 + 时间紧）；现有 edge 全量 251/251 通过、含 command-pacing「不秒退」相关红线 <!-- 待补 navigateBack fastReturn 专项断言 -->
 - [x] 3.4 两仓 `npm run typecheck`（绿）→ `test:acceptance`（cloud 11/11、edge 11/11，AC-PROTO 44 两端一致）→ `test`（cloud 185/185、edge 251/251） <!-- 2026-06-19 合并树（含 captcha WIP）全绿 -->
 
