@@ -52,7 +52,9 @@
 - [x] 7.1 `scripts/launch-multinode.ts` 加 adspower 分支：`AIDCP_ADS_USER_IDS="prof1,prof2"` → 每 profile 一个 adspower 节点；端口/用户数据目录/指纹/IP 由 AdsPower 自管、无需分配；edgeId 默认 `ads-<profileId>`；`AIDCP_ADS_API_KEY/BASE` 随父环境继承 <!-- aidcp-edge da5ba98 -->
 - [x] 7.2 未设 `AIDCP_ADS_USER_IDS` 仍走原 self 多节点（行为不变）；看护/重起/信号两模式共用；新增 `AIDCP_MULTINODE_PRINT=1` 干跑 <!-- aidcp-edge da5ba98；干跑实测 adspower 2 profile / self 2 槽位计划正确，scoped typecheck 0 错 -->
 - [x] 7.3 前提确认：云端多租户 `multi-account-node-support` 已部署 ECS（2026-06-25，cloud 497d1bc+a38fb96）→ 两 edge 两账号不串号；非 default 账号须先后台配人设否则诚实人设闸拒启 <!-- 据 multi-account-node-support tasks §7.3/§2 -->
-- [ ] 7.4 真机灰度：起 ≥2 个 adspower 节点（各登不同小红书测试号 + 各配人设）跑通双号并行闭环 <!-- 待：需 ≥2 个已登录且已配人设的 AdsPower profile -->
+- [x] 7.4 真机灰度：起 2 个 adspower 节点（profile k1e0awu5=账号66cd / k1e0ero8=账号63e2）跑通**双号并行连云闭环**——各起各浏览器、各读各账号、sess-1/sess-2 隔离、各刷各 feed、**不串号**（生产云多租户生效）<!-- 2026-06-27 真机实测 -->
+  - 附带修复 launcher Windows 既有 bug：原 `spawn(.bin/tsx)` Windows ENOENT → 改 `spawn(node --import tsx)` 跨平台 <!-- aidcp-edge 559a18c -->
+  - 待用户核：账号63e2 据称未绑人设却直接浏览——确认后台人设闸是否对其生效
 
 ## 8. 待办（延后/可选）
 
