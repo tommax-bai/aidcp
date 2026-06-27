@@ -39,3 +39,10 @@
 - [x] 5.2 回写 `aidcp/docs/anti-detection.md`（注：在**umbrella** 仓非 edge）Phase 3 + §8：指纹浏览器接入由路线图转实现指针（本 change + `browser-provider.ts` + `scripts/adspower-poc.ts`）<!-- aidcp 本提交 -->
 - [x] 5.3 `openspec validate adspower-browser-provider --strict` 通过
 - [x] 5.4 tasks 进度按 sub-repo 分节回写本仓，完成项标 `[x]` 并附 `<!-- <repo> <commit-sha> 备注 -->` <!-- aidcp 本提交 -->
+
+## 6. aidcp-edge — 默认 provider 翻转为 adspower（BREAKING，用户 2026-06-27 拍板）
+
+- [x] 6.1 `selectBrowserProvider` 缺省 self→adspower；模块 header / 函数 doc / `main.ts` header env 文档同步 <!-- aidcp-edge 3653a0a -->
+- [x] 6.2 self 专属路径钉回 self：`scripts/launch-multinode.ts` 冻结 env 设 `AIDCP_BROWSER_PROVIDER='self'`（槽位=端口+目录 self 专属）；`src/electron/main.cjs` spawn env 钉 self（`'self'` 在前、`...process.env` 可覆盖）<!-- aidcp-edge 3653a0a -->
+- [x] 6.3 更新单测（默认 adspower 缺 user_id 报错 / 默认 adspower 全配 / 显式 self）；typecheck 0 / 全量 380 / acceptance 11 全绿 <!-- aidcp-edge 3653a0a -->
+- [x] 6.4 spec / proposal / design 同步「默认 adspower + BREAKING + self 专属路径钉回」措辞 <!-- aidcp 本提交 -->

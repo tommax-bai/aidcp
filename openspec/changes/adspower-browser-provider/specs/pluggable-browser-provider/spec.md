@@ -1,16 +1,20 @@
 ## ADDED Requirements
 
-### Requirement: 浏览器启动层可插拔且默认 self
+### Requirement: 浏览器启动层可插拔且默认 adspower
 
-edge 的**浏览器启动与生命周期**层 SHALL 经一个可选的 provider 选择，由 `AIDCP_BROWSER_PROVIDER` 决定，取值 `self` 或 `adspower`，**缺省为 `self`**。`self` 提供商 SHALL 自起一个真实指纹 Chrome，其行为与本能力引入前**逐字等价**；`adspower` 提供商 SHALL 把浏览器启动与生命周期托管给 AdsPower 指纹浏览器。provider 的职责边界 SHALL **仅限启动与生命周期**，MUST NOT 改动 CDP 接入及其下游（定位 / 拟人 / 读身份）。
+edge 的**浏览器启动与生命周期**层 SHALL 经一个可选的 provider 选择，由 `AIDCP_BROWSER_PROVIDER` 决定，取值 `self` 或 `adspower`，**缺省为 `adspower`**。`adspower` 提供商 SHALL 把浏览器启动与生命周期托管给 AdsPower 指纹浏览器，并要求显式指定目标 profile（`AIDCP_ADS_USER_ID`），缺失即诚实报错；`self` 提供商（经显式 `AIDCP_BROWSER_PROVIDER=self` 选用）SHALL 自起一个真实指纹 Chrome，其行为与本能力引入前**逐字等价**。provider 的职责边界 SHALL **仅限启动与生命周期**，MUST NOT 改动 CDP 接入及其下游（定位 / 拟人 / 读身份）。以 self 为前提的编排路径（同机多节点启动器、Electron 桌面外壳）SHALL 各自显式钉回 `self`，不因默认翻转而启动失败。
 
-#### Scenario: 未设 provider 时行为与现状等价
+#### Scenario: 未设 provider 时默认走 AdsPower
 - **WHEN** 启动 edge 且未设置 `AIDCP_BROWSER_PROVIDER`
-- **THEN** 走 `self` 提供商自起真实指纹 Chrome，启动 / 复用 / 登录等待 / 回收行为与本能力引入前一致，不依赖任何外部浏览器服务
+- **THEN** 默认走 `adspower` 提供商：已配 `AIDCP_ADS_USER_ID` 则经 AdsPower 启动该 profile 并接管生命周期；未配则诚实报错停手，绝不静默回落 self
 
-#### Scenario: 显式切到 AdsPower 提供商
-- **WHEN** 设 `AIDCP_BROWSER_PROVIDER=adspower` 并提供目标 AdsPower profile 标识
-- **THEN** edge 不再自起 Chrome，而是经 AdsPower 启动该 profile 的指纹浏览器并接管其生命周期
+#### Scenario: 显式切到 self 提供商
+- **WHEN** 设 `AIDCP_BROWSER_PROVIDER=self`
+- **THEN** edge 自起真实指纹 Chrome，启动 / 复用 / 登录等待 / 回收行为与本能力引入前一致，不依赖任何外部浏览器服务
+
+#### Scenario: self 专属编排路径不受默认翻转影响
+- **WHEN** 经同机多节点启动器或 Electron 桌面外壳启动 edge，且未在外部显式覆盖 provider
+- **THEN** 这些路径各自钉回 `self`、自起真实指纹 Chrome，不因默认翻为 adspower 而启动失败
 
 ### Requirement: CDP 接入层在 provider 之下保持不变
 

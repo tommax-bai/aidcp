@@ -11,7 +11,7 @@ edge 今天**自己 spawn 真实 Chrome** 并经 CDP 接入：`launchChrome`（`
 **Goals:**
 - 让 edge 能**可选**地把浏览器启动 / 生命周期托管给 AdsPower 指纹浏览器，实现同机多账号**防关联**（每 profile 独立指纹 + 独立代理 + 独立账号）。
 - **接缝最小**：只换「启动 / 生命周期」一层，CDP attach 及以下（定位 / 拟人 / 读身份）**零改动**。
-- **默认零变化**：`self` 仍是默认 provider，自起真实指纹 Chrome，行为同今天；AdsPower 为显式 opt-in。
+- **主路径默认 adspower**（BREAKING）：`AIDCP_BROWSER_PROVIDER` 缺省 = adspower（用户主用路径）；`self`（行为同今天）经显式选用。self 专属编排路径（多节点 / 桌面）各自钉回 self，不被默认翻转破坏。
 - 修订 `multi-account-node-support` 把指纹浏览器列为绝对禁止的 Non-Goal，画清「默认 self / opt-in AdsPower」边界。
 
 **Non-Goals:**
@@ -27,9 +27,11 @@ edge 今天**自己 spawn 真实 Chrome** 并经 CDP 接入：`launchChrome`（`
 **理由**：AdsPower 的 `start` 返回标准 DevTools `debug_port`（`/json` / `/json/version` / ws 都在），与 edge 接入层天然兼容——PoC 已真机验证现成 `attachToPage` 零改动连上（C1 ✅）。把抽象边界精确切在「启动 / 生命周期」与「CDP 接入」之间，改动面最小、风险最低。
 **取舍 / 备选**：① 直接在 `main.ts` 里 if/else 两条启动路径——否决，启动逻辑会和身份 / 反检测装配缠在一起、难测；② 走 AdsPower 的 Selenium/Puppeteer SDK——否决，会绕开 edge 自研裸 CDP 接入层、等于重写定位 / 拟人。
 
-### D2. provider 选择经 env，默认 `self`，非 BREAKING
-**选择**：`AIDCP_BROWSER_PROVIDER ∈ {self, adspower}`，缺省 `self`。未设 = 今天的行为，逐字等价。
-**理由**：opt-in 才动新路径，存量单机 / 多节点部署零影响；回滚 = 不设该 env。
+### D2. provider 选择经 env，**默认 `adspower`**（BREAKING，用户 2026-06-27 拍板）
+**选择**：`AIDCP_BROWSER_PROVIDER ∈ {self, adspower}`，缺省 **`adspower`**。裸 `npm start` 默认走 AdsPower，须配 `AIDCP_ADS_USER_ID`，否则诚实报错（绝不静默回落 self）；`self` 经显式 `AIDCP_BROWSER_PROVIDER=self` 选用。
+**理由**：用户主用路径已是 AdsPower（生产多账号防关联），让主路径免去每次设 env。
+**BREAKING 处置**：两条 self 专属编排路径在代码内各自钉回 self，不被默认翻转破坏——`launch-multinode`（槽位 = 端口 + 用户数据目录，self 专属；adspower 多 profile 编排尚未支持）在冻结 env 里设 `AIDCP_BROWSER_PROVIDER='self'`；Electron 桌面外壳（自带 `chrome-launcher.cjs` 自起 9222）spawn env 钉 `self`（`'self'` 在前、被 `...process.env` 覆盖 → 外部可显式改）。整体回滚 = 把 `selectBrowserProvider` 缺省改回 self。
+**取舍 / 备选**：保持默认 self（原设计、非 BREAKING）——用户否决，要主路径默认 adspower。
 
 ### D3. AdsPower 生命周期映射 + 诚实失败不回落
 **选择**：`AdsPowerProvider.launch()` = `GET /api/v1/browser/start?user_id=<id>&ip_tab=0&headless=<0|1>&launch_args=[...]`（带 Bearer 如配置）→ 解析 `data.debug_port` → 轮询 `/json/version` 就绪 → 返回 `ChromeInstance`，其中 `kill`/`killAndConfirmDead` 调 `browser/stop?user_id=` 并轮询 `browser/active` 确认已关。本地 API 调用串行节流（≥1s 间隔，避开限速）。**任一步失败（API 不可达 / `code≠0` / 无 `debug_port` / profile 未登录致 `readSelfIdentity` 读不出）→ 诚实报错停手**，MUST NOT 静默回落 `self`、MUST NOT 假成功。
@@ -56,7 +58,8 @@ edge 今天**自己 spawn 真实 Chrome** 并经 CDP 接入：`launchChrome`（`
 
 ## Risks / Trade-offs
 
-- **[新增付费常驻依赖]** AdsPower 客户端 + 本地 API 服务（50325）须常驻、按 profile 计费 → 仅 `adspower` 模式需要；`self` 默认路径零依赖，回滚即切回 self。
+- **[BREAKING：默认翻 adspower]** 裸 `npm start` / 任何未配 AdsPower 的节点默认走 adspower，缺 `AIDCP_ADS_USER_ID` 即启动失败 → 缓解：不用 adspower 的部署显式 `AIDCP_BROWSER_PROVIDER=self`；`launch-multinode` 与 Electron 已代码内钉回 self；回滚把缺省改回 self。
+- **[新增付费常驻依赖]** AdsPower 客户端 + 本地 API 服务（50325）须常驻、按 profile 计费 → 仅 `adspower` 模式需要；`self`（现需显式选用）零依赖。
 - **[本地 API 限速 1 req/s]** 多 profile 并发 start/stop 可能触限 → provider 内串行节流（≥1s 间隔）；CDP 流量直连 `debug_port`、不过 50325，不受限。
 - **[双层反检测误配更危险]** 若误把 edge stealth 与 cdp_mask 都开 / 都关 → 自洽被破或裸奔 → 默认值随 provider 锁死（self=on / adspower=off），并在 spec 写明二者**恰一层生效**。
 - **[失去自管生命周期]** `killAndConfirmDead` 改信任 AdsPower stop+active → 回收确认精度下降 → 轮询 `browser/active` 确认 + 超时诚实报告，不假装已关。
@@ -65,7 +68,7 @@ edge 今天**自己 spawn 真实 Chrome** 并经 CDP 接入：`launchChrome`（`
 
 ## Migration Plan
 
-1. **edge 实现（默认不启用）**：落 `browser-provider.ts` + `SelfChromeProvider`（包 `launchChrome`）+ `AdsPowerProvider` + `main.ts` 按 env 选 provider + `AIDCP_STEALTH` 接线。`self` 默认路径行为逐字不变，先全量回归（`npm test` / `test:acceptance` / `typecheck` 绿）。
+1. **edge 实现**：落 `browser-provider.ts`（`SelfChromeProvider` / `AdsPowerProvider`）+ `main.ts` 按 env 选 provider + `AIDCP_STEALTH` 接线；**默认翻为 adspower**，self 专属路径（multinode / electron）钉回 self。全量回归绿（typecheck 0 / test 380 / acceptance 11）。
 2. **跨 change 协调**：软化 `multi-account-node-support` 的指纹浏览器 Non-Goal 措辞（proposal + chrome-instance-isolation spec）。
 3. **运维准备**：逐账号建 AdsPower profile（独立指纹 + 独立住宅 IP + 登录目标小红书号），记 `user_id`；验证每个 profile 「能到小红书 + 已登录」（可复用 `scripts/adspower-poc.ts`）。
 4. **灰度启用**：先单账号 `AIDCP_BROWSER_PROVIDER=adspower AIDCP_ADS_USER_ID=<id>` 跑通真机闭环，再扩多账号。
