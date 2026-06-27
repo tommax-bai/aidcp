@@ -1,4 +1,4 @@
-<!-- 进度（2026-06-27）：§1-§6 + §7.2 实装完成、已 commit+push（cloud 472a2f8 / console 0d4308a / 本仓进度 70d7e59→本次）。代码级验证绿：acceptance 26/26（AC-PROTO/PUB/RISK 全过）+ 自有新测 23/23 + 我方改动文件 tsc 零错。§7.1 全量 npm test/typecheck 被并发 publish-multi-image WIP（其 M types.ts 令 imageUrls/imagePrompts 必填、role 实装未跟上）阻塞，非本 change 代码——待并发 land 后全量复跑。cloud types.ts 经 surgical HEAD-blob+my-hunk 提交（仅含 OrchestratorDeps 回调、不裹挟 multi-image WIP，已验工作树 multi-image WIP 完好保留）。§8 部署/真机/归档 gated。 -->
+<!-- 进度（2026-06-27）：§1-§6 + §7.2 实装完成、已 commit+push（cloud 472a2f8 / console 0d4308a / 本仓进度 70d7e59→本次）。代码级验证绿：acceptance 26/26（AC-PROTO/PUB/RISK 全过）+ 自有新测 23/23 + 我方改动文件 tsc 零错。§7.1 全量 npm test/typecheck 被并发 publish-multi-image WIP（其 M types.ts 令 imageUrls/imagePrompts 必填、role 实装未跟上）阻塞，非本 change 代码——待并发 land 后全量复跑。cloud types.ts 经 surgical HEAD-blob+my-hunk 提交（仅含 OrchestratorDeps 回调、不裹挟 multi-image WIP，已验工作树 multi-image WIP 完好保留）。§8.1 **已部署 ECS 2026-06-27 healthcheck 全绿**（cloud 472a2f8 + console 0d4308a，resume_config 表 0 行零回归，isales 未碰；生产即 feature ON=24/7 默认）；§8.2 真机校准 + §8.3 归档 = operator-driven gated。 -->
 
 ## 1. aidcp-cloud — 配置层（按账号续场护栏 + 看门狗阈值）
 
@@ -47,6 +47,8 @@
 
 ## 8. 部署与归档（显式动作，gated）
 
-- [ ] 8.1 按 §5 安全序列部署 ECS（先备份 → `rsync --dry-run` 摸范围 → rsync 排除 .env/node_modules/.git → restart → healthcheck：8787 / PG `select 1` / 迁移已建列 / 面板 8090 / isales 未碰）；部署后 grep ECS 文件内容 + 看启动日志确认新码生效
+- [x] 8.1 **已部署 ECS（2026-06-27）**：cloud（pristine origin/master worktree 472a2f8 + 内容级 checksum dry-run 仅本变更 15 文件零co-ship → 备份 → rsync 排除 .env/node_modules/.git 无 --delete → restart）healthcheck 全绿（active + 8787/8090 listening + 面板 /api/health ok + 启动日志「续场配置存储已就绪 resume_config」无错 + resume_config 表已建 0 行=零回归 + grep server.ts resumeConfig=5 新码生效 + types.ts imageUrls=0 未带 multi-image WIP + isales 4/4 未碰）；console（pristine master 0d4308a build → 备份 → rsync dist，served index-DN-LhXrz.js + 8088→200 + nginx ok）。**console 从 master HEAD 构建，附带co-ship 已提交但他会话 deploy-gated 的 prompt-preview 人设选择 UI（4e35cbf）+ nav 改名（a5e35d2），纯加性无回归** <!-- cloud 472a2f8 deployed / console 0d4308a deployed 2026-06-27 -->
+<!-- 部署后生产即 feature ON：缺配置默认 rest10%/全天窗口/不限/轻推~2min/放弃1h = 24/7 连刷，运营须经 console「自动续场与看门狗」设活跃时段窗口才不连轴转 -->
+- [ ] 8.2 真机校准（operator-driven）：正常结束→歇 10%→续场；过活跃窗口/达每日上限/风控受限不续；发布触发→会话结束→发布跑完→新场起、无撞页；巡视耗时不计入单场、巡视不被时限掐断；看门狗 1h 生效 + 后台改阈值下场即生效
 - [ ] 8.2 真机校准：正常结束→歇 10%→续场；过活跃窗口/达每日上限/风控受限不续；发布触发→会话结束→发布跑完→新场起、无撞页；巡视耗时不计入单场、巡视不被时限掐断；看门狗 1h 生效 + 后台改阈值下场即生效
 - [ ] 8.3 `openspec validate --strict` 终检 → archive（delta 合并进 `openspec/specs/`，归档目录 `<YYYY-MM-DD>-session-auto-resume-with-excursions/`）
