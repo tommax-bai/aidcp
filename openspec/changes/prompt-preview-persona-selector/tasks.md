@@ -24,6 +24,7 @@
 
 ## 4. 部署与归档（显式动作，gated）
 
-- [ ] 4.1 部署 cloud（备份→rsync 排除 .env/node_modules/.git→restart→healthcheck）+ console 重 build 出静态；按 ECS 全量快照纪律先 dry-run 看范围。
+- [x] 4.1 部署 cloud（备份→rsync 排除 .env/node_modules/.git→restart→healthcheck）+ console 重 build 出静态；按 ECS 全量快照纪律先 dry-run 看范围。<!-- 06-27 部署成功: 从干净 origin/master worktree(cloud 4c7fea2 typecheck+751测试绿 / console a5e35d2 build绿)出, 内容级 --checksum dry-run; cloud 仅 8 内容变更文件(3我源+2我测试+3他人测试, server.ts 已随他人部署在线)→restart→healthcheck全绿(active+8787+8090+所有存储就绪+飞书 onReady+零错误, isales 四服务未碰); console rsync --delete 换新 bundle index-Dv1xOKuX.js, 8088 返200; 备份 cloud/console.bak.20260627-pps.tar.gz + .env.bak. 连带上线 account-real-nickname(他人已部分部署) -->
+
 - [ ] 4.2 真机/后台核对：选不同账号查看同一角色 prompt，人设段随账号变化；未配人设账号显示回落标注。
 - [ ] 4.3 `openspec archive prompt-preview-persona-selector`（delta 合并进 `openspec/specs/role-llm-config`）。
