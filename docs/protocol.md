@@ -13,7 +13,7 @@
 > v2 在保持这条链路向后兼容的同时，新增了三大块：
 > 1. **浏览会话编排**（`note.content`/`browse.*`/`note.open` 等）——云端逐条驱动边缘刷信息流；
 > 2. **角色驱动指令 + 结构化上报**（`page.cards`/`note.detail` 上报，`interaction.like`/`page.scroll` 等下发）——
->    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 15 角色）后的实时控制面；
+>    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 约 32 个角色，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
 > v2 共 **56 个消息类型**，下表按职能分组列全。
@@ -142,8 +142,7 @@
 {
   "edgeId": "edge-01",        // string  边缘节点标识
   "app": "xhs",               // string? 业务/站点标识
-  "capabilities": ["click", "input", "scroll"], // string[]? 能力声明
-  "nickname": "工程师大白"     // string? 当前登录账号自身平台真实昵称（change account-real-nickname）；诚实失败时省略，绝不用 accountId/label 伪造、绝不错配被浏览作者昵称。亦携 accountId?/machineLabel?/remoteAddr?（见 HelloPayload）
+  "capabilities": ["click", "input", "scroll"] // string[]? 能力声明；亦携 accountId?/machineLabel?/remoteAddr?（见 HelloPayload）
 }
 ```
 
@@ -340,7 +339,8 @@
 // note.scroll_comments（CommentReviewer 决策）
 { "noteId": "n123", "thinkMs": 700, "dwellMs": 2000 }
 // profile.open（进入作者主页；边缘点详情页作者头像进入，authorId 仅观测/兜底）
-{ "authorId": "u456", "reason": "作者值得关注评估", "thinkMs": 800 }
+// direct?: boolean — 云端直驱（change account-real-nickname）：true=直接 navi 到 /user/profile/<authorId>、不抓取当前页；缺省/false 维持点头像进入
+{ "authorId": "u456", "reason": "作者值得关注评估", "thinkMs": 800, "direct": false }
 ```
 
 > **深读动作的回报**：`note.browse_images` / `note.scroll_comments` 经 `action.completed` 如实回报——
@@ -509,7 +509,7 @@
 ### 4.1 浏览会话闭环（v2 主路径：结构化上报 + 角色驱动）
 
 ```
-edge                                          cloud（RoleDispatcher + 15 角色 + EventBus）
+edge                                          cloud（RoleDispatcher + 约 32 角色 + EventBus）
  │  hello {edgeId}                             │
  │ ───────────────────────────────────────────►│  分配 session
  │  welcome {sessionId}                         │
@@ -549,7 +549,7 @@ edge                                cloud
  │ ─────────────────────────────────►│
  │  anchor.get.result {anchor|null}   │
  │ ◄─────────────────────────────────│
- │  （缺口）select.request {goal,els}  │  Qwen 选编号 + 范围校验
+ │  （缺口）select.request {goal,els}  │  文本 LLM 选编号 + 范围校验
  │ ─────────────────────────────────►│
  │  select.response {index|null}      │
  │ ◄─────────────────────────────────│
