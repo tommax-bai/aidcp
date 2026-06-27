@@ -142,7 +142,8 @@
 {
   "edgeId": "edge-01",        // string  边缘节点标识
   "app": "xhs",               // string? 业务/站点标识
-  "capabilities": ["click", "input", "scroll"] // string[]? 能力声明
+  "capabilities": ["click", "input", "scroll"], // string[]? 能力声明
+  "nickname": "工程师大白"     // string? 当前登录账号自身平台真实昵称（change account-real-nickname）；诚实失败时省略，绝不用 accountId/label 伪造、绝不错配被浏览作者昵称。亦携 accountId?/machineLabel?/remoteAddr?（见 HelloPayload）
 }
 ```
 
