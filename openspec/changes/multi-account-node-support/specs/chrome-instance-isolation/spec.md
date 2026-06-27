@@ -22,7 +22,7 @@
 
 ### Requirement: 多节点编排留在 edge 之外，保持边缘薄
 
-节点的端口 / 用户数据目录 / 账号与节点身份（`AIDCP_ACCOUNT_ID` / `AIDCP_EDGE_ID`）的**分配与多进程拉起** SHALL 由 edge 核心之外的启动器承担，edge 核心 MUST NOT 内建账号循环 / 进程池 / 编排逻辑。本能力 MUST NOT 引入第三方指纹浏览器（同机不同账号防关联非本次范围）。
+节点的端口 / 用户数据目录 / 账号与节点身份（`AIDCP_ACCOUNT_ID` / `AIDCP_EDGE_ID`）的**分配与多进程拉起** SHALL 由 edge 核心之外的启动器承担，edge 核心 MUST NOT 内建账号循环 / 进程池 / 编排逻辑。**本能力本身不引入第三方指纹浏览器**——其默认浏览器为 edge 自起的真实指纹 Chrome；同机不同账号防关联（独立设备指纹 / 独立 IP）**经后续 change `adspower-browser-provider` 以显式 opt-in 的可插拔浏览器 provider 接入，非本 change 范围**。
 
 #### Scenario: 编排不进 edge 核心
 - **WHEN** 审查 edge 核心代码

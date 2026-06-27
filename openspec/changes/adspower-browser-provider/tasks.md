@@ -33,7 +33,8 @@
 
 ## 5. aidcp（中控）— 跨 change 协调 + 文档 + 校验
 
-- [ ] 5.1 软化 `multi-account-node-support` 指纹浏览器 Non-Goal：`proposal.md` 末条 + `specs/chrome-instance-isolation/spec.md:25`，从「MUST NOT 引入第三方指纹浏览器」改为范围说明（「本 change 不引入；同机防关联经 change `adspower-browser-provider` 以显式 opt-in provider 接入」）；两 change 都活跃时一次做掉
+- [x] 5.1 软化 `multi-account-node-support` 指纹浏览器 Non-Goal：`proposal.md` 末条 + `specs/chrome-instance-isolation/spec.md:25`，从「MUST NOT 引入第三方指纹浏览器」改为范围说明（「本 change 不引入；同机防关联经 change `adspower-browser-provider` 以显式 opt-in provider 接入」）；两 change 都活跃时一次做掉 <!-- aidcp 同步软化 proposal + spec + design(Non-Goals/D5) 四处；指向本 change -->
+- [ ] 5.1a apply 阶段须复核：`multi-account-node-support` 归档时，软化后的 `chrome-instance-isolation` 措辞正确并入 baseline，且与本能力 `pluggable-browser-provider` 不冲突
 - [ ] 5.2 回写 `aidcp-edge/docs/anti-detection.md` Phase 3：指纹浏览器接入由路线图转实现指针（本 change + `browser-provider.ts` + `scripts/adspower-poc.ts`）
 - [ ] 5.3 `openspec validate adspower-browser-provider --strict` 通过
 - [ ] 5.4 tasks 进度按 sub-repo 分节回写本仓，完成项标 `[x]` 并附 `<!-- <repo> <commit-sha> 备注 -->`

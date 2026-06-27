@@ -41,4 +41,4 @@
 - **协议**：本 change **完全不动边-云协议**——被拒/需配置经飞书通知 + 后台状态呈现，**不新增 cloud→edge 命令**（决策 ③）。
 - **迁移 / 红线必做**：上线诚实闸前**给现存真实账号预种 `persona_config` 行**，否则它们突变「未绑定、拒启动」回归；**现默认账号的 edge 须显式声明 `AIDCP_ACCOUNT_ID=default`**（上线「拒绝缺账号握手」后不声明会被拒，决策 ④）；新增账号状态接口走同一 JWT；`accounts.persona_ref` 列是死的（`account-store.ts:25`）**留着别用**，绑定以 `persona_config` 行存在为准。
 - **依赖 / 协调**：依赖 `account-persona-config`（人设存储/解析/后台页）；与 `safety-quota-config` 共改 `interaction-risk-gating`、与 `account-real-nickname` 共改 `account-store.ts` / panel DTO，需错峰协调。
-- **非目标**：同机不同账号**防关联**（不同设备指纹 / 独立 IP / 指纹浏览器）——不在本次范围（edge 仍一机真实指纹）。
+- **非目标**：同机不同账号**防关联**（不同设备指纹 / 独立 IP / 指纹浏览器）——**本 change 不做**（edge 仍一机真实指纹）；该能力由后续 change `adspower-browser-provider` 以**显式 opt-in 的可插拔浏览器 provider** 接入，默认浏览器仍为 self 自起的真实指纹 Chrome。
