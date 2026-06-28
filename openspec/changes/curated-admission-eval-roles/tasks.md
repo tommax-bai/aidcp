@@ -49,7 +49,7 @@
 
 ## 9. 部署（ECS 安全序列；git archive committed-only 绕开并发 WIP）
 
-- [ ] 9.1 §0 前置（私钥/子仓）→ ECS 先备份 → `git archive <sha> src | ssh tar -x` → `systemctl restart aidcp-cloud` → healthcheck（active+8787+飞书+PG+`curated_content`）→ 失败回滚。绝不碰 isales。
+- [x] 9.1 §0 前置（私钥/子仓）→ ECS 先备份 → `git archive <sha> src | ssh tar -x` → `systemctl restart aidcp-cloud` → healthcheck（active+8787+飞书+PG+`curated_content`）→ 失败回滚。绝不碰 isales。 <!-- cloud 47e8f54 备份 cloud.bak.20260628-214010.tar.gz + .env.bak;git archive 47e8f54 src committed-only 绕并发WIP;restart 21:41:07;healthcheck 全绿(active+8787 LISTEN+飞书长连接已建立+CuratedContentStore 已就绪 curated_content 表+0 启动错误);两新角色按连接懒注册(启动日志不显,curatedStore 已就绪待注入);.env 未碰 --> <!-- 2026-06-28 deployed -->
 
 ## 10. 真机标定
 
