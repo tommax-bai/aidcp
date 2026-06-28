@@ -11,7 +11,7 @@
 - **§1–§8 已实现 + cloud 全量回归通过**：cloud `afc385e`（已推送 master）。typecheck 净；官方测试集 832 测，830 通过；
   仅 2 个失败为本机环境产物、与本 change 无关：`AC-PUB-01`（Windows `path.join` 把 `/tmp` 误拼成 Windows 反斜杠路径，Linux/ECS 通过）、
   `session-config-store` 热加载（需本机 PostgreSQL）。`openspec validate ... --strict` 通过。
-- **§9 部署：已完成**（2026-06-28）。部署 committed HEAD `45758b7`（含本 change `afc385e` + 同期他人已提交的 curated/weekly），走 `git archive HEAD` 干净包（排除工作树 WIP）、tar-over-ssh（本机无 rsync）、先备份（`cloud.bak.20260628-141327.tar.gz`）+ 重启 + healthcheck 全绿（active / :8787 监听 / 飞书长连接已建立 / 22 角色 + Scheduler 就绪 / 无启动错误 / isales 未碰）。**真机回归（§9.3）仍待运营在 edge 上验**。
+- **§9 部署 + 真机回归：已完成并通过**（2026-06-28，账号 Tmax，draft 18 published 真机闭环；详见 §9.3）。部署 committed HEAD `45758b7`（含本 change `afc385e` + 同期他人已提交的 curated/weekly），走 `git archive HEAD` 干净包（排除工作树 WIP）、tar-over-ssh（本机无 rsync）、先备份（`cloud.bak.20260628-141327.tar.gz`）+ 重启 + healthcheck 全绿（active / :8787 监听 / 飞书长连接已建立 / 22 角色 + Scheduler 就绪 / 无启动错误 / isales 未碰）。**真机回归（§9.3）仍待运营在 edge 上验**。
 - 提交隔离说明：cloud 工作树当时并行有其它在途改动（curated-inspiration-corpus 等），本 change 经外科式 staging 只提交了自身 12 个文件，未卷入他人未提交工作。
 
 ## 1. aidcp-cloud — 落库支持读回草稿与待审状态
@@ -69,4 +69,5 @@
 
 - [x] 9.1 前置检查：私钥 `~/codes/isales-4.pem` 存在（已 `chmod 600`）、SSH 连通、ECS 服务 active；确认部署 committed HEAD（非工作树，规避并发 WIP）。<!-- 2026-06-28 done -->
 - [x] 9.2 ECS 先备份（`cloud.bak.20260628-141327.tar.gz` + `.env.bak`）→ 部署：`git archive HEAD` 干净包经 **tar-over-ssh**（本机无 rsync，偏离文档 rsync 法）解包覆盖 `/opt/aidcp/cloud`（保留 .env/node_modules）→ `systemctl restart aidcp-cloud.service` → healthcheck 全绿（active running / `0.0.0.0:8787` 监听 / 飞书长连接已建立 / PublishOrchestrator 22 角色 + PublishScheduler 就绪 / 无启动错误）。DB：`status` CHECK 约束经 `PUBLISH_SCHEMA_SQL` 在 `init()` 幂等更新（重启即跑），无手工迁移。**未碰同机 isales**（仅查 is-active）。<!-- 2026-06-28 deployed: cloud HEAD 45758b7 (incl. afc385e) -->
-- [ ] 9.3 真机回归（edge 本地连 ECS）：触发 `/publish` → 确认生成期间浏览不被掐（让位推迟）→ 飞书审批卡到达、运营延迟数分钟再点「授权发布」期间浏览照常 → 点通过后即切下发、笔记真发 → 下发完起新浏览。重点验证：候审长窗内浏览不停、通过即切、无审批超时落 needs_review。
+- [x] 9.3 真机回归（edge AdsPower 连 ECS，账号 Tmax）：**通过**（2026-06-28）。draft 18 全链路：18:32:51 草稿待审（候审**不让位**、浏览照常）→ 18:32:55 人审通过即 `会话结束: publish_takeover`（**让位只在下发段**、通过即切 4s 响应）→ 18:33:07 `submit_publish` 成功 → `published`、`images_attached=t` → 同刻 `sendCommand scroll`（**发完即续浏览**）；笔记「大模型工具调用选型避坑」已在 Tmax 主页可见。另：候审无超时验到（草稿 16/17 各挂 3–4 分钟未自动改判/自动发）；离线诚实失败验到 3×（edge 掉线时审批→`无在线边缘节点…诚实 failed`）。<!-- 2026-06-28 真机验 passed -->
+  - **顺带发现两个与本 change 无关的 follow-up**：① `capture_postId no_target`——笔记发成功但发后抓不到分享 URL（edge 选择器），`post_url` 落空（诚实 null、非误判失败）；② edge 无 Electron 的 `npm start` 跑法**云连接每几分钟掉一次且不自动重连**（4 次重启才凑上窗口）——edge 侧连接韧性缺口。两者各自单独立项，勿混入本 change。
