@@ -37,6 +37,14 @@
 >
 > **stream A 已部署 ECS（2026-06-27 19:34）**：因本机无 rsync，改用 `git archive HEAD | ssh tar -xzf -C /opt/aidcp/cloud`（只送 committed HEAD `90a03cf`、不含 .env/node_modules/.git；无新依赖、无迁移，未跑 npm install）。部署前备份 `cloud.bak.20260627-193118.tar.gz` + `.env.bak.20260627-193118`。`systemctl restart aidcp-cloud` 后 healthcheck 全绿：active / 8787 LISTEN / `select 1`→1 / 飞书长连接已建立；ECS 上已核 `resume_redrive` 存在且 session.should_end 处理器无 endSession。edge 本地运行（不上 ECS），真机验证见 §10.3 待用户。绝未碰同机 isales。
 
+> **stream B 已实现 + 部署完成（2026-06-28，本会话）。** 单场上限 + 续场/看门狗已从按账号收敛为全局单例。落点：
+> - cloud commit `4d1c4f9`（本地，origin push 待授权——harness 拦截直推 master）：migration `0022_global_safety_config.sql`（单行全局表 `session_config_global`/`resume_config_global`，迁入旧 `default` 行、`to_regclass` 守卫、`ON CONFLICT DO NOTHING` 幂等）；两 store 单例化（`id=1` 单行、新表名）；两 provider 去 accountId（`sessionDurationMs/sessionBudget`、`restRatio/activeWindow/dailyCaps/idleNudgeMs/idleEndMs`）；两 facade 改全局 `getView/set`；`panel/types.ts` + `panel-server.ts` 去账号；`role-dispatcher.ts` 7 个 provider 调用点去实参（多租路由 / 每日计数 `dailyTally` 按账号不变）；`server.ts` 注释同步；测试改写/新增。
+> - console commit `b96a0bc`（本地，origin push 待授权）：`types/api.ts` 数组壳收敛为单全局对象（`SessionLimitView`/`ResumeConfigView`）；`queries.ts` 返回全局对象；`QuotasPage.tsx` 两表去账号列/弹窗账号、单行全局渲染、payload 去 accountId、文案「对所有账号生效」、并把单场上限+续场两卡移到安全限额上面；加载守卫改各卡自门控。
+> - 验证：cloud typecheck 0 / 全量 809 测试仅 2 既有失败（AC-PUB-01 Windows 路径 + note.detail view-count，stash 回干净 HEAD 复核确认非本次引入）；console typecheck/build/test 全绿。多智能体对抗式复审 13→6 条确认（5 条陈旧「按账号」注释 + 1 条加载守卫），均已修复复跑通过；无 blocker、无逻辑缺陷。
+> - **部署 ECS（2026-06-28 10:24，安全序列）**：备份 cloud + console + .env → ECS 实查坐实 §5.4（`session_config` 仅 `default` 行 max=30min + 预算 5/4/1/2/1/2；`resume_config` 0 行 = Case C，迁移 `WHERE='default'` 正确）→ 跑迁移 0022（global 表迁入 30min 行 / resume 空）→ git archive 仅本 change 文件 surgical 同步（避开并发会话 WIP `follow-agent.ts`/`interaction-appraiser-role.ts`）→ `systemctl restart` → healthcheck 全绿（active / 8787 / select 1 / 飞书长连 onReady / panel 8090 / 无 error）→ console dist tar-over-ssh（新 bundle 含「对所有账号生效」、nginx 8088 index 200 + /api/version 代理 OK）。旧表保留未清。**绝未碰同机 isales。**
+> - **效果变化（需告知运营）**：旧 bug 下真账号读自己缺行 → 跑写死默认（10min + 预算 10/5/3/5/2/3），`default` 行 30min 从未生效。迁移后全局 = 30min + 预算 5/4/1/2/1/2 对所有账号生效（部分预算下调：likes 10→5、follows 3→1、searches 5→2）；若只想要 30min 而非这套预算，可在现已生效的全局面板重设。
+> - **仅剩**：§10.3/§10.4 真机回归；§10.5/§10.6 spec 归档（待 `session-limits-to-quota-layer` 先归档）。下列 5–10 复选框据此为实现完成、仅真机验 + 归档待办。
+
 ## 5. aidcp-cloud — stream B：存储收敛全局单例 + 迁移
 
 - [ ] 5.1 `ls ../aidcp-cloud/migrations/` 复核取号；新增 `migrations/00XX_global_safety_config.sql`：把 `session_config` + `resume_config` 收敛为单行全局表（`id INTEGER PRIMARY KEY DEFAULT 1 CHECK(id=1)`），把现有 `account_id='default'` 行值**迁入全局行**（保 30min）；幂等；旧维度数据保留至 §10.4 验证后再清理
