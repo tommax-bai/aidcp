@@ -33,7 +33,7 @@
 
 ## 6. aidcp-cloud — 配置
 
-- [x] 6.1 共鸣预筛阈值沿用 Phase 1（collectFloor/ratioMin/ratioLikeFloor + 新 commentLikeFloor）；评估模型选择复用既有 role-model 配置（判定类）；评估总开关（缺省开，可关回「仅共鸣」）。**不写死、不记敏感值**。验证：单测缺省 + 覆盖。 <!-- cloud 47e8f54 commentLikeFloor 缺省10 入 DEFAULT;模型经 decide() 的 browse:curated_* role-key 解析(未知 key 安全回落全局默认 model);开关 AIDCP_CURATED_LLM_EVAL!=='false'(缺省开),关→仅共鸣回退;单测 DEFAULT 值 + llmEvalEnabled=false 两角色回退 -->
+- [x] 6.1 共鸣预筛阈值沿用 Phase 1（collectFloor/ratioMin/ratioLikeFloor + 新 commentLikeFloor）；评估模型选择复用既有 role-model 配置（判定类）；评估总开关（缺省开，可关回「仅共鸣」）。**不写死、不记敏感值**。验证：单测缺省 + 覆盖。 <!-- cloud 47e8f54 commentLikeFloor 缺省10 入 DEFAULT;模型经 decide() 的 browse:curated_* role-key 解析(未知 key 安全回落全局默认 model);开关 AIDCP_CURATED_LLM_EVAL!=='false'(缺省开),关→仅共鸣回退;单测 DEFAULT 值 + llmEvalEnabled=false 两角色回退 --> <!-- cloud 9ff4869 真机follow-up：初版两角色未登记进 role-catalog → categoryOf 返 undefined → 运行时解析回落到全局默认(doubao 创意模型)而非判定类(qwen3.7-plus)。真机日志暴露后,把两角色登记进 browse_judge 分类(role-catalog.ts),才真正"复用判定类配置"+在后台角色页可见。已部署23:33 -->
 
 ## 7. 验收
 
@@ -53,4 +53,4 @@
 
 ## 10. 真机标定
 
-- [ ] 10.1 真账号浏览一段：核精选库样本——是否挡掉「高收藏但跑题/水帖/广告」、是否纳入「相关且扎实」；据样本回调三维严格度（过严→放宽、过松→收紧）。参 Phase 1 真机验经验（[[curated-inspiration-corpus-impl]] 的相关性 bug 即真机才暴露）。
+- [x] 10.1 真账号浏览一段：核精选库样本——是否挡掉「高收藏但跑题/水帖/广告」、是否纳入「相关且扎实」；据样本回调三维严格度（过严→放宽、过松→收紧）。参 Phase 1 真机验经验（[[curated-inspiration-corpus-impl]] 的相关性 bug 即真机才暴露）。 <!-- 2026-06-28 真机验(账号测评酱 66cd1d4f via AdsPower k1e0awu5)：**正文链路通过**。两段式成立(只有过共鸣预筛的才调模型)、三维(相关/丰富/非广告)都在判且推理有领域感。样本:准入「李开复的Claude提示词」(系统提示词设计→可作模型指令遵循/诚实度评测用例,扎实无导流)+确认落库;拒绝「Knowhere vs MinerU」(RAG文档解析=数据工程层非模型选型 + 开源PR软文标题党 + 缺实测,三维一次性判到)。**关键发现**:换 qwen3.7-plus 前(误用全局默认 doubao 创意模型)judged 过严、前4篇全拒;换判定类模型后准/拒健康混合、判得准——「太严」元凶是模型不对而非 prompt(见 6.1 follow-up)。⚠️**评论链路真机未采到样本**:AIDCP_COMMENT_LIKE=true 已开、curated_comment_evaluator 已注册,但评论点赞低频(随机+比率+配额闸)、本场未触发;单测覆盖,真机待后续机会补采。⚠️真机当晚踩坑:cd 进 cloud 目录后 npm start 误起本地云(本地.env 指向生产),见 [[local-env-points-at-prod-cloud-start-hazard]]。 -->
