@@ -7,6 +7,12 @@
 >
 > **范围**：默认 Phase 1 先行、Phase 2 紧随。Phase 1 纯 cloud、零边端、大概率零协议改动；可独立交付。
 
+> **实装进度（2026-06-28）**：Phase 1 全部实装 + 自验通过。
+> - 隔离建块（store / gate / concept 来源标题）：cloud master **`1cb2d3d`**（curated-content-store + curated-gate + getNewConceptsWithSourceSince + cache 导出 + 测试）。
+> - 接线（捕获 / 标记 / 创作消费 / prompts 蒸馏+护栏）：cloud master **`45758b7`**（server / publish-scheduler / types / prompts）。整树 typecheck 净；curated 隔离套 18/18 + publish-agent/cache 168 绿。
+> - 门槛缺省修正：`ratioMin 0.20 / ratioLikeFloor 80`（原 0.25/200 会让收藏/点赞比率分支被 collectFloor 完全遮蔽失效）。
+> - **未 push、未部署**：45758b7 因 server.ts 与并发 retire-default-account WIP 行级纠缠、按用户授权全树捆绑提交，含他人 WIP；push/部署待用户放行（部署走 git archive committed-only 绕开本地 WIP）。task 1–6 实装完成，task 7–8 隔离验证通过，task 9 部署待放行。
+
 ## 1. aidcp-cloud — 精选语料表 `curated_content`
 
 - [ ] 1.1 新增 `src/cache/curated-content-store.ts`：`curated_content` 表 DDL（`CREATE TABLE IF NOT EXISTS`，仿 `valuable-comment-store.ts:16-30`）含 `account_id` / `content_type(note|comment)` / `source_id` / `dedup_key UNIQUE` / `title` / `body` / `author` / `source_url` / `topics TEXT[]`（GIN）/ `like_count` / `collect_count` / `comment_count` / `counts_captured_at` / `bot_liked` / `bot_collected` / `admit_reason` / `first_seen_at` / `updated_at`。验证：单测建表幂等（重复建不报错）。
