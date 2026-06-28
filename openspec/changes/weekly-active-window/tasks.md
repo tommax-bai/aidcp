@@ -20,6 +20,7 @@
 - [x] 4.2 启动收口：`restartSession()` 顶部加闸（统一覆盖 边端 hello / 绑人设自启 / 续场 / 面板手动）
 - [x] 4.3 续场闸：`canAutoResume()` 加「可活跃时间」一道（与日窗口 / 每日上限 / 风控并列）
 - [x] 4.4 运行中跨入即结束：监测体加 `getActiveWindowOpen?` 注入口，`checkSession` 现读（巡视暂停期不打断）；调度器注入 `() => isWithinActiveWeek(clock())`
+- [x] 4.5 **窗口唤醒**：纯函数 `msUntilNextActive`（下一活跃整点毫秒；缺/非法/已活跃/全休眠→null）；调度器 `wakeTimer`+`armWakeTimerIfWindowed`（叠1min抖动、与续场同特性闸）+`onWakeElapsed`（账号/活跃二次校验→doAutoResume）；接入 restartSession 被拦处、doAutoResume 拒签处；start/restart/endSession 清计时器
 
 ## 5. 管理后台「安全」页（aidcp-console）
 - [x] 5.1 `types/api.ts`：`SessionLimitView.activeWeekMask` 手动对齐
@@ -31,6 +32,7 @@
 - [x] 6.2 store 取值 / 写 / 部分写保持 / 脏掩码回落 null（修既有 fakePool 位序陈旧致 updated_by 错位的红用例）
 - [x] 6.3 facade 校验（合法落库 / 非法整块拒 / 仅传掩码非 no_valid_fields）
 - [x] 6.4 调度器闸（全休眠不开/不续、全活跃正常、缺掩码零回归）+ 既有 SessionLimitProvider 桩补字段
+- [x] 6.4b 窗口唤醒：`msUntilNextActive` 纯函数（缺/非法/已活跃/全休眠→null、本日稍后、跨天）+ 调度器（窗口外排唤醒计时器→到点窗口开主动起会话 / 全休眠不排）
 - [x] 6.5 cloud `typecheck` 全树 0 错；console `typecheck` + `vitest` 绿
 
 ## 7. 部署 + 真机（待用户放行生产 SSH）
