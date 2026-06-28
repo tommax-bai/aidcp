@@ -52,7 +52,7 @@
 
 - **aidcp-edge**：无改动。
 - **协议**：无改动（消息集与计数不变）。
-- **DB（ECS PostgreSQL 库 `aidcp`）**：不新增表/列；复用 `publish_log` 既有列与 `status`（新增取值 `pending_approval`，不改 schema）。
+- **DB（ECS PostgreSQL 库 `aidcp`）**：不新增表/列；复用 `publish_log` 既有列与 `status`。`status` 新增取值 `pending_approval`，需一处**幂等 CHECK 约束更新**（`DROP CONSTRAINT IF EXISTS` + 以新取值集合重建，随 `PUBLISH_SCHEMA_SQL` 在 `init()` 幂等执行，无需手工迁移）。
 - **依赖与红线**：`AC-PUB-*`（未授权绝不静默发布）MUST 仍全过——下发只在 `approved === true` 时发生；`AC-PROTO-*` 不受影响（协议不动）；`AC-RISK-*` 不受影响。审批信号文件路径契约 `/tmp/aidcp-publish-approve-<requestId>.json` 两端不漂移。
 
 - **与在途 publish 系列 change 的关系**
