@@ -11,7 +11,9 @@
 > - 隔离建块（store / gate / concept 来源标题）：cloud master **`1cb2d3d`**（curated-content-store + curated-gate + getNewConceptsWithSourceSince + cache 导出 + 测试）。
 > - 接线（捕获 / 标记 / 创作消费 / prompts 蒸馏+护栏）：cloud master **`45758b7`**（server / publish-scheduler / types / prompts）。整树 typecheck 净；curated 隔离套 18/18 + publish-agent/cache 168 绿。
 > - 门槛缺省修正：`ratioMin 0.20 / ratioLikeFloor 80`（原 0.25/200 会让收藏/点赞比率分支被 collectFloor 完全遮蔽失效）。
-> - **未 push、未部署**：45758b7 因 server.ts 与并发 retire-default-account WIP 行级纠缠、按用户授权全树捆绑提交，含他人 WIP；push/部署待用户放行（部署走 git archive committed-only 绕开本地 WIP）。task 1–6 实装完成，task 7–8 隔离验证通过，task 9 部署待放行。
+> - 1cb2d3d / 45758b7 已 push + 部署 ECS（2026-06-28 14:10 重启，git archive committed-only，备份 + healthcheck 全绿，`curated_content` 表 19 列）。task 1–6 实装完成、task 7–8 隔离验证通过、task 9 已部署（45758b7 因 server.ts 与并发 retire-default-account WIP 行级纠缠、经用户授权全树捆绑提交+部署）。
+>
+> **Phase 2（评论并入）2026-06-28 已实装 + 上线**：cloud master **`11ece3f`**（部署 ECS 16:46 重启 healthcheck 全绿）。task 10.1 完成（`archiveComment` 双写 content_type=comment、按账号；发帖创作取精选评论当「读者角度线索」commentHints）；task 10.2 部分（评论以「确认点赞」准入 = 现有门槛；「按评论赞数」门槛 deferred）；**task 11.1/11.2（边端逐条评论赞数 / 笔记评论数上报）deferred = Phase 2b**，搭下次动评论抽取便车。评论写作链路（comment-composer 读 valuable_comments）原样不动。纯 cloud、干净提交、无并发纠缠。
 
 ## 1. aidcp-cloud — 精选语料表 `curated_content`
 
