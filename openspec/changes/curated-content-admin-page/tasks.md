@@ -39,8 +39,8 @@
 
 ## 7. 部署与验收
 
-- [ ] 7.1 三仓提交并 push（cloud/console master、中控 main 回写本 change）；本地若有并发 WIP 走外科式提交（显式 `git add` 本 change 文件，勿 `-A`）。
-- [ ] 7.2 cloud 部署 ECS 安全序列：备份→committed-only 同步（勿 tar 整树带 WIP）→`systemctl restart aidcp-cloud.service`→healthcheck（active + 8787 监听 + 飞书长连 + PG select 1）→失败回滚。
-- [ ] 7.3 console 部署：重 build dist→覆盖 `/opt/aidcp/console`（备份旧 dist）→curl/HTTP 200 验证。
-- [ ] 7.4 真机验收：跑一段浏览使 `curated_content` 有数据后核——按账号看见笔记 + 评论两类、计数 null≠0、删单条回真态且账号隔离、清空正文壳行回真实 N、缺账号 400、缺存储 503、删后再观测达标会重新纳入（语义符合）。
-- [ ] 7.5 `openspec validate curated-content-admin-page --strict` 通过；全部 task `[x]` 后 archive。
+- [x] 7.1 三仓外科式提交并 push：cloud `28f3bb1`、console `dfe4e41`（避开并发 WIP `QuotasPage.tsx`）、中控 `5834975`。
+- [x] 7.2 cloud 部署 ECS（2026-06-28 18:15 重启）：因 master 上夹着别会话已提交未上线的 `f4a575d`（weekly-active-window 主动唤醒），改走**targeted scp 4 个源文件**（curated-content-store/panel-server/panel-types/server.ts，不碰 f4a575d 文件）避免误带；先备份（cloud-src.bak.20260628-181512.tar.gz + 逐文件 .bak）→scp→restart→healthcheck 全绿（active、8787+8090 监听、CuratedContentStore 已就绪、飞书长连已建、PG 就绪、无致命错误、/api/health 200、/api/curated/contents 无 token 401 证明路由接通）。
+- [x] 7.3 console 部署（2026-06-28 18:20）：QuotasPage WIP 已被别会话提交进 HEAD `3d2ab68`（工作树转干净），从干净 HEAD 重 build（index-Bbl414Fp.js）→备份 console.bak.20260628-182002.tar.gz→scp index.html + 新 assets→验证 index.html 已切新包、包内含精选页标记、:80/:8088 HTTP 200。
+- [ ] 7.4 真机验收：跑一段浏览使 `curated_content` 有数据后核——按账号看见笔记 + 评论两类、计数 null≠0、删单条回真态且账号隔离、清空正文壳行回真实 N、缺账号 400、缺存储 503、删后再观测达标会重新纳入（语义符合）。【用户侧】
+- [ ] 7.5 `openspec validate` 已过；真机验后全部 task `[x]` 再 archive。
