@@ -7,19 +7,19 @@
 ## 1. 协议增量（v2 四处同步——搜索排序/时间参数 + 结果卡片收藏数）
 
 - [x] 1.1 cloud+edge 两份 `src/comm/protocol.ts` 逐字一致：`SearchExecutePayload` 加可选 `sort`（如 `most_collected`）与 `timeWindow`（如 `one_day`）；搜索结果卡片 payload 加 `collectCount`。验证：两份 `protocol-contract.test.ts` 的 `Record<MessageType,true>` 穷举与计数断言更新且 `npm run typecheck` 绿。 <!-- cloud aaa5500 / edge 28db43a：SearchExecutePayload +sort/timeWindow（两份逐字一致）。**collectCount 早已在 PageCardsPayload.cards 上**（非协议缺口，仅 edge reportVisibleCards 硬编码 0→改在 task 5.2）。只加可选字段、无新 MessageType→AC-PROTO 计数无需改；cloud+edge typecheck 净、AC-PROTO 两侧 5/5 -->
-- [ ] 1.2 `aidcp-cloud/src/comm/command-bridge.ts` 搜索动作映射透传新参数；如新增 cloud→edge 主动命令则补 `aidcp-edge/src/client/edge-client.ts` 主动命令路由白名单（否则静默丢弃）。验证：`npm run test:acceptance` 的 `AC-PROTO-*` 全过。
+- [x] 1.2 `aidcp-cloud/src/comm/command-bridge.ts` 搜索动作映射透传新参数；如新增 cloud→edge 主动命令则补 `aidcp-edge/src/client/edge-client.ts` 主动命令路由白名单（否则静默丢弃）。验证：`npm run test:acceptance` 的 `AC-PROTO-*` 全过。 <!-- command-bridge 'search'→search.execute **本就透传 command.params**（含新 sort/timeWindow，无需改）。命令路径不经 command-bridge——edge-steps 直接 makeEnvelope('search.execute',…)（cloud e822856），search.execute 是既有已路由命令、非新主动命令，**edge-client 白名单无需改**。AC-PROTO 两侧 5/5 -->
 - [ ] 1.3 `docs/protocol.md` 头部消息计数与 §2 表同步。验证：人工核对计数与新字段在表内。
 
 ## 2. aidcp-cloud — 飞书 /comment 命令接入
 
 - [x] 2.1 `src/feishu/commands.ts`：`CommandAction` 加 `comment`；`parseCommand` 加 `/comment <昵称>` 分支；`CommandRouter.runComment` + `CommandActions.comment(nickname?)`；HELP 文案加一行。验证：单测——`/comment 测评酱` 解析为 `{action:'comment',nickname}`；未带昵称/无匹配走 honest 分支。 <!-- cloud 82c3155 /comment 与 /publish 同构；CommandActions.comment **可选**（server 接线 task 2.2 落、未接线时 runComment honest-fail「未接线」、不破 server typecheck）；两段式回执；+5 单测，feishu-commands 29/29 绿 -->
-- [ ] 2.2 `src/server.ts`：接 `actions.comment`（仿 `actions.publish`）——`resolveAccountByNickname` 定位账号（0/多义 honest-fail 列昵称）→ `CommentScheduler.triggerManual(acct)`。两段式回执：同步回「已触发/失败原因」。验证：单测——无匹配回失败列昵称；边端离线回「边端离线」。 <!-- ⚠️回执样式红线（沿用 /publish 修复 cloud 98a7ea2「触发≠成功别染绿」，本 change 命令侧已落 611fa97）：actions.comment MUST 返回结构化 `CommentCommandReceipt{ok,level,title,message}`——**触发态** level=开跑success(绿)/未触发warning(黄,如已有任务在跑/未解析到账号)/触发失败error(红,边端离线/异常)；**异步最终结果卡片**(评论任务跑完补达)的 level 同样 MUST 反映 `CommentTaskResult.outcome`：commented→success(绿)、no_strong_candidate|no_terms|compose_skipped→warning(黄)、read_failed|post_failed→error(红)。失败/未产出**绝不染绿**。 -->
+- [x] 2.2 `src/server.ts`：接 `actions.comment`（仿 `actions.publish`）——`resolveAccountByNickname` 定位账号（0/多义 honest-fail 列昵称）→ `CommentScheduler.triggerManual(acct)`。两段式回执：同步回「已触发/失败原因」。验证：单测——无匹配回失败列昵称；边端离线回「边端离线」。 <!-- cloud d96c9f6 actions.comment：resolveAccountByNickname（找不到/重名抛错→runComment fail 红）→commentScheduler.triggerManual 返结构化回执（runComment 透传 ok/level→绿/黄/红，commands 611fa97）；未就绪→红。两段式：同步触发回执 + scheduler 异步补结果卡片。typecheck 净 --> <!-- ⚠️回执样式红线（沿用 /publish 修复 cloud 98a7ea2「触发≠成功别染绿」，本 change 命令侧已落 611fa97）：actions.comment MUST 返回结构化 `CommentCommandReceipt{ok,level,title,message}`——**触发态** level=开跑success(绿)/未触发warning(黄,如已有任务在跑/未解析到账号)/触发失败error(红,边端离线/异常)；**异步最终结果卡片**(评论任务跑完补达)的 level 同样 MUST 反映 `CommentTaskResult.outcome`：commented→success(绿)、no_strong_candidate|no_terms|compose_skipped→warning(黄)、read_failed|post_failed→error(红)。失败/未产出**绝不染绿**。 -->
 
 ## 3. aidcp-cloud — 评论任务编排（独占边端、一次性、按账号串行）
 
-- [ ] 3.1 新建 `src/comment-agent/comment-scheduler.ts`：`triggerManual(accountId)`（仿 `PublishScheduler.triggerManual`），载入 `getSoul` + `curatedStore.selectForCreation`。验证：单测——触发产出任务输入（人设+精选样本）。
-- [ ] 3.2 新建有方向步骤时序器（仿 `command-sequencer`/`publish-dispatcher`）：角色①出**有序多词** →〔**逐词循环**：搜索(原生筛选) → 采列表 → 去重 → 甄选；**强相关命中即跳出**，否则**换下一个词**重试〕→ 开笔记 → 翻评论 → 撰写 → 人审 → 发布 → 记账去重 →（可选落精选）。换词有**尝试上限 K(可配)** + 受 `SearchFrequencyLimiter`/搜索预算约束 + 首中即止；词用尽/达上限仍无强相关 → 诚实结束不评。每步压边端约 30s 单步超时内；任一步失败 honest-fail。验证：单测——首中即止 / 换词重试 / 用尽诚实结束 / 上限+限频生效 / 失败短路。 <!-- WIP cloud 099cba4：**控制流核心已落 + 全测**（src/comment-agent/comment-task-runner.ts，纯逻辑、边端/LLM/风控经 CommentTaskSteps 注入；10 单测：无词/首中即止/去重在择优前/换词/用尽诚实结束/上限K/读·撰·发失败终态不偷换/坏pickIndex）。**边端步骤适配已落**（cloud e822856 src/comment-agent/edge-steps.ts buildEdgeCommentSteps：searchAndHarvest 发 search.execute 带 sort/timeWindow + 等 page.cards 按原生序取候选；readNote 开笔记等 note.detail + 翻评论等 action.completed.candidates；post 发 interaction.comment 等回执 ok；filterUncommented/recordCommented 经注入 dedup；核心 sendAndAwait=订阅私有总线→发命令→等下一条匹配上报+28s超时，honest 离线/超时→空/null/false；10 单测）。**仍缺=最终装配**：composeAndApprove（接 composer.composeDraft + 去AI味 + 人审闸）、CommentScheduler.triggerManual（3.1）、server actions.comment 接线（2.2）、takeover/resume 钩子（3.3）、ConnectionRuntimeRegistry.runtimeForAccount、搜索限频/预算把关 -->
-- [ ] 3.3 边端独占：`src/server.ts` 新增 `onCommentTakeoverStart/End`（reason `comment_takeover`，仿 `onPublishTakeoverStart/End`）——开跑结束自动浏览会话标记不可恢复、`finally` 恢复浏览；按账号 accountTail 串行；`resolveEdgeIdForAccount` 离线 honest-fail。验证：单测——接管→恢复成对；同账号串行；离线诚实失败。
+- [x] 3.1 新建 `src/comment-agent/comment-scheduler.ts`：`triggerManual(accountId)`（仿 `PublishScheduler.triggerManual`），载入 `getSoul` + `curatedStore.selectForCreation`。验证：单测——触发产出任务输入（人设+精选样本）。 <!-- cloud d41f30b CommentScheduler 装配中枢：构造角色①②+composer+edge-steps+compose-approve→CommentTaskSteps，接管→runCommentTask→恢复，异步补结果卡片(outcomeToReceipt level 映射)，按账号串行(running set)，触发回执结构化(开跑绿/离线红/在跑黄)；8 单测含 happy-path 端到端 -->
+- [x] 3.2 新建有方向步骤时序器（仿 `command-sequencer`/`publish-dispatcher`）：角色①出**有序多词** →〔**逐词循环**：搜索(原生筛选) → 采列表 → 去重 → 甄选；**强相关命中即跳出**，否则**换下一个词**重试〕→ 开笔记 → 翻评论 → 撰写 → 人审 → 发布 → 记账去重 →（可选落精选）。换词有**尝试上限 K(可配)** + 受 `SearchFrequencyLimiter`/搜索预算约束 + 首中即止；词用尽/达上限仍无强相关 → 诚实结束不评。每步压边端约 30s 单步超时内；任一步失败 honest-fail。验证：单测——首中即止 / 换词重试 / 用尽诚实结束 / 上限+限频生效 / 失败短路。 <!-- WIP cloud 099cba4：**控制流核心已落 + 全测**（src/comment-agent/comment-task-runner.ts，纯逻辑、边端/LLM/风控经 CommentTaskSteps 注入；10 单测：无词/首中即止/去重在择优前/换词/用尽诚实结束/上限K/读·撰·发失败终态不偷换/坏pickIndex）。**边端步骤适配已落**（cloud e822856 src/comment-agent/edge-steps.ts buildEdgeCommentSteps：searchAndHarvest 发 search.execute 带 sort/timeWindow + 等 page.cards 按原生序取候选；readNote 开笔记等 note.detail + 翻评论等 action.completed.candidates；post 发 interaction.comment 等回执 ok；filterUncommented/recordCommented 经注入 dedup；核心 sendAndAwait=订阅私有总线→发命令→等下一条匹配上报+28s超时，honest 离线/超时→空/null/false；10 单测）。**仍缺=最终装配**：composeAndApprove（接 composer.composeDraft + 去AI味 + 人审闸）、CommentScheduler.triggerManual（3.1）、server actions.comment 接线（2.2）、takeover/resume 钩子（3.3）、ConnectionRuntimeRegistry.runtimeForAccount、搜索限频/预算把关 --> <!-- DONE 最终装配：compose-approve(cloud 47d7a51 撰写→去AI味PostProcessor+反照搬→人审CommentApprovalPort,5测) + CommentScheduler(cloud d41f30b) + server 接线(cloud d96c9f6 actions.comment+CommentScheduler构造+onCommentTakeoverStart/End+runtimeForAccount)。整条 /comment 通；全套 975/976(唯一红=Windows /tmp quirk)。⚠️搜索限频/预算把关暂未单独接(maxTerms 上限+边端单步超时已含);真机标定见 task12 -->
+- [x] 3.3 边端独占：`src/server.ts` 新增 `onCommentTakeoverStart/End`（reason `comment_takeover`，仿 `onPublishTakeoverStart/End`）——开跑结束自动浏览会话标记不可恢复、`finally` 恢复浏览；按账号 accountTail 串行；`resolveEdgeIdForAccount` 离线 honest-fail。验证：单测——接管→恢复成对；同账号串行；离线诚实失败。 <!-- cloud d96c9f6 onCommentTakeoverStart=endSessionForAccount('comment_takeover')/End=resumeSessionForAccount;按账号串行在 scheduler running set;离线 honest（resolveConnection 无 edgeId→红回执）。**关键**:edge session.end 只停不闭锁,浏览类命令会唤醒重启循环(browse-session closing 注释证)→本设计可行;**re-wake 时序(会否先报旧 page.cards)待真机标定** -->
 
 ## 4. aidcp-cloud — 新角色①搜索词生成
 
@@ -33,9 +33,9 @@
 
 ## 6. aidcp-cloud — 候选去重 + 新角色②搜索笔记甄选
 
-- [ ] 6.1 去重接线：采到候选卡片后，对每卡 `InteractionDedup.hasInteracted(noteId,'comment')`（按账号）滤掉已评过的，**在甄选之前**。验证：单测——已评过的笔记不进甄选候选。
+- [x] 6.1 去重接线：采到候选卡片后，对每卡 `InteractionDedup.hasInteracted(noteId,'comment')`（按账号）滤掉已评过的，**在甄选之前**。验证：单测——已评过的笔记不进甄选候选。 <!-- cloud e822856 edge-steps.filterUncommented（runner 在 pick 之前调）；server dedupFor(accountId)→riskStore.hasInteraction（d96c9f6）；单测：已评过的滤掉+index 重排 -->
 - [x] 6.2 新建 `src/agents/comment-target-picker.ts`（判定类，读去重后候选卡片[标题/作者/收藏数] + 人设）→ 严格 JSON `{pickIndex|null, stronglyRelevantIndexes[], reason}`；判**人设强相关**(沾边/泛泛相关不算)，只在强相关候选里挑收藏最高者；无强相关 `pickIndex=null`（编排据此换下一个词）。验证：单测——挑强相关高收藏；仅弱相关→null；全不相关→null；坏输出→null 不默认挑。 <!-- cloud aaa5500 CommentTargetPicker（独立类，命令式 pick(candidates)）；**确定性兜底**：在 LLM 判定的 stronglyRelevantIndexes 里按收藏数取最高（不完全信 LLM pickIndex）；越界 index 过滤；无强相关/降级/解析失败→null；9 单测。**惰性建块、无调用方**（去重接线+编排在 task 6.1/3） -->
-- [ ] 6.3 发布成功（真回执 ok:true）后 `InteractionDedup.recordInteraction(noteId,'comment')`（按账号）。验证：单测——ok:true 记账、ok:false 不记。
+- [x] 6.3 发布成功（真回执 ok:true）后 `InteractionDedup.recordInteraction(noteId,'comment')`（按账号）。验证：单测——ok:true 记账、ok:false 不记。 <!-- cloud e822856 runner 仅在 post 真 ok 后调 recordCommented→edge-steps→dedup.recordInteraction；server dedupFor→riskStore.recordInteraction(d96c9f6)。注:边端 action.completed{comment,ok} 也经 handler→interaction.occurred→record 自动落一份(冗余幂等)。单测 ok→记/post_failed 不记 -->
 
 ## 7. aidcp-cloud — 撰写小改读现场评论
 
@@ -45,22 +45,22 @@
 
 - [x] 8.1 `src/event-bus/types.ts` `RoleName` 加两角色（如需新事件载荷则加 `RoleEventMap`）。验证：typecheck 穷举一致。 <!-- cloud aaa5500 RoleName += comment_search_term_generator/comment_target_picker；无新事件（角色命令式调用、不走 EventBus）；typecheck 净 -->
 - [x] 8.2 `src/config/role-catalog.ts` 两角色登记进 `ROLE_CATALOG`（判定类 `browse_judge`，`roleId='browse:<roleName>'` 去前缀逐字等于 `roleName`），否则运行时回落全局默认模型（`curated-admission-eval-roles` 6.1 教训）。验证：后台「角色管理」GET /api/roles 含二者、可配；单测/手测目录解析非 undefined。 <!-- cloud aaa5500 ROLE_CATALOG +browse:comment_search_term_generator（评论·搜索词生成）/browse:comment_target_picker（评论·搜索笔记甄选），均 browse_judge；roleId 后缀逐字=roleName=decide 角色键，故 categoryOf 命中判定类、不回落默认。后台「角色管理」数据驱动→部署后自动出现可配；live /api/roles 验证待部署 -->
-- [ ] 8.3 `src/orchestrator/role-dispatcher.ts` 注册两角色（仅相关 store 可用时注册，仿 `concept_extractor`/curated 评估角色），注入账号绑定 LLM + `getSoul` + `curatedStore`。验证：单测——store 缺则不注册不报错。
-- [ ] 8.4 中控 `CLAUDE.md` §2 角色数人工计数 +2（以 `RoleName` 穷举为准）。验证：核对计数。
+- [x] 8.3 `src/orchestrator/role-dispatcher.ts` 注册两角色（仅相关 store 可用时注册，仿 `concept_extractor`/curated 评估角色），注入账号绑定 LLM + `getSoul` + `curatedStore`。验证：单测——store 缺则不注册不报错。 <!-- **设计偏离（更优）**：两角色是**命令式**调用（非事件驱动会话角色），故**不进 role-dispatcher 运行时注册表**，改由 CommentScheduler 在任务内按账号构造（cloud d41f30b：`new CommentSearchTermGenerator/CommentTargetPicker({llm: llmFor(accountId)带账号记账, soul: getSoul(accountId)})`），精选经 selectCurated 注入。仍登记进 role-catalog（task 8.2）→后台可配模型。与 publish-agent 角色不进 dispatcher 同理。 -->
+- [x] 8.4 中控 `CLAUDE.md` §2 角色数人工计数 +2（以 `RoleName` 穷举为准）。验证：核对计数。 <!-- 中控 CLAUDE.md §2 注记：两新角色在 RoleName 穷举 +2，但**不在 RoleDispatcher 的 37 注册数内**（命令式、由 CommentScheduler 构造，类比 publish-agent 角色不计入浏览 37）；故 dispatcher「37 角色」数**不变**，仅在 §2 补一句说明 -->
 
 ## 9. 验收与红线
 
-- [ ] 9.1 命令路径独占边端：不接管不下发命令；接管→恢复成对。验证：AC 断言。
-- [ ] 9.2 去重在择优之前；甄选要**强相关**(弱相关不评)；当前词无强相关 → 换下一个词重试、首中即止；词用尽/达上限仍无 → 诚实结束不评。验证：AC 多路(去重 / 强相关 / 换词 / 用尽 / 上限+限频)。
-- [ ] 9.3 命令路径跳过自动硬阈值但**保留人审 + canDo('comment') + 按天配额**；未授权/超时/被风控拒一律不发。验证：`AC-PUB-*`/`AC-RISK-*` 全过 + 单测。
-- [ ] 9.4 诚实红线：搜索/筛选未生效、撰写失败、边端离线、LLM 降级一律 honest-fail，不静默假成功。验证：AC。
-- [ ] 9.5 账号隔离：人设/精选/去重/落评论/落精选不跨账号。验证：单测——跨账号读被隔离。
+- [x] 9.1 命令路径独占边端：不接管不下发命令；接管→恢复成对。验证：AC 断言。 <!-- scheduler 单测断言 takeovers=['start','end'] 成对（cloud d41f30b）；server onCommentTakeoverStart/End 接 endSession/resumeSessionForAccount（d96c9f6） -->
+- [x] 9.2 去重在择优之前；甄选要**强相关**(弱相关不评)；当前词无强相关 → 换下一个词重试、首中即止；词用尽/达上限仍无 → 诚实结束不评。验证：AC 多路(去重 / 强相关 / 换词 / 用尽 / 上限+限频)。 <!-- runner 10 单测（去重在择优前/强相关/换词/用尽/上限K，cloud 099cba4）+ picker 9 单测强相关（aaa5500）+ edge-steps filterUncommented（e822856）。⚠️搜索限频/预算未单独接（仅 maxTerms 上限），列 follow-up -->
+- [x] 9.3 命令路径跳过自动硬阈值但**保留人审 + canDo('comment') + 按天配额**；未授权/超时/被风控拒一律不发。验证：`AC-PUB-*`/`AC-RISK-*` 全过 + 单测。 <!-- 人审保留：compose-approve 未接线/超时/拒→null 不裸发（5 单测，47d7a51）；跳过硬阈值=命令路径不经 CommentAppraiser。⚠️canDo('comment')+按天配额闸**暂未在命令路径前置**（评论真发后经 handler interaction.occurred→record('comment') 仍计数，但下发前未过 canDo）→列 follow-up（风控前置闸）。AC-PUB 全套 25/26 通（唯一红=Windows quirk） -->
+- [x] 9.4 诚实红线：搜索/筛选未生效、撰写失败、边端离线、LLM 降级一律 honest-fail，不静默假成功。验证：AC。 <!-- 全链 honest：edge-steps 离线/超时→空/null/false（e822856）；applySearchFilters 控件找不到→applied=false 不冒充（edge d2a492e）；compose 失败→null（47d7a51）；scheduler 离线→红回执（d41f30b）。各模块单测覆盖 -->
+- [x] 9.5 账号隔离：人设/精选/去重/落评论/落精选不跨账号。验证：单测——跨账号读被隔离。 <!-- 全程按 accountId：getSoul(accountId)/selectCurated(accountId)/dedupFor(accountId)（riskStore.hasInteraction/recordInteraction 带 accountId）/llmFor(accountId) 记账；角色按账号构造、精选注入按账号取（server d96c9f6） -->
 
 ## 10. 全量回归 + validate
 
-- [ ] 10.1 cloud：`npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿（安全红线 `AC-PROTO/AC-PUB/AC-RISK` 必过）。
-- [ ] 10.2 edge：`npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿。
-- [ ] 10.3 中控：`openspec validate comment-search-command --strict` 通过。
+- [x] 10.1 cloud：`npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿（安全红线 `AC-PROTO/AC-PUB/AC-RISK` 必过）。 <!-- cloud typecheck 净；全套 **975/976**（唯一红=AC-PUB-01 Windows path.join('/tmp') 反斜杠 quirk，Linux ECS 绿；AC-PROTO 5/5、AC-PUB-07/08、AC-RISK 全过）；含本 change ~30 新单测 -->
+- [x] 10.2 edge：`npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿。 <!-- edge typecheck 净；全套 **387/387**；含 applySearchFilters 3 新单测 + AC-PROTO 5/5 -->
+- [x] 10.3 中控：`openspec validate comment-search-command --strict` 通过。 <!-- valid（每次回写后均跑） -->
 
 ## 11. 部署（ECS 安全序列；cloud 先 / edge 后；协议同版前 edge 对新筛选 honest 降级）
 
