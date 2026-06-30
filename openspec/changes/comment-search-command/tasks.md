@@ -6,7 +6,7 @@
 
 ## 1. 协议增量（v2 四处同步——搜索排序/时间参数 + 结果卡片收藏数）
 
-- [ ] 1.1 cloud+edge 两份 `src/comm/protocol.ts` 逐字一致：`SearchExecutePayload` 加可选 `sort`（如 `most_collected`）与 `timeWindow`（如 `one_day`）；搜索结果卡片 payload 加 `collectCount`。验证：两份 `protocol-contract.test.ts` 的 `Record<MessageType,true>` 穷举与计数断言更新且 `npm run typecheck` 绿。
+- [x] 1.1 cloud+edge 两份 `src/comm/protocol.ts` 逐字一致：`SearchExecutePayload` 加可选 `sort`（如 `most_collected`）与 `timeWindow`（如 `one_day`）；搜索结果卡片 payload 加 `collectCount`。验证：两份 `protocol-contract.test.ts` 的 `Record<MessageType,true>` 穷举与计数断言更新且 `npm run typecheck` 绿。 <!-- cloud aaa5500 / edge 28db43a：SearchExecutePayload +sort/timeWindow（两份逐字一致）。**collectCount 早已在 PageCardsPayload.cards 上**（非协议缺口，仅 edge reportVisibleCards 硬编码 0→改在 task 5.2）。只加可选字段、无新 MessageType→AC-PROTO 计数无需改；cloud+edge typecheck 净、AC-PROTO 两侧 5/5 -->
 - [ ] 1.2 `aidcp-cloud/src/comm/command-bridge.ts` 搜索动作映射透传新参数；如新增 cloud→edge 主动命令则补 `aidcp-edge/src/client/edge-client.ts` 主动命令路由白名单（否则静默丢弃）。验证：`npm run test:acceptance` 的 `AC-PROTO-*` 全过。
 - [ ] 1.3 `docs/protocol.md` 头部消息计数与 §2 表同步。验证：人工核对计数与新字段在表内。
 
@@ -23,7 +23,7 @@
 
 ## 4. aidcp-cloud — 新角色①搜索词生成
 
-- [ ] 4.1 新建 `src/agents/comment-search-term-generator.ts`（判定类，读 `getSoul` + `curatedStore.selectForCreation('note'|'comment',N)`）→ 严格 JSON `{terms[], source}`，`terms` **有序**（供逐个换词重试）；精选稀疏退回 `seed_keywords`；解析失败/空诚实回退、不编造。验证：单测——有精选出贴领域有序词；精选空退种子词；坏输出回退不崩。
+- [x] 4.1 新建 `src/agents/comment-search-term-generator.ts`（判定类，读 `getSoul` + `curatedStore.selectForCreation('note'|'comment',N)`）→ 严格 JSON `{terms[], source}`，`terms` **有序**（供逐个换词重试）；精选稀疏退回 `seed_keywords`；解析失败/空诚实回退、不编造。验证：单测——有精选出贴领域有序词；精选空退种子词；坏输出回退不崩。 <!-- cloud aaa5500 CommentSearchTermGenerator（独立类，非 BaseRole，命令式调用 generate(samples)；调用方按账号传精选样本=账号隔离）；角色键 browse:comment_search_term_generator；7 单测（精选出词/解析空+降级退种子词/种子也空诚实返空/有序去重上限/source 标注）。**惰性建块、无调用方**（编排在 task 3） -->
 
 ## 5. aidcp-edge — 搜索结果原生筛选 + 收藏数采集（最大不确定性、需真机标定）
 
@@ -34,7 +34,7 @@
 ## 6. aidcp-cloud — 候选去重 + 新角色②搜索笔记甄选
 
 - [ ] 6.1 去重接线：采到候选卡片后，对每卡 `InteractionDedup.hasInteracted(noteId,'comment')`（按账号）滤掉已评过的，**在甄选之前**。验证：单测——已评过的笔记不进甄选候选。
-- [ ] 6.2 新建 `src/agents/comment-target-picker.ts`（判定类，读去重后候选卡片[标题/作者/收藏数] + 人设）→ 严格 JSON `{pickIndex|null, stronglyRelevantIndexes[], reason}`；判**人设强相关**(沾边/泛泛相关不算)，只在强相关候选里挑收藏最高者；无强相关 `pickIndex=null`（编排据此换下一个词）。验证：单测——挑强相关高收藏；仅弱相关→null；全不相关→null；坏输出→null 不默认挑。
+- [x] 6.2 新建 `src/agents/comment-target-picker.ts`（判定类，读去重后候选卡片[标题/作者/收藏数] + 人设）→ 严格 JSON `{pickIndex|null, stronglyRelevantIndexes[], reason}`；判**人设强相关**(沾边/泛泛相关不算)，只在强相关候选里挑收藏最高者；无强相关 `pickIndex=null`（编排据此换下一个词）。验证：单测——挑强相关高收藏；仅弱相关→null；全不相关→null；坏输出→null 不默认挑。 <!-- cloud aaa5500 CommentTargetPicker（独立类，命令式 pick(candidates)）；**确定性兜底**：在 LLM 判定的 stronglyRelevantIndexes 里按收藏数取最高（不完全信 LLM pickIndex）；越界 index 过滤；无强相关/降级/解析失败→null；9 单测。**惰性建块、无调用方**（去重接线+编排在 task 6.1/3） -->
 - [ ] 6.3 发布成功（真回执 ok:true）后 `InteractionDedup.recordInteraction(noteId,'comment')`（按账号）。验证：单测——ok:true 记账、ok:false 不记。
 
 ## 7. aidcp-cloud — 撰写小改读现场评论
@@ -43,8 +43,8 @@
 
 ## 8. aidcp-cloud — 角色注册 + 目录 + 文档
 
-- [ ] 8.1 `src/event-bus/types.ts` `RoleName` 加两角色（如需新事件载荷则加 `RoleEventMap`）。验证：typecheck 穷举一致。
-- [ ] 8.2 `src/config/role-catalog.ts` 两角色登记进 `ROLE_CATALOG`（判定类 `browse_judge`，`roleId='browse:<roleName>'` 去前缀逐字等于 `roleName`），否则运行时回落全局默认模型（`curated-admission-eval-roles` 6.1 教训）。验证：后台「角色管理」GET /api/roles 含二者、可配；单测/手测目录解析非 undefined。
+- [x] 8.1 `src/event-bus/types.ts` `RoleName` 加两角色（如需新事件载荷则加 `RoleEventMap`）。验证：typecheck 穷举一致。 <!-- cloud aaa5500 RoleName += comment_search_term_generator/comment_target_picker；无新事件（角色命令式调用、不走 EventBus）；typecheck 净 -->
+- [x] 8.2 `src/config/role-catalog.ts` 两角色登记进 `ROLE_CATALOG`（判定类 `browse_judge`，`roleId='browse:<roleName>'` 去前缀逐字等于 `roleName`），否则运行时回落全局默认模型（`curated-admission-eval-roles` 6.1 教训）。验证：后台「角色管理」GET /api/roles 含二者、可配；单测/手测目录解析非 undefined。 <!-- cloud aaa5500 ROLE_CATALOG +browse:comment_search_term_generator（评论·搜索词生成）/browse:comment_target_picker（评论·搜索笔记甄选），均 browse_judge；roleId 后缀逐字=roleName=decide 角色键，故 categoryOf 命中判定类、不回落默认。后台「角色管理」数据驱动→部署后自动出现可配；live /api/roles 验证待部署 -->
 - [ ] 8.3 `src/orchestrator/role-dispatcher.ts` 注册两角色（仅相关 store 可用时注册，仿 `concept_extractor`/curated 评估角色），注入账号绑定 LLM + `getSoul` + `curatedStore`。验证：单测——store 缺则不注册不报错。
 - [ ] 8.4 中控 `CLAUDE.md` §2 角色数人工计数 +2（以 `RoleName` 穷举为准）。验证：核对计数。
 
