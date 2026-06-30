@@ -27,9 +27,9 @@
 
 ## 5. aidcp-edge — 搜索结果原生筛选 + 收藏数采集（最大不确定性、需真机标定）
 
-- [ ] 5.1 `src/browse/search-handler.ts`：搜索后驱动原生「最多收藏」排序标签 +「一天内」时间筛选控件（双布局选择器）；后置校验确实切到目标排序/时间，未生效 honest 报降级、不冒充。验证：jsdom 桩单测点击路径；真机标定见 task 12。
-- [ ] 5.2 `src/browse/feed-scroller.ts` 卡片扫描 + `src/browse/browse-session.ts` `reportVisibleCards`：采每卡真实收藏数填 `collectCount`（替换硬编码 0）；采不到则置空、不编造。验证：单测/夹具——卡片含收藏数文本→解析正确；缺失→空不崩。
-- [ ] 5.3 edge 侧消费搜索新参数 `sort`/`timeWindow`（来自 task 1）。验证：`npm run typecheck` + `AC-PROTO-*` 绿。
+- [x] 5.1 `src/browse/search-handler.ts`：搜索后驱动原生「最多收藏」排序标签 +「一天内」时间筛选控件（双布局选择器）；后置校验确实切到目标排序/时间，未生效 honest 报降级、不冒充。验证：jsdom 桩单测点击路径；真机标定见 task 12。 <!-- edge d2a492e applySearchFilters：**按可见文案精确匹配点击**（跨布局/类名漂移最稳）；两遍=行内 tab 直点→缺则开「筛选」面板再点；控件找不到→applied=false honest 降级、不冒充。3 单测（applied/honest-not-found/no-op）；edge typecheck 净、全套 387/387。⚠️选择器/面板机制**待真机标定** -->
+- [ ] 5.2 `src/browse/feed-scroller.ts` 卡片扫描 + `src/browse/browse-session.ts` `reportVisibleCards`：采每卡真实收藏数填 `collectCount`（替换硬编码 0）；采不到则置空、不编造。验证：单测/夹具——卡片含收藏数文本→解析正确；缺失→空不崩。 <!-- 真机现实修正（d2a492e 勘察 CARD_SCAN_JS）：**搜索结果卡片只显示点赞数、不显示收藏数**（收藏数是详情页才有）。故「最多收藏」靠**原生排序**实现、云端用结果**顺序**（picker 的 stable sort 在收藏数未知时退化为保序=原生收藏序，已正确）。collectCount 维持 0、不强抓（避免误抓收藏/评论数=既有 feed-scroller 刻意规避的坑）。**本任务按原文不再需要**，留 [ ] 记录此判定；如真机发现某布局卡片确有收藏数再补 -->
+- [x] 5.3 edge 侧消费搜索新参数 `sort`/`timeWindow`（来自 task 1）。验证：`npm run typecheck` + `AC-PROTO-*` 绿。 <!-- edge d2a492e browse-session search.execute 读 payload.sort/timeWindow→executeSearch 后调 applySearchFilters；自治浏览不带这俩→跳过、行为不变。typecheck 净、AC-PROTO 5/5 -->
 
 ## 6. aidcp-cloud — 候选去重 + 新角色②搜索笔记甄选
 
@@ -39,7 +39,7 @@
 
 ## 7. aidcp-cloud — 撰写小改读现场评论
 
-- [ ] 7.1 `src/agents/comment-composer.ts` `buildPrompt` 增加可选「现场评论」输入（命令路径在开笔记后先翻一屏评论采集 `CommentCandidate[]` 传入）；正文+现场评论+人设+精选参考一起入 prompt。撰写失败/空/超长诚实跳过、不回退占位。验证：单测——带现场评论的 prompt 含之；空输入退化为原行为；失败 skip。
+- [x] 7.1 `src/agents/comment-composer.ts` `buildPrompt` 增加可选「现场评论」输入（命令路径在开笔记后先翻一屏评论采集 `CommentCandidate[]` 传入）；正文+现场评论+人设+精选参考一起入 prompt。撰写失败/空/超长诚实跳过、不回退占位。验证：单测——带现场评论的 prompt 含之；空输入退化为原行为；失败 skip。 <!-- cloud ddf9069 buildPrompt +可选 onPageComments 块（读者角度语境）；新增 public composeDraft(note,{references,onPageComments}) 供命令路径命令式调用（复用同 buildPrompt+sanitize+长度闸）；事件路径 onAppraised 不传→行为不变（向后兼容）；空/超长/LLM失败→honest null；6 单测 -->
 
 ## 8. aidcp-cloud — 角色注册 + 目录 + 文档
 
