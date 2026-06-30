@@ -18,12 +18,12 @@
 ## 3. aidcp-cloud — 评论任务编排（独占边端、一次性、按账号串行）
 
 - [ ] 3.1 新建 `src/comment-agent/comment-scheduler.ts`：`triggerManual(accountId)`（仿 `PublishScheduler.triggerManual`），载入 `getSoul` + `curatedStore.selectForCreation`。验证：单测——触发产出任务输入（人设+精选样本）。
-- [ ] 3.2 新建有方向步骤时序器（仿 `command-sequencer`/`publish-dispatcher`）：搜索词 → 搜索(原生筛选) → 采列表 → 去重 → 甄选 → 开笔记 → 翻评论 → 撰写 → 人审 → 发布 → 记账去重 →（可选落精选）。每步压在边端约 30s 单步超时内；任一步失败 honest-fail。验证：单测——步骤序列时序 + 失败短路。
+- [ ] 3.2 新建有方向步骤时序器（仿 `command-sequencer`/`publish-dispatcher`）：角色①出**有序多词** →〔**逐词循环**：搜索(原生筛选) → 采列表 → 去重 → 甄选；**强相关命中即跳出**，否则**换下一个词**重试〕→ 开笔记 → 翻评论 → 撰写 → 人审 → 发布 → 记账去重 →（可选落精选）。换词有**尝试上限 K(可配)** + 受 `SearchFrequencyLimiter`/搜索预算约束 + 首中即止；词用尽/达上限仍无强相关 → 诚实结束不评。每步压边端约 30s 单步超时内；任一步失败 honest-fail。验证：单测——首中即止 / 换词重试 / 用尽诚实结束 / 上限+限频生效 / 失败短路。
 - [ ] 3.3 边端独占：`src/server.ts` 新增 `onCommentTakeoverStart/End`（reason `comment_takeover`，仿 `onPublishTakeoverStart/End`）——开跑结束自动浏览会话标记不可恢复、`finally` 恢复浏览；按账号 accountTail 串行；`resolveEdgeIdForAccount` 离线 honest-fail。验证：单测——接管→恢复成对；同账号串行；离线诚实失败。
 
 ## 4. aidcp-cloud — 新角色①搜索词生成
 
-- [ ] 4.1 新建 `src/agents/comment-search-term-generator.ts`（判定类，读 `getSoul` + `curatedStore.selectForCreation('note'|'comment',N)`）→ 严格 JSON `{terms[], source}`；精选稀疏退回 `seed_keywords`；解析失败/空诚实回退、不编造。验证：单测——有精选出贴领域词；精选空退种子词；坏输出回退不崩。
+- [ ] 4.1 新建 `src/agents/comment-search-term-generator.ts`（判定类，读 `getSoul` + `curatedStore.selectForCreation('note'|'comment',N)`）→ 严格 JSON `{terms[], source}`，`terms` **有序**（供逐个换词重试）；精选稀疏退回 `seed_keywords`；解析失败/空诚实回退、不编造。验证：单测——有精选出贴领域有序词；精选空退种子词；坏输出回退不崩。
 
 ## 5. aidcp-edge — 搜索结果原生筛选 + 收藏数采集（最大不确定性、需真机标定）
 
@@ -34,7 +34,7 @@
 ## 6. aidcp-cloud — 候选去重 + 新角色②搜索笔记甄选
 
 - [ ] 6.1 去重接线：采到候选卡片后，对每卡 `InteractionDedup.hasInteracted(noteId,'comment')`（按账号）滤掉已评过的，**在甄选之前**。验证：单测——已评过的笔记不进甄选候选。
-- [ ] 6.2 新建 `src/agents/comment-target-picker.ts`（判定类，读去重后候选卡片[标题/作者/收藏数] + 人设）→ 严格 JSON `{pickIndex|null, relevantIndexes[], reason}`；只在相关候选里挑收藏最高者；无相关候选 `pickIndex=null` 诚实结束。验证：单测——挑相关高收藏；全不相关→null；坏输出→null 不默认挑。
+- [ ] 6.2 新建 `src/agents/comment-target-picker.ts`（判定类，读去重后候选卡片[标题/作者/收藏数] + 人设）→ 严格 JSON `{pickIndex|null, stronglyRelevantIndexes[], reason}`；判**人设强相关**(沾边/泛泛相关不算)，只在强相关候选里挑收藏最高者；无强相关 `pickIndex=null`（编排据此换下一个词）。验证：单测——挑强相关高收藏；仅弱相关→null；全不相关→null；坏输出→null 不默认挑。
 - [ ] 6.3 发布成功（真回执 ok:true）后 `InteractionDedup.recordInteraction(noteId,'comment')`（按账号）。验证：单测——ok:true 记账、ok:false 不记。
 
 ## 7. aidcp-cloud — 撰写小改读现场评论
@@ -51,7 +51,7 @@
 ## 9. 验收与红线
 
 - [ ] 9.1 命令路径独占边端：不接管不下发命令；接管→恢复成对。验证：AC 断言。
-- [ ] 9.2 去重在择优之前；无合格候选诚实结束、不强评。验证：AC 多路。
+- [ ] 9.2 去重在择优之前；甄选要**强相关**(弱相关不评)；当前词无强相关 → 换下一个词重试、首中即止；词用尽/达上限仍无 → 诚实结束不评。验证：AC 多路(去重 / 强相关 / 换词 / 用尽 / 上限+限频)。
 - [ ] 9.3 命令路径跳过自动硬阈值但**保留人审 + canDo('comment') + 按天配额**；未授权/超时/被风控拒一律不发。验证：`AC-PUB-*`/`AC-RISK-*` 全过 + 单测。
 - [ ] 9.4 诚实红线：搜索/筛选未生效、撰写失败、边端离线、LLM 降级一律 honest-fail，不静默假成功。验证：AC。
 - [ ] 9.5 账号隔离：人设/精选/去重/落评论/落精选不跨账号。验证：单测——跨账号读被隔离。
