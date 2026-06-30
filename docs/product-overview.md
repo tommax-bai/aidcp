@@ -212,7 +212,7 @@ graph LR
 
 **目标**：账号数继续扩张，引入自动止损与高级运营策略。
 
-- 规模化反检测（指纹浏览器方案 B、住宅代理池，`anti-detection.md §6`）。
+- 规模化反检测：**指纹浏览器（AdsPower）已落地并设为默认 provider**；住宅代理池仍待接（`anti-detection.md §6`）。
 - 人机协作与止损（#12）：自动化分级、冻结规则、效果归因。
 - 高级运营策略：跨号内容编排、热点跟进、A/B 人设实验。
 
@@ -254,7 +254,7 @@ graph TB
         CDP["CDP 接入层<br/>原生 WebSocket"]
     end
 
-    CHROME["Chrome（headful）<br/>--remote-debugging-port"]
+    CHROME["浏览器（默认 AdsPower 指纹浏览器 / 可切 self）<br/>headful · CDP 调试端口"]
     XHS["小红书 Web"]
 
     OP --> WEB
@@ -293,7 +293,7 @@ graph TB
 
 - **边轻云重**：边缘只做定位/执行/拟人化/反检测注入；规划、模型推理、状态、持久化在云端。
 - **接口不变、实现可换**：`DomProvider` / `ActionExecutor` 接口固定，CDP 层是其真实实现；
-  未来切指纹浏览器时只换 CDP 连接目标，定位/执行逻辑零改动。
+  默认经 AdsPower 指纹浏览器（可切 self）；切 provider 时只换 CDP 连接目标，定位/执行逻辑零改动。
 - **虚线节点 = 规划中**：仅 Web 管理面板（Phase 2）尚未实现；`RiskController` 与飞书 Bot 均已落地。
 - **云端已是事件驱动多 Agent**：`RoleDispatcher` 注册约 32 角色经 `EventBus` 协作，角色事件经 `command-bridge` 翻译为 v2 协议指令下发——不再是单体 `Planner→PlanStep[]`。
 
