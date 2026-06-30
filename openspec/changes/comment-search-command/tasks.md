@@ -12,13 +12,13 @@
 
 ## 2. aidcp-cloud — 飞书 /comment 命令接入
 
-- [ ] 2.1 `src/feishu/commands.ts`：`CommandAction` 加 `comment`；`parseCommand` 加 `/comment <昵称>` 分支；`CommandRouter.runComment` + `CommandActions.comment(nickname?)`；HELP 文案加一行。验证：单测——`/comment 测评酱` 解析为 `{action:'comment',nickname}`；未带昵称/无匹配走 honest 分支。
+- [x] 2.1 `src/feishu/commands.ts`：`CommandAction` 加 `comment`；`parseCommand` 加 `/comment <昵称>` 分支；`CommandRouter.runComment` + `CommandActions.comment(nickname?)`；HELP 文案加一行。验证：单测——`/comment 测评酱` 解析为 `{action:'comment',nickname}`；未带昵称/无匹配走 honest 分支。 <!-- cloud 82c3155 /comment 与 /publish 同构；CommandActions.comment **可选**（server 接线 task 2.2 落、未接线时 runComment honest-fail「未接线」、不破 server typecheck）；两段式回执；+5 单测，feishu-commands 29/29 绿 -->
 - [ ] 2.2 `src/server.ts`：接 `actions.comment`（仿 `actions.publish`）——`resolveAccountByNickname` 定位账号（0/多义 honest-fail 列昵称）→ `CommentScheduler.triggerManual(acct)`。两段式回执：同步回「已触发/失败原因」。验证：单测——无匹配回失败列昵称；边端离线回「边端离线」。
 
 ## 3. aidcp-cloud — 评论任务编排（独占边端、一次性、按账号串行）
 
 - [ ] 3.1 新建 `src/comment-agent/comment-scheduler.ts`：`triggerManual(accountId)`（仿 `PublishScheduler.triggerManual`），载入 `getSoul` + `curatedStore.selectForCreation`。验证：单测——触发产出任务输入（人设+精选样本）。
-- [ ] 3.2 新建有方向步骤时序器（仿 `command-sequencer`/`publish-dispatcher`）：角色①出**有序多词** →〔**逐词循环**：搜索(原生筛选) → 采列表 → 去重 → 甄选；**强相关命中即跳出**，否则**换下一个词**重试〕→ 开笔记 → 翻评论 → 撰写 → 人审 → 发布 → 记账去重 →（可选落精选）。换词有**尝试上限 K(可配)** + 受 `SearchFrequencyLimiter`/搜索预算约束 + 首中即止；词用尽/达上限仍无强相关 → 诚实结束不评。每步压边端约 30s 单步超时内；任一步失败 honest-fail。验证：单测——首中即止 / 换词重试 / 用尽诚实结束 / 上限+限频生效 / 失败短路。
+- [ ] 3.2 新建有方向步骤时序器（仿 `command-sequencer`/`publish-dispatcher`）：角色①出**有序多词** →〔**逐词循环**：搜索(原生筛选) → 采列表 → 去重 → 甄选；**强相关命中即跳出**，否则**换下一个词**重试〕→ 开笔记 → 翻评论 → 撰写 → 人审 → 发布 → 记账去重 →（可选落精选）。换词有**尝试上限 K(可配)** + 受 `SearchFrequencyLimiter`/搜索预算约束 + 首中即止；词用尽/达上限仍无强相关 → 诚实结束不评。每步压边端约 30s 单步超时内；任一步失败 honest-fail。验证：单测——首中即止 / 换词重试 / 用尽诚实结束 / 上限+限频生效 / 失败短路。 <!-- WIP cloud 099cba4：**控制流核心已落 + 全测**（src/comment-agent/comment-task-runner.ts，纯逻辑、边端/LLM/风控经 CommentTaskSteps 注入；10 单测：无词/首中即止/去重在择优前/换词/用尽诚实结束/上限K/读·撰·发失败终态不偷换/坏pickIndex）。**仍缺=边端触达的步骤适配实现**（searchAndHarvest 发 search.execute 带 sort/timeWindow + 等 page.cards；readNote 开笔记+翻评论等 note.detail/action.completed；composeAndApprove 接评论链；post 发 interaction.comment 等回执）+ 单步 30s 超时 + 搜索限频/预算把关，与 3.1/3.3/5/6/7 一并接线 -->
 - [ ] 3.3 边端独占：`src/server.ts` 新增 `onCommentTakeoverStart/End`（reason `comment_takeover`，仿 `onPublishTakeoverStart/End`）——开跑结束自动浏览会话标记不可恢复、`finally` 恢复浏览；按账号 accountTail 串行；`resolveEdgeIdForAccount` 离线 honest-fail。验证：单测——接管→恢复成对；同账号串行；离线诚实失败。
 
 ## 4. aidcp-cloud — 新角色①搜索词生成
