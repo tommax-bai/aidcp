@@ -52,7 +52,7 @@
 
 - [x] 9.1 命令路径独占边端：不接管不下发命令；接管→恢复成对。验证：AC 断言。 <!-- scheduler 单测断言 takeovers=['start','end'] 成对（cloud d41f30b）；server onCommentTakeoverStart/End 接 endSession/resumeSessionForAccount（d96c9f6） -->
 - [x] 9.2 去重在择优之前；甄选要**强相关**(弱相关不评)；当前词无强相关 → 换下一个词重试、首中即止；词用尽/达上限仍无 → 诚实结束不评。验证：AC 多路(去重 / 强相关 / 换词 / 用尽 / 上限+限频)。 <!-- runner 10 单测（去重在择优前/强相关/换词/用尽/上限K，cloud 099cba4）+ picker 9 单测强相关（aaa5500）+ edge-steps filterUncommented（e822856）。⚠️搜索限频/预算未单独接（仅 maxTerms 上限），列 follow-up -->
-- [x] 9.3 命令路径跳过自动硬阈值但**保留人审 + canDo('comment') + 按天配额**；未授权/超时/被风控拒一律不发。验证：`AC-PUB-*`/`AC-RISK-*` 全过 + 单测。 <!-- 人审保留：compose-approve 未接线/超时/拒→null 不裸发（5 单测，47d7a51）；跳过硬阈值=命令路径不经 CommentAppraiser。⚠️canDo('comment')+按天配额闸**暂未在命令路径前置**（评论真发后经 handler interaction.occurred→record('comment') 仍计数，但下发前未过 canDo）→列 follow-up（风控前置闸）。AC-PUB 全套 25/26 通（唯一红=Windows quirk） -->
+- [x] 9.3 命令路径跳过自动硬阈值但**保留人审**；评论**不计入风控配额**（人工授权，用户决策 2026-06-30 反转原「仍计入」草拟）。验证：`AC-PUB-*` 全过 + 单测。 <!-- 人审保留：compose-approve 未接线/超时/拒→null 不裸发（5 单测，47d7a51）；跳过硬阈值=命令路径不经 CommentAppraiser。**不计入风控配额**（cloud c97f014 部署 23:26）：评论任务接管期间账号入 manualCommentAccounts，interaction.occurred 的 RiskController.record 对 comment 跳过（接管已停自治会话→该窗口唯一 comment 即手动评论）；仍记每笔记去重(risk_interactions)。spec R7 已改。risk-guard AC 3/3、AC-PUB 25/26（唯一红=Windows quirk） -->
 - [x] 9.4 诚实红线：搜索/筛选未生效、撰写失败、边端离线、LLM 降级一律 honest-fail，不静默假成功。验证：AC。 <!-- 全链 honest：edge-steps 离线/超时→空/null/false（e822856）；applySearchFilters 控件找不到→applied=false 不冒充（edge d2a492e）；compose 失败→null（47d7a51）；scheduler 离线→红回执（d41f30b）。各模块单测覆盖 -->
 - [x] 9.5 账号隔离：人设/精选/去重/落评论/落精选不跨账号。验证：单测——跨账号读被隔离。 <!-- 全程按 accountId：getSoul(accountId)/selectCurated(accountId)/dedupFor(accountId)（riskStore.hasInteraction/recordInteraction 带 accountId）/llmFor(accountId) 记账；角色按账号构造、精选注入按账号取（server d96c9f6） -->
 

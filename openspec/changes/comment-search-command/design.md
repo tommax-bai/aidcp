@@ -53,7 +53,7 @@
 复用 `CommentComposer`→`CommentDeAiFlavor`→`CommentApprovalGate`→`executeComment`。唯一改动：`CommentComposer.buildPrompt` 增加**可选「现场评论」输入**（现状只看标题+正文+精选参考）。现场评论采集已有（`scroll_comments` → `harvestCommentCandidates` 产 `CommentCandidate{author,text,likeCount}`），命令编排在开笔记后先翻一屏评论再撰写。自治闭环的撰写是否也吃这个可选输入留作实现细节、不强制。
 
 ### D6. 门槛取舍：跳过自动硬阈值，保留人审 + 配额
-命令路径**不经** `CommentAppraiser` 的硬数值阈值（赞>1000 且 藏>300）与「是否值得」LLM——用户已手动指定意图、相关性由角色②把关。但**保留**飞书人工审核闸（`AC-PUB`：未授权/超时不发）、**仍过** `riskController.canDo('comment')` 且**计入**按天评论配额（被拒诚实跳过）。
+命令路径**不经** `CommentAppraiser` 的硬数值阈值（赞>1000 且 藏>300）与「是否值得」LLM——用户已手动指定意图、相关性由角色②把关。**保留**飞书人工审核闸（`AC-PUB`：未授权/超时不发）。**不计入风控配额**（用户决策）：手动评论是人工授权动作，与 `/publish` 越过风控同理——**不经 `canDo('comment')` 门控、不计入按天评论配额、不动风控状态机**（不消耗自治评论预算）。实现：评论任务接管期间该账号入 `manualCommentAccounts` 集合，`interaction.occurred` 的 `RiskController.record` 对 `comment` 跳过（接管已结束自治会话→该窗口唯一 comment 即手动评论，判定精准）；**仍记每笔记去重**（`risk_interactions`，避免重复评同一篇）。取舍：真实评论速率（自治+手动）可能超安全配额，因 `/comment` 是运营刻意触发、由运营负责。
 
 ### D7. 两段式回执 + 账号隔离 + 诚实红线
 飞书回执两段：命令同步回「已触发/honest-fail（昵称无匹配、边端离线）」；评论经人审发出后再补结果卡片（仿发布异步）。人设/精选集/去重/落评论/落精选全按命令解析到的账号，**不跨账号**。任一步（搜索、筛选、开笔记、撰写、发布）失败 → honest-fail，绝不静默假成功。
@@ -88,7 +88,7 @@
 | 强相关过严 → 多数运行空手不评 | 中 | 强相关严格度真机标定；换词重试拉高产出率；空手是诚实结果、非 bug |
 | 每步超 30s 边端超时 | 中 | 拟人延迟压云端中心值；分步小化；参发布拟人两次踩坑 |
 | 新角色未登记目录→回落默认模型「判得不对」 | 中 | 登记进 `ROLE_CATALOG`（判定类）；后台可见即对（`curated-admission-eval-roles` 6.1 教训） |
-| 命令路径误绕人审/风控 | 高（红线） | 保留 `CommentApprovalGate` + `canDo('comment')` + 配额；`AC-PUB`/`AC-RISK` 全过 |
+| 命令路径误绕人审 | 高（红线） | 保留 `CommentApprovalGate`（未授权绝不发）；`AC-PUB` 全过。注：评论**不计入风控配额**=人工授权刻意决策（非误绕）；真实速率由运营负责 |
 | 与自治浏览/通知巡视抢边端 | 中 | accountTail 串行 + 接管/恢复钩子；honest-fail 若边端离线 |
 
 ## Migration Plan
