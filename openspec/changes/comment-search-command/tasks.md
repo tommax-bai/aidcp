@@ -64,7 +64,7 @@
 
 ## 11. 部署（ECS 安全序列；cloud 先 / edge 后；协议同版前 edge 对新筛选 honest 降级）
 
-- [ ] 11.1 cloud 部署：§0 前置（私钥/子仓）→ 先备份 → `git archive <sha> src` 推 committed-only → `systemctl restart aidcp-cloud` → healthcheck（active+8787+飞书+PG）→ 失败回滚。绝不碰 isales。
+- [x] 11.1 cloud 部署：§0 前置（私钥/子仓）→ 先备份 → `git archive <sha> src` 推 committed-only → `systemctl restart aidcp-cloud` → healthcheck（active+8787+飞书+PG）→ 失败回滚。绝不碰 isales。 <!-- DONE 2026-06-30 23:06：备份 cloud.bak.20260630-230600.tar.gz(14M)+.env.bak；git archive d96c9f6 src committed-only 推（local==origin/master 无并发领先）；restart→healthcheck 全绿：active+8787 LISTEN+**「CommentScheduler 已就绪（飞书 /comment 即用）」无⚠️=AIDCP_COMMENT_APPROVAL=true 人审口已接**+飞书长连接已建立+全 store 就绪+0 启动错误。绝未碰 isales --> <!-- 2026-06-30 deployed -->
 - [ ] 11.2 edge：用户本地 `git pull` + 重启本地 edge（边端本地跑、连生产 8787）；如已打 Electron 包则需重打分发。
 
 ## 12. 真机标定（最大未知=原生筛选控件）
