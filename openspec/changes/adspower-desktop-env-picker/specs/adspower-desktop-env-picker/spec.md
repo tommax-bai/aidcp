@@ -1,0 +1,53 @@
+## ADDED Requirements
+
+### Requirement: 桌面外壳前置探测 AdsPower 本地 API 可用性
+
+`adspower` 模式下，Electron 桌面外壳 SHALL 在面板加载、切到 AdsPower 选择项、以及「保存并启动」之前，经 AdsPower 本地 API 的**根级**健康检查接口（`/status`，不在 `/api/v1/` 前缀下）**只读探测**其是否可达，并把结果如实呈现给运维。该探测 SHALL 按端点显式构造 URL，MUST NOT 因把请求误加 `/api/v1/` 前缀而把一个本可达的服务谎报为不可达。探测可达 SHALL 呈现「AdsPower 本地 API 已就绪」；探测不可达 SHALL 诚实提示「未检测到 AdsPower 本地 API（请启动 AdsPower 并开启本地 API）」并提供下载入口，MUST NOT 谎报就绪、MUST NOT 因探测不可达就假装可启动。探测 SHALL 为人工低频触发，MUST NOT 引入后台常驻轮询。「是否已安装」无独立探测手段，SHALL 由不可达状态反推去引导安装 / 启动 / 开启本地 API，MUST NOT 猜测本机安装路径而谎报。
+
+#### Scenario: 本地 API 可达时呈现就绪
+- **WHEN** 桌面外壳在 `adspower` 模式下面板加载、切到 AdsPower 分段或点「检测」，且 AdsPower 客户端在运行并已开启本地 API
+- **THEN** 面板经健康检查接口探到可达，如实呈现「AdsPower 本地 API 已就绪」
+
+#### Scenario: 本地 API 不可达时诚实提示不谎报
+- **WHEN** 探测健康检查接口不可达（AdsPower 未安装 / 未启动 / 未开本地 API）
+- **THEN** 面板诚实提示「未检测到 AdsPower 本地 API」并给出下载入口，不谎报就绪、不假装可启动；运维仍可选择手填分身 id 继续（诚实降级）
+
+### Requirement: 桌面外壳拉取并下拉选择 AdsPower 浏览器环境
+
+`adspower` 模式下，桌面外壳 SHALL 经 AdsPower 本地 API 的环境列表接口（`user/list`）**只读拉取**可用的浏览器环境，并以下拉列表供运维选择，每项 SHALL 至少展示环境名称与其分身 id，并 SHOULD 展示分组与代理配置摘要（`user/list` 返回的代理类型 / host 及配置 `ip` / `ip_country`）以便**初步**核对防关联绑定契约（1 环境 = 1 指纹 = 1 独立 IP = 1 账号）；该 `ip` SHALL 明示为环境的**配置值**、对无代理或动态分配代理可能为空 / 占位，实测出口 IP 以 AdsPower 内『检测代理』为准，MUST NOT 把防关联核对的可信度绑死在该字段。运维选中某环境后，**其 `user/list` 返回的 `user_id`**（非 `serial_number` 序号）SHALL 写入既有持久化设置的分身 id 字段（即注入核心的 `AIDCP_ADS_USER_ID`，下游 `browser/start` 只认 `user_id`）；`serial_number` / 名称仅供下拉展示，MUST NOT 写入分身 id 字段（否则 `browser/start` 找不到该 user 而失败）。下游启动路径 MUST NOT 因引入下拉而改变。需鉴权的拉取 SHALL 支持取渲染层传入的**当前表单 api-key / api-base 作调用级参数**（仅本次调用用、不持久化、不落日志），以支持「新填 key 未保存即刷新」而不陷入「填了仍被要求去填」的回环。**手敲分身 id 的输入方式 SHALL 始终保留为兜底**：当环境列表拉取失败时，桌面外壳 SHALL 诚实降级为手填分身 id 并如实说明拉取失败原因，MUST NOT 把启动的唯一入口绑死在列表拉取成功上。最终以写入分身 id 字段的值为准，保存时 SHALL 校验其非空。
+
+#### Scenario: 拉取成功时下拉选择写入分身 id
+- **WHEN** 桌面外壳在 `adspower` 模式下拉取环境列表成功
+- **THEN** 面板以下拉列表展示各环境（名称 / 分身 id / 分组 / 代理配置摘要），运维选中一项后其 `user_id`（非 `serial_number`）写入持久化设置的分身 id 字段，注入核心的目标 profile env 与手敲同等生效、下游零改动
+
+#### Scenario: 新填未保存的 api-key 刷新即生效不陷回环
+- **WHEN** 运维在表单新填了 api-key 但尚未「保存并启动」，即点「刷新环境列表」，且 AdsPower 开启了 API 校验
+- **THEN** 拉取用表单当前填写的 api-key（调用级、不持久化、不落日志）发起，key 正确则拉出环境列表；若仍失败其提示 MUST NOT 反过来要求运维去填一个他已填的 key 框
+
+#### Scenario: 拉取失败时诚实降级为手填
+- **WHEN** 环境列表接口调用失败（本地 API 不可达 / 开了 API 校验致鉴权失败 / 返回错误）
+- **THEN** 面板如实说明拉取失败原因（疑似鉴权失败时提示去填 API key），并保留手填分身 id 的入口让运维继续，MUST NOT 谎报有环境、MUST NOT 禁死启动
+
+#### Scenario: 环境未登录仍走核心诚实退出
+- **WHEN** 运维选中或手填了某环境并启动，但该环境未登录目标账号、身份读不出
+- **THEN** 沿用既有红线由核心诚实非零退出并弹窗提示去 AdsPower 登录，桌面外壳 MUST NOT 在面板侧假判为成功或以「运行中」外观空跑
+
+### Requirement: 桌面外壳提供「打开 AdsPower 新建环境」引导入口
+
+桌面外壳 SHALL 提供一个「打开 AdsPower 新建环境」入口。因 AdsPower 客户端不公开直达其内部「新建浏览器」界面的深链，该入口 SHALL 以 best-effort 拉起 / 聚焦 AdsPower 客户端实现；无法拉起时 SHALL 退回在系统浏览器打开 AdsPower 官方页面。点击后面板 SHALL 提示运维在 AdsPower 中完成新建与配置、返回后点「刷新环境列表」以看到新环境。该入口 MUST NOT 承诺一键直达 AdsPower 内部的新建界面，且 MUST NOT 经本地 API 的创建接口在面板内代建环境（指纹 / 代理配置属 AdsPower）。
+
+#### Scenario: 点击新建入口引导去 AdsPower 并可刷新看到新环境
+- **WHEN** 运维点击「打开 AdsPower 新建环境」
+- **THEN** 桌面外壳 best-effort 拉起 / 聚焦 AdsPower 客户端（起不来则打开其官方页面），并提示在 AdsPower 中完成新建后回来点「刷新环境列表」；刷新后新环境出现在下拉中
+
+### Requirement: 桌面外壳对 AdsPower 本地 API 的调用只读且在主进程侧自持限速节流
+
+桌面外壳为探测与环境拉取而对 AdsPower 本地 API 发起的所有调用 SHALL **只读**（仅健康检查与环境列表查询），MUST NOT 触及浏览器启动 / 停止 / 生命周期接口，MUST NOT 改动核心 provider 的启动与生命周期层。因面板探测 / 拉取运行在 Electron 主进程、而核心的启动 / 停止 / active 调用运行在被 `spawn` 拉起的**独立子进程**内（节流状态为其进程私有、且探测常发生在核心尚未启动之时），二者分属不同 OS 进程、无法共享同一内存节流队列——**故本 change 不要求跨进程共享节流**。桌面外壳的这些只读调用 SHALL 在 Electron 主进程内经其**自持的同一条 ≥1 秒间隔串行节流**按序发出（复用与核心相同的最小间隔逻辑、但为独立实例），且探测 / 刷新触发按钮 SHALL 在请求在途时禁用；跨进程残余并发窗口极小（探测为人工低频、核心仅在启动 / 回收瞬间打本地 API），一旦真撞上本地 API 每秒一次限速 SHALL **诚实降级**（如实提示、允许 ≥1 秒后重试 / 手敲），MUST NOT 谎报限速合规、MUST NOT 假成功。开启 API 校验时环境列表查询 SHALL 携带 api-key（优先取渲染层传入的调用级当前值、否则回落持久化值），且 api-key MUST NOT 被写入日志或文档。
+
+#### Scenario: 只读调用不触碰启动生命周期层
+- **WHEN** 桌面外壳执行探测或拉取环境列表
+- **THEN** 仅调用本地 API 的健康检查与环境列表查询接口，不调用启动 / 停止接口，核心 provider 的启动与生命周期逻辑零改动
+
+#### Scenario: 主进程侧自持节流按序发出、撞限速即诚实降级
+- **WHEN** 面板的探测 / 刷新连续触发，或与运行中核心的浏览器启动 / 回收调用在同一秒内相近发生
+- **THEN** 主进程侧的只读调用经其自持的同一条串行节流按 ≥1 秒间隔发出、按钮在途禁用；因主 / 核心分属不同进程无法共享内存队列，若跨进程碰撞触发本地 API 每秒限速，则如实提示并允许 ≥1 秒后重试，不谎报合规、不假成功

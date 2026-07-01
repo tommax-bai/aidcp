@@ -1,0 +1,96 @@
+## Context
+
+桌面外壳（Electron, `aidcp-edge/src/electron/`）已在 `adspower-browser-provider` §9 落地「应用内 provider 选择」：面板可切 `adspower`（默认）/ `self`，AdsPower 配置存 `userData/settings.json`（`{ provider, adsProfileId, adsApiKey, adsApiBase }`），按选择派生 env 注入核心进程。但**分身 id 只能手敲**（`main.cjs:267` 仅校验非空），面板对 AdsPower **不做任何探测**、不列可用环境——AdsPower 没装 / 没开 / 本地 API 没启 / 环境不对，都要等核心起来调 `browser/start` 失败才延迟暴露。
+
+AdsPower 本地 API（`http://local.adspower.net:50325`，限速 **1 req/s**，开安全校验时 `Authorization: Bearer <key>`）除已接的 `browser/start|stop|active` 外，还提供：`GET /status`（本地 API 健康检查，通常免鉴权）、`GET /api/v1/user/list`（列浏览器环境，支持 `group_id` / `page` / `page_size`，返回 id / 名称 / 分组 / 代理等）。现有 API 客户端（`src/cdp/browser-provider.ts` 的 `api<T>()`）已带 **≥1.1s 串行节流** 与 Bearer——是新增只读探测 / 拉取的天然复用点。
+
+约束（项目铁律）：边轻云重、**绝不静默假成功 / 绝不静默回落**、不记敏感值、诚实降级。Electron 安全边界：`contextIsolation` 下渲染层不直连本地 API，只经 preload 暴露的 IPC 通道。
+
+## Goals / Non-Goals
+
+**Goals:**
+- 面板**前置探测** AdsPower 本地 API 可用性（`/status`），不可达即诚实提示 + 下载入口，把失败从「核心延迟报错」提前到「面板即时反馈」。
+- 面板**拉取并下拉选择**浏览器环境（`user/list`），替代手敲分身 id；顺带显示代理配置摘要（含配置 `ip`，非实测出口 IP）供初步核对防关联绑定（D6 契约）。选中写入既有 `adsProfileId`（取 `user_id`）、**下游零改动**。
+- **手敲 id 兜底保留**：拉取失败诚实降级、仍可手填——不把唯一入口绑死在拉取上。
+- 提供**「打开 AdsPower 新建环境」** best-effort 入口（拉起 / 聚焦客户端 + 提示 + 刷新闭环）。
+- 全量中文化，接缝**只在 Electron 外壳 + 本地 API 只读查询**，核心 provider 层与 CDP 接入零改动。
+
+**Non-Goals:**
+- 面板内建环境（`user/create` 需指纹 + 代理参数，等于重做建环境表单，交给 AdsPower）。
+- 一键直达 AdsPower 内部「新建浏览器」tab（AdsPower 无深链 / URL scheme）。
+- 按分组做服务器侧编排；任何 cloud / console / 边-云协议改动；改核心 provider 启动 / 生命周期层。
+- 渲染层直连本地 API（破 `contextIsolation`）。
+
+## Decisions
+
+### D1. 探测经根级 `/status`、在「面板加载 / 切 AdsPower 分段 / 点检测 / 保存前」触发，不做常驻轮询
+**选择**：新增只读探测调**根级** `GET /status`（见 D3a）。触发点绑到**实际存在的事件**：渲染层加载时探一次（低频）+ 切到 AdsPower 分段时探一次（复用现有 `prov-adspower` 点击）+ `adspower` 模式「保存并启动」前探一次；若加显式「检测」按钮则一并挂上（tasks 3.1）。**不**把触发点写成「打开设置面板」——设置区是 `index.html` 内常驻内联块、无「打开」事件。**不**做后台常驻轮询。可达 → 面板显示「AdsPower 已就绪」；不可达 → 诚实提示「未检测到 AdsPower 本地 API（请启动 AdsPower 并开启本地 API）」+ 下载入口。
+**理由**：`/status` 是官方健康检查、语义精确（「本地 API 在不在」）、通常免鉴权，比拿 `browser/active` 探活更干净。人工触发足够，常驻轮询会平白占用 1 req/s 配额。
+**取舍**：「是否已安装」无独立接口——由 `/status` 不可达反推去引导安装 / 启动 / 开 API，不猜测本机安装路径。
+
+### D2. 环境列表下拉 + 手敲兜底并存，选中仍写 `adsProfileId`
+**选择**：调 `user/list`（分页拉取，见 D7）平铺成下拉，每项展示「名称 / 分身 id / 分组 / 代理配置摘要」。选中即把该环境的 **`user_id`**（非 `serial_number`）写入既有 `settings.adsProfileId` → 注入 `AIDCP_ADS_USER_ID`，**下游与 §9 完全一致、零改动**。手敲 id 输入框**保留**为兜底：拉取失败（API 校验未配 / 限速 / 网络）时诚实降级、仍可手填并启动。
+**理由**：下拉解决手敲易错的痛点、并让代理配置可视以初步核对防关联绑定；但拉取有失败面，不能把唯一入口绑死在它上——保留手敲是诚实降级红线的体现。
+**取舍 — 字段陷阱**：`user/list` 每项同时返回内部 `user_id`（长串）与 `serial_number`（AdsPower UI 里眼熟的短「序号」），二者不同；下游 `browser/start` **只认 `user_id`**（`browser-provider.ts:120`）。写入 `adsProfileId` 的**必须是 `user_id`**，若图省事写 `serial_number` 会让 `browser/start` 因找不到该 user 而 `code≠0` 失败。`serial_number` / 名称仅供下拉展示。
+**取舍 — 两入口以谁为准**：**以最终写入 `adsProfileId` 的值为准**（选中下拉即覆盖手敲框、手敲框亦可编辑），保存时校验非空。
+
+### D3. 探测 / 拉取在 Electron 主进程侧自持独立只读客户端（CJS 模块），各进程各自节流
+**选择**：新增一个 Electron 主进程侧、自包含的 CJS 只读模块（如 `src/electron/ads-local-api.cjs`，比照现有 `src/electron/chrome-launcher.cjs` 的复制先例），实现 `status()` / `listProfiles()`，**自持一条 ≥1.1s 串行节流**（复用与核心相同的最小间隔常量 / 逻辑，但为**独立实例**）+ 可选 Bearer，按端点显式拼 URL（见 D3a）。核心 provider 的 `api<T>()`（`browser-provider.ts`）**不改、不复用**。
+**理由（进程边界）**：面板探测 / 拉取只能在 Electron 主进程（`main.cjs`）发起，而现有节流是核心 `AdsPowerProvider` 的**实例内私有时间戳闸门**（`browser-provider.ts:103` 的 `lastApiAt`），跑在 `main.cjs` 用 `spawn` 拉起的**独立子进程**（`main.cjs:174`）里——两者不同 OS 进程、堆内存不通，无法共享同一内存节流；且 `main.cjs` 是 CommonJS、核心产物是 ESM，`require` 也复用不了（本仓 `chrome-launcher.cjs` 与 `src/cdp/chrome-launcher.ts` 两份并存正是此先例）；更何况探测多发生在**核心尚未 spawn 之时**（`adsProfileId` 为空时 `startAdsPowerFlow` 于 `main.cjs:267` 早返回、根本不起核心），那时连 provider 实例都不存在。故主进程侧**必然是第二套独立节流**——这是唯一可行且正确的形态，不是红线。
+**跨进程残余并发**：核心仅在浏览器启动 / 回收瞬间打本地 API（稳态浏览走 CDP + 云 WS、不打），与面板人工低频探测 / 刷新的重叠窗口极窄。万一真在 <1s 内撞上本地 API 每秒限速（返回 `code≠0`，现有客户端已把非 0 抛错暴露），即**诚实降级**：如实提示限速、允许 ≥1s 后重试 / 手敲，MUST NOT 谎报合规、MUST NOT 假成功。主进程内所有只读调用过**同一条（主进程内的）串行节流**，探测 / 刷新按钮在途禁用（D7）。
+**取舍**：不把探测经 IPC 路由进核心子进程去「共享那条闸门」——与「只在主进程做」（D5）冲突，且选环境时核心常未起，按 YAGNI 不做。真正要避免的是「主进程内多处各自计时」——收口成主进程内**单闸门**即可。
+
+### D3a. 只读端点按根 / 前缀显式拼 URL，不套用 `/api/v1/` 前缀
+**选择**：健康检查走**根级** `${base}/status`（通常免鉴权）；环境列表走 `${base}/api/v1/user/list`（开 API 校验时带 Bearer）。主进程只读模块**逐端点显式构造 URL**，不复用核心那个前缀写死的方法。
+**理由**：现有 `api<T>()` 把前缀写死为 `${apiBase}/api/v1/${path}`（`browser-provider.ts:157`）。若 `status()` 套用它会打到**不存在的** `/api/v1/status` → 404 → 即便 AdsPower 在运行也**恒判「不可达」**、谎报未就绪——正是红线所禁的假降级、整个探测能力形同虚设。
+**红线守卫**：健康检查的 404 / 非 2xx / 抛错，只有在**确属可达性失败**时才呈现「未检测到 AdsPower 本地 API」；实装 MUST NOT 让「拼错前缀的 404」冒充「不可达」。
+
+### D4.「打开新建环境」= best-effort 拉起客户端 + 提示 + 刷新闭环，不 `user/create`
+**选择**：按钮先尝试拉起 / 聚焦 AdsPower 客户端（best effort）；起不来退回 `shell.openExternal` 到 AdsPower 官网 / 控制台。随后面板提示「请在 AdsPower 中点『新建浏览器』完成配置，回来点『刷新环境列表』」，与 D2 的刷新形成闭环。
+**理由**：AdsPower 不公开跳其内部 tab 的深链；`user/create` 要传指纹 + 代理一堆参数、且指纹 / 代理本该在 AdsPower 里配——在面板重做建环境表单越界且过重（YAGNI）。
+**取舍**：**不承诺一键直达那个 tab**，spec 明说是「打开客户端 + 引导」而非「直达新建页」，避免过度承诺。
+
+### D5. 探测 / 拉取只在 Electron 主进程做，经 IPC 暴露；渲染层不直连本地 API
+**选择**：`main.cjs` 加 IPC handler（探测 / 拉列表 / 打开新建）调 D3 的主进程只读模块，`preload.cjs` 经 `contextBridge` 暴露 `ads:status` / `ads:listProfiles` / `ads:openCreate` 通道，渲染层只调这些通道。**刷新拉取支持「表单当前值」**：`ads:listProfiles`（及需鉴权的探测）SHALL 接受渲染层传入的**当前表单 apiKey / apiBase 作调用级参数**（仅本次调用用、不持久化、不落日志），主进程优先用传入值、表单为空才回落持久化的 `settings.adsApiKey`。
+**理由**：守 Electron `contextIsolation`；只读模块与 api-key 只在**主进程**（非渲染层、非核心子进程），不落日志 / 文档。**为什么要收表单当前值**：运维新填了 key 但还没点「保存并启动」就点「刷新」，若只读持久化旧 / 空 key 会 401 → 提示「去填 key」——可 key 已在框里，形成「填了仍报去填」回环；且「先保存再刷新」这条路被堵死（保存需要正被查找的分身 id、且会强制重启核心）。api-key 本就已在渲染层（`settings:get` 现今回传它、填进输入框），回传一次调用级不新增泄漏面。
+
+### D6. 诚实降级矩阵（红线落地）
+**选择**：分档如实反馈，绝不假成功 / 空跑：
+- `/status` 不可达 → 面板「未检测到 AdsPower」+ 下载入口；不禁死流程但明示「AdsPower 未就绪，启动可能失败」，允许手敲继续（诚实降级）。
+- `user/list` 失败（含 API 校验 401）→ 退回手敲 id + 提示「拉取环境失败：<原因>，可手填分身 id」；疑似 401 时措辞须兼顾「已填未保存」：如「疑似开启了 API 校验；若已在下方填了 API key，本次刷新已用当前填写值，请确认 key 正确后重试」，MUST NOT 反过来叫运维去填一个他已经填了的框（刷新取表单当前值、见 D5；不得要求「先保存再刷新」）。
+- 选中 / 手填了环境但该环境未登录目标账号 → 仍走核心**诚实非零退出**（沿用 §9 既有弹窗，不在面板侧假判）。
+- 写盘失败 → 沿用 §9「本次生效但未持久化」诚实提示。
+**理由**：延续全仓「绝不静默假成功」红线；探测是**辅助信息**，不能因探测失败就谎报或把运维锁死。
+
+### D7. 限速与防抖：分页拉取 + in-flight 禁用刷新
+**选择**：`user/list` 按 `page_size`（如 100）分页拉全量、设合理上限（如最多几页，超量提示按分组过滤）；探测 / 刷新按钮在请求在途时禁用（防狂点把每秒限速排爆）。所有调用走 D3 主进程侧的**同一条**串行节流（in-flight 禁用是主进程内的，跨进程不覆盖核心侧）。
+**理由**：面板是低频人工触发，共享节流 + in-flight 禁用即可，无需复杂搜索 / 缓存（YAGNI）；超大环境量是少数场景，先给分组过滤提示、不预造复杂 UI。
+
+## Risks / Trade-offs
+
+- **[拉取失败把运维卡死]** `user/list` 失败若成唯一入口则无法启动 → **手敲 id 兜底始终保留** + 诚实提示原因，不禁死唯一入口（D2 / D6）。
+- **[1 req/s 限速被面板高频探测 / 刷新触发]** → 主进程侧只读调用过**自持的同一条串行节流**（D3，与核心子进程各自独立、非跨进程共享）+ 按钮 in-flight 禁用 / 去抖（D7）；探测人工低频、且多在核心未起时，跨进程碰撞窗口极窄，真撞限速即诚实降级（D6）。
+- **[跨进程无法共享节流的根因]** → 面板探测在 Electron 主进程（CJS `main.cjs`）、核心节流在 `spawn` 的子进程（ESM）内，堆内存与模块系统皆不通 → 主进程侧只能自持独立节流（D3），spec 不写「共享同一节流」这类不可实现的 SHALL。
+- **[/status 前缀打错致恒判不可达]** → 现有客户端写死 `/api/v1/` 前缀，根级 `/status` 必须显式拼 URL、不复用该方法（D3a）；否则 AdsPower 在运行也谎报未就绪。
+- **[环境标识取错字段致启动失败]** → `user/list` 每项含 `user_id`（长）与 `serial_number`（UI 序号，短），下游 `browser/start` 只认 `user_id` → 写入 `adsProfileId` 的**必须是 `user_id`**，`serial_number` / 名称仅供下拉展示（D2 / tasks 1.2 钉死）。
+- **[代理 / IP 展示过度承诺]** → `user/list` 回的是代理**配置**（含配置 `ip` / `ip_country`，无代理 / 动态代理可能为空 / 占位），**非实测出口 IP** → 下拉只标「代理配置摘要」并提示实测出口 IP 以 AdsPower『检测代理』为准，不把防关联核对可信度绑死在该字段（OQ#3）。
+- **[新填未保存的 api-key 刷新回环]** → `ads:listProfiles` 接受表单当前 apiKey / apiBase 作调用级参数（不持久化 / 不落日志），优先用之、表单空才回落持久化值；401 提示措辞兼顾「已填未保存」（D5 / D6）。
+- **[API 校验开着致 `user/list` 401]** → `/status` 通常免鉴权仍可探活；`user/list` 401 时诚实提示配 API key，并退回手敲（D6）。
+- **[环境列表超大]** → 分页 + 上限 + 「按分组过滤」提示，不预造搜索 / 虚拟列表（D7，YAGNI）。
+- **[best-effort 拉起客户端跨平台不可靠]** → 起不来退回 `shell.openExternal` 官网、提示手动打开；不承诺直达 tab（D4）。
+- **[渲染层安全]** → 探测 / 拉取只在主进程、经 IPC，`contextIsolation` 不破；api-key 不下发渲染层、不落日志 / 文档（D5 + 不记敏感值铁律）。
+- **[与 adspower-browser-provider 协调]** → 本 change 只 ADD 独立新能力、加性衔接（手敲仍在、不改「分身 id 必填」语义），无需软化对方措辞、归档顺序不强制。
+
+## Migration Plan
+
+1. **edge 主进程只读 API 层**：新增 `src/electron/ads-local-api.cjs`（自持 ≥1.1s 串行节流 + 可选 Bearer，按端点显式拼 URL：根级 `/status`、`/api/v1/user/list`），**不改 / 不复用**核心 `api<T>()`；单测注入 fetch 桩（status 可达 / 不可达、list 成功 / 401 / 空；断言本进程内串行 ≥1s；断言只读、不碰 start/stop/active）。
+2. **edge Electron 外壳**：`main.cjs` IPC + `preload.cjs` 通道 + `renderer/` 控件（检测徽标 / 环境下拉 + 刷新 / 打开新建）+ 中文化；手敲 id 输入框保留。jsdom 无头冒烟覆盖：探测可达 / 不可达提示、下拉选中写入、拉取失败退手敲、打开新建外链、诚实降级各态。
+3. **回归**：`npm run typecheck` 0 + `npm test` + `npm run test:acceptance` 全绿；§9 既有 `selectBrowserProvider` / 写盘诚实回报契约不回归。
+4. **文档**：`aidcp-edge/OPERATOR.md` 补探测 / 环境选择 / 新建入口用法。
+5. **回滚**：纯增量——移除新控件与 IPC 即回到 §9 手敲 id 流程，`adsProfileId` 语义不变、向后兼容。
+
+## Open Questions
+
+1. **是否按 `group_id` 过滤 `user/list`**：倾向先一次拉全量（分页）平铺下拉，环境数很大再加分组筛选下拉。设 `settings.adsGroupId` 为可选、默认不带（拉全量）。待真机环境规模确认。
+2. **探测时机**：打开设置面板自动探一次（低频）+ 手动「检测」+ 保存前探——是否够，还是需要一个轻量「AdsPower 状态常亮」指示（会引入低频常驻探测，与「不常驻轮询」权衡）。倾向不常驻。
+3. **环境下拉展示代理 / IP 明细的粒度**：展示 IP / 代理类型便于核对防关联，但需确认 `user/list` 返回字段是否直接含出口 IP（可能只有代理配置、非实际出口 IP）；若无实际出口 IP，仅展示代理配置摘要并提示「实际出口 IP 以 AdsPower 内『检测代理』为准」。
