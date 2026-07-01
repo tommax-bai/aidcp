@@ -32,6 +32,6 @@
 ## 5. 回归 / 部署 / 收尾
 
 - [x] 5.1 cloud：`npm run test:acceptance` 27/27 → 全量 `npm test` **1001/1001** → `npm run typecheck` 干净（AC-RISK / AC-PROTO / AC-PUB 红线不破）。console typecheck + build 通过。 <!-- aidcp-cloud 全绿 2026-07-01 -->
-- [ ] 5.2 部署 cloud + console。**阻塞待决**：cloud 工作区有其他流的未提交 WIP（`ws-server.ts` / `comment-agent/edge-steps.ts` / `role-catalog.ts` / `connection-runtime.ts` / `publish-agent/command-sequencer.ts`）；deploy 走工作区 rsync 会**连带把这些 WIP 一起推上生产**。需先：WIP 提交/清理，或从「本 change 已提交状态」的干净树部署。等用户拍板部署时机与方式。
+- [ ] 5.2 部署 cloud + console。工作区已干净（之前的 WIP 已被并发提交方 commit+push）。**待用户拍板**：origin/master 现叠了其他流刚落地的提交（`8f0387d` multi-image 修复、`3810478` docs timeout 旋钮，非本 change），部署会把它们一起推上生产——deploy 是跨流协调决策，等用户确认时机。本 change 代码已全绿、已推。
 - [ ] 5.3 运营对 Tmax（`66cd1d4f…0314ee`）执行「强制恢复」（用户自理，已明确）——本 change 部署后它不再自锁。
 - [ ] 5.4 `openspec validate --strict`（已通过）→ **部署验证后再 archive**。
