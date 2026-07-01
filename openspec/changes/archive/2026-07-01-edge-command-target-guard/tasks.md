@@ -30,4 +30,4 @@
 ## 5. 部署与归档
 
 - [x] 5.1 按 CLAUDE.md §5 安全序列部署 cloud 到 ECS（备份 → rsync → restart → healthcheck）。 <!-- aidcp-cloud e0efbb9 2026-07-01 deployed；用户授权「整棵树一起部署」（含无关 publish-agent WIP，已确认可上线）；备份 cloud.bak.20260701-105017.tar.gz + .env.bak.20260701；healthcheck：active + 8787 LISTEN + 飞书长连接已建立；isales 未碰 -->
-- [ ] 5.2 `openspec validate edge-command-target-guard --strict` 通过后归档（`/opsx:archive`）。 <!-- 待 5.1 部署后 -->
+- [x] 5.2 `openspec validate edge-command-target-guard --strict` 通过后归档（`/opsx:archive`）。 <!-- 2026-07-01 validate 通过；delta 合并进 openspec/specs/edge-command-targeting/，change 移入 archive/ -->
