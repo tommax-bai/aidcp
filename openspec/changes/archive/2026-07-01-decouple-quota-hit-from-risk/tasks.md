@@ -33,5 +33,5 @@
 
 - [x] 5.1 cloud：`npm run test:acceptance` 27/27 → 全量 `npm test` **1001/1001** → `npm run typecheck` 干净（AC-RISK / AC-PROTO / AC-PUB 红线不破）。console typecheck + build 通过。 <!-- aidcp-cloud 全绿 2026-07-01 -->
 - [x] 5.2 部署 cloud + console（用户 2026-07-01 授权「带其他修改一起上」）。**cloud**：并发操作方已把 master（含本 change 三 commit）部署上 ECS（server.ts mtime 10:55、11:13:55 重启）——探针实测 Group 1/2/3 全部 live（`quota_exceeded` 已删净、`PacingSaturationAlerter` 接线 + 启动日志「已就绪」、panel `totalsByAccountWithQuotas`+`saturated` 在）；healthcheck 全过（`active`／8787 监听／飞书 onReady／PG `select 1`／NRestarts=0／isales 未受影响）。故未重复 rsync（避免撞车）。**console**：ECS 是 06-30 旧构建，由本人补部署——备份 `console.bak.20260701-111756.tar.gz` → 纯覆盖 rsync（无 `--delete`，保 `intro.*`）→ 验证 index.html 引新 bundle `index-Y58Wj89Q.js`、8088 serve 200。 <!-- aidcp-cloud 并发方部署; aidcp-console 本人 rsync /opt/aidcp/console 2026-07-01 deployed -->
-- [ ] 5.3 运营对 Tmax（`66cd1d4f…0314ee`）执行「强制恢复」（用户自理，已明确）——本 change 部署后它不再自锁。
-- [ ] 5.4 `openspec validate --strict`（已通过）→ **部署验证后再 archive**。
+- [x] 5.3 运营对 Tmax（`66cd1d4f…0314ee`）执行「强制恢复」——用户 2026-07-01 确认已恢复。本 change 已上线，不再自锁。 <!-- 2026-07-01 用户经后台强制恢复 -->
+- [x] 5.4 `openspec validate --strict` 通过 → 部署验证通过 → archive（用户 2026-07-01 确认）。 <!-- 2026-07-01 archived -->
