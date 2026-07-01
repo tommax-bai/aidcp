@@ -2,7 +2,7 @@
 
 ### Requirement: 浏览器启动层可插拔且默认 adspower
 
-edge 的**浏览器启动与生命周期**层 SHALL 经一个可选的 provider 选择，由 `AIDCP_BROWSER_PROVIDER` 决定，取值 `self` 或 `adspower`，**缺省为 `adspower`**。`adspower` 提供商 SHALL 把浏览器启动与生命周期托管给 AdsPower 指纹浏览器，并要求显式指定目标 profile（`AIDCP_ADS_USER_ID`），缺失即诚实报错；`self` 提供商（经显式 `AIDCP_BROWSER_PROVIDER=self` 选用）SHALL 自起一个真实指纹 Chrome，其行为与本能力引入前**逐字等价**。provider 的职责边界 SHALL **仅限启动与生命周期**，MUST NOT 改动 CDP 接入及其下游（定位 / 拟人 / 读身份）。以 self 为前提的编排路径（同机多节点启动器、Electron 桌面外壳）SHALL 各自显式钉回 `self`，不因默认翻转而启动失败。
+edge 的**浏览器启动与生命周期**层 SHALL 经一个可选的 provider 选择，由 `AIDCP_BROWSER_PROVIDER` 决定，取值 `self` 或 `adspower`，**缺省为 `adspower`**。`adspower` 提供商 SHALL 把浏览器启动与生命周期托管给 AdsPower 指纹浏览器，并要求显式指定目标 profile（`AIDCP_ADS_USER_ID`），缺失即诚实报错；`self` 提供商（经显式 `AIDCP_BROWSER_PROVIDER=self` 选用）SHALL 自起一个真实指纹 Chrome，其行为与本能力引入前**逐字等价**。provider 的职责边界 SHALL **仅限启动与生命周期**，MUST NOT 改动 CDP 接入及其下游（定位 / 拟人 / 读身份）。以 self 为前提的命令行多节点启动器 SHALL 显式钉回 `self`，不因默认翻转而启动失败；Electron 桌面外壳则 SHALL 由**应用内浏览器选择**决定 provider（见下方桌面 provider 选择需求）。
 
 #### Scenario: 未设 provider 时默认走 AdsPower
 - **WHEN** 启动 edge 且未设置 `AIDCP_BROWSER_PROVIDER`
@@ -12,9 +12,29 @@ edge 的**浏览器启动与生命周期**层 SHALL 经一个可选的 provider 
 - **WHEN** 设 `AIDCP_BROWSER_PROVIDER=self`
 - **THEN** edge 自起真实指纹 Chrome，启动 / 复用 / 登录等待 / 回收行为与本能力引入前一致，不依赖任何外部浏览器服务
 
-#### Scenario: self 专属编排路径不受默认翻转影响
-- **WHEN** 经同机多节点启动器或 Electron 桌面外壳启动 edge，且未在外部显式覆盖 provider
-- **THEN** 这些路径各自钉回 `self`、自起真实指纹 Chrome，不因默认翻为 adspower 而启动失败
+#### Scenario: 命令行多节点启动器不受默认翻转影响
+- **WHEN** 经同机命令行多节点启动器启动 edge，且未在外部显式覆盖 provider
+- **THEN** 该路径显式钉回 `self`、自起真实指纹 Chrome，不因默认翻为 adspower 而启动失败
+
+### Requirement: 桌面外壳内可选浏览器 provider 且默认 adspower
+
+Electron 桌面外壳 SHALL 提供**应用内浏览器选择**，让运维在 `adspower`（默认）与 `self`（本机 Chrome）之间一键切换，并把选择与 AdsPower 配置（分身 id 必填、API key / API base 可选）**持久化到本机**、在下次启动沿用。桌面外壳按当前选择把对应的 `AIDCP_BROWSER_PROVIDER` 及 AdsPower 相关 env 注入其派生的核心进程；外部显式设置的同名 env SHALL 仍可覆盖（逃生阀）。`adspower` 模式 SHALL 委托核心经 AdsPower 托管浏览器与登录态（不自起本机 Chrome、不做本机端口 cookie 轮询）；`self` 模式沿用自起 Chrome + 登录门。缺 AdsPower 分身 id、浏览器缺失、核心诚实非零退出、以及**设置持久化写盘失败**等情形 SHALL 如实暴露给运维，MUST NOT 谎报成功或以「运行中」外观空跑。桌面外壳 SHALL 提供直达 AdsPower 官方下载页的入口。
+
+#### Scenario: 桌面默认 adspower、可切 self
+- **WHEN** 首次启动桌面外壳（未改设置）
+- **THEN** 默认选 `adspower`；运维可在面板一键切到 `self`（本机 Chrome）并「保存并启动」，选择被持久化、下次启动沿用
+
+#### Scenario: adspower 缺分身 id 时诚实提示待配置
+- **WHEN** 桌面选 `adspower` 但未填分身 id
+- **THEN** 面板显示「待配置」并提示先填分身 id，不派生核心、不静默假装在跑
+
+#### Scenario: 设置写盘失败如实告知
+- **WHEN** 保存浏览器设置时写本机持久化文件失败（目录只读 / 磁盘满等）
+- **THEN** 面板如实告知「本次已生效但写入本地失败、重启后可能丢失」，MUST NOT 谎报「已保存」
+
+#### Scenario: 提供 AdsPower 下载入口
+- **WHEN** 运维本机尚未安装 AdsPower
+- **THEN** 面板提供「下载 AdsPower」入口，点击在系统浏览器打开 AdsPower 官方下载页
 
 ### Requirement: CDP 接入层在 provider 之下保持不变
 

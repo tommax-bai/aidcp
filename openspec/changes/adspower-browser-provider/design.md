@@ -11,7 +11,7 @@ edge 今天**自己 spawn 真实 Chrome** 并经 CDP 接入：`launchChrome`（`
 **Goals:**
 - 让 edge 能**可选**地把浏览器启动 / 生命周期托管给 AdsPower 指纹浏览器，实现同机多账号**防关联**（每 profile 独立指纹 + 独立代理 + 独立账号）。
 - **接缝最小**：只换「启动 / 生命周期」一层，CDP attach 及以下（定位 / 拟人 / 读身份）**零改动**。
-- **主路径默认 adspower**（BREAKING）：`AIDCP_BROWSER_PROVIDER` 缺省 = adspower（用户主用路径）；`self`（行为同今天）经显式选用。self 专属编排路径（多节点 / 桌面）各自钉回 self，不被默认翻转破坏。
+- **主路径默认 adspower**（BREAKING）：`AIDCP_BROWSER_PROVIDER` 缺省 = adspower（用户主用路径）；`self`（行为同今天）经显式选用。命令行多节点启动器钉回 self、不被默认翻转破坏；Electron 桌面外壳（2026-07-01）改为应用内 provider 选择、默认 adspower（见 D2 / tasks §9）。
 - 修订 `multi-account-node-support` 把指纹浏览器列为绝对禁止的 Non-Goal，画清「默认 self / opt-in AdsPower」边界。
 
 **Non-Goals:**
@@ -30,7 +30,7 @@ edge 今天**自己 spawn 真实 Chrome** 并经 CDP 接入：`launchChrome`（`
 ### D2. provider 选择经 env，**默认 `adspower`**（BREAKING，用户 2026-06-27 拍板）
 **选择**：`AIDCP_BROWSER_PROVIDER ∈ {self, adspower}`，缺省 **`adspower`**。裸 `npm start` 默认走 AdsPower，须配 `AIDCP_ADS_USER_ID`，否则诚实报错（绝不静默回落 self）；`self` 经显式 `AIDCP_BROWSER_PROVIDER=self` 选用。
 **理由**：用户主用路径已是 AdsPower（生产多账号防关联），让主路径免去每次设 env。
-**BREAKING 处置**：两条 self 专属编排路径在代码内各自钉回 self，不被默认翻转破坏——`launch-multinode`（槽位 = 端口 + 用户数据目录，self 专属；adspower 多 profile 编排尚未支持）在冻结 env 里设 `AIDCP_BROWSER_PROVIDER='self'`；Electron 桌面外壳（自带 `chrome-launcher.cjs` 自起 9222）spawn env 钉 `self`（`'self'` 在前、被 `...process.env` 覆盖 → 外部可显式改）。整体回滚 = 把 `selectBrowserProvider` 缺省改回 self。
+**BREAKING 处置**：`launch-multinode`（槽位 = 端口 + 用户数据目录，self 专属；adspower 多 profile 编排走另一分支）在冻结 env 里设 `AIDCP_BROWSER_PROVIDER='self'`、不被默认翻转破坏。Electron 桌面外壳**原**（2026-06-27）在 spawn env 钉 `self`；**2026-07-01 反转为应用内 provider 选择**：桌面外壳读本机持久化设置（默认 adspower、可切 self），按选择注入 `buildProviderEnv()` 的 provider env（provider env 在前、被 `...process.env` 覆盖 → 外部仍可显式改），self 模式沿用 `chrome-launcher.cjs` 自起 9222 + 登录门、adspower 模式委托核心经 AdsPower 托管（见 D8 / tasks §9）。整体回滚 = 把 `selectBrowserProvider` 缺省改回 self（桌面外壳的应用内选择独立于此缺省）。
 **取舍 / 备选**：保持默认 self（原设计、非 BREAKING）——用户否决，要主路径默认 adspower。
 
 ### D3. AdsPower 生命周期映射 + 诚实失败不回落
@@ -56,9 +56,15 @@ edge 今天**自己 spawn 真实 Chrome** 并经 CDP 接入：`launchChrome`（`
 **理由**：两 change 并行活跃，软化措辞使其不矛盾、且都过 strict 校验；待 `multi-account-node-support` 归档后，软化后的措辞并入 baseline，与本能力一致。
 **取舍**：若先于 `multi-account-node-support` 归档本 change，则那条软化措辞要在对方归档时随其 delta 合入——错峰协调，二者归档顺序不强制，但软化动作须在两 change 都活跃时一次做掉。
 
+### D8. 桌面外壳应用内 provider 选择（2026-07-01，反转桌面钉回 self）
+**选择**：Electron 桌面外壳不再在 spawn env 钉 `self`，改为**应用内浏览器选择**：面板提供 `adspower`（默认）/ `self` 一键切换 + AdsPower 配置（分身 id 必填、API key / API base 可选）+「下载 AdsPower」外链；选择与配置持久化到 `userData/settings.json`，启动时读入并按选择派生 `buildProviderEnv()` 注入核心进程（provider env 在前、被 `...process.env` 覆盖 → 外部逃生阀保留）。`self` 模式沿用 `chrome-launcher.cjs` 自起 9222 + cookie 登录门；`adspower` 模式**不**自起本机 Chrome、不做 9222 轮询，委托核心经 AdsPower 本地 API 托管浏览器与登录态（未登录 → 核心诚实非零退出、桌面弹窗提示去 AdsPower 窗口登录后「重新登录」）。面板全量中文化。
+**理由**：桌面外壳原钉 self 是 2026-06-27 默认翻转时的保守处置；用户要桌面主用路径也走 AdsPower（防关联）、同时保留一键切回本机 Chrome 的能力，故把 provider 选择上升为面板一等公民、免命令行设 env。
+**诚实失败红线延续**：缺分身 id → 面板「待配置」不派生核心；AdsPower 不可达 / 未登录 / 核心非零退出 → 弹窗如实告知、不假成功；**设置写盘失败 → 面板明说「本次生效但未持久化、重启可能丢失」，绝不谎报「已保存」**。有序重启（保存 / 恢复 / 重新登录）经统一出口停旧核心再按新 provider 起，退出 / 暂停途中作废在途重启避免孤儿核心与暂停被覆盖。
+**取舍 / 备选**：① 桌面继续钉 self、adspower 只走命令行——否决，桌面运维无从用 AdsPower；② 桌面直接默认 adspower 但无 UI 切换——否决，丢了「一键切回本机 Chrome」的逃生能力。
+
 ## Risks / Trade-offs
 
-- **[BREAKING：默认翻 adspower]** 裸 `npm start` / 任何未配 AdsPower 的节点默认走 adspower，缺 `AIDCP_ADS_USER_ID` 即启动失败 → 缓解：不用 adspower 的部署显式 `AIDCP_BROWSER_PROVIDER=self`；`launch-multinode` 与 Electron 已代码内钉回 self；回滚把缺省改回 self。
+- **[BREAKING：默认翻 adspower]** 裸 `npm start` / 任何未配 AdsPower 的节点默认走 adspower，缺 `AIDCP_ADS_USER_ID` 即启动失败 → 缓解：不用 adspower 的部署显式 `AIDCP_BROWSER_PROVIDER=self`；`launch-multinode` 代码内钉回 self，Electron 桌面外壳走应用内选择（默认 adspower、可切 self，见 D8）；回滚把缺省改回 self。
 - **[新增付费常驻依赖]** AdsPower 客户端 + 本地 API 服务（50325）须常驻、按 profile 计费 → 仅 `adspower` 模式需要；`self`（现需显式选用）零依赖。
 - **[本地 API 限速 1 req/s]** 多 profile 并发 start/stop 可能触限 → provider 内串行节流（≥1s 间隔）；CDP 流量直连 `debug_port`、不过 50325，不受限。
 - **[双层反检测误配更危险]** 若误把 edge stealth 与 cdp_mask 都开 / 都关 → 自洽被破或裸奔 → 默认值随 provider 锁死（self=on / adspower=off），并在 spec 写明二者**恰一层生效**。
@@ -68,7 +74,7 @@ edge 今天**自己 spawn 真实 Chrome** 并经 CDP 接入：`launchChrome`（`
 
 ## Migration Plan
 
-1. **edge 实现**：落 `browser-provider.ts`（`SelfChromeProvider` / `AdsPowerProvider`）+ `main.ts` 按 env 选 provider + `AIDCP_STEALTH` 接线；**默认翻为 adspower**，self 专属路径（multinode / electron）钉回 self。全量回归绿（typecheck 0 / test 380 / acceptance 11）。
+1. **edge 实现**：落 `browser-provider.ts`（`SelfChromeProvider` / `AdsPowerProvider`）+ `main.ts` 按 env 选 provider + `AIDCP_STEALTH` 接线；**默认翻为 adspower**，`launch-multinode` 钉回 self；Electron 桌面外壳走应用内 provider 选择（2026-07-01，见 D8 / tasks §9）。全量回归绿（typecheck 0 / test 380 / acceptance 11）。
 2. **跨 change 协调**：软化 `multi-account-node-support` 的指纹浏览器 Non-Goal 措辞（proposal + chrome-instance-isolation spec）。
 3. **运维准备**：逐账号建 AdsPower profile（独立指纹 + 独立住宅 IP + 登录目标小红书号），记 `user_id`；验证每个 profile 「能到小红书 + 已登录」（可复用 `scripts/adspower-poc.ts`）。
 4. **灰度启用**：先单账号 `AIDCP_BROWSER_PROVIDER=adspower AIDCP_ADS_USER_ID=<id>` 跑通真机闭环，再扩多账号。
