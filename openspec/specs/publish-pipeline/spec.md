@@ -21,7 +21,7 @@ TBD - created by archiving change dedicated-title-creator-role. Update Purpose a
 
 ### Requirement: 标题生成失败则发布失败且绝不造假标题
 
-`TitleCreator` 失败（LLM 调用失败 / 超时 / 多次重试后仍不合规）时系统 MUST 判该次发布失败，MUST NOT 派生或编造一个标题去顶替继续发布。角色失败策略为 `abort`：失败时**不写 `titleSelection`**，下游发布因缺该字段而不激活、本次流水线判 `failed`。角色默认 `timeoutMs=120000`。失败 MUST 即时冒泡为流水线失败，MUST NOT 让流水线干等到 `pipelineTimeoutMs` 才超时。
+`TitleCreator` 失败（LLM 调用失败 / 超时 / 多次重试后仍不合规）时系统 MUST 判该次发布失败，MUST NOT 派生或编造一个标题去顶替继续发布。角色失败策略为 `abort`：失败时**不写 `titleSelection`**，下游发布因缺该字段而不激活、本次流水线判 `failed`。角色默认 `timeoutMs` MUST ≥ 单次模型调用天花板（当前 ≥180000）且经 env 可调，并把该超时同传进标题生成的模型调用（不短于模型预算）。失败 MUST 即时冒泡为流水线失败，MUST NOT 让流水线干等到 `pipelineTimeoutMs` 才超时。
 
 #### Scenario: 标题 LLM 失败则不发布、判失败
 - **WHEN** `TitleCreator` 的 LLM 调用连续失败、重试用尽
@@ -33,7 +33,7 @@ TBD - created by archiving change dedicated-title-creator-role. Update Purpose a
 
 #### Scenario: 失败即时判定不挂死
 - **WHEN** `TitleCreator` `abort`
-- **THEN** 流水线即时收敛为 `failed`（与 `ContentCreator` 现有 `abort` 行为一致），MUST NOT 干等到 18 分钟 `pipelineTimeoutMs`
+- **THEN** 流水线即时收敛为 `failed`（与 `ContentCreator` 现有 `abort` 行为一致），MUST NOT 干等到 `pipelineTimeoutMs`
 
 ### Requirement: 发布严格接在标题就绪事件之后
 
@@ -379,4 +379,29 @@ MUST NOT 因任何超时被自动丢弃，**更 MUST NOT** 因久未审批而自
 #### Scenario: 红线反例——并发下发抢同一边缘（禁止）
 - **WHEN** 有实现允许同账号两份草稿同时进入下发、并发向同一边缘下发发布指令
 - **THEN** MUST 视为违规、不予合入；同账号下发 MUST 串行，杜绝两条发布序列在同一 Chrome 上交错撞页
+
+### Requirement: 发布角色执行超时不得短于其所包裹的模型预算，总闸不得小于关键路径角色预算之和
+
+发布角色的执行超时（`base-role` 的 `executeWithTimeout` 用 `Promise.race` 包裹 `execute()`）**不取消底层模型 HTTP 请求**——只让本角色放弃等待走 fallback。故任何**调用模型的发布角色**其有效模型预算 = min(角色执行超时, 模型调用超时)。系统 MUST 保证外层各级超时不短于其所包裹的模型预算、且总闸不小于其内容物，以避免「角色秒表先于模型答完就掐断 → 每次合法慢调用都误触降级」。具体不变量如下：
+
+- 任何调用模型的发布角色，其**角色执行超时 MUST NOT 短于单次模型调用天花板**（见 `role-llm-config` 的构造默认天花板，当前 ≥180s），且 MUST 把该超时**同步传进底层模型调用**（`chat()/complete()` 的 `opts.timeoutMs`），使底层 HTTP 在同一时限被真正中止、不残留悬空请求。此为 `ContentScout` 已验证的范式（角色闸与模型调用超时同取一个常量），其余调用模型的角色 MUST 遵循。
+- 各角色超时 SHALL 经文档化 env 旋钮可调，缺失/非法回落安全默认、绝不 brick。
+- 发布**流水线总预算 MUST ≥ 关键路径上各模型角色预算之和**（容器不得小于其内容物），使总闸绝不在某个合法慢角色仍在其自身允许预算内运行时先行掐断整条流水线并丢弃已产出的模型结果。任何角色的执行超时 MUST NOT 大于流水线总预算（否则该角色的诚实降级永不可达）。
+- 上述不变量 MUST NOT 削弱既有「MUST NOT 静默假成功」红线：超时后角色仍按各自 fallback 诚实降级（可见/可观测），绝不伪造成功产出。
+
+#### Scenario: 调用模型的角色秒表不短于模型天花板且同传超时
+- **WHEN** 一个调用模型的发布角色（如审批闸 / 质量评审 / 去 AI 味 / 配图规划）被激活
+- **THEN** 其角色执行超时 ≥ 单次模型调用天花板，且该超时被传进底层模型调用，使一次处于合法耗时内的 thinking 调用不会被角色秒表提前掐断
+
+#### Scenario: 合法慢调用不再误触降级
+- **WHEN** 某调用模型的发布角色的模型调用耗时处于 thinking 模型合法范围内（如 60–150s）
+- **THEN** 该角色等到模型正常返回并写出真实产出，MUST NOT 因角色秒表短于模型耗时而退化到降级默认
+
+#### Scenario: 总闸不小于关键路径角色预算之和
+- **WHEN** 关键路径上串行的模型角色各自在其允许预算内运行（其预算和大于旧总闸）
+- **THEN** 流水线总闸 MUST 足以容纳该串行和，MUST NOT 在正文/标题等合法慢角色仍在运行时先行判 `failed` 并丢弃已付费的模型产出
+
+#### Scenario: 红线——角色秒表短于模型预算导致每次都降级（反例）
+- **WHEN** 任一调用模型的发布角色其执行超时短于单次模型调用天花板、且未把超时传进模型调用
+- **THEN** MUST 视为违规、不予合入（该配置会让合法慢调用每次误触降级、并残留跑满默认超时的悬空请求）
 
