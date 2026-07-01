@@ -35,12 +35,12 @@
 - [x] 6.3 测试：图像角色 `available:true` 且 prompt 含固定风格基底特征串（no text/no watermark/no human faces）、无来源段；带 `accountId` 仍 `available:true`、保留图片指令说明、无 personaFallback。<!-- aidcp-cloud 2c97fde typecheck 干净 + role-prompt-preview 15/15 -->
 - [x] 6.4 部署 ECS（scoped：prompts-preview.ts + role-prompt-preview.ts + test）。<!-- 2026-07-01 deployed：备份 cloud.bak.20260701-191922.tar.gz；ECS prompts.ts 仍含 IMAGE_STYLE_BASE(依赖满足)；restart→active/8787/飞书 onReady；GET publish:ImageGenerator/prompt 未鉴权 401；与并发 split-topic-roles 不同文件、零冲突；isales 未碰。带 token available:true 点测留用户 -->
 
-## 7. 审计发现·暂缓（并发方在改同批文件，避免撞车）
+## 7. 审计发现·本期不补（用户决定 2026-07-01，非任务，仅存档）
 
-> 审计「还有哪些没做」时发现两个**真实但更大**的缺口——均需改并发方（change `split-topic-roles`）正在动的文件（`prompts.ts` / `role-catalog.ts` / `content-creator.ts` / `types.ts` / `server.ts`），故本 change 不含，待其落地后另开 change。
+> 审计「还有哪些没做」时发现两个**真实但更大**的缺口（现役 LLM 调用但不在角色目录 → 查看器/模型配置均不可见）。均需改并发方（change `split-topic-roles`）正在动的文件（`prompts.ts` / `role-catalog.ts` / `content-creator.ts` / `types.ts` / `server.ts`）。**用户明确决定本期不补**（2026-07-01）——故以下**不是本 change 的任务**，仅留档，日后如需再单独立 change。
 
-- [ ] 7.1（另开 change）**发布正文去 AI 味重写**（ContentCleaner 经注入的 PostProcessor 调 `llm.complete`，prompt 内联在 `server.ts`）是现役 LLM 调用，但不在角色目录 → 查看器/模型配置均不可见。补齐需：抽 prompt 为共享 builder（server 与预览同源防漂移）+ 给该 `llm.complete` 接 roleId（否则配了模型是静默 no-op）+ catalog 加 `publish:ContentCleaner` + 预览 + 测试。
-- [ ] 7.2（另开 change）**评论点赞择选**（`comment_like_appraiser`，`AIDCP_COMMENT_LIKE=true` 线上已开、现役）用 `BaseRole.decide` 且已有 `previewPrompt`/`personaSegments`，但不在角色目录 → 一行 catalog 即可让其可预览+可配模型（零运行时改动）。因 `role-catalog.ts` 被并发方 `4e7c06b` 重排 + 后续要加话题角色，暂缓避让。
+- **发布正文去 AI 味重写**（ContentCleaner 经注入的 PostProcessor 调 `llm.complete`，prompt 内联在 `server.ts`）不在角色目录。补齐需：抽 prompt 为共享 builder（server 与预览同源防漂移）+ 给该 `llm.complete` 接 roleId（否则配了模型是静默 no-op）+ catalog 加 `publish:ContentCleaner` + 预览 + 测试。
+- **评论点赞择选**（`comment_like_appraiser`，`AIDCP_COMMENT_LIKE=true` 线上已开、现役）用 `BaseRole.decide` 且已有 `previewPrompt`/`personaSegments`，但不在角色目录 → 一行 catalog 即可让其可预览+可配模型（零运行时改动）。**已知缺口：线上在跑却看不见/配不了**。
 
 ## 5. 收尾
 
