@@ -57,7 +57,8 @@
 
 ### D5. 封面恒取成功序列首张，本期不引入封面索引、不改 set_cover 触发
 - `CoverSelector` 从"单图直选"升级为"读 `imageUrls[]`、恒取首张、`hasCover = length>0`"。封面 = `imageUrls[0]`（即成功序列首张，钩子图）。
-- **不引入 `coverIndex` 字段、不改 `command-sequencer.ts:120` 的 `set_cover` 触发条件**：避免提前接通"选非首图 → 下发 set_cover"这条会踩边缘未校准设封面操作的路径。平台默认首图即封面，本期天然正确。
+- **不引入 `coverIndex` 字段、不改 `command-sequencer.ts:120` 的 `set_cover` 触发条件，且 executor 本期不传 `cover`（`cover: undefined`）**：`set_cover` 条件是 `input.cover && images.length>1`，不传 cover → 多图也不触发 `set_cover`。封面 = 首张上传图 = 平台默认（FIFO 首传即 `imageUrls[0]`）。
+- **为何必须不传 cover（已核实 ground truth）**：edge `set_cover` 仍是 fail-closed 桩——后置校验 `coverActiveValidator` 要求 anchor `note.publish_cover_active`，"真实 DOM 在 task-0 校准前不含此锚点 → 诚实失败"（`publish-command-handlers.ts:137-160`）；且 `set_cover` 在 sequencer 中**非 best-effort**，其 `ok:false` 会命中 `return {ok:false}`（`:230`）→ **整帖 failed**。故多图一旦强发 `set_cover` 必拖垮发布。选非首图当封面 + 真正下发 `set_cover` + edge DOM 校准 = 独立后续 change。
 - **替代（弃）**：本 change 就做 `coverIndex` 一等公民 + 美学/LLM 选封面。红队指出这是"为未来付费、给现在埋雷"（恒零字段贯穿多文件 + 接通会踩 fail-closed 桩），按 YAGNI 推迟到边缘设封面校准那一期一起做、一起真机验证。
 
 ### D6. 复活闲置 `images` 列，加列不改旧列，迁移 0017
