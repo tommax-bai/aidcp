@@ -49,10 +49,11 @@
 
 ## 7. 部署与真机（gated，显式放行才做）
 
-- [ ] 7.1 迁移 0017 上 ECS：先备份 → 应用 → 验 `images`/`images_attached_count` 列存在 + `images IS NULL` 已兜底
-- [ ] 7.2 全 master rsync 部署（先 dry-run surface scope，连带 master 累积改动）→ restart → healthcheck（active + 8787 + 飞书长连 + PG select 1）→ 失败回滚
-- [ ] 7.3 部署后 grep 关键文件确认新码生效 + 看新启动日志（不仅信 rsync 回执）
-- [ ] 7.4 真机 E2E：飞书 `/publish [accountId]` 触发，验多图真出图（并行、wall-clock≈最慢单张）、M/K 记账、封面=成功序列首张、真帖多图上账号；edge"一命令一图"多图上传通道复用正确（edge 零改动）
+- [x] 7.1 迁移 0017 上 ECS：先备份 → 应用 → 验 `images`/`images_attached_count` 列存在 + `images IS NULL` 已兜底 <!-- 2026-07-01 verified：ECS PG publish_log 已有 images + images_attached_count 列（canonical PUBLISH_SCHEMA_SQL 于服务启动 init() 幂等施加 + 迁移 0017）；psql select 1 通。 -->
+- [x] 7.2 全 master rsync 部署（先 dry-run surface scope，连带 master 累积改动）→ restart → healthcheck（active + 8787 + 飞书长连 + PG select 1）→ 失败回滚 <!-- 2026-07-01 已由并发全-master 部署上线（本会话期间多个并发会话持续 commit+deploy）；不做我方全-rsync（会回滚比 704bbd2 新的并发文件）。核实 ECS：aidcp-cloud active（restart 11:13:55）、8787 监听、飞书长连已建、PG select 1 通。isales 四服务独立运行、未触碰。 -->
+- [x] 7.3 部署后 grep 关键文件确认新码生效 + 看新启动日志（不仅信 rsync 回执） <!-- 2026-07-01 核实 ECS 现役码含我方复审修复：DEFAULT_PER_IMAGE_TIMEOUT_MS=200_000、command-sequencer lastUploadSeq present、image-prompt-composer.ts present；启动日志 PublishOrchestrator 注册 ImageSetPlanner/ImagePromptComposer/ImageGenerator/CoverSelector（无旧 ImagePlanner）。遗留：旧 image-planner.ts 因并发 rsync 未带 --delete 仍在盘上但未注册/未加载（无害死码），留待后续 rsync --delete 清理。 -->
+- [ ] 7.4 真机 E2E：飞书 `/publish [accountId]` 触发，验多图真出图（并行、wall-clock≈最慢单张）、M/K 记账、封面=成功序列首张、真帖多图上账号；edge"一命令一图"多图上传通道复用正确（edge 零改动） <!-- 待用户驱动：需本机 edge 在线并登录 XHS 账号 + 飞书发 /publish [accountId] + 人审通过。Claude 无法自发飞书消息/自触发；用户触发后我可看 ECS 日志 + publish_log 行（images[]/images_attached_count=K）核验。 -->
+
 
 ## 8. 归档
 
