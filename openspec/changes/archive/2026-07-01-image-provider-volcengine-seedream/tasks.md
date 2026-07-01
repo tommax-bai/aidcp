@@ -22,4 +22,5 @@
 ## 5. 验证与收尾
 - [x] 5.1 缺省零回归核对：`image_provider` 缺省 dashscope、`imageModel` 缺省 wan2.7-image-pro → 路由归一到万相，请求与改造前一致（RoutingImageProvider 未知/缺省归一测试 + 全量回归佐证）。
 - [x] 5.2 `openspec validate image-provider-volcengine-seedream --strict` 通过。
-- [ ] 5.3 （可选 / 后续）console 前端图片厂商下拉；ECS 配火山 Ark key 后真机探活一次 Seedream 出图。
+- [x] 5.3 ECS 真机验证：surgical rsync 部署 7 文件 + 重启（自愈加 image_provider 列）；真机跑 SeedreamClient 出图——未开通模型诚实 404 不伪造（红线），`doubao-seedream-5-0-260128`（Seedream 5.0，账号已开通）实测 26s 出图成功；已切生产 `image_provider=volcengine` + `image_model=doubao-seedream-5-0-260128`。<!-- aidcp-cloud 1c1f8da deployed 2026-07-01；4.0/4.5 未开通 ModelNotOpen -->
+- [ ] 5.4 （可选 / 后续，aidcp-console）前端图片厂商下拉——后端契约已就绪，不阻塞归档。
