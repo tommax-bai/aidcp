@@ -8,7 +8,8 @@
 > - **人设必填 / 无人设拒绝**：浏览侧早由 `retire-default-account` 实现（`canStartSession` + `isPersonaBound` fail-closed + 飞书告警 + `startOnPersonaBound`）；评论侧人设空即 honest-fail（无搜索词→不评）；本 change 补**发布侧人设闸**（`PublishScheduler.isPersonaBound`，未绑人设 `blocked/needs_persona_setup`、绝不用兜底 soul）+ 清 `panel-store` 失效 `default` 特判（cloud `9876eaa` 已提交推送，full suite 1029/1029）。
 > - resolver 保留「回落 + 永不抛」（既有 spec，`persona-store.test` task 5.3）——去默认人设由各**闸**在入口 enforce，非改 resolver；ECS 实测 0 个未绑人设账号、`default` 已删。
 > - ✅ **`9876eaa` 已部署**：首次 scoped 部署因 ECS 落后于 HEAD（split-topic-roles 已 commit 未 deploy、`server.ts` 依赖其 `roles/index.js` 的 `TopicEvaluatorRole` 导出）触发启动 `SyntaxError`、已即时回滚（restore 3 文件、服务恢复、de-tech 完好）；经用户确认后把 ECS **整体升到 HEAD**——`git archive HEAD` 干净快照 → 全量 `src/` rsync `--delete`（一并部署 split-topic-roles + 发布闸、删去 topic-strategist）→ 重启 healthcheck 全过（active / 8787 / 8090 / PG select 1 / 飞书 onReady、无 SyntaxError、de-tech 完好、isales 未碰）。**ECS 现与 HEAD 一致。**
-> - 备注：`server.ts` 现有两处同款 `isPersonaBound`（浏览闸 retire-default-account + 本 change 发布闸），口径一致。
+> - ✅ **`/comment` 触发前人设闸已补 + 部署**（cloud `c1b70b3`）：`CommentScheduler.triggerManual` 未绑人设直接 `ok:false/warning` 拒绝、**不接管边端、不启动评论任务**（此前是接管后到「生成搜索词」才 honest-fail 的空跑）。至此**浏览 / 发布 / 评论三类任务均在入口拒绝未绑人设账号**，全部已部署、healthcheck 过。
+> - 备注：`server.ts` 现有三处同款 `isPersonaBound`（浏览闸 retire-default-account + 发布闸 + 评论闸），口径一致。登录采昵称（nickname-capture-on-login）按设计仍对未绑人设账号跑一次——那是登录引导步骤、非浏览/发布/评论任务，不在默认人设上空跑。
 
 ## 0. 前置与排序（务必先读）
 
