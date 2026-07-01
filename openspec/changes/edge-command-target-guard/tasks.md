@@ -29,5 +29,5 @@
 
 ## 5. 部署与归档
 
-- [ ] 5.1 按 CLAUDE.md §5 安全序列部署 cloud 到 ECS（备份 → rsync → restart → healthcheck → 失败回滚；绝不碰同机 isales）。 <!-- HOLD 2026-07-01：aidcp-cloud 工作树含**与本次无关的未提交 WIP**（publish-agent roles / qwen.ts / server.ts 等 6 文件）；rsync 会连带上传半成品，须待用户处理该 WIP（提交或 stash）后再部署。代码本身已提交 e0efbb9 并全测通过。 -->
+- [x] 5.1 按 CLAUDE.md §5 安全序列部署 cloud 到 ECS（备份 → rsync → restart → healthcheck）。 <!-- aidcp-cloud e0efbb9 2026-07-01 deployed；用户授权「整棵树一起部署」（含无关 publish-agent WIP，已确认可上线）；备份 cloud.bak.20260701-105017.tar.gz + .env.bak.20260701；healthcheck：active + 8787 LISTEN + 飞书长连接已建立；isales 未碰 -->
 - [ ] 5.2 `openspec validate edge-command-target-guard --strict` 通过后归档（`/opsx:archive`）。 <!-- 待 5.1 部署后 -->
