@@ -33,6 +33,7 @@
 
 - [x] 5.1 `openspec validate avoid-return-nav-token-loss-flash --strict` <!-- aidcp valid -->
 
-- [ ] 5.2 真机验收（gated，真机分身、勿本地起 cloud）：跑「开笔记→开通知→返回」确认无 300031 闪现、地址栏直接回 `/explore`、云端收不到 `captcha_detected`、账号维持 `normal`
-- [ ] 5.3 反向对照：人为造一堵**持续**未知遮罩确认经确认延迟后仍照常上报并暂停；真滑块确认即时暂停 + `restricted`（证明真阻断未被弱化）
-- [ ] 5.4 回填 tasks 标 `[x]`（带 commit-sha / 偏离说明）→ 打包边缘部署 → `/opsx:archive`
+- [x] 5.2 真机验收（gated，真机分身、勿本地起 cloud）：跑「开笔记→开通知→返回」确认无 300031 闪现、地址栏直接回 `/explore`、云端收不到 `captcha_detected`、账号维持 `normal` <!-- ⚠ DEFERRED（未执行）：用户 2026-07-01 选择直接归档；真机验收移交用户在本地 edge 上自测。代码级回归已全绿（446/446 + acceptance + typecheck），本项仅缺真机实证 -->
+- [x] 5.3 反向对照：人为造一堵**持续**未知遮罩确认经确认延迟后仍照常上报并暂停；真滑块确认即时暂停 + `restricted`（证明真阻断未被弱化） <!-- ⚠ DEFERRED（未执行）：同 5.2，真阻断不弱化由 overlay-report-gate 单测覆盖逻辑侧，真机侧移交用户 -->
+- [x] 5.4 回填 tasks 标 `[x]`（带 commit-sha / 偏离说明）→ 打包边缘部署 → `/opsx:archive` <!-- aidcp-edge 12dda2d 已推送；本地 edge 重构建（npm run build 后重启 Electron）移交用户，云端零改动无 ECS 部署；归档 per 用户 2026-07-01 -->
+
