@@ -35,12 +35,16 @@
 - [x] 6.3 测试：图像角色 `available:true` 且 prompt 含固定风格基底特征串（no text/no watermark/no human faces）、无来源段；带 `accountId` 仍 `available:true`、保留图片指令说明、无 personaFallback。<!-- aidcp-cloud 2c97fde typecheck 干净 + role-prompt-preview 15/15 -->
 - [x] 6.4 部署 ECS（scoped：prompts-preview.ts + role-prompt-preview.ts + test）。<!-- 2026-07-01 deployed：备份 cloud.bak.20260701-191922.tar.gz；ECS prompts.ts 仍含 IMAGE_STYLE_BASE(依赖满足)；restart→active/8787/飞书 onReady；GET publish:ImageGenerator/prompt 未鉴权 401；与并发 split-topic-roles 不同文件、零冲突；isales 未碰。带 token available:true 点测留用户 -->
 
-## 7. 审计发现·本期不补（用户决定 2026-07-01，非任务，仅存档）
+## 7. 审计发现·补齐（用户 2026-07-01 决定补上；在隔离 worktree 做，避让并发 split-topic-roles WIP）
 
-> 审计「还有哪些没做」时发现两个**真实但更大**的缺口（现役 LLM 调用但不在角色目录 → 查看器/模型配置均不可见）。均需改并发方（change `split-topic-roles`）正在动的文件（`prompts.ts` / `role-catalog.ts` / `content-creator.ts` / `types.ts` / `server.ts`）。**用户明确决定本期不补**（2026-07-01）——故以下**不是本 change 的任务**，仅留档，日后如需再单独立 change。
+> 审计「还有哪些没做」发现两个现役 LLM 调用但不在角色目录（查看器/模型配置均不可见）。因并发方在主工作区有未提交改动动到同批文件（`prompts.ts` / `role-catalog.ts` / `server.ts`），改在基于干净 `origin/master` 的 **git worktree** 做，提交推送后主工作区他的 WIP 零扰动。
 
-- **发布正文去 AI 味重写**（ContentCleaner 经注入的 PostProcessor 调 `llm.complete`，prompt 内联在 `server.ts`）不在角色目录。补齐需：抽 prompt 为共享 builder（server 与预览同源防漂移）+ 给该 `llm.complete` 接 roleId（否则配了模型是静默 no-op）+ catalog 加 `publish:ContentCleaner` + 预览 + 测试。
-- **评论点赞择选**（`comment_like_appraiser`，`AIDCP_COMMENT_LIKE=true` 线上已开、现役）用 `BaseRole.decide` 且已有 `previewPrompt`/`personaSegments`，但不在角色目录 → 一行 catalog 即可让其可预览+可配模型（零运行时改动）。**已知缺口：线上在跑却看不见/配不了**。
+- [x] 7.1 **发布正文去 AI 味重写（ContentCleaner）**：抽内联 prompt 为共享 builder `buildDeAiRewritePrompt`（`server.ts` rewrite 与只读预览同源、防漂移，**逐字保留原文含「口吾」笔误 → 线上零变化**）；`server.ts` rewrite 调用带 `role='publish:ContentCleaner'`（模型/温度后台可配、非静默 no-op）；catalog 加 `publish:ContentCleaner`（publish_create，可调温度）；prompts-preview 加预览。<!-- aidcp-cloud 9a7f1ed -->
+- [x] 7.2 **评论点赞择选（comment_like_appraiser）**：catalog 加 `browse:comment_like_appraiser`（browse_judge，不调温度）；已具 `previewPrompt`/`personaSegments` + `BaseRole.decide`，零运行时改动即可预览+可配模型。开关关闭未注册时预览诚实回落「暂不支持预览」。<!-- aidcp-cloud 9a7f1ed -->
+- [x] 7.3 测试：ContentCleaner `available:true` 且 prompt 含「去除AI味」；comment_like_appraiser 注册时 `available:true`、未注册时诚实 `available:false`。<!-- aidcp-cloud 9a7f1ed 干净 worktree 全量 1022/1022 绿 -->
+- [x] 7.4 部署 ECS（scoped：role-catalog/prompts/server/prompts-preview + test，从 worktree rsync）。<!-- 2026-07-01 deployed：先 md5 核 ECS 4 文件 == 基线 2c97fde（无并发方 WIP 落 ECS、无漂移）→ 备份 cloud.bak.20260701-194719 → rsync → md5 核 ECS == 目标 9a7f1ed → restart→active/8787/飞书 onReady；两新角色 prompt 路由未鉴权 401（接线+守护）；isales 未碰 -->
+
+> 主工作区（并发 split-topic-roles WIP）零扰动；其提交后 pull 到 9a7f1ed 时，我的增量落在 role-catalog/prompts/server 的低冲突区（多为追加），一般可自动三方合并。
 
 ## 5. 收尾
 
