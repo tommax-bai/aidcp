@@ -57,9 +57,9 @@
 - [x] 7.1 环境**直接列表**替代下拉：探测就绪即**自动拉一次** `listProfiles`（无需先点刷新）；渲染成可点行（名称/序号/分组/代理配置），点选带出 `user_id`、高亮选中；「刷新」只更新；列表限高滚动；未就绪/失败诚实降级不留空 <!-- aidcp-edge 3e9f815 -->
 - [x] 7.2 API 地址 / API Key 折叠进「高级设置」默认收起（`index.html`/`styles.css`/`renderer.js` 加折叠开关）<!-- aidcp-edge 3e9f815 -->
 - [x] 7.3 分身 id 默认由选中环境带出（只读显示 `#ads-profile-display`）+「手动填写」开关（默认关；开=手敲兜底 `#ads-profile`）；保存/启动前校验最终分身 id 非空、写入的是 `user_id` <!-- aidcp-edge 3e9f815 -->
-- [x] 7.4 保存/启动拆分：`settings:save` 去掉重启副作用（只写盘、返回 `saveOk`/`saveError`，不打断在跑核心）；新增 `edge:start` / `edge:restart` IPC；`self` 模式隐藏「保存」；保存后核心在跑且设置已变 → 面板给「按新设置重启」显式入口（走 `stopAndRestart`）<!-- aidcp-edge 3e9f815 -->
+- [x] 7.4 **保存并入启动**（无独立保存按钮，用户二次拍板）：启动 = 先 `saveSettings` 再 `edge:start`（`adspower` 校验分身 id 非空、缺则诚实提示不启动）；「按新设置重启」= 先 `saveSettings` 再 `edge:restart`，仅在 **dirty && 核心在跑**时出现；`settings:save` 只写盘不重启（作为启动/重启内部步骤被调用）；`self` 启动同样先存再起、无分身校验 <!-- aidcp-edge 3e9f815（拆分）→ fc0d9ab 保存并入启动二次迭代 -->
 - [x] 7.5 悬浮三态会话按钮（窗口右下角固定 `#session-fab`）：`session=paused→恢复` / `edge=stopped/warning→启动` / 其余→`暂停`，触发 resume/start/pause；顶部原「暂停/恢复」toggle 收进它（「重新登录」保留）<!-- aidcp-edge 3e9f815 -->
-- [x] 7.6 全量中文化 + jsdom 冒烟改版 13 项：自动加载列出、点选带出 user_id、手动开关切换、高级折叠、保存不重启（不调 restart）、悬浮三态随状态、self 隐藏保存、新建分档 <!-- aidcp-edge 3e9f815 -->
+- [x] 7.6 全量中文化 + jsdom 冒烟改版 14 项：自动加载列出、点选带出 user_id、手动开关切换、高级折叠、无独立保存按钮/启动先存再起、缺分身诚实不启动、改动+在跑才现「按新设置重启」（先存再重启）、self 启动、悬浮三态随状态、新建分档 <!-- aidcp-edge 3e9f815 → fc0d9ab 保存并入启动迭代 -->
 - [x] 7.7 回归：`node --check` 4 文件 + typecheck 0 + 全量 test 423 + electron 冒烟 13 全绿；§9 既有写盘诚实回报 / 缺分身 id「待配置」契约不破 <!-- aidcp-edge 3e9f815 -->
 - [ ] 7.8 真机 GUI 灰度（本机有 AdsPower，待用户跑）：`npm run electron:dev` 看自动列环境、点选带出、高级折叠、保存不打断、悬浮三态启停
 
