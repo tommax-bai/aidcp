@@ -48,9 +48,24 @@
 - **备选**：按 `this.cdp` 存在与否路由（原设计）。评审指出生产 cdp **恒注入**，该「无 cdp 兜底」在生产不可达 → Phase B 合并到实机校准之间会**在生产静默丢光话题**（假阴性，同样是「行为撒谎」）。
 - **理由**：把「未校准不上线」变成运行时可强制，而非仅 tasks.md 口头约束。
 
-### D6. `runAddTopic` 镜像已校准的 CDP 直驱 handler
-- **决定**：聚焦 `.tiptap.ProseMirror`（复用 `runFillField` 的 focus）→ `typeHumanized('#'+kw)` 触发建议下拉 → 轮询等下拉容器（≤4s）→ 用盒模型中心点（复用 `findShadowButtonCenter` 的 `DOM.getDocument(pierce)` 走查）点文本精确匹配的建议（`dispatchClick` 精确落点；无命中则 Enter 兜底）→ `topicPillValidator` 断言真话题 pill/token 节点出现（**非**全局子串）→ fail-closed 回 `no_target`/`post_validate_failed`。
+### D6. `runAddTopic` 镜像已校准的 CDP 直驱 handler（选择器已实机坐实，见「实机校准」节）
+- **决定**：聚焦**正文编辑器** `.tiptap.ProseMirror`（复用 `runFillField` 的 focus）→ `typeHumanized('#'+kw)` 触发建议下拉 → 轮询等 `.tippy-box[role="tooltip"]` 下拉出现（≤4s）→ 在 `#creator-editor-topic-container .item` 里选目标项（**优先文本精确匹配关键词**者；无精确命中则点首项「新建话题」`span.num.newTopic` 以贴上字面关键词）→ 取其盒模型中心、用**真实鼠标事件** `Input.dispatchMouseEvent`(press/release) 点它 → `topicPillValidator` 断言 `a.tiptap-topic[data-topic]` 出现且其文本/`data-topic.name` 与关键词一致 → fail-closed 回 `no_target`/`post_validate_failed`。
+- **关键修正（探针实证）**：① 落点是**正文富文本**、不是 `button.topic-btn`（那只是插 `#` 的入口）；② 提交必须**真实鼠标事件**——`.click()` 实测不触发提交（待定 span 不转化）；③ 候选无精确命中时用「新建话题」兜底，保证贴的是云端要的那个词（下拉恒有此项，故任意关键词都能贴上，无需对上平台真实话题）。
 - **理由**：与标题/正文/提交同一条「直驱+绑定式后置校验」路线；把「静默假成功」换成诚实的真 token 校验。
+
+## 实机校准（探针实证，2026-07-01）
+
+用只读探针连本机在跑的 edge Chrome（登录账号 工程师大白）抓到真实创作发布页 DOM，D5 门控下的 B5 三处未知全部落地（探针脚本存 scratchpad）：
+
+- **输入落点**：话题在正文富文本 `.tiptap.ProseMirror` 里打 `#关键词`（`button.topic-btn` 只是插 `#` 的入口，不是填写目标）。打字后编辑器即插「待定」内联节点 `<span class="suggestion" data-decoration-id="…">#关键词</span>`。
+- **建议下拉**：`div.tippy-box[role="tooltip"]` → `#creator-editor-topic-container.items` → 若干 `.item`（`.item.is-selected` 为高亮项，每项 `data-impression` JSON 内含真实 `tagId` 与浏览量）；首项通常是「新建话题」`span.num.newTopic`，下方是平台真实话题（如 `#高考数学二轮彻底拿下 …人浏览`）。
+- **提交**：必须**真实鼠标事件**（`Input.dispatchMouseEvent` press/release）点中某 `.item`；`.click()` 实测不触发提交。
+- **已提交话题标记（`topicPillValidator` 目标）**：待定 span 转成
+  `a.tiptap-topic[data-topic][contenteditable="false"]`，文本 `#话题名`，`data-topic` 为 `{"id","link","name"}` JSON，内含隐藏 `<span class="content-hide">[话题]#</span>`。
+- **失败/未提交特征**：只打字不点建议 → 退化成纯文本 `#关键词`（无 `a.tiptap-topic`）。实测这正是老校验（页面出现该串即判成功）会误判成功的「假话题」——「静默假成功」现场铁证。
+- **兜底能力**：下拉恒有「新建话题」→ 任意关键词（含 AI 生成、平台无此话题）都能新建贴上 → 无需对上平台真实话题（印证约束①「云端评判纯 LLM」可行）。
+
+`topicPillValidator` 据此断言：编辑器内存在 `a.tiptap-topic`，且其文本或 `data-topic.name` 与目标关键词一致；否则诚实失败。真机复跑确认端到端后即可打开 `AIDCP_PUBLISH_TOPIC_CDP`。
 
 ## Risks / Trade-offs
 
@@ -62,13 +77,13 @@
 
 ## Migration Plan
 
-- **落地顺序**：Phase A（cloud 两角色 + 解耦正文）→ Phase B（edge `runAddTopic` + 收紧校验，B5 实机校准为 gated）→ Phase C（审批==下发接线 + 回归）。A/C 可先上线（开关 OFF，边缘行为不变）；B 的开关待实机校准后再开。
+- **落地顺序**：Phase A（cloud 两角色 + 解耦正文）→ Phase B（edge `runAddTopic` + 收紧校验；选择器已实机校准，B5 降为「接线后真机复跑确认」）→ Phase C（审批==下发接线 + 回归）。A/C 可先上线（开关 OFF，边缘行为不变）；B 的 `AIDCP_PUBLISH_TOPIC_CDP` 待接线后真机复跑确认再开。
 - **数据迁移**：无。`publish_metadata.topics` JSONB 形状不变（`string[]`），旧草稿重放一致；内存黑板的在飞 run 重启即弃（非问题）。
 - **回归**：cloud 与 edge 各 `npm run test:acceptance` → `npm test` → `npm run typecheck`；`AC-PROTO-*`（协议未漂移，本期无协议改动天然成立）/ `AC-PUB-*`（未授权绝不发布）须绿。
 - **回滚**：Phase B 关开关即回退到原填写路径；Phase A/C 为角色替换，回滚即还原 `TopicStrategist` 注册与 executor tags 源。
 
 ## Open Questions
 
-1. **[GATED 实机]** 边缘话题下拉容器选择器、已提交 token/pill 节点选择器、以及 XHS 是「点建议」还是「Enter 提交」——须真机 CDP 抓一次 DOM 样本确认后方可打开 `AIDCP_PUBLISH_TOPIC_CDP`。
+1. ~~[GATED 实机] 边缘话题下拉容器 / 已提交 token 选择器 / 点建议 vs Enter 提交~~ **已解（2026-07-01 探针实证，见「实机校准」节）**：下拉 `.tippy-box[role=tooltip]`、提交用真实鼠标事件、已提交标记 `a.tiptap-topic[data-topic]`。剩余只需接线后真机复跑一遍确认端到端贴话题成功（task 2.5 已从「未知校准」降级为「接线后复跑确认」）。
 2. 超时 env 命名：新增 `AIDCP_PUBLISH_TOPIC_TIMEOUT_MS` 还是复用标题的？两者默认 180_000。
 3. `TopicSelection` 保持最简（不带评判理由/被弃列表）——确认后台/可观测性暂不需要暴露评判 rationale（未来加是增量安全）。

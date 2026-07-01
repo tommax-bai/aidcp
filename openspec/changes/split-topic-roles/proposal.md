@@ -27,4 +27,4 @@
 - **aidcp-edge**：`src/flows/publish-command-handlers.ts`（新增 `runAddTopic` + 路由 + 开关）、`src/flows/publish-post.ts`（收紧话题后置校验为真 token），复用 `cdp-util.ts` / `action-executor.ts`。
 - **协议**：无（`docs/protocol.md` 与两份 `protocol.ts` 不动）。
 - **测试**：删 `topic-strategist.test.ts`；加 `topic-generator` / `topic-evaluator` / edge `runAddTopic` 单测；更新 `publish-orchestrator.test.ts`（角色数 23→24 + fakeLlm 路由）、`model-call-timeout-invariants.test.ts`、`publish-executor.test.ts`。安全红线 `AC-PROTO-*` / `AC-PUB-*` 须绿。
-- **实机 gated**：边缘话题下拉容器 / 真 token 选择器 / Enter-vs-click 提交行为需一次真机 CDP 校准后方可打开 `AIDCP_PUBLISH_TOPIC_CDP`。
+- **实机校准（已完成，2026-07-01 探针实证）**：话题在正文 `.tiptap.ProseMirror` 里打 `#` 触发 `.tippy-box[role=tooltip]` 下拉、真实鼠标点建议提交、已提交标记为 `a.tiptap-topic[data-topic]`（详见 design「实机校准」节）。接线后真机复跑确认端到端即可打开 `AIDCP_PUBLISH_TOPIC_CDP`。

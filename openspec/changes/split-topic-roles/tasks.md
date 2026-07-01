@@ -13,10 +13,10 @@
 ## 2. aidcp-edge — 真实加话题填写（Phase B）
 
 - [ ] 2.1 `src/flows/publish-command-handlers.ts`：新增开关 `AIDCP_PUBLISH_TOPIC_CDP`（默认 OFF）读取；`add_with_candidate{topic}` 分支在开关 ON 时路由到新 `runAddTopic`，OFF 时保留现有 `buildTagInputRequest` + `PublishStepValidator(input_tag)` 路径。**不**以 `this.cdp` 存在与否判启用。
-- [ ] 2.2 实现 `runAddTopic`（镜像 `runFillField` :456-508 的 focus + `findShadowButtonCenter` :511-560 的盒模型走查 + `dispatchClick`）：聚焦 `.tiptap.ProseMirror` → `typeHumanized('#'+kw)` → 轮询等建议下拉容器（≤4s）→ 盒模型中心点点文本匹配建议（无命中 Enter 兜底）→ 后置校验真 token → 诚实 `no_target`/`post_validate_failed`。时长封在云端 30s 单步超时内。
-- [ ] 2.3 `src/flows/publish-post.ts`：新增 `topicPillValidator`（断言真话题 token/pill 节点存在，非全局子串），供 `runAddTopic` 后置校验；保留旧 `input_tag`（供开关 OFF 兜底路径）。
-- [ ] 2.4 edge 单测：`runAddTopic` 在选择器未命中（校准前）fail-closed 回 `no_target`/`post_validate_failed`；桩 pill 节点的 happy-path 回 `ok`。
-- [ ] 2.5 **[GATED — 实机 CDP 校准]** 真机 Chrome 打开创作发布页，校准：① 话题建议下拉容器选择器；② 已提交话题 token/pill 选择器/class；③ 确认「点建议」vs「Enter 提交」行为。抓一份 DOM 样本存档；未完成此项 MUST NOT 打开 `AIDCP_PUBLISH_TOPIC_CDP`（本 task 未勾选前 Phase B 不得标记完成）。
+- [ ] 2.2 实现 `runAddTopic`（镜像 `runFillField` :456-508 的 focus + `findShadowButtonCenter` :511-560 的盒模型走查 + 真实鼠标事件）。已校准流程（见 design「实机校准」节）：聚焦**正文** `.tiptap.ProseMirror` → `typeHumanized('#'+kw)` → 轮询等 `.tippy-box[role="tooltip"]` 下拉（≤4s）→ 在 `#creator-editor-topic-container .item` 选目标项（**优先文本精确匹配关键词**者；无则点首项「新建话题」`span.num.newTopic`）→ 取其中心用 **`Input.dispatchMouseEvent`(press/release)** 点击（`.click()` 实测无效）→ 后置校验 → 诚实 `no_target`/`post_validate_failed`。时长封在云端 30s 单步超时内。
+- [ ] 2.3 `src/flows/publish-post.ts`：新增 `topicPillValidator`——断言编辑器内存在 `a.tiptap-topic[data-topic]` 且其文本 / `data-topic.name` == 目标关键词（**非**全局子串、**非**纯文本 `#kw`）；供 `runAddTopic` 后置校验。保留旧 `input_tag`（供开关 OFF 兜底路径）。
+- [ ] 2.4 edge 单测：`runAddTopic` 在下拉/`a.tiptap-topic` 未命中时 fail-closed 回 `no_target`/`post_validate_failed`；桩 `a.tiptap-topic` 节点的 happy-path 回 `ok`。
+- [ ] 2.5 **[已实机校准，待接线后复跑]** 选择器已由探针实证（下拉 `.tippy-box[role="tooltip"]`、候选 `#creator-editor-topic-container .item` / 首项「新建话题」、提交用真实鼠标事件、已提交标记 `a.tiptap-topic[data-topic]`；DOM 样本见 design「实机校准」节）。接线完成后在真机复跑一遍确认端到端**真把话题贴上**（编辑器出现 `a.tiptap-topic`），确认无误再打开 `AIDCP_PUBLISH_TOPIC_CDP`；未复跑确认前不开开关、Phase B 不算完成。
 
 ## 3. aidcp-cloud — 审批==下发接线（Phase C）
 
