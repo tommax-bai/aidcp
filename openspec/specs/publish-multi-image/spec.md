@@ -1,0 +1,85 @@
+# publish-multi-image Specification
+
+## Purpose
+TBD - created by archiving change publish-multi-image. Update Purpose after archive.
+## Requirements
+### Requirement: 配图张数由正文决定并夹在安全范围
+
+图集选题角色 `ImageSetPlanner` SHALL watch `createdContent`、读正文决定本帖配图张数与每张主题，写键 `imageSetPlan`。张数 SHALL 由内容判断产出，并经规则**夹取**到安全范围：默认 3 张、范围 1–6、硬上限 MUST NOT 超过 9（平台上界）。当 `imageSetPlan.wantImage === true` 时下界 SHALL ≥1（图文帖不能 0 张）。选题角色 MUST NOT 调用图源、MUST NOT 产出万相 prompt（纯内容决策）。
+
+#### Scenario: 内容定张数、规则夹安全范围
+- **WHEN** `createdContent` 就绪、`ImageSetPlanner` 激活
+- **THEN** 产出 `imageSetPlan`（含 `wantImage` / `imageCount` / `themes` / `styleHint`），`imageCount` 取 LLM 判断值并 `clamp(1, AIDCP_PUBLISH_MAX_IMAGES≤9)`；`themes` 长度与 `imageCount` 一致、每项为业务语言主题
+
+#### Scenario: 越界张数被夹回
+- **WHEN** LLM 给出 0 或 >6（或 >`AIDCP_PUBLISH_MAX_IMAGES`）的张数 / 主题数
+- **THEN** 规则 SHALL 夹回 `[1, 上限]`；`wantImage:true` 下永不产出 0 张
+
+#### Scenario: 选题角色不碰图源与话术
+- **WHEN** 为 `ImageSetPlanner` 写单测
+- **THEN** 只需桩内容决策 LLM、无需桩图源；其依赖中不含 `ImageProvider`
+
+### Requirement: N 张主题与画图指令分两决策角色规划且画面各异
+
+配图指令角色 `ImagePromptComposer` SHALL watch `imageSetPlan`、把每个主题翻成一条**各不相同**的万相 prompt（叙事递进、不重复画面），共享一份**固定风格基底**（模板常量，MUST NOT 由 LLM 产出），写键 `imagePlan`（`imagePrompts: string[]`）。指令角色 SHALL 仍是决策角色（有自己的超时/降级），MUST NOT 调用图源。去重护栏 SHALL 丢弃归一化后近似的 prompt（命中即丢、不补不复用），但 SHALL **永远保留第 0 个**（封面位），使 `wantImage:true` 时 `imagePrompts` 恒非空。
+
+#### Scenario: 主题翻成各异指令、共享固定风格基底
+- **WHEN** `imageSetPlan.wantImage === true` 且含 N 个主题
+- **THEN** `ImagePromptComposer` 产出 `imagePlan.imagePrompts`（N 条各异 prompt，每条 = 主题语义 + 固定风格基底），风格基底取自模板常量而非 LLM 输出
+
+#### Scenario: 去重护栏丢近似但保住封面位
+- **WHEN** LLM 产出的若干 prompt 归一化后近似
+- **THEN** 护栏丢弃近似项、不补不复用，但第 0 个（封面位）恒保留；最终 `imagePrompts.length ≥ 1`
+
+#### Scenario: 指令角色不碰图源
+- **WHEN** 为 `ImagePromptComposer` 写单测
+- **THEN** 只需桩话术 LLM、无需桩图源；其依赖中不含 `ImageProvider`（决策/执行解耦红线）
+
+### Requirement: 并行出图且每张独立计时绝不清零已成功图
+
+配图生成角色 `ImageGenerator` SHALL 按 `imagePlan.imagePrompts` **并行**调图源生成（`Promise.allSettled`），全部 settle 后把成功的真实 URL 按**规划顺序**收进 `imageDirective.imageUrls`（[0] 为钩子图/封面位）。计时 SHALL **下沉到每张图**：每张独立超时（env `AIDCP_PUBLISH_PER_IMAGE_TIMEOUT_MS`），某张超时 / 失败 SHALL 只丢该张、不影响其余张，MUST NOT 把已成功生成的图整体清零。并发上限 SHALL 可经 env `AIDCP_PUBLISH_IMAGE_CONCURRENCY` 配置（防图源突发限流）。角色级总闸 SHALL 设为 ≈ 每图超时 + 余量（并行下 wall-clock 为最慢单张、非各张相加），且即便触发 SHALL 用"已 settle 的成功 URL"构造产出、MUST NOT 返回空产出丢弃已成功图。失败那张 MUST NOT 进入 `imageUrls`（不补空、不复用别张 URL）。
+
+#### Scenario: 部分图超时只丢该张、保留已成功
+- **WHEN** 并行生成中第 k 张超时 / 失败，其余张成功
+- **THEN** `imageDirective.imageUrls` 含所有成功张的真实 URL（按规划顺序）、不含第 k 张，不因单张失败清零或中断其余张
+
+#### Scenario: 红线——总闸超时清零已成功图（反例）
+- **WHEN** 任一实现让角色级总闸 `Promise.race` 在 `allSettled` 结算前到点即返回空产出，丢弃已生成成功的 URL
+- **THEN** MUST 视为违规、不予合入（已成功图绝不被外层超时清零；总闸须 ≥ 每图超时 + 余量、超时也返回已 settle 结果）
+
+#### Scenario: 生成角色单测只桩图源
+- **WHEN** 为 `ImageGenerator` 写单测
+- **THEN** 只需桩图源、无需桩任何 LLM；并行计时、保序累积、部分成功收集逻辑可脱离真实图源验证
+
+### Requirement: 部分成功诚实发已成图全失败诚实失败并记真实附着数
+
+发布 SHALL 按真实图数诚实收敛：生成成 M 张（`imageDirective.imageUrls.length === M`）时，`M ≥ 1` SHALL 照常发布该 M 张、`M === 0` SHALL 诚实判 `failed`（判据为成功图数组为空，不再以单图 URL 判定）。下发上传 SHALL 按真实成功上传条数 K 记账（取代"任一图失败即整体降级"）：`K ≥ 1` 即有效帖、发已成功的 K 张；`K === 0` 才 `failed`。记录 SHALL 落**真实附着张数**（`images_attached_count`），`images_attached` 派生为 `count > 0`。`submit_publish` 成功后任何超时 MUST NOT 把记录翻成 `failed`。
+
+#### Scenario: 想要 N 张成 M 张（M≥1）照发 M 张
+- **WHEN** 计划 N 张、实际生成成功 M 张（1 ≤ M < N）
+- **THEN** 发布按 M 张继续，失败那 N−M 张不补空、不复用 URL；记录 `images_attached_count` 反映真实附着数
+
+#### Scenario: 全部生成失败（M=0）诚实失败
+- **WHEN** `imageDirective.imageUrls.length === 0`
+- **THEN** 执行端落库 `status='failed'`、`images_attached=false`、`images_attached_count=0`，MUST NOT 发审批卡、MUST NOT 下发任何指令、MUST NOT 走纯文字必败路径
+
+#### Scenario: 上传按真实成功数 K 记账
+- **WHEN** 下发 M 张上传、边缘成功上传 K 张（1 ≤ K ≤ M）
+- **THEN** 帖子有效、`images_attached_count = K`；仅当 K===0 才判 failed
+
+#### Scenario: 红线——附着数虚报或提交后翻失败（反例）
+- **WHEN** 任一实现把 `images_attached_count` 记为计划数 M（而非真实 K）、或在 `submit_publish` 成功后因超时把已发布记录翻成 `failed`
+- **THEN** MUST 视为违规、不予合入（附着数必须如实、提交成功不可静默翻失败）
+
+### Requirement: 多图封面恒取成功序列首张且本期不引入封面索引
+
+多图封面 SHALL 恒取成功生成序列的第一张（`imageUrls[0]`，即钩子图），由 `CoverSelector` 产出。本 change MUST NOT 引入封面索引字段、MUST NOT 改动命令序列的 `set_cover` 触发条件（保持仅 `images.length > 1` 才下发的现状），从而 MUST NOT 提前接通"选非首图 → 真正下发 set_cover"这条会踩边缘未校准设封面操作的路径。选非首图当封面 / 美学或 LLM 选封面 / 边缘设封面 DOM 真机校准 SHALL 留待独立后续 change。
+
+#### Scenario: 封面取首张
+- **WHEN** `imageDirective.imageUrls` 含 M(≥1) 张成功图
+- **THEN** `CoverSelector` 产出封面 = `imageUrls[0]`、`hasCover = true`；下发 `cover` 指向该首张
+
+#### Scenario: 本期不接通非首图封面
+- **WHEN** 审视本 change 的封面选择与下发
+- **THEN** 不存在 `coverIndex` 字段、命令序列 `set_cover` 触发条件未改（平台默认首图即封面，单图与多图均不依赖真正下发 set_cover 即可正确）
+
