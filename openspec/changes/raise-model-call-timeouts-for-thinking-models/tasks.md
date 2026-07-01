@@ -37,11 +37,11 @@
 
 ## 7. 部署与文档（含看门狗结束阈值生产值同步）
 
-- [ ] 7.1 部署 cloud（§5 安全序列：备份 → rsync → restart → healthcheck）
-- [ ] 7.2 **部署后必做**：经后台把生产账号 idle-end 阈值抬到 ≥480s（须显著 > 新轻推 240s）。注意：读时钳制下，若 DB idle-end ≤ 现轻推(240s) 会回落写死默认 1h（安全但回收变慢），故须显式设 ≥480s 恢复较快回收；此值走既有配置管线（属 change `restore-auto-resume-and-global-safety-config`），本 change 只核对不改管线
-- [x] 7.3 在 `docs/environment-database.md` 新增「超时旋钮」节，登记 `AIDCP_LLM_TIMEOUT_MS`、`AIDCP_PUBLISH_{GATE,QUALITY,CLEAN,IMGSETPLAN,IMGPROMPT,SCOUT,CONTENT,TITLE}_TIMEOUT_MS`、`AIDCP_PUBLISH_PIPELINE_TIMEOUT_MS` 及看门狗阈值联动（缺省值与含义）<!-- aidcp-cloud docs committed -->
+- [x] 7.1 部署 cloud（§5 安全序列：备份 `cloud.bak.20260701-111154.tar.gz` + `.env.bak` → rsync src → `systemctl restart` → healthcheck 全绿：active / :8787 监听 / PG select 1 / 飞书长连接已建立 / isales-scheduler 未受影响）<!-- aidcp-cloud 3810478 2026-07-01 deployed -->
+- [x] 7.2 **核对完成，无需改配置**：ECS 上 `resume_config_global` 与 `resume_config` 均 **0 行**（无 idle 覆盖），看门狗走代码写死默认——轻推 = 240s（> 180s 天花板 ✓）、放弃结束 = 1h（>> 240s 轻推 ✓），联动不变量已自动成立。若将来经后台写入 idle-end，须显式 ≥480s（否则 ≤ 轻推时读时回落 1h）<!-- 2026-07-01 verified -->
+- [x] 7.4 回写 commit-sha / 部署注记：cloud `3810478`(含 704bbd2 时限改动+面板改动)、edge `082ad12`，本行即 <!-- 2026-07-01 deployed -->
 
-- [ ] 7.4 回写本 change tasks 的 commit-sha / 部署注记（`<!-- <repo> <sha> 备注 -->` + `<!-- <date> deployed -->`）
+- [x] 7.3 在 `docs/environment-database.md` 新增「超时旋钮」节，登记 `AIDCP_LLM_TIMEOUT_MS`、`AIDCP_PUBLISH_{GATE,QUALITY,CLEAN,IMGSETPLAN,IMGPROMPT,SCOUT,CONTENT,TITLE}_TIMEOUT_MS`、`AIDCP_PUBLISH_PIPELINE_TIMEOUT_MS` 及看门狗阈值联动（缺省值与含义）<!-- aidcp-cloud docs committed -->
 
 ## 8. Backlog（非本次目标，仅登记）
 
