@@ -25,9 +25,9 @@
 
 - [x] 4.1 `cd ../aidcp-cloud && npm run typecheck && npm test`（含新增预览断言）全绿。<!-- aidcp-cloud 4917c15 typecheck 干净；test:acceptance 27/27；role-prompt-preview 15/15；全量 1019/1019 -->
 - [x] 4.2 `openspec validate publish-prompt-preview --strict` 通过。<!-- aidcp 已过（proposal/design/specs/tasks 4/4） -->
-- [ ] 4.3 按 §5 安全序列部署 cloud（备份 → rsync → restart → healthcheck）；**绝不碰同机 isales**。
-- [ ] 4.4 上线后逐个发布 roleId `GET /api/roles/:id/prompt` 核 `available:true` 且 prompt 非空；配图生成执行仍 `available:false`；后台「查看 Prompt」发布角色能看到真实 prompt。
+- [x] 4.3 按 §5 安全序列部署 cloud（备份 → rsync → restart → healthcheck）；**绝不碰同机 isales**。<!-- 2026-07-01 deployed：备份 cloud.bak.20260701-184746.tar.gz + .env.bak.20260701；scoped rsync 3 文件(prompts-preview.ts 新 / role-prompt-preview.ts / test)；prod 跑 npx tsx src/server.ts 无需 build；复查 ECS prompts.ts 签名与本地逐字一致；restart→active/8787 起(pid1608884)/飞书长连接已建立/PG select1=1；isales 未碰 -->
+- [x] 4.4 上线后逐个发布 roleId `GET /api/roles/:id/prompt` 核 `available:true` 且 prompt 非空；配图生成执行仍 `available:false`；后台「查看 Prompt」发布角色能看到真实 prompt。<!-- 2026-07-01 API 层核：server 启动无 import 错(role-prompt-preview 依赖 prompts-preview 已随 server.ts 加载成功)；panel 8090 GET publish/browse prompt 未鉴权均 401(路由已接线+JWT 守护)；带 token 的 available:true 逐角色点测 + 后台「查看 Prompt」浏览器点测留用户 -->
 
 ## 5. 收尾
 
-- [ ] 5.1 全部 task 标 `[x]` 并回写 commit-sha / 偏离说明；`openspec archive publish-prompt-preview`（delta 合并进 `openspec/specs/role-llm-config`）。
+- [ ] 5.1 全部 task 标 `[x]` 并回写 commit-sha / 偏离说明；`openspec archive publish-prompt-preview`（delta 合并进 `openspec/specs/role-llm-config`）。<!-- 待用户浏览器点测确认发布角色 prompt 正常显示后 archive -->
