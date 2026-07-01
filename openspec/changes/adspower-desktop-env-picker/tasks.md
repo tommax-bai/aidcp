@@ -33,6 +33,8 @@
 - [x] 4.2 jsdom 无头冒烟补例：探测可达/不可达提示、下拉选中写入 `adsProfileId`、拉取失败退手敲、打开新建外链、按钮 in-flight 禁用、诚实降级各态 <!-- aidcp-edge 8eecded；test/electron/renderer-smoke.test.ts 7 项全绿 -->
 - [x] 4.3 回归护栏：§9 既有契约不破——`selectBrowserProvider`（默认 adspower / 缺 user_id 报错 / 显式 self）、写盘失败诚实回报、adspower 缺分身 id「待配置」；`adsProfileId` 语义与下游注入不变 <!-- aidcp-edge 8eecded；browser-provider.test 等既有测试随全量 415 全绿 -->
 - [x] 4.4 安全红线断言：新增本地 API 调用只读、绝不触碰 start/stop/active、绝不静默假成功/回落；api-key 不落日志 <!-- aidcp-edge 8eecded；单测「只读边界」断言 URL 从不含 browser/start|stop|active -->
+- [x] 4.5 对抗性代码复查（+真机只读验证）修 3 项确认缺陷：D1 节流对并发不生效（改模块内串行队列，防两独立按钮/自动探测撞 1req/s 自伤成假失败）、D2 清空 API Key 框不回落已存 key（改与 API 地址同语义）、D3「已尝试打开 AdsPower」兜底误导（openAdsClient 异步返真实 launched、渲染层分档文案）；附并发串行化 + no_proxy + launched 分档测试。真机（AdsPower Global）坐实 /status 可达 / user_id≠serial_number / 1req/s 限速 <!-- aidcp-edge de33fda -->
+- [x] 4.6 真机只读冒烟（§5.1 部分）：本机 AdsPower `status()` 就绪、`listProfiles()` 列出真实环境（工程师大白/组 aidcp/无代理），`user_id`/`serial_number` 归一化正确、no_proxy 显示「无代理配置」 <!-- 2026-07-01 本机 headless 只读验证；GUI 完整闭环仍待 §5.1 -->
 
 ## 5. aidcp-edge — 真机灰度（可选，gated）
 
