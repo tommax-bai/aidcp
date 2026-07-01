@@ -27,7 +27,7 @@
 
 ## 5. aidcp-edge — 搜索结果原生筛选 + 收藏数采集（最大不确定性、需真机标定）
 
-- [x] 5.1 `src/browse/search-handler.ts`：搜索后驱动原生「最多收藏」排序标签 +「一天内」时间筛选控件（双布局选择器）；后置校验确实切到目标排序/时间，未生效 honest 报降级、不冒充。验证：jsdom 桩单测点击路径；真机标定见 task 12。 <!-- edge d2a492e applySearchFilters：**按可见文案精确匹配点击**（跨布局/类名漂移最稳）；两遍=行内 tab 直点→缺则开「筛选」面板再点；控件找不到→applied=false honest 降级、不冒充。3 单测（applied/honest-not-found/no-op）；edge typecheck 净、全套 387/387。⚠️选择器/面板机制**待真机标定** -->
+- [x] 5.1 `src/browse/search-handler.ts`：搜索后驱动原生「最多收藏」排序标签 +「一天内」时间筛选控件（双布局选择器）；后置校验确实切到目标排序/时间，未生效 honest 报降级、不冒充。验证：jsdom 桩单测点击路径；真机标定见 task 12。 <!-- edge d2a492e applySearchFilters：**按可见文案精确匹配点击**（跨布局/类名漂移最稳）；两遍=行内 tab 直点→缺则开「筛选」面板再点；控件找不到→applied=false honest 降级、不冒充。3 单测（applied/honest-not-found/no-op）；edge typecheck 净、全套 387/387。⚠️选择器/面板机制**待真机标定** --> <!-- edge face692 真机反馈修 hover bug：「筛选」是 hover 展开的悬浮控件，pass2 原先 dispatchClick=「hover 展开→click 又 toggle 收起」，面板内「一天内」永远点不到。修法：cdp-util 抽 hover-only 原语 dispatchHover；pass2 改「hover 展开→轮询目标可见→展开不了再 click 兜底→点选项」混合式（对 hover 触发/click-toggle 都稳、绝不二次 toggle；点选项 from=筛选坐标避免中途 mouseleave 收起）；honest 降级不变。+1 回归单测（hover 面板内时恰好 2 次点击、零次 click 筛选）；427/427。**仍待真机**：hover vs click 触发、选中时间项后是否需点「确定」——用 scripts/search-filter-probe.ts 标定（见 12.1） -->
 - [ ] 5.2 `src/browse/feed-scroller.ts` 卡片扫描 + `src/browse/browse-session.ts` `reportVisibleCards`：采每卡真实收藏数填 `collectCount`（替换硬编码 0）；采不到则置空、不编造。验证：单测/夹具——卡片含收藏数文本→解析正确；缺失→空不崩。 <!-- 真机现实修正（d2a492e 勘察 CARD_SCAN_JS）：**搜索结果卡片只显示点赞数、不显示收藏数**（收藏数是详情页才有）。故「最多收藏」靠**原生排序**实现、云端用结果**顺序**（picker 的 stable sort 在收藏数未知时退化为保序=原生收藏序，已正确）。collectCount 维持 0、不强抓（避免误抓收藏/评论数=既有 feed-scroller 刻意规避的坑）。**本任务按原文不再需要**，留 [ ] 记录此判定；如真机发现某布局卡片确有收藏数再补 -->
 - [x] 5.3 edge 侧消费搜索新参数 `sort`/`timeWindow`（来自 task 1）。验证：`npm run typecheck` + `AC-PROTO-*` 绿。 <!-- edge d2a492e browse-session search.execute 读 payload.sort/timeWindow→executeSearch 后调 applySearchFilters；自治浏览不带这俩→跳过、行为不变。typecheck 净、AC-PROTO 5/5 -->
 
@@ -69,7 +69,7 @@
 
 ## 12. 真机标定（最大未知=原生筛选控件）
 
-- [ ] 12.1 真账号 `/comment <昵称>`：核「最多收藏 + 一天内」是否真切到、收藏数是否真采、去重是否避开已评、甄选是否挑相关高收藏、撰写是否吃到现场评论、人审卡片→发出闭环。据真机回调甄选相关性严格度与筛选选择器（参 [[xhs-responsive-nav-layout]] 双布局、[[curated-inspiration-corpus-impl]] 集成时序 bug 只真机暴露）。
+- [ ] 12.1 真账号 `/comment <昵称>`：核「最多收藏 + 一天内」是否真切到、收藏数是否真采、去重是否避开已评、甄选是否挑相关高收藏、撰写是否吃到现场评论、人审卡片→发出闭环。据真机回调甄选相关性严格度与筛选选择器（参 [[xhs-responsive-nav-layout]] 双布局、[[curated-inspiration-corpus-impl]] 集成时序 bug 只真机暴露）。 <!-- 探针已交付 edge face692：scripts/search-filter-probe.ts（只读默认，登录 XHS + 停在搜索结果页跑）。用法：tsx scripts/search-filter-probe.ts [--hover|--click-filter|--apply|--sort|--production]，产物 /tmp/aidcp-search-filter-probe-*。待真机跑出：① 「筛选」hover 展开 vs click-toggle；② 选中「一天内」后是否需点「确定」；③ 时间/排序在宽窄布局是否行内。据此裁剪 applySearchFilters pass2（已修为对两种触发都稳的混合式，见 5.1） -->
 
 ## 13. console 标签（可选）+ openspec 归档
 
