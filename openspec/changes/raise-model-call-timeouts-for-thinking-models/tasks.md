@@ -39,7 +39,8 @@
 
 - [ ] 7.1 部署 cloud（§5 安全序列：备份 → rsync → restart → healthcheck）
 - [ ] 7.2 **部署后必做**：经后台把生产账号 idle-end 阈值抬到 ≥480s（须显著 > 新轻推 240s）。注意：读时钳制下，若 DB idle-end ≤ 现轻推(240s) 会回落写死默认 1h（安全但回收变慢），故须显式设 ≥480s 恢复较快回收；此值走既有配置管线（属 change `restore-auto-resume-and-global-safety-config`），本 change 只核对不改管线
-- [ ] 7.3 在部署文档 / `.env` 说明登记新增 env 旋钮：`AIDCP_LLM_TIMEOUT_MS`、`AIDCP_PUBLISH_{GATE,QUALITY,CLEAN,IMGSETPLAN,IMGPROMPT,SCOUT,CONTENT,TITLE}_TIMEOUT_MS`、`AIDCP_PUBLISH_PIPELINE_TIMEOUT_MS`（缺省值与含义）
+- [x] 7.3 在 `docs/environment-database.md` 新增「超时旋钮」节，登记 `AIDCP_LLM_TIMEOUT_MS`、`AIDCP_PUBLISH_{GATE,QUALITY,CLEAN,IMGSETPLAN,IMGPROMPT,SCOUT,CONTENT,TITLE}_TIMEOUT_MS`、`AIDCP_PUBLISH_PIPELINE_TIMEOUT_MS` 及看门狗阈值联动（缺省值与含义）<!-- aidcp-cloud docs committed -->
+
 - [ ] 7.4 回写本 change tasks 的 commit-sha / 部署注记（`<!-- <repo> <sha> 备注 -->` + `<!-- <date> deployed -->`）
 
 ## 8. Backlog（非本次目标，仅登记）
