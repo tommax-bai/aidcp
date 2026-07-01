@@ -27,7 +27,7 @@
 
 - [x] 4.1 `openspec validate feishu-message-fast-ack --strict` 通过。<!-- 2026-07-01 valid -->
 - [x] 4.2 回填 tasks commit-sha / deployed 注记；`git commit` + `push`（cloud `master`、本仓 `main`）。<!-- cloud a430e70 pushed；本仓 propose c5c1529 + tasks 回填本次提交 -->
-- [ ] 4.3 archive：`/opsx:archive feishu-message-fast-ack`（delta 合并进 `openspec/specs/`）。<!-- 待 3.4 现场验证「只触发一次」确认后再 archive -->
+- [x] 4.3 archive：`openspec archive feishu-message-fast-ack`（delta 合并进 `openspec/specs/`）。<!-- 2026-07-01 用户验收通过后归档；新 capability feishu-command-ingestion 合并入库 -->
 
 ## 5. 部署观察记录（deployed）
 
