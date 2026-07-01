@@ -48,4 +48,4 @@
 
 ## 5. 收尾
 
-- [ ] 5.1 全部 task 标 `[x]` 并回写 commit-sha / 偏离说明；`openspec archive publish-prompt-preview`（delta 合并进 `openspec/specs/role-llm-config`）。<!-- 待用户浏览器点测确认发布/图片角色 prompt 正常显示后 archive -->
+- [x] 5.1 全部 task 标 `[x]` 并回写 commit-sha / 偏离说明；`openspec archive publish-prompt-preview`（delta 合并进 `openspec/specs/role-llm-config`）。<!-- 2026-07-01 用户确认归档（接受/跳过浏览器点测）；cloud 4917c15 + 2c97fde + 9a7f1ed 均已部署 ECS -->
