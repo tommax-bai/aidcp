@@ -7,7 +7,8 @@
 > - **内容去技术化（1/4/5）已实装 + 部署 + 线上生效**（cloud `aecc1ce`；ECS prompts.ts「技术帖」=0、标签已改）。
 > - **人设必填 / 无人设拒绝**：浏览侧早由 `retire-default-account` 实现（`canStartSession` + `isPersonaBound` fail-closed + 飞书告警 + `startOnPersonaBound`）；评论侧人设空即 honest-fail（无搜索词→不评）；本 change 补**发布侧人设闸**（`PublishScheduler.isPersonaBound`，未绑人设 `blocked/needs_persona_setup`、绝不用兜底 soul）+ 清 `panel-store` 失效 `default` 特判（cloud `9876eaa` 已提交推送，full suite 1029/1029）。
 > - resolver 保留「回落 + 永不抛」（既有 spec，`persona-store.test` task 5.3）——去默认人设由各**闸**在入口 enforce，非改 resolver；ECS 实测 0 个未绑人设账号、`default` 已删。
-> - ⚠️ **`9876eaa` 未部署**：其 `server.ts` 依赖 split-topic-roles 的 `roles/index.js`（`TopicEvaluatorRole` 导出），而 **ECS 落后于 HEAD——split-topic-roles 已 commit 未 deploy**；scoped 部署 `server.ts` 触发启动 `SyntaxError` 崩溃、已即时回滚（restore 3 文件、服务 active、de-tech 完好）。**部署本闸须先把 ECS 升到 HEAD（含 split-topic-roles）。**
+> - ✅ **`9876eaa` 已部署**：首次 scoped 部署因 ECS 落后于 HEAD（split-topic-roles 已 commit 未 deploy、`server.ts` 依赖其 `roles/index.js` 的 `TopicEvaluatorRole` 导出）触发启动 `SyntaxError`、已即时回滚（restore 3 文件、服务恢复、de-tech 完好）；经用户确认后把 ECS **整体升到 HEAD**——`git archive HEAD` 干净快照 → 全量 `src/` rsync `--delete`（一并部署 split-topic-roles + 发布闸、删去 topic-strategist）→ 重启 healthcheck 全过（active / 8787 / 8090 / PG select 1 / 飞书 onReady、无 SyntaxError、de-tech 完好、isales 未碰）。**ECS 现与 HEAD 一致。**
+> - 备注：`server.ts` 现有两处同款 `isPersonaBound`（浏览闸 retire-default-account + 本 change 发布闸），口径一致。
 
 ## 0. 前置与排序（务必先读）
 
