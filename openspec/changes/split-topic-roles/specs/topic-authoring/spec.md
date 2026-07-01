@@ -74,14 +74,14 @@
 
 ### Requirement: 边缘真实加话题由显式开关门控、未校准不上线
 
-边缘真实加话题通道 SHALL 由**显式配置开关**（`AIDCP_PUBLISH_TOPIC_CDP`，默认 **关闭**）门控，MUST NOT 仅以「CDP 是否注入」判是否启用（生产 CDP 恒注入，会使兜底路径不可达）。开关关闭时 SHALL 保留原有填写路径为净兜底，MUST NOT 在真实交互选择器未经实机校准时于生产静默丢光话题。真实交互所需的下拉容器选择器 / 真 token 选择器 / 提交行为 SHALL 经一次真机 DOM 校准后方可打开开关。
+边缘真实加话题通道 SHALL 由**显式配置开关**（`AIDCP_PUBLISH_TOPIC_CDP`）门控，MUST NOT 仅以「CDP 是否注入」判是否启用（生产 CDP 恒注入，会使兜底路径不可达）。**实机校准 + 端到端确认（真话题 `a.tiptap-topic` 真被贴上）之前，默认关闭、走原有填写路径为净兜底**，MUST NOT 在未确认时于生产静默丢光话题；确认通过后 SHALL 默认启用，并保留 env kill-switch（显式 `0/false/no/off` 回退兜底）。真实交互所需的下拉容器选择器 / 真 token 选择器 / 提交行为 SHALL 经一次真机 DOM 校准确认。
 
-#### Scenario: 开关默认关闭、走兜底路径
-- **WHEN** `AIDCP_PUBLISH_TOPIC_CDP` 未设置或为关闭
-- **THEN** 边缘走原有话题填写路径，MUST NOT 启用未校准的真实交互 handler
+#### Scenario: 显式 kill-switch → 走兜底路径
+- **WHEN** `AIDCP_PUBLISH_TOPIC_CDP` 设为 `0`/`false`/`no`/`off`
+- **THEN** 边缘走原有话题填写路径（不启用真实交互 handler），作为出问题时的即时回退
 
-#### Scenario: 校准后开关打开启用真实交互
-- **WHEN** 实机校准完成、`AIDCP_PUBLISH_TOPIC_CDP` 打开
+#### Scenario: 实机确认后默认启用真实交互
+- **WHEN** 真机 DOM 校准 + 端到端确认已完成（真话题 token 真被贴上），且未设 kill-switch
 - **THEN** 边缘走真实加话题 handler（`#`→下拉→选建议→校验真 token）
 
 #### Scenario: 红线反例——按 CDP 存在与否路由（禁止）
