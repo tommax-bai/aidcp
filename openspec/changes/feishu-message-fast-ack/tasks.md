@@ -21,7 +21,7 @@
 - [x] 3.1 部署前 §0 检查：私钥 `~/codes/isales-4.pem` 存在且 `chmod 600`；探测 ECS 现役版本，确认无并发方半程改动冲突。<!-- 2026-07-01 pem 600 ✓；探测发现 ECS 落后 master 一批已提交未部署改动（seedream/multi-image/panel-quota/comment-search），dry-run -c 会误伤 → 改外科式单文件部署 -->
 - [x] 3.2 ECS 先备份（`cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`）→ `rsync`（`--exclude .env --exclude node_modules --exclude .git`）→ `systemctl restart aidcp-cloud.service`。<!-- 2026-07-01 偏离：因 ECS 落后 master、全量 rsync 会连并发方未部署改动一起推，故只 rsync 单文件 src/feishu/ws-receiver.ts（先核 ECS 该文件 md5==基线 1c1f8da，落地后 md5==工作版 4a871562）。备份 cloud.bak.20260701-120318.tar.gz + ws-receiver.ts.bak.20260701-120318 -->
 - [x] 3.3 Healthcheck：`active (running)` + 8787 监听 + 飞书长连接已建立（`飞书长连接已建立` 日志）+ PG `select 1`；失败即回滚。绝不碰同机 isales。<!-- 2026-07-01 active since 12:04:10；8787 监听(pid 1604777)；12:04:12 飞书长连接已建立；pg_isready 接受连接；无 error 日志 -->
-- [ ] 3.4 现场验证：飞书发一次 `/publish <account>`，确认**只触发一次**（journalctl 中同一窗口仅一条 `starting pipeline`、无 `pipeline already running`），且终态/审批卡照常到达。<!-- 待用户下次 /publish 时观察（需真实飞书消息，我方不代发以免产生真发帖副作用） -->
+- [x] 3.4 现场验证：飞书发一次 `/publish <account>`，确认**只触发一次**（journalctl 中同一窗口仅一条 `starting pipeline`、无 `pipeline already running`），且终态/审批卡照常到达。<!-- 2026-07-01 用户验收通过。ECS 实证：12:12:13 手动 /publish → 单条 starting pipeline run=evop0xf3 → 12:14:58 completed（2m45s），全程无第二次触发、无 pipeline already running。ECS ws-receiver.ts md5 仍==4a871562（fast-ack 版，未被并发方 12:05 重启覆盖） -->
 
 ## 4. 收尾
 
