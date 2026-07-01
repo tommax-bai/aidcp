@@ -28,6 +28,20 @@
 - [x] 4.3 按 §5 安全序列部署 cloud（备份 → rsync → restart → healthcheck）；**绝不碰同机 isales**。<!-- 2026-07-01 deployed：备份 cloud.bak.20260701-184746.tar.gz + .env.bak.20260701；scoped rsync 3 文件(prompts-preview.ts 新 / role-prompt-preview.ts / test)；prod 跑 npx tsx src/server.ts 无需 build；复查 ECS prompts.ts 签名与本地逐字一致；restart→active/8787 起(pid1608884)/飞书长连接已建立/PG select1=1；isales 未碰 -->
 - [x] 4.4 上线后逐个发布 roleId `GET /api/roles/:id/prompt` 核 `available:true` 且 prompt 非空；配图生成执行仍 `available:false`；后台「查看 Prompt」发布角色能看到真实 prompt。<!-- 2026-07-01 API 层核：server 启动无 import 错(role-prompt-preview 依赖 prompts-preview 已随 server.ts 加载成功)；panel 8090 GET publish/browse prompt 未鉴权均 401(路由已接线+JWT 守护)；带 token 的 available:true 逐角色点测 + 后台「查看 Prompt」浏览器点测留用户 -->
 
+## 6. aidcp-cloud — 图片类角色（配图生成执行）补预览
+
+- [x] 6.1 `prompts-preview.ts` 新增图片指令预览：`IMAGE_PROMPT_PREVIEW_BUILDERS['publish:ImageGenerator'] = () => \`<示例主体>. ${IMAGE_STYLE_BASE}\``（示例主体用配图指令角色文档里的英文范例，固定风格基底逐字取自 `prompts.ts`）。<!-- aidcp-cloud 2c97fde -->
+- [x] 6.2 `role-prompt-preview.ts` 图像分支：`llmKind==='image'` 时查表 → 命中则 `available:true` + 图片指令说明（try 降级），未命中回落旧「无文本 prompt」；`get()` 发布分支仅对**文本**角色加「人设不随账号切」标注，图像角色保留其图片指令说明（不被覆盖）。<!-- aidcp-cloud 2c97fde -->
+- [x] 6.3 测试：图像角色 `available:true` 且 prompt 含固定风格基底特征串（no text/no watermark/no human faces）、无来源段；带 `accountId` 仍 `available:true`、保留图片指令说明、无 personaFallback。<!-- aidcp-cloud 2c97fde typecheck 干净 + role-prompt-preview 15/15 -->
+- [x] 6.4 部署 ECS（scoped：prompts-preview.ts + role-prompt-preview.ts + test）。<!-- 2026-07-01 deployed：备份 cloud.bak.20260701-191922.tar.gz；ECS prompts.ts 仍含 IMAGE_STYLE_BASE(依赖满足)；restart→active/8787/飞书 onReady；GET publish:ImageGenerator/prompt 未鉴权 401；与并发 split-topic-roles 不同文件、零冲突；isales 未碰。带 token available:true 点测留用户 -->
+
+## 7. 审计发现·暂缓（并发方在改同批文件，避免撞车）
+
+> 审计「还有哪些没做」时发现两个**真实但更大**的缺口——均需改并发方（change `split-topic-roles`）正在动的文件（`prompts.ts` / `role-catalog.ts` / `content-creator.ts` / `types.ts` / `server.ts`），故本 change 不含，待其落地后另开 change。
+
+- [ ] 7.1（另开 change）**发布正文去 AI 味重写**（ContentCleaner 经注入的 PostProcessor 调 `llm.complete`，prompt 内联在 `server.ts`）是现役 LLM 调用，但不在角色目录 → 查看器/模型配置均不可见。补齐需：抽 prompt 为共享 builder（server 与预览同源防漂移）+ 给该 `llm.complete` 接 roleId（否则配了模型是静默 no-op）+ catalog 加 `publish:ContentCleaner` + 预览 + 测试。
+- [ ] 7.2（另开 change）**评论点赞择选**（`comment_like_appraiser`，`AIDCP_COMMENT_LIKE=true` 线上已开、现役）用 `BaseRole.decide` 且已有 `previewPrompt`/`personaSegments`，但不在角色目录 → 一行 catalog 即可让其可预览+可配模型（零运行时改动）。因 `role-catalog.ts` 被并发方 `4e7c06b` 重排 + 后续要加话题角色，暂缓避让。
+
 ## 5. 收尾
 
-- [ ] 5.1 全部 task 标 `[x]` 并回写 commit-sha / 偏离说明；`openspec archive publish-prompt-preview`（delta 合并进 `openspec/specs/role-llm-config`）。<!-- 待用户浏览器点测确认发布角色 prompt 正常显示后 archive -->
+- [ ] 5.1 全部 task 标 `[x]` 并回写 commit-sha / 偏离说明；`openspec archive publish-prompt-preview`（delta 合并进 `openspec/specs/role-llm-config`）。<!-- 待用户浏览器点测确认发布/图片角色 prompt 正常显示后 archive -->

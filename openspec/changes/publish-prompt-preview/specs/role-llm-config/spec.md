@@ -17,7 +17,9 @@
 - **不传** `accountId` 时，系统 SHALL 渲染系统默认人设，行为与本扩展前**逐字一致**（向后兼容）。
 - 返回体为支持上述标注新增的字段 MUST 为**可选**字段，未升级的查看器 MUST 仍能正常显示。
 
-本能力 MUST 为**纯只读**：MUST NOT 提供任何写/改 prompt 的接口或路径，`accountId` 仅作渲染口径、MUST NOT 改写任何账号的人设或状态。渲染 MUST NOT 改动任何角色既有 `buildPrompt`/`build*Prompt` 的逻辑（线上 prompt 行为零变化）。单个角色渲染失败 MUST 降级为「预览不可用 + 原因」、MUST NOT 抛出、MUST NOT 连累浏览/发布闭环。未知 `roleId` SHALL 返回 404；**图像角色与纯规则角色** SHALL 返回「不可预览」标注而非 prompt（图像角色无文本 prompt、用全局图片模型）。
+**图像角色（配图生成执行）SHALL 展示其发给文生图模型的「有效图片指令」预览**：即「配图指令」角色按正文产出的主体描述（示例占位）+ 系统统一追加的固定风格基底（`IMAGE_STYLE_BASE`，每张图被强制施加的风格/负向约束），返回 `available:true` + prompt，并以说明标注「这是文生图图片指令、非大模型文本 prompt；配图用全局图片模型生成」。图像角色 MUST NOT 附人设来源段、MUST NOT 因 `accountId` 加人设标注（图片指令无账号人设）。**纯规则 / 不调模型角色** SHALL 返回「不可预览」标注而非 prompt。
+
+本能力 MUST 为**纯只读**：MUST NOT 提供任何写/改 prompt 的接口或路径，`accountId` 仅作渲染口径、MUST NOT 改写任何账号的人设或状态。渲染 MUST NOT 改动任何角色既有 `buildPrompt`/`build*Prompt` 的逻辑（线上 prompt 行为零变化）。单个角色渲染失败 MUST 降级为「预览不可用 + 原因」、MUST NOT 抛出、MUST NOT 连累浏览/发布闭环。未知 `roleId` SHALL 返回 404。
 
 #### Scenario: 文本角色 prompt 只读可见
 
@@ -49,10 +51,15 @@
 - **WHEN** 已鉴权请求预览且不带 `accountId`
 - **THEN** 渲染系统默认人设，返回体与本扩展前逐字一致，旧查看器正常显示
 
-#### Scenario: 图像角色不可预览
+#### Scenario: 图像角色展示有效图片指令
 
 - **WHEN** 已鉴权请求配图生成执行（图像角色）的 prompt 预览
-- **THEN** 返回 `available:false` 与「图像角色无文本 prompt（用全局图片模型）」的标注，而非 prompt 文本
+- **THEN** 返回 `available:true` 且 `prompt` 为「示例主体描述 + 固定风格基底」的有效图片指令（固定风格基底可见），返回体说明标注其为文生图图片指令、用全局图片模型生成；不附来源段
+
+#### Scenario: 图像角色带 accountId 不加人设标注
+
+- **WHEN** 已鉴权请求图像角色预览并带 `?accountId=<任一账号>`
+- **THEN** 仍返回 `available:true` 的图片指令，保留其图片指令说明（不被「不随账号切换」的人设标注覆盖），不设 `personaFallback`、不附来源段
 
 #### Scenario: 未鉴权被拒
 
