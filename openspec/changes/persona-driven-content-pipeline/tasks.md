@@ -3,8 +3,11 @@
 > 排序铁律：第 1–3 组「先行批」不碰 `split-topic-roles` 占用的文件，可先做先部署；
 > 第 4–5 组「发布侧」改 `prompts.ts` / `content-creator.ts` / `role-catalog.ts`，**必须排在 `split-topic-roles` 落地之后**，避免同文件互吞。
 >
-> 进度（2026-07-01）：**内容去技术化（1/4/5，非破坏性）已实装 + 部署**（cloud `aecc1ce`，split-topic-roles `abf6769`/`af35378` 落地后进行）。
-> **人设必填 + 去默认人设（2/3，破坏性）待做**——需先补齐存量账号人设（0.2）再启用，等用户确认迁移。
+> 进度（2026-07-01）：
+> - **内容去技术化（1/4/5）已实装 + 部署 + 线上生效**（cloud `aecc1ce`；ECS prompts.ts「技术帖」=0、标签已改）。
+> - **人设必填 / 无人设拒绝**：浏览侧早由 `retire-default-account` 实现（`canStartSession` + `isPersonaBound` fail-closed + 飞书告警 + `startOnPersonaBound`）；评论侧人设空即 honest-fail（无搜索词→不评）；本 change 补**发布侧人设闸**（`PublishScheduler.isPersonaBound`，未绑人设 `blocked/needs_persona_setup`、绝不用兜底 soul）+ 清 `panel-store` 失效 `default` 特判（cloud `9876eaa` 已提交推送，full suite 1029/1029）。
+> - resolver 保留「回落 + 永不抛」（既有 spec，`persona-store.test` task 5.3）——去默认人设由各**闸**在入口 enforce，非改 resolver；ECS 实测 0 个未绑人设账号、`default` 已删。
+> - ⚠️ **`9876eaa` 未部署**：其 `server.ts` 依赖 split-topic-roles 的 `roles/index.js`（`TopicEvaluatorRole` 导出），而 **ECS 落后于 HEAD——split-topic-roles 已 commit 未 deploy**；scoped 部署 `server.ts` 触发启动 `SyntaxError` 崩溃、已即时回滚（restore 3 文件、服务 active、de-tech 完好）。**部署本闸须先把 ECS 升到 HEAD（含 split-topic-roles）。**
 
 ## 0. 前置与排序（务必先读）
 
