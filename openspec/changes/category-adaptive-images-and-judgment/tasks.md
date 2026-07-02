@@ -11,7 +11,8 @@
 > - **2.1 顺带完成**（人物三档已写进各档 styleBase）；**1.7/0.2 未完**：比例仅到 prompt 层（styleBase 含 `vertical 3:4`），provider `defaultSize`(2048 方图) 未改——待 0.2 核实线上 Seedream 合法竖版尺寸后再改像素。
 > - **并发坑记录**：批中并发方又起 `edit-note-draft-before-publish` WIP 污染共享工作树（`feishu/*`/`panel/*`/`publish-dispatcher`/`server.ts`）。提交用精确逐文件 staging + `server.ts` 只挑含 `CategoryClassifier` 的 hunk（`git apply --cached`），未卷入其 WIP；全量 1 失败(`buildPublishApprovalCard`)为其 WIP、与本批无关。
 > - **第 3 组（质量评审接人设 + 品类自适应）已实装 + 测试全绿 + 已推 master**（aidcp-cloud `86bb0e0`，叠在并发方已提交的 `8eb0664` edit-note-draft 之上、只含我 3 文件）。`buildAssemblerPrompt` 加 `soul` + 品类：「真实感」→「贴合人设声音」、「内容价值」维度按品类切子标准（`QUALITY_VALUE_HINTS`）、few-shot 去技术腔；`QualityScorer.extractInput` 取 `trigger.generateInput.soul` + `postCategory`；preview 同源。**未动**放行阈值/降级公式/getDefaultOutput=50（AC-PUB）。tests: 13/13 + acceptance 27/27。
-> - **剩余**：2.2/2.4（产后校验）、4（感叹号双侧）、5（互动/评论门禁）、6（浏览/评论去偏见）、1.7/0.2（竖版尺寸，待 ECS 探版本）、7（部署，按需）。
+> - **第 6 组（浏览去偏见 + 评论去 AI 味接人设）已实装 + 测试全绿 + 已推 master**（aidcp-cloud `f9f270c`）。`content-evaluator` 删「娱乐/明星=无关、与AI/技术相关」硬编码 → 从账号真实兴趣派生 + 诚实 skip + 全局品牌安全底线；`comment-de-ai-flavor` 去 AI 味按人设语气重写（`this.soul`，未注入诚实降级）、抽共享 `buildRewritePrompt` 让 rewrite/previewPrompt 同源，**4.4 顺带完成**（感叹号软化）。tests 46/46 + acceptance 27/27。
+> - **剩余**：2.2/2.4（产后校验）、4.1-4.3/4.5（正文感叹号双侧分档 + BANNED 校准）、5（互动/评论门禁品类自适应）、1.7/0.2（竖版尺寸，待 ECS 探版本）、7（部署，按需）。
 
 ## 0. 前置与排序（务必先做）
 
@@ -51,7 +52,7 @@
 - [ ] 4.1 `src/publish-agent/prompts.ts` `buildCreatorPrompt`（:217）：感叹号上限**主要按人设分档**（活泼/生活人设放宽、克制人设保持严），保留排比套话禁令。注：正文创作发生在品类判定之前、此时无内容品类，故以人设为主轴、不依赖内容品类。
 - [ ] 4.2 `src/publish-agent/post-processor.ts`：`EXCLAMATION_RE`（:16）与 `detectBannedPhrases` 的「过量感叹号」虚拟命中（:37-40）接受同一品类/人设参数，避免放宽后仍被判过量推向 rewrite/manual。
 - [ ] 4.3 `src/publish-agent/prompts.ts` `BANNED_PHRASES`（:30）校准：把「不得不说」移出后处理硬检测/扣分（保留真正 AI 套话如首先/其次/综上所述/众所周知）；若一并动「各有千秋/各有优劣」须同步清 `ENCOURAGED_STYLE:40`/`NEGATIVE_EXAMPLES:66` 的引用以免生成/检测口径自相矛盾（本轮可暂不动这两词）。
-- [ ] 4.4 `src/agents/comment-de-ai-flavor.ts`（:23 复用发帖 `PostProcessor`）：仅微调 rewrite 措辞「保留自然口语感叹、只在明显模板套话时收敛」并同步 `previewPrompt`（避免过度设计，不注入独立配置）。
+- [x] 4.4 `src/agents/comment-de-ai-flavor.ts`（:23 复用发帖 `PostProcessor`）：仅微调 rewrite 措辞「保留自然口语感叹、只在明显模板套话时收敛」并同步 `previewPrompt`（避免过度设计，不注入独立配置）。
 - [ ] 4.5 回归：生活类放宽感叹号且检测同步不被判过量、干货类仍克制（对应 spec「正文标点表达按品类分档且生成与后处理检测口径同步」两 Scenario）。
 
 ## 5. 互动/评论门禁品类自适应（aidcp-cloud）
@@ -62,9 +63,9 @@
 
 ## 6. 浏览相关性去偏见 + 评论去 AI 味接人设（aidcp-cloud）
 
-- [ ] 6.1 `src/agents/content-evaluator.ts`（:179）：删「AI/技术=默认兴趣、娱乐/八卦/明星=无关」硬编码，改从已注入 `interestsStr` 派生相关性；保留「无匹配诚实 skip、不编造相关理由」；加一个「无论人设都不碰」的全局品牌安全禁区兜底。
-- [ ] 6.2 `src/agents/comment-de-ai-flavor.ts` `rewrite`（:116）/`rewriteAwayFrom`（:96）：拼入与 `CommentComposer` 同源的人设片段（`this.soul` 已可达），「改成更像真人随手留言」改为「用该人设语气重写、只去 AI 腔」，保留原有约束；同步 `previewPrompt`（:108）。
-- [ ] 6.3 回归：娱乐/明星人设不再被判无关、无匹配诚实 skip、全局禁区兜底生效（对应 `interaction-appraisal`「相关性与收藏判定去题材硬编码」三 Scenario）；评论去 AI 味体现人设语气。
+- [x] 6.1 `src/agents/content-evaluator.ts`（:179）：删「AI/技术=默认兴趣、娱乐/八卦/明星=无关」硬编码，改从已注入 `interestsStr` 派生相关性；保留「无匹配诚实 skip、不编造相关理由」；加一个「无论人设都不碰」的全局品牌安全禁区兜底。
+- [x] 6.2 `src/agents/comment-de-ai-flavor.ts` `rewrite`（:116）/`rewriteAwayFrom`（:96）：拼入与 `CommentComposer` 同源的人设片段（`this.soul` 已可达），「改成更像真人随手留言」改为「用该人设语气重写、只去 AI 腔」，保留原有约束；同步 `previewPrompt`（:108）。
+- [x] 6.3 回归：娱乐/明星人设不再被判无关、无匹配诚实 skip、全局禁区兜底生效（对应 `interaction-appraisal`「相关性与收藏判定去题材硬编码」三 Scenario）；评论去 AI 味体现人设语气。
 
 ## 7. 测试与部署
 
