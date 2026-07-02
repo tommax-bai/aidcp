@@ -82,7 +82,7 @@
 
 | type | 方向 | 用途 |
 | --- | --- | --- |
-| `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll） |
+| `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll；可选 `dwellMs`：feed 翻页按本次新卡数算的停留兜底，返回未刷新时省略） |
 | `interaction.like` | cloud → edge | 点赞指定笔记 |
 | `interaction.collect` | cloud → edge | 收藏指定笔记 |
 | `interaction.follow` | cloud → edge | 关注作者 |
@@ -319,7 +319,8 @@
 
 ```jsonc
 // page.scroll
-{ "reason": "feed_scroll" }            // feed_scroll | search_scroll
+{ "reason": "feed_scroll" }                  // feed_scroll | search_scroll
+{ "reason": "feed_scroll", "dwellMs": 1350 } // feed 出新卡：翻页前按新卡数看一会（feed-scroll-card-floor）；返回未刷新则省略 dwellMs
 // interaction.like
 { "noteId": "n123", "reason": "高质量内容", "thinkMs": 900 }
 // interaction.collect
