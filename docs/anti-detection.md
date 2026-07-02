@@ -314,8 +314,10 @@ overshoot: ~15% 概率越过目标 5–15px 后回拉
 > **现状（change `adspower-browser-provider` 落地后）**：运行时**默认 provider 已切到方案 B——
 > AdsPower 指纹浏览器托管**（`AIDCP_BROWSER_PROVIDER` 缺省 = `adspower`，见 `aidcp-edge/src/cdp/browser-provider.ts`）。
 > 方案 A（self 自起真实指纹 Chrome）保留为显式 `AIDCP_BROWSER_PROVIDER=self` 的 opt-in，且 `launch-multinode`
-> 与 Electron 桌面版两条路径仍钉 self。adspower 模式下指纹层由 AdsPower 的 `cdp_mask` 独占（edge 自研
-> stealth 默认关）；下方 §6.3 的 self headful 方案即「方案 A」路径的细节。
+> 与 Electron 桌面版两条路径仍钉 self。adspower 模式下反检测整层交 AdsPower（edge 自研 stealth 默认关）：
+> 自动化痕迹由 `cdp_mask`（`browser/start` 字段，掩盖 CDP / `navigator.webdriver` 特征）掩盖、指纹由该 profile
+> 的 `fingerprint_config`（Canvas/WebGL/UA/时区…按分身稳定生成）负责——两者是 AdsPower 的两套独立机制、勿混为一谈；
+> 下方 §6.3 的 self headful 方案即「方案 A」路径的细节。
 
 ### 6.3 推荐的最小可行方案（MVP）
 
