@@ -50,7 +50,7 @@
 - [x] 7.4 brick-recovery（版本不符可重审不锁死）+ 部署兼容（缺版本→0 老审批照发） <!-- publish-dispatcher.test 3 例 -->
 - [x] 7.5 云端全绿 test:acceptance→test→typecheck（AC-PUB/AC-PROTO/AC-RISK 必过）+ console build/typecheck 绿 <!-- cloud：acceptance 27/27、full 1089/1089、tsc 0；console：tsc 0、vite build 绿、vitest 绿 -->
 
-## 8. 部署（安全序列，云端先于 console）—— HELD（多改动交织，需协调）
+## 8. 部署（安全序列，云端先于 console）—— DONE 2026-07-03（用户选 Option 2：发整个 master）
 
 <!-- 2026-07-03 部署前探测结论（read-only）：
   · ECS aidcp-cloud active、8787 LISTENING、decouple/dispatch 基座（loadForDispatch）已在线——本 change 的
@@ -64,6 +64,6 @@
   · 备选安全路径（用户确认后可做）：从 ECS 现网拉基线到隔离目录、只打 8eb0664 的 diff——但因同文件叠 a2c8f09，
     面板/server 三文件需手工摘除其 hunk，易错；或直接发 master HEAD（= 两改动同上）。-->
 
-- [ ] 8.1 云端上 ECS：备份 → rsync（排除 .env/node_modules/.git）→ restart → healthcheck → 失败回滚；绝不碰 isales <!-- HELD：见上；发 master 会连带 account-group-chat-injection，需用户确认 -->
-- [ ] 8.2 云端验证后再发 console 编辑 UI（发 `/opt/aidcp/console`，rsync 绝不 --delete） <!-- HELD -->
-- [ ] 8.3 tasks.md 回写 deploy 日期；`openspec validate --strict` → archive <!-- 部署后做 -->
+- [x] 8.1 云端上 ECS：备份 → rsync → restart → healthcheck → 失败回滚；绝不碰 isales <!-- aidcp-cloud d031344 2026-07-03 deployed。从 pinned 干净 worktree(1103/1103 绿) rsync；备份 cloud.bak.20260703-001951.tar.gz + .env.bak.20260703；healthcheck 全绿：active / 8787+8090 LISTENING / 飞书长连接已建立 / content_version·edited_by·edited_at 列启动自建 / /api/version OK；package.json 与 ECS 一致无需 npm install。用户选 Option 2「发整个 master」→ 连带 account-group-chat-injection(a2c8f09) + category-adaptive-images-and-judgment + feed-scroll-card-floor 一并上（全量 1103/1103 绿为门）。 -->
+- [x] 8.2 console 上 ECS（发 `/opt/aidcp/console`，rsync 绝不 --delete） <!-- aidcp-console 7c995290 2026-07-03 deployed。备份 console.bak.20260703-002253.tar.gz；nginx 8088 服新 bundle index-BCUsanfL.js（ECS md5==本地构建 be308a0b…，含 already_decided/version_stale//draft）；intro.* 保留。 -->
+- [ ] 8.3 `openspec validate --strict`（已过）→ archive <!-- deploy 日期已回写。建议先做一次真机确认（后台开一条 pending_approval 草稿 → 改标题/正文 → 保存并批准 → 真发布）再 archive；本 change delta 独立、与连带上线的其他 change 各自归档互不影响。 -->
