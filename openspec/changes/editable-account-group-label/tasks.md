@@ -33,6 +33,7 @@
 - [x] 3.2 `AccountsPage.tsx`：新增 `useMutation` 打 `apiPut('/api/accounts/:id/group-label')`；**非乐观**——`onSuccess` 后 `invalidateQueries(['accounts'])` + 诚实 toast（设置/清除可辨）；经 `onEditGroup` 传入 `AccountsTable` <!-- aidcp-console b9512a3 -->
 - [x] 3.3 `DashboardPage.tsx` 只读账号表**不传** `onEditGroup` → 保持纯文本、零回归（已核对：其调用仅 `accounts/loading/severitySorted`） <!-- 无需改动，现状即满足 -->
 - [x] 3.4 复用 `styles/app.css` 既有 `.editable-cell`（悬停高亮 + pointer）；空值仍渲染破折号占位、单元格 `title="点击编辑"` <!-- 无需改样式，既有类满足 -->
+- [x] 3.5 UI polish（用户反馈）：分组就地编辑输入框 + 显示值字号从继承的 14px 压到 12px（原偏大、与相邻「群聊引流」列 12px 不齐）。<!-- aidcp-console 0baf92e 纯样式；干净 worktree（origin/master）build → commit → 部署，验证 LIVE bundle index-CkPCLemS.js 含 style:{fontSize:12}；部署期遇并发方陈旧 build 覆盖一次、已重新部署核验，见 [[console-deploy-nginx-root]] -->
 
 ## 4. 校验 / 回归 / 部署
 
