@@ -1,8 +1,13 @@
-<!-- 状态注记（未提交）：代码全部写完并单元验证通过（见下）。但两 sub-repo 工作树在我动手前
-     已带 change `role-thinking-mode-config` 的并行 WIP（0/28、约同时开工），且我必须编辑的 3 个 cloud 文件
-     （panel/types.ts、panel-server.ts、server.ts）现同时含我的 group-label 改动 + 他们的 thinking WIP，
-     交织在同一文件内 → 无法在本环境（无交互式 git add -p）干净地只提交我的部分。故**暂不提交、暂不部署**，
-     等用户裁决如何解交织（见对话）。绝不把他们未完成、当前红的 WIP 混进我的 commit。 -->
+<!-- 状态注记（2026-07-02）：
+  - CONSOLE 已提交推送：aidcp-console b9512a3（我的两文件 AccountsTable/AccountsPage，clean vs HEAD=e25e22e，build 绿）。
+    注：thinking 的 console 部分已由并行方先提交（e25e22e），故我的 console 无交织、干净落地。
+  - CLOUD 暂不提交、暂不部署：cloud 工作树处于**多 change 并行 live 编辑**状态——panel/types.ts、panel-server.ts、
+    server.ts 现同时含我的 group-label + `role-thinking-mode-config`（thinking）+ `alert-resolution-by-id`（alertStore）
+    三个 change 的 hunk，且文件在我操作期间被并行方持续改动（多次收到外部修改通知）。git 按整文件提交、本环境无交互式
+    add -p，故无法只切出我的部分而不连带并行方**未完成/未提交**的 hunk。强行 revert/reapply 会与 live 并行方相撞、
+    有 clobber 风险。→ 安全路径：等并行方的 cloud 改动先 commit（届时这 3 文件 diff 只剩我的 hunk，可干净提交），
+    或由用户给我 cloud 独占访问（暂停其它 agent）后我一次修绿+提交。绝不把他人未完成 WIP 混进我的 commit。
+  - 唯一 cloud 阻塞绿的是 `role-config-store.test.ts` 一个断言（thinking 归属、非本改动），属并行方修绿范畴。 -->
 
 ## 1. aidcp-cloud — 账号存储单写方法
 
@@ -19,8 +24,8 @@
 
 ## 3. aidcp-console — 前端可编辑「分组」列
 
-- [x] 3.1 `AccountsTable.tsx`：「分组」列传 `onEditGroup` 时改为点击即编辑单元格（复用 `.editable-cell`「点击编辑」+ AntD `Input`，回车/失焦 `commit`、editingId 守卫幂等）；新增**可选** `onEditGroup?(accountId, label|null)` prop——不传退回纯文本 <!-- aidcp-console 未提交 src/components/AccountsTable.tsx（clean-mine，无 WIP 交织） -->
-- [x] 3.2 `AccountsPage.tsx`：新增 `useMutation` 打 `apiPut('/api/accounts/:id/group-label')`；**非乐观**——`onSuccess` 后 `invalidateQueries(['accounts'])` + 诚实 toast（设置/清除可辨）；经 `onEditGroup` 传入 `AccountsTable` <!-- aidcp-console 未提交 src/pages/AccountsPage.tsx -->
+- [x] 3.1 `AccountsTable.tsx`：「分组」列传 `onEditGroup` 时改为点击即编辑单元格（复用 `.editable-cell`「点击编辑」+ AntD `Input`，回车/失焦 `commit`、editingId 守卫幂等）；新增**可选** `onEditGroup?(accountId, label|null)` prop——不传退回纯文本 <!-- aidcp-console b9512a3 -->
+- [x] 3.2 `AccountsPage.tsx`：新增 `useMutation` 打 `apiPut('/api/accounts/:id/group-label')`；**非乐观**——`onSuccess` 后 `invalidateQueries(['accounts'])` + 诚实 toast（设置/清除可辨）；经 `onEditGroup` 传入 `AccountsTable` <!-- aidcp-console b9512a3 -->
 - [x] 3.3 `DashboardPage.tsx` 只读账号表**不传** `onEditGroup` → 保持纯文本、零回归（已核对：其调用仅 `accounts/loading/severitySorted`） <!-- 无需改动，现状即满足 -->
 - [x] 3.4 复用 `styles/app.css` 既有 `.editable-cell`（悬停高亮 + pointer）；空值仍渲染破折号占位、单元格 `title="点击编辑"` <!-- 无需改样式，既有类满足 -->
 
