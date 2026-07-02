@@ -42,10 +42,10 @@
 
 ## 6. aidcp-console — 前端「内容排期」页
 
-- [ ] 6.1 抽出共用周历网格组件（从 `QuotasPage` 的浏览掩码网格控件抽到 `src/components/`），安全页与内容排期页共用
-- [ ] 6.2 新页「内容排期」Card1=全局「内容可自动时段」网格（复用组件；文案区分「治自动发帖」vs 浏览页那张「治浏览会话」、点破「格子=何时允许自动尝试、非保证发出」）
-- [ ] 6.3 新页 Card2=每账号策略表（账号 | 总开关默认关 | 发帖开关 + 日上限 | 时段=跟随全局）；账号变多只加行；每账号自定义时段编辑入口 v1 不做
-- [ ] 6.4 `types/api.ts` 镜像 DTO（两处防漂移）；`queries` 读写 `/api/content-schedule[/:accountId]` 与 `/global`；路由 / 菜单入口
+- [x] 6.1 抽出共用周历网格组件（从 `QuotasPage` 的浏览掩码网格控件抽到 `src/components/`），安全页与内容排期页共用 <!-- aidcp-console 7c99529 偏离：新建 src/components/WeekActiveGrid.tsx（从 QuotasPage 忠实复制 + 导出 helper），内容排期页已用；为避免并发 session 改动期碰 QuotasPage，QuotasPage 改用共享组件的去重留后续 -->
+- [x] 6.2 新页「内容排期」Card1=全局「内容可自动时段」网格（复用组件；文案区分「治自动发帖」vs 浏览页那张「治浏览会话」、点破「格子=何时允许自动尝试、非保证发出」） <!-- aidcp-console 7c99529 -->
+- [x] 6.3 新页 Card2=每账号策略表（账号 | 总开关默认关 | 发帖开关 + 日上限 | 时段=跟随全局）；账号变多只加行；每账号自定义时段编辑入口 v1 不做 <!-- aidcp-console 7c99529 -->
+- [x] 6.4 `types/api.ts` 镜像 DTO（两处防漂移）；`queries` 读写 `/api/content-schedule[/:accountId]` 与 `/global`；路由 / 菜单入口 <!-- aidcp-console 7c99529 前端先照 spec DTO 契约建；cloud 端点待云端仓安静后落 -->
 
 ## 7. 测试与回归
 
@@ -53,7 +53,7 @@
 - [ ] 7.2 cloud 存储单测：UPSERT 校验账号存在 / 退役拒 / 非法整块拒 / 写后回读真态 / 未配=不自动
 - [ ] 7.3 面板写诚实非乐观断言（拒绝与成功可区分、绝不 raw UPDATE）
 - [ ] 7.4 全局回归：`npm run test:acceptance` → `npm test` → `npm run typecheck`（AC-PROTO / AC-PUB / AC-RISK 全过；本变更不动协议 / 风控单写 / 发布发送，人审铁红线不破）
-- [ ] 7.5 console `npm run typecheck` + `npm run build`
+- [x] 7.5 console `npm run typecheck` + `npm run build` <!-- aidcp-console 7c99529 typecheck 干净 + vite build 通过（chunk-size 告警为既有、非本变更引入） -->
 
 ## 8. 部署（按需、安全序列）
 
