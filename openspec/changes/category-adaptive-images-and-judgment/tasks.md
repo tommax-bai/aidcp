@@ -10,7 +10,8 @@
 > - **偏离**：品类不挂 `ImageSetPlan.category`，改为独立 `PipelineFields.postCategory`（分类角色单独产出、下游复用），比挂选题对象更解耦。人物策略（2.1）直接写进各档 `styleBase` 串而非独立字段（YAGNI）。
 > - **2.1 顺带完成**（人物三档已写进各档 styleBase）；**1.7/0.2 未完**：比例仅到 prompt 层（styleBase 含 `vertical 3:4`），provider `defaultSize`(2048 方图) 未改——待 0.2 核实线上 Seedream 合法竖版尺寸后再改像素。
 > - **并发坑记录**：批中并发方又起 `edit-note-draft-before-publish` WIP 污染共享工作树（`feishu/*`/`panel/*`/`publish-dispatcher`/`server.ts`）。提交用精确逐文件 staging + `server.ts` 只挑含 `CategoryClassifier` 的 hunk（`git apply --cached`），未卷入其 WIP；全量 1 失败(`buildPublishApprovalCard`)为其 WIP、与本批无关。
-> - **剩余**：2.2/2.4（产后校验）、3（质量评审接人设）、4（感叹号双侧）、5（互动/评论门禁）、6（浏览/评论去偏见）、7（各批回归+部署）。
+> - **第 3 组（质量评审接人设 + 品类自适应）已实装 + 测试全绿 + 已推 master**（aidcp-cloud `86bb0e0`，叠在并发方已提交的 `8eb0664` edit-note-draft 之上、只含我 3 文件）。`buildAssemblerPrompt` 加 `soul` + 品类：「真实感」→「贴合人设声音」、「内容价值」维度按品类切子标准（`QUALITY_VALUE_HINTS`）、few-shot 去技术腔；`QualityScorer.extractInput` 取 `trigger.generateInput.soul` + `postCategory`；preview 同源。**未动**放行阈值/降级公式/getDefaultOutput=50（AC-PUB）。tests: 13/13 + acceptance 27/27。
+> - **剩余**：2.2/2.4（产后校验）、4（感叹号双侧）、5（互动/评论门禁）、6（浏览/评论去偏见）、1.7/0.2（竖版尺寸，待 ECS 探版本）、7（部署，按需）。
 
 ## 0. 前置与排序（务必先做）
 
@@ -39,11 +40,11 @@
 
 ## 3. 质量评审接人设 + 品类自适应维度（aidcp-cloud）
 
-- [ ] 3.1 `src/publish-agent/prompts.ts` `buildAssemblerPrompt`：加 `soul` 入参，注入 identity.role/tone/interests + 本帖 `style.type`/品类；「内容价值」维度改品类自适应（干货看信息量 / 情感·审美看共鸣·画面感·真实体验）、「真实感」改「贴合人设声音」；:468 技术 few-shot 换品类中性。
-- [ ] 3.2 `src/publish-agent/roles/quality-scorer.ts`：`extractInput` 从 `snapshot.trigger.generateInput.soul` 取 soul，更新调用点。
-- [ ] 3.3 `src/publish-agent/prompts-preview.ts:97`：补 `EXAMPLE_SOUL`/style 入参（改签名后 typecheck 会红——同源守卫）。
-- [ ] 3.4 核对不动放行闸：`gatekeeper` 阈值（auto≥75/manual/retry/abort）、`QualityScorer` 降级公式 `round((1-aiScore)*70)`、`getDefaultOutput=50` 一律未改（AC-PUB）。
-- [ ] 3.5 回归：情感类不因缺硬信息被压低、评审 prompt 含人设声音、降级公式与放行分支不变（对应 spec「内容质量评审随品类与人设自适应」三 Scenario）。
+- [x] 3.1 `src/publish-agent/prompts.ts` `buildAssemblerPrompt`：加 `soul` 入参，注入 identity.role/tone/interests + 本帖 `style.type`/品类；「内容价值」维度改品类自适应（干货看信息量 / 情感·审美看共鸣·画面感·真实体验）、「真实感」改「贴合人设声音」；:468 技术 few-shot 换品类中性。
+- [x] 3.2 `src/publish-agent/roles/quality-scorer.ts`：`extractInput` 从 `snapshot.trigger.generateInput.soul` 取 soul，更新调用点。
+- [x] 3.3 `src/publish-agent/prompts-preview.ts:97`：补 `EXAMPLE_SOUL`/style 入参（改签名后 typecheck 会红——同源守卫）。
+- [x] 3.4 核对不动放行闸：`gatekeeper` 阈值（auto≥75/manual/retry/abort）、`QualityScorer` 降级公式 `round((1-aiScore)*70)`、`getDefaultOutput=50` 一律未改（AC-PUB）。
+- [x] 3.5 回归：情感类不因缺硬信息被压低、评审 prompt 含人设声音、降级公式与放行分支不变（对应 spec「内容质量评审随品类与人设自适应」三 Scenario）。
 
 ## 4. 感叹号按品类分档 + 后处理口径同步（aidcp-cloud，唯一双侧 sync）
 
