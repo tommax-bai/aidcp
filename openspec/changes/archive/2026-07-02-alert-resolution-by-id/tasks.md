@@ -28,9 +28,9 @@
 
 - [x] 5.1 cloud 已上线（`7a90701` 生效）。**偏离说明**：并发 session 的 `role-thinking-mode-config` 与本改动共用同一份工作树 `../aidcp-cloud`，其 rsync 部署把共享工作树（含本改动 + 其 WIP）一并推上 ECS，服务于 **22:00:57** 重启到位（干净启动：`AlertStore 已就绪`、8787+8090 监听、飞书长连接已建立、PG 正常）。故本改动**非**由我走 §5 序列部署，而是随并发方部署一并生效；我**未**再次部署 cloud（避免重推其 WIP、覆盖其更新工作）。已只读验证路由存活：`POST /api/alerts/2/resolve` 无 token → 401（JWT 闸 + 路由已接线、新码在跑）。 <!-- aidcp-cloud 7a90701, 2026-07-02 deployed (via concurrent shared-tree rsync), verified live -->
 - [x] 5.2 console 已部署：`npm run build`（bundle `index-ChRoxtSX.js` 含 `api/alerts/` 路由）→ ECS 先备份（`console.bak.20260702-220637.tar.gz`）→ `rsync dist/`（**无** `--delete`，保 `intro.*` 非构建文件）→ Nginx 8088 验证：`index.html` 200 且引用新 bundle、`assets/index-ChRoxtSX.js` 200。「解决」按钮已上线。 <!-- aidcp-console 1a84054, 2026-07-02 deployed -->
-- [ ] 5.3 上线验证（**待运营一键**）：路由 + 按钮均已上线可用；两条卡死告警仍在库（未解决）：alert 3（P1 block，edge `ads-k1e0awu5`）、alert 2（P2 pacing，`edge_id` 空）。运营在监控页/首页点各行「解决」即可清除、确认掉出「未解决」列表（我无面板登录、不便代点；亦不走 raw SQL 绕开 owner）。
+- [x] 5.3 上线验证已完成：运营在后台点「解决」清掉两条卡死告警——alert 3（P1 block，edge `ads-k1e0awu5`）与 alert 2（P2 pacing，`edge_id` 空，此前结构上无解）均于 **22:44** `resolved_at` 置值、掉出未解决列表；未解决计数归零（DB 核实 `count(*) WHERE resolved_at IS NULL = 0`）。经真面板 API 端到端生效，未走 raw SQL。此前另加两次前端微调并部署：告警行内容包一层 `Space` 修对齐（console `3d66568`）、「解决」去 `type=link` 改带框按钮（console `bd01105`）。 <!-- 2026-07-02 operator-verified live -->
 
 ## 6. 收尾
 
 - [x] 6.1 `openspec validate alert-resolution-by-id --strict` 绿。
-- [ ] 6.2 全部 task `[x]`、附 commit-sha / 部署注记后 `archive`（delta 合并进 `openspec/specs/alert-manual-resolution/`）。
+- [x] 6.2 全部 task `[x]`、附 commit-sha / 部署注记后 `archive`（delta 合并进 `openspec/specs/alert-manual-resolution/`）。
