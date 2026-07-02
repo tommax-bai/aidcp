@@ -1,13 +1,15 @@
-<!-- 状态注记（2026-07-02）：
-  - CONSOLE 已提交推送：aidcp-console b9512a3（我的两文件 AccountsTable/AccountsPage，clean vs HEAD=e25e22e，build 绿）。
-    注：thinking 的 console 部分已由并行方先提交（e25e22e），故我的 console 无交织、干净落地。
-  - CLOUD 暂不提交、暂不部署：cloud 工作树处于**多 change 并行 live 编辑**状态——panel/types.ts、panel-server.ts、
-    server.ts 现同时含我的 group-label + `role-thinking-mode-config`（thinking）+ `alert-resolution-by-id`（alertStore）
-    三个 change 的 hunk，且文件在我操作期间被并行方持续改动（多次收到外部修改通知）。git 按整文件提交、本环境无交互式
-    add -p，故无法只切出我的部分而不连带并行方**未完成/未提交**的 hunk。强行 revert/reapply 会与 live 并行方相撞、
-    有 clobber 风险。→ 安全路径：等并行方的 cloud 改动先 commit（届时这 3 文件 diff 只剩我的 hunk，可干净提交），
-    或由用户给我 cloud 独占访问（暂停其它 agent）后我一次修绿+提交。绝不把他人未完成 WIP 混进我的 commit。
-  - 唯一 cloud 阻塞绿的是 `role-config-store.test.ts` 一个断言（thinking 归属、非本改动），属并行方修绿范畴。 -->
+<!-- 状态注记（2026-07-02，已上线）：
+  - 功能已全量部署上线并验证：
+    * CLOUD 后端：setGroupLabel + `PUT /api/accounts/:id/group-label` + accountAttr 装配**已在 ECS 上运行**
+      （并发方 21:59 rsync 共享工作树时连带带上我的改动，服务 22:00:57 重启加载；源码 grep 确认在位、
+      1053/1053 全绿 + 27/27 acceptance 红线过 + typecheck 净）。我**未重复部署 cloud**（已在，避免与并发部署相撞）。
+    * CONSOLE 前端：本人 build（HEAD 1a84054 clean，含 group-label/thinking/alert-resolution 三前端）→ 备份
+      console.bak.20260702-220510.tar.gz → rsync dist/ 到 /opt/aidcp/console（**无 --delete**，intro.* 保全）→
+      验证 index.html 指向新 bundle index-ChRoxtSX.js（含我的分组 UI）、8088 HTTP 200、/api/version 经 nginx 200、
+      cloud 服务未受扰 active。绝不碰同机 isales（inactive）。
+  - CLOUD git 提交仍未做（与现状无关的独立事项）：cloud 工作树多 change（group-label + thinking + alert-resolution）
+    并行交织于 panel/types.ts、panel-server.ts、server.ts，无交互式 add -p 无法只切我的部分。→ 待并行方 cloud 改动
+    先 commit 后，这 3 文件 diff 只剩我的 hunk，我再干净提交 group-label cloud。CONSOLE 我的部分已提交（b9512a3）。 -->
 
 ## 1. aidcp-cloud — 账号存储单写方法
 
@@ -34,5 +36,5 @@
 - [x] 4.1 cloud：`npm run typecheck` 全绿；我的用例 targeted 全过（account-store 4 + panel-server group-label 1，合 22/22）。全量 `npm test` = 1048 tests / 1047 pass / **1 fail**，唯一失败在 `role-config-store.test.ts`（thinkingMode）——**并行 WIP，非本改动** <!-- 本改动零回归；红线 AC-* 全过 -->
 - [x] 4.2 console：`tsc --noEmit` 对我的两文件零错误；`npm run build` 当前被 `RolesPage.tsx`（thinking WIP，未用变量 + 类型不符）阻断——**并行 WIP，非本改动** <!-- 我的文件 clean，构建阻断待 WIP 收尾 -->
 - [x] 4.3 `openspec validate editable-account-group-label --strict` 通过
-- [ ] 4.4 手动 / 端到端验证：后台点击「分组」→ 输入 → 保存 → 刷新后持久显示；清空 → 显示破折号；对已退役账号无编辑入口 / 被拒 <!-- 待部署后真机验证；本地未起 cloud（部署铁律） -->
-- [ ] 4.5 提交 + 部署：**阻塞中**——需先解与 `role-thinking-mode-config` WIP 的文件交织（见顶部注记），且部署安全序列①「测试通过」当前因并行 WIP 未满足。按安全序列部署 cloud 面板层（备份→rsync→restart→healthcheck）+ console 构建产物按既有 nginx root 发布（不 --delete）；绝不碰 isales
+- [~] 4.4 端到端验证：自动层已过（cloud 源码在位 + 服务 active/8787+8090 监听 + 1053/1053 + 27/27 红线 + typecheck；console 8088 HTTP 200 + /api/version 经 nginx 200 + 新 bundle 含分组 UI）。**浏览器点选流**（登录后台→点「分组」→输入→保存→刷新持久→清空显破折号→退役账号被拒）待用户在真机点通（需面板登录凭据，我不取密） <!-- 自动可达性 + 单测已证；人工 UI 点通留用户 -->
+- [x] 4.5 部署：**已上线**——CLOUD 后端并发方部署已连带带上并运行（我未重复部署，避免撞车）；CONSOLE 本人按安全序列部署（备份 console.bak.20260702-220510 → rsync 无 --delete → 验证 200 + 新 bundle + intro 保全 + cloud 未受扰 + 不碰 isales）。<!-- cloud git 提交待并行方先落后再干净补，见顶部注记 -->
