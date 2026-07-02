@@ -12,7 +12,9 @@
 > - **并发坑记录**：批中并发方又起 `edit-note-draft-before-publish` WIP 污染共享工作树（`feishu/*`/`panel/*`/`publish-dispatcher`/`server.ts`）。提交用精确逐文件 staging + `server.ts` 只挑含 `CategoryClassifier` 的 hunk（`git apply --cached`），未卷入其 WIP；全量 1 失败(`buildPublishApprovalCard`)为其 WIP、与本批无关。
 > - **第 3 组（质量评审接人设 + 品类自适应）已实装 + 测试全绿 + 已推 master**（aidcp-cloud `86bb0e0`，叠在并发方已提交的 `8eb0664` edit-note-draft 之上、只含我 3 文件）。`buildAssemblerPrompt` 加 `soul` + 品类：「真实感」→「贴合人设声音」、「内容价值」维度按品类切子标准（`QUALITY_VALUE_HINTS`）、few-shot 去技术腔；`QualityScorer.extractInput` 取 `trigger.generateInput.soul` + `postCategory`；preview 同源。**未动**放行阈值/降级公式/getDefaultOutput=50（AC-PUB）。tests: 13/13 + acceptance 27/27。
 > - **第 6 组（浏览去偏见 + 评论去 AI 味接人设）已实装 + 测试全绿 + 已推 master**（aidcp-cloud `f9f270c`）。`content-evaluator` 删「娱乐/明星=无关、与AI/技术相关」硬编码 → 从账号真实兴趣派生 + 诚实 skip + 全局品牌安全底线；`comment-de-ai-flavor` 去 AI 味按人设语气重写（`this.soul`，未注入诚实降级）、抽共享 `buildRewritePrompt` 让 rewrite/previewPrompt 同源，**4.4 顺带完成**（感叹号软化）。tests 46/46 + acceptance 27/27。
-> - **剩余**：2.2/2.4（产后校验）、4.1-4.3/4.5（正文感叹号双侧分档 + BANNED 校准）、5（互动/评论门禁品类自适应）、1.7/0.2（竖版尺寸，待 ECS 探版本）、7（部署，按需）。
+> - **第 4 组（感叹号双侧分档 + BANNED 校准）已实装 + 测试全绿 + 已推 master**（aidcp-cloud `ca415da`）。`buildCreatorPrompt` 感叹号改按语气克制；`post-processor` 加 `exclamationMaxForTone`(casual/narrative→3 否则1) + `detectBannedPhrases`/`process` 参数化，`ContentCleaner` 按 `created.tone` 传入（生成+后处理同一口径）；`BANNED_PHRASES` 移除「不得不说」。tests 20/20 + acceptance 27/27。
+> - **第 5 组（互动/评论门禁品类自适应）已实装 + 测试全绿 + 已推 master**（aidcp-cloud `4a0f321`）。`interaction-appraiser` 收藏判据去技术示例 + 订正收藏率注释（审美类经既有 getMinSaveLikeRatio 钩子调低）；`comment-appraiser` 门槛从固定「赞>1000且藏>300」改「赞>1000 且（藏>300 或 赞>10000 高热爆帖豁免）」——治高赞低藏爆帖被固定藏300排除、主条件不放松、pre-LLM 便宜确定性、稀缺闸不动。对应 comment-interaction spec MODIFIED。tests 32/32 + acceptance 27/27。
+> - **剩余（均有外部依赖/开放子决策，待用户）**：**2.2/2.4 配图产后校验**（需定「乱码/肖像」视觉核验机制——轻规则 or 二次视觉模型，涉成本/延迟/新能力）；**1.7/0.2 出图竖版像素**（需连 ECS 探线上 Seedream 版本+合法尺寸，风格档文本已写 vertical 3:4）；**7 部署**（按需，走安全序列 + 先探 ECS 状态）。已完成 6 个代码批中的 5 个（1/3/4/5/6 + 2.1/4.4），全部已推 master、未部署。
 
 ## 0. 前置与排序（务必先做）
 
@@ -49,17 +51,17 @@
 
 ## 4. 感叹号按品类分档 + 后处理口径同步（aidcp-cloud，唯一双侧 sync）
 
-- [ ] 4.1 `src/publish-agent/prompts.ts` `buildCreatorPrompt`（:217）：感叹号上限**主要按人设分档**（活泼/生活人设放宽、克制人设保持严），保留排比套话禁令。注：正文创作发生在品类判定之前、此时无内容品类，故以人设为主轴、不依赖内容品类。
-- [ ] 4.2 `src/publish-agent/post-processor.ts`：`EXCLAMATION_RE`（:16）与 `detectBannedPhrases` 的「过量感叹号」虚拟命中（:37-40）接受同一品类/人设参数，避免放宽后仍被判过量推向 rewrite/manual。
-- [ ] 4.3 `src/publish-agent/prompts.ts` `BANNED_PHRASES`（:30）校准：把「不得不说」移出后处理硬检测/扣分（保留真正 AI 套话如首先/其次/综上所述/众所周知）；若一并动「各有千秋/各有优劣」须同步清 `ENCOURAGED_STYLE:40`/`NEGATIVE_EXAMPLES:66` 的引用以免生成/检测口径自相矛盾（本轮可暂不动这两词）。
+- [x] 4.1 `src/publish-agent/prompts.ts` `buildCreatorPrompt`（:217）：感叹号上限**主要按人设分档**（活泼/生活人设放宽、克制人设保持严），保留排比套话禁令。注：正文创作发生在品类判定之前、此时无内容品类，故以人设为主轴、不依赖内容品类。
+- [x] 4.2 `src/publish-agent/post-processor.ts`：`EXCLAMATION_RE`（:16）与 `detectBannedPhrases` 的「过量感叹号」虚拟命中（:37-40）接受同一品类/人设参数，避免放宽后仍被判过量推向 rewrite/manual。
+- [x] 4.3 `src/publish-agent/prompts.ts` `BANNED_PHRASES`（:30）校准：把「不得不说」移出后处理硬检测/扣分（保留真正 AI 套话如首先/其次/综上所述/众所周知）；若一并动「各有千秋/各有优劣」须同步清 `ENCOURAGED_STYLE:40`/`NEGATIVE_EXAMPLES:66` 的引用以免生成/检测口径自相矛盾（本轮可暂不动这两词）。
 - [x] 4.4 `src/agents/comment-de-ai-flavor.ts`（:23 复用发帖 `PostProcessor`）：仅微调 rewrite 措辞「保留自然口语感叹、只在明显模板套话时收敛」并同步 `previewPrompt`（避免过度设计，不注入独立配置）。
-- [ ] 4.5 回归：生活类放宽感叹号且检测同步不被判过量、干货类仍克制（对应 spec「正文标点表达按品类分档且生成与后处理检测口径同步」两 Scenario）。
+- [x] 4.5 回归：生活类放宽感叹号且检测同步不被判过量、干货类仍克制（对应 spec「正文标点表达按品类分档且生成与后处理检测口径同步」两 Scenario）。
 
 ## 5. 互动/评论门禁品类自适应（aidcp-cloud）
 
-- [ ] 5.1 `src/agents/interaction-appraiser-role.ts`（:160）：删「代码/架构图才配收藏」技术示例，改品类中立可复用性、具体类型交上文已注入的收藏原则；（:26）`COLLECT_MIN_SAVE_LIKE_RATIO` 默认随人设/品类可配（审美/灵感类放宽/旁路），订正注释去「硬核=唯一收藏标准」假定；保留地板存在性与「0 赞不收藏」防线。
-- [ ] 5.2 `src/agents/comment-appraiser.ts`（:98）：把评论精品门槛的固定绝对值（`likeCount>1000 且 collectCount>300`）改为品类自适应/比例/按账号可配（默认按品类给合理值）；**勿用宽松纯 OR**（成本）；保留「必要非充分」硬门槛存在性、每日上限、风控取小、LLM 精品 + 飞书人审多道稀缺闸；门槛在调 LLM 前确定性判定。
-- [ ] 5.3 回归：高赞低藏爆帖不再被固定绝对值一律排除、审美类账号收藏率放宽、稀缺闸/每日上限/风控取小不移除（对应 `comment-interaction` MODIFIED 与 `interaction-appraisal` ADDED 的 Scenario）。
+- [x] 5.1 `src/agents/interaction-appraiser-role.ts`（:160）：删「代码/架构图才配收藏」技术示例，改品类中立可复用性、具体类型交上文已注入的收藏原则；（:26）`COLLECT_MIN_SAVE_LIKE_RATIO` 默认随人设/品类可配（审美/灵感类放宽/旁路），订正注释去「硬核=唯一收藏标准」假定；保留地板存在性与「0 赞不收藏」防线。
+- [x] 5.2 `src/agents/comment-appraiser.ts`（:98）：把评论精品门槛的固定绝对值（`likeCount>1000 且 collectCount>300`）改为品类自适应/比例/按账号可配（默认按品类给合理值）；**勿用宽松纯 OR**（成本）；保留「必要非充分」硬门槛存在性、每日上限、风控取小、LLM 精品 + 飞书人审多道稀缺闸；门槛在调 LLM 前确定性判定。
+- [x] 5.3 回归：高赞低藏爆帖不再被固定绝对值一律排除、审美类账号收藏率放宽、稀缺闸/每日上限/风控取小不移除（对应 `comment-interaction` MODIFIED 与 `interaction-appraisal` ADDED 的 Scenario）。
 
 ## 6. 浏览相关性去偏见 + 评论去 AI 味接人设（aidcp-cloud）
 
