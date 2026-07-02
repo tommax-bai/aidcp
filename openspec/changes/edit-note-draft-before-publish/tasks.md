@@ -50,8 +50,20 @@
 - [x] 7.4 brick-recovery（版本不符可重审不锁死）+ 部署兼容（缺版本→0 老审批照发） <!-- publish-dispatcher.test 3 例 -->
 - [x] 7.5 云端全绿 test:acceptance→test→typecheck（AC-PUB/AC-PROTO/AC-RISK 必过）+ console build/typecheck 绿 <!-- cloud：acceptance 27/27、full 1089/1089、tsc 0；console：tsc 0、vite build 绿、vitest 绿 -->
 
-## 8. 部署（安全序列，云端先于 console）—— HELD（排在 publish-trigger-and-apply 上线之后）
+## 8. 部署（安全序列，云端先于 console）—— HELD（多改动交织，需协调）
 
-- [ ] 8.1 云端先上 ECS：备份 → rsync（排除 .env/node_modules/.git）→ restart → healthcheck → 失败回滚；绝不碰 isales <!-- HELD：下发版本闸须与已在 master 但未部署的 publish-trigger-and-apply 协调排序；等其上线或与之合并部署 -->
+<!-- 2026-07-03 部署前探测结论（read-only）：
+  · ECS aidcp-cloud active、8787 LISTENING、decouple/dispatch 基座（loadForDispatch）已在线——本 change 的
+    下发版本闸基座已具备，publish-trigger-and-apply 的 runDispatch 顾虑消解。
+  · 真正阻塞：① 云端本地工作树脏——有并发 session 的第三个改动未提交 WIP（8 文件，含 comm/protocol.ts 的
+    dwellMs 字段），rsync 会连带上线未验证代码，绝不可发；② 更关键——ECS 落后于 master：既缺本 change(8eb0664)，
+    也缺 account-group-chat-injection 云端(a2c8f09，含 protocol.ts groupChatCode)。二者在 master 同一线、且都改了
+    panel-server.ts / panel/types.ts / server.ts 同文件（我方叠在其上），**无法只发我方而不带 account-group-chat-injection**。
+  · 结论：发 master HEAD = 我方 + account-group-chat-injection 一起上（后者 openspec 未提交、边缘侧未核，非本人可决其发布）；
+    近史「cloud held on live multi-change contention」印证团队正刻意压 cloud 发布。→ HELD，待用户/归属方定夺。
+  · 备选安全路径（用户确认后可做）：从 ECS 现网拉基线到隔离目录、只打 8eb0664 的 diff——但因同文件叠 a2c8f09，
+    面板/server 三文件需手工摘除其 hunk，易错；或直接发 master HEAD（= 两改动同上）。-->
+
+- [ ] 8.1 云端上 ECS：备份 → rsync（排除 .env/node_modules/.git）→ restart → healthcheck → 失败回滚；绝不碰 isales <!-- HELD：见上；发 master 会连带 account-group-chat-injection，需用户确认 -->
 - [ ] 8.2 云端验证后再发 console 编辑 UI（发 `/opt/aidcp/console`，rsync 绝不 --delete） <!-- HELD -->
 - [ ] 8.3 tasks.md 回写 deploy 日期；`openspec validate --strict` → archive <!-- 部署后做 -->
