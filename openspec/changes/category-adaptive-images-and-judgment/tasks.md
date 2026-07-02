@@ -9,14 +9,15 @@
 
 - [ ] 0.1 `openspec list` + `git -C ../aidcp-cloud status` 确认并发方 WIP 占用文件（`prompts.ts`/`role-catalog.ts`/`server.ts`/`panel`/`config`）当前状态；本 change 改 `prompts.ts` 须与 `persona-driven-content-pipeline`/`split-topic-roles` 协调、避免同文件互吞。
 - [ ] 0.2 核实 ECS 线上实跑 Seedream 版本（代码默认 `doubao-seedream-4-5-251128` vs 台账 `5-0-260128`）及其同步 `/images/generations` 允许的合法 size 串与推荐 3:4 尺寸；万相对应竖版尺寸。据此决定第 1 组比例改动同批做还是拆后（尺寸不确定则先只上风格档、比例拆到后续）。
+- [ ] 0.3 新增品类判定角色须动【角色目录 / 角色索引 / 装配】——正是并发方 WIP 占用文件（`role-catalog.ts` / `server.ts` / `roles/index.ts`）。此步排在这几文件稳定或与并发方协调后做，避免同文件互吞（搭车加字段本可绕开、独立角色绕不开）。
 
 ## 1. 配图风格档 + 中文主体 + 去第二风格源（aidcp-cloud）
 
 - [ ] 1.1 `src/publish-agent/types.ts`：新增 `Category` 字面枚举（干货/知识、美妆护肤、美食、穿搭、旅行、家居、情感/治愈、职场/成长、技术示意图 + 兜底档）与 `StyleProfile` 类型；`ImageSetPlan` 增 `category: Category`。
 - [ ] 1.2 `src/publish-agent/prompts.ts`：删 `IMAGE_STYLE_BASE`（:361），新增 `STYLE_PROFILES: Record<Category, StyleProfile>`（每档 styleBase/palette/人物策略/比例/封面变体/品类 few-shot，取自 design 附的 9 档）+ `resolveStyleProfile(category, {cover})`。
-- [ ] 1.3 `src/publish-agent/prompts.ts`：`buildImageSetPlanPrompt` 增「从固定品类枚举选 category」指令与输出字段；`buildImagePromptComposerPrompt` 停止「翻成英文主体」（主体保留中文、只补动作/场景、不写风格词），few-shot 换成按 category 注入的对应示例（去 isometric 分布式系统例）。
-- [ ] 1.4 `src/publish-agent/roles/image-set-planner.ts`：parse 出 `category` 写进 `imageSetPlan`；未知/缺失回落兜底档、绝不 brick；`degradePlan`/`getDefaultOutput` 带兜底 category。
-- [ ] 1.5 `src/publish-agent/roles/image-prompt-composer.ts`：把 :86 的 `${desc}. ${IMAGE_STYLE_BASE}` 改为 `resolveStyleProfile(input.category)` 取一次——图 0 用 `coverStyleBase`、图 1..N 用 `styleBase` 逐字复用；保留现有去重护栏与「永远保住第 0 张」。
+- [ ] 1.3 `src/publish-agent/prompts.ts`：新增 `buildCategoryClassifierPrompt`（输入品类枚举 + 正文、只输出单个 category）；`buildImagePromptComposerPrompt` 停止「翻成英文主体」（主体保留中文、只补动作/场景、不写风格词），few-shot 换成按 category 注入的对应示例（去 isometric 分布式系统例）。`buildImageSetPlanPrompt` 不再承担分类（分类归品类判定角色）。
+- [ ] 1.4 新增【品类判定角色】（发布侧，`src/publish-agent/roles/` + 装配）：flash 模型、输入品类枚举 + 正文、schema 约束输出单个 `category` + 校验重试；判不出/枚举外回落安全兜底档、绝不 brick；**一帖判一次**写入管线状态供配图选题与质量评审消费；登记角色目录（`role-catalog.ts` displayName + `role-llm-config`）供后台配模型。⚠️ 触 `role-catalog.ts` / `server.ts` / `roles/index.ts` 装配——见 0.3 排期。
+- [ ] 1.5 `src/publish-agent/roles/image-prompt-composer.ts`：把 :86 的 `${desc}. ${IMAGE_STYLE_BASE}` 改为 `resolveStyleProfile(category)`（category 来自品类判定角色、经管线状态传入）取一次——图 0 用 `coverStyleBase`、图 1..N 用 `styleBase` 逐字复用；保留现有去重护栏与「永远保住第 0 张」。
 - [ ] 1.6 `src/publish-agent/roles/image-generator.ts` + `seedream-client.ts` + `wanxiang-client.ts`：ImageGenerator 生成时不再把 `imageStyle` 枚举传给 provider（消除 `seedream-client.ts:81` 的「，风格：<enum>」第二风格源）。
 - [ ] 1.7 （依赖 0.2）比例竖版化：`SeedreamClient`/`WanxiangClient` 的 `defaultSize` 由方图改合法竖版 3:4（或经 env 在 `server.ts` 注入）；全帖同比例。尺寸未核实则本任务拆到后续、不乱填。
 - [ ] 1.8 `src/publish-agent/prompts-preview.ts`：图像示例（EXAMPLE_IMAGE_SUBJECT/科技扁平）随真源改为按品类示例，保预览与线上同源（真源先改、再同步预览）。
@@ -39,7 +40,7 @@
 
 ## 4. 感叹号按品类分档 + 后处理口径同步（aidcp-cloud，唯一双侧 sync）
 
-- [ ] 4.1 `src/publish-agent/prompts.ts` `buildCreatorPrompt`（:217）：感叹号上限改按品类/人设分档（生活·情感放宽、干货·克制保持严），保留排比套话禁令。
+- [ ] 4.1 `src/publish-agent/prompts.ts` `buildCreatorPrompt`（:217）：感叹号上限**主要按人设分档**（活泼/生活人设放宽、克制人设保持严），保留排比套话禁令。注：正文创作发生在品类判定之前、此时无内容品类，故以人设为主轴、不依赖内容品类。
 - [ ] 4.2 `src/publish-agent/post-processor.ts`：`EXCLAMATION_RE`（:16）与 `detectBannedPhrases` 的「过量感叹号」虚拟命中（:37-40）接受同一品类/人设参数，避免放宽后仍被判过量推向 rewrite/manual。
 - [ ] 4.3 `src/publish-agent/prompts.ts` `BANNED_PHRASES`（:30）校准：把「不得不说」移出后处理硬检测/扣分（保留真正 AI 套话如首先/其次/综上所述/众所周知）；若一并动「各有千秋/各有优劣」须同步清 `ENCOURAGED_STYLE:40`/`NEGATIVE_EXAMPLES:66` 的引用以免生成/检测口径自相矛盾（本轮可暂不动这两词）。
 - [ ] 4.4 `src/agents/comment-de-ai-flavor.ts`（:23 复用发帖 `PostProcessor`）：仅微调 rewrite 措辞「保留自然口语感叹、只在明显模板套话时收敛」并同步 `previewPrompt`（避免过度设计，不注入独立配置）。

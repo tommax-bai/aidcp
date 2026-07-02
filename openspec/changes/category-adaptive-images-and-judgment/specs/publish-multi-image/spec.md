@@ -20,14 +20,14 @@
 
 ### Requirement: 配图风格按内容品类自适应（帖内一致、帖间有别）
 
-系统 SHALL 以「内容品类 → 风格档」注册表取代任何**全局单一固定风格常量**。`ImageSetPlanner` SHALL 在读正文时判出本帖 `category`（取自固定字面枚举，含一个安全兜底档）并写入 `imageSetPlan.category`；分类失败 / 未知 MUST 回落兜底档、MUST NOT 阻断配图（绝不 brick）。每档 `StyleProfile` SHALL 覆盖媒介/风格族、色板、光线、构图、质感、人物策略、比例与封面变体。风格档 MUST 仍为模板常量派生、MUST NOT 由 LLM 产出。风格作用域 SHALL 收敛为「每帖一档、帖内逐字复用、帖间因品类而异」——**不得**再对所有帖、所有品类施加同一段风格。
+系统 SHALL 以「内容品类 → 风格档」注册表取代任何**全局单一固定风格常量**。系统 SHALL 由一个**独立的品类判定步骤**（发布侧、读正文、单一职责，一帖判一次）判出本帖 `category`（取自固定字面枚举，含一个安全兜底档）并写入管线状态，供配图选题与质量评审**复用同一值**；分类失败 / 未知 MUST 回落兜底档、MUST NOT 阻断配图（绝不 brick）。每档 `StyleProfile` SHALL 覆盖媒介/风格族、色板、光线、构图、质感、人物策略、比例与封面变体。风格档 MUST 仍为模板常量派生、MUST NOT 由 LLM 产出。风格作用域 SHALL 收敛为「每帖一档、帖内逐字复用、帖间因品类而异」——**不得**再对所有帖、所有品类施加同一段风格。
 
 #### Scenario: 不同品类帖得到不同风格档
 - **WHEN** 两篇不同品类（如美食 vs 干货）的帖分别进入配图链路
 - **THEN** 各自 `imageSetPlan.category` 不同、`resolveStyleProfile` 返回不同风格档，两帖配图风格明显不同；而同一帖内图 1..N 共享同一档、风格一致
 
 #### Scenario: 未知品类安全回落不阻断
-- **WHEN** `ImageSetPlanner` 无法判定品类或产出枚举外的值
+- **WHEN** 品类判定无法判定品类或产出枚举外的值
 - **THEN** `imageSetPlan.category` 回落到兜底档、配图照常进行，MUST NOT 因分类失败而不配图或报错
 
 ### Requirement: 配图主体中文直喂、去第二风格源、竖版比例
