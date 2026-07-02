@@ -41,7 +41,7 @@
 - [x] 6.1 cloud：`npm run test:acceptance` → 全量 `npm test` → `npm run typecheck`（安全红线 AC-PROTO/AC-PUB/AC-RISK 全过；新增 default 零回归断言必过）
 - [x] 6.2 更新 `docs/protocol.md` 无关（本 change 不动协议）；确认无遗漏
 - [x] 6.3 部署 cloud 走 §5 安全序列（备份 → rsync → restart → healthcheck → 失败回滚），绝不碰同机 isales
-- [ ] 6.4 部署 console（发 /opt/aidcp/console，rsync 绝不 --delete）
+- [x] 6.4 部署 console（发 /opt/aidcp/console，rsync 绝不 --delete）
 - [x] 6.5 线上逐角色核验：设 off/on 后经 `llm_token_usage` / 日志确认翻译生效、Qwen+on 未 400；default 角色请求不变
 
 <!-- 实装完成 2026-07-02：aidcp-cloud store/resolver/egress/panel + aidcp-console 前端全部落地；cloud npm test 1048/1048 绿、typecheck 绿；console tsc+vite build 绿。
@@ -51,4 +51,5 @@
      部署 + 应用（6.3/6.5，2026-07-02）：cloud 从工作区 rsync 部署（连带并发 editable-account-group-label 未提交 WIP，健康检查全绿：active + 8787 + 飞书长连 + PG）；
        自愈加列 thinking_mode；写入设置——分类 browse_judge/browse_compose/publish_create/publish_gate=off、角色 publish:ContentScout/publish:ApprovalGatekeeper=on；
        线上 e2e 逐角色核验出口参数正确、全 200（curated 评估 deepseek 关思考后 685ms，原 ~30s）。回滚点 /opt/aidcp/cloud.bak.20260702-215923.tar.gz + config-backup-{cat,role}-20260702-215923.txt。
-     仍未做：cloud git commit（生产领先于 git；工作区与 group-label WIP 交织，待其先提交后 thinking 再单独提交回填 sha）；6.4 console 部署（等 group-label 处理后再发）。 -->
+     全部提交 + 部署完成 2026-07-02：cloud aidcp-cloud 3f37324（thinking 主体；panel/types.ts+panel-server.ts+server.ts 的 thinking 改动被并发提交 7a90701 一并纳入——共享工作区多方提交所致，代码完整、typecheck 绿）；
+     console aidcp-console e25e22e（本功能）已推送、并 build+rsync 部署 /opt/aidcp/console（index/asset/api 均 200）。group-label + alert-resolution 并发 change 已由其作者各自提交（cloud 7a90701、console b9512a3/1a84054）。回滚点 cloud.bak/console.bak.20260702-*。 -->
