@@ -35,7 +35,7 @@
 - aidcp-edge：并发 ≤ 2。
 - aidcp-console：并发 ≤ 2。
 
-## 2. 目录布局 `[草案]`
+## 2. 目录布局 `[稳]`
 
 worktree 放到各仓的兄弟目录 `<repo>.wt/<change-name>`，保持主 checkout 干净、作为
 集成与部署位：
@@ -51,13 +51,13 @@ worktree 放到各仓的兄弟目录 `<repo>.wt/<change-name>`，保持主 check
 **铁律**：worktree / 分支 / openspec change **三名合一**。这样 `openspec list` 与
 `git worktree list` 永远 1:1 对得上——有 worktree 却无对应活跃 change = 孤儿、清掉。
 
-## 3. 开一条流 `new-change` `[草案]`
+## 3. 开一条流 `new-change` `[稳]`
 
 ```bash
-# repo ∈ {aidcp-edge, aidcp-cloud, aidcp-console}；name = openspec change 名
-git -C ../<repo> fetch origin
-git -C ../<repo> worktree add ../<repo>.wt/<name> -b <name> origin/master
-# 之后：在 ../<repo>.wt/<name> 里启动该 session 的 Claude / 开发
+scripts/new-change <aidcp-edge|aidcp-cloud|aidcp-console> <change-name>
+# 等价于：fetch origin + git worktree add ../<repo>.wt/<name> -b <name> origin/<默认分支>
+# 会拒绝覆盖已存在的分支/worktree；change 名不在控制仓时 WARN 提示（不阻断）
+# 之后：cd ../<repo>.wt/<name> 里启动该 session 的开发
 ```
 
 控制仓 aidcp 侧无需 worktree：直接在主 checkout 用 openspec 流程建 change 目录
@@ -85,7 +85,16 @@ git -C ../<repo> worktree add ../<repo>.wt/<name> -b <name> origin/master
 
 ## 6. 串行集成 `land-change` `[草案]`
 
-一个一个来，这是整支 fleet 的节流阀：
+一个一个来，这是整支 fleet 的节流阀。脚本封装：
+
+```bash
+scripts/land-change <repo> <name>          # 只做 prep：fetch+rebase+测试，然后停下打印命令
+scripts/land-change <repo> <name> --yes    # prep 通过后自动 ff 推送+同步主 checkout+清理
+```
+
+`--yes` 用 `git push origin <name>:<默认分支>` 走 ff 推送（不切主 checkout 分支、
+不碰其工作区），撞 non-ff 立即中止、**绝不 force**。下面是 `--yes` 自动化的等价手动步骤
+（脚本骨架已落、清理路径已 pilot；`--yes` 推送全流程待首个真实 change 验证后转 `[稳]`）：
 
 ```bash
 # 1) 把本流 rebase 到最新默认分支，解冲突
@@ -111,20 +120,16 @@ git -C ../<repo> branch -d <name>
   （见 memory `concurrent-session-shares-subrepo-worktree`）。
 - 集成顺序：先落**不碰热点、改动小**的流，热点流留到最后单独处理。
 
-## 7. fleet 状态一屏看 `fleet-status` `[待建]`
+## 7. fleet 状态一屏看 `fleet-status` `[稳]`
 
-目标：一条命令对四仓所有 worktree 输出「分支 / 相对默认分支 ahead-behind / 是否 dirty
-/ 对应 openspec change 状态」，让整支 fleet 一屏可见，孤儿 worktree 一眼可查。
-
-参考实现骨架（`[待建]`，落地后改 `[稳]`）：
+一条命令对四仓所有 worktree 输出「分支 / 相对默认分支 ahead-behind / dirty 计数 /
+是否孤儿」，整支 fleet 一屏可见，孤儿 worktree（无对应活跃 change）一眼可查。只读
+（仅 quiet fetch）。
 
 ```bash
-for repo in aidcp aidcp-edge aidcp-cloud aidcp-console; do
-  d="../$repo"; [ -d "$d/.git" ] || { echo "$repo: NOT CLONED"; continue; }
-  git -C "$d" worktree list --porcelain   # 解析 branch + path
-  # TODO: 对每个 worktree 补 rev-list --left-right --count、status --porcelain 计数、
-  #       与 `openspec list` 对账（worktree 名是否有对应活跃 change）
-done
+scripts/fleet-status
+# 每个 worktree 一行：路径 · branch · ahead/behind(vs origin/<默认分支>) · dirty 数 · 标签
+#   标签：(main checkout · 集成+部署位) / change:active / !! ORPHAN(该清)
 ```
 
 ## 8. 部署边界（承 CLAUDE.md §5）
@@ -134,11 +139,17 @@ done
 - 多流并行期，一次只推一个已集成 + 验证过的 change 上线，别让半合并态堆到 ECS。
 - 同机 isales 独立运行，任何 ECS 操作绝不碰它。
 
-## 9. helper 脚本（`[待建]`，验证后提升为 `[稳]`）
+## 9. helper 脚本
 
-计划落 `new-change` / `land-change` / `fleet-status` 三个薄封装（放本仓 `scripts/` 或
-用户 shell 函数）。**在跑通 ≥1 轮真实并行开发前，本手册对应块保持 `[草案]` / `[待建]`，
-不写入 CLAUDE.md 当法条。**
+三个薄封装已落 `scripts/`（共享 `scripts/lib.sh`），见 `scripts/README.md`：
+
+- `scripts/new-change <repo> <name>` — `[稳]`（pilot 跑通：建 worktree/分支、拒绝覆盖、change 缺失 WARN）
+- `scripts/fleet-status` — `[稳]`（pilot 跑通：四仓扫描 + ahead/behind + dirty + 孤儿标记，只读）
+- `scripts/land-change <repo> <name> [--yes]` — `[草案]`（脚本已落、清理路径已 pilot；
+  `--yes` 的 ff 推送+同步全流程待首个真实 change 落地时验证）
+
+**红线**：`land-change` 永不 force-push；`new-change` 不覆盖已存在分支/worktree；
+部署只从主 checkout（§8）。
 
 ## 10. 常见故障与兜底
 

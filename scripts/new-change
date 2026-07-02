@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Open a parallel-dev stream: create ../<repo>.wt/<name> on branch <name>.
+# See docs/parallel-dev-worktrees.md §3.
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+usage() { echo "usage: new-change <aidcp-edge|aidcp-cloud|aidcp-console> <change-name>" >&2; exit 1; }
+[ $# -eq 2 ] || usage
+repo="$1"; name="$2"
+require_subrepo "$repo"
+repo_cloned "$repo" || die "$repo 未在本机 clone（见 CLAUDE.md §0）。"
+
+rp="$(repo_path "$repo")"; wt="$(worktree_path "$repo" "$name")"; def="$(_default_branch "$repo")"
+
+change_active "$name" || warn "openspec change '$name' 在控制仓不存在——记得 propose，或确认命名一致（worktree/分支/change 三名合一）。"
+
+git -C "$rp" show-ref --verify --quiet "refs/heads/$name" \
+  && die "分支 '${name}' 已存在于 ${repo} ，换名或先清理。"
+[ -e "$wt" ] && die "worktree 目录已存在: $wt"
+
+info "fetch origin ..."
+git -C "$rp" fetch origin --quiet
+info "创建 worktree: $wt  (branch $name from origin/$def)"
+git -C "$rp" worktree add "$wt" -b "$name" "origin/$def"
+
+cat <<EOF
+
+✔ 已开流。下一步：
+    cd "${wt}"
+    # 在此启动该 session 的开发；提交到分支 ${name} 、message 前缀带 change 名
+    # 部署绝不从 worktree 走；集成用：  scripts/land-change ${repo} ${name}
+EOF

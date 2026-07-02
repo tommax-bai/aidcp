@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Integrate one stream: fetch + rebase + tests, then (with --yes) ff-push to the
+# default branch, sync the main checkout, and clean up worktree/branch.
+# NEVER force-pushes. See docs/parallel-dev-worktrees.md §6.
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+usage() {
+cat >&2 <<EOF
+usage: land-change <aidcp-edge|aidcp-cloud|aidcp-console> <change-name> [--yes]
+
+  (default)  只做安全 prep：fetch + rebase → origin/<默认分支> + 跑
+             test:acceptance/test/typecheck，然后停下、打印合并/推送/清理命令。
+  --yes      prep 通过后自动 ff 推送到远端默认分支 + 同步主 checkout + 清理
+             worktree/分支。push 撞 non-ff 一律中止（绝不 force）。
+EOF
+exit 1
+}
+
+[ $# -ge 2 ] || usage
+repo="$1"; name="$2"; do_push="no"
+[ "${3:-}" = "--yes" ] && do_push="yes"
+require_subrepo "$repo"
+repo_cloned "$repo" || die "$repo 未在本机 clone。"
+
+rp="$(repo_path "$repo")"; wt="$(worktree_path "$repo" "$name")"; def="$(_default_branch "$repo")"
+[ -d "$wt" ] || die "worktree 不存在: ${wt} （先 new-change？）"
+git -C "$rp" show-ref --verify --quiet "refs/heads/$name" || die "分支 '$name' 不存在。"
+
+info "fetch origin ..."
+git -C "$rp" fetch origin --quiet
+
+info "rebase $name → origin/$def ..."
+if ! git -C "$wt" rebase "origin/$def"; then
+  die "rebase 冲突。去 $wt 解决后 'git rebase --continue'，再重跑 land-change。"
+fi
+
+info "跑安全红线 + 全量 + typecheck（在 worktree 内）..."
+( cd "$wt" && npm run test:acceptance && npm test && npm run typecheck ) \
+  || die "测试/typecheck 未过——不合并。修好再来。"
+
+ahead="$(git -C "$wt" rev-list --count "origin/$def..$name")"
+info "$name 领先 origin/$def $ahead 个提交。"
+[ "$ahead" = "0" ] && info "空 diff = 已在远端，直接清理即可。"
+
+if [ "$do_push" != "yes" ]; then
+cat <<EOF
+
+✔ prep 通过（未推送）。确认后执行：
+    git -C "${rp}" push origin "${name}:${def}"                                  # ff 推远端默认分支；撞 non-ff 就重跑本脚本
+    git -C "${rp}" fetch origin && git -C "${rp}" merge --ff-only "origin/${def}" # 同步主 checkout（部署位）
+    git -C "${rp}" worktree remove "${wt}"
+    git -C "${rp}" branch -d "${name}"
+    openspec archive ${name}                                                     # 收口 openspec change（控制仓）
+    # 部署（如需）：只从主 checkout、严格走 CLAUDE.md §5 安全序列
+  或直接重跑： scripts/land-change ${repo} ${name} --yes
+EOF
+exit 0
+fi
+
+info "push origin $name:$def （ff-only，撞 non-ff 即中止、绝不 force）..."
+if ! git -C "$rp" push origin "$name:$def"; then
+  die "push 被拒（多半 non-ff：他人先推了）。重跑 land-change 会重新 fetch+rebase。绝不 force。"
+fi
+
+info "同步主 checkout（部署位）..."
+git -C "$rp" fetch origin --quiet
+if [ "$(git -C "$rp" symbolic-ref --quiet --short HEAD 2>/dev/null || echo)" = "$def" ] \
+   && git -C "$rp" diff --quiet && git -C "$rp" diff --cached --quiet; then
+  git -C "$rp" merge --ff-only "origin/$def" || warn "主 checkout ff 失败，部署前自行同步。"
+else
+  warn "主 checkout 不在 $def 或有未提交改动，跳过同步——部署前自行 fast-forward。"
+fi
+
+info "清理 worktree + 分支 ..."
+git -C "$rp" worktree remove "$wt" || warn "worktree 有未提交内容，未删除：$wt"
+rmdir "$(dirname "$wt")" 2>/dev/null || true   # 删空的 ../<repo>.wt 父目录（非空则无操作）
+git -C "$rp" branch -d "$name" 2>/dev/null || warn "分支 $name 未删（未完全合并？）。"
+
+cat <<EOF
+
+✔ 已集成并推送到 origin/${def} 。下一步：
+    - archive openspec change：openspec archive ${name}
+    - 如需部署：只从主 checkout ${rp} 、严格走 CLAUDE.md §5 安全序列
+EOF

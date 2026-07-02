@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# One-screen view of the whole fleet: every worktree across the 4 repos with its
+# branch, ahead/behind vs default, dirty count, and orphan flag.
+# Read-only (only a quiet fetch). See docs/parallel-dev-worktrees.md §7.
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+for repo in aidcp aidcp-edge aidcp-cloud aidcp-console; do
+  echo "===== $repo ====="
+  if ! repo_cloned "$repo"; then echo "  NOT CLONED"; continue; fi
+  rp="$(repo_path "$repo")"; def="$(_default_branch "$repo")"
+  git -C "$rp" fetch origin --quiet 2>/dev/null || echo "  (fetch failed — offline? ahead/behind may be stale)"
+
+  git -C "$rp" worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wpath; do
+    br="$(git -C "$wpath" symbolic-ref --quiet --short HEAD 2>/dev/null || echo '(detached)')"
+    ab="$(git -C "$wpath" rev-list --left-right --count "origin/$def...HEAD" 2>/dev/null || echo '? ?')"
+    behind="${ab%%[[:space:]]*}"; ahead="${ab##*[[:space:]]}"
+    dirty="$(git -C "$wpath" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+    if [ "$wpath" = "$rp" ]; then
+      tag="(main checkout · 集成+部署位)"
+    elif change_active "$(basename "$wpath")"; then
+      tag="change:active"
+    else
+      tag="!! ORPHAN(无对应活跃 change → 该清)"
+    fi
+    printf "  %-52s br=%-30s ahead=%s behind=%s dirty=%s  %s\n" \
+      "$wpath" "$br" "$ahead" "$behind" "$dirty" "$tag"
+  done
+done
