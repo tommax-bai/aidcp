@@ -73,3 +73,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **问题 / 方案的说明方式（默认模式，用户偏好）**：讲逻辑、不用比喻；不点代码内部标识符（变量 / 类 / 函数 / 消息类型名），改用**功能性正文**描述组件与机制（如「执行端 / 决策端 / 监测体」「发命令给执行端的统一出口」「阻塞式 vs 临时离开式打断」）；分点、句子短、让非工程视角也能跟上；确需落到代码时再补具体 `文件:行`。
 - **不记敏感值**：文档 / 提交 / tasks.md 里不写任何 PostgreSQL 密码 / token / 私钥内容，只记路径、服务位置、命令用法、配置读取方式。
 - **每次对话收尾给一段「说人话」的总结**：用非技术语言讲清楚——这次做了什么、对系统有什么影响、下一步是什么。技术细节照常给，但总结那段要让非工程视角也看得懂。
+
+## 7. 并行开发规范（多 Claude session / git worktree）
+
+以多个并行 session 同时开发时（用户编排 5–8 个）按下列铁律，防版本错落。这是从「多 session 共用同一子仓工作树」（现状：push 撞 non-ff、脏文件成常态）向「每 change 一个 worktree」的迁移；迁移期两态并存，共享工作树处仍守末条 rebase 纪律。**单个 session 只需守自己这一段；「5–8 条流串行集成」是用户在 fleet 层协调的性质，单 session 强制不了。**
+
+- **一个 session = 一个 openspec change = 一条分支 = 一个 worktree，四者同名**；worktree 放 `../<repo>.wt/<change-name>`。控制仓 aidcp 的 change 是 additive 目录、近零冲突，可不开 worktree、在主 checkout 各写各的 change 目录。
+- **先判定自己在哪**：`git worktree list` / `git rev-parse` 认清是「主 checkout」还是某 change 的 worktree。worktree 内 = 只在本分支开发 + 提交 + 跑 `test` / `typecheck`；主 checkout = 集成与部署位。
+- **部署只从主 checkout 的默认分支走，绝不从任何 worktree 部署**（承 §5 部署铁律）。
+- **热点文件单写者，并行时绝不同时碰**：两份 `protocol.ts` + `aidcp-cloud/src/comm/command-bridge.ts` 动作映射（§2 协议四处同步）、角色注册（`event-bus/types.ts` 的 `RoleName` + `src/config/role-catalog.ts`）、风控状态机 `src/risk/risk-state-machine.ts`。任务若必须动这些，标记为需串行、不与他人并行。
+- **开发并行、集成串行**：合回默认分支前先 `fetch` + rebase 到最新默认分支、解冲突、跑 `test:acceptance` + `typecheck` 再 ff 合并。**push 遇 non-ff 一律 rebase 后重来、绝不 force**（force / 非 ff 仍按 §6 需先确认）；空 diff = 已在远端、可弃（见 memory `concurrent-session-shares-subrepo-worktree`）。
+- **完成即收口**：部署 + 验证通过 → archive 该 change → 删 worktree / 分支。有 worktree 却无对应活跃 change = 孤儿，清掉。
+- 操作手册（开流 / 集成 / fleet 状态命令、helper 脚本）见 `docs/parallel-dev-worktrees.md`。**该手册的命令序列 / 脚本经实战跑通验证后方视为定稿**；未验证前只把本节不变量当 OVERRIDE 法条。
