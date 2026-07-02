@@ -4,28 +4,35 @@
 > 排序铁律：动手前先做第 0 组前置（核实 Seedream 尺寸、避开并发方 WIP 文件、与 `split-topic-roles`/`persona-driven-content-pipeline` 协调）。
 > 每组改完按 CLAUDE.md §4：`npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿（AC-PROTO/AC-PUB/AC-RISK 必过）；按需走 §5 安全序列部署、绝不碰 isales。
 > 分批独立可测可部署，组间无强依赖（第 4 组感叹号是唯一「生成+后处理」双侧同步点）。
+>
+> **进度（2026-07-02）**：
+> - **第 1 组（配图风格档 + 品类判定角色）已实装 + 测试全绿 + 已推 master**（aidcp-cloud `2769a88`）。删全局 `IMAGE_STYLE_BASE` → `STYLE_PROFILES`(10 档：9 品类 + 兜底 general) + `resolveStyleProfile`；新增独立 flash 角色 `CategoryClassifier`（watch `createdContent` → 写 `PostCategory`，判不出恒回落 general 防 composer waitAll 挂死）；composer 改 `waitAll [imageSetPlan, postCategory]`、图0封面变体/图1..N内页 styleBase 逐字复用、主体保留中文、`imageStyle=null`；去 provider 第二风格源；preview 同源 + 新角色登记 role-catalog。
+> - **偏离**：品类不挂 `ImageSetPlan.category`，改为独立 `PipelineFields.postCategory`（分类角色单独产出、下游复用），比挂选题对象更解耦。人物策略（2.1）直接写进各档 `styleBase` 串而非独立字段（YAGNI）。
+> - **2.1 顺带完成**（人物三档已写进各档 styleBase）；**1.7/0.2 未完**：比例仅到 prompt 层（styleBase 含 `vertical 3:4`），provider `defaultSize`(2048 方图) 未改——待 0.2 核实线上 Seedream 合法竖版尺寸后再改像素。
+> - **并发坑记录**：批中并发方又起 `edit-note-draft-before-publish` WIP 污染共享工作树（`feishu/*`/`panel/*`/`publish-dispatcher`/`server.ts`）。提交用精确逐文件 staging + `server.ts` 只挑含 `CategoryClassifier` 的 hunk（`git apply --cached`），未卷入其 WIP；全量 1 失败(`buildPublishApprovalCard`)为其 WIP、与本批无关。
+> - **剩余**：2.2/2.4（产后校验）、3（质量评审接人设）、4（感叹号双侧）、5（互动/评论门禁）、6（浏览/评论去偏见）、7（各批回归+部署）。
 
 ## 0. 前置与排序（务必先做）
 
-- [ ] 0.1 `openspec list` + `git -C ../aidcp-cloud status` 确认并发方 WIP 占用文件（`prompts.ts`/`role-catalog.ts`/`server.ts`/`panel`/`config`）当前状态；本 change 改 `prompts.ts` 须与 `persona-driven-content-pipeline`/`split-topic-roles` 协调、避免同文件互吞。
+- [x] 0.1 `openspec list` + `git -C ../aidcp-cloud status` 确认并发方 WIP 占用文件（`prompts.ts`/`role-catalog.ts`/`server.ts`/`panel`/`config`）当前状态；本 change 改 `prompts.ts` 须与 `persona-driven-content-pipeline`/`split-topic-roles` 协调、避免同文件互吞。
 - [ ] 0.2 核实 ECS 线上实跑 Seedream 版本（代码默认 `doubao-seedream-4-5-251128` vs 台账 `5-0-260128`）及其同步 `/images/generations` 允许的合法 size 串与推荐 3:4 尺寸；万相对应竖版尺寸。据此决定第 1 组比例改动同批做还是拆后（尺寸不确定则先只上风格档、比例拆到后续）。
-- [ ] 0.3 新增品类判定角色须动【角色目录 / 角色索引 / 装配】——正是并发方 WIP 占用文件（`role-catalog.ts` / `server.ts` / `roles/index.ts`）。此步排在这几文件稳定或与并发方协调后做，避免同文件互吞（搭车加字段本可绕开、独立角色绕不开）。
+- [x] 0.3 新增品类判定角色须动【角色目录 / 角色索引 / 装配】——正是并发方 WIP 占用文件（`role-catalog.ts` / `server.ts` / `roles/index.ts`）。此步排在这几文件稳定或与并发方协调后做，避免同文件互吞（搭车加字段本可绕开、独立角色绕不开）。
 
 ## 1. 配图风格档 + 中文主体 + 去第二风格源（aidcp-cloud）
 
-- [ ] 1.1 `src/publish-agent/types.ts`：新增 `Category` 字面枚举（干货/知识、美妆护肤、美食、穿搭、旅行、家居、情感/治愈、职场/成长、技术示意图 + 兜底档）与 `StyleProfile` 类型；`ImageSetPlan` 增 `category: Category`。
-- [ ] 1.2 `src/publish-agent/prompts.ts`：删 `IMAGE_STYLE_BASE`（:361），新增 `STYLE_PROFILES: Record<Category, StyleProfile>`（每档 styleBase/palette/人物策略/比例/封面变体/品类 few-shot，取自 design 附的 9 档）+ `resolveStyleProfile(category, {cover})`。
-- [ ] 1.3 `src/publish-agent/prompts.ts`：新增 `buildCategoryClassifierPrompt`（输入品类枚举 + 正文、只输出单个 category）；`buildImagePromptComposerPrompt` 停止「翻成英文主体」（主体保留中文、只补动作/场景、不写风格词），few-shot 换成按 category 注入的对应示例（去 isometric 分布式系统例）。`buildImageSetPlanPrompt` 不再承担分类（分类归品类判定角色）。
-- [ ] 1.4 新增【品类判定角色】（发布侧，`src/publish-agent/roles/` + 装配）：flash 模型、输入品类枚举 + 正文、schema 约束输出单个 `category` + 校验重试；判不出/枚举外回落安全兜底档、绝不 brick；**一帖判一次**写入管线状态供配图选题与质量评审消费；登记角色目录（`role-catalog.ts` displayName + `role-llm-config`）供后台配模型。⚠️ 触 `role-catalog.ts` / `server.ts` / `roles/index.ts` 装配——见 0.3 排期。
-- [ ] 1.5 `src/publish-agent/roles/image-prompt-composer.ts`：把 :86 的 `${desc}. ${IMAGE_STYLE_BASE}` 改为 `resolveStyleProfile(category)`（category 来自品类判定角色、经管线状态传入）取一次——图 0 用 `coverStyleBase`、图 1..N 用 `styleBase` 逐字复用；保留现有去重护栏与「永远保住第 0 张」。
-- [ ] 1.6 `src/publish-agent/roles/image-generator.ts` + `seedream-client.ts` + `wanxiang-client.ts`：ImageGenerator 生成时不再把 `imageStyle` 枚举传给 provider（消除 `seedream-client.ts:81` 的「，风格：<enum>」第二风格源）。
+- [x] 1.1 `src/publish-agent/types.ts`：新增 `Category` 字面枚举（干货/知识、美妆护肤、美食、穿搭、旅行、家居、情感/治愈、职场/成长、技术示意图 + 兜底档）与 `StyleProfile` 类型；`ImageSetPlan` 增 `category: Category`。
+- [x] 1.2 `src/publish-agent/prompts.ts`：删 `IMAGE_STYLE_BASE`（:361），新增 `STYLE_PROFILES: Record<Category, StyleProfile>`（每档 styleBase/palette/人物策略/比例/封面变体/品类 few-shot，取自 design 附的 9 档）+ `resolveStyleProfile(category, {cover})`。
+- [x] 1.3 `src/publish-agent/prompts.ts`：新增 `buildCategoryClassifierPrompt`（输入品类枚举 + 正文、只输出单个 category）；`buildImagePromptComposerPrompt` 停止「翻成英文主体」（主体保留中文、只补动作/场景、不写风格词），few-shot 换成按 category 注入的对应示例（去 isometric 分布式系统例）。`buildImageSetPlanPrompt` 不再承担分类（分类归品类判定角色）。
+- [x] 1.4 新增【品类判定角色】（发布侧，`src/publish-agent/roles/` + 装配）：flash 模型、输入品类枚举 + 正文、schema 约束输出单个 `category` + 校验重试；判不出/枚举外回落安全兜底档、绝不 brick；**一帖判一次**写入管线状态供配图选题与质量评审消费；登记角色目录（`role-catalog.ts` displayName + `role-llm-config`）供后台配模型。⚠️ 触 `role-catalog.ts` / `server.ts` / `roles/index.ts` 装配——见 0.3 排期。
+- [x] 1.5 `src/publish-agent/roles/image-prompt-composer.ts`：把 :86 的 `${desc}. ${IMAGE_STYLE_BASE}` 改为 `resolveStyleProfile(category)`（category 来自品类判定角色、经管线状态传入）取一次——图 0 用 `coverStyleBase`、图 1..N 用 `styleBase` 逐字复用；保留现有去重护栏与「永远保住第 0 张」。
+- [x] 1.6 `src/publish-agent/roles/image-generator.ts` + `seedream-client.ts` + `wanxiang-client.ts`：ImageGenerator 生成时不再把 `imageStyle` 枚举传给 provider（消除 `seedream-client.ts:81` 的「，风格：<enum>」第二风格源）。
 - [ ] 1.7 （依赖 0.2）比例竖版化：`SeedreamClient`/`WanxiangClient` 的 `defaultSize` 由方图改合法竖版 3:4（或经 env 在 `server.ts` 注入）；全帖同比例。尺寸未核实则本任务拆到后续、不乱填。
-- [ ] 1.8 `src/publish-agent/prompts-preview.ts`：图像示例（EXAMPLE_IMAGE_SUBJECT/科技扁平）随真源改为按品类示例，保预览与线上同源（真源先改、再同步预览）。
-- [ ] 1.9 回归：不同品类帖得到不同风格档、同帖内一致（对应 spec「配图风格按内容品类自适应」两 Scenario）；未知品类回落不阻断；无第二风格源；typecheck。
+- [x] 1.8 `src/publish-agent/prompts-preview.ts`：图像示例（EXAMPLE_IMAGE_SUBJECT/科技扁平）随真源改为按品类示例，保预览与线上同源（真源先改、再同步预览）。
+- [x] 1.9 回归：不同品类帖得到不同风格档、同帖内一致（对应 spec「配图风格按内容品类自适应」两 Scenario）；未知品类回落不阻断；无第二风格源；typecheck。
 
 ## 2. 配图真人/封面文字分级 + 高风险图产后校验（aidcp-cloud）
 
-- [ ] 2.1 在各品类 `StyleProfile` 落人物三档（默认无人 / 无脸匿名 / 需正脸用明确非写实虚拟人物，绝不写实真脸）与封面文字策略（默认留白 + 后期叠字）。
+- [x] 2.1 在各品类 `StyleProfile` 落人物三档（默认无人 / 无脸匿名 / 需正脸用明确非写实虚拟人物，绝不写实真脸）与封面文字策略（默认留白 + 后期叠字）。
 - [ ] 2.2 新增产后校验：仅对「含真人或封面出字」的图做（乱码字 / 是否像可识别真人·名人），命中丢弃该张重生成；无则靠内页 no-text + faceless 默认兜底。实现为轻量规则 + 可选二次模型判定（首版覆盖子集即可）。
 - [ ] 2.3 合规 AI 标识确认走既有 `ComplianceDecision.ai/aiEnforced` + 发布声明/元数据，MUST NOT 让模型画面内画水印。
 - [ ] 2.4 回归：需人物时不出写实真脸；高风险图未过校验即重生成（对应 spec「配图真人与封面文字分级并对高风险图产后校验」两 Scenario）。
