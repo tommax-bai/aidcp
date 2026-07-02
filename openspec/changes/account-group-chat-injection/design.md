@@ -52,7 +52,12 @@
 
 `group:on` 但 `getGroupChatInfo` 返 null → 在 `triggerManual` 早退一张黄色告警回执「该账号未配置关联群聊信息，请先到后台设置；未注入不代发」，本次不发。绝不静默降级成无码普通评论。形态镜像 `comment-scheduler.ts` 现有「未绑人设」闸。
 
-### D5. 边缘保真：先「云端约束码空间」，再按真机结果决定是否改边缘输入方式
+### D5. 边缘保真：文字逐字输入 + 串码整段插入（已定案，2026-07-02 用户拍板）
+
+**结论（实现于 cloud 77faef0 + edge d714b9f）**：不等真机探针二选一，直接采「分层送达」——评论**正文**边缘逐字符拟人敲（保留反检测打字节奏），**串码**单次 `Input.insertText` 整段插入（相当于粘贴），绕过逐字输入才会触发的 @/# data-tribute 提及/主题补全，从根上消除码被劫持/篡改；串码 verbatim（不 trim、不逐字）。为此正文与码**分开**穿到边缘：协议 `interaction.comment` 加可选 `groupChatCode`，云端 compose-approve 返回 `{text, groupChatCode}`（人审卡仍展示合并终稿，审=发），edge `executeComment(text, groupChatCode?)` 先敲正文、再整段插码。真机探针（6.1）降级为可选复核。下方原「二选一」推演保留作记录。
+
+<!-- 原推演（探针二选一）保留： -->
+#### （原）边缘保真：先「云端约束码空间」，再按真机结果决定是否改边缘输入方式
 
 「审=发」的真实威胁在边缘，不在云端 JSON（UTF-8 天然保 emoji、React 文本节点无 sanitize）。已核实边缘：`trim` 首尾空白；逐字符敲入 data-tribute `@`提及编辑器（`@`、可能 `#` 触发补全劫持后续键入）；`Array.from` 按码点切分 → **emoji 安全**（代理对 / ZWJ 不裂）；发布后只比对前 12 字。
 

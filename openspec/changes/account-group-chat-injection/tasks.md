@@ -41,12 +41,16 @@
 - [x] 5.3 注入：把已解析码穿进 `buildComposeAndApprove`（`ComposeApproveDeps` 加 `groupChatCode`），在 `compose-approve.ts` 去 AI 味 + overlapsAny **之后**、`approval.request` **之前** verbatim 追加。码不进 overlap 比对。 <!-- aidcp-cloud a2c8f09 单一 groupChatCode（非空即注入，省去独立 injectGroup 布尔下传） -->
 - [x] 5.4 验收测试：需注入+有码 → 人审卡 text 含**完整 verbatim 码**（AC-PUB 审=发）；需注入+无码 → 不静默发、回告警；无 flag → 与今天完全一致（零回归）；码不被去 AI 味改写、不进反照搬；正文长度闸只作用正文。 <!-- aidcp-cloud a2c8f09 compose-approve.test +3 + scheduler.test +4（端到端审=发 + fail-closed + 零回归） -->
 
-## 6. aidcp-edge — 边缘保真（真机探针先行，按结果二选一）
+## 6. aidcp-edge — 边缘保真（用户拍板：文字逐字输入 + 串码整段粘贴）
 
-- [x] 6.1 只读真机探针（仿 search-filter-probe）：核实评论框对 ① `#`/`:/#`、② 多行 `\n`、③ 单次整段 `Input.insertText` 的行为。产物落 `/tmp/aidcp-comment-verbatim-probe-*`。 <!-- aidcp-edge 1385fef scripts/comment-verbatim-probe.ts：逐字 vs 整段两法各敲入→读回比对→扫补全下拉，绝不提交。**待用户在真机跑**（本地无登录边端，无法执行） -->
-- [ ] 6.2 据 6.1 结论二选一：**A·云端规整**（首选）——人审卡前校验/规整触发字符（拒/转义 `@`、定换行策略、告知首尾空白会被 trim）；**B·边缘整段插入**——改 `executeComment` 用单次整段 `Input.insertText` 送达码段。 <!-- 阻塞：待 6.1 真机探针跑出结论后决定；当前注入为 verbatim 追加 + 人审兜底 -->
-- [ ] 6.3 若走 B：发布后校验覆盖到码尾（现只比对前 12 字）——确保码尾被打乱能被 honest-fail 抓到。 <!-- 阻塞：依赖 6.2 选型 -->
-- [ ] 6.4 回归断言：正文仍逐字拟人输入；码段按 6.2 选型送达；任一步空/超时/阻断 honest-fail。 <!-- 阻塞：依赖 6.2 -->
+<!-- 决策变更 2026-07-02（用户）：不再等真机探针二选一——直接走「正文逐字 + 串码整段插入」。
+     故正文（text）与串码（groupChatCode）**分开**下发：正文边缘逐字拟人敲、串码单次 Input.insertText 整段插入，
+     绕过 @/# data-tribute 提及/主题补全的逐字触发，从根上消除码被劫持/篡改。实现：cloud 77faef0 + edge d714b9f。 -->
+
+- [x] 6.1 只读真机探针（仿 search-filter-probe）：核实评论框对 ① `#`/`:/#`、② 多行 `\n`、③ 单次整段 `Input.insertText` 的行为。 <!-- aidcp-edge 1385fef scripts/comment-verbatim-probe.ts。用户已直接拍板走整段插入，探针**降级为可选验证**（想复核整段插入在真机的落字仍可跑）；不再是落地前置 -->
+- [x] 6.2 采**方案 B·分层送达**：正文 `text` 边缘逐字敲（拟人，保留反检测节奏）；串码 `groupChatCode` 单次 `Input.insertText` 整段插入（绕过逐字补全）。协议 `interaction.comment` 加可选 `groupChatCode`（两份 protocol.ts 逐字一致）；云端正文与码**分开**返回/下发（compose-approve `{text,groupChatCode}`、edge-steps.post 三参、runner/scheduler 透传）；人审卡仍展示合并终稿（审=发）。 <!-- aidcp-cloud 77faef0 + aidcp-edge d714b9f；AC-PROTO 绿、两份 protocol.ts byte-identical、comment-agent 测试 46/46 -->
+- [x] 6.3 码送达失败即诚实失败：整段 `Input.insertText` 若 CDP 层抛错 → executeComment 外层 try/catch 兜成 honest-fail（reportActionCompleted ok:false）；发布后校验确认正文前缀出现 + 编辑器清空（评论确已落地）。 <!-- aidcp-edge d714b9f。判断：整段插入比逐字可靠得多，专门比对码尾 DOM 属 YAGNI（码长/含 emoji 会被编辑器视觉变形，比对易假阴），故不加码尾断言；CDP 抛错路径已覆盖诚实失败 -->
+- [x] 6.4 回归：无 `groupChatCode` → 边缘行为与今天逐字一致（零回归）；有码 → 正文逐字 + 码整段插入；edge `npm run typecheck` 绿。 <!-- aidcp-edge d714b9f typecheck 通过；executeComment 结构上「无码走原路径」。edge 未加 executeComment 单测（无现成 CDP-mock 夹具）——真机闭环并入 7.5 -->
 
 ## 7. 校验 / 回归 / 部署
 
@@ -55,4 +59,4 @@
 - [x] 7.3 edge：`npm run typecheck` 绿。 <!-- aidcp-edge 1385fef src typecheck 全绿（仅加脚本、无 src 改动；探针不在 tsconfig include） -->
 - [x] 7.4 `openspec validate account-group-chat-injection --strict` 通过。 <!-- aidcp 通过 -->
 - [ ] 7.5 手动/端到端：后台粘贴含 emoji/多行码 → 保存 → 刷新持久且原样；清空 → 无码；`/comment <昵称> group:on`（有码）→ 人审卡含完整码 → 发出闭环；`group:on`（无码）→ 告警不发；`/comment <昵称>`（无 flag）→ 普通评论零回归；同码配多账号 → 前端告警。 <!-- 待部署后真机验证；本地不起 cloud（部署铁律） -->
-- [ ] 7.6 提交 + 部署：**前置**——6.1 真机探针跑出、6.2 边缘保真定案（否则 group:on 注入的码在边缘可能被 @/# 补全/换行破坏，破「审=发」）。文档迁移用 `migrations/0027_account_group_chat_info.sql`。cloud 面板层按安全序列（备份→rsync→restart→healthcheck），console 按既有 nginx root 发布（不 --delete），edge（若改）用户本地 pull/重启；**绝不碰同机 isales**。 <!-- 代码已提交（cloud a2c8f09 / console c81bb32 / edge 1385fef）未部署；injectGroup 默认 off，未部署时零影响 -->
+- [ ] 7.6 提交 + 部署：代码已全部提交推送（cloud a2c8f09 存储/面板/命令/注入 + 77faef0 分层送达 / console c81bb32 / edge 1385fef 探针 + d714b9f 分层输入）。边缘保真**已定案**（分层送达，不再 probe-gated）。**新部署前置**：① 云端工作树当前被并发方未提交 WIP 污染（publish/feishu，含 1 处类型错误）——`rsync` 会连带打包他们的半成品，**须待其提交/还原、工作树干净后再部署**，或从干净 checkout 部署；② 标准 e2e（7.5）。文档迁移 `migrations/0027_account_group_chat_info.sql`。序列：cloud 面板层备份→rsync→restart→healthcheck；console 按既有 nginx root（不 --delete）；edge 用户本地 pull/重启；**绝不碰同机 isales**。 <!-- injectGroup 默认 off，未部署时零影响；HEAD 已是干净的、可部署的代码，唯工作树被并发方污染 -->
