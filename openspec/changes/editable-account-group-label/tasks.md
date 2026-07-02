@@ -7,9 +7,12 @@
       console.bak.20260702-220510.tar.gz → rsync dist/ 到 /opt/aidcp/console（**无 --delete**，intro.* 保全）→
       验证 index.html 指向新 bundle index-ChRoxtSX.js（含我的分组 UI）、8088 HTTP 200、/api/version 经 nginx 200、
       cloud 服务未受扰 active。绝不碰同机 isales（inactive）。
-  - CLOUD git 提交仍未做（与现状无关的独立事项）：cloud 工作树多 change（group-label + thinking + alert-resolution）
-    并行交织于 panel/types.ts、panel-server.ts、server.ts，无交互式 add -p 无法只切我的部分。→ 待并行方 cloud 改动
-    先 commit 后，这 3 文件 diff 只剩我的 hunk，我再干净提交 group-label cloud。CONSOLE 我的部分已提交（b9512a3）。 -->
+  - CLOUD git 提交**已完成**：我的 group-label cloud 全部 hunk（account-store setGroupLabel + panel/types accountAttr +
+    panel-server PUT 路由 + server.ts 装配 + 两测试套）**已在 origin/master `3f37324`**。归属偏离：因共享工作树，
+    并行方的 thinking cloud commit（3f37324「role-thinking-mode-config (cloud)」）把我的 hunk 一并 commit 了
+    （同其部署也一并带上）——功能上我的 change 已提交推送，只是没落进独立 commit message。用干净 worktree（origin/master）
+    核验：我的 6 处 hunk 全在、typecheck 净、23/23 targeted 测试过（含全部 setGroupLabel + 路由用例）。无需再提交。
+    CONSOLE 我的部分独立提交在 b9512a3。alert-resolution cloud 也已在 master（7a90701）。 -->
 
 ## 1. aidcp-cloud — 账号存储单写方法
 
@@ -37,4 +40,5 @@
 - [x] 4.2 console：`tsc --noEmit` 对我的两文件零错误；`npm run build` 当前被 `RolesPage.tsx`（thinking WIP，未用变量 + 类型不符）阻断——**并行 WIP，非本改动** <!-- 我的文件 clean，构建阻断待 WIP 收尾 -->
 - [x] 4.3 `openspec validate editable-account-group-label --strict` 通过
 - [~] 4.4 端到端验证：自动层已过（cloud 源码在位 + 服务 active/8787+8090 监听 + 1053/1053 + 27/27 红线 + typecheck；console 8088 HTTP 200 + /api/version 经 nginx 200 + 新 bundle 含分组 UI）。**浏览器点选流**（登录后台→点「分组」→输入→保存→刷新持久→清空显破折号→退役账号被拒）待用户在真机点通（需面板登录凭据，我不取密） <!-- 自动可达性 + 单测已证；人工 UI 点通留用户 -->
-- [x] 4.5 部署：**已上线**——CLOUD 后端并发方部署已连带带上并运行（我未重复部署，避免撞车）；CONSOLE 本人按安全序列部署（备份 console.bak.20260702-220510 → rsync 无 --delete → 验证 200 + 新 bundle + intro 保全 + cloud 未受扰 + 不碰 isales）。<!-- cloud git 提交待并行方先落后再干净补，见顶部注记 -->
+- [x] 4.5 提交 + 部署：**均已完成**。提交：CLOUD 在 origin/master 3f37324（并行 thinking commit 因共享树连带带上，worktree 核验 6 hunk 全在 + 23/23 绿）、CONSOLE 独立 b9512a3。部署：CLOUD 后端并发方 rsync 已带上并运行（我未重复部署，避免撞车 + 避免用干净基线回退他方 live 改动）；CONSOLE 本人按安全序列部署（备份 console.bak.20260702-220510 → rsync 无 --delete → 验证 8088 200 + /api/version 200 + 新 bundle 含分组 UI + intro 保全 + cloud 未受扰 + 不碰 isales）。<!-- aidcp-cloud 3f37324（bundled）; aidcp-console b9512a3; 均已 deployed -->
+<!-- 仅剩 4.4 浏览器点选流待用户真机确认；确认后本 change 可 openspec archive（spec delta 已在，validate --strict 过）。 -->
