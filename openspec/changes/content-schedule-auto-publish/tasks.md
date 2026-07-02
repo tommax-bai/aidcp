@@ -59,5 +59,5 @@
 
 - [ ] 8.1 前置：§0 WIP 解结提交后再部署
 - [ ] 8.2 cloud 面板层按安全序列（备份 → rsync `--exclude .env/node_modules/.git` → `systemctl restart` → healthcheck `active(running)`+8787+飞书长连接+PG `select 1`）；失败即回滚；绝不碰同机 isales
-- [ ] 8.3 console 构建产物发 nginx root（**不 `--delete`**）
+- [x] 8.3 console 构建产物发 nginx root（**不 `--delete`**） <!-- aidcp-console 7c99529 2026-07-03 deployed：rsync dist/ → /opt/aidcp/console（无 --delete，intro.* 保留）；nginx 8088 HTTP 200、/api 反代 200、isales 端口未动。注：前端为 shell，/api/content-schedule 端点待云端实现前进页面为空/存不了 -->
 - [ ] 8.4 先建表 + 上界面、`AIDCP_CONTENT_SCHEDULE_AUTO` 保持关，验证配置读写诚实后再开自动扳机
