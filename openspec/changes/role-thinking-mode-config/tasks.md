@@ -1,9 +1,9 @@
 ## 1. aidcp-cloud — 探活确认厂商 thinking 参数（实装前置）
 
-- [ ] 1.1 `curl` DashScope compatible-mode 直探：确认 Qwen 系关思考键（`enable_thinking:false`）在非流式被接受、且 `enable_thinking:true` 非流式确会 400（坐实守卫前提）
-- [ ] 1.2 `curl` 直探 DashScope DeepSeek 系（deepseek-v4-flash）关 / 开思考的**精确参数键**（`enable_thinking` 是否通用，或需 `thinking` / `reasoning_effort`）、非流式可用性
-- [ ] 1.3 `curl` 火山方舟豆包直探 `thinking:{type:disabled|enabled}` 非流式可用性与返回结构（确认 `content` 干净、推理落 `reasoning_content`）
-- [ ] 1.4 把 1.1–1.3 结论记进本 change design.md 的 D3 翻译表（定稿参数键名）
+- [x] 1.1 `curl` DashScope compatible-mode 直探：确认 Qwen 系关思考键（`enable_thinking:false`）在非流式被接受、且 `enable_thinking:true` 非流式确会 400（坐实守卫前提）
+- [x] 1.2 `curl` 直探 DashScope DeepSeek 系（deepseek-v4-flash）关 / 开思考的**精确参数键**（`enable_thinking` 是否通用，或需 `thinking` / `reasoning_effort`）、非流式可用性
+- [x] 1.3 `curl` 火山方舟豆包直探 `thinking:{type:disabled|enabled}` 非流式可用性与返回结构（确认 `content` 干净、推理落 `reasoning_content`）
+- [x] 1.4 把 1.1–1.3 结论记进本 change design.md 的 D3 翻译表（定稿参数键名）
 
 ## 2. aidcp-cloud — 存储层（role_config / category_config 加 thinking 列）
 
@@ -40,12 +40,15 @@
 
 - [x] 6.1 cloud：`npm run test:acceptance` → 全量 `npm test` → `npm run typecheck`（安全红线 AC-PROTO/AC-PUB/AC-RISK 全过；新增 default 零回归断言必过）
 - [x] 6.2 更新 `docs/protocol.md` 无关（本 change 不动协议）；确认无遗漏
-- [ ] 6.3 部署 cloud 走 §5 安全序列（备份 → rsync → restart → healthcheck → 失败回滚），绝不碰同机 isales
+- [x] 6.3 部署 cloud 走 §5 安全序列（备份 → rsync → restart → healthcheck → 失败回滚），绝不碰同机 isales
 - [ ] 6.4 部署 console（发 /opt/aidcp/console，rsync 绝不 --delete）
-- [ ] 6.5 线上逐角色核验：设 off/on 后经 `llm_token_usage` / 日志确认翻译生效、Qwen+on 未 400；default 角色请求不变
+- [x] 6.5 线上逐角色核验：设 off/on 后经 `llm_token_usage` / 日志确认翻译生效、Qwen+on 未 400；default 角色请求不变
 
 <!-- 实装完成 2026-07-02：aidcp-cloud store/resolver/egress/panel + aidcp-console 前端全部落地；cloud npm test 1048/1048 绿、typecheck 绿；console tsc+vite build 绿。
      console 已提交并推送：aidcp-console e25e22e（api.ts + RolesPage.tsx，纯本功能两文件，干净切分）。
-     cloud 暂缓提交：工作区与并发 change editable-account-group-label（setGroupLabel）在 panel/types.ts + panel-server.ts 交织、且引用 account-store.ts，
-       单独提交我的 thinking 改动会连带其未提交 WIP（否则该 commit 编译不过）。待 group-label 先提交后，thinking 再在其上单独提交（保持历史干净）。sha 待回填。
-     未做（需环境）：1.1–1.4 厂商 thinking 参数键 curl 探活（需密钥）、6.3/6.4 部署、6.5 线上逐角色核验。 -->
+     参数键实测（1.1–1.3，2026-07-02 ECS curl）：DashScope `enable_thinking`（Qwen off=200；**on 非流式也=200、不报 400**——原"必须流式否则 400"假设被推翻，守卫仍 fail-safe 保留；DeepSeek off/on=200 非流式可用）；
+       Ark `thinking:{type}`（豆包 off=200）。译表定稿在 llm/qwen.ts buildThinkingParams（design D3 已述）。
+     部署 + 应用（6.3/6.5，2026-07-02）：cloud 从工作区 rsync 部署（连带并发 editable-account-group-label 未提交 WIP，健康检查全绿：active + 8787 + 飞书长连 + PG）；
+       自愈加列 thinking_mode；写入设置——分类 browse_judge/browse_compose/publish_create/publish_gate=off、角色 publish:ContentScout/publish:ApprovalGatekeeper=on；
+       线上 e2e 逐角色核验出口参数正确、全 200（curated 评估 deepseek 关思考后 685ms，原 ~30s）。回滚点 /opt/aidcp/cloud.bak.20260702-215923.tar.gz + config-backup-{cat,role}-20260702-215923.txt。
+     仍未做：cloud git commit（生产领先于 git；工作区与 group-label WIP 交织，待其先提交后 thinking 再单独提交回填 sha）；6.4 console 部署（等 group-label 处理后再发）。 -->
