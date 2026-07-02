@@ -33,4 +33,4 @@
 
 - [x] 6.1 `openspec validate feed-scroll-card-floor --strict` 通过 <!-- aidcp 随 tasks 提交，validate 见下 -->
 - [x] 6.2 各 task 用 HTML 注释标 `[x]` 并附 `<!-- <repo> <commit-sha> 备注 -->`；commit + push（cloud/edge `master`） <!-- edge 98f41fe pushed 6bb9358..98f41fe / cloud 1fc31d5 pushed f9f270c..1fc31d5 -->
-- [ ] 6.3 按需部署 cloud（走 §5 安全序列：备份→rsync→restart→healthcheck→失败回滚；绝不碰同机 isales）；部署后 tasks 追加 `<!-- <date> deployed -->` <!-- 待用户确认：cloud 部署可让云端开始下发 dwellMs；但完整生效还需 edge 更新（旧 edge 向后兼容忽略 dwellMs，无害但不加停留）。edge 本地跑/自更新，非 ECS 部署 -->
+- [x] 6.3 按需部署 cloud（走 §5 安全序列：备份→rsync→restart→healthcheck→失败回滚；绝不碰同机 isales）；部署后 tasks 追加 `<!-- <date> deployed -->` <!-- aidcp-cloud 1fc31d5 deployed 2026-07-03: 备份 cloud.bak.20260703-001440.tar.gz + .env.bak.20260703-001440 → rsync(无--delete，排除 .env/node_modules/.git) → restart → healthcheck 全绿(active/8787 监听/PG select 1/飞书长连接 onReady/NRestarts=0)；并发方 f9f270c 工作仍在、isales 未碰。edge(98f41fe) 本地跑/自更新，非 ECS 部署——旧 edge 向后兼容忽略 dwellMs，edge 更新到位后完整生效 -->
