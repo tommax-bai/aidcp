@@ -50,6 +50,9 @@
 - [ ] **return-to-feed-on-follow-block 3.1 / 3.2** — follow 受阻后返回 feed 续刷、不死锁
 - [ ] **recency-aware-revisit-pacing 4.4 + 3.2 / 3.3** — 新鲜度重访节奏，上线后校准观察
 - [ ] **restore-auto-resume-and-global-safety-config 10.3 / 10.4** — 断点自动续跑 + 全局安全配置生效
+- [ ] **fix-interaction-and-comment-capture 7.1** — 互动栏是否存在「只带 `.engage-bar` 不带 `.interactions`」布局变体（定 E1 逗号选择器兜底是否够；打开一篇笔记核 engage-bar 真实 class）
+- [ ] **fix-interaction-and-comment-capture 7.2** — 评论行 `[id^="comment-"]` 与可滚容器种子选择器真机校准（定评论采集命中率；核评论行真实 id 前缀与内容/作者 class）
+- [ ] **fix-interaction-and-comment-capture 7.3** — 线上抓日志佐证：`skip reason=cooldown`（限流占比、佐证「偶尔没点着」主因是设计限速）、`recover_after_like_failed|recover_after_collect_failed` 频次应降、`未找到可滚动的评论区容器`(no_target) vs candidates 长度分布、`btn_no-bar` vs `state_unchanged` 分布（验 E1 是否消掉 no-bar）（2026-07-03 实装，部署后观察）
 
 ## 簇 5 — 后台配置生效（浏览器点后台 UI）
 
@@ -97,3 +100,23 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 
 - **split-topic-roles** ✓ 已上线、已归档（`2026-07-03-split-topic-roles`）
 - **publish-metadata-compliance-roles** ✓ 已上线、已归档（stage-4 显式延后项随归档 tasks.md 留档）
+
+---
+
+## 簇 9 — console-cloud-panel-hardening 真机验收（面板加固批，登记于 2026-07-03）
+
+**前置**：cloud 已部署新面板层 + console 已发新构建（**WS 协议 breaking：首帧鉴权取代 ?token=，cloud 与 console 必须同步部署**，否则旧 console 连新 cloud 会 auth_timeout）+ ECS 运维项已执行；一个真实运营会话在跑。
+
+- [ ] **#3/#24 会话续签** — 活跃使用超过 TTL 不被踢；临近过期自动换新令牌（网络面板见周期性 `/api/auth/refresh`、令牌 exp 推进）；登出后原令牌立即 401 revoked
+- [ ] **#25 WS 首帧鉴权 + 到期断连** — Nginx access log 的 `/ws` 行不含 `?token=`（token 走首帧）；令牌到 exp 时连接被主动 close(4401)、前端不无限重连而是跳登录
+- [ ] **#26 令牌撤销** — 登出/管理撤销后该令牌 HTTP 与 WS 均立即被拒；cloud 重启后黑名单清空属预期（短 TTL + 续签使窗口有界）
+- [ ] **#20 WS 背压 / 大载荷截断** — 高频事件下慢客户端（后台标签/弱网）被跳帧/断开而非拖垮主编排进程；超 256KB 的 page.cards/note.detail 前端收到 truncated 摘要帧
+- [ ] **#21/#22/#23 索引与保留** — 生产库 `\d risk_counters`/`interaction_feed`/`llm_token_usage` 见 occurred_at/bucket_start 打头索引；面板今日聚合/全局互动流/用量窗查询 EXPLAIN 无 seq scan；保留清理日频删超窗行（7d/30d/45d）
+- [ ] **#4/#5/#6 漂移哨兵 live 对拍** — 设 `AIDCP_PANEL_URL` 指向 ECS 面板端点跑 console 哨兵 live 用例（`aidcp-enums.test` 的 skipIf），确认 riskAction(7 含 comment_like)/imageProvider(含 volcengine)/dtoFields.panelAccount 与 cloud live 一致
+- [ ] **#5 图片厂商** — 线上切图片厂商为火山即梦后，设置页与角色页显示火山（不再钉死通义）
+- [ ] **#26 httpOnly 迁移评估** — 评估 token 从 localStorage 迁 httpOnly cookie 的条件（跨 8088 console/8090 面板端口的 cookie 作用域需 Nginx same-origin 反代配合），决定是否落地（本批仅留 setToken/getToken 抽象缝）
+
+### ECS 运维项（部署时执行，对应 tasks 1.8/1.9/1.10）
+- [ ] `AIDCP_PANEL_JWT_TTL_SECONDS` 设值（续签已落地故可短，如 3600；不设则默认 3600）
+- [ ] Nginx `aidcp-console.conf` 去 `/downloads/` 的 `autoindex on`（#27，`curl /downloads/` 应返 403/404）
+- [ ] 生产库补 occurred_at/bucket_start 索引（上机执行 `CREATE INDEX IF NOT EXISTS` 或确认随重启自建）
