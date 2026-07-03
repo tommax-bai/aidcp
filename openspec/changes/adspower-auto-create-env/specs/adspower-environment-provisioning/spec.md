@@ -1,0 +1,89 @@
+## ADDED Requirements
+
+### Requirement: 程序化创建一个指纹环境（委托生成 + 挑整机模板 + 薄护栏 + OS 四者一致断言）
+
+`adspower` 模式下，桌面外壳 SHALL 经 AdsPower 本地 API `user/create` **程序化创建一个**浏览器指纹环境，指纹的生成 SHALL **最大化委托 AdsPower 按 OS 自动生成自洽整套**（`ua_auto` 匹配内核、`canvas`/`webgl_image`/`audio`/`client_rects` 噪声开启），aidcp 侧 MUST NOT 逐字段手搓整套 `fingerprint_config`。aidcp 侧 SHALL 只承担三件事：① 由运维（或按模板轮换）挑一个「整机模板」，**OS 为第一锁定字段**，`device_memory`/`hardware_concurrency`/`screen_resolution` 等折进模板、MUST NOT 逐字段独立随机；② 一层薄静态护栏——`device_memory` SHALL 只允 2 的幂且封顶 8（**MUST NOT 提交 `6`** 等非 2 的幂）、`hardware_concurrency` SHALL 取真实值、`webgl` 模式 SHALL 不自相取消（`webgl='3'` 时 MUST NOT 同传会被忽略的 `webgl_config`）、`webrtc` SHALL 为替换成代理 IP 的模式、字体 MUST NOT 跨 OS 混装、时区/语言 SHALL based-on-IP、「每次启动重随机指纹」SHALL 关闭；③ 提交前 SHALL 做「声明 OS == 下发 UA 的 OS == 字体的 OS == renderer 家族的 OS」四者一致断言，任一不符 SHALL **诚实拒绝创建**、MUST NOT 提交一个自相矛盾的环境。aidcp 侧 MUST NOT 为「让检测方看着均衡」而强行匹配「CPU 性能档 == GPU 性能档」（检测方不查此项）。
+
+#### Scenario: 委托生成 + 护栏放行合法自洽环境
+- **WHEN** 运维选定一个整机模板（含 OS）点「创建环境」，且模板经护栏与四者一致断言校验通过
+- **THEN** 桌面外壳以委托生成为主 + 模板锁定的 OS/整机字段构造 `fingerprint_config`，经 `user/create` 建号成功并返回分身 id
+
+#### Scenario: 非法取值在提交前被护栏拦下
+- **WHEN** 待提交的 `fingerprint_config` 含 `device_memory=6`（或其它非 2 的幂 / 超 8 的值）
+- **THEN** 护栏在提交前诚实拒绝，MUST NOT 把该值发给 `user/create`
+
+#### Scenario: OS 不自洽在提交前拒建
+- **WHEN** 模板声明 Windows 但下发 UA / 字体 / renderer 家族任一不是 Windows（四者一致断言不符）
+- **THEN** 桌面外壳诚实拒绝创建并说明不一致点，MUST NOT 提交该矛盾环境
+
+### Requirement: 创建态与就绪态分离，创建只标「仅配置层/未验证」
+
+`user/create` 返回分身 id SHALL 仅被视为「配置层已建」，桌面外壳 MUST NOT 据此把环境标为「已就绪 / 可投产」。因 `user/list` 是配置层、非实测出口 IP、指纹字段读不回，创建流程 SHALL 只保证「配置层自洽 + 取值合法 + 有区分度 + 稳定」，并把环境状态**显式命名**为「仅配置层 / 未验证 / 不可投产」，如实呈现给运维。是否「真实且有区分度」SHALL 仅由 `environment-readiness-verification` 的运行时实测置位，MUST NOT 由创建响应推断（不静默假成功红线）。
+
+#### Scenario: 创建成功不等于就绪
+- **WHEN** `user/create` 成功返回分身 id
+- **THEN** 环境被标为「仅配置层 / 未验证」，UI 明示「尚未证明 IP 隔离与指纹自洽、不可据此投产」，MUST NOT 显示为「已就绪」
+
+### Requirement: 写能力经独立写客户端 + 硬编码 allowlist，绝不触碰浏览器生命周期
+
+程序化创建 SHALL 经一个与只读 `ads-local-api` **分离的**「写客户端」发起，该写客户端 SHALL 用**硬编码 allowlist** 只放行 `user/create` 与 `group/create`，任何 `browser/start` / `browser/stop` / `browser/active` 等浏览器生命周期路径 SHALL 在该客户端内**直接抛错**（生命周期仍是核心子进程单写职责），并 SHALL 有回归断言证明该写客户端到不了生命周期端点（红线靠测试守、不靠注释）。写客户端对本地 API 的调用 SHALL 复用与只读侧相同的 ≥1 秒串行节流；本机核心子进程活跃时 SHALL NOT 并发跑批量写（避免与核心的启动/回收调用叠加撞每秒限速），撞限速 SHALL 诚实降级、MUST NOT 假成功。
+
+#### Scenario: 写客户端拒绝生命周期端点
+- **WHEN** 代码路径尝试经写客户端调用 `browser/start`（或 stop/active）
+- **THEN** 写客户端直接抛错、不发出该请求，且有回归断言覆盖此禁令
+
+#### Scenario: 核心活跃时不并发批量写
+- **WHEN** 本机核心子进程正在运行且运维触发创建
+- **THEN** 写客户端串行、与核心的本地 API 调用不在同秒并发；若仍撞每秒限速则诚实降级提示重试，MUST NOT 假成功
+
+### Requirement: 幂等与生命周期——write-ahead 台账、reconcile 对账、单飞互斥
+
+创建 SHALL 由 write-ahead 台账保护：桌面外壳 SHALL 在发出 `user/create` **之前**先写一条 `pending` 记录（含所选模板/代理位/时间戳），拿到分身 id 后再补 id、置 `created`，台账写盘 SHALL 为原子写（临时文件 + rename）。桌面外壳 SHALL 提供 reconcile：拉 `user/list` 与台账全量对账，AdsPower 有而台账无标 `untracked-orphan`、台账有而 AdsPower 无标 `stale`，并在创建前/启动前可跑。创建动作在主进程 SHALL **单飞互斥**（同一时刻只一个创建在途，重入诚实返回「进行中」），渲染层触发控件 SHALL 在请求在途时禁用。崩溃后 SHALL 能据 `pending`/台账恢复重放或清理，MUST NOT 因崩溃窗口漏记真实分身而下次重复创建、复用同一代理。
+
+#### Scenario: 崩溃窗口不致漏记与重复建号
+- **WHEN** `user/create` 已成功但在写台账 id 前进程崩溃
+- **THEN** reconcile 经 `user/list` 对账发现该分身并标 `untracked-orphan`，下次创建 MUST NOT 对它失明而重复建一个复用同代理的新分身
+
+#### Scenario: 重复点击不双建
+- **WHEN** 运维在创建在途时再次点击「创建环境」
+- **THEN** 主进程单飞互斥拒绝重入、渲染层控件已禁用，MUST NOT 交错跑出两个各绑同一代理的分身
+
+### Requirement: 凭据只内存持有、绝不明文落盘、日志脱敏
+
+AdsPower API key 与代理账号密码 SHALL 仅在创建批处理期间**内存持有**，MUST NOT 明文写入 `settings.json` 或任何台账/文档；台账 SHALL 只存非密的代理摘要。`user/create` 的 POST 请求体 SHALL NOT 被整体 stringify 进日志/错误，日志与错误透传层 SHALL 显式脱敏 `proxy_user`/`proxy_password` 与 `Authorization`。确需持久化敏感值时 SHALL 用 OS keychain（如 `safeStorage`），MUST NOT 写明文设置。
+
+#### Scenario: 代理账密不落盘不进日志
+- **WHEN** 创建时携带了代理账号密码，且某条 `user/create` 返回错误
+- **THEN** 账密只内存持有、不写入 settings/台账，错误信息中 `proxy_password`/`Authorization` 被脱敏，MUST NOT 出现在日志/UI
+
+### Requirement: 代理为软提示、非创建硬闸，无代理如实标注
+
+桌面外壳 SHALL NOT 因未配代理而阻止创建：未配代理时 SHALL 给出提醒，但仍允许创建。桌面外壳 SHALL 在环境列表如实呈现「无代理」状态（`no_proxy` 可从 `user/list` 读出），使无代理环境不被误当作已配好独立代理；该标注 MUST NOT 拦截任何操作。代理供给本身 SHALL 由运维手动完成，桌面外壳 MUST NOT 自动采购/管理代理池。
+
+#### Scenario: 未配代理仍可创建但给提醒并标注
+- **WHEN** 运维未给环境配代理即点「创建环境」
+- **THEN** 桌面外壳给出「未配置代理」提醒但仍允许创建，成功后该环境在列表如实标「无代理」，不阻止任何后续操作
+
+### Requirement: 创建时预填绑定意图 intendedAccountLabel
+
+创建时账号尚未登录（登录在后、由人手扫码），桌面外壳 SHALL 允许运维为该环境**预填一个 `intendedAccountLabel`**（该分身打算承载哪个号的人肉意图锚），并随台账持久化。该字段 SHALL 供 `environment-readiness-verification` 与登录握手时回写比对真实 accountId 之用，MUST NOT 被当作已确立的绑定（绑定在登录时才成立并校验）。
+
+#### Scenario: 预填意图账号供登录时比对
+- **WHEN** 运维创建环境时填了「打算给账号 A」
+- **THEN** 台账记录 `intendedAccountLabel=A`，供之后登录握手回写真实 accountId 时比对
+
+### Requirement: MUST NOT 程序化删除任何分身
+
+桌面外壳 MUST NOT 接线任何程序化 `user/delete`。孤儿分身（reconcile 标出的 `untracked-orphan`/`stale`）SHALL 仅**暴露其 user_id 并引导运维在 AdsPower 中手动删除**，MUST NOT 由 aidcp 自动删除。删除已登录暖号不可逆且云端零审计，故此红线 SHALL 不在本 change 放开。
+
+#### Scenario: 孤儿只暴露不自动删
+- **WHEN** reconcile 标出若干 `untracked-orphan` 分身
+- **THEN** 桌面外壳列出其 user_id 引导运维去 AdsPower 手动删，MUST NOT 调用任何删除接口
+
+### Requirement: 单次创建规模上限与观测能力挂钩
+
+单次创建（或一批）的分身数量上限 N SHALL 与「能观测到号被平台盯上 + 后台可逐账号可观测绑定/健康」的能力挂钩。在真实封号/限流信号未接入状态迁移、且后台逐账号可观测未就绪之前，N SHALL 收敛到不大于 3，桌面外壳 MUST NOT 把「一键创建十号」当默认路径。放开 N>3 SHALL 以观测能力就绪为前置（能力门、非时间顺序）。
+
+#### Scenario: 观测未就绪时 N 收敛
+- **WHEN** 真实封号信号未接入、后台逐账号可观测未就绪，运维试图一次创建超过 3 个环境
+- **THEN** 桌面外壳把 N 限制在不大于 3 并说明原因，MUST NOT 默认放开到十号
