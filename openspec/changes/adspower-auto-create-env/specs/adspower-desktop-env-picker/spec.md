@@ -10,7 +10,7 @@
 
 ### Requirement: 桌面外壳「创建环境」程序化建号入口 + 是否配代理提示
 
-`adspower` 模式下，桌面外壳的「创建环境」入口 SHALL 触发 `adspower-environment-provisioning` 的程序化建号流程（而非仅拉起 AdsPower 客户端），运维 SHALL 只需挑一个「整机模板」，MUST NOT 被要求在面板内逐字段手配指纹。触发控件 SHALL 在创建在途时禁用（配合主进程单飞互斥）。**唯一的运营提示 = 「是否配置了代理」**：环境列表 SHALL 对每个环境如实呈现其代理配置状态，无代理（`user_proxy_config.proxy_soft` 为 `no_proxy` / 空）SHALL 给出「未配置代理」提示；该提示为纯提醒、MUST NOT 阻止任何操作（代理由运维手动在 AdsPower 侧配）。桌面外壳 MUST NOT 自动做运行时自检 / 投产硬闸 / 就绪判定——创建成功即如实呈现「已创建」，是否可用由运维登录时自行确认。本地 API 不可达或程序化创建失败时 SHALL 诚实降级（如实说明原因，并保留「打开 AdsPower 手动新建」兜底），MUST NOT 谎报已创建。
+`adspower` 模式下，桌面外壳的「创建环境」入口 SHALL 触发 `adspower-environment-provisioning` 的程序化建号流程（而非仅拉起 AdsPower 客户端），运维 SHALL 只需挑一个「整机模板」，MUST NOT 被要求在面板内逐字段手配指纹。触发控件 SHALL 在创建在途时禁用（配合主进程单飞互斥）。**唯一的运营提示 = 「是否配置了代理」**：环境列表 SHALL 对每个环境如实呈现其代理配置状态，无代理（`user_proxy_config.proxy_soft` 为 `no_proxy` / 空）SHALL 给出「未配置代理」提示；该提示为纯提醒、MUST NOT 阻止任何操作（代理由运维手动在 AdsPower 侧配）。桌面外壳 MUST NOT 自动做运行时自检 / 投产硬闸 / 就绪判定——创建成功即如实呈现「已创建」，是否可用由运维登录时自行确认。本地 API 不可达或程序化创建失败时 SHALL 诚实降级（如实说明原因），MUST NOT 谎报已创建（不再提供「打开 AdsPower 手动新建」外链）。环境列表每行 SHALL 提供**删除入口**，其行为按 `adspower-environment-provisioning` 的「删除环境仅经界面逐个二次确认」需求（点两次确认、警示不可恢复）。
 
 #### Scenario: 挑模板一键程序化创建，不必手配指纹
 - **WHEN** 运维在「创建环境」入口选定一个整机模板并确认
@@ -22,4 +22,8 @@
 
 #### Scenario: 创建失败诚实降级
 - **WHEN** 本地 API 不可达或 `user/create` 返回错误
-- **THEN** 桌面外壳如实说明失败原因并保留「打开 AdsPower 手动新建」兜底，MUST NOT 谎报已创建
+- **THEN** 桌面外壳如实说明失败原因，MUST NOT 谎报已创建
+
+#### Scenario: 每行删除入口二次确认
+- **WHEN** 运维点击某环境行的删除按钮
+- **THEN** 第一次仅进入「确认删除?」待确认态、第二次才真删；删除后刷新列表

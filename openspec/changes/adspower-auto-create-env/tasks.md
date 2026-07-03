@@ -37,6 +37,8 @@
 - [x] 5.2 「创建环境」入口改触发程序化建号（挑整机模板下拉，不在面板逐字段配指纹）；创建失败诚实降级、保留「打开 AdsPower 手动新建」兜底（改 id=`ads-create-manual`）；成功即呈现「已创建」 <!-- aidcp-edge beda2e5 renderer.js + index.html -->
 - [x] 5.3 环境列表对每个环境显示**是否配置了代理**（`no_proxy`/空 → 「无代理配置」纯提醒、不拦任何操作） <!-- 现成：renderer.js populateEnvs 已显示 prof.proxy||'无代理配置'（summarizeProxy），无需改 -->
 - [x] 5.4 UI 钩子接在 `edge-companion-ui` 已落地的新 renderer 上（其已 ff 合并 master，直接在新 UI 上实装、无需 rebase） <!-- aidcp-edge beda2e5 -->
+- [x] 5.5 （据用户 2026-07-03）移除「打开 AdsPower 新建环境」手动外链（创建已程序化） <!-- aidcp-edge 8c339f8 index.html/renderer.js + smoke 断言同步 -->
+- [x] 5.6 （据用户 2026-07-03）删除环境功能：C3 放宽为「界面逐个二次确认删」——每行「删」按钮点两次确认、警示不可恢复；写客户端放行 `user/delete`（`browser/*` 仍禁）、`ads:deleteEnv` IPC；MUST NOT 自动/批量 <!-- aidcp-edge 8c339f8 ads-write-api.deleteProfile + main/preload + renderer makeDeleteBtn；deleteProfile 放行断言 + 点两次才删 smoke 用例 -->
 
 ## 6. 收尾验证与归档
 

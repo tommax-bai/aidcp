@@ -56,10 +56,18 @@ AdsPower API key 与代理账号密码 SHALL 仅在创建批处理期间**内存
 - **WHEN** 运维未给环境配代理即点「创建环境」
 - **THEN** 桌面外壳给出「未配置代理」提醒但仍允许创建，成功后该环境在列表如实标「无代理」，不阻止任何后续操作
 
-### Requirement: MUST NOT 程序化删除任何分身
+### Requirement: 删除环境仅经界面逐个二次确认触发，绝不自动 / 批量
 
-桌面外壳 MUST NOT 接线任何程序化 `user/delete`。需清理的孤儿分身 SHALL 仅**暴露其 user_id 并引导运维在 AdsPower 中手动删除**，MUST NOT 由 aidcp 自动删除。删除已登录暖号不可逆且云端零审计，故此红线 SHALL 不在本 change 放开。
+桌面外壳 MAY 提供删除环境（`user/delete`）功能，但 SHALL 仅由运维在界面上**逐个、二次确认**触发：第一次点击仅进入待确认态（如「确认删除?」，短时后自动收回）、**第二次点击才执行**删除。删除前 SHALL 明确警示**不可恢复**（若该环境已登录账号，其登录态 / cookie 一并丢失）。删除 MUST NOT 自动触发、MUST NOT 批量执行、MUST NOT 由本机 ledger / 过期状态驱动。写客户端对 `user/delete` 放行、但对浏览器生命周期（`browser/start|stop|active`）SHALL 仍**直接抛错**（M7 不变）。凭据同建号：只内存持有、日志脱敏。
 
-#### Scenario: 孤儿只暴露不自动删
-- **WHEN** 从 `user/list` 认出若干疑似残留分身
-- **THEN** 桌面外壳列出其 user_id 引导运维去 AdsPower 手动删，MUST NOT 调用任何删除接口
+#### Scenario: 删除需二次确认
+- **WHEN** 运维点击某环境的删除按钮
+- **THEN** 第一次点击仅进入「确认删除?」待确认态、不发任何删除请求；第二次点击才执行 `user/delete`，删前已警示不可恢复
+
+#### Scenario: 绝不自动 / 批量删
+- **WHEN** 任何非「运维逐个二次确认」的路径（自动清理 / 批量 / ledger 驱动）
+- **THEN** MUST NOT 触发删除
+
+#### Scenario: 写客户端仍禁浏览器生命周期
+- **WHEN** 代码路径尝试经写客户端调用 `browser/start|stop|active`
+- **THEN** 直接抛错、不发出（放宽 `user/delete` 不动 M7 生命周期红线）
