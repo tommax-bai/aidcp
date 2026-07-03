@@ -38,15 +38,11 @@
 
 ### Requirement: 幂等与生命周期——以 AdsPower user/list 为账本、专用分组/备注、单飞互斥
 
-本 change 建的分身 SHALL 归入一个专用分组，创建时 SHALL 把「意图账号 / 模板 / 建号机」写进分身 `remark`（随 `user/create` 一次写入、随 `user/list` 读回）。「有哪些分身、各绑什么代理」SHALL 以 AdsPower `user/list` 为**唯一账本**读取，MUST NOT 另建本机 write-ahead 台账（与 AdsPower 自身记录重复，徒增丢失 / 损坏 / 与 AdsPower 走样的同步面）。理由：号一旦登录、edge 一起即经握手把账号↔分身↔机器上报云端（见「握手载荷携带并持久化」需求），该上报已有、不重造；仅「创建后、登录前」空壳期云端不可见，而这段 AdsPower `user/list` 本就记着分身 + 各自代理，是现成账本。建号前 SHALL 读 `user/list` 的**已占代理集去重**，MUST NOT 把一条已被现有分身占用的代理再绑给新分身。创建动作在主进程 SHALL **单飞互斥**（同一时刻只一个创建在途，重入诚实返回「进行中」），渲染层触发控件 SHALL 在请求在途时禁用。崩溃后 SHALL 据下次 `user/list` 直接看见已建分身（不丢账），MUST NOT 因崩溃窗口重复建号、复用同一代理。
+本 change 建的分身 SHALL 归入一个专用分组，创建时 SHALL 把「意图账号 / 模板 / 建号机」写进分身 `remark`（随 `user/create` 一次写入、随 `user/list` 读回）。「有哪些分身、各绑什么代理」SHALL 以 AdsPower `user/list` 为**唯一账本**读取，MUST NOT 另建本机 write-ahead 台账（与 AdsPower 自身记录重复，徒增丢失 / 损坏 / 与 AdsPower 走样的同步面）。理由：号一旦登录、edge 一起即经握手把账号↔分身↔机器上报云端（见「握手载荷携带并持久化」需求），该上报已有、不重造；仅「创建后、登录前」空壳期云端不可见，而这段 AdsPower `user/list` 本就记着分身 + 各自代理，是现成账本。代理全程手工、本按钮 MUST NOT 碰（不下发 / 不校验 / 不去重——见「代理为软提示、非创建硬闸」需求）。创建动作在主进程 SHALL **单飞互斥**（同一时刻只一个创建在途，重入诚实返回「进行中」），渲染层触发控件 SHALL 在请求在途时禁用。崩溃后 SHALL 据下次 `user/list` 直接看见已建分身（在专用分组、带 `remark`，不丢账）。
 
-#### Scenario: 崩溃后据 user/list 不丢账不重复
+#### Scenario: 崩溃后据 user/list 不丢账
 - **WHEN** `user/create` 已成功建出分身但紧接着进程崩溃 / 关窗
-- **THEN** 下次读 `user/list` 直接看见该分身（在专用分组、带 `remark`），创建流程据其已占代理去重，MUST NOT 重复建一个复用同代理的新分身
-
-#### Scenario: 建号前据已占代理集去重
-- **WHEN** 待绑代理已被某现有分身（`user/list` 可见）占用
-- **THEN** 创建流程诚实拒绝把该代理再绑给新分身，避免两号共用一条代理
+- **THEN** 下次读 `user/list` 直接看见该分身（在专用分组、带 `remark`），无需本机台账即可续接
 
 #### Scenario: 重复点击不双建
 - **WHEN** 运维在创建在途时再次点击「创建环境」

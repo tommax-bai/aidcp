@@ -22,14 +22,16 @@
 
 <!-- 简化(用户 2026-07-03)：去掉自建本机 write-ahead 台账，改以 AdsPower user/list 为账本 + 专用分组 + remark 承载意图/模板/机器。理由：登录后 edge 握手即上报账号↔分身↔机器(Task 7)，只有创建-登录空窗云端不可见，而 user/list 本就是现成账本。 -->
 
-- [ ] 4.1 本 change 建的分身归入专用分组；创建时把「意图账号 / 模板 / 建号机」写进分身 `remark`（随 `user/create` 一次写入）——不建本机台账
-- [ ] 4.2 以 `user/list` 为唯一账本：建号前读其「已占代理集」去重（拒绝把已占代理再绑新分身）；崩溃后据下次 `user/list` 直接看见已建分身（不丢账、不重复建）
-- [ ] 4.3 主进程创建动作单飞互斥（重入诚实返回「进行中」），渲染层触发控件在途禁用
-- [ ] 4.4 凭据只内存持有、绝不明文落盘；POST 日志/错误层脱敏 `proxy_user`/`proxy_password`/`Authorization`，禁 stringify 整个 body（`ads-write-api.cjs` 已具备，接线时用 `redactSensitive`）
-- [ ] 4.5 创建成功仅标「仅配置层/未验证/不可投产」，绝不把 `create` 回 id 当就绪
-- [ ] 4.6 创建时可预填 `intendedAccountLabel`，写进分身 `remark`（随 `user/list` 读回，供登录时比对）
-- [ ] 4.7 MUST NOT 接线任何程序化 `user/delete`；孤儿只暴露 user_id 引导人工在 AdsPower 删
-- [ ] 4.8 单次创建规模 N 与观测能力挂钩：观测未就绪时限 N≤3 并说明原因
+- [x] 4.1 本 change 建的分身归入专用分组；创建时把「意图账号 / 模板 / 建号机」写进分身 `remark`（随 `user/create` 一次写入）——不建本机台账 <!-- aidcp-edge 03b6dde ads-create-flow.cjs encodeRemark；专用分组经写客户端 createGroup(7227783) -->
+- [x] 4.2 崩溃后据下次 `user/list` 直接看见已建分身（专用分组 + `remark`，不丢账、无需本机台账续接）；**代理全程手工、本按钮不碰（不下发/不校验/不去重）** <!-- aidcp-edge 03b6dde 无本机台账；createEnvironment 只传 no_proxy、零代理逻辑 -->
+- [x] 4.3 主进程创建动作单飞互斥（重入诚实返回「进行中」） <!-- aidcp-edge 03b6dde ads-create-flow 单飞互斥；「渲染层控件在途禁用」随 task 5 UI 接线 -->
+- [ ] 4.4 凭据只内存持有、绝不明文落盘 <!-- 机制就绪：ads-write-api 错误不含 body + redactSensitive(7227783)；「不落 settings.json」的接线随 task 5 main.cjs -->
+- [x] 4.5 创建成功仅标「仅配置层/未验证/不可投产」，绝不把 `create` 回 id 当就绪 <!-- aidcp-edge 03b6dde status=UNVERIFIED -->
+- [x] 4.6 创建时可预填 `intendedAccountLabel`，写进分身 `remark`（随 `user/list` 读回，供登录时比对） <!-- aidcp-edge 03b6dde encodeRemark/parseRemark -->
+- [x] 4.7 MUST NOT 接线任何程序化 `user/delete`；孤儿只暴露 user_id 引导人工在 AdsPower 删 <!-- aidcp-edge 7227783 allowlist 已断言禁 user/delete；「孤儿暴露」随 task 5 UI -->
+- [ ] 4.8 单次创建规模 N 与观测能力挂钩：观测未就绪时限 N≤3 并说明原因 <!-- policy/UI，随 task 5 -->
+
+<!-- task 4 核心逻辑（编排/护栏/断言/remark/互斥/无台账/无代理）已落 aidcp-edge 03b6dde；剩 4.4「不落盘」接线 + 4.8「N 上限」policy 随 task 5（main.cjs/UI，串行等 edge-companion-ui）。 -->
 
 ## 5. aidcp-edge — preload/IPC + 按钮 UI（与 edge-companion-ui 串行，待其落地后 rebase）
 
