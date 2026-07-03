@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 约 32 个角色，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> v2 共 **56 个消息类型**，下表按职能分组列全。
+> v2 共 **57 个消息类型**，下表按职能分组列全。
 
 ## 1. 信封（Envelope）
 
@@ -53,6 +53,7 @@
 | --- | --- | --- | --- |
 | `hello` | edge → cloud | `welcome` | 边缘上线握手，声明能力 |
 | `welcome` | cloud → edge | — | 握手确认，下发 sessionId |
+| `ui.snapshot` | cloud → edge | — | 陪伴界面数据回填（昵称/最近发布/审批状态；hello 注册完成后全量 + 审批变化时增量） |
 | `plan.request` | edge → cloud | `plan.response` | 高层目标拆解为步骤 |
 | `plan.response` | cloud → edge | — | 返回有序步骤清单 |
 | `select.request` | edge → cloud | `select.response` | 元素清单 + 目标，请云端选一个 |
@@ -153,6 +154,23 @@
   "serverVersion": "0.1.0"    // string  服务端版本
 }
 ```
+
+**`ui.snapshot`**（cloud → edge，主动推送；change edge-companion-ui 8.1）
+```jsonc
+{
+  "account": { "id": "acc-1", "nickname": "晚风手作" },   // 可选；昵称空则整个字段不带（宁缺毋假）
+  "lastPublish": { "title": "上一篇", "at": 1730000000000 }, // 可选；最近一次成功发布（at=epoch ms，为草稿入库时间近似）
+  "publish": { "state": "pending", "title": "候审笔记", "code": "#83" } // 可选；审批状态增量
+}
+```
+发送时机：① 边缘 hello 注册完成后（连接进推送表且 `welcome` 已回发之后，避开「hello 处理中推送
+sent=0」前科）回填全量快照；② 发布审批生命周期变化时增量推送（`pending`=草稿候审、`approved`=授权
+已核、`rejected`=拒绝发布、`failed`=云端终判失败）。`published` 不经此通道——边缘在 `submit_publish`
+成功处自知并本地打 `[ui-event]` 行；`reminded` 枚举保留但云端当前无再提醒机制、不会出现。`code` 与
+飞书审批卡「编号」字段同源（发布记录 id，如 `#83`），供界面对暗号。边缘核心收到后转成 `[ui-event]`
+结构化行打到 stdout，由 Electron 壳解析驱动标题带与发布卡（解析器 `src/electron/ui-events.cjs`）。
+已拒草稿在 hello 快照不回放（拒绝时刻已实时推过，重启不翻旧账）。推送为 best-effort：账号无在线
+边缘即如实放弃，持久态由下次 hello 快照补齐。
 
 ### 3.2 任务规划
 
