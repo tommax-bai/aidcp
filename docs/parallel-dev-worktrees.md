@@ -75,7 +75,15 @@ scripts/new-change <aidcp-edge|aidcp-cloud|aidcp-console> <change-name>
 
 ## 3b. 多终端模式（形态 A：每终端一条流）`[稳]`
 
-用户自己开 N 个 claude CLI 终端并行开发时，每终端一条命令进车道：
+用户自己开 N 个 claude CLI 终端并行开发时，**最简入口是斜杠命令**（定义在 `.claude/commands/`，指令自包含、不依赖 session 自行理解规范）：
+
+```bash
+cd ~/codes/aidcp && claude          # 每个终端正常启动
+/impl <change名>                     # 指派实装：全流程自动（worktree→开发→land→回写→归档）
+/claim                              # 或让它自己领活：worktree=认领锁，先报所选再开工
+```
+
+等价的一条 shell 命令（免进 claude 再敲命令）：
 
 ```bash
 cd ~/codes/aidcp && scripts/spawn-change <repo> <change-name> --launch
