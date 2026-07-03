@@ -35,6 +35,16 @@
 - aidcp-edge：并发 ≤ 2。
 - aidcp-console：并发 ≤ 2。
 
+### 用手动 `git worktree add`，不用内置 EnterWorktree/ExitWorktree
+
+本项目一律用**手动 `git worktree add` 到目标子仓**（`scripts/new-change` 封装），**不要**用 Claude Code 内置的 `EnterWorktree`/`ExitWorktree`。原因是内置工具只适配「单仓隔离分支」，不合本项目「中控仓驱动、代码落子仓」的多仓模型（已对照工具接口核实）：
+
+- **只能操作当前仓**：内置 worktree 建在当前仓 `.claude/worktrees/`，`path` 进已有 worktree 也要求它属于当前仓。session 锚在中控仓 aidcp，就**开不出 / 进不了 aidcp-cloud 等子仓的 worktree**——而要隔离的正是子仓。
+- **会切走 session cwd**：而本项目要 cwd 锚在中控仓（`openspec/` + `tasks.md` 在这），代码落子仓、来回走；切走反而别扭。
+- **生命周期纳管不覆盖手动 worktree**：`ExitWorktree` 明确只管 `EnterWorktree` 建的，不碰 `git worktree add` 的——多仓场景连它的 keep/remove 便利都吃不到。
+
+单仓（非本项目多仓编排）做隔离分支时，内置工具是好默认；本项目用手动。
+
 ## 2. 目录布局 `[稳]`
 
 worktree 放到各仓的兄弟目录 `<repo>.wt/<change-name>`，保持主 checkout 干净、作为
