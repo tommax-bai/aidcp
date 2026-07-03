@@ -7,16 +7,16 @@
 
 ## 2. aidcp-edge — 写客户端与红线（MVP，非 UI，可先行）
 
-- [ ] 2.1 新增与只读 `ads-local-api` 分离的「写客户端」，硬编码 allowlist 只放行 `user/create`/`group/create`，任何 `browser/start|stop|active` 路径直接抛错
-- [ ] 2.2 写客户端复用 ≥1 秒串行节流；本机核心子进程活跃时不并发跑批量写（撞每秒限速诚实降级、不假成功）
-- [ ] 2.3 回归断言：证明写客户端结构上到不了浏览器生命周期端点（红线靠测试守）
+- [x] 2.1 新增与只读 `ads-local-api` 分离的「写客户端」，硬编码 allowlist 只放行 `user/create`/`group/create`，任何 `browser/start|stop|active` 路径直接抛错 <!-- aidcp-edge 7227783 src/electron/ads-write-api.cjs -->
+- [x] 2.2 写客户端复用 ≥1 秒串行节流；本机核心子进程活跃时不并发跑批量写（撞每秒限速诚实降级、不假成功） <!-- aidcp-edge 7227783 串行节流单链已实现；「核心活跃时不并发批量写」的互斥闸留 task 4.3/M6 与 main.cjs 接线时落 -->
+- [x] 2.3 回归断言：证明写客户端结构上到不了浏览器生命周期端点（红线靠测试守） <!-- aidcp-edge 7227783 test/electron/ads-write-api.test.ts：browser/start|stop|active + user/delete 抛错且零 fetch，11/11 过 -->
 
 ## 3. aidcp-edge — 指纹生成策略：模板 + 护栏 + 一致断言（MVP，非 UI）
 
-- [ ] 3.1 定义少量「整机模板」（Win/Mac 各若干套，OS 为第一锁定字段；`device_memory`/`hardware_concurrency`/`screen_resolution`/字体/renderer 家族折进模板、不逐字段独立随机）
-- [ ] 3.2 委托生成为主构造 `fingerprint_config`（`ua_auto`、canvas/webgl_image/audio/client_rects 噪声=1、关闭「每次启动重随机指纹」、`webrtc=proxy`、时区/语言 based-on-IP）
-- [ ] 3.3 薄静态护栏：`device_memory` 只允 2 的幂封顶 8（拒 `6`）、`hardware_concurrency` 真实值、`webgl` 模式不自相取消、字体不跨 OS（据 1.1/1.2 定细节）
-- [ ] 3.4 提交前「声明 OS == UA OS == 字体 OS == renderer 家族 OS」四者一致断言，不符诚实拒建
+- [x] 3.1 定义少量「整机模板」（Win/Mac 各若干套，OS 为第一锁定字段；`device_memory`/`hardware_concurrency`/`screen_resolution`/字体/renderer 家族折进模板、不逐字段独立随机） <!-- aidcp-edge b92989b DEVICE_TEMPLATES 5 套(win×3/mac×2)，OS 第一锁定 -->
+- [x] 3.2 委托生成为主构造 `fingerprint_config`（**显式 pin OS 而非 ua_auto**、canvas/webgl_image/audio/client_rects 噪声=1、不启用「每次启动重随机指纹」、`webrtc=proxy`、时区/语言 based-on-IP） <!-- aidcp-edge b92989b buildFingerprintConfig；据探针 1.3 用 random_ua.ua_system_version pin OS(ua_auto 会随机分 OS/iPhone) -->
+- [x] 3.3 薄静态护栏：`device_memory` 只允 2 的幂（拒 `6`）、`hardware_concurrency` 真实值、`webgl` 模式不自相取消、`webrtc` 禁 local/real、噪声必开、字体不跨 OS <!-- aidcp-edge b92989b validateGuardrails -->
+- [x] 3.4 提交前「声明 OS == UA OS == 字体 OS == renderer 家族 OS」四者一致断言，不符诚实拒建 <!-- aidcp-edge b92989b assertOsCoherent，拦 H6「Mac 画像+Windows renderer」 -->
 
 ## 4. aidcp-edge — 创建管线：台账/幂等/凭据安全（MVP，非 UI）
 
