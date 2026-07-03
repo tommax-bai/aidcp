@@ -41,7 +41,12 @@
 - [x] 5.2 `populateEnvs` 增自动选中：恰好 1 个环境且分身 ID 为空 → 自动选中并明示；多环境不代选、已有值不覆盖 <!-- aidcp-edge 50a8b23 加一道「核心未在运行」闸（运行中绝不偷改配置），delta spec 已同步补该措辞 -->
 - [x] 5.3 待配置态：首屏醒目主动步骤条（点击开抽屉），替代灰 notice；登录引导同步升级为主动步骤（检测到登录自动前进） <!-- aidcp-edge 50a8b23 登录检测自动前进沿用既有 cookie 轮询（checkLoginAndStart），文案与样式升级 -->
 
-## 6. 回归与收口
+## 6. 启动行为与文案（用户验收反馈第 5 轮）
+
+- [x] 6.a 客户端启动不自动开跑：whenReady 只做轻量预检（缺配置亮「待配置」引导 / 配置齐备诚实「就绪」），任务由用户点「启动」开跑；恢复/重新登录/按新设置重启仍为用户主动动作；delta spec 增「客户端启动不自动开跑任务」要求 <!-- aidcp-edge de0ee62 已 ff 合回 master；538/538 + typecheck -->
+- [x] 6.b 发布卡空态卡头与收起薄条标题改「发布过的 AI 写好的笔记」；脚注只加粗「通过/驳回」；编号值加设计稿灰底小片 <!-- aidcp-edge d1eeaa6 + de0ee62 -->
+
+## 7. 回归与收口
 
 - [x] 6.1 `cd ../aidcp-edge && npm test && npm run typecheck`（含新增 ui-events / ui-logic 单测；FAB 三态与设置既有行为回归） <!-- worktree 内 490/490 全量 + 11/11 acceptance + typecheck 干净（2026-07-03，分支 50a8b23） -->
 - [x] 6.2 mac 端到端冒烟：启动 → 待配置引导 → 抽屉配置 → 登录 → 活动流滚动 → 暂停/恢复 → 模拟发布候审卡（喂日志行） <!-- 2026-07-03 用 worktree 本地演示假核心（gitignored dist/main.js，按剧本打日志、零真实副作用）真机驱动全链路：标题带/在场感 shimmer/循环 chip/活动流/今日小结/发布候审卡（含结构化 [ui-event] pending→approved→published 流转）均如 v3 设计呈现且进程全程无崩溃（首帧截图存档，后续帧被用户前台窗口遮挡未截）；抽屉交互/暂停恢复/五状态断言由 companion-ui jsdom 冒烟 13 条覆盖。注意：本机存量旧实例会占单实例锁，冒烟前先清（见 memory edge-companion-ui-rollout） -->
@@ -49,6 +54,6 @@
 - [ ] 6.4 结构化 `[ui-event]` 发射点（发布链路内）标记串行：待 `publish-edge-command-runtime` 收口后按需补插（或由其顺手带上），本 change 不触碰发布文件
 - [ ] 6.5 `openspec validate edge-companion-ui --strict` → 合回 master + 部署分发 → archive <!-- 2026-07-03 已合回：rebase 到 master 44d56ad 后 493/493+typecheck+acceptance 全绿，ff 合并推送（master 9ef116e）；双平台安装包产物在 worktree dist-electron/（AIDCP-0.2.0*.dmg/zip + AIDCP Setup 0.2.0.exe）。archive 待 6.4（[ui-event] 发射点，等 publish-edge-command-runtime 收口）与分发落定后执行 -->
 
-## 7. 云端数据回填（串行批：与 6.4 同等 publish-edge-command-runtime 收口）
+## 8. 云端数据回填（串行批：与 7.4[原6.4] 同等 publish-edge-command-runtime 收口）
 
-- [ ] 7.1 云端账号资料快照下发：边缘握手确认（或会话启动）时云端下发 {昵称, 最近发布摘要 {title, at}}——昵称云端账号主数据已有、发布记录云端已有；edge 核心收到后转 `[ui-event]` 行给壳（壳侧已就绪：status.account source='xhs' 优先于环境名、status.lastPublish 以云端为准替代本地 ui-state）。热点提醒：动协议载荷 = 两份 protocol.ts 逐字同步 + docs/protocol.md + 视需要 command-bridge，按并行规范串行、绝不与并行 change 同时碰
+- [ ] 8.1 云端账号资料快照下发：边缘握手确认（或会话启动）时云端下发 {昵称, 最近发布摘要 {title, at}}——昵称云端账号主数据已有、发布记录云端已有；edge 核心收到后转 `[ui-event]` 行给壳（壳侧已就绪：status.account source='xhs' 优先于环境名、status.lastPublish 以云端为准替代本地 ui-state）。热点提醒：动协议载荷 = 两份 protocol.ts 逐字同步 + docs/protocol.md + 视需要 command-bridge，按并行规范串行、绝不与并行 change 同时碰
