@@ -14,7 +14,7 @@
 
 - [x] 2.1 `main.cjs` `createWindow()`：mac `titleBarStyle:'hidden'` + `trafficLightPosition`；win `titleBarStyle:'hidden'` + `titleBarOverlay{color,symbolColor,height:46}`；其余平台默认框；窗口尺寸随新布局微调 <!-- aidcp-edge 50a8b23 760x640 / min 640x520 -->
 - [x] 2.2 渲染器标题带：46px drag 区 + 控件岛 no-drag（账号名 / 健康药丸 / 齿轮）；风控状态染色（normal 平静 / warned 琥珀 / restricted·frozen 警示），win32 同步 `setTitleBarOverlay`（try/catch） <!-- aidcp-edge 50a8b23 -->
-- [ ] 2.3 mac 本机冒烟：红绿灯 / 拖拽 / 控件点击互不冲突；win 打包件冒烟留待 §6
+- [x] 2.3 mac 本机冒烟：红绿灯 / 拖拽 / 控件点击互不冲突；win 打包件冒烟留待 §6 <!-- 2026-07-03 真机截图验证：系统标题栏消失、红绿灯内嵌标题带、账号「@晚风手作」+ 小红书标 + 绿色「运行中 · 一切正常」药丸 + 齿轮齐备；注意本机若有旧实例在跑会触发单实例锁把旧窗口带前台（≠新代码未生效），冒烟前先清 -->
 
 ## 3. aidcp-edge — 主界面重排（renderer 三件套）
 
@@ -38,7 +38,7 @@
 ## 6. 回归与收口
 
 - [x] 6.1 `cd ../aidcp-edge && npm test && npm run typecheck`（含新增 ui-events / ui-logic 单测；FAB 三态与设置既有行为回归） <!-- worktree 内 490/490 全量 + 11/11 acceptance + typecheck 干净（2026-07-03，分支 50a8b23） -->
-- [ ] 6.2 mac 端到端冒烟：启动 → 待配置引导 → 抽屉配置 → 登录 → 活动流滚动 → 暂停/恢复 → 模拟发布候审卡（喂日志行）
+- [x] 6.2 mac 端到端冒烟：启动 → 待配置引导 → 抽屉配置 → 登录 → 活动流滚动 → 暂停/恢复 → 模拟发布候审卡（喂日志行） <!-- 2026-07-03 用 worktree 本地演示假核心（gitignored dist/main.js，按剧本打日志、零真实副作用）真机驱动全链路：标题带/在场感 shimmer/循环 chip/活动流/今日小结/发布候审卡（含结构化 [ui-event] pending→approved→published 流转）均如 v3 设计呈现且进程全程无崩溃（首帧截图存档，后续帧被用户前台窗口遮挡未截）；抽屉交互/暂停恢复/五状态断言由 companion-ui jsdom 冒烟 13 条覆盖。注意：本机存量旧实例会占单实例锁，冒烟前先清（见 memory edge-companion-ui-rollout） -->
 - [ ] 6.3 electron-builder 双平台打包，win-unpacked 验 titleBarOverlay 观感与窗控
 - [ ] 6.4 结构化 `[ui-event]` 发射点（发布链路内）标记串行：待 `publish-edge-command-runtime` 收口后按需补插（或由其顺手带上），本 change 不触碰发布文件
 - [ ] 6.5 `openspec validate edge-companion-ui --strict` → 合回 master + 部署分发 → archive
