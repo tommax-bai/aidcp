@@ -39,6 +39,8 @@ TBD - created by archiving change aidcp-console-panel-mvp. Update Purpose after 
 
 面板只读接口 SHALL 组合已持久化存储（风控状态 / 计数器 / 发布记录 / 概念）与进程内活态（在线边缘登记、在途发布槽）产出视图，且 MUST 只用已有索引的点查/范围查询、MUST NOT 跑会阻塞事件循环的全表扫描或重聚合（避免给 `8787` 边缘命令下发加延迟）。MVP 接口至少含：`GET /api/version`、`GET /api/dashboard/summary`、`GET /api/accounts`、`GET /api/accounts/:id`、`GET /api/content/queue`、`GET /api/content/published`、`GET /api/analytics/like-rate`。
 
+已发布历史接口 `GET /api/content/published` SHALL 在每条记录中返回 `accountId`、`content`（已发布正文全文）、`postUrl`（详情页链接，可空），以及既有 `id`/`title`/`status`/`platformPostId`/`publishedAt`；账号展示名 SHALL 取 `accounts.nickname ?? accounts.label ?? account_id`。该接口 SHALL 接受可选 `?accountId` 过滤，命中时凭 `publish_log.account_id` 既有索引做范围/点查、MUST NOT 退化为全表扫描。
+
 #### Scenario: 总览汇总走索引查询
 - **WHEN** 请求 `GET /api/dashboard/summary`
 - **THEN** 面板层用计数器的窗口查询 + 在线边缘数 + 风控状态点查组合返回，不执行阻塞事件循环的全表扫描
@@ -46,6 +48,14 @@ TBD - created by archiving change aidcp-console-panel-mvp. Update Purpose after 
 #### Scenario: 归因待补时不冒充按账号数字
 - **WHEN** `accountId` 归因尚未在事件上流通，而 `GET /api/dashboard/summary` 被请求
 - **THEN** 按账号切片被标记为「全部账号 / 归因待补」，绝不显示为按行的按账号数字
+
+#### Scenario: 已发布历史带账号、正文与详情链接
+- **WHEN** 请求 `GET /api/content/published`
+- **THEN** 每条记录含 `accountId`（及可解析的账号展示名）、`content` 全文、可空的 `postUrl`，以及既有字段；`postUrl` 缺失时为 null 而非伪造链接
+
+#### Scenario: 按账号过滤已发布历史
+- **WHEN** 请求 `GET /api/content/published?accountId=A`
+- **THEN** 仅返回 `account_id = 'A'` 的已发布记录，查询走 `publish_log.account_id` 索引、不全表扫描
 
 ### Requirement: 面板 WebSocket 为纯只读事件扇出，与边-云 ws 物理隔离
 
@@ -87,4 +97,56 @@ TBD - created by archiving change aidcp-console-panel-mvp. Update Purpose after 
 
 - **WHEN** 面板层为总览接口计算按账号用量 / 上限
 - **THEN** 该计算不触发任何风控状态写 / 迁移（`applySignal` / `setQuotaLevel` 不被调用），风控终态单写不变量不受影响
+
+### Requirement: 账号接口暴露人设绑定状态
+
+`GET /api/accounts`（及 `GET /api/accounts/:id`）SHALL 在账号视图中暴露**人设绑定状态**（如 `personaBound` / `needsPersonaSetup`），供后台账号列表标示「需设置人设」并跳转人设页。该字段 SHALL 沿用面板既有 JWT 鉴权，MUST NOT 另开免鉴权入口。该字段在 cloud 面板类型与 console 端类型为**手工镜像**，两处 MUST 同步以防漂移。
+
+#### Scenario: 账号列表标示需设置人设
+- **WHEN** 一个已登记但未绑人设的账号，经鉴权请求 `GET /api/accounts`
+- **THEN** 响应中该账号带「未绑人设 / 需设置」状态，后台据此标示并提供跳转人设页的入口
+
+#### Scenario: 状态字段受同一 JWT 守护
+- **WHEN** 未携带有效 JWT 请求 `GET /api/accounts`
+- **THEN** 返回 401，不泄露任何账号或其人设绑定状态
+
+### Requirement: 看板事件扇出跨每连接私有通道聚合
+
+当编排改为「每连接一条私有事件通道」后，实时看板的事件扇出 SHALL **跨所有连接的私有通道聚合**，对外仍呈现为**单一全局只读流**（与既有面板 WS 契约一致），MUST NOT 因通道私有化而漏掉某连接的事件或重复推送。该聚合仍是纯只读扇出，MUST NOT 触碰边缘 socket、MUST 沿用面板 WS 的 JWT 鉴权。
+
+#### Scenario: 多连接事件汇入单一看板流
+- **WHEN** 多个 edge 连接各自在自己的私有通道上产生面板相关事件
+- **THEN** 看板聚合这些通道、对浏览器仍输出一条单一全局流，各连接事件不漏不重
+
+#### Scenario: 私有化不破坏单连接看板
+- **WHEN** 全机只有一个 edge 连接
+- **THEN** 看板流内容与「单一全局总线」时代等价，无可见差异
+
+### Requirement: 待审草稿编辑端点（JWT 守护、依赖缺失非致命、拒因映射 HTTP）
+
+面板层 SHALL 暴露 `PUT /api/publish/:recordId/draft` 用于就地编辑待审正文草稿的标题 / 正文 / 可见范围 / 话题。该端点 MUST 落在既有 JWT 鉴权闸之下（以 JWT 主体作编辑者审计），MUST 在其依赖的草稿写对象缺失时返回 503（非致命、绝不崩塌关键闭环），MUST 对请求体做类型校验，并 MUST 把拥有者对象返回的可区分拒因映射为可区分 HTTP 语义（`not_found` → 404；`version_conflict` / `already_decided` / `not_pending` → 409；`invalid_title` / 非法字段 → 400；缺可见范围 → 422；成功 → 200 携写回后的 `recordId` / `contentVersion` / 标题 / 正文 / 元数据）。该端点 MUST NOT 发裸 SQL，一切写经拥有者对象。
+
+#### Scenario: 编辑成功回写真态
+- **WHEN** 已鉴权运营 PUT 合法的标题 / 正文 / 可见范围 / 话题到一条待审草稿
+- **THEN** 端点经拥有者对象单写、返回 200 及写回后的 `contentVersion` 与字段真态
+
+#### Scenario: 依赖缺失非致命
+- **WHEN** 草稿写对象未注入
+- **THEN** 端点返回 503 而非崩塌，其余面板接口与关键闭环不受影响
+
+#### Scenario: 拒因映射可区分 HTTP
+- **WHEN** 编辑因版本冲突 / 授权在途 / 非待审 / 非法标题 / 缺可见范围被拒
+- **THEN** 端点分别返回 409 / 409 / 409 / 400 / 422，前端据码回不同文案，绝不混淆
+
+### Requirement: 已发布投影增量带出内容版本号
+
+只读聚合接口 `GET /api/content/published` SHALL 在既有投影上**增量**带出 `content_version`，供前端渲染草稿生命周期标签并快照「人所见的版本」以随授权携带。该扩展 MUST 为加性——MUST NOT fork 抽屉或另起端点、MUST NOT 改动既有字段语义，与已归档的发布历史 item 形状协调。
+
+#### Scenario: 投影含版本号
+- **WHEN** 控制台拉取已发布 / 待审历史
+- **THEN** 每条 item 额外带 `content_version`，其余既有字段语义不变
+
+#### Scenario: 加性不 fork
+- **WHEN** 本能力扩展投影
+- **THEN** 复用同一端点与 item 形状（仅新增字段），不新建并行端点、不 fork 只读抽屉
 

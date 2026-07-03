@@ -47,48 +47,77 @@ TBD - created by archiving change aidcp-console-panel-mvp. Update Purpose after 
 
 系统 SHALL 采集**当前登录账号自身**的小红书真实昵称用于后台展示,且**采集由云端角色驱动、edge 仅执行**:云端角色决定何时采、命令 edge 打开本人主页、解析上报的主页 DOM、单写持久化;**edge MUST NOT 做任何昵称相关决策**(不判定、不挑选、不门控)。该昵称只在账号**本人主页**可读(feed 页不含),故采集 SHALL 经一次「访问本人主页」完成。
 
-- **触发与幂等(云端)**:当某连接的账号是真实平台 userid(非占位 `default`)**且** `accounts.nickname` 为 NULL 时,云端角色 SHALL 在会话开始时驱动**恰好一次**本人主页访问;`nickname` 已非空则 MUST NOT 再绕路(无写放大)。
+采真名是**登录后的固定引导步骤**,与浏览会话/人设解耦:
+
+- **触发与幂等(云端)**:当某连接的账号是真实平台 userid(非占位 `default`)**且** `accounts.nickname` 为 NULL 时,云端角色 SHALL 在**该账号登录后(edge hello)**驱动**恰好一次**本人主页访问;`nickname` 已非空则 MUST NOT 再绕路(无写放大)。该触发 **MUST NOT 被诚实人设启动闸阻断**——未绑人设、被启动闸拦下不开浏览会话的账号,登录后**仍** SHALL 采一次真名。绑了人设的账号经会话开始(`session_start`)触发同一采集体,行为不变。
+- **红线:采集不等于浏览**。登录引导采集路径 **MUST** 只驱动「访问本人主页」这一个动作(经 `profile.open{direct}` + 读 `profile.detail` + 单写),**MUST NOT** 接入浏览反应链;未绑人设的账号采完真名后 **MUST** 闲置,**MUST NOT** 在默认人设上浏览/点赞/关注/评论/搜索。
 - **执行(edge,纯操作)**:edge SHALL 按云端命令打开指定主页 id(`/user/profile/<id>`)、原样上报主页 DOM(含昵称;读不到则诚实置空,亦可由页面标题兜底),**MUST NOT** 含「这是不是自己」之类判定。
-- **隔离(红线:本人绝不进社交管线)**:本人主页访问 MUST NOT 触发关注决策 / 关注命令、MUST NOT 产生 `interaction_feed` / 关注 / 去重记录、MUST NOT 被当作「被浏览作者」进入作者评估管线。判据为「上报主页的 author id == 该连接已认证账号」。
-- **持久化(云端,单写、诚实)**:云端 SHALL **仅当**上报昵称非空时经单写接口 upsert 到该账号行;空(诚实失败)MUST NOT 覆盖已有真名、DB 保持 NULL 以便下次重试(有界)。
-- **风控中性**:本人主页采集 MUST NOT 消耗风控配额 / 单场预算,MUST NOT 计为互动动作。
-- **有界回 feed**:采集(成功或 edge 静默)后云端 SHALL 在有界时间内恢复正常浏览、绝不困死会话。
-- **展示**:面板 API SHALL 暴露 `nickname`;console 账号名 SHALL 按 `nickname → label → accountId` 回落(无真名回落运营标识,MUST NOT 展示假名)。
+- **持久化(云端,单写、诚实)**:云端 SHALL **仅当**上报昵称非空时经单写接口 upsert 到该账号行;空(诚实失败)MUST NOT 覆盖已有真名、DB 保持 NULL 以便下次有界重试。
+- **有界**:~20s 兜底超时(edge 静默/未登录不困死会话/连接);采空 K 次后退避,不永绕。`profile.open` 采集 MUST NOT 触发风控/预算/节奏。
+- **调度开关**:全局调度关闭时 MUST NOT 驱动边端(连登录引导采集也不动)。
+- **展示**:面板 API SHALL 暴露 `nickname`;console 一切展示账号名处 SHALL 按 `nickname → label → accountId` 回落(无真名回落运营标识,MUST NOT 展示假名)。
 
-该要求 MUST NOT 改变 `account_id` 作为主键,MUST NOT 影响已按账号 keyed 的风控/发布/概念表,MUST NOT 新增协议消息类型(经已有 `profile.open` 命令的可选字段 + 已有 `profile.detail` 上报);**废止**初版「昵称随握手由 edge 判定带回」的行为。
+该要求 MUST NOT 改变 `account_id` 作为主键,MUST NOT 影响已按账号 keyed 的风控/发布/概念表,MUST NOT 新增协议消息类型(经已有 `profile.open` 命令的可选字段 + 已有 `profile.detail` 上报)。
 
-#### Scenario: 真实账号且昵称未知 → 云端角色驱动一次本人主页采集并持久化
+#### Scenario: 真实账号且昵称未知 → 登录后(不经人设闸)驱动一次本人主页采集并持久化
 
-- **WHEN** 某连接账号是真实 userid(非 default)且 `accounts.nickname` 为 NULL,会话开始
-- **THEN** 云端角色命令 edge 打开本人主页(`profile.open{authorId=accountId, direct}`),读上报的主页昵称,经单写接口持久化,并让节点返回 feed
+- **WHEN** 某连接账号是真实 userid(非 `default`)且 `accounts.nickname` 为 NULL,该账号登录(edge hello)
+- **THEN** 云端角色在**登录引导**(不要求开浏览会话、不要求绑人设)命令 edge 打开本人主页(`profile.open{authorId=accountId, direct}`),读上报的主页昵称,经单写接口持久化,且全程不浏览
+
+#### Scenario: 未绑人设账号登录 → 仍采真名但绝不浏览(红线)
+
+- **WHEN** 账号未绑人设、被诚实人设启动闸拦下(不开浏览会话),但库内昵称为 NULL 且全局调度开着,该账号登录
+- **THEN** 云端**仅**驱动一次本人主页采集(恰一次 `profile.open{direct}`),采到非空昵称即持久化;**MUST NOT** 产生任何浏览指令(open_note/like/collect/follow/comment),采完即闲置
 
 #### Scenario: 昵称已知 → 不再绕路
 
-- **WHEN** `accounts.nickname` 已非空,会话开始
-- **THEN** 云端不驱动本人主页访问(无写放大)
+- **WHEN** `accounts.nickname` 已非空,该账号登录或会话开始
+- **THEN** 云端不尝试昵称采集(无写放大、零扰动)
 
-#### Scenario: 占位账号不采
+#### Scenario: 全局调度关闭 → 不驱动边端
 
-- **WHEN** 账号为 `default`(占位、非 userid),会话开始
-- **THEN** 云端不尝试昵称采集
+- **WHEN** 全局调度开关关闭(运营显式暂停),未绑人设账号登录
+- **THEN** 云端 MUST NOT 驱动任何命令(连登录引导采集也不动)
 
-#### Scenario: 本人绝不进社交管线
+#### Scenario: 上报空昵称(诚实失败)→ 不写、有界重试
 
-- **WHEN** 发生本人主页访问
-- **THEN** 本账号 MUST NOT 产生 `profile.browsed`、MUST NOT 触发关注决策或关注命令、MUST NOT 生成 `interaction_feed`/关注/去重行、MUST NOT 消耗风控配额或单场预算
+- **WHEN** edge 上报空昵称(未登录/读不到)
+- **THEN** 云端 MUST NOT 写入,`accounts.nickname` 保持原值(NULL 则下次有界重试),采集经 ~20s 超时兜底干净收尾
 
-#### Scenario: 诚实空不覆盖真名
+#### Scenario: edge 纯执行,不新增协议
 
-- **WHEN** edge 上报空昵称(诚实失败)
-- **THEN** 云端 MUST NOT 写入,`accounts.nickname` 保持原值(NULL 则下次会话有界重试)
+- **WHEN** 昵称采集链路运行(无论经会话开始还是登录引导)
+- **THEN** edge 仅打开云端指定的主页 id 并原样上报主页 DOM(含标题兜底),不含任何昵称判定/自身识别;采集不新增协议消息类型
 
-#### Scenario: edge 静默 → 有界恢复浏览
+### Requirement: 握手时自动登记新账号
 
-- **WHEN** 本人主页采集中 edge 在超时内未上报(如 CDP 断)
-- **THEN** 云端在有界时间(~20s)内恢复浏览、返回 feed,绝不困死会话
+云端 SHALL 在 edge 以一个未登记的 `accountId` 握手时，对 `accounts` 主表做一次**幂等 upsert**，使该账号以一个**显式状态**出现在主表（从而在后台账号列表即时可见、等待配置人设）。该 upsert MUST NOT 覆盖一个已被运营配置过的同名账号行（不抹掉既有 `status`/标签/绑定），MUST NOT 把无显式状态的行默认成 `active`（与既有「去掉默认 active 回退」一致）。
 
-#### Scenario: edge 保持纯执行
+#### Scenario: 新账号握手后出现在主表
+- **WHEN** 一个此前不存在于 `accounts` 的 `accountId` 首次握手接入
+- **THEN** 该账号以显式状态被登记进主表，后台账号列表可见，且不被默认成 `active`
 
-- **WHEN** 昵称采集链路运行
-- **THEN** edge 仅打开云端指定的主页 id 并原样上报主页 DOM(含标题兜底),不含任何昵称判定 / 自身识别;采集不新增协议消息类型
+#### Scenario: 已配置账号不被握手 upsert 覆盖
+- **WHEN** 一个已被运营配置（如已暂停、已绑人设）的账号再次握手
+- **THEN** 其既有行不被 upsert 抹掉或重置，配置保持
+
+### Requirement: 账号人设绑定状态为派生字段
+
+账号是否已绑人设 SHALL 作为一个**派生字段**对外暴露，以**人设存储中是否存在该账号的人设行**为唯一判据。死列 `accounts.persona_ref` MUST NOT 被用作绑定指针（保留不用）。
+
+#### Scenario: 绑定状态以人设行存在为准
+- **WHEN** 计算某账号的人设绑定状态
+- **THEN** 有人设行 → 已绑，无人设行 → 未绑；不读取/不依赖 `persona_ref` 列
+
+### Requirement: 账号以登录态读出的稳定 id 为主键登记，昵称仅作显示名
+
+当节点在登录后读出真实账号身份并握手时，系统 SHALL 以该**登录态读出的稳定 id**（如平台 userid）作为账号主表主键自动登记该账号，MUST NOT 以运营外部指派的标签或可变昵称作为主键。账号昵称 SHALL 仅作显示名（与 `account-real-nickname` 协调：昵称=显示，稳定 id=主键）；昵称变化 MUST NOT 改变账号主键或其人设/风控绑定。该登记仍为幂等 upsert（不覆盖已配置行、不默认就绪态），与既有"握手时自动登记新账号"一致。
+
+#### Scenario: 真实账号按稳定 id 登记进主表
+- **WHEN** 一个此前不存在的真实账号在某节点登录后首次握手（携带登录态读出的稳定 id）
+- **THEN** 该账号以其稳定 id 为主键登记进主表，显示名取其昵称（若可读），后台账号列表可见、等待配置人设
+
+#### Scenario: 昵称改变不改主键与绑定
+- **WHEN** 一个已登记账号在平台改了昵称
+- **THEN** 其主表主键（稳定 id）与人设/风控绑定不变，仅显示名随之更新
 
