@@ -44,6 +44,6 @@
 
 - [x] 6.1 edge `npm run typecheck` + 全量 `npm test` <!-- aidcp-edge beda2e5：541/541 过、typecheck 干净；新模块单测 ads-write-api(11)/ads-fingerprint(12)/ads-create-flow(7)/renderer-smoke 程序化建号(2)/listGroups(1) 全绿 -->
 - [x] 6.2 `openspec validate adspower-auto-create-env --strict` <!-- 通过 -->
-- [ ] 6.3 各 task 标 `[x]` 写 commit-sha；完成后 archive（delta 合并进 `openspec/specs/`）
+- [x] 6.3 各 task 标 `[x]` 写 commit-sha；完成后 archive（delta 合并进 `openspec/specs/`） <!-- edge 全部实装 7227783/b92989b/03b6dde/beda2e5/8c339f8/9daab92；真机 UI 冒烟登记 backlog 簇7；2026-07-03 archive -->
 
 <!-- 已砍（用户 2026-07-03，YAGNI）：创建后自动自检 + 投产硬闸（原组 6）、云端 profile↔machine 映射与登录比对（原组 7）、单次规模上限、复杂就绪态。本功能 = 一键建配好的指纹环境 + 一个「是否配代理」提示；是否可用由运维登录时人工确认。将来要规模化 / 后台看板再另立 change。 -->

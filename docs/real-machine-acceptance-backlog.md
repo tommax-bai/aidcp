@@ -77,6 +77,7 @@
 
 - [ ] **edge-desktop-packaging 4.6 / 6.4** — 打包产物启动 + 人工扫码登录闭环
 - [ ] **edge-companion-ui 6.3（win 半段）** — Windows 真机装 `AIDCP Setup 0.2.0.exe`（mac 交叉构建，2026-07-03）：验 titleBarOverlay 观感（46px 叠加窗控、最小/最大/关闭可用）、标题带随风控染色时 `setTitleBarOverlay` 同步换色、拖拽区与控件岛不打架（mac 半段已当日真机验过）
+- [ ] **adspower-auto-create-env（UI 半段）** — 真实客户端里在设置抽屉点「创建环境」：挑模板→建号成功、环境列表刷出新环境、无代理显「无代理配置」；点某行「删」按钮两次确认→删除成功刷新。（底层 user/create + user/delete 已由 `scripts/adspower-fingerprint-probe.ts` 真机验过，此项仅验 Electron UI 路径；2026-07-03 归档）
 
 ## 簇 8 — 真模型行为回归（LLM 运行时，prompt 面已由 AC 锁死）
 

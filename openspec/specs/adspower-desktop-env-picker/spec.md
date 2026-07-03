@@ -35,14 +35,6 @@ TBD - created by archiving change adspower-desktop-env-picker. Update Purpose af
 - **WHEN** 运维选中或手填了某环境并启动，但该环境未登录目标账号、身份读不出
 - **THEN** 沿用既有红线由核心诚实非零退出并弹窗提示去 AdsPower 登录，桌面外壳 MUST NOT 在面板侧假判为成功或以「运行中」外观空跑
 
-### Requirement: 桌面外壳提供「打开 AdsPower 新建环境」引导入口
-
-桌面外壳 SHALL 提供一个「打开 AdsPower 新建环境」入口。因 AdsPower 客户端不公开直达其内部「新建浏览器」界面的深链，该入口 SHALL 以 best-effort 拉起 / 聚焦 AdsPower 客户端实现；无法拉起时 SHALL 退回在系统浏览器打开 AdsPower 官方页面。点击后面板 SHALL 提示运维在 AdsPower 中完成新建与配置、返回后点「刷新环境列表」以看到新环境。该入口 MUST NOT 承诺一键直达 AdsPower 内部的新建界面，且 MUST NOT 经本地 API 的创建接口在面板内代建环境（指纹 / 代理配置属 AdsPower）。
-
-#### Scenario: 点击新建入口引导去 AdsPower 并可刷新看到新环境
-- **WHEN** 运维点击「打开 AdsPower 新建环境」
-- **THEN** 桌面外壳 best-effort 拉起 / 聚焦 AdsPower 客户端（起不来则打开其官方页面），并提示在 AdsPower 中完成新建后回来点「刷新环境列表」；刷新后新环境出现在下拉中
-
 ### Requirement: 桌面外壳对 AdsPower 本地 API 的调用只读且在主进程侧自持限速节流
 
 桌面外壳为探测与环境拉取而对 AdsPower 本地 API 发起的所有调用 SHALL **只读**（仅健康检查与环境列表查询），MUST NOT 触及浏览器启动 / 停止 / 生命周期接口，MUST NOT 改动核心 provider 的启动与生命周期层。因面板探测 / 拉取运行在 Electron 主进程、而核心的启动 / 停止 / active 调用运行在被 `spawn` 拉起的**独立子进程**内（节流状态为其进程私有、且探测常发生在核心尚未启动之时），二者分属不同 OS 进程、无法共享同一内存节流队列——**故本 change 不要求跨进程共享节流**。桌面外壳的这些只读调用 SHALL 在 Electron 主进程内经其**自持的同一条 ≥1 秒间隔串行节流**按序发出（复用与核心相同的最小间隔逻辑、但为独立实例），且探测 / 刷新触发按钮 SHALL 在请求在途时禁用；跨进程残余并发窗口极小（探测为人工低频、核心仅在启动 / 回收瞬间打本地 API），一旦真撞上本地 API 每秒一次限速 SHALL **诚实降级**（如实提示、允许 ≥1 秒后重试 / 手敲），MUST NOT 谎报限速合规、MUST NOT 假成功。开启 API 校验时环境列表查询 SHALL 携带 api-key（优先取渲染层传入的调用级当前值、否则回落持久化值），且 api-key MUST NOT 被写入日志或文档。
@@ -102,4 +94,24 @@ TBD - created by archiving change adspower-desktop-env-picker. Update Purpose af
 #### Scenario: 悬浮按钮随状态三态切换
 - **WHEN** 边缘处于停止 / 运行 / 已暂停三种状态之一
 - **THEN** 悬浮主按钮相应呈现「启动」/「暂停」/「恢复」并触发对应动作；顶部不再另设重复的暂停 / 恢复控件
+
+### Requirement: 桌面外壳「创建环境」程序化建号入口 + 是否配代理提示
+
+`adspower` 模式下，桌面外壳的「创建环境」入口 SHALL 触发 `adspower-environment-provisioning` 的程序化建号流程（而非仅拉起 AdsPower 客户端），运维 SHALL 只需挑一个「整机模板」，MUST NOT 被要求在面板内逐字段手配指纹。触发控件 SHALL 在创建在途时禁用（配合主进程单飞互斥）。**唯一的运营提示 = 「是否配置了代理」**：环境列表 SHALL 对每个环境如实呈现其代理配置状态，无代理（`user_proxy_config.proxy_soft` 为 `no_proxy` / 空）SHALL 给出「未配置代理」提示；该提示为纯提醒、MUST NOT 阻止任何操作（代理由运维手动在 AdsPower 侧配）。桌面外壳 MUST NOT 自动做运行时自检 / 投产硬闸 / 就绪判定——创建成功即如实呈现「已创建」，是否可用由运维登录时自行确认。本地 API 不可达或程序化创建失败时 SHALL 诚实降级（如实说明原因），MUST NOT 谎报已创建（不再提供「打开 AdsPower 手动新建」外链）。环境列表每行 SHALL 提供**删除入口**，其行为按 `adspower-environment-provisioning` 的「删除环境仅经界面逐个二次确认」需求（点两次确认、警示不可恢复）。
+
+#### Scenario: 挑模板一键程序化创建，不必手配指纹
+- **WHEN** 运维在「创建环境」入口选定一个整机模板并确认
+- **THEN** 桌面外壳触发程序化建号流程，运维无需在面板内逐字段配指纹；创建在途时该控件禁用；成功后如实呈现「已创建」
+
+#### Scenario: 无代理给提示但不拦
+- **WHEN** 环境列表刷新，其中某环境未配置代理（`no_proxy` / 空）
+- **THEN** 该环境如实标「未配置代理」提示，运维仍可对其做任何操作，MUST NOT 因无代理而拦截
+
+#### Scenario: 创建失败诚实降级
+- **WHEN** 本地 API 不可达或 `user/create` 返回错误
+- **THEN** 桌面外壳如实说明失败原因，MUST NOT 谎报已创建
+
+#### Scenario: 每行删除入口二次确认
+- **WHEN** 运维点击某环境行的删除按钮
+- **THEN** 第一次仅进入「确认删除?」待确认态、第二次才真删；删除后刷新列表
 
