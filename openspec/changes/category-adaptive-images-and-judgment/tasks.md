@@ -16,12 +16,14 @@
 > - **第 5 组（互动/评论门禁品类自适应）已实装 + 测试全绿 + 已推 master**（aidcp-cloud `4a0f321`）。`interaction-appraiser` 收藏判据去技术示例 + 订正收藏率注释（审美类经既有 getMinSaveLikeRatio 钩子调低）；`comment-appraiser` 门槛从固定「赞>1000且藏>300」改「赞>1000 且（藏>300 或 赞>10000 高热爆帖豁免）」——治高赞低藏爆帖被固定藏300排除、主条件不放松、pre-LLM 便宜确定性、稀缺闸不动。对应 comment-interaction spec MODIFIED。tests 32/32 + acceptance 27/27。
 > - **✅ 已部署上线（2026-07-03）**：5 批全部在 ECS 生产运行。探测发现并发方 07-03 00:14-00:21 一次整体升 HEAD 已把 batch 1/3/6 带上线；本次 scoped rsync 只补 batch 4（`ca415da`）+ batch 5（`4a0f321`）的 5 文件（prompts/post-processor/content-cleaner/interaction-appraiser/comment-appraiser）。安全序列：备份 `cloud.bak.20260703-095110.tar.gz` + `.env` → rsync → `systemctl restart` → healthcheck 全绿（active / 8787 / PG select 1 / 存储就绪 / PublishOrchestrator 25 角色含 `CategoryClassifier` / 飞书 onReady / 零启动错误）→ isales 未碰。<!-- aidcp-cloud 4a0f321 2026-07-03 deployed（batch1/3/6 由并发方整体升 HEAD 带上、batch4/5 scoped rsync 补齐）-->
 > - **1.7 出图竖版：env 开关机制已实装 + 已推 master**（aidcp-cloud `913eca4`）。SeedreamClient/WanxiangClient `defaultSize` 增 env 回落链（`AIDCP_SEEDREAM_IMAGE_SIZE` / `AIDCP_WANXIANG_IMAGE_SIZE`），**代码默认保持方图不变**——避免并发方整体升 HEAD 自动部署误激活未验证尺寸致全部出图失败。**0.2 已确认**：线上 image_model=`doubao-seedream-5-0-260128`(volcengine/Ark)；文档确认 5.0 支持 3:4 + WxH 至 3072（候选 Seedream `1536x2048` / 万相 `1152*1536`）。**未完（待用户）**：3:4 像素级激活前需实测尺寸被接受——即席 prod 测试脚本（读加密凭据+打付费 API）被部署守卫拦下（合理），需用户授权该验证 or 接受「设 env 部署+监控+瞬间回滚」。
-> - **剩余（待用户决策）**：① **激活 3:4**（设 `AIDCP_SEEDREAM_IMAGE_SIZE=1536x2048` + 重启，需先验证尺寸；瞬间可回滚）；② **2.2/2.4 配图产后校验**——「乱码/像不像真人」必须看生成图 → 需**新接一个视觉/多模态模型**（现有图像模型只文生图、文本客户端只纯文本），是新能力+成本/延迟/选型决策；建假占位校验=违反无声假成功红线，故不擅自做，默认风格档 faceless/no-text 已基础兜底。已完成 6 代码批中 5 个 + 1.7 机制，**全部已上线**。
+> - **✅ 3:4 竖版已激活上线（2026-07-03，用户授权实测后）**：线上 key 实测确认 Seedream 5.0 size 规则（只收 `WIDTHxHEIGHT`/`2k`/`3k`/`4k`、总像素 ≥3,686,400；`1536x2048` 太小被拒、**`1728x2304` 实测出图成功**）→ 备份 `cloud.bak.20260703-105745.tar.gz` → ECS `.env` 设 `AIDCP_SEEDREAM_IMAGE_SIZE=1728x2304` + rsync `913eca4` 两 client → restart → healthcheck 全绿（active/8787/PG/飞书 onReady/零错误）。**线上配图现出竖版 3:4**；回滚=删 env 行+重启。
+> - **唯一剩余（待用户决策）**：**2.2/2.4 配图产后校验**——「乱码/像不像真人」必须看生成图 → 需**新接一个视觉/多模态模型**（现有图像模型只文生图、文本客户端只纯文本），是新能力+成本/延迟/选型决策；建假占位校验=违反无声假成功红线，故不擅自做，默认风格档 faceless/no-text 已基础兜底。其余全部完成且**全部已上线**。
 
 ## 0. 前置与排序（务必先做）
 
 - [x] 0.1 `openspec list` + `git -C ../aidcp-cloud status` 确认并发方 WIP 占用文件（`prompts.ts`/`role-catalog.ts`/`server.ts`/`panel`/`config`）当前状态；本 change 改 `prompts.ts` 须与 `persona-driven-content-pipeline`/`split-topic-roles` 协调、避免同文件互吞。
-- [ ] 0.2 核实 ECS 线上实跑 Seedream 版本（代码默认 `doubao-seedream-4-5-251128` vs 台账 `5-0-260128`）及其同步 `/images/generations` 允许的合法 size 串与推荐 3:4 尺寸；万相对应竖版尺寸。据此决定第 1 组比例改动同批做还是拆后（尺寸不确定则先只上风格档、比例拆到后续）。
+- [x] 0.2 核实 ECS 线上实跑 Seedream 版本（代码默认 `doubao-seedream-4-5-251128` vs 台账 `5-0-260128`）及其同步 `/images/generations` 允许的合法 size 串与推荐 3:4 尺寸；万相对应竖版尺寸。据此决定第 1 组比例改动同批做还是拆后（尺寸不确定则先只上风格档、比例拆到后续）。<!-- 2026-07-03 线上=doubao-seedream-5-0-260128(volcengine/Ark)；用户授权后经线上 key 实测：size 只收 WIDTHxHEIGHT 或 2k/3k/4k（ratio "3:4" 不收）、总像素须 ≥3,686,400（1536x2048/1440x1920 被拒）；1728x2304(3:4) 实测出图成功 -->
+
 - [x] 0.3 新增品类判定角色须动【角色目录 / 角色索引 / 装配】——正是并发方 WIP 占用文件（`role-catalog.ts` / `server.ts` / `roles/index.ts`）。此步排在这几文件稳定或与并发方协调后做，避免同文件互吞（搭车加字段本可绕开、独立角色绕不开）。
 
 ## 1. 配图风格档 + 中文主体 + 去第二风格源（aidcp-cloud）
@@ -32,7 +34,8 @@
 - [x] 1.4 新增【品类判定角色】（发布侧，`src/publish-agent/roles/` + 装配）：flash 模型、输入品类枚举 + 正文、schema 约束输出单个 `category` + 校验重试；判不出/枚举外回落安全兜底档、绝不 brick；**一帖判一次**写入管线状态供配图选题与质量评审消费；登记角色目录（`role-catalog.ts` displayName + `role-llm-config`）供后台配模型。⚠️ 触 `role-catalog.ts` / `server.ts` / `roles/index.ts` 装配——见 0.3 排期。
 - [x] 1.5 `src/publish-agent/roles/image-prompt-composer.ts`：把 :86 的 `${desc}. ${IMAGE_STYLE_BASE}` 改为 `resolveStyleProfile(category)`（category 来自品类判定角色、经管线状态传入）取一次——图 0 用 `coverStyleBase`、图 1..N 用 `styleBase` 逐字复用；保留现有去重护栏与「永远保住第 0 张」。
 - [x] 1.6 `src/publish-agent/roles/image-generator.ts` + `seedream-client.ts` + `wanxiang-client.ts`：ImageGenerator 生成时不再把 `imageStyle` 枚举传给 provider（消除 `seedream-client.ts:81` 的「，风格：<enum>」第二风格源）。
-- [ ] 1.7 （依赖 0.2）比例竖版化：`SeedreamClient`/`WanxiangClient` 的 `defaultSize` 由方图改合法竖版 3:4（或经 env 在 `server.ts` 注入）；全帖同比例。尺寸未核实则本任务拆到后续、不乱填。
+- [x] 1.7 （依赖 0.2）比例竖版化：`SeedreamClient`/`WanxiangClient` 的 `defaultSize` 由方图改合法竖版 3:4（或经 env 在 `server.ts` 注入）；全帖同比例。尺寸未核实则本任务拆到后续、不乱填。<!-- aidcp-cloud 913eca4 env 开关(代码默认方图,防并发方自动部署误激活)；2026-07-03 deployed：ECS .env 设 AIDCP_SEEDREAM_IMAGE_SIZE=1728x2304 + rsync 两 client + restart，healthcheck 全绿——线上配图已出竖版 3:4 -->
+
 - [x] 1.8 `src/publish-agent/prompts-preview.ts`：图像示例（EXAMPLE_IMAGE_SUBJECT/科技扁平）随真源改为按品类示例，保预览与线上同源（真源先改、再同步预览）。
 - [x] 1.9 回归：不同品类帖得到不同风格档、同帖内一致（对应 spec「配图风格按内容品类自适应」两 Scenario）；未知品类回落不阻断；无第二风格源；typecheck。
 
