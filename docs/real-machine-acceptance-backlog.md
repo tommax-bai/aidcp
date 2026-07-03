@@ -75,12 +75,10 @@
 
 ---
 
-## 附：非本专项、但需单独处理的两个「部署存疑」项
+## 附：两个「部署存疑」项 —— 已了结（2026-07-03）
 
-以下两个 change **代码已完成、但未确认是否已部署**（无 deployed 标记，而 cloud 有可部署内容），
-**未归档**——归档 = 声称已上线，未确认前不归档。需先**只读探 ECS** 确认部署状态：
+只读探 ECS 确认：两者的角色文件均在 `/opt/aidcp/cloud`、md5 与本地 master 逐字节一致、服务
+active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。已补 deployed 标记并归档：
 
-- **split-topic-roles**（22/22 ✓Complete）— cloud 注册 2 个新话题角色，是否已上线？
-- **publish-metadata-compliance-roles**（31/34）— cloud 注册 9 个新决策角色，是否已上线？
-
-确认已部署 → 归档；未部署 → 补部署后归档。
+- **split-topic-roles** ✓ 已上线、已归档（`2026-07-03-split-topic-roles`）
+- **publish-metadata-compliance-roles** ✓ 已上线、已归档（stage-4 显式延后项随归档 tasks.md 留档）

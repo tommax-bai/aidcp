@@ -71,3 +71,5 @@
 - [x] 7.1 `cd ../aidcp-cloud && npm run test:acceptance`：AC-PUB（未授权绝不静默发布）、AC-PROTO（两份 protocol.ts 不漂移——本阶段零协议改动应天然不动）、AC-RISK 全过、无新失败（验证：命令退出码 0）
 - [x] 7.2 `cd ../aidcp-cloud && npm test`：全量单测含 §6 新增全过、阶段2 既有 publish-agent 测试不回归（验证：命令退出码 0）
 - [x] 7.3 `cd ../aidcp-cloud && npm run typecheck`：全仓类型零错误（含两份 protocol.ts `Record<MessageType,true>` 穷举不漂移）（验证：命令退出码 0）
+
+<!-- 2026-07-03 deployed — verified via read-only ECS probe: all sampled stage-3 role files (compliance-decider / metadata-aggregator / permission-decider / visibility-decider) present on /opt/aidcp/cloud, md5 identical to local master, service active. Deploy vehicle: full ECS→HEAD upgrade (control-repo c4ef902). Remaining [ ] tasks are explicit stage-4 deferrals (§5.1/5.2/6.10). -->

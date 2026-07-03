@@ -5,7 +5,7 @@ TBD - created by archiving change dedicated-title-creator-role. Update Purpose a
 ## Requirements
 ### Requirement: 标题由独立角色在正文定稿后生成
 
-系统 SHALL 以一个独立角色 `TitleCreator`（角色 id `publish:TitleCreator`）生成发帖标题，与内容生成解耦以避免单次 LLM 调用的注意力稀释。该角色 MUST `watchKeys=['assembledContent']`，以**最终定稿正文** `assembledContent.finalContent` 为输入（MUST NOT 取草稿 `createdContent.content`——正文经去 AI 味环节改写后才定稿，标题须忠于真正发出的文字），单次短提示产出一个 ≤18 可见字符的钩子标题，写入新黑板字段 `titleSelection`（`{title, source:'llm'|'derived', decidedAt}`）。`source` MUST 如实标注：LLM 真产出为 `'llm'`，任何派生/兜底为 `'derived'`，MUST NOT 把派生标题标为 `'llm'`。
+系统 SHALL 以一个独立角色 `TitleCreator`（角色 id `publish:TitleCreator`）生成发帖标题，与内容生成解耦以避免单次 LLM 调用的注意力稀释。该角色 MUST `watchKeys=['assembledContent']`，以**最终定稿正文** `assembledContent.finalContent` 为输入（MUST NOT 取草稿 `createdContent.content`——正文经去 AI 味环节改写后才定稿，标题须忠于真正发出的文字），单次短提示产出一个 ≤18 可见字符的钩子标题，写入新黑板字段 `titleSelection`（`{title, source:'llm'|'derived', decidedAt}`）。`source` MUST 如实标注：LLM 真产出为 `'llm'`，任何派生/兜底为 `'derived'`，MUST NOT 把派生标题标为 `'llm'`。同理，话题亦自 `ContentCreator` 解耦：`ContentCreator` 自话题拆分能力起 SHALL 仅产出正文（及 tone / style），MUST NOT 再产出标签，标题由 `TitleCreator`、话题由 `TopicGenerator` 各自独立调用产出。
 
 #### Scenario: 正文定稿后激活、据定稿正文产出标题
 - **WHEN** `ContentAssembler` 写出 `assembledContent`（含 `finalContent`）
@@ -15,9 +15,9 @@ TBD - created by archiving change dedicated-title-creator-role. Update Purpose a
 - **WHEN** 去 AI 味环节把草稿里的某句话删改、`finalContent` 与 `createdContent.content` 不一致
 - **THEN** `TitleCreator` 据 `finalContent`（真正发出的版本）拟标题，标题不引用已被删改的草稿句子
 
-#### Scenario: 标题与正文分两次 LLM 调用
+#### Scenario: 标题、正文、话题分多次 LLM 调用
 - **WHEN** 生成一篇帖子
-- **THEN** 正文由 `ContentCreator` 一次调用产出、标题由 `TitleCreator` 在其后另一次调用产出，标题不再作为「标题+正文+标签」单次 JSON 里被稀释的子字段
+- **THEN** 正文由 `ContentCreator` 一次调用产出（**仅正文**，不含标题、不含标签）、标题由 `TitleCreator`、话题由 `TopicGenerator` 各自另次调用产出；标题与话题 MUST NOT 再作为「标题+正文+标签」单次 JSON 里被稀释的子字段
 
 ### Requirement: 标题生成失败则发布失败且绝不造假标题
 
@@ -138,27 +138,27 @@ TBD - created by archiving change dedicated-title-creator-role. Update Purpose a
 
 ### Requirement: ContentAssembler 瘦身但产出同形 assembledContent（稳定边界、下游零改动）
 
-`ContentAssembler` SHALL 瘦身为**纯组装**角色：`watchAll`（`waitAll: true`）`cleanedContent` / `aiFlavorScore` / `qualityReport` / `imageDirective` / `coverSelection` 就绪后仅做字段拼装，MUST NOT 再持有 `llmClient` / `postProcessor`、MUST NOT 做任何 LLM 调用或外部 IO。它 SHALL 产出 `assembledContent`，字段为 `{ finalContent, finalTags, imageUrls, imageUrl, aiScore, qualityScore, rewritten, flaggedPhrases, assembledAt }`：`imageUrls` ← `coverSelection.imageUrls`（上传全集），`imageUrl` ← 封面（`imageUrls[0] ?? null`，保留为向后兼容的单数派生字段）。除多图能力显式新增的 `imageUrls` 外，其余字段集 / 语义与细拆前一致。下游 `PublishExecutor` 因多图能力 SHALL 读 `imageUrls` 下发上传全集（这是新能力的预期扩展，非历史细拆所禁的静默改形）；`ApprovalGatekeeper`（watch `assembledContent`）MUST NOT 因字段拼装方式而改注册。本要求 MUST NOT 触及协议或 edge。
+`ContentAssembler` SHALL 瘦身为**纯组装**角色：`watchAll`（`waitAll: true`）`cleanedContent` / `aiFlavorScore` / `qualityReport` / `imageDirective` / `coverSelection` 就绪后仅做字段拼装，MUST NOT 再持有 `llmClient` / `postProcessor`、MUST NOT 做任何 LLM 调用或外部 IO。它 SHALL 产出 `assembledContent`，字段为 `{ finalContent, finalTags, imageUrls, imageUrl, aiScore, qualityScore, rewritten, flaggedPhrases, assembledAt }`：`imageUrls` ← `coverSelection.imageUrls`（上传全集），`imageUrl` ← 封面（`imageUrls[0] ?? null`，保留为向后兼容的单数派生字段）。**自话题拆分能力起，`finalTags` 恒为 `[]`**——话题改由独立 `TopicGenerator` / `TopicEvaluator` 产出、经 `publishMetadata.topics` 落地并成为唯一真源，`finalTags` 不再承载笔记话题；这是话题拆分能力显式许可的语义变更（与多图能力显式新增 `imageUrls` 同类的预期演进），MUST NOT 被读作历史细拆所禁的静默改形。除此显式变更外，其余字段集 / 语义与细拆前一致。下游 `PublishExecutor` 因多图能力 SHALL 读 `imageUrls` 下发上传全集；`ApprovalGatekeeper`（watch `assembledContent`）MUST NOT 因字段拼装方式而改注册。本要求 MUST NOT 触及协议或 edge。
 
 #### Scenario: 瘦身后仅组装、无 LLM / 无 IO
 
 - **WHEN** `cleanedContent` / `aiFlavorScore` / `qualityReport` / `imageDirective` / `coverSelection` 五键全部就绪
-- **THEN** `ContentAssembler` 仅做字段映射（`finalContent ← cleanedContent.content`、`finalTags ← createdContent.tags`、`imageUrls ← coverSelection.imageUrls`、`imageUrl ← imageUrls[0] ?? null`、`aiScore ← aiFlavorScore.aiScore`、`qualityScore ← qualityReport.qualityScore`、`rewritten`/`flaggedPhrases ← cleanedContent`），其依赖中不含 `llmClient` / `postProcessor`
+- **THEN** `ContentAssembler` 仅做字段映射（`finalContent ← cleanedContent.content`、`finalTags ← createdContent.tags`（因 `createdContent.tags` 自话题拆分起恒 `[]`，`finalTags` 恒 `[]`）、`imageUrls ← coverSelection.imageUrls`、`imageUrl ← imageUrls[0] ?? null`、`aiScore ← aiFlavorScore.aiScore`、`qualityScore ← qualityReport.qualityScore`、`rewritten`/`flaggedPhrases ← cleanedContent`），其依赖中不含 `llmClient` / `postProcessor`
 
 #### Scenario: 多图能力新增 imageUrls 字段、其余形状不变
 
 - **WHEN** 重组后的生产段跑完、`ContentAssembler` 写出 `assembledContent`
-- **THEN** `assembledContent` 含 `finalContent` / `finalTags` / `imageUrls` / `imageUrl` / `aiScore` / `qualityScore` / `rewritten` / `flaggedPhrases` / `assembledAt`；`imageUrls` 为上传全集、`imageUrl` 为封面（首张派生），其余字段语义与细拆前等价
+- **THEN** `assembledContent` 含 `finalContent` / `finalTags` / `imageUrls` / `imageUrl` / `aiScore` / `qualityScore` / `rewritten` / `flaggedPhrases` / `assembledAt`；`imageUrls` 为上传全集、`imageUrl` 为封面（首张派生），`finalTags` 恒 `[]`（话题移交独立角色），其余字段语义与细拆前等价
 
 #### Scenario: 下游消费方按多图能力读取
 
 - **WHEN** 一轮发布流水线在多图能力下完整跑通
-- **THEN** `ApprovalGatekeeper` 仍 watch `assembledContent`、`PublishExecutor` 仍 watch `gateDecision`；`PublishExecutor` 读 `assembledContent.imageUrls` 下发上传全集、读封面字段下发 `cover`，端到端结果（`gateDecision` / `publishResult`）形状与单图等价
+- **THEN** `ApprovalGatekeeper` 仍 watch `assembledContent`、`PublishExecutor` 仍 watch `gateDecision`；`PublishExecutor` 读 `assembledContent.imageUrls` 下发上传全集、读封面字段下发 `cover`，读 `publishMetadata.topics` 作为话题真源，端到端结果（`gateDecision` / `publishResult`）形状与单图等价
 
 #### Scenario: 红线——细拆波及协议或越界改形（反例）
 
-- **WHEN** 任一改动改了 `assembledContent` 除 `imageUrls` 外的字段集 / 字段名 / 字段语义，或触及协议 / edge
-- **THEN** MUST 视为越界、不予合入（稳定边界 `assembledContent` 除本 change 显式新增 `imageUrls` 外不可破，多图能力 MUST NOT 触及协议 / edge）
+- **WHEN** 任一改动改了 `assembledContent` 除 `imageUrls`（多图能力显式新增）/ `finalTags` 恒空（话题拆分能力显式许可）外的字段集 / 字段名 / 字段语义，或触及协议 / edge
+- **THEN** MUST 视为越界、不予合入（稳定边界 `assembledContent` 除各能力显式许可的变更外不可破，且 MUST NOT 触及协议 / edge）
 
 ### Requirement: ContentTypeSelector 产出内容类型
 
@@ -543,4 +543,104 @@ v1 整页发布路径（无上传步骤）收到带图 payload 时 SHALL **显�
 #### Scenario: 红线反例——v1 静默丢图后假成功（禁止）
 - **WHEN** v1 路径丢弃 `images` 后仍按纯文字返回 `ok:true`
 - **THEN** MUST 视为违规、不予合入；带图在 v1 MUST 显式失败改道，绝不静默降级伪装成功
+
+### Requirement: 按维度拆分的元数据决策角色
+
+发帖黑板流水线 SHALL 为发帖元数据按维度提供独立的 cloud 决策角色（`TopicStrategist`、`MentionStrategist`、`LocationStrategist`、`CollectionStrategist`、`VisibilityDecider`、`PermissionDecider`、`PublishModeDecider`、`ComplianceDecider`），每个角色 MUST 实例化并注册到 `PublishOrchestrator`，MUST NOT 仅作为类型联合或注释里的名字、也 MUST NOT 把多维度决策合并进单一 `MetadataEvaluator`。每个角色 MUST 各写自己的中间黑板键，且无论成败都写键（写降级默认值，遵守黑板 R1 死锁防护）。`TopicStrategist` MUST 在 `createdContent.tags` 基础上产出话题、约束话题数 3-30；`MentionStrategist` MUST 去重并剔除账号自身、上限 10；`PublishModeDecider` 的定时时间 MUST 限定未来且 ≤7 天。
+
+#### Scenario: 各维度角色独立产出中间键
+- **WHEN** `createdContent`（含 `tags`）与 `assembledContent` 就绪
+- **THEN** 每个元数据维度角色按自己的 watchKeys 激活并写入对应中间键（如 `topicSelection`/`mentionSelection`/`visibilityDecision` 等），各角色 LLM/策略失败时写降级默认值而非不写键
+
+#### Scenario: 话题在已有 tags 基础上扩展并满足 3-30 硬约束
+- **WHEN** `TopicStrategist` 基于 `createdContent.tags` 与内容做话题决策
+- **THEN** 产出的 `selectedTopics` 数量落在 3-30 闭区间内，且包含/扩展原有 tags，不产出超过 30 个话题
+
+#### Scenario: @提及去重剔除自己且不超过 10
+- **WHEN** `MentionStrategist` 决策推荐 @ 用户
+- **THEN** `selectedMentions` 去重、不含账号自身、长度 ≤10；无合适人选时回空数组
+
+#### Scenario: 反例——不得编造元数据凑数
+- **WHEN** 某维度（如地点/合集/@）无合适候选或 LLM 决策为空
+- **THEN** 该维度角色 MUST 如实写空值（`[]` 或 `null`），MUST NOT 为提高覆盖度而编造地点/合集/@ 用户，对应 `metadataScore` 该维度计 0 分
+
+### Requirement: 可见范围云端必选不可为空
+
+`VisibilityDecider` SHALL 产出 `public | friends_only | self_only` 三选一，云端决策端 MUST 必选、MUST NOT 写入 `null`/`undefined`；LLM 或策略失败时 MUST 降级为最保守的 `self_only`，MUST NOT 因失败而隐式落到 `public`（防「静默假成功」式的无意公开）。本要求约束的是「云端必须选出某值」；该值实际应用到边缘页面（指令下发）属 stage-4，不在本阶段。
+
+#### Scenario: 正常决策产出三选一
+- **WHEN** `VisibilityDecider` 基于内容与人设决策可见范围
+- **THEN** `visibility` 取 `public`/`friends_only`/`self_only` 之一且非空，附 `visibilityReason`
+
+#### Scenario: 决策失败降级最保守值
+- **WHEN** `VisibilityDecider` 的 LLM 调用失败或返回非法值
+- **THEN** `visibility` 降级为 `self_only`（最保守），而非 `public`
+
+#### Scenario: 反例——不得隐式公开
+- **WHEN** 可见范围决策不可用且无明确「公开」依据
+- **THEN** 系统 MUST NOT 默认 `public`；缺省/失败一律收敛到 `self_only`
+
+#### Scenario: 可见范围始终非空进入聚合
+- **WHEN** `MetadataAggregator` 读取 `visibilityDecision`
+- **THEN** `publishMetadata.visibility` 字段始终为三枚举之一、不为 null
+
+### Requirement: 合规声明与 AI 声明强制红线
+
+`ComplianceDecider` SHALL 产出合规声明决策（AI 生成 / 广告 / 原创）及优先级 `ai > ad > origin`。当 `assembledContent.aiScore` 超过强制阈值（硬编码，统一 0.6（对齐 approval-gatekeeper abort））**或** 终稿内容含 AI 生成/合成类关键词时，系统 MUST 强制 `compliance.ai=true` 并置 `compliance.aiEnforced=true`，该标记一经置位 MUST NOT 被后续任何流程降级为 `ai=false`。`PublishExecutor`/`MetadataAggregator` 落库或聚合前若检出 `aiEnforced && !ai` 的篡改态，MUST 记审计日志并拒绝降级（保持 `ai=true`），MUST NOT 静默放行。本红线对齐 2026 合规硬规，不可被人设/用户偏好覆盖。
+
+#### Scenario: AI 味分超阈值强制 AI 声明
+- **WHEN** `assembledContent.aiScore > 0.6`
+- **THEN** `compliance.ai=true` 且 `compliance.aiEnforced=true`，记一条强制声明日志
+
+#### Scenario: 内容含 AI 生成关键词强制声明
+- **WHEN** 终稿正文命中「AI 生成/合成/AIGC」等关键词而 aiScore 未超阈值
+- **THEN** 仍强制 `compliance.ai=true`、`aiEnforced=true`
+
+#### Scenario: 反例——强制 AI 声明不可被降级
+- **WHEN** 后续流程或用户偏好试图把 `aiEnforced=true` 的记录改为 `compliance.ai=false`
+- **THEN** 系统 MUST 拒绝该降级、保持 `ai=true`，记审计日志，MUST NOT 静默落库为 `ai=false`
+
+#### Scenario: 非 AI 内容不强制声明
+- **WHEN** aiScore 低于阈值且无 AI 关键词
+- **THEN** `compliance.ai` 不被强制（可由策略决定是否声明广告/原创），`aiEnforced` 为 false 或缺省
+
+### Requirement: publishMetadata 聚合键与 assembledContent 边界
+
+系统 SHALL 由唯一生产者 `MetadataAggregator`（waitAll 各维度中间键）汇合产出单一黑板键 `publishMetadata`，并按维度覆盖度计算 `metadataScore`（0-1）。`MetadataAggregator` 与所有元数据角色 MUST 只读 `assembledContent`、MUST NOT 写 `assembledContent`；`assembledContent` 的八字段（`finalContent/finalTags/imageUrl/aiScore/qualityScore/rewritten/flaggedPhrases/assembledAt`）MUST 逐字保持不变、MUST NOT 因本阶段新增字段。`publishMetadata` MUST 是 `assembledContent` 之外的并行键。各维度缺失/失败时 `metadataScore` 对应项计 0，整体可低至 0、上限 1。
+
+#### Scenario: 聚合产出 publishMetadata 与覆盖度分
+- **WHEN** 各维度中间键全部就绪（含降级默认值）
+- **THEN** `MetadataAggregator` 写入 `publishMetadata`（含各维度选择 + `compliance` + `metadataScore` + `decidedAt`），`metadataScore` 按各维度有效性加权求和
+
+#### Scenario: assembledContent 八字段不回归
+- **WHEN** 本阶段流水线跑完一轮
+- **THEN** `assembledContent` 仍为且仅为原八字段、值与阶段2 同形，未被注入任何元数据字段
+
+#### Scenario: 单一生产者无死锁
+- **WHEN** 某些维度角色降级写默认值、其余正常产出
+- **THEN** `MetadataAggregator` 的 waitAll 仍因「各维度键无论成败都写」而满足并触发一次，产出 `publishMetadata`，不挂起
+
+#### Scenario: 反例——元数据不得污染 assembledContent
+- **WHEN** 任一元数据角色或聚合器运行
+- **THEN** 它们 MUST NOT 调用 `ctx.write('assembledContent', ...)`，元数据只落 `publishMetadata` 等并行键
+
+### Requirement: 本阶段不下发元数据 edge 指令
+
+本阶段 SHALL 只产出元数据/合规决策并可选落库/记录血缘，MUST NOT 让 `CommandSequencer` 把任何元数据相关指令（`set_option`/`set_schedule`/`add_with_candidate` 的 `mention`/`location`/`collection`/可见范围/权限/各声明）加入发布指令序列；`buildCommandSequence` 的指令集 MUST 与本阶段前保持一致。edge 对这些 kind 仍回 `kind_not_implemented`，本阶段 MUST NOT 实装其 edge 处理器。`PublishExecutor` 的发布判定、AC-PUB 授权闸与既有发布行为 MUST 不变；若落库 `publishMetadata`，MUST NOT 借此改变是否发布/发什么指令。
+
+#### Scenario: 指令序列不含元数据指令
+- **WHEN** 已授权的 auto_publish 走 `CommandSequencer.executePublishSequence`
+- **THEN** 下发的指令仍为 `navigate_entry/select_mode/fill_field/add_with_candidate(topic)/submit_publish/capture_postId`，不含 `set_option/set_schedule/add_with_candidate(mention|location|collection)`
+
+#### Scenario: 元数据已决但暂不应用
+- **WHEN** `publishMetadata` 已产出（含可见范围/权限/合规声明等决策）
+- **THEN** 这些决策仅落库/可观测，不转化为任何下发到 edge 的指令（应用延后 stage-4）
+
+#### Scenario: 落库不改发布行为
+- **WHEN** `PublishExecutor` 把 `publishMetadata` 随 `recordId` 落库
+- **THEN** 发布是否进行、走哪条路径（指令驱动/旧整页）、授权判定均与未落库时完全一致
+
+#### Scenario: 反例——edge 元数据 kind 仍诚实拒绝
+- **WHEN** 任何路径意外向 edge 下发 `set_option`/`set_schedule`
+- **THEN** edge MUST 回 `kind_not_implemented`、MUST NOT 假成功，且本阶段 MUST NOT 为消除该拒绝而实装 edge 处理器
 

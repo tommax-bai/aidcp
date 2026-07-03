@@ -31,3 +31,5 @@
 - [x] 4.3 cloud：`npm run test:acceptance`（27）→ `npm test`（1023）→ `npm run typecheck` 全绿；`AC-PROTO-*`/`AC-PUB-*` 过（本 change 无协议改动）。 <!-- aidcp-cloud abf6769 -->
 - [x] 4.4 edge：`npm run test:acceptance`（11）→ `npm test`（437）→ `npm run typecheck` 全绿。 <!-- aidcp-edge 873fd0d -->
 - [x] 4.5 `openspec validate split-topic-roles --strict` 通过。 <!-- aidcp abf6769/873fd0d -->
+
+<!-- 2026-07-03 deployed — verified via read-only ECS probe: topic-generator.ts / topic-evaluator.ts present on /opt/aidcp/cloud, stale topic-strategist.ts removed, md5 identical to local master, service active. Deploy vehicle: full ECS→HEAD upgrade (see control-repo c4ef902). -->
