@@ -2,6 +2,7 @@
 
 > 全部落 `../aidcp-edge`（UI 三件套 + main.cjs + 新纯函数模块），本仓只回写进度。设计定稿：Artifact v3（https://claude.ai/code/artifact/86ccc89f-2ba4-4b62-b69b-387017ba4426 ）。红线：无构建链、零审批按钮、动效只由真实事件驱动、发布链路文件零触碰（与活跃 change `publish-edge-command-runtime` 防撞）。
 > 开发位：worktree `../aidcp-edge.wt/edge-companion-ui`（分支 `edge-companion-ui`，自 master ce05a57 开出）。
+> **接手剩余任务（7.4/8.1/7.5）先读同目录 `handoff.md`**（2026-07-03 交接：契约、发射点位置、协议四处同步与 edge-client 白名单坑、验收标准全在里面）。
 
 ## 1. aidcp-edge — 事件管线（先坐实数据面）
 
