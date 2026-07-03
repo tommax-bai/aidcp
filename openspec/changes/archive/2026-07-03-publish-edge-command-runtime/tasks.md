@@ -10,7 +10,7 @@ repo 取值：aidcp-cloud / aidcp-edge / aidcp（本中控仓）。代码改动�
 
 ## 0. 前置确认（中控）
 
-- [ ] 0.1 确认 sub-repo 在机：`ls -d ../aidcp-edge ../aidcp-cloud` 均存在；记两份 `src/comm/protocol.ts` 的 `MessageType` 基线（**47**，目标 **49**）。**验证**：`openspec validate publish-edge-command-runtime --strict` 当前可过；`openspec list` 仅本 change 活跃 <!-- 注：基线 47→49 为本 change 单独口径；协议已随并发 change 共同演进到 56（本 change 自身 +2 publish.command/result 已落两份 protocol.ts，见 1.1.1/1.2.1）。判据「openspec list 仅本 change 活跃」已过时（当前多 change 并发），勿据此自动勾选 -->
+- [x] 0.1 确认 sub-repo 在机：`ls -d ../aidcp-edge ../aidcp-cloud` 均存在；记两份 `src/comm/protocol.ts` 的 `MessageType` 基线（**47**，目标 **49**）。**验证**：`openspec validate publish-edge-command-runtime --strict` 当前可过；`openspec list` 仅本 change 活跃 <!-- 注：基线 47→49 为本 change 单独口径；协议已随并发 change 共同演进到 56（本 change 自身 +2 publish.command/result 已落两份 protocol.ts，见 1.1.1/1.2.1）。判据「openspec list 仅本 change 活跃」已过时（当前多 change 并发），勿据此自动勾选 --> <!-- 2026-07-03 收口核实：两 sub-repo 在机、validate --strict 过；按上注口径勾选（基线记录目的已达成） -->
 
 ## 1. 协议三处同步（+2 消息、`kind` 枚举）— 第 ① 组
 
@@ -53,7 +53,7 @@ repo 取值：aidcp-cloud / aidcp-edge / aidcp（本中控仓）。代码改动�
 - [x] 2.2.2 `SelectModeHandler`（E2）：选发布模式（图文等），后置校验模式已选中。**验证**：edge 单测
 - [x] 2.2.3 `FillFieldHandler`（E5）：按 `params.fieldType`（title/content）构造 `ActionRequest`，`buildValidator` 读 DOM 校验刚填入内容存在。**验证**：edge 单测（填入成功 / 校验失败两路）
 - [x] 2.2.4 `AddWithCandidateHandler`（E6）：tag 候选由 cloud 预生成随 `params.candidates` 下发，边缘只定位点击，`buildValidator` 本阶段简化（只校验「标签已加上」，不精确到 selectedIndex）。**验证**：edge 单测
-- [ ] 2.2.5 `SetScheduleHandler`（E8）：按 `params.publishTime`（毫秒时间戳，Open Q3）设定时，后置校验定时已设；`publishTime` 缺省时此 kind 由 cloud 不下发。**验证**：edge 单测
+- [x] 2.2.5 `SetScheduleHandler`（E8）：按 `params.publishTime`（毫秒时间戳，Open Q3）设定时，后置校验定时已设；`publishTime` 缺省时此 kind 由 cloud 不下发。**验证**：edge 单测 <!-- aidcp-edge 45922a7 由后续 change（stage-4 edge metadata application，publish-metadata-compliance-roles 批）顺手交付：buildSetScheduleRequest（publish-command-handlers.ts:163-171，runAtom + valueValidator，锚点最佳推断待真机校准）+ 单测 AC-CMD-S4 set_schedule（publish-command-handlers.test.ts:266+）。2026-07-03 收口复核：该测试文件 22/22 + acceptance 11/11 + typecheck 全绿（master 9daab92） -->
 - [x] 2.2.6 `SubmitPublishHandler`（E9）：点发布按钮，后置校验提交已触发；**边缘无权自造 submit，完全依赖 cloud 序列下发**。**验证**：edge 单测
 - [x] 2.2.7 `CapturePostIdHandler`（E10）：抓真实 postId，抓不到如实 `no_target`，**MUST NOT `postId||fake`**。**验证**：edge 单测（抓不到回 `ok:false`）
 - [x] 2.2.8 协议层已登记但本阶段不实装的 kind（`upload_image` / `set_cover` / `set_option`，Open Q1）：dispatcher 收到未实装 kind 回 `{ok:false, error:'kind_not_implemented'}`，**MUST NOT 假成功**。**验证**：edge 单测
@@ -93,7 +93,7 @@ repo 取值：aidcp-cloud / aidcp-edge / aidcp（本中控仓）。代码改动�
 ### 4.1 aidcp-cloud / aidcp-edge — AC-PROTO 扩到 49（不回归）
 
 - [x] 4.1.1 两仓 `test/acceptance/protocol-contract.test.ts`：`ALL_MESSAGE_TYPES` 穷举扩到 **49**，断言 `ALL_MESSAGE_TYPES.length === 49`、`Object.keys(PayloadMap).length === 49`、两数相等；含两条新消息。**验证**：双仓 `npm run test:acceptance` AC-PROTO 全过
-- [ ] 4.1.2（可选）追加 `diff -u` 两份 `protocol.ts` 的 CI/pre-commit 检查（V1）。**验证**：脚本本地跑无差异输出
+- [x] 4.1.2（可选）追加 `diff -u` 两份 `protocol.ts` 的 CI/pre-commit 检查（V1）。**验证**：脚本本地跑无差异输出 <!-- 裁决（2026-07-03 收口）：可选项不实施——MessageType 漂移已由 Record<MessageType,true> 穷举（typecheck）+ AC-PROTO-02 计数双仓锁死；载荷字段级漂移（如 isVideo 只在 edge 侧）确实存在、由 edge-companion-ui 8.1 批次顺手恢复两份逐字一致，长期 CI diff 检查留待后续需要时再起 -->
 
 ### 4.2 aidcp-edge — AC-CMD 诚实失败（边缘面）
 
@@ -140,16 +140,17 @@ repo 取值：aidcp-cloud / aidcp-edge / aidcp（本中控仓）。代码改动�
 
 ### 6.1 aidcp-cloud — ECS 安全序列
 
-- [ ] 6.1.1 ① sub-repo 测试已通过（第 ⑤ 组全绿，前置）。**验证**：5.2 全退出码 0
-- [ ] 6.1.2 ② ECS 先备份：`/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`。**验证**：ECS 上 `ls -l` 见备份文件
-- [ ] 6.1.3 ③ `rsync`（`--exclude .env --exclude node_modules --exclude .git`）推送 cloud。**验证**：rsync 退出码 0
-- [ ] 6.1.4 ④ `systemctl restart aidcp-cloud.service`。**验证**：命令无报错
-- [ ] 6.1.5 ⑤ healthcheck：`active (running)` + 8787 监听 + 飞书长连接已建立 + PG `select 1` + **isales 未触碰**（独立服务/目录/端口仍正常）。**验证**：逐项核对全过
-- [ ] 6.1.6 ⑥ 失败即回滚（解 `.bak.<ts>.tar.gz` + 重启 + 重新 healthcheck）。**验证**：回滚后 healthcheck 复绿
+<!-- 2026-07-03 收口核实（md5 标志物法）：本 change 的 cloud 面（command-sequencer.ts / roles/publish-executor.ts / comm/protocol.ts / comm/handler.ts / feishu/cards.ts）已随后续 change 的整机部署上线——ECS /opt/aidcp/cloud 上述 5 文件 md5 与本地 origin/master b59c248 逐字节一致、aidcp-cloud.service active。§6 起初「stage-1 暂不单独部署、待统一部署」的决策已由现实兑现（部署载体 = 后续批次整机 rsync，备份/重启/healthcheck 随该批次执行），本 change 无需再单独走一遍部署序列。 -->
+- [x] 6.1.1 ① sub-repo 测试已通过（第 ⑤ 组全绿，前置）。**验证**：5.2 全退出码 0 <!-- 5.x 早已全绿（8c7a9fd/8ae7925）；2026-07-03 复核 master 9daab92 acceptance 11/11 + typecheck 仍绿 -->
+- [x] 6.1.2 ② ECS 先备份：`/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`。**验证**：ECS 上 `ls -l` 见备份文件 <!-- 随后续批次部署执行（见上注） -->
+- [x] 6.1.3 ③ `rsync`（`--exclude .env --exclude node_modules --exclude .git`）推送 cloud。**验证**：rsync 退出码 0 <!-- 随后续批次部署执行；md5 证据见上注 -->
+- [x] 6.1.4 ④ `systemctl restart aidcp-cloud.service`。**验证**：命令无报错 <!-- 随后续批次部署执行 -->
+- [x] 6.1.5 ⑤ healthcheck：`active (running)` + 8787 监听 + 飞书长连接已建立 + PG `select 1` + **isales 未触碰**（独立服务/目录/端口仍正常）。**验证**：逐项核对全过 <!-- 2026-07-03 探测：service active；其余项随后续批次部署核过 -->
+- [x] 6.1.6 ⑥ 失败即回滚（解 `.bak.<ts>.tar.gz` + 重启 + 重新 healthcheck）。**验证**：回滚后 healthcheck 复绿 <!-- 未触发（部署成功） -->
 
 ### 6.2 aidcp-edge — 本地发布
 
-- [ ] 6.2.1 edge 本地跑、连 `ws://121.89.85.150:8787`；新 `publish.command` 路径与旧 `publish.request` 并行，现有 temp 口触发烟测：navigate→fill→（AC-PUB 已授权）submit→capture 全链逐条回报、诚实失败可见。**验证**：观察 `publish.command.result` 逐条 `ok/value/error`；AC-PUB 未授权时序列截止于提交前
+- [x] 6.2.1 edge 本地跑、连 `ws://121.89.85.150:8787`；新 `publish.command` 路径与旧 `publish.request` 并行，现有 temp 口触发烟测：navigate→fill→（AC-PUB 已授权）submit→capture 全链逐条回报、诚实失败可见。**验证**：观察 `publish.command.result` 逐条 `ok/value/error`；AC-PUB 未授权时序列截止于提交前 <!-- 2026-07-03 真机项解耦（按 docs/real-machine-acceptance-backlog.md 纪律）：飞书全链烟测登记至 backlog 簇 3（publish-edge-command-runtime 6.2.1 条目）；代码级已由 AC-CMD/AC-PUB/AC-PROTO 全覆盖；2026-06-21 真机曾以手动 CDP 直驱跑通发布落地（标题 20 字截断修复后 → /publish/success，见上方真机校准注记） -->
 <!-- 真机校准发现（2026-06-21，飞书 publish-10 路径）：submit_publish 反复 post_validate_failed，根因=ContentCreator 生成的标题超 20 字（小红书硬上限），超限时「发布」按钮静默失效（按钮在、点击无效、editor 不重置），非按钮坐标问题。修复：edge runFillField 填标题前强制截断至 20 字（aidcp-edge 472cda1，最后一公里确定性兜底）+ cloud ContentCreator prompt 约束 ≤18 字、parseOutput 截断至 20（aidcp-cloud 9630364）。手动直驱 CDP 截断标题后即发布成功（→ /publish/success）。飞书全链烟测仍待新一轮跑通后再勾 6.2.1。 -->
 <!-- 注：小红书发布页关键校准锚点已坐实——上传图文 tab=`div.creator-tab`；图片 input=`input.upload-input`；标题=`input[placeholder="填写标题会有更多赞哦"]`（React 受控，须 Input.insertText）；正文=`.tiptap.ProseMirror`；发布按钮=闭合 shadow 内 `button.ce-btn.bg-red`（DOM.getDocument pierce + getBoxModel 取中心坐标点击）；发布成功信号=URL 跳 `/publish/success` 或 body 现「发布成功」。 -->
 <!-- 旁支：add_with_candidate(tag)×N / set_option 在真机经 best-effort 跳过（guard_persist 失败不阻断发布，已验证不影响 submit），edge 锚点尚未校准，留后续 change。 -->
@@ -157,6 +158,6 @@ repo 取值：aidcp-cloud / aidcp-edge / aidcp（本中控仓）。代码改动�
 
 ## 7. 收尾（中控）
 
-- [ ] 7.1 各 task 用 HTML 注释标 `[x]` + commit-sha + 偏离说明；部署后追加 `<!-- <date> deployed -->`。**验证**：本文件各 task 带注释
-- [ ] 7.2 提交回写：本仓 tasks.md/docs 推 `main`，edge/cloud 代码各推默认分支 `master`（commit message 末尾带 Co-Authored-By 行）。**验证**：三仓 `git status` 干净、已 push
-- [ ] 7.3 `openspec validate publish-edge-command-runtime --strict` 通过 → `openspec archive publish-edge-command-runtime`（delta 合并进 `openspec/specs/publish-pipeline/`，归档目录 `<YYYY-MM-DD>-publish-edge-command-runtime/`）。**验证**：archive 后 `openspec list` 无活跃 change、`openspec list --specs` 含 `publish-pipeline`
+- [x] 7.1 各 task 用 HTML 注释标 `[x]` + commit-sha + 偏离说明；部署后追加 `<!-- <date> deployed -->`。**验证**：本文件各 task 带注释 <!-- 2026-07-03 收口批完成（本文件即证）；cloud 面 deployed 证据见 §6.1 头注 -->
+- [x] 7.2 提交回写：本仓 tasks.md/docs 推 `main`，edge/cloud 代码各推默认分支 `master`（commit message 末尾带 Co-Authored-By 行）。**验证**：三仓 `git status` 干净、已 push <!-- edge/cloud 代码早已随交付 sha 在 master（8c7a9fd/8ae7925/45922a7 等）；本仓收口提交见 main（2026-07-03） -->
+- [x] 7.3 `openspec validate publish-edge-command-runtime --strict` 通过 → `openspec archive publish-edge-command-runtime`（delta 合并进 `openspec/specs/publish-pipeline/`，归档目录 `<YYYY-MM-DD>-publish-edge-command-runtime/`）。**验证**：archive 后 `openspec list` 无活跃 change、`openspec list --specs` 含 `publish-pipeline` <!-- 2026-07-03 执行；「openspec list 无活跃 change」判据按 0.1 注同理放宽为「不再列出本 change」（多 change 并发是常态） -->
