@@ -31,6 +31,7 @@
 - [x] 4.1 发布卡组件：白底卡 + 四节点旅程步骤条 + 唯一琥珀呼吸点 + 脚注「通过/驳回在飞书」+「打开飞书 ↗」（深链失败降级纯文字）；零按钮断言（卡内不存在 button 元素） <!-- aidcp-edge 50a8b23 深链依次试 feishu://、lark://；jsdom 断言 card.querySelectorAll('button').length===0 -->
 - [x] 4.2 五状态接线：候审 / 超 30min（未证实不谎称「已再提醒」）/ 已通过择时（呼吸点转平静色 + 无需操作文案）/ 已发布收进流并计入小结 / 拒绝收起表述为「暂不发布、内容留档」 <!-- aidcp-edge 50a8b23 状态由 status.publish 驱动（[ui-event] 契约就绪）；终态折进活动流按签名去重 -->
 - [x] 4.3 编号展示：仅当 1.1 核对确认飞书卡含 requestId 时展示尾 4 位，否则本期不显示 <!-- 1.1 已核对：飞书卡不含可见 requestId → 本期不显示；渲染层保留 code 字段支持，云端补印后即可点亮 -->
+- [x] 4.4 发布卡改常驻三态（用户验收反馈第 2 轮）：flow 进行中（原旅程）/ last 上次发布（四节点全勾 + 相对时间，userData/ui-state.json 本地持久化、重启不丢；云端快照接入后以云端为准）/ empty 从未发布（幽灵旅程 + 空态文案，同设计语言）；「打开飞书」仅 flow 态出现；拒绝折进流后回落 last/empty、不渲染成失败 <!-- aidcp-edge 163b018 + 72e106f（测试类型补丁）已 ff 合回 master；504/504 + typecheck -->
 
 ## 5. aidcp-edge — 设置抽屉
 
@@ -45,3 +46,7 @@
 - [x] 6.3 electron-builder 双平台打包，win-unpacked 验 titleBarOverlay 观感与窗控 <!-- 2026-07-03 worktree 内双平台产物齐：mac dmg+zip×双架构（AIDCP-0.2.0*）+ win NSIS（AIDCP Setup 0.2.0.exe，signAndEditExecutable:false 使 mac 交叉构建免 wine）；asar 核验新界面五文件与新窗框代码均打入。win titleBarOverlay 实际观感需 Windows 真机，已挂 docs/real-machine-acceptance-backlog.md 簇 7；打包配置零改动（renderer/**、*.cjs 通配自动覆盖新文件） -->
 - [ ] 6.4 结构化 `[ui-event]` 发射点（发布链路内）标记串行：待 `publish-edge-command-runtime` 收口后按需补插（或由其顺手带上），本 change 不触碰发布文件
 - [ ] 6.5 `openspec validate edge-companion-ui --strict` → 合回 master + 部署分发 → archive <!-- 2026-07-03 已合回：rebase 到 master 44d56ad 后 493/493+typecheck+acceptance 全绿，ff 合并推送（master 9ef116e）；双平台安装包产物在 worktree dist-electron/（AIDCP-0.2.0*.dmg/zip + AIDCP Setup 0.2.0.exe）。archive 待 6.4（[ui-event] 发射点，等 publish-edge-command-runtime 收口）与分发落定后执行 -->
+
+## 7. 云端数据回填（串行批：与 6.4 同等 publish-edge-command-runtime 收口）
+
+- [ ] 7.1 云端账号资料快照下发：边缘握手确认（或会话启动）时云端下发 {昵称, 最近发布摘要 {title, at}}——昵称云端账号主数据已有、发布记录云端已有；edge 核心收到后转 `[ui-event]` 行给壳（壳侧已就绪：status.account source='xhs' 优先于环境名、status.lastPublish 以云端为准替代本地 ui-state）。热点提醒：动协议载荷 = 两份 protocol.ts 逐字同步 + docs/protocol.md + 视需要 command-bridge，按并行规范串行、绝不与并行 change 同时碰
