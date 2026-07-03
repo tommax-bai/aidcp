@@ -41,11 +41,13 @@
 **D6 · 代理软提示 + 无代理如实标注，不设创建闸。** 没配代理给提醒但允许创建；环境列表把 `no_proxy` 如实显示。
 - 理由：用户决定——保留运营控制权、不强制。仅保留「别把无代理号伪装成已配好」的诚实（零成本，`ads-local-api.cjs:167` 已能读）。
 
-**D7 · 账号绑定闭环 = `intendedAccountLabel` 预填 + 登录时回写比对。** 台账每条预填意图账号；登录握手边缘回写真实 accountId 并比对，不一致诚实告警不投产。`ads_profile_id` + `machine_label` 进握手落库、走已有自愈 ALTER。
-- 理由：创建时账号未知（登录在后、人手扫码），profile↔账号绑定否则全生命周期无强制点，扫错分身零拦截（致命洞 C2）。落库与本 change 同批交付、不推迟到「以后」。
+**D7 · 账号绑定闭环 = 建号时把意图账号写进分身备注 + 登录时回写比对。** 建号时把 `intendedAccountLabel`（打算给哪个号）写进 AdsPower 分身的 `remark`（随 `user/create` 一次写入、随 `user/list` 读回）；登录握手边缘回写真实 accountId 并比对，不一致诚实告警不投产。`ads_profile_id` + `machine_label` 进握手落库、走已有自愈 ALTER。
+- 理由：创建时账号未知（登录在后、人手扫码），profile↔账号绑定否则全生命周期无强制点，扫错分身零拦截（致命洞 C2）。落库与本 change 同批交付、不推迟到「以后」。意图存 `remark` 而非本机文件，随分身走、抗崩溃、免同步。
 
-**D8 · write-ahead 台账 + reconcile + 原子写；主进程单飞互斥 + 点击即 disable。**
-- 理由：远程 `create` 成功但台账未写的崩溃窗口会漏记真分身、下次重复建号复用代理（H4）；无锁的「查台账-再创建」是 TOCTOU、连点两下双建（H5）。
+**D8 · 以 AdsPower `user/list` 为账本，不自建本机 write-ahead 台账；主进程单飞互斥 + 点击即 disable。** 用一个专用分组承载本 change 建的分身；意图/模板/机器写进各分身 `remark`。「有哪些分身、各绑什么代理」直接读 `user/list`（防重复建 / 防代理撞车 / 查残缺孤儿都据它）。
+- 理由（收纳用户质疑，简化 H4/H5）：**号一旦登录、edge 一起就经握手把账号↔分身↔机器上报云端（D7/Task 7）——这条上报已有，不重造**；只有「创建后、登录前」这段空壳期云端看不见，而这段 **AdsPower 自己的 `user/list` 就是现成账本**（本就记着分身 + 每个的代理配置），故无需自建本机台账（省掉 write-ahead / 原子写 / 双向对账，及其丢失 / 损坏 / 走样面）。抗崩溃由「AdsPower 里已建的分身下次读列表即见」保证；防代理复用由「建号前读 `user/list` 已占代理集去重」保证。仅保留主进程单飞互斥 + 渲染层点击即 disable 防连点双建（H5）。
+- 备选（否决）：自建本机 write-ahead 台账 + reconcile——与 AdsPower 自身记录重复，徒增本机文件的丢失 / 损坏 / 与 AdsPower 走样的同步面，YAGNI。
+- 存疑（Task 6 定）：`verifyState`（验没验过）AdsPower 不天然记——MVP 倾向「每次起号前就近实测一遍」（零持久化，且天然满足 H10 跨机重验），而非持久化进 `remark`（需 `user/update`、扩写面）。
 
 **D9 · 凭据只内存持有、绝不明文落盘。** POST 扩展后日志层脱敏 `proxy_user/password` 与 Authorization、禁 stringify 整个 body。
 - 理由：`adsApiKey` 已明文存 settings（`main.cjs:35/79`），代理账密更敏感、是防关联命脉，落盘或进日志即被盗刷（H3）。

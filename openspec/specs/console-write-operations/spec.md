@@ -152,3 +152,31 @@ Web 发布审批 SHALL 与飞书审批调用**同一个** `writeApprovalSignal(r
 - **WHEN** 面板需要写账号分组标签
 - **THEN** 改动经账号存储的 `setGroupLabel` 单写方法进行，面板层不持有也不使用对 `accounts` 表的 raw SQL UPDATE 能力
 
+### Requirement: 内容排期写入经一等单写通道，UPSERT 前校验账号存在，默认 fail-closed
+
+内容排期的写入——每账号 `PUT /api/content-schedule/:accountId` 与全局 `PUT /api/content-schedule/global`——SHALL 经受 JWT 保护的一等单写通道（内容排期存储的专属方法），MUST NOT 用 raw SQL UPDATE 绕过，MUST NOT 报告乐观成功。每账号写为 UPSERT，且写前 SHALL 先校验 `accounts` 中确有该账号行（无行 → 具名拒 `unknown_account`，绝不为不存在 / 退役账号造幽灵排期行），退役保留账号 `default` SHALL 拒。非法值（掩码非 168 位 '0'/'1'、日上限非非负整数、坏结构）SHALL **整块拒**、绝不部分落库。写后 SHALL 回读真态返回，且拒绝与成功 MUST **可区分**呈现。缺省与非法一律 fail-closed（归「不自动」）。此与本 spec「写只经拥有者对象、诚实非乐观」核心不变量同构。
+
+#### Scenario: 写后回真态
+- **WHEN** 运营经面板保存某账号或全局的内容排期
+- **THEN** 接口返回从内容排期存储读回的写后真实状态，而非提交即返回的乐观「ok」
+
+#### Scenario: 未知账号拒、不造幽灵行
+- **WHEN** 对一个 `accounts` 中不存在或已退役的账号 PUT 内容排期
+- **THEN** 接口具名拒绝（如 `unknown_account` / 退役拒），绝不 UPSERT 出一条孤儿排期行
+
+#### Scenario: 非法值整块拒
+- **WHEN** 提交的内容掩码非 168 位 '0'/'1'、或日上限为负 / 非整数
+- **THEN** 整块拒绝、绝不部分落库，接口以可区分于成功的方式呈现拒绝
+
+### Requirement: 内容排期评论字段写入与发帖字段严格同构
+
+内容排期写通道（`PUT /api/content-schedule/:accountId`）SHALL 新增 `commentEnabled`（布尔）与 `commentDailyCap`（0..50 整数）两字段，校验与既有发帖字段严格同构：非法值（类型错 / 越界 / 非整数）SHALL 整块拒、绝不部分落库；写后 SHALL 回读真态；未配 / 默认一律 fail-closed（评论不自动）。写仍只经内容排期存储的一等单写方法，MUST NOT raw UPDATE、MUST NOT 乐观假成功。
+
+#### Scenario: 评论字段合法写回读真态
+- **WHEN** 运营为某账号打开自动评论并设日上限 2
+- **THEN** UPSERT 经单写方法完成，接口返回回读的真实行（commentEnabled=true、commentDailyCap=2）
+
+#### Scenario: 非法评论上限整块拒
+- **WHEN** 提交 `commentDailyCap` 为 -1、1.5 或 51
+- **THEN** 整块拒绝、绝不部分落库，拒绝与成功可区分呈现
+

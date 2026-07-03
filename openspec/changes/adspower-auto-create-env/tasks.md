@@ -18,14 +18,16 @@
 - [x] 3.3 薄静态护栏：`device_memory` 只允 2 的幂（拒 `6`）、`hardware_concurrency` 真实值、`webgl` 模式不自相取消、`webrtc` 禁 local/real、噪声必开、字体不跨 OS <!-- aidcp-edge b92989b validateGuardrails -->
 - [x] 3.4 提交前「声明 OS == UA OS == 字体 OS == renderer 家族 OS」四者一致断言，不符诚实拒建 <!-- aidcp-edge b92989b assertOsCoherent，拦 H6「Mac 画像+Windows renderer」 -->
 
-## 4. aidcp-edge — 创建管线：台账/幂等/凭据安全（MVP，非 UI）
+## 4. aidcp-edge — 创建管线：以 user/list 为账本 / 幂等 / 凭据安全（MVP，非 UI）
 
-- [ ] 4.1 write-ahead 台账：发 `user/create` 前写 `pending`（模板/代理位/时间戳），回 id 补齐置 `created`，原子写（临时文件 + rename）
-- [ ] 4.2 reconcile：拉 `user/list` 与台账全量对账，标 `untracked-orphan`/`stale`，创建前/启动前可跑
+<!-- 简化(用户 2026-07-03)：去掉自建本机 write-ahead 台账，改以 AdsPower user/list 为账本 + 专用分组 + remark 承载意图/模板/机器。理由：登录后 edge 握手即上报账号↔分身↔机器(Task 7)，只有创建-登录空窗云端不可见，而 user/list 本就是现成账本。 -->
+
+- [ ] 4.1 本 change 建的分身归入专用分组；创建时把「意图账号 / 模板 / 建号机」写进分身 `remark`（随 `user/create` 一次写入）——不建本机台账
+- [ ] 4.2 以 `user/list` 为唯一账本：建号前读其「已占代理集」去重（拒绝把已占代理再绑新分身）；崩溃后据下次 `user/list` 直接看见已建分身（不丢账、不重复建）
 - [ ] 4.3 主进程创建动作单飞互斥（重入诚实返回「进行中」），渲染层触发控件在途禁用
-- [ ] 4.4 凭据只内存持有、绝不明文落盘；POST 日志/错误层脱敏 `proxy_user`/`proxy_password`/`Authorization`，禁 stringify 整个 body
+- [ ] 4.4 凭据只内存持有、绝不明文落盘；POST 日志/错误层脱敏 `proxy_user`/`proxy_password`/`Authorization`，禁 stringify 整个 body（`ads-write-api.cjs` 已具备，接线时用 `redactSensitive`）
 - [ ] 4.5 创建成功仅标「仅配置层/未验证/不可投产」，绝不把 `create` 回 id 当就绪
-- [ ] 4.6 创建时可预填 `intendedAccountLabel` 并随台账持久化
+- [ ] 4.6 创建时可预填 `intendedAccountLabel`，写进分身 `remark`（随 `user/list` 读回，供登录时比对）
 - [ ] 4.7 MUST NOT 接线任何程序化 `user/delete`；孤儿只暴露 user_id 引导人工在 AdsPower 删
 - [ ] 4.8 单次创建规模 N 与观测能力挂钩：观测未就绪时限 N≤3 并说明原因
 

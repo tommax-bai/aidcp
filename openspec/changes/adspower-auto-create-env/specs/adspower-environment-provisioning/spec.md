@@ -36,13 +36,17 @@
 - **WHEN** 本机核心子进程正在运行且运维触发创建
 - **THEN** 写客户端串行、与核心的本地 API 调用不在同秒并发；若仍撞每秒限速则诚实降级提示重试，MUST NOT 假成功
 
-### Requirement: 幂等与生命周期——write-ahead 台账、reconcile 对账、单飞互斥
+### Requirement: 幂等与生命周期——以 AdsPower user/list 为账本、专用分组/备注、单飞互斥
 
-创建 SHALL 由 write-ahead 台账保护：桌面外壳 SHALL 在发出 `user/create` **之前**先写一条 `pending` 记录（含所选模板/代理位/时间戳），拿到分身 id 后再补 id、置 `created`，台账写盘 SHALL 为原子写（临时文件 + rename）。桌面外壳 SHALL 提供 reconcile：拉 `user/list` 与台账全量对账，AdsPower 有而台账无标 `untracked-orphan`、台账有而 AdsPower 无标 `stale`，并在创建前/启动前可跑。创建动作在主进程 SHALL **单飞互斥**（同一时刻只一个创建在途，重入诚实返回「进行中」），渲染层触发控件 SHALL 在请求在途时禁用。崩溃后 SHALL 能据 `pending`/台账恢复重放或清理，MUST NOT 因崩溃窗口漏记真实分身而下次重复创建、复用同一代理。
+本 change 建的分身 SHALL 归入一个专用分组，创建时 SHALL 把「意图账号 / 模板 / 建号机」写进分身 `remark`（随 `user/create` 一次写入、随 `user/list` 读回）。「有哪些分身、各绑什么代理」SHALL 以 AdsPower `user/list` 为**唯一账本**读取，MUST NOT 另建本机 write-ahead 台账（与 AdsPower 自身记录重复，徒增丢失 / 损坏 / 与 AdsPower 走样的同步面）。理由：号一旦登录、edge 一起即经握手把账号↔分身↔机器上报云端（见「握手载荷携带并持久化」需求），该上报已有、不重造；仅「创建后、登录前」空壳期云端不可见，而这段 AdsPower `user/list` 本就记着分身 + 各自代理，是现成账本。建号前 SHALL 读 `user/list` 的**已占代理集去重**，MUST NOT 把一条已被现有分身占用的代理再绑给新分身。创建动作在主进程 SHALL **单飞互斥**（同一时刻只一个创建在途，重入诚实返回「进行中」），渲染层触发控件 SHALL 在请求在途时禁用。崩溃后 SHALL 据下次 `user/list` 直接看见已建分身（不丢账），MUST NOT 因崩溃窗口重复建号、复用同一代理。
 
-#### Scenario: 崩溃窗口不致漏记与重复建号
-- **WHEN** `user/create` 已成功但在写台账 id 前进程崩溃
-- **THEN** reconcile 经 `user/list` 对账发现该分身并标 `untracked-orphan`，下次创建 MUST NOT 对它失明而重复建一个复用同代理的新分身
+#### Scenario: 崩溃后据 user/list 不丢账不重复
+- **WHEN** `user/create` 已成功建出分身但紧接着进程崩溃 / 关窗
+- **THEN** 下次读 `user/list` 直接看见该分身（在专用分组、带 `remark`），创建流程据其已占代理去重，MUST NOT 重复建一个复用同代理的新分身
+
+#### Scenario: 建号前据已占代理集去重
+- **WHEN** 待绑代理已被某现有分身（`user/list` 可见）占用
+- **THEN** 创建流程诚实拒绝把该代理再绑给新分身，避免两号共用一条代理
 
 #### Scenario: 重复点击不双建
 - **WHEN** 运维在创建在途时再次点击「创建环境」
@@ -66,11 +70,11 @@ AdsPower API key 与代理账号密码 SHALL 仅在创建批处理期间**内存
 
 ### Requirement: 创建时预填绑定意图 intendedAccountLabel
 
-创建时账号尚未登录（登录在后、由人手扫码），桌面外壳 SHALL 允许运维为该环境**预填一个 `intendedAccountLabel`**（该分身打算承载哪个号的人肉意图锚），并随台账持久化。该字段 SHALL 供 `environment-readiness-verification` 与登录握手时回写比对真实 accountId 之用，MUST NOT 被当作已确立的绑定（绑定在登录时才成立并校验）。
+创建时账号尚未登录（登录在后、由人手扫码），桌面外壳 SHALL 允许运维为该环境**预填一个 `intendedAccountLabel`**（该分身打算承载哪个号的人肉意图锚），并随分身 `remark` 持久化（随 `user/create` 写入、随 `user/list` 读回，不落本机文件）。该字段 SHALL 供登录握手时回写比对真实 accountId 之用，MUST NOT 被当作已确立的绑定（绑定在登录时才成立并校验）。
 
-#### Scenario: 预填意图账号供登录时比对
+#### Scenario: 预填意图账号写进分身备注供登录时比对
 - **WHEN** 运维创建环境时填了「打算给账号 A」
-- **THEN** 台账记录 `intendedAccountLabel=A`，供之后登录握手回写真实 accountId 时比对
+- **THEN** 该意图写进分身 `remark`（`intendedAccountLabel=A`），随 `user/list` 读回，供之后登录握手回写真实 accountId 时比对
 
 ### Requirement: MUST NOT 程序化删除任何分身
 

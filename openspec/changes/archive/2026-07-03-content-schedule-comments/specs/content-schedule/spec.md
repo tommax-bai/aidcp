@@ -44,6 +44,11 @@
 - **WHEN** 哈希偶发使同账号两动作命中同一分钟
 - **THEN** 本 tick 只触发其一，另一动作顺延（不并发抢边端）
 
+## RENAMED Requirements
+
+- FROM: `### Requirement: 本能力仅覆盖发帖，声明协同指纹已知缺口与后续前置`
+- TO: `### Requirement: 本能力覆盖发帖与评论，群评仍排除并声明已知缺口与后续前置`
+
 ## MODIFIED Requirements
 
 ### Requirement: 本能力覆盖发帖与评论，群评仍排除并声明已知缺口与后续前置
