@@ -77,10 +77,18 @@
   4. **迭代 3（放开 N>3 前置）**：真机多号并发承载力验证 + 封号/限流信号接入状态迁移 + console 逐账号绑定/健康视图 + fleet 级代理去重。
 - **回滚**：按钮行为可退回旧「拉起 AdsPower」外链；云端加列为加性、无需回退。
 
-## Open Questions
+## 实测结论（探针 2026-07-03，`aidcp-edge/scripts/adspower-fingerprint-probe.ts`）
 
-- AdsPower `user/create` 传 `device_memory=6` 是被静默接受还是纠正？（决定护栏是「拒绝提交」还是「AdsPower 已兜」）
-- `webgl='3'`(random matching) 时同传 `webgl_config` 是被忽略还是生效、随机池是否受 OS 约束？（决定「锁家族」能否做，还是只能 `webgl='2'`+显式 config）
+对真实 AdsPower（本地 API 无鉴权、SunBrowser kernel 148）建测试分身、真开一次经 CDP 实测，得：
+
+- **Q1 已答**：`device_memory='6'`（非 2 的幂）→ 运行时 `navigator.deviceMemory` 读到 **4**（不是 6、不是 8）——AdsPower **不忠实下发 6**、把它归到某个 2 的幂。护栏「只允 2 的幂、拒 6」**证实必要**（用 6 拿到的是你没想要的 4）。测量教训：`navigator.deviceMemory` **仅安全上下文(HTTPS)暴露**，自检页 MUST NOT 用 `about:blank`（会恒 `undefined`）。
+- **Q2 已答**：`webgl='2'`(custom) **逐字 honor** `webgl_config`（读出所给 `NVIDIA ... Direct3D11`）；`webgl='3'`(random) **无视** `webgl_config`、按分身 OS 给自洽随机 renderer。→ 锁 GPU 家族**只能** `webgl='2'`+显式 config；`webgl='3'` 时传 config 是白传，MUST NOT 传。
+- **新发现（比原问题更要命）——不 pin OS 时 OS 随机、且会出桌面外的画像**：同一 `browser_kernel_config: chrome/148`、不 pin OS，三次实测分身被随机分到 **Windows / macOS / Linux / 甚至 iPhone(iOS Safari UA、`deviceMemory=0`)**。iPhone 画像会直接破坏「桌面小红书自动化」（窄屏布局 + 无 deviceMemory）。→ **D10 升级为硬结论：整机模板 MUST 显式 pin OS 且限定桌面（Win/Mac）**，绝不放任 AdsPower 随机分配。
+- **H6 现场坐实**：`webgl='2'` 强塞 OS 不符的 renderer（Mac 画像 + NVIDIA/Direct3D11）→ AdsPower **照单全收、不校验** → 造出「Mac 系统配 Windows 显卡」的一眼假。→ 提交前「四者一致断言」护栏**必不可少**。
+- **旁证**：不覆盖子字段时委托生成确实自洽（Win: Win32+Win UA+NVIDIA D3D11；Mac: MacIntel+Mac UA+Apple Metal）；`webdriver=false`（cdp_mask 生效）；时区/语言随（宿主）IP 为 `Asia/Shanghai`+`zh-CN`；canvas 噪声令各分身 hash 互不相同（区分度成立）。**元结论**：提交的 config 值不可信（6→4、OS→随机含 iPhone、webgl=2 可造矛盾），唯有运行时开一次读值才是真相——**正面印证 C1/D2/D4「就绪只由运行时实测置位」**。
+
+## Open Questions（剩余）
+
 - fleet 级代理去重落点：cloud 侧持代理分配台账（申领去重）vs 代理清单中心统一签发——放开 N>3 前必须定，MVP 先本机去重 + 明示单机盲区。
-- 运行时自检的实测手段：CDP `Runtime.evaluate` 直接读指纹值 vs 载入一个自建自检页读取——需定，注意 §4.2「不常驻 `Runtime.enable`、优先 isolated world」的既有反检测约束。
-- 初始整机模板数量（Win/Mac 各几套）与维护节奏（Chrome 升级 / 新 GPU 致模板漂移过时）。
+- 运行时自检的实测手段：CDP `Runtime.evaluate` 直接读指纹值 vs 载入一个自建自检页读取——需定，注意 §4.2「不常驻 `Runtime.enable`、优先 isolated world」的既有反检测约束；且 deviceMemory 类字段须在 HTTPS 页读（见上）。
+- 初始整机模板数量（Win/Mac 各几套）与维护节奏（Chrome 升级 / 新 GPU 致模板漂移过时）；模板须显式钉 OS + 桌面 + `webgl='2'`+OS 匹配 renderer 或 `webgl='3'` 纯委托（二选一）。

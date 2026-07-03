@@ -1,8 +1,9 @@
 ## 1. 下码前置 — 真机实测（阻塞护栏细节，先做）
 
-- [ ] 1.1 对真实 AdsPower 打一次 `user/create`：观测 `device_memory=6` 是被静默接受还是纠正（决定护栏是「提交前拒绝」还是「AdsPower 已兜」）
-- [ ] 1.2 对真实 AdsPower 打一次 `user/create`：观测 `webgl='3'`(random matching) 时同传 `webgl_config` 是被忽略还是生效、随机池是否受 OS 约束（决定「锁家族」用 `webgl='2'`+显式 config 还是删 config）
-- [ ] 1.3 记录实测结论，据此定护栏细节与 webgl 模式取舍，回写 design.md「Open Questions」
+- [x] 1.1 对真实 AdsPower 打一次 `user/create`：观测 `device_memory=6` 行为 <!-- aidcp-edge scripts/adspower-fingerprint-probe.ts 实测: device_memory=6 → 运行时 navigator.deviceMemory=4(非6非8), 不忠实下发→护栏「只允2的幂、拒6」证实必要; deviceMemory 仅HTTPS暴露、自检勿用about:blank -->
+- [x] 1.2 对真实 AdsPower 打一次 `user/create`：观测 `webgl` 模式与 `webgl_config` 交互 <!-- 实测: webgl='2' 逐字honor webgl_config; webgl='3' 无视config按OS给自洽随机→锁家族只能webgl='2'+显式config, webgl='3'传config白传 -->
+- [x] 1.3 记录实测结论回写 design.md <!-- 已写入 design.md「实测结论」段; 另挖出更要命发现: 不pin OS时OS随机(Win/Mac/Linux/甚至iPhone)→模板MUST显式钉OS+桌面; H6现场坐实(Mac画像+NVIDIA/D3D11 renderer被照单全收)→四者一致断言必不可少 -->
+- [ ] 1.4 （新增，据 1.3）整机模板 MUST 显式 pin OS + 限定桌面（Win/Mac，绝不放任随机分到 iPhone/Linux）；webgl 二选一（`webgl='2'`+OS 匹配 renderer / `webgl='3'` 纯委托）
 
 ## 2. aidcp-edge — 写客户端与红线（MVP，非 UI，可先行）
 
