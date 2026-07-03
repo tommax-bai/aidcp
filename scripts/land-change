@@ -35,8 +35,10 @@ if ! git -C "$wt" rebase "origin/$def"; then
   die "rebase 冲突。去 $wt 解决后 'git rebase --continue'，再重跑 land-change。"
 fi
 
-info "跑安全红线 + 全量 + typecheck（在 worktree 内）..."
-( cd "$wt" && npm run test:acceptance && npm test && npm run typecheck ) \
+info "跑安全红线 + 全量 + typecheck（在 worktree 内；test:acceptance 仅在该仓存在时跑）..."
+( cd "$wt" \
+  && if node -e "process.exit((require('./package.json').scripts||{})['test:acceptance']?0:1)" 2>/dev/null; then npm run test:acceptance; fi \
+  && npm test && npm run typecheck ) \
   || die "测试/typecheck 未过——不合并。修好再来。"
 
 ahead="$(git -C "$wt" rev-list --count "origin/$def..$name")"

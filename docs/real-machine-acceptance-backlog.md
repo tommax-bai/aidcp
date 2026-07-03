@@ -59,6 +59,7 @@
 - [ ] **editable-account-group-label 4.4** — 账号表分组列 inline 编辑落库
 - [ ] **session-limits-to-quota-layer 7.4** — 配额层真机校准
 - [ ] **llm-token-usage-stats 7.5 + 6.4** — token 用量曲线真机出数 + 视觉/数据核对
+- [ ] **dashboard-refresh-clarity 4.4/3.2** — 总览页新鲜度标识随 10s 轮询推进；零边缘在线时「系统未在浏览」提示可见（能一眼区分「无新活动」vs「界面冻结」）（2026-07-03 集成，部署后验）
 
 ## 簇 6 — 精选库（数据自然积累后，机会性验）
 
