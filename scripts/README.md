@@ -9,6 +9,7 @@
 | --- | --- | --- |
 | `fleet-status` | 四仓所有 worktree 一屏:分支 / ahead-behind / dirty / 孤儿标记 | 只读（仅 quiet fetch） |
 | `new-change <repo> <name>` | 开一条流：建 `../<repo>.wt/<name>` 分支 `<name>` | 可逆（worktree remove + branch -d） |
+| `spawn-change <repo> <name> [--launch]` | 多终端模式：确保 worktree（幂等）+ 生成任务简报；`--launch` 直接在中控仓启动 claude | 同 new-change；`--launch` 只是启动 CLI |
 | `land-change <repo> <name> [--yes]` | 集成：fetch+rebase+测试；`--yes` 才 ff 推送+同步主 checkout+清理 | 默认只 prep 不推；push 撞 non-ff 即中止，**绝不 force** |
 
 ```bash

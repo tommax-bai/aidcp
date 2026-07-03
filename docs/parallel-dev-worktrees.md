@@ -73,6 +73,25 @@ scripts/new-change <aidcp-edge|aidcp-cloud|aidcp-console> <change-name>
 控制仓 aidcp 侧无需 worktree：直接在主 checkout 用 openspec 流程建 change 目录
 （`/opsx:propose` 等）。
 
+## 3b. 多终端模式（形态 A：每终端一条流）`[稳]`
+
+用户自己开 N 个 claude CLI 终端并行开发时，每终端一条命令进车道：
+
+```bash
+cd ~/codes/aidcp && scripts/spawn-change <repo> <change-name> --launch
+# = 确保隔离 worktree 存在（幂等，缺则创建）→ 生成任务简报 → 在中控仓启动 claude
+#   （中控仓启动 = 自动读到 CLAUDE.md §7）；不带 --launch 只打印简报，可粘给任意 session
+```
+
+- session 拿到简报即自知身份（独占哪个 change、代码只写哪个 worktree、怎么集成），
+  无需逐个口头交代。全新任务先在任一 session `/opsx:propose` 再 spawn。
+- **用户在 fleet 层只管三件事**：① 挑互不重叠的任务（按子系统摊开，见并发软上限）；
+  ② 碰热点文件（§5）的任务不同时派两个；③ 部署天然串行（部署前必探 ECS，见 §8）。
+- 集成撞车由机制兜底：`land-change` ff-only + rebase 重试，绝不 force；中控仓 tasks.md
+  各 change 各一份、互不冲突。
+- 资源提醒：多条流同时跑全量测试很吃 CPU，集成（land-change 全量套件）尽量错峰；
+  多 session 共享模型/API 限额。
+
 ## 4. 在 worktree 里干活的规矩
 
 - 只在**本分支**提交；commit message 前缀带 change 名（如 `<name>: …`），末尾带

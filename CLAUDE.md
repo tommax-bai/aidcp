@@ -80,6 +80,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **一个 session = 一个 openspec change = 一条分支 = 一个 worktree，四者同名**；worktree 放 `../<repo>.wt/<change-name>`。控制仓 aidcp 的 change 是 additive 目录、近零冲突，可不开 worktree、在主 checkout 各写各的 change 目录。
 - **用手动 `git worktree add` 到子仓（`scripts/new-change`），不用内置 `EnterWorktree`/`ExitWorktree`**：内置只作用于当前（中控）仓、会切走 session cwd、且不纳管手动建的 worktree——不合本项目「中控仓驱动、代码落子仓」的多仓模型（详见手册 §1）。
+- **被指派 change 即为 fleet 成员**：session 若经 `scripts/spawn-change` 启动、或用户直接说「实装 change X」，即独占该 change，按本节自主走全流程（读 change 文档 → worktree 开发 → `land-change` 集成 → tasks.md 回写 → 真机项登记 backlog → 部署前探 ECS → archive），无需逐步征询。
 - **先判定自己在哪**：`git worktree list` / `git rev-parse` 认清是「主 checkout」还是某 change 的 worktree。worktree 内 = 只在本分支开发 + 提交 + 跑 `test` / `typecheck`；主 checkout = 集成与部署位。
 - **部署只从主 checkout 的默认分支走，绝不从任何 worktree 部署**（承 §5 部署铁律）。
 - **热点文件单写者，并行时绝不同时碰**：两份 `protocol.ts` + `aidcp-cloud/src/comm/command-bridge.ts` 动作映射（§2 协议四处同步）、角色注册（`event-bus/types.ts` 的 `RoleName` + `src/config/role-catalog.ts`）、风控状态机 `src/risk/risk-state-machine.ts`。任务若必须动这些，标记为需串行、不与他人并行。
