@@ -123,3 +123,14 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] `AIDCP_PANEL_JWT_TTL_SECONDS` 设值（续签已落地故可短，如 3600；不设则默认 3600）
 - [ ] Nginx `aidcp-console.conf` 去 `/downloads/` 的 `autoindex on`（#27，`curl /downloads/` 应返 403/404）
 - [ ] 生产库补 occurred_at/bucket_start 索引（上机执行 `CREATE INDEX IF NOT EXISTS` 或确认随重启自建）
+
+## 簇 10 — identity-recheck-page-context-guard 真机验收（身份误判停摆修复，登记于 2026-07-03）
+
+**前置**：edge 本地重建到 master `0765e00`+ 一个真实账号跑一轮「浏览 + 发布」（发布会把共用标签页带到 `creator.xiaohongshu.com`）。
+**背景**：修复的是「发布把标签页带离消费端 feed → 身份监测体不看页面就误判登出 → 断连停摆」的系统性假阳性（2026-07-03 同账号当天复现两次）。分域判据/inconclusive/断连前诚实回执/自愈归位四条逻辑单测已锁，此处验真机页面行为。
+
+- [ ] **创作发布页登录门禁判据** — 未登录访问 `creator.xiaohongshu.com/publish/publish` 确会 302 到 `creator.xiaohongshu.com/login`（判据 `path.includes('/login')` 成立的前提）；已登录停在真实发布页 URL host=`creator.xiaohongshu.com`、path 非 `/login`
+- [ ] **发布期间身份监测不误判** — 真实账号一边浏览一边发布，发布跨越 ≥1 次 30s 身份轮询时，日志出现「creator-app 判健康」或「无法确认本轮跳过」，**绝不**再出现「身份失效（登出/过期）→ 退回无身份态」+「重新确立身份失败 → 停摆」
+- [ ] **消费端真登出仍判 lost** — 真在消费端登出（或 session 过期弹登录浮层）时，身份监测体仍连续判 lost 达阈值、正常退回无身份态（分域闸不漏判真登出）
+- [ ] **自愈能回消费页恢复** — 若在创作页/弹层态触发一次重新确立身份，`reestablishIdentity` 先 `Page.navigate` 回 explore 首页再读身份、健康账号真恢复重连（而非停摆待人工）
+- [ ] **在途发布断连诚实回执** — 身份翻转断连若撞上在途发布，云端收到 `[recycled] identity_flip:*` 失败 `publish.command.result`（不再干等），且绝不重复发帖
