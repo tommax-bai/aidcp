@@ -32,4 +32,5 @@
 
 ## 6. 观察窗（3-7 天，不阻塞本 change 代码部分收口）
 
-- [ ] 6.1 `llm_token_usage` 按 role×model 对比改前后：calls / ok_calls / token 单耗；content_evaluator 重点看 valuable 率与下游 content_curator reject 率（误判代理指标）；异常即 psql 改回 `qwen3.7-plus`
+- [ ] 6.1 `llm_token_usage` 按 role×model 对比改前后：calls / ok_calls / token 单耗；content_evaluator 重点看 valuable 率与下游 content_curator reject 率（误判代理指标）；异常即 psql 改回 `qwen3.7-plus` <!-- 2026-07-03 用户拍板即时归档,本项转日常运维随跑随看(归档时距部署尚无浏览流量,0 行可比数据);回滚口径已备:psql 一条 UPDATE 即回 -->
+
