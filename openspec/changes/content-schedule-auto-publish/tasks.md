@@ -7,12 +7,12 @@
 
 ## 1. aidcp-cloud — 内容排期数据层
 
-- [ ] 1.1 全局单例表 `content_schedule_global`（`content_active_mask TEXT` 168 格 '0'/'1' + 审计列），`CREATE TABLE IF NOT EXISTS` 于 store `init()` 自建（幂等、单例行守卫）
-- [ ] 1.2 旁挂 1:1 侧表 `account_content_schedule`（PK `account_id`；`auto_enabled`/`post_enabled` 默认 false、`post_daily_cap INTEGER` 默认 0、`content_active_mask TEXT` null=继承全局、审计列），`CREATE TABLE IF NOT EXISTS` 自建
-- [ ] 1.3 单写方法 `setContentScheduleGlobal(patch)`：掩码非 168 位 '0'/'1' 整块拒、`RETURNING` 回读真态、诚实结果联合
-- [ ] 1.4 单写方法 `setAccountContentSchedule(accountId, patch)`：UPSERT-only、UPSERT 前 `SELECT 1 FROM accounts` 校验存在（无行→`unknown_account`、绝不造幽灵行）、退役 `default` 拒、非法整块拒、`RETURNING` 回读、诚实联合、绝不 raw UPDATE / 乐观
-- [ ] 1.5 读方法 `getContentScheduleGlobal()` / `getAccountContentSchedule(accountId)` / `listContentSchedules()`（`LEFT JOIN accounts`，缺行合成默认全 false/0/继承、`configured=false`；派生 `effectiveMask`=override??global、`maskSource`、`hasGroupCode`）
-- [ ] 1.6 掩码判定 helper（fail-closed）：`isContentCellActiveFailClosed(mask, now) = isValidWeekActiveMask(mask) && isWeekActiveAt(mask, now)`，非法 / 缺失一律 false；**绝不**复用 `isWeekActiveAt` 的非法→全天活跃兜底
+- [x] 1.1 全局单例表 `content_schedule_global`（`content_active_mask TEXT` 168 格 '0'/'1' + 审计列），`CREATE TABLE IF NOT EXISTS` 于 store `init()` 自建（幂等、单例行守卫） <!-- aidcp-cloud (branch content-schedule-cloud) a35a8ed 待合并；src/config/content-schedule-store.ts -->
+- [x] 1.2 旁挂 1:1 侧表 `account_content_schedule`（PK `account_id`；`auto_enabled`/`post_enabled` 默认 false、`post_daily_cap INTEGER` 默认 0、`content_active_mask TEXT` null=继承全局、审计列），`CREATE TABLE IF NOT EXISTS` 自建 <!-- a35a8ed 待合并 -->
+- [x] 1.3 单写方法 `setGlobal(patch)`：掩码非 168 位 '0'/'1' 整块拒、`RETURNING` 回读真态、诚实结果联合 <!-- a35a8ed 待合并；方法名 setGlobal（非 setContentScheduleGlobal） -->
+- [x] 1.4 单写方法 `setAccount(accountId, patch)`：UPSERT-only、UPSERT 前 `SELECT 1 FROM accounts` 校验存在（无行→`account_not_found`、绝不造幽灵行）、退役 `default` 拒、非法整块拒、`RETURNING` 回读、诚实联合、绝不 raw UPDATE / 乐观 <!-- a35a8ed 待合并；reason=account_not_found（非 unknown_account） -->
+- [x] 1.5 读方法 `getGlobal()` / `getAccount(accountId)` / `listCatalog()`（`LEFT JOIN accounts`，缺行合成默认全 false/0/继承、`configured=false`；派生 `effectiveMask`=override??global、`maskSource`）+ 调度器现读 `effectiveScheduleFor(accountId)` <!-- a35a8ed 待合并；hasGroupCode 归 Phase 3 群评、本期未派生 -->
+- [x] 1.6 掩码判定 fail-closed：调度器 tick 用 `isValidWeekActiveMask(mask) && isWeekActiveAt(mask, now)`，非法 / 缺失一律「不活跃、跳过」；**绝不**复用 `isWeekActiveAt` 的非法→全天活跃兜底 <!-- a35a8ed 待合并；落在 content-scheduler.ts onTick -->
 - [ ] 1.7 人审文档 `migrations/0028_content_schedule.sql`（两表 DDL，与 store 建表逐字对齐）
 
 ## 2. aidcp-cloud — 发帖多账号泛化 + 日上限计数
@@ -23,12 +23,13 @@
 
 ## 3. aidcp-cloud — 内容调度器（ContentScheduler）
 
-- [ ] 3.1 `ConnectionRuntimeRegistry` 加 `onlineAccountIds(): string[]` 访问器（遍历取有 edgeId 的 distinct accountId）
-- [ ] 3.2 `ContentScheduler`（新文件、纯控制流、全 I/O 注入、可脱边端单测）：每 tick 遍历在线账号，闸序 `enabled ∧ isContentCellActiveFailClosed(effectiveMask,now) ∧ 分钟命中偏移 ∧ 未达日上限 ∧ 风控 normal`
-- [ ] 3.3 分钟错峰 `offset = hash(accountId + localDayKey(now) + 'post') % 60`（复用 dispatcher `localDayKey`，纯函数无状态可复现）
-- [ ] 3.4 幂等键 `(account, 'post', 小时格)`（同格不重触发）+ tick 重入护栏（上轮未完跳过）+ 每账号跨动作 single-flight 集合（本 Phase 只发帖，预留背板）
-- [ ] 3.5 触发**发帖全局串行 + fire-and-forget**：下发前过 `isPublishBusy()`、忙则本槽顺延；心跳「发起即返回」绝不 `await` 生成管线
-- [ ] 3.6 每次触发回诚实结果卡：已发起待审 / 本槽无新素材本次不发 / 发帖全局排队本槽顺延 / 失败带原因；绝不静默假成功、绝不硬凑内容
+- [ ] 3.1 `ConnectionRuntimeRegistry` 加 `onlineAccountIds(): string[]` 访问器（遍历取有 edgeId 的 distinct accountId） <!-- 调度器已把它作为注入 dep（onlineAccounts）；真实访问器待 §4 装配时加 -->
+- [x] 3.2 `ContentScheduler`（新文件、纯控制流、全 I/O 注入、可脱边端单测）：每 tick 遍历在线账号，闸序 `enabled ∧ fail-closed(effectiveMask,now) ∧ 分钟命中偏移 ∧ 风控 normal ∧ 非全局忙 ∧ 未达日上限` <!-- aidcp-cloud (branch content-schedule-cloud) a35a8ed 待合并；src/orchestrator/content-scheduler.ts -->
+- [x] 3.3 分钟错峰 `offset = hash(accountId + localDayKey(now) + 'post') % 60`（纯函数无状态可复现） <!-- a35a8ed 待合并；自带 localDayKey（不导出 dispatcher 的、避开热点文件）+ djb2 hash -->
+- [x] 3.4 幂等键 `(account, 小时格)`（同格不重触发）+ tick 重入护栏（上轮未完跳过）+ 每账号 single-flight 集合（本 Phase 只发帖，预留背板） <!-- a35a8ed 待合并 -->
+- [x] 3.5 触发**发帖全局串行 + fire-and-forget**：下发前过 `isPublishBusy()`、忙则本槽顺延；心跳「发起即返回」绝不 `await` 生成管线 <!-- a35a8ed 待合并 -->
+- [ ] 3.6 每次触发回诚实结果卡：已发起待审 / 本槽无新素材本次不发 / 失败带原因；绝不静默假成功 <!-- 归 triggerPost 注入实现（§4 装配）异步补卡，调度器只 fire -->
+
 
 ## 4. aidcp-cloud — 装配与旧扳机互斥
 
@@ -49,7 +50,7 @@
 
 ## 7. 测试与回归
 
-- [ ] 7.1 cloud 调度器单测：闸序 / 错峰偏移确定性 / 幂等键 / 重入护栏 / 日上限原子（已发+在途）/ fail-closed 掩码 / 全局串行 / fire-and-forget 不阻塞 / 开新关旧扳机互斥
+- [x] 7.1 cloud 调度器单测：闸序 / 错峰偏移确定性 / 幂等键 / 重入护栏 / 日上限原子（已发+在途）/ fail-closed 掩码 / 全局串行 / fire-and-forget 不阻塞 <!-- aidcp-cloud (branch content-schedule-cloud) a35a8ed 待合并；test/content-scheduler.test.ts 10/10 通过。「开新关旧扳机互斥」待 §4 装配后补断言 -->
 - [ ] 7.2 cloud 存储单测：UPSERT 校验账号存在 / 退役拒 / 非法整块拒 / 写后回读真态 / 未配=不自动
 - [ ] 7.3 面板写诚实非乐观断言（拒绝与成功可区分、绝不 raw UPDATE）
 - [ ] 7.4 全局回归：`npm run test:acceptance` → `npm test` → `npm run typecheck`（AC-PROTO / AC-PUB / AC-RISK 全过；本变更不动协议 / 风控单写 / 发布发送，人审铁红线不破）
