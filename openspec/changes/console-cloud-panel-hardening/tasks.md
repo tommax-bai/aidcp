@@ -7,13 +7,14 @@
 
 ## 波1 — aidcp-cloud：高危止血（性能 + 接口安全，无前置、组内并行）
 
-- [ ] 1.1 面板 WS 背压：`src/panel/panel-ws.ts` 广播前对每客户端查 `bufferedAmount`，超阈值（~1MB）跳过该帧、持续超阈值断开慢客户端；`onAny` handler 入口查有无活跃订阅、无则 return 不序列化（省编排热路径）。验证：单测——慢客户端（模拟高 bufferedAmount）被跳帧/断开、快客户端不受影响、零订阅时不序列化。 [#20]
-- [ ] 1.2 面板 WS 大载荷截断：单帧序列化后超上限（~256KB，如 `page.cards`/`note.detail` 大对象）截断为带「已截断」标记的摘要帧。验证：单测——超大事件被截断且带标记、正常事件原样。 [#20]
-- [ ] 1.3 `risk_counters` 补 `occurred_at` 索引：`src/risk/pg-risk-store.ts` 建表内嵌 `CREATE INDEX IF NOT EXISTS ... (occurred_at)` + 新 migration 文件双写；面板三处今日聚合查询（`panel-store.ts` todayTotals/todayTotalsByAccount/likeRate）确认走新索引。验证：单测/EXPLAIN 断言不再 seq scan（或查询计划测试）；修 `panel-server.ts:148` 错误注释。 [#21]
-- [ ] 1.4 `interaction_feed` 补 `occurred_at` 索引：`src/cache/interaction-feed-store.ts` 建表 + migration 双写；全局视图查询（`panel-store.ts` 无 accountId 分支 ORDER BY occurred_at DESC）走新索引。验证：查询计划测试不再全表扫。 [#23]
-- [ ] 1.5 三表每日保留清理：进程内日频任务，`risk_counters` 保留 7d、`interaction_feed` 保留 30d、`llm_token_usage` 接线既有 `token-usage-store.ts` 的 `purgeOlderThan`（保留 45d）。DELETE 走 occurred_at 索引。验证：单测——清理删掉超窗行、保留窗内行；purge 被调度。 [#21][#22][#23]
-- [ ] 1.6 pause/resume/风控端点账号存在性校验：`src/panel/panel-server.ts` pause/resume（385-391）、risk/status（460-488）、risk/quota（490-507）先查账号存在，不存在返 404 `account_not_found`（照同文件 group-label 端点 419-422 范式），杜绝 ON CONFLICT 造幽灵行的「假成功」。验证：单测——不存在账号 ID 返 404、不写库；存在账号正常。 [#28]
-- [ ] 1.7 审批端点 requestId 白名单：`src/panel/panel-server.ts:268` 取 requestId 后加格式校验（仅 `^publish-\d+$` 或 `[A-Za-z0-9_-]+`），非法即 400、不进 `writeApprovalSignal`，堵 `../` 路径穿越。验证：单测——含 `../`/非法字符的 requestId 被拒、合法通过。 [#29]
+- [x] 1.1 面板 WS 背压：`src/panel/panel-ws.ts` 广播前对每客户端查 `bufferedAmount`，超阈值（~1MB）跳过该帧、持续超阈值断开慢客户端；`onAny` handler 入口查有无活跃订阅、无则 return 不序列化（省编排热路径）。验证：单测——慢客户端（模拟高 bufferedAmount）被跳帧/断开、快客户端不受影响、零订阅时不序列化。 [#20] <!-- aidcp-cloud ac3be98 背压 backpressureDecision + 零订阅短路；纯函数单测 + 端到端；PANEL_WS_BACKPRESSURE_BYTES=1MB / MAX_SLOW_STRIKES=30 -->
+- [x] 1.2 面板 WS 大载荷截断：单帧序列化后超上限（~256KB，如 `page.cards`/`note.detail` 大对象）截断为带「已截断」标记的摘要帧。验证：单测——超大事件被截断且带标记、正常事件原样。 [#20] <!-- aidcp-cloud ac3be98 serializePanelFrame 超 256KB 截断为 {truncated,reason,bytes}；端到端 + 纯函数测试 -->
+- [x] 1.3 `risk_counters` 补 `occurred_at` 索引：`src/risk/pg-risk-store.ts` 建表内嵌 `CREATE INDEX IF NOT EXISTS ... (occurred_at)` + 新 migration 文件双写；面板三处今日聚合查询（`panel-store.ts` todayTotals/todayTotalsByAccount/likeRate）确认走新索引。验证：单测/EXPLAIN 断言不再 seq scan（或查询计划测试）；修 `panel-server.ts:148` 错误注释。 [#21] <!-- aidcp-cloud ac3be98 idx_risk_counters_time (occurred_at DESC) 建表内嵌 + migration 0030 双写；panel-server summary 注释已更正为「走 occurred_at 索引、不全表扫描」 -->
+- [x] 1.4 `interaction_feed` 补 `occurred_at` 索引：`src/cache/interaction-feed-store.ts` 建表 + migration 双写；全局视图查询（`panel-store.ts` 无 accountId 分支 ORDER BY occurred_at DESC）走新索引。验证：查询计划测试不再全表扫。 [#23] <!-- aidcp-cloud ac3be98 idx_interaction_feed_time (occurred_at DESC) + migration 0030；SQL 字符串断言测试 -->
+- [x] 1.5 三表每日保留清理：进程内日频任务，`risk_counters` 保留 7d、`interaction_feed` 保留 30d、`llm_token_usage` 接线既有 `token-usage-store.ts` 的 `purgeOlderThan`（保留 45d）。DELETE 走 occurred_at 索引。验证：单测——清理删掉超窗行、保留窗内行；purge 被调度。 [#21][#22][#23] <!-- aidcp-cloud ac3be98 新建 src/panel/retention-sweeper.ts（runRetentionSweep 各表独立 try/catch + startRetentionSweeper 日频 unref）；pg-risk purgeCountersOlderThan / feed purgeOlderThan(+清孤儿 meta) 新增，token purgeOlderThan 接线；server.ts 起 sweeper；7 单测 -->
+- [x] 1.6 pause/resume/风控端点账号存在性校验：`src/panel/panel-server.ts` pause/resume（385-391）、risk/status（460-488）、risk/quota（490-507）先查账号存在，不存在返 404 `account_not_found`（照同文件 group-label 端点 419-422 范式），杜绝 ON CONFLICT 造幽灵行的「假成功」。验证：单测——不存在账号 ID 返 404、不写库；存在账号正常。 [#28] <!-- aidcp-cloud ac3be98 端点层 assertAccountExists（数据源 panelStore.listAccounts，账号表小）：幽灵账号 404、查询失败 503 不放行；4 端点接入；panel-server 17/17 -->
+- [x] 1.7 审批端点 requestId 白名单：`src/panel/panel-server.ts:268` 取 requestId 后加格式校验（仅 `^publish-\d+$` 或 `[A-Za-z0-9_-]+`），非法即 400、不进 `writeApprovalSignal`，堵 `../` 路径穿越。验证：单测——含 `../`/非法字符的 requestId 被拒、合法通过。 [#29] <!-- aidcp-cloud ac3be98 白名单取 [A-Za-z0-9_-]+（publish-<n> 超集，排除 ./ 堵穿越，兼容既有 req-1 测试）；编码 ../ 请求 → 400 invalid_request_id -->
+
 
 ## 波1 — ECS / 运维（与代码解耦，部署时执行）
 
