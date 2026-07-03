@@ -29,14 +29,14 @@ edge 桌面客户端安装包当前的公网托管链路：发版时在 edge 仓
 **D3. 发版上传工具：默认 `ossutil` CLI，`ali-oss` 仅在自动化时用。**
 发版上传是运维在**发版机（非 ECS）**上跑的独立步骤、非应用运行时，用 `ossutil cp --acl public-read` 一行即可，零代码零依赖、最贴合现有手动发版流。若后续做 CI 直传，再在 `build-desktop.yml` 用 `ossutil`/`ali-oss` 加一步。备选（console/cloud 运行时用 SDK 传）不适用——上传不是运行时职责。
 
-**D4. 鉴权用最小权限子账号 AK，不用 ECS RAM 角色。**
-本 change 的上传发生在发版机 / CI，**不在 ECS 上**，拿不到实例元数据角色，故必须用显式凭据：新建 RAM 子账号，策略只授目标桶 `oss:PutObject`（发版）+ 只读校验所需。AK 走 `ossutil` 本机配置或 GitHub Secrets，**绝不硬编码**。（对照：将来 P1 配图转存在 ECS 上跑，那里才首选 ECS RAM 角色、零存储密钥——两个场景鉴权路径不同，本 change 不涉及 P1。）
+**D4. 鉴权按用户决定放松:用主账号 AK,不做子账号。**
+上传发生在发版机(非 ECS),用显式 AK。用户已明确安全等级不高、不折腾子账号,故直接用现有主账号 AK 走 `ossutil` 本机配置即可,**绝不硬编码进仓/日志/commit**。唯一保留的红线:主账号 AK(全账号权限)**绝不放进 GitHub Secrets / CI**——一旦要做 CI 直传再单独议(那时才值得配最小权限子账号)。备选(最小权限子账号)更安全但用户嫌麻烦、本次不做;对照 change `cloud-oss-storage-integration` 的云端上传在 ECS 上跑、AK 存加密库,鉴权路径不同。
 
 **D5. 发版后「对象存在性校验闸」前置于版本切换。**
 切换 console `version`（及部署）之前，MUST 对桶内该版本三平台对象逐一匿名 `HEAD`，要求 `200` + 非零 `Content-Length`；任一未命中即停手、不切版本、不部署。这把「文件名/版本手动对齐」这一红线风险点从「事后可能 404」变成「事前证伪」，落实「绝不静默假成功」。
 
 **D6. console 只改 `EDGE_DOWNLOAD.base`，其余不动。**
-`base` 从 `'/downloads'` 改为 OSS/CDN 公网 base（含版本段，如 `https://aidcp-downloads.oss-cn-<region>.aliyuncs.com/downloads/<version>`，或指向 `edgeDownloadUrl` 前缀的稳定形态）。`edgeDownloadUrl(file)` 的 `encodeURIComponent(file)` 逻辑保持不变，天然处理 `'AIDCP Setup <ver>.exe'` 的空格。上传时对象 MUST 设正确 `Content-Type`（dmg=application/x-apple-diskimage、exe=application/octet-stream 或 vnd.microsoft.portable-executable）与 `Content-Disposition: attachment`。
+`base` 从 `'/downloads'` 改为 OSS 公网 base（含版本段，如 `https://aidcp.oss-cn-beijing.aliyuncs.com/downloads/<version>`，或将来 CDN/自有域名的稳定形态）。`edgeDownloadUrl(file)` 的 `encodeURIComponent(file)` 逻辑保持不变，天然处理 `'AIDCP Setup <ver>.exe'` 的空格。上传时对象 MUST 设正确 `Content-Type`（dmg=application/x-apple-diskimage、exe=application/octet-stream 或 vnd.microsoft.portable-executable）与 `Content-Disposition: attachment`。
 
 **D7. 灰度回退：ECS `/downloads/` 暂留一版。**
 切 OSS 稳定一版后再摘 Nginx location 与目录。回退只需把 console `base` 改回 `'/downloads'` 并重构建部署（ECS 上仍有旧包）。
@@ -45,14 +45,14 @@ edge 桌面客户端安装包当前的公网托管链路：发版时在 edge 仓
 
 - **[误设私有桶 → 匿名下载按钮 403]** → D5 校验闸用**匿名** HEAD/GET 验证，私有桶会在校验阶段即失败、挡在切版本之前。
 - **[版本/文件名与桶内对象漂移 → 404]** → D5 校验闸逐对象证实命中方可切版本；此为红线「绝不静默假成功」的直接落地。
-- **[AK 泄漏]** → 最小权限子账号（仅目标桶 PutObject）+ AK 只进 `ossutil` 本机配置或 GitHub Secrets，绝不进仓/日志/commit；CI 直传若做，上传成败如实反映退出码、不 `|| true` 吞错。
+- **[AK 泄漏]** → 用户已知并接受(安全等级不高、用主账号 AK)；仍守 AK 只进发版机 `ossutil` 本机配置、绝不进仓/日志/commit、**绝不进 GitHub Secrets/CI**。CI 直传若日后要做,须先换最小权限子账号,且上传成败如实反映退出码、不 `|| true` 吞错。
 - **[无 CDN 时跨地域下载慢]** → 桶选就近 region 兜底；CDN + 自有域名作后续增量（需 ICP 备案）。
 - **[公读桶暴露面]** → 与现状 `autoindex on` 等同（现即公开可下），可接受；但意识到「有 URL 即可下」，不放任何非公开物。关闭桶级 list 权限，避免目录遍历。
 - **[同机 isales]** → 本 change 仅动 console 前端配置 + 发版流程 + 新建 OSS 资源，**不触碰 ECS 上 isales 的任何服务/目录/端口**；灰度期 Nginx `/downloads/` location 保持原样。
 
 ## Migration Plan
 
-1. 阿里云控制台：新建 public-read 桶（就近 region）、关桶级 list；新建 RAM 子账号 + 仅该桶 `PutObject`/只读策略，发版机 `ossutil config` 或 GitHub Secrets 写入 AK。
+1. 用户已建桶 `aidcp`（`oss-cn-beijing`，公读）；发版机 `ossutil config` 写入主账号 AK（不做子账号、不进 CI）。
 2. 用 `ossutil cp` 把当前 `0.2.0` 三平台安装包上传到 `downloads/0.2.0/`，设对 `Content-Type`/`Content-Disposition`。
 3. **校验闸**：匿名 `HEAD` 三对象，确认 `200` + 非零 `Content-Length`（私有/缺失即停）。
 4. 改 `downloads.ts` 的 `base` 指向 OSS 版本前缀，重构建 + 部署 console（承 console 部署纪律：rsync 到 `/opt/aidcp/console`、绝不 `--delete`）。
@@ -62,6 +62,6 @@ edge 桌面客户端安装包当前的公网托管链路：发版时在 edge 仓
 
 ## Open Questions
 
-- 桶所在 region 定哪个（就近用户分布）？是否本次即绑 CDN + 自有域名（取决于 ICP 备案是否就绪）？未定则先用默认 `oss-cn-<region>.aliyuncs.com` endpoint。
+- 是否本次即绑 CDN + 自有域名（取决于 ICP 备案是否就绪）？未定则先用默认 `aidcp.oss-cn-beijing.aliyuncs.com` endpoint。
 - 是否本次就做 CI 直传（`build-desktop.yml` 加步），还是先保留手动 `ossutil` 上传、稳定后再自动化？倾向先手动跑通再自动化。
 - 旧版本对象的保留/清理策略（保留 N 版还是设 OSS 生命周期规则）？

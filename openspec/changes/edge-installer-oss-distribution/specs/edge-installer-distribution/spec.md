@@ -42,19 +42,24 @@
 - **WHEN** 任一平台对象 `HEAD` 返回非 `200`、零长度、或私有 403
 - **THEN** 发版流程 SHALL 中止并如实报出未命中的对象键，MUST NOT 切换前端版本、MUST NOT 部署，绝不静默以旧版本或坏链上线
 
-### Requirement: 发版上传使用最小权限凭据且密钥绝不外发
+### Requirement: 发版凭据不外发,主账号 AK 绝不进 CI
 
-安装包上传 OSS SHALL 使用**仅授予目标桶写入所需权限**的 RAM 子账号凭据（策略最小化到该桶的 `PutObject` 及校验所需只读），MUST NOT 使用主账号 AccessKey。凭据 SHALL 只存在于发版机的 `ossutil` 本机配置或 CI 的加密 Secrets 中，MUST NOT 出现在代码仓、日志、commit、tasks.md 或任何文档明文里。若启用 CI 直传，上传步骤的成功/失败 MUST 如实反映到步骤退出码，MUST NOT 用 `|| true` 之类吞掉失败。
+安装包上传 OSS 使用发版机上配置的 AccessKey。安全等级按属主决定放松:MAY 使用现有主账号 AK(不强制最小权限子账号)。凭据明文 MUST NOT 出现在代码仓、日志、commit、tasks.md 或任何文档中,引用时只记读取方式/存放位置、不记值。**红线保留**:主账号 AK(全账号权限)MUST NOT 放进 GitHub Secrets / CI 或任何共享/远端载体——一旦要做 CI 直传,SHALL 先改用仅授目标桶写权限的最小权限子账号。若启用 CI 直传,上传步骤的成功/失败 MUST 如实反映到步骤退出码,MUST NOT 用 `|| true` 之类吞掉失败。
 
-#### Scenario: CI 直传失败必须让流水线失败
+#### Scenario: 主账号 AK 不进共享载体
 
-- **WHEN** CI 中的 OSS 上传步骤因凭据/网络/权限失败
-- **THEN** 该步骤 SHALL 以非零退出码结束、使流水线失败，绝不静默继续，也绝不把「未真正上传」当成功
+- **WHEN** 配置发版上传凭据
+- **THEN** 主账号 AK MAY 存于发版机本机 `ossutil` 配置,但 MUST NOT 被放进 GitHub Secrets / CI / 代码仓 / 任何远端可追溯载体;要走 CI 直传时 SHALL 先换最小权限子账号
 
 #### Scenario: 凭据不进任何可追溯载体
 
 - **WHEN** 提交代码、写文档或打印日志
 - **THEN** OSS AccessKey/Secret MUST NOT 以明文出现在其中；引用凭据时只记「读取方式/存放位置」，不记值
+
+#### Scenario: CI 直传失败必须让流水线失败
+
+- **WHEN** 启用了 CI 直传且 OSS 上传步骤因凭据/网络/权限失败
+- **THEN** 该步骤 SHALL 以非零退出码结束、使流水线失败，绝不静默继续，也绝不把「未真正上传」当成功
 
 ### Requirement: 迁移保留一版灰度回退且不触碰同机 isales
 
