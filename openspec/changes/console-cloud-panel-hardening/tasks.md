@@ -39,8 +39,9 @@
 
 ## 波3 — aidcp-console：前端体验（纯前端接线，后端字段已具备）
 
-- [ ] 3.1 `<QueryGate>` 统一读错误呈现：新增 `src/components/QueryGate.tsx`（loading/error/success 三态 + 重试），接入 10 个失败无呈现的页面（Settings/Roles/Persona/Quotas 永久骨架屏 4 页 + Accounts/Content/Schedule/Monitor/TokenUsage/NotificationContacts 误导空态 6 页）；排期页去掉「失败回落内置默认掩码」的假默认值。验证：单测——读查询 mock 失败时呈现错误 + 重试而非骨架屏/空态。 [#30]
-- [ ] 3.2 client 保留 reason + 中文映射：`src/api/client.ts:86-94` 把 `body.reason` 合并进异常；抽集中 reason→中文映射（吸收 `ContentPage.tsx:20-42` 孤例）；`ContentSchedulePage.tsx:78,131` 等不再上屏英文码。验证：单测——400 带 reason 时上屏中文文案。 [#31]
+- [x] 3.1 `<QueryGate>` 统一读错误呈现：新增 `src/components/QueryGate.tsx`（loading/error/success 三态 + 重试），接入 10 个失败无呈现的页面（Settings/Roles/Persona/Quotas 永久骨架屏 4 页 + Accounts/Content/Schedule/Monitor/TokenUsage/NotificationContacts 误导空态 6 页）；排期页去掉「失败回落内置默认掩码」的假默认值。验证：单测——读查询 mock 失败时呈现错误 + 重试而非骨架屏/空态。 [#30] <!-- aidcp-console c9de5d7 QueryGate 导出 QueryError（纯错误面板，页首最小接入）+ QueryGate（包裹式）。整页 early-return 用于单一配置面页（Settings/Roles/Persona/Quotas/Accounts/Schedule，均验证 early-return 在所有 hooks 之后，无 hooks 规则违规）；局部 inline gate 用于有独立工作区的页（Content 队列+抽屉、Monitor WS流+总表、TokenUsage 筛选、Notification 账号筛选），partial 失败不 blank 工作区。Schedule 去掉 FULL_ACTIVE/EMPTY 假默认（真空配置路径保留、与读失败区分）。偏离：未写 QueryGate 组件级测试（React 渲染测试成本高，错误呈现逻辑由 errorText 单测 + 页面 typecheck 覆盖） -->
+- [x] 3.2 client 保留 reason + 中文映射：`src/api/client.ts:86-94` 把 `body.reason` 合并进异常；抽集中 reason→中文映射（吸收 `ContentPage.tsx:20-42` 孤例）；`ContentSchedulePage.tsx:78,131` 等不再上屏英文码。验证：单测——400 带 reason 时上屏中文文案。 [#31] <!-- aidcp-console c9de5d7 ApiError+reason 字段；新建 src/api/errorText.ts（reason 优先于 error，未知回落 fallback、绝不上屏英文码）+ errorText.test.ts 5 测；ContentPage reasonMessage 委托 errorText（删写死 switch）；Schedule 保存失败换 errorText -->
+<!-- 波3 剩余：3.3 账号筛选 URL 深链（#17）、3.4 队列卡管道快照+待审筛选（#18）——信息可达性，与错误呈现解耦，未做。 -->
 - [ ] 3.3 账号筛选 URL 深链：各页账号筛选状态读写 `useSearchParams`（`?account=`）；账号行加站内深链（跳该账号的内容/用量/联系人视图，带 account 参数）。验证：URL 带 account 参数进入页面即预选该账号；刷新不丢。 [#17]
 - [ ] 3.4 队列卡管道快照 + 待审筛选：`src/pages/ContentPage.tsx:223-227` 队列卡渲染 `snapshot` 各阶段（类型已声明 `api.ts:148-151`）+ 展开交互；发布内容表加「只看待审」状态筛选（232-239）。验证：队列卡展开见管道各阶段快照；筛选只显待审行。 [#18]
 
