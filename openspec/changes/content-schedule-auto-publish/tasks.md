@@ -17,9 +17,9 @@
 
 ## 2. aidcp-cloud — 发帖多账号泛化 + 日上限计数
 
-- [ ] 2.1 发帖触发加孪生入口 `triggerScheduled(accountId)`：复用 `doTrigger`/`buildTriggerInput`、`forced=false`（`ContentScout` 可诚实判无素材跳过）、绕开 `checkAndMaybeTrigger` 的 `resolveSingleAccountId` 单账号闸；persona 绑定 + 风控 `status==='normal'` + `canDo('publish')` + 发布前人审全部不变
-- [ ] 2.2 `isPublishBusy()` 真全局忙闲闸（无 accountId），并在 `publishAccountRef` 处加注释锚定「发帖必须全局串行」这条 load-bearing 不变量（禁止未来按账号并行发帖，除非先消灭全局槽）
-- [ ] 2.3 `countPublishedTodayForAccount(accountId)` 从 `publish_log`（已账号感知）按服务器本地日历日派生；日上限判定 = 今日已发 + `hasPendingApprovalForAccount(accountId)`（在途草稿计入，堵 TOCTOU）
+- [x] 2.1 发帖触发加孪生入口 `triggerScheduled(accountId)`：复用 `doTrigger`/`buildTriggerInput`、`forced=false`（`ContentScout` 可诚实判无素材跳过）、绕开 `checkAndMaybeTrigger` 的 `resolveSingleAccountId` 单账号闸；persona 绑定 + 风控 `status==='normal'` + `canDo('publish')` + 发布前人审全部不变 <!-- aidcp-cloud (branch content-schedule-cloud) 787a9cc 待合并 -->
+- [x] 2.2 `isBusy()` 真全局忙闲闸（无 accountId，`publishing` flag 环绕 doTrigger）；调度器侧再加 `postFiring` 同步闸防同 tick 双 fire（load-bearing：发帖必须全局串行、禁按账号并行，除非先消灭 publishAccountRef 全局槽） <!-- 787a9cc 待合并；+1 全局串行测试 -->
+- [x] 2.3 `countPublishedTodayForAccount(accountId)` 从 `publish_log`（已账号感知）按服务器本地日历日派生；日上限判定 = 今日已发 + `hasPendingApprovalForAccount(accountId)`（在途草稿计入，堵 TOCTOU） <!-- 787a9cc 待合并 -->
 
 ## 3. aidcp-cloud — 内容调度器（ContentScheduler）
 
