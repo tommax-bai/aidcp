@@ -60,6 +60,7 @@
 - [ ] **session-limits-to-quota-layer 7.4** — 配额层真机校准
 - [ ] **llm-token-usage-stats 7.5 + 6.4** — token 用量曲线真机出数 + 视觉/数据核对
 - [ ] **dashboard-refresh-clarity 4.4/3.2** — 总览页新鲜度标识随 10s 轮询推进；零边缘在线时「系统未在浏览」提示可见（能一眼区分「无新活动」vs「界面冻结」）（2026-07-03 集成，部署后验）
+- [ ] **persona-driven-content-pipeline 3.2** — 人设页：留空保存被拦 + 诚实提示；未绑定账号红标「未绑定」（非「回落默认」）（2026-07-03 集成，部署后验）
 
 ## 簇 6 — 精选库（数据自然积累后，机会性验）
 
@@ -73,6 +74,15 @@
 **前置**：可出桌面打包产物 + 人在场扫码。
 
 - [ ] **edge-desktop-packaging 4.6 / 6.4** — 打包产物启动 + 人工扫码登录闭环
+
+## 簇 8 — 真模型行为回归（LLM 运行时，prompt 面已由 AC 锁死）
+
+**前置**：真模型出口可用 + 一个非技术领域人设账号真实跑一轮浏览 / 发布。
+**说明**：prompt 渲染面已有 acceptance 断言锁死（AC-CONCEPT-NEUTRAL / content-detech），
+此处验的是**真模型在新 prompt 下的产出行为**，单测桩覆盖不了。
+
+- [ ] **persona-driven-content-pipeline 1.3** — 非技术笔记（美食/旅行/穿搭）真模型能抽到领域概念并写库；纯情绪/无信息仍返回空
+- [ ] **persona-driven-content-pipeline 4.6** — 非技术人设账号真模型生成的正文/标题体现该账号领域、无技术腔残留
 
 ---
 
