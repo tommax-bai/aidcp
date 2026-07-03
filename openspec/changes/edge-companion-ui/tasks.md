@@ -22,6 +22,8 @@
 - [x] 3.2 index.html/styles.css 按 v3 重排：在场感行（shimmer + 呼吸点 + 新鲜度走字）、循环 chip（刷 feed→选笔记→阅读→互动→返回续刷）、活动流（环形 ≤200 条）、「开发者详情」折叠收原始日志、「今日小结」条；`prefers-reduced-motion` 全局关动效 <!-- aidcp-edge 50a8b23 -->
 - [x] 3.3 五徽章收进健康药丸点开的明细浮层（内部词改人话：边缘进程→本机引擎等）；旧 hero / stats / grid / log DOM 移除 <!-- aidcp-edge 50a8b23 五徽章 ID 原样保留（#auth-status 等），迁入 #health-pop -->
 - [x] 3.4 无事件诚实态：待命 / 已暂停 / 需登录 / 等待云端静态文案；shimmer 门断言（停止态绝不动效） <!-- aidcp-edge 50a8b23 「运行中但事件过期>5min → 如实说没有新动态」也覆盖（与看门狗有界 idle 对齐） -->
+- [x] 3.5 修「今日小结」空数字（用户验收反馈）：updateStatus 先整体替换再合并，局部计数补丁会把其余计数清空（老 bug，被新小结条放大）→ 抽纯函数 mergeStats 先合并成完整 stats 再落 + 渲染层各计数 ??0 兜底 + 零值弱化样式；回归单测 2 条 <!-- aidcp-edge 35d9b1e 已 ff 合回 master；495/495 + typecheck 过 -->
+- [x] 3.6 真机验收反馈第 1 轮（5 条）：①标题带昵称优先、无昵称显「账号 …尾4位」绝不摆长 id（in-place 身份读取无 displayName 属常态，昵称仅 navigate 路径有——核心侧取昵称另议）；②活动流身份句同理不暴露长 id；③暂停等静态态补「状态更新 · N 前」时间戳消大空白；④「开发者详情」默认不显示、设置抽屉开关 + settings.devDetails 持久化；⑤FAB 改白底药丸+状态点与整体风格一致；⑥活动流加类型记号字（赞/藏/评/读/注/发）+ 空态重设计，治无发布卡时的纯文字墙 <!-- aidcp-edge 24954fd 已 ff 合回 master；499/499 + typecheck；+6 断言 -->
 
 ## 4. aidcp-edge — 发布等待卡（纯展示）
 
