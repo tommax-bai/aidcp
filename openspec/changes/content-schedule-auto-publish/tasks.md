@@ -56,6 +56,14 @@
 - [x] 7.4 全局回归：`npm run test:acceptance` → `npm test` → `npm run typecheck`（AC-PROTO / AC-PUB / AC-RISK 全过；本变更不动协议 / 风控单写 / 发布发送，人审铁红线不破） <!-- 2026-07-03 部署树 e1a10a9：acceptance 27/27、全量 1121/1121、typecheck 干净 -->
 - [x] 7.5 console `npm run typecheck` + `npm run build` <!-- aidcp-console 7c99529 typecheck 干净 + vite build 通过（chunk-size 告警为既有、非本变更引入） -->
 
+## 9. 合并修正（2026-07-03，回归用户拍板的三态形态；design D8）
+
+- [x] 9.1 云端「自动 ⊆ 活跃」强制闸：调度器加浏览掩码活跃判定（fail-open：未配=全天活跃=不限），server 注入 `sessionConfigStore.weekActiveMask()`；+1 测试（12/12），全量 1136/1136 <!-- aidcp-cloud 397fd9e -->
+- [x] 9.2 console 三态合并网格：排期页一张周历点格循环 休眠→活跃→活跃+可自动（白点标在活跃格内），一次保存串行写 /api/session-limits 与 /api/content-schedule/global，失败诚实报错+整体重取；WeekActiveGrid 加 overlayMask <!-- aidcp-console bc84812 -->
+- [x] 9.3 安全页「可活跃时间」卡只读化：删本地编辑 Modal/mutation，换「去排期页编辑」链接（唯一编辑入口，防双写互踩） <!-- aidcp-console bc84812 -->
+- [x] 9.4 spec delta 补两条 Requirement（自动 ⊆ 活跃 / 前端一处编辑底层分离）+ design D8 决策修订 <!-- 本仓本次提交 -->
+- [x] 9.5 部署：cloud 从干净 git 树（git archive 397fd9e，避开并发方脏工作树）备份→rsync→restart→healthcheck 全绿；console dist 发布（不 --delete，intro.* 保留），8088/api 均 200 <!-- 2026-07-03 deployed；备份 cloud.bak.20260703-135849.tar.gz -->
+
 ## 8. 部署（按需、安全序列）
 
 - [x] 8.1 前置：§0 WIP 解结提交后再部署 <!-- 并发方已提交至 6d63909，master 合并后部署 -->
