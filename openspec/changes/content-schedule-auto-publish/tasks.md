@@ -38,8 +38,8 @@
 
 ## 5. aidcp-cloud — 面板 API
 
-- [ ] 5.1 新 panel dep `PanelContentSchedule` / `PanelContentScheduleGlobal`（不复用 `accountAttr`）+ DTO（`ContentScheduleRow` / 全局 view），`panel/types` 定义 + 校验（掩码 168 位、日上限非负整数）
-- [ ] 5.2 端点 `GET /api/content-schedule` / `PUT /api/content-schedule/:accountId` / `GET,PUT /api/content-schedule/global`（JWT 保护；写经 §1 单写方法、诚实非乐观）
+- [x] 5.1 新 panel dep `PanelContentSchedule`（不复用 `accountAttr`）+ DTO（`ContentScheduleGlobalView` + `ContentScheduleCatalogRow` 复用 store 类型），`panel/types` 定义 <!-- aidcp-cloud (branch content-schedule-cloud) bbaf3f3 待合并；facade 具体实现 + 注入 PanelDeps 在 §4 装配 -->
+- [x] 5.2 端点 `GET,PUT /api/content-schedule/global` / `GET /api/content-schedule` / `PUT /api/content-schedule/:accountId`（JWT 经 `verified.payload.sub`；写经 §1 单写、诚实非乐观、类型校验后整块交 store 拒；404 account_not_found；/global 精确匹配序在 /:accountId 前缀前） <!-- bbaf3f3 待合并；未注入 facade 前返 503 -->
 
 ## 6. aidcp-console — 前端「内容排期」页
 
