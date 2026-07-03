@@ -63,6 +63,8 @@
 - [x] 9.3 安全页「可活跃时间」卡只读化：删本地编辑 Modal/mutation，换「去排期页编辑」链接（唯一编辑入口，防双写互踩） <!-- aidcp-console bc84812 -->
 - [x] 9.4 spec delta 补两条 Requirement（自动 ⊆ 活跃 / 前端一处编辑底层分离）+ design D8 决策修订 <!-- 本仓本次提交 -->
 - [x] 9.5 部署：cloud 从干净 git 树（git archive 397fd9e，避开并发方脏工作树）备份→rsync→restart→healthcheck 全绿；console dist 发布（不 --delete，intro.* 保留），8088/api 均 200 <!-- 2026-07-03 deployed；备份 cloud.bak.20260703-135849.tar.gz -->
+- [x] 9.6 安全页「可活跃时间」卡整体移除（用户拍板：排期页三态网格是唯一的家；删只读卡 + 内嵌网格副本 + mask helper 死代码），build 后发布 <!-- aidcp-console 7d2c66f 2026-07-03 deployed -->
+- [x] 9.7 开闸：ECS .env 备份后加 `AIDCP_CONTENT_SCHEDULE_AUTO=true` + restart；日志确认「ContentScheduler 已启动…旧 AIDCP_PUBLISH_AUTO 扳机已被互斥关闭」、active、8787/8090、飞书长连 <!-- 2026-07-03 enabled；账号总开关默认关+未圈时段=开闸后仍不发，配置即生效 -->
 
 ## 8. 部署（按需、安全序列）
 
