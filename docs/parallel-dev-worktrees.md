@@ -93,7 +93,7 @@ scripts/new-change <aidcp-edge|aidcp-cloud|aidcp-console> <change-name>
 
 任一任务需动上述文件 → 该 change 串行做，同一时刻只有一个 session 在碰。
 
-## 6. 串行集成 `land-change` `[草案]`
+## 6. 串行集成 `land-change` `[稳]`
 
 一个一个来，这是整支 fleet 的节流阀。脚本封装：
 
@@ -104,7 +104,7 @@ scripts/land-change <repo> <name> --yes    # prep 通过后自动 ff 推送+同�
 
 `--yes` 用 `git push origin <name>:<默认分支>` 走 ff 推送（不切主 checkout 分支、
 不碰其工作区），撞 non-ff 立即中止、**绝不 force**。下面是 `--yes` 自动化的等价手动步骤
-（脚本骨架已落、清理路径已 pilot；`--yes` 推送全流程待首个真实 change 验证后转 `[稳]`）：
+（`--yes` 全流程已于 2026-07-03 随 dashboard-refresh-clarity 在 cloud+console 两仓实战跑通：rebase 到已前进的 master、全量绿、ff 推送、清理）：
 
 ```bash
 # 1) 把本流 rebase 到最新默认分支，解冲突
@@ -155,8 +155,8 @@ scripts/fleet-status
 
 - `scripts/new-change <repo> <name>` — `[稳]`（pilot 跑通：建 worktree/分支、拒绝覆盖、change 缺失 WARN）
 - `scripts/fleet-status` — `[稳]`（pilot 跑通：四仓扫描 + ahead/behind + dirty + 孤儿标记，只读）
-- `scripts/land-change <repo> <name> [--yes]` — `[草案]`（脚本已落、清理路径已 pilot；
-  `--yes` 的 ff 推送+同步全流程待首个真实 change 落地时验证）
+- `scripts/land-change <repo> <name> [--yes]` — `[稳]`（2026-07-03 随 dashboard-refresh-clarity
+  在 cloud+console 两仓实战跑通全流程；test:acceptance 仅在该仓定义时跑）
 
 **红线**：`land-change` 永不 force-push；`new-change` 不覆盖已存在分支/worktree；
 部署只从主 checkout（§8）。

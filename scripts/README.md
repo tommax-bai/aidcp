@@ -22,5 +22,5 @@ scripts/land-change aidcp-cloud my-change-name --yes    # prep 通过后自动�
 **红线**：部署只从主 checkout 默认分支走、绝不从 worktree（CLAUDE.md §5/§7）；
 `land-change` 永不 force-push；`new-change` 不会覆盖已存在的分支/worktree。
 
-> 状态：`fleet-status` / `new-change` 已 pilot 跑通；`land-change` 的 `--yes` 全流程
-> 待随首个真实 change 落地时验证（见 docs 手册状态标注）。
+> 状态：三者均已实战跑通（2026-07-03 dashboard-refresh-clarity 经 new-change 开流、
+> land-change --yes 在 cloud+console 两仓完成 rebase→全量绿→ff 推送→清理）。
