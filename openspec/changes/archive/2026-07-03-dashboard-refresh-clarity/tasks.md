@@ -32,6 +32,6 @@
 
 - [x] 4.1 按 sub-repo 分节回写本 tasks.md 进度（commit-sha + 偏离说明）。 <!-- 2026-07-03 本次回写；实装经 fleet agent 于隔离 worktree 完成、scripts/land-change 串行集成（rebase→全量绿→ff push） -->
 - [x] 4.2 `openspec validate dashboard-refresh-clarity --strict` 通过。 <!-- 2026-07-03 valid -->
-- [ ] 4.3 cloud 改动（若有）按 §5 安全序列部署 ECS；console 静态产物按 console 发布流上线。
-- [ ] 4.4 上线后让运营核对：看板能一眼区分「无新活动」与「界面冻结」（新鲜度标识推进 + 无边缘在线提示）。
+- [x] 4.3 cloud 改动（若有）按 §5 安全序列部署 ECS；console 静态产物按 console 发布流上线。<!-- 2026-07-03 deployed — 与 persona-driven 批同车（cloud 88a1b91 含于 6097b89 快照、console d65d093 含于 7eaf9cc dist）；healthcheck 全绿 -->
+- [ ] 4.4 上线后让运营核对：看板能一眼区分「无新活动」与「界面冻结」（新鲜度标识推进 + 无边缘在线提示）。<!-- → docs/real-machine-acceptance-backlog.md 簇5（真机验收专项，与归档解耦） -->
 - [ ] 4.5 `/opsx:archive` 归档（delta 合并进 `openspec/specs/console-panel-api`）。
