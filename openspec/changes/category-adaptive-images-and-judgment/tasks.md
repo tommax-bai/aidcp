@@ -14,7 +14,8 @@
 > - **第 6 组（浏览去偏见 + 评论去 AI 味接人设）已实装 + 测试全绿 + 已推 master**（aidcp-cloud `f9f270c`）。`content-evaluator` 删「娱乐/明星=无关、与AI/技术相关」硬编码 → 从账号真实兴趣派生 + 诚实 skip + 全局品牌安全底线；`comment-de-ai-flavor` 去 AI 味按人设语气重写（`this.soul`，未注入诚实降级）、抽共享 `buildRewritePrompt` 让 rewrite/previewPrompt 同源，**4.4 顺带完成**（感叹号软化）。tests 46/46 + acceptance 27/27。
 > - **第 4 组（感叹号双侧分档 + BANNED 校准）已实装 + 测试全绿 + 已推 master**（aidcp-cloud `ca415da`）。`buildCreatorPrompt` 感叹号改按语气克制；`post-processor` 加 `exclamationMaxForTone`(casual/narrative→3 否则1) + `detectBannedPhrases`/`process` 参数化，`ContentCleaner` 按 `created.tone` 传入（生成+后处理同一口径）；`BANNED_PHRASES` 移除「不得不说」。tests 20/20 + acceptance 27/27。
 > - **第 5 组（互动/评论门禁品类自适应）已实装 + 测试全绿 + 已推 master**（aidcp-cloud `4a0f321`）。`interaction-appraiser` 收藏判据去技术示例 + 订正收藏率注释（审美类经既有 getMinSaveLikeRatio 钩子调低）；`comment-appraiser` 门槛从固定「赞>1000且藏>300」改「赞>1000 且（藏>300 或 赞>10000 高热爆帖豁免）」——治高赞低藏爆帖被固定藏300排除、主条件不放松、pre-LLM 便宜确定性、稀缺闸不动。对应 comment-interaction spec MODIFIED。tests 32/32 + acceptance 27/27。
-> - **剩余（均有外部依赖/开放子决策，待用户）**：**2.2/2.4 配图产后校验**（需定「乱码/肖像」视觉核验机制——轻规则 or 二次视觉模型，涉成本/延迟/新能力）；**1.7/0.2 出图竖版像素**（需连 ECS 探线上 Seedream 版本+合法尺寸，风格档文本已写 vertical 3:4）；**7 部署**（按需，走安全序列 + 先探 ECS 状态）。已完成 6 个代码批中的 5 个（1/3/4/5/6 + 2.1/4.4），全部已推 master、未部署。
+> - **✅ 已部署上线（2026-07-03）**：5 批全部在 ECS 生产运行。探测发现并发方 07-03 00:14-00:21 一次整体升 HEAD 已把 batch 1/3/6 带上线；本次 scoped rsync 只补 batch 4（`ca415da`）+ batch 5（`4a0f321`）的 5 文件（prompts/post-processor/content-cleaner/interaction-appraiser/comment-appraiser）。安全序列：备份 `cloud.bak.20260703-095110.tar.gz` + `.env` → rsync → `systemctl restart` → healthcheck 全绿（active / 8787 / PG select 1 / 存储就绪 / PublishOrchestrator 25 角色含 `CategoryClassifier` / 飞书 onReady / 零启动错误）→ isales 未碰。<!-- aidcp-cloud 4a0f321 2026-07-03 deployed（batch1/3/6 由并发方整体升 HEAD 带上、batch4/5 scoped rsync 补齐）-->
+> - **剩余（均有外部依赖/开放子决策，待用户）**：**2.2/2.4 配图产后校验**（需定「乱码/肖像」视觉核验机制——轻规则 or 二次视觉模型，涉成本/延迟/新能力）；**1.7/0.2 出图竖版像素**（需连 ECS 探线上 Seedream 版本+合法尺寸，风格档文本已写 vertical 3:4）。已完成 6 个代码批中的 5 个（1/3/4/5/6 + 2.1/4.4），**全部已上线**。
 
 ## 0. 前置与排序（务必先做）
 
@@ -71,6 +72,6 @@
 
 ## 7. 测试与部署
 
-- [ ] 7.1 每组改完：`cd ../aidcp-cloud && npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿；AC-PROTO/AC-PUB/AC-RISK 必过；preview 同源 typecheck 守卫过。
-- [ ] 7.2 绿后按批 commit（末尾带 `Co-Authored-By: Claude Opus 4.8 (1M context)`），进度回写本 tasks.md（`<!-- <repo> <sha> 备注 -->`，部署后追加 `<!-- <date> deployed -->`）。
-- [ ] 7.3 按需部署走 §5 安全序列（ECS 先备份 → rsync `--exclude .env --exclude node_modules --exclude .git` → `systemctl restart aidcp-cloud.service` → healthcheck active/8787/8090/飞书 onReady/PG select 1 → 失败回滚），避开并发方 WIP、绝不碰同机 isales。
+- [x] 7.1 每组改完：`cd ../aidcp-cloud && npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿；AC-PROTO/AC-PUB/AC-RISK 必过；preview 同源 typecheck 守卫过。
+- [x] 7.2 绿后按批 commit（末尾带 `Co-Authored-By: Claude Opus 4.8 (1M context)`），进度回写本 tasks.md（`<!-- <repo> <sha> 备注 -->`，部署后追加 `<!-- <date> deployed -->`）。
+- [x] 7.3 按需部署走 §5 安全序列（ECS 先备份 → rsync `--exclude .env --exclude node_modules --exclude .git` → `systemctl restart aidcp-cloud.service` → healthcheck active/8787/8090/飞书 onReady/PG select 1 → 失败回滚），避开并发方 WIP、绝不碰同机 isales。
