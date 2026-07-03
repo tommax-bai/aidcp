@@ -39,6 +39,6 @@
 
 - [x] 6.1 `cd ../aidcp-edge && npm test && npm run typecheck`（含新增 ui-events / ui-logic 单测；FAB 三态与设置既有行为回归） <!-- worktree 内 490/490 全量 + 11/11 acceptance + typecheck 干净（2026-07-03，分支 50a8b23） -->
 - [x] 6.2 mac 端到端冒烟：启动 → 待配置引导 → 抽屉配置 → 登录 → 活动流滚动 → 暂停/恢复 → 模拟发布候审卡（喂日志行） <!-- 2026-07-03 用 worktree 本地演示假核心（gitignored dist/main.js，按剧本打日志、零真实副作用）真机驱动全链路：标题带/在场感 shimmer/循环 chip/活动流/今日小结/发布候审卡（含结构化 [ui-event] pending→approved→published 流转）均如 v3 设计呈现且进程全程无崩溃（首帧截图存档，后续帧被用户前台窗口遮挡未截）；抽屉交互/暂停恢复/五状态断言由 companion-ui jsdom 冒烟 13 条覆盖。注意：本机存量旧实例会占单实例锁，冒烟前先清（见 memory edge-companion-ui-rollout） -->
-- [ ] 6.3 electron-builder 双平台打包，win-unpacked 验 titleBarOverlay 观感与窗控
+- [x] 6.3 electron-builder 双平台打包，win-unpacked 验 titleBarOverlay 观感与窗控 <!-- 2026-07-03 worktree 内双平台产物齐：mac dmg+zip×双架构（AIDCP-0.2.0*）+ win NSIS（AIDCP Setup 0.2.0.exe，signAndEditExecutable:false 使 mac 交叉构建免 wine）；asar 核验新界面五文件与新窗框代码均打入。win titleBarOverlay 实际观感需 Windows 真机，已挂 docs/real-machine-acceptance-backlog.md 簇 7；打包配置零改动（renderer/**、*.cjs 通配自动覆盖新文件） -->
 - [ ] 6.4 结构化 `[ui-event]` 发射点（发布链路内）标记串行：待 `publish-edge-command-runtime` 收口后按需补插（或由其顺手带上），本 change 不触碰发布文件
-- [ ] 6.5 `openspec validate edge-companion-ui --strict` → 合回 master + 部署分发 → archive
+- [ ] 6.5 `openspec validate edge-companion-ui --strict` → 合回 master + 部署分发 → archive <!-- 2026-07-03 已合回：rebase 到 master 44d56ad 后 493/493+typecheck+acceptance 全绿，ff 合并推送（master 9ef116e）；双平台安装包产物在 worktree dist-electron/（AIDCP-0.2.0*.dmg/zip + AIDCP Setup 0.2.0.exe）。archive 待 6.4（[ui-event] 发射点，等 publish-edge-command-runtime 收口）与分发落定后执行 -->

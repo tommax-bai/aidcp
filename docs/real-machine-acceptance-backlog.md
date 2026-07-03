@@ -69,11 +69,12 @@
 - [ ] **curated-admission-eval-roles** — 评论链路 `curated_comment_evaluator` 真机补采样本（单测已覆盖，机会性补）
 - [ ] **curated-inspiration-corpus** — Phase 2b：边端逐条评论赞数 / 笔记评论数上报（11.1/11.2 deferred，搭下次评论抽取便车）
 
-## 簇 7 — 桌面打包（需人扫码）
+## 簇 7 — 桌面打包（需人扫码 / 需 Windows 真机）
 
-**前置**：可出桌面打包产物 + 人在场扫码。
+**前置**：可出桌面打包产物 + 人在场扫码；Windows 项另需一台真 Windows 机。
 
 - [ ] **edge-desktop-packaging 4.6 / 6.4** — 打包产物启动 + 人工扫码登录闭环
+- [ ] **edge-companion-ui 6.3（win 半段）** — Windows 真机装 `AIDCP Setup 0.2.0.exe`（mac 交叉构建，2026-07-03）：验 titleBarOverlay 观感（46px 叠加窗控、最小/最大/关闭可用）、标题带随风控染色时 `setTitleBarOverlay` 同步换色、拖拽区与控件岛不打架（mac 半段已当日真机验过）
 
 ## 簇 8 — 真模型行为回归（LLM 运行时，prompt 面已由 AC 锁死）
 
