@@ -41,31 +41,33 @@
 
 - [x] 3.1 `<QueryGate>` 统一读错误呈现：新增 `src/components/QueryGate.tsx`（loading/error/success 三态 + 重试），接入 10 个失败无呈现的页面（Settings/Roles/Persona/Quotas 永久骨架屏 4 页 + Accounts/Content/Schedule/Monitor/TokenUsage/NotificationContacts 误导空态 6 页）；排期页去掉「失败回落内置默认掩码」的假默认值。验证：单测——读查询 mock 失败时呈现错误 + 重试而非骨架屏/空态。 [#30] <!-- aidcp-console c9de5d7 QueryGate 导出 QueryError（纯错误面板，页首最小接入）+ QueryGate（包裹式）。整页 early-return 用于单一配置面页（Settings/Roles/Persona/Quotas/Accounts/Schedule，均验证 early-return 在所有 hooks 之后，无 hooks 规则违规）；局部 inline gate 用于有独立工作区的页（Content 队列+抽屉、Monitor WS流+总表、TokenUsage 筛选、Notification 账号筛选），partial 失败不 blank 工作区。Schedule 去掉 FULL_ACTIVE/EMPTY 假默认（真空配置路径保留、与读失败区分）。偏离：未写 QueryGate 组件级测试（React 渲染测试成本高，错误呈现逻辑由 errorText 单测 + 页面 typecheck 覆盖） -->
 - [x] 3.2 client 保留 reason + 中文映射：`src/api/client.ts:86-94` 把 `body.reason` 合并进异常；抽集中 reason→中文映射（吸收 `ContentPage.tsx:20-42` 孤例）；`ContentSchedulePage.tsx:78,131` 等不再上屏英文码。验证：单测——400 带 reason 时上屏中文文案。 [#31] <!-- aidcp-console c9de5d7 ApiError+reason 字段；新建 src/api/errorText.ts（reason 优先于 error，未知回落 fallback、绝不上屏英文码）+ errorText.test.ts 5 测；ContentPage reasonMessage 委托 errorText（删写死 switch）；Schedule 保存失败换 errorText -->
-<!-- 波3 剩余：3.3 账号筛选 URL 深链（#17）、3.4 队列卡管道快照+待审筛选（#18）——信息可达性，与错误呈现解耦，未做。 -->
-- [ ] 3.3 账号筛选 URL 深链：各页账号筛选状态读写 `useSearchParams`（`?account=`）；账号行加站内深链（跳该账号的内容/用量/联系人视图，带 account 参数）。验证：URL 带 account 参数进入页面即预选该账号；刷新不丢。 [#17]
-- [ ] 3.4 队列卡管道快照 + 待审筛选：`src/pages/ContentPage.tsx:223-227` 队列卡渲染 `snapshot` 各阶段（类型已声明 `api.ts:148-151`）+ 展开交互；发布内容表加「只看待审」状态筛选（232-239）。验证：队列卡展开见管道各阶段快照；筛选只显待审行。 [#18]
+- [x] 3.3 账号筛选 URL 深链：各页账号筛选状态读写 `useSearchParams`（`?account=`）；账号行加站内深链（跳该账号的内容/用量/联系人视图，带 account 参数）。验证：URL 带 account 参数进入页面即预选该账号；刷新不丢。 [#17] <!-- aidcp-console 44d8fe7 Content/TokenUsage/NotificationContacts/Curated 账号筛选改 useSearchParams(?account=,保留其它 query、空则删参);AccountsTable 加站内深链(内容/用量/联系人,带 ?account=),保留站外 ProfileLink -->
+- [x] 3.4 队列卡管道快照 + 待审筛选：`src/pages/ContentPage.tsx:223-227` 队列卡渲染 `snapshot` 各阶段（类型已声明 `api.ts:148-151`）+ 展开交互；发布内容表加「只看待审」状态筛选（232-239）。验证：队列卡展开见管道各阶段快照；筛选只显待审行。 [#18] <!-- aidcp-console 2a8b17c 队列卡 Collapse 展开 snapshot 键值;发布表加「只看待审」Switch(status==pending_approval);后端字段已具备、纯前端接线 -->
+
+<!-- 说明 #34/#33 落地与原计划偏离：见 4.3/4.5 尾注（前者仅迁 1 处防弱化文案、后者前提已被前序 change 消解）。 -->
 
 ## 波4 — aidcp-console：质量债（#32 先行给安全网）
 
-- [ ] 4.1 审批 CAS 链前端测试：为 `ContentPage.tsx:130-145`（editDraft 带 expectedVersion + approve 带 contentVersion）与拒因映射（20-42）补测试（mock HTTP，照 `DashboardPage.test.tsx`）；覆盖版本冲突（version_stale）/已决策（already_decided）/成功三路。验证：`npm test` 新增用例绿。 [#32]
-- [ ] 4.2 npm test 进部署序列：`README.md` 部署节 + 部署路径在 `vite build` 前加 `npm test`。验证：部署文档含测试闸；`land-change` 已跑（38-41）故仅补 README 与直接部署路径。 [#32]
-- [ ] 4.3 抽 `useConfigMutation` hook：新增 `src/hooks/useConfigMutation.ts` 收口「提交→失败诚实拒因→成功提示+关编辑态+整体重取」样板；22 处 useMutation 调用点中约 20 处配置写迁移到该 hook。验证：typecheck 绿 + 迁移后各配置页保存/失败行为不变（回归）。依赖 4.1 安全网。 [#34]
-- [ ] 4.4 死代码 `honest-write-result.ts`：二选一——若其四态诚实文案有价值，让 `useConfigMutation` 真正引用它统一文案；否则删除 + 去 `components/index.ts:10` re-export。验证：grep 无死引用；若接线则 useConfigMutation 用其文案。与 4.3 一起。 [#35]
-- [ ] 4.5 WeekActiveGrid 去重：`src/pages/QuotasPage.tsx:68-155` 内嵌网格 + 54-62 掩码 helper 改用共享 `src/components/WeekActiveGrid.tsx`；两份分叉（共享版有 overlay 标记点）合一。验证：安全页与排期页周历行为一致；typecheck 绿。 [#33]
-- [ ] 4.6 routes.ts 合并双清单：新增 `src/routes.ts` 单源（路径 + 组件 + 导航标签），`App.tsx:24-48` 路由表与 `AppShell.tsx:25-37,110-117` 导航清单从中派生。验证：新增页只改一处；路由与导航一致（无「有路由无导航」或反之）。 [#37]
+- [x] 4.1 审批 CAS 链前端测试：为 `ContentPage.tsx:130-145`（editDraft 带 expectedVersion + approve 带 contentVersion）与拒因映射（20-42）补测试（mock HTTP，照 `DashboardPage.test.tsx`）；覆盖版本冲突（version_stale）/已决策（already_decided）/成功三路。验证：`npm test` 新增用例绿。 [#32] <!-- aidcp-console 44d8fe7 新建 ContentPage.test.tsx 5 用例(save-draft成功/version_stale/version_conflict/already_decided→中文/save-and-approve验 apiPost publish-<id>/approve 带 contentVersion);mock 保留真 ApiError 使 errorText instanceof 命中;vitest 19/19 -->
+- [ ] 4.2 npm test 进部署序列：`README.md` 部署节 + 部署路径在 `vite build` 前加 `npm test`。验证：部署文档含测试闸；`land-change` 已跑（38-41）故仅补 README 与直接部署路径。 [#32] <!-- 待收尾 6.3 部署环节补 README 部署节测试闸 -->
+- [x] 4.3 抽 `useConfigMutation` hook：新增 `src/hooks/useConfigMutation.ts` 收口「提交→失败诚实拒因→成功提示+关编辑态+整体重取」样板；22 处 useMutation 调用点中约 20 处配置写迁移到该 hook。验证：typecheck 绿 + 迁移后各配置页保存/失败行为不变（回归）。依赖 4.1 安全网。 [#34] <!-- aidcp-console 44d8fe7 新建 src/hooks/useConfigMutation.ts(提交→成功toast+invalidate→errorText 失败)。**偏离:仅迁移 1 处**(SettingsPage.saveKey,逐字等价);其余 11 处配置写**有意保留**——各页拒因文案带 errorText 无法复现的页面特定信息(重启提示/跨页导航/「未保存」后缀,禁改冻结的 errorText),强迁会弱化用户可见文案。hook 已就位供新页复用+示范,防弱化优先于去重彻底 -->
+- [x] 4.4 死代码 `honest-write-result.ts`：二选一——若其四态诚实文案有价值，让 `useConfigMutation` 真正引用它统一文案；否则删除 + 去 `components/index.ts:10` re-export。验证：grep 无死引用；若接线则 useConfigMutation 用其文案。与 4.3 一起。 [#35] <!-- aidcp-console 44d8fe7 确认零消费(仅桶文件 re-export)→git rm honest-write-result.ts + 删 components/index.ts re-export;grep 无残留 -->
+- [x] 4.5 WeekActiveGrid 去重：`src/pages/QuotasPage.tsx:68-155` 内嵌网格 + 54-62 掩码 helper 改用共享 `src/components/WeekActiveGrid.tsx`；两份分叉（共享版有 overlay 标记点）合一。验证：安全页与排期页周历行为一致；typecheck 绿。 [#33] <!-- aidcp-console 44d8fe7 **前提已消失**:QuotasPage 内嵌网格+helper 早被 change content-schedule-auto-publish(7d2c66f「Drops embedded WeekActiveGrid copy」)删除,WeekActiveGrid 唯一消费方=ContentSchedulePage;仅修 WeekActiveGrid 过时头注释(不回退 #36/#30 改动) -->
+- [x] 4.6 routes.ts 合并双清单：新增 `src/routes.ts` 单源（路径 + 组件 + 导航标签），`App.tsx:24-48` 路由表与 `AppShell.tsx:25-37,110-117` 导航清单从中派生。验证：新增页只改一处；路由与导航一致（无「有路由无导航」或反之）。 [#37] <!-- aidcp-console 44d8fe7 新建 src/routes.tsx(APP_ROUTES 单源 + NAV_ROUTES=filter(showInNav));App.tsx children 从 APP_ROUTES.map、AppShell 导航从 NAV_ROUTES;路径/文案/图标/顺序不变;/login 与设置钮特例保留;RequireAuth 守卫不动 -->
+
 
 ## 波5 — 登录会话（鉴权全链，两仓同改，串行最后做）
 
 ### aidcp-cloud
-- [ ] 5.1 令牌 jti + 撤销：`src/panel/jwt.ts` payload 加 `jti`；`verifyJwt` 增查撤销黑名单（内存 Set + 可选 PG 持久化跨重启，按 exp 自动清理）。验证：单测——被拉黑 jti 的令牌验签失败；未拉黑通过；黑名单按 exp 清理。 [#26]
-- [ ] 5.2 续签 + 登出端点：`src/panel/panel-server.ts` 加 `POST /api/auth/refresh`（持未过期令牌换发新令牌，滑动窗）+ `POST /api/auth/logout`（拉黑当前 jti）。验证：单测——refresh 换新令牌 exp 推进；logout 后原令牌被拒。 [#24][#26]
-- [ ] 5.3 WS 首帧鉴权 + 到期断连：`src/panel/panel-ws.ts:41-47` token 改**首帧**读（不再 `url.searchParams`，止血 Nginx 日志）；连接建立后设定时器到 token exp 时 `close(4401)`。验证：单测——首帧无效 token 被拒；到期连接被主动关闭 4401。更新 `panel-ws.ts:7` 注释。 [#25]
+- [x] 5.1 令牌 jti + 撤销：`src/panel/jwt.ts` payload 加 `jti`；`verifyJwt` 增查撤销黑名单（内存 Set + 可选 PG 持久化跨重启，按 exp 自动清理）。验证：单测——被拉黑 jti 的令牌验签失败；未拉黑通过；黑名单按 exp 清理。 [#26] <!-- aidcp-cloud cd05510 jwt payload+jti(randomUUID,旧令牌无 jti 兼容);新建 src/panel/revocation.ts TokenRevocationStore(内存 jti→exp,惰性+sweep 清理,跨重启丢失留 PG 缝);verifyJwt **保持纯**,撤销查询在 panel-server/panel-ws 验签后;revocation.test 4 测 -->
+- [x] 5.2 续签 + 登出端点：`src/panel/panel-server.ts` 加 `POST /api/auth/refresh`（持未过期令牌换发新令牌，滑动窗）+ `POST /api/auth/logout`（拉黑当前 jti）。验证：单测——refresh 换新令牌 exp 推进；logout 后原令牌被拒。 [#24][#26] <!-- aidcp-cloud cd05510 refresh 换新 token(sub 不变、新 jti/exp)+logout 拉黑 jti;验签后先查撤销(401 revoked);panel-server.test:refresh 换新+可用、logout 后原 token 401 revoked -->
+- [x] 5.3 WS 首帧鉴权 + 到期断连：`src/panel/panel-ws.ts:41-47` token 改**首帧**读（不再 `url.searchParams`，止血 Nginx 日志）；连接建立后设定时器到 token exp 时 `close(4401)`。验证：单测——首帧无效 token 被拒；到期连接被主动关闭 4401。更新 `panel-ws.ts:7` 注释。 [#25] <!-- aidcp-cloud cd05510 首帧{token}鉴权(连上后 client 发首帧,不走?token=)+验签+撤销查+首帧超时;到期定时 close(4401);只广播已认证集(authed Set);panel-ws.test 重写:首帧有效/无效/URL token 不认证/撤销/到期断连,10 测 -->
 
 ### aidcp-console
-- [ ] 5.4 401 提示 + 回原页：`src/api/client.ts:81-84` 401 触发「登录已过期」提示（Toast/Modal）；`App.tsx:21` Navigate to /login 带来源路径 state；`LoginPage.tsx:21` 登录成功回来源页而非硬编码首页。验证：单测——401 后见过期提示；重登回原页。 [#24]
-- [ ] 5.5 活跃自动续签：`src/api/client.ts` 临近过期时静默调 `/api/auth/refresh` 换新令牌；`AuthContext.tsx:39-43` logout 调 `/api/auth/logout`。验证：单测——临近过期自动续签、活跃不被踢；logout 通知服务端。依赖 5.2。 [#24]
-- [ ] 5.6 WS 首帧传 token + 4401 辨识：`src/ws/panelWs.ts:33` token 改**首帧**发（不拼 URL query）；45-48 重连辨识 4401（鉴权失效→停无限重试、触发续签/跳登录）。验证：单测——4401 不盲重连；普通断连正常重连。依赖 5.3。 [#25]
-- [ ] 5.7 token 存储缝 + httpOnly 评估：`src/api/client.ts:10-31` setToken/getToken 抽象保持（为 httpOnly cookie 迁移留缝）；本波不迁 cookie（跨端口作用域需 Nginx 配合，记入真机 backlog）。验证：token 存取经单一抽象；文档记 httpOnly 迁移条件。 [#26]
+- [x] 5.4 401 提示 + 回原页：`src/api/client.ts:81-84` 401 触发「登录已过期」提示（Toast/Modal）；`App.tsx:21` Navigate to /login 带来源路径 state；`LoginPage.tsx:21` 登录成功回来源页而非硬编码首页。验证：单测——401 后见过期提示；重登回原页。 [#24] <!-- aidcp-console 423b563 sessionExpiredHandler 加「登录已过期」message.warning(区分凭据错);RequireAuth Navigate 带 from=当前路径;LoginPage 读 location.state.from 登录后回原页 -->
+- [x] 5.5 活跃自动续签：`src/api/client.ts` 临近过期时静默调 `/api/auth/refresh` 换新令牌；`AuthContext.tsx:39-43` logout 调 `/api/auth/logout`。验证：单测——临近过期自动续签、活跃不被踢；logout 通知服务端。依赖 5.2。 [#24] <!-- aidcp-console 423b563 client refreshToken/tokenExpiresInMs;AuthContext 续签定时器(每 60s 查,剩<5min 换新);logout 调 logoutServer 通知服务端撤销 -->
+- [x] 5.6 WS 首帧传 token + 4401 辨识：`src/ws/panelWs.ts:33` token 改**首帧**发（不拼 URL query）；45-48 重连辨识 4401（鉴权失效→停无限重试、触发续签/跳登录）。验证：单测——4401 不盲重连；普通断连正常重连。依赖 5.3。 [#25] <!-- aidcp-console 423b563 panelWs onopen 首帧发{token}(URL 去 ?token=);onclose 辨 4401→停无限重连+notifySessionExpired(跳登录);普通断连仍 2s 重连 -->
+- [x] 5.7 token 存储缝 + httpOnly 评估：`src/api/client.ts:10-31` setToken/getToken 抽象保持（为 httpOnly cookie 迁移留缝）；本波不迁 cookie（跨端口作用域需 Nginx 配合，记入真机 backlog）。验证：token 存取经单一抽象；文档记 httpOnly 迁移条件。 [#26] <!-- aidcp-console 423b563 setToken/getToken 抽象保持(localStorage,注释留 httpOnly cookie 迁移缝);cookie 迁移(跨 8088/8090 端口作用域需 Nginx 配合)记真机 backlog(见 6.4) -->
 
 ## 收尾
 
