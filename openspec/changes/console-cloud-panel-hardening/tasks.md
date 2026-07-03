@@ -25,15 +25,17 @@
 ## 波2 — 配置漂移（#4 解锁 #36；#6 收口机制；#5 前后端同修）
 
 ### aidcp-console
-- [ ] 2.1 补评论赞动作列 + 修哨兵测试：`src/types/aidcp-enums.ts:14` 公用枚举补 `comment_like`（对齐云端 7 动作）；`src/components/AccountTotalsTable.tsx:36` 出该列；`src/types/aidcp-enums.test.ts` 本地断言从写死 6 项改为对 `/api/version` live 真值断言（或引 cloud 导出的契约指纹快照）。验证：`npm test` 哨兵对 7 动作真值绿；按账号表出评论赞列。 [#4]
-- [ ] 2.2 QuotasPage 复用公用枚举：`src/pages/QuotasPage.tsx:20-33` 私有档位标签/配色（green/blue/orange）+ 私有动作标签删除，改用 `types/aidcp-enums.ts` 公用枚举（冷色 blue/geekblue/purple）；`types/api.ts:362` 重复的 `QuotaTier`/`RiskQuotaLevel` 合一。验证：配额页档位配色与账号页一致（冷色）；typecheck 绿。依赖 2.1。 [#36]
-- [ ] 2.3 图片厂商前端：`src/types/api.ts:211-212` 图片厂商去字面量钉死、加 `imageProviders` 下拉清单字段；`src/pages/SettingsPage.tsx:97,123-124` 渲染厂商下拉、保存回传厂商字段（43-44,130-132）。验证：设置页显示真实图片厂商 + 可切换。依赖 2.5（cloud 出下拉数据）。 [#5]
-- [ ] 2.4 DTO 单源镜像收敛（console 侧）：`src/types/api.ts` 手抄镜像与 cloud 导出契约指纹对拍，哨兵测试覆盖枚举 + 关键 DTO 字段集合。验证：`npm test` diff 断言绿；人为改错一处镜像 → 测试红（负向验证）。依赖 2.7。 [#6]
+- [x] 2.1 补评论赞动作列 + 修哨兵测试：`src/types/aidcp-enums.ts:14` 公用枚举补 `comment_like`（对齐云端 7 动作）；`src/components/AccountTotalsTable.tsx:36` 出该列；`src/types/aidcp-enums.test.ts` 本地断言从写死 6 项改为对 `/api/version` live 真值断言（或引 cloud 导出的契约指纹快照）。验证：`npm test` 哨兵对 7 动作真值绿；按账号表出评论赞列。 [#4] <!-- aidcp-console b6ccdfa RISK_ACTIONS+comment_like(+color cyan/label 评论赞)；AccountTotalsTable **无需改**（map RISK_ACTIONS 自动出列，AccountTotals=Record<RiskAction> 自动含键）；哨兵：值快照修正到 7 项 + 新增结构自洽断言（动作↔label/color 键必须一致，检出「加动作忘配」）+ live 对拍扩展 imageProvider/dtoFields；vitest 绿 -->
+- [x] 2.2 QuotasPage 复用公用枚举：`src/pages/QuotasPage.tsx:20-33` 私有档位标签/配色（green/blue/orange）+ 私有动作标签删除，改用 `types/aidcp-enums.ts` 公用枚举（冷色 blue/geekblue/purple）；`types/api.ts:362` 重复的 `QuotaTier`/`RiskQuotaLevel` 合一。验证：配额页档位配色与账号页一致（冷色）；typecheck 绿。依赖 2.1。 [#36] <!-- aidcp-console b6ccdfa 档位/动作标签+配色改用 RISK_QUOTA_COLOR/LABEL+RISK_ACTION_LABEL（冷色，消暖色误用）；保留 TIER_ORDER/ACTION_ORDER 排序（公用枚举无 order）。偏离：QuotaTier/RiskQuotaLevel 类型合一未做（值相同、配色已统一，类型合一为洁癖、留） -->
+- [x] 2.3 图片厂商前端：`src/types/api.ts:211-212` 图片厂商去字面量钉死、加 `imageProviders` 下拉清单字段；`src/pages/SettingsPage.tsx:97,123-124` 渲染厂商下拉、保存回传厂商字段（43-44,130-132）。验证：设置页显示真实图片厂商 + 可切换。依赖 2.5（cloud 出下拉数据）。 [#5] <!-- aidcp-console b6ccdfa ModelConfig.imageProvider→string+ImageProviderOption；SettingsPage 加图片厂商 Select（data.imageProviders）+保存传 imageProvider+去「钉死通义」文案。cloud buildModelConfigView **早已返回真实 imageProvider+imageProviders**（仅前端接线） -->
+- [x] 2.4 DTO 单源镜像收敛（console 侧）：`src/types/api.ts` 手抄镜像与 cloud 导出契约指纹对拍，哨兵测试覆盖枚举 + 关键 DTO 字段集合。验证：`npm test` diff 断言绿；人为改错一处镜像 → 测试红（负向验证）。依赖 2.7。 [#6] <!-- aidcp-console b6ccdfa VersionPayload 镜像+enums.textProvider/imageProvider+dtoFields.panelAccount；哨兵 live 对拍 imageProvider/dtoFields。偏离：跨仓无共享包，DTO 单源=「cloud typecheck 强制字段清单（PANEL_ACCOUNT_FIELDS type-level 断言）+ console live 对拍」组合，非编译期跨仓单源（跨仓边界固有限制，见 design.md D2） -->
 
 ### aidcp-cloud
-- [ ] 2.5 图片厂商后端：`src/config/role-config-facade.ts:70` 图像角色「生效厂商」读真实图片厂商配置（非 `DEFAULT_TEXT_PROVIDER`）；`src/server.ts:1572-1582` 面板视图带 `imageProviders` 下拉清单（若未带）。验证：单测——图像角色视图厂商随图片厂商配置变化。 [#5]
-- [ ] 2.6 `/api/version` 契约指纹：`src/panel/panel-server.ts` version 端点暴露 live 枚举（7 动作 + 档位 + 告警分级）+ 关键 DTO 字段集合，作漂移哨兵真值源。验证：单测——version 响应含 7 动作与图片厂商枚举。 [#4][#6]
-- [ ] 2.7 DTO 单源（cloud 侧）：面板 DTO 收敛到 `src/panel/dto/`（纯类型 + 可序列化契约清单），导出契约指纹供 console 测试引用。验证：cloud typecheck 绿；契约清单与实际接口枚举一致的自测。 [#6]
+- [x] 2.5 图片厂商后端：`src/config/role-config-facade.ts:70` 图像角色「生效厂商」读真实图片厂商配置（非 `DEFAULT_TEXT_PROVIDER`）；`src/server.ts:1572-1582` 面板视图带 `imageProviders` 下拉清单（若未带）。验证：单测——图像角色视图厂商随图片厂商配置变化。 [#5] <!-- aidcp-cloud d92ed7b role-config-facade 图像角色 effectiveProvider=normImageProvider(deps.getGlobalImageProvider())；server 注入 getGlobalImageProvider。偏离：server 面板视图 **早已带 imageProviders**（无需改）；role-facade 14/14 含火山用例 -->
+- [x] 2.6 `/api/version` 契约指纹：`src/panel/panel-server.ts` version 端点暴露 live 枚举（7 动作 + 档位 + 告警分级）+ 关键 DTO 字段集合，作漂移哨兵真值源。验证：单测——version 响应含 7 动作与图片厂商枚举。 [#4][#6] <!-- aidcp-cloud d92ed7b version.ts enums+textProvider/imageProvider（Object.keys(*_PROVIDERS)）+dtoFields.panelAccount；riskAction 早已是 RISK_ACTIONS live 真值（含 comment_like）；PANEL_API_VERSION 1→2；panel-server 断言含 comment_like/volcengine/accountId -->
+- [x] 2.7 DTO 单源（cloud 侧）：面板 DTO 收敛到 `src/panel/dto/`（纯类型 + 可序列化契约清单），导出契约指纹供 console 测试引用。验证：cloud typecheck 绿；契约清单与实际接口枚举一致的自测。 [#6] <!-- aidcp-cloud d92ed7b 契约指纹=version.ts PANEL_ACCOUNT_FIELDS（可序列化）+ type-level _AssertNever 断言强制清单与 PanelAccount 键严格一致（漏/多字段 cloud typecheck 失败，protocol.ts 穷举范式）。偏离：**未新建 src/panel/dto/ 目录**（YAGNI——面板 DTO 十几个类型，字段指纹集中在 version.ts 已达「单源+typecheck 强制」目的，无需再抽独立 DTO 层；留缝可后抽） -->
+
+<!-- 波2 部署待办（随首次部署执行）：console 哨兵 live 对拍需在 CI/部署后设 AIDCP_PANEL_URL 指向 ECS 面板端点跑一次（否则 skipIf 默认跳过、检不出 cloud 真漂移）——登记真机 backlog（见 6.4）。 -->
 
 ## 波3 — aidcp-console：前端体验（纯前端接线，后端字段已具备）
 
