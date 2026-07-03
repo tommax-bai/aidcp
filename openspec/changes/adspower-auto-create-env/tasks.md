@@ -29,41 +29,19 @@
 - [x] 4.5 创建成功仅标「仅配置层/未验证/不可投产」，绝不把 `create` 回 id 当就绪 <!-- aidcp-edge 03b6dde status=UNVERIFIED -->
 - [x] 4.6 创建时可预填 `intendedAccountLabel`，写进分身 `remark`（随 `user/list` 读回，供登录时比对） <!-- aidcp-edge 03b6dde encodeRemark/parseRemark -->
 - [x] 4.7 MUST NOT 接线任何程序化 `user/delete`；孤儿只暴露 user_id 引导人工在 AdsPower 删 <!-- aidcp-edge 7227783 allowlist 已断言禁 user/delete；「孤儿暴露」随 task 5 UI -->
-- [ ] 4.8 单次创建规模 N 与观测能力挂钩：观测未就绪时限 N≤3 并说明原因 <!-- policy/UI，随 task 5 -->
+<!-- task 4 核心逻辑（编排/护栏/断言/remark/互斥/无台账/无代理）已落 aidcp-edge 03b6dde；剩「凭据不落 settings」接线随 task 5（main.cjs/UI，串行等 edge-companion-ui）。「规模上限」已砍（用户 YAGNI）。 -->
 
-<!-- task 4 核心逻辑（编排/护栏/断言/remark/互斥/无台账/无代理）已落 aidcp-edge 03b6dde；剩 4.4「不落盘」接线 + 4.8「N 上限」policy 随 task 5（main.cjs/UI，串行等 edge-companion-ui）。 -->
+## 5. aidcp-edge — preload/IPC + 按钮 UI + 「是否配代理」提示（与 edge-companion-ui 串行，待其落地后 rebase）
 
-## 5. aidcp-edge — preload/IPC + 按钮 UI（与 edge-companion-ui 串行，待其落地后 rebase）
-
-- [ ] 5.1 `preload.cjs` + 主进程新增创建 / 自检 / 台账查询的 IPC 通道
-- [ ] 5.2 「创建环境」入口改触发程序化建号（挑模板 + 可选预填意图账号，不在面板逐字段配指纹），本地 API 不可达/创建失败诚实降级、保留「打开 AdsPower 手动新建」兜底
-- [ ] 5.3 环境列表如实呈现就绪态（仅配置层/未验证 / 已验证 / 验证失败含失败项）+「无代理」标注；代理软提示、非硬闸（未配代理仍允许创建）
+- [ ] 5.1 `preload.cjs` + 主进程新增「创建环境」IPC 通道（调 `ads-create-flow`）；凭据不落 `settings.json`、日志用 `redactSensitive`（4.4 接线落此）
+- [ ] 5.2 「创建环境」入口改触发程序化建号（挑整机模板，不在面板逐字段配指纹）；本地 API 不可达/创建失败诚实降级、保留「打开 AdsPower 手动新建」兜底；成功即呈现「已创建」
+- [ ] 5.3 环境列表对每个环境显示**唯一提示：是否配置了代理**（`no_proxy`/空 → 「未配置代理」纯提醒、不拦任何操作；代理由运维手动在 AdsPower 侧配）。不做就绪态/自检/硬闸
 - [ ] 5.4 UI 钩子在 `edge-companion-ui`（17/22）落地后 rebase 到其新 renderer 三件套上（标记串行）
 
-## 6. aidcp-edge — 创建后自检 + 投产硬闸（MVP 先接通道，实测置位入迭代 2）
+## 6. 收尾验证与归档
 
-- [ ] 6.1 投产硬闸先接线：起号出口（`pluggable-browser-provider` 起浏览器前 / `launch-multinode` 组装槽位）读 `verifyState`，非 `ready` 诚实拒绝启动（复用 `browser-provider.ts:131` 同款闸）——MVP 即打通此 gate 通道
-- [ ] 6.2 运行时自检（迭代 2）：开一次分身经 CDP 实测出口 IP / renderer 非软渲染 / WebRTC 不漏真机 IP / 时区↔IP / 跨分身 Canvas·WebGL·Audio 哈希与 renderer 字符串去重 → 置 `verifyState`（全过 ready / 任一失败 failed 标红）
-- [ ] 6.3 `verifyState=ready` 绑定建号机 `machineLabel`；跨机消费（建号机 != 当前机）视为未验证、强制重验/拒投产
+- [ ] 6.1 edge `npm run typecheck` + 全量 `npm test`（确认新模块未破坏既有；新模块单测已随实装绿：ads-write-api / ads-fingerprint / ads-create-flow）
+- [ ] 6.2 `openspec validate adspower-auto-create-env --strict`
+- [ ] 6.3 各 task 标 `[x]` 写 commit-sha；完成后 archive（delta 合并进 `openspec/specs/`）
 
-## 7. aidcp-cloud — 账号↔分身↔机器映射（与本 change 同批交付，不推迟）
-
-- [ ] 7.1 `account-store` 自愈 `ALTER ... ADD COLUMN IF NOT EXISTS ads_profile_id`，激活 `machine_label` 写入（加性、向后兼容）
-- [ ] 7.2 边缘握手载荷携带 `ads_profile_id`/`machine_label`，云端幂等 upsert 一并落库（不覆盖运营已配字段、缺字段按 NULL）
-- [ ] 7.3 登录握手回写真实 accountId 并与环境 `intendedAccountLabel` 比对，不一致诚实告警且不投产
-
-## 8. 测试与回归
-
-- [ ] 8.1 写客户端 allowlist 回归断言（到不了 `browser/start|stop|active`）
-- [ ] 8.2 护栏单测：`device_memory=6` 被拒、OS 四者一致断言、`webgl` 模式取舍
-- [ ] 8.3 台账崩溃窗口 / reconcile / 单飞互斥 / 幂等单测（含「create 成功台账未写」恢复）
-- [ ] 8.4 凭据脱敏测试（账密/Authorization 不进日志、不落盘）
-- [ ] 8.5 投产硬闸测试：非 `ready` 环境被启动出口拒绝
-- [ ] 8.6 安全红线复跑：`AC-PROTO-*`/`AC-PUB-*`/`AC-RISK-*` + `npm run test:acceptance` 后全量 `npm test`（edge & cloud）
-- [ ] 8.7 `npm run typecheck`（edge & cloud）
-
-## 9. 验收与归档
-
-- [ ] 9.1 `openspec validate adspower-auto-create-env --strict`
-- [ ] 9.2 各 task 标 `[x]` 并写 commit-sha / 偏离说明（`<!-- <repo> <sha> 备注 -->`）
-- [ ] 9.3 全部完成后 archive（delta 合并进 `openspec/specs/`）
+<!-- 已砍（用户 2026-07-03，YAGNI）：创建后自动自检 + 投产硬闸（原组 6）、云端 profile↔machine 映射与登录比对（原组 7）、单次规模上限、复杂就绪态。本功能 = 一键建配好的指纹环境 + 一个「是否配代理」提示；是否可用由运维登录时人工确认。将来要规模化 / 后台看板再另立 change。 -->

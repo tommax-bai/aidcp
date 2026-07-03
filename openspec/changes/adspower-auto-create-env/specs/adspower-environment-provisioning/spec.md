@@ -16,14 +16,6 @@
 - **WHEN** 模板声明 Windows 但下发 UA / 字体 / renderer 家族任一不是 Windows（四者一致断言不符）
 - **THEN** 桌面外壳诚实拒绝创建并说明不一致点，MUST NOT 提交该矛盾环境
 
-### Requirement: 创建态与就绪态分离，创建只标「仅配置层/未验证」
-
-`user/create` 返回分身 id SHALL 仅被视为「配置层已建」，桌面外壳 MUST NOT 据此把环境标为「已就绪 / 可投产」。因 `user/list` 是配置层、非实测出口 IP、指纹字段读不回，创建流程 SHALL 只保证「配置层自洽 + 取值合法 + 有区分度 + 稳定」，并把环境状态**显式命名**为「仅配置层 / 未验证 / 不可投产」，如实呈现给运维。是否「真实且有区分度」SHALL 仅由 `environment-readiness-verification` 的运行时实测置位，MUST NOT 由创建响应推断（不静默假成功红线）。
-
-#### Scenario: 创建成功不等于就绪
-- **WHEN** `user/create` 成功返回分身 id
-- **THEN** 环境被标为「仅配置层 / 未验证」，UI 明示「尚未证明 IP 隔离与指纹自洽、不可据此投产」，MUST NOT 显示为「已就绪」
-
 ### Requirement: 写能力经独立写客户端 + 硬编码 allowlist，绝不触碰浏览器生命周期
 
 程序化创建 SHALL 经一个与只读 `ads-local-api` **分离的**「写客户端」发起，该写客户端 SHALL 用**硬编码 allowlist** 只放行 `user/create` 与 `group/create`，任何 `browser/start` / `browser/stop` / `browser/active` 等浏览器生命周期路径 SHALL 在该客户端内**直接抛错**（生命周期仍是核心子进程单写职责），并 SHALL 有回归断言证明该写客户端到不了生命周期端点（红线靠测试守、不靠注释）。写客户端对本地 API 的调用 SHALL 复用与只读侧相同的 ≥1 秒串行节流；本机核心子进程活跃时 SHALL NOT 并发跑批量写（避免与核心的启动/回收调用叠加撞每秒限速），撞限速 SHALL 诚实降级、MUST NOT 假成功。
@@ -64,26 +56,10 @@ AdsPower API key 与代理账号密码 SHALL 仅在创建批处理期间**内存
 - **WHEN** 运维未给环境配代理即点「创建环境」
 - **THEN** 桌面外壳给出「未配置代理」提醒但仍允许创建，成功后该环境在列表如实标「无代理」，不阻止任何后续操作
 
-### Requirement: 创建时预填绑定意图 intendedAccountLabel
-
-创建时账号尚未登录（登录在后、由人手扫码），桌面外壳 SHALL 允许运维为该环境**预填一个 `intendedAccountLabel`**（该分身打算承载哪个号的人肉意图锚），并随分身 `remark` 持久化（随 `user/create` 写入、随 `user/list` 读回，不落本机文件）。该字段 SHALL 供登录握手时回写比对真实 accountId 之用，MUST NOT 被当作已确立的绑定（绑定在登录时才成立并校验）。
-
-#### Scenario: 预填意图账号写进分身备注供登录时比对
-- **WHEN** 运维创建环境时填了「打算给账号 A」
-- **THEN** 该意图写进分身 `remark`（`intendedAccountLabel=A`），随 `user/list` 读回，供之后登录握手回写真实 accountId 时比对
-
 ### Requirement: MUST NOT 程序化删除任何分身
 
-桌面外壳 MUST NOT 接线任何程序化 `user/delete`。孤儿分身（reconcile 标出的 `untracked-orphan`/`stale`）SHALL 仅**暴露其 user_id 并引导运维在 AdsPower 中手动删除**，MUST NOT 由 aidcp 自动删除。删除已登录暖号不可逆且云端零审计，故此红线 SHALL 不在本 change 放开。
+桌面外壳 MUST NOT 接线任何程序化 `user/delete`。需清理的孤儿分身 SHALL 仅**暴露其 user_id 并引导运维在 AdsPower 中手动删除**，MUST NOT 由 aidcp 自动删除。删除已登录暖号不可逆且云端零审计，故此红线 SHALL 不在本 change 放开。
 
 #### Scenario: 孤儿只暴露不自动删
-- **WHEN** reconcile 标出若干 `untracked-orphan` 分身
+- **WHEN** 从 `user/list` 认出若干疑似残留分身
 - **THEN** 桌面外壳列出其 user_id 引导运维去 AdsPower 手动删，MUST NOT 调用任何删除接口
-
-### Requirement: 单次创建规模上限与观测能力挂钩
-
-单次创建（或一批）的分身数量上限 N SHALL 与「能观测到号被平台盯上 + 后台可逐账号可观测绑定/健康」的能力挂钩。在真实封号/限流信号未接入状态迁移、且后台逐账号可观测未就绪之前，N SHALL 收敛到不大于 3，桌面外壳 MUST NOT 把「一键创建十号」当默认路径。放开 N>3 SHALL 以观测能力就绪为前置（能力门、非时间顺序）。
-
-#### Scenario: 观测未就绪时 N 收敛
-- **WHEN** 真实封号信号未接入、后台逐账号可观测未就绪，运维试图一次创建超过 3 个环境
-- **THEN** 桌面外壳把 N 限制在不大于 3 并说明原因，MUST NOT 默认放开到十号
