@@ -151,9 +151,19 @@
 ```jsonc
 {
   "sessionId": "sess-1",      // string  云端分配的会话 id
-  "serverVersion": "0.1.0"    // string  服务端版本
+  "serverVersion": "0.1.0",   // string  服务端版本
+  "pacing": {                 // object?  可选节奏快照（change pacing-floor-config-min-interval）；旧端忽略
+    "tempo": 1.0,             //   number  风控档全局节奏乘子（normal=1.0/warned=1.3/restricted=1.6），边缘乘算
+    "opFloorsMs": {           //   object  每类操作兜底 floor 默认区间（已含云端读出口 clamp 护栏、非零）；逐字段可缺、边缘逐项回落内置默认
+      "action":       { "minMs": 1500, "maxMs": 4000 }, // note.open/profile.open/interaction.*
+      "scroll":       { "minMs": 500,  "maxMs": 1500 }, // note.scroll_comments
+      "card_gap":     { "minMs": 3000, "maxMs": 7000 }, // note.browse_images
+      "detail_dwell": { "minMs": 2500, "maxMs": 5000 }  // ensureDetailDwell 兜底 floor
+    }
+  }
 }
 ```
+> `pacing` 承载**全局节奏兜底**，供边缘做「操作间**最小间隔** gating」（记上次操作完成时刻，收到下一操作时若距上次已达 floor 则立即执行、**不累加**、吸收云端往返；否则只补差额）与详情页停留兜底。数值后台（console）可配、存云端 PostgreSQL、下次握手/重连热加载。与 `session.budget.pacing`（`PacingDefaultsPayload`，边缘从不消费的**死通道**）区分——本快照走 `welcome` 请求/响应，永不经主动命令白名单。**红线**：配置只能抬高延迟、经三道夹（facade 校验含 `max≥min×1.5` + 云端读出口 `clamp(防呆下限,CAP=15000ms)` + 边缘 `Math.max` 二次夹）永远抬不穿非零下限，绝不零延迟。
 
 **`ui.snapshot`**（cloud → edge，主动推送；change edge-companion-ui 8.1）
 ```jsonc
