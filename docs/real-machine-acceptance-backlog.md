@@ -134,3 +134,16 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **消费端真登出仍判 lost** — 真在消费端登出（或 session 过期弹登录浮层）时，身份监测体仍连续判 lost 达阈值、正常退回无身份态（分域闸不漏判真登出）
 - [ ] **自愈能回消费页恢复** — 若在创作页/弹层态触发一次重新确立身份，`reestablishIdentity` 先 `Page.navigate` 回 explore 首页再读身份、健康账号真恢复重连（而非停摆待人工）
 - [ ] **在途发布断连诚实回执** — 身份翻转断连若撞上在途发布，云端收到 `[recycled] identity_flip:*` 失败 `publish.command.result`（不再干等），且绝不重复发帖
+
+## 簇 11 — cloud-oss-storage-integration 真机验收（配图转存 OSS 根治过期掉图，登记于 2026-07-04）
+
+**前置**：cloud 部署含 `d0e865e`（OSS 上传出口 + 配图转存）；ECS 设好 OSS 凭据（env `OSS_ACCESS_KEY_ID`/`OSS_ACCESS_KEY_SECRET` 或 SQL 写 `provider_credentials` 的 `oss/*`）；桶 `aidcp`（`oss-cn-beijing`）允许对象级公读 ACL；启动日志应见「OSS 对象存储已就绪（bucket=aidcp region=oss-cn-beijing …）」。
+**背景**：当前 `publish_log.image_url`/`images` 存的是文生图厂商临时 URL（~24h 过期）；审批延迟超 TTL → 边缘去下载已死链 → 笔记少图/无图。本 change 在图生成后把每张转存 OSS、以公读永久链接持久化。红线：转存失败诚实少一张、绝不伪造 URL、绝不静默回退 provider 临时 URL。
+
+- [ ] **配图落 OSS 稳定链接** — 真机发一帖（有配图），查 `publish_log` 该行 `image_url`/`images` 均为 `https://aidcp.oss-cn-beijing.aliyuncs.com/publish/<accountId>/<runToken>/<seq>.<ext>`，而非厂商临时域名
+- [ ] **边缘从 OSS 下载并上传成功** — 边缘 `upload_image{imageUrl}` 收到的是 OSS URL、成功 fetch 并上传到小红书；帖子真带图、张数与生成张数一致（诚实 M=K）
+- [ ] **过期根治（核心价值）** — 走人工审批、故意让审批延迟超过厂商原始 TTL（如隔天再批），边缘仍能从 OSS URL 成功下载配图（不再死链掉图）
+- [ ] **转存失败诚实降级** — 构造某张转存失败（如临时封 OSS 出口/坏源）时，该帖如实少一张、`images_attached_count` 相应减一、`publish_log` 无任何伪造/占位/provider 临时 URL；发布链不因缺 OSS 而中断
+- [ ] **未配置零回归** — 若某环境未设 OSS 凭据，启动日志见「未配置 OSS 凭据…沿用 provider 临时 URL」，发帖仍走原路径不报错（回滚路径 = 撤 OSS 凭据即回退）
+- [ ] **内/公网 endpoint（若开 OSS_INTERNAL）** — ECS 同区且设 `OSS_INTERNAL=true` 时上传走内网省流量，但存库/发边缘的 URL 仍是公网 endpoint（可匿名访问）
+- [ ] **未触碰同机 isales** — 部署与运行全程确认 isales 服务/目录/端口未受影响
