@@ -23,7 +23,8 @@
 - [x] 4.1 edge：`cd ../aidcp-edge && npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿 <!-- aidcp-edge 130acd7：acceptance 12 绿 + 全量 587 绿（+2 硬化）+ typecheck 净 -->
 - [x] 4.2 中控：`openspec validate publish-select-mode-layout-robust --strict` 通过 <!-- 2026-07-04 strict 通过 -->
 
-## 5. 真机标定（留待 AdsPower 可用 + 用户在场）
+## 5. 真机标定（AdsPower 大白 k1e0ero8，2026-07-04 已做）
 
-- [ ] 5.1 宽/窄两窗口各探一次创作发布页 tab 的可见元素/文案/class（AdsPower `user_id=k1e0ero8`），据此收紧窄布局候选、去掉 best-effort 猜测。
-- [ ] 5.2 接发布链路簇 3 端到端真机验：`/publish` → 审批 → `navigate_entry`→`select_mode`→…→ 发布落地。
+- [x] 5.1 宽/窄两窗口各探一次创作发布页 tab 的可见元素/文案/class，据此收紧候选。<!-- aidcp-edge f51ae9c：真机 CDP 只读 dump（scripts/calibrate-select-mode-layout.ts）。**关键发现**：①「上传图文」隐藏副本不是 display:none，而是**移到屏幕外** rect≈{x:-9758,y:-9934}（offsetParent 非空、getClientRects 非空）→ 消费端 offsetParent 判据误判其可见、且在文档序更靠前 → 旧「取首个」正点了它；②600×900 窄视口 tab 栏形态与 1904 完全一样、克隆仍在 -9758 → **不是宽/窄响应式差异，是持久屏幕外克隆、与视口无关**。**修**：IS_VISIBLE 由 offsetParent 判据改为「与视口相交」(getBoundingClientRect 非零盒 + right>0&&bottom>0&&left<innerWidth&&top<innerHeight)，排除屏幕外克隆、兼容 fixed。窄布局 best-effort 候选保留但实测未触发（无独立窄形态）。 -->
+- [x] 5.2 `select_mode` 端到端真机验（驱动真实 dispatcher）。<!-- aidcp-edge f51ae9c：scripts/verify-select-mode-live.ts 跑真实 PublishCommandDispatcher 一条 select_mode——BEFORE mode=video/accept 视频类 → ok:true 531ms（点屏内 369,81、未误点屏外克隆、无重试）→ AFTER mode=image/accept=.jpg,.jpeg,.png,.webp（模式真切换）。窄视口 dump 亦取屏内可见 tab。 -->
+- [ ] 5.3 接发布链路簇 3 **整条** `/publish` 端到端（会真发一条帖：审批→填写→提交→落地）——`select_mode` 步已单独验，剩全链路。留待簇 3 一并跑。

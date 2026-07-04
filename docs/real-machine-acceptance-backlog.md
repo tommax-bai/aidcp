@@ -153,9 +153,9 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 **前置**：edge 本地重建到 master `130acd7`（含 `runSelectMode` 双布局稳健修复）；AdsPower 该账号浏览器已登录（`user_id=k1e0ero8`=大白 / `k1e0awu5`=Tmax）。
 **背景**：创作发布页宽/窄双布局导致 tab 重复渲染两套（一套可见一套隐藏），旧 `select_mode`「取第一个文本匹配、不挑可见、只等 12s」→ 生产偶发 `no_target`（recordId=37，2026-07-03）。修复=取可见 + 幂等早退（保守 MODE_STATE）+ 有界重试（20s<云端30s）+ 辅助信号 video 否决 + 诚实失败；**窄布局精确形态是 best-effort、待此处标定**。逻辑单测已锁（587 绿），此处验真机页面行为。
 
-- [ ] **窄布局 tab 形态标定（最大不确定）** — AdsPower 起浏览器拿 debug port → `Page.navigate` 到 `https://creator.xiaohongshu.com/publish/publish?source=official` → **宽窗口和窄窗口各 dump 一次**（改 AdsPower 窗口宽度或 `Emulation.setDeviceMetricsOverride`）：`div.creator-tab`/`div.header-tabs`/`input[type=file]` 的**可见性 / 文案 / class / 激活态标记**。据此确认「上传图文」在窄布局是否收成图标/换文案/换结构；若与宽布局不同，回 `runSelectMode` 收紧窄布局候选、去掉 best-effort 猜测。（只读探针，绝不上传/发布。）
-- [ ] **宽布局取可见 tab 真点中** — 宽窗口下走真实 `select_mode`：默认停「上传视频」→ 点中**可见**的「上传图文」→ 激活 tab 变图文、编辑器（标题/正文/传图区）出现；确认没点到隐藏副本、没 `no_target`。
-- [ ] **窄布局取可见 tab 真点中** — 窄窗口下同上；确认可见性判据（`offsetParent||getClientRects`）在窄布局 `position:fixed` 下仍取到可见 tab。
-- [ ] **幂等早退真机验** — 已在图文模式时再触发 `select_mode`（或发布重入），确认直接成功、不重复点击、不误报 `no_target`。
-- [ ] **接簇 3 端到端** — 与簇 3 发布链路一并跑：`/publish` → 审批 → `navigate_entry`→`select_mode`→ 填写 → 提交 → 落地；确认 `select_mode` 不再是中止点。
-- [ ] **辅助信号 video 否决不误伤** — 观察日志：正常切换后经权威 `MODE_STATE==='image'` 判成功（辅助 IMG 信号一般用不上）；确认没有「点了没切上却因残留图片信号谎报成功」（硬化目标），也没有「真切上了却被 video 否决误判失败」。
+- [x] **窄布局 tab 形态标定（最大不确定）** — ✅ 2026-07-04 CDP 只读 dump（大白，`scripts/calibrate-select-mode-layout.ts`）。**关键发现：隐藏副本不是 display:none 而是移到屏幕外** `rect≈{x:-9758,y:-9934}`（offsetParent 非空、getClientRects 非空）——消费端 `offsetParent||getClientRects` 判据会误判其可见、且它文档序更靠前，旧「取首个」正点了它。**且不是宽/窄差异**：600×900 窄视口 tab 栏形态与 1904 完全一样、克隆仍在 -9758 → 持久屏幕外克隆、与视口无关（创作页 tab 栏无独立窄形态）。**修**：`IS_VISIBLE` 改「与视口相交」判据（`getBoundingClientRect` 非零盒 + 落在视口内），排除屏幕外克隆（edge `f51ae9c`）。
+- [x] **宽布局取可见 tab 真点中** — ✅ 端到端实测（`scripts/verify-select-mode-live.ts` 驱动真实 dispatcher）：默认 `mode=video`/accept 视频类 → `select_mode` `ok:true` **531ms**（点屏内 `369,81`、未误点屏外克隆、无重试）→ `mode=image`/`accept=.jpg,.jpeg,.png,.webp`（模式真切换）。
+- [x] **窄布局取可见 tab 真点中** — ✅ 窄视口（600×900）dump 确认取的是屏内可见 tab（视口相交判据在窄视口下仍正确排除屏幕外克隆）。
+- [ ] **幂等早退真机验** — 已在图文模式时再触发 `select_mode`，确认直接成功、不重复点击、不误报 `no_target`（逻辑单测已锁；真机顺带在簇 3 全链路重入时观察）。
+- [ ] **接簇 3 端到端** — 与簇 3 发布链路一并跑**整条** `/publish`：审批→`navigate_entry`→`select_mode`→填写→提交→落地；`select_mode` 步已单独端到端验、剩全链路把它串起来跑一次真发帖。
+- [ ] **辅助信号 video 否决不误伤** — 真机 `select_mode` 经权威 `MODE_STATE==='image'` 判成功（531ms 实测走的就是权威信号、辅助未用上）；簇 3 全链路时再确认无「点了没切上谎报成功」也无「真切上却被 video 否决误判失败」。
