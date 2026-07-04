@@ -12,5 +12,5 @@
 
 ## 3. Release
 
-- [ ] 3.1 Commit and push control/cloud changes after validation.
-- [ ] 3.2 Deploy cloud from the default branch snapshot and run production healthchecks if runtime changes are accepted.
+- [x] 3.1 Commit and push control/cloud changes after validation. <!-- 2026-07-05 local: aidcp-cloud 8be807b pushed to origin/master; aidcp 4ec576c pushed to origin/main -->
+- [x] 3.2 Deploy cloud from the default branch snapshot and run production healthchecks if runtime changes are accepted. <!-- 2026-07-05 07:47 CST: archived aidcp-cloud HEAD to /opt/aidcp/cloud; backup /opt/aidcp/backups/cloud.bak.20260705-074730.tar.gz and /opt/aidcp/backups/cloud.env.bak.20260705-074730; aidcp-cloud.service active; ports 8787/8090 listening; Feishu ws ready; pg select 1 ok -->
