@@ -69,6 +69,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 6. git / 沟通 / 安全边界
 
 - **默认主动 `git commit` + `git push` 到 origin，并按需直接部署**（本仓 + sub-repo 都适用），推各仓默认分支（本仓 `main`、edge/cloud/console `master`）。**提交 / 推送 / 部署都不需每次问**（用户长期授权，2026-06-27；部署安全序列与红线见 §5）。commit message 末尾带 `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。**仍需先确认**：force-push、非 fast-forward、推到非默认 protected branch。
+- **提交 / 推送 / 部署必须用干净 worktree 做最终确认**：代码改动提交推送后，若当前工作区存在任何无关改动，或处于多任务并行场景，必须从目标提交新建 clean worktree（或等价 `git archive HEAD` 快照）运行部署闸与打包；严禁从脏共享工作区直接 `rsync` / 打包上线，避免把未提交 / 他人改动混入生产。部署仍只从默认分支目标提交的快照走，worktree 用于验证与产物生成，不作为长期开发主干。
 - **语言**：正文默认中文；代码 / 注释 / commit / PR / 命令 / 文件名保持英文。
 - **问题 / 方案的说明方式（默认模式，用户偏好）**：讲逻辑、不用比喻；不点代码内部标识符（变量 / 类 / 函数 / 消息类型名），改用**功能性正文**描述组件与机制（如「执行端 / 决策端 / 监测体」「发命令给执行端的统一出口」「阻塞式 vs 临时离开式打断」）；分点、句子短、让非工程视角也能跟上；确需落到代码时再补具体 `文件:行`。
 - **不记敏感值**：文档 / 提交 / tasks.md 里不写任何 PostgreSQL 密码 / token / 私钥内容，只记路径、服务位置、命令用法、配置读取方式。
