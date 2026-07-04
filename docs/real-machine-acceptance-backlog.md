@@ -43,7 +43,7 @@
 - [ ] **publish-media-upload 8.4** — 运营机真机端到端发一条（**带配图**，验 upload_image / set_cover 落地）
 - [ ] **edit-note-draft-before-publish 8.3** — 草稿在位编辑后再发布，确认一次
 - [ ] **publish-edge-command-runtime 6.2.1** — 飞书全链发布烟测：`/publish` 触发→草稿→飞书审批→`publish.command` 序列逐条回报（`ok/value/error`）→发布落地（URL 跳 `/publish/success`）；未授权时序列截止于提交前（AC-PUB）。注：2026-06-21 曾手动 CDP 直驱跑通发布（标题 20 字截断修复后），待新一轮飞书全链；与上面 8.4 同一次真机 session 可一并覆盖
-- [ ] **edge-companion-ui 真数据流转（handoff §5.1/§5.2）** — 前置：cloud ≥1f013e7 已上 ECS（含 ui.snapshot；随 console-cloud-panel-hardening 的 cloud+console 同步部署批走，单方面先上会破线上后台的 WS 鉴权配对）+ 客户端用 2026-07-03 22:37 重打的安装包。验：①发布卡真数据全链——云端出草稿→客户端发布卡**自动**展开「等你确认」（带编号 #n，与飞书卡「编号」一致）→飞书通过→卡转「择时发布」→发布落地→卡收「上次发布 · 刚刚」+活动流一条+今日小结不计数；飞书拒绝→卡收「暂不发布」；②清 userData 模拟新装机→标题带显真实小红书昵称（@ 前缀）、发布卡直显云端返回的上次发布；③界面红线复核：零审批控件、reminded 永不出现、无事件不造活跃
+- [ ] **edge-companion-ui 真数据流转（handoff §5.1/§5.2）** — 前置**已满足**（2026-07-04 09:06 cloud 1f013e7 与 console 首帧鉴权构建同步上线，healthcheck 全绿）+ 客户端用 2026-07-03 22:37 重打的安装包（`../aidcp-edge/dist-electron/`）。验：①发布卡真数据全链——云端出草稿→客户端发布卡**自动**展开「等你确认」（带编号 #n，与飞书卡「编号」一致）→飞书通过→卡转「择时发布」→发布落地→卡收「上次发布 · 刚刚」+活动流一条+今日小结不计数；飞书拒绝→卡收「暂不发布」；②清 userData 模拟新装机→标题带显真实小红书昵称（@ 前缀）、发布卡直显云端返回的上次发布；③界面红线复核：零审批控件、reminded 永不出现、无事件不造活跃
 
 ## 簇 4 — 浏览闭环行为（真机浏览观察）
 
@@ -108,7 +108,7 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 
 ## 簇 9 — console-cloud-panel-hardening 真机验收（面板加固批，登记于 2026-07-03）
 
-**前置**：cloud 已部署新面板层 + console 已发新构建（**WS 协议 breaking：首帧鉴权取代 ?token=，cloud 与 console 必须同步部署**，否则旧 console 连新 cloud 会 auth_timeout）+ ECS 运维项已执行；一个真实运营会话在跑。
+**前置**：cloud 已部署新面板层 + console 已发新构建（**WS 协议 breaking：首帧鉴权取代 ?token=，cloud 与 console 必须同步部署**，否则旧 console 连新 cloud 会 auth_timeout）+ ECS 运维项已执行；一个真实运营会话在跑。<!-- 2026-07-04 09:06 前置已满足：cloud master 1f013e7 + console 首帧鉴权构建同步上线（cloud restart 切换、healthcheck 全绿、/api 鉴权 401 生效） -->
 
 - [ ] **#3/#24 会话续签** — 活跃使用超过 TTL 不被踢；临近过期自动换新令牌（网络面板见周期性 `/api/auth/refresh`、令牌 exp 推进）；登出后原令牌立即 401 revoked
 - [ ] **#25 WS 首帧鉴权 + 到期断连** — Nginx access log 的 `/ws` 行不含 `?token=`（token 走首帧）；令牌到 exp 时连接被主动 close(4401)、前端不无限重连而是跳登录
@@ -120,9 +120,9 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **#26 httpOnly 迁移评估** — 评估 token 从 localStorage 迁 httpOnly cookie 的条件（跨 8088 console/8090 面板端口的 cookie 作用域需 Nginx same-origin 反代配合），决定是否落地（本批仅留 setToken/getToken 抽象缝）
 
 ### ECS 运维项（部署时执行，对应 tasks 1.8/1.9/1.10）
-- [ ] `AIDCP_PANEL_JWT_TTL_SECONDS` 设值（续签已落地故可短，如 3600；不设则默认 3600）
-- [ ] Nginx `aidcp-console.conf` 去 `/downloads/` 的 `autoindex on`（#27，`curl /downloads/` 应返 403/404）
-- [ ] 生产库补 occurred_at/bucket_start 索引（上机执行 `CREATE INDEX IF NOT EXISTS` 或确认随重启自建）
+- [ ] `AIDCP_PANEL_JWT_TTL_SECONDS` 设值（续签已落地故可短，如 3600；不设则默认 3600）<!-- 2026-07-04 部署时未设值，走代码默认 3600（续签已落地，够用；要更短再上机加 env） -->
+- [x] Nginx `aidcp-console.conf` 去 `/downloads/` 的 `autoindex on`（#27，`curl /downloads/` 应返 403/404）<!-- 2026-07-04 09:06 随 cloud+console 同步部署执行：autoindex off + nginx reload，curl 实测 403；conf 备份 aidcp-console.conf.bak.20260704-090427 -->
+- [x] 生产库补 occurred_at/bucket_start 索引（上机执行 `CREATE INDEX IF NOT EXISTS` 或确认随重启自建）<!-- 2026-07-04 重启后 \di 实测六索引齐备（risk_counters/interaction_feed/llm_token_usage 各 2），随启动自建确认 -->
 
 ## 簇 10 — identity-recheck-page-context-guard 真机验收（身份误判停摆修复，登记于 2026-07-03）
 
