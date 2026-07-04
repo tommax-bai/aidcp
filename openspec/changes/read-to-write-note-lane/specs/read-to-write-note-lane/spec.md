@@ -2,78 +2,75 @@
 
 ## ADDED Requirements
 
-### Requirement: Feed、阅读、写笔记 SHALL 作为互斥场景切换
+### Requirement: Electron 客户端 SHALL 在发布稿件过程中展示写笔记状态
 
-系统 SHALL 将 Feed、阅读详情、写笔记定义为互斥主场景，而不是同时常驻展示的并列模块。Feed 是默认主循环，阅读详情由 Feed 中的笔记进入；写笔记是从 Feed 或阅读详情唤起的创作旁路。进入写笔记旁路时，系统 MUST 记录来源场景，取消、拒绝、触发成功或生成结束后 SHALL 回到来源场景或继续既定返回 feed 流程，MUST NOT 让浏览闭环停在无主场景状态。
+Electron 客户端 SHALL 将发布稿件过程投影为浏览循环中的 `写笔记` 状态。该状态 SHALL 通过既有 UI event / loopStage 机制更新，MUST NOT 新增边云协议字段，MUST NOT 改变发布审批、发布终态或失败回执语义。
 
-#### Scenario: 从 Feed 进入阅读再返回
+#### Scenario: 原子发布指令进入写笔记状态
 
-- **WHEN** 系统从 Feed 选择一篇笔记进入阅读详情
-- **THEN** 当前主场景切换为阅读详情；完成阅读、互动或跳过后，系统返回来源 Feed 并继续刷 feed
+- **WHEN** edge 接收到并执行 `publish.command`
+- **THEN** Electron 客户端当前 loop stage SHALL 切换为 `写笔记`
+- **AND** 该状态更新 SHALL NOT 产生活动流计数
 
-#### Scenario: 阅读详情唤起写笔记
+#### Scenario: 发布快照进入写笔记状态
 
-- **WHEN** 用户或系统在阅读详情中触发写笔记
-- **THEN** 当前笔记作为写笔记旁路的来源；旁路结束后回到该阅读来源并按既定返回 feed 流程续刷
+- **WHEN** Electron 客户端收到发布审批或发布终态的结构化 UI 事件
+- **THEN** 客户端 SHALL 将当前 loop stage 置为 `写笔记`
+- **AND** 发布卡仍 SHALL 按既有 pending / approved / published / rejected / failed 状态展示
 
-#### Scenario: 不得三块主场景同屏常驻
+#### Scenario: 旧整页发布路径也进入写笔记状态
 
-- **WHEN** 控制台或产品界面呈现 Feed、阅读详情和写笔记能力
-- **THEN** 同一时刻 MUST 只有一个主场景占据主要内容区域；写笔记入口可以是按钮、浮层或临时流程，但 MUST NOT 把 Feed 列表、阅读详情和编辑器三块主内容同时常驻展示
+- **WHEN** edge 接收到旧 `publish.request` 整页发布请求
+- **THEN** Electron 客户端当前 loop stage SHALL 同样切换为 `写笔记`
 
-### Requirement: 阅读后写笔记 SHALL 是保守触发的创作旁路而非必经步骤
+### Requirement: Electron 客户端 SHALL 在阅读页发布评论时展示评论创作状态
 
-系统 SHALL 在阅读现场拥有足够上下文后才判定是否触发写笔记旁路。写笔记 MUST 只在当前笔记对账号人设有明确选题、结构、观点或视觉叙事启发时触发；普通笔记仍走互动/跳过/返回续刷。写笔记判定 MUST 不消耗点赞/收藏等互动预算，且 MUST 有本场或日级冷却/上限以避免过度自动创作。
+Electron 客户端 SHALL 将阅读页进入发布评论的过程投影为 `评论创作` 状态。评论创作状态只表达当前正在写/发评论，MUST NOT 把失败行计为评论成功。
 
-#### Scenario: 强参照笔记触发写笔记旁路
+#### Scenario: 评论命令进入评论创作状态
 
-- **WHEN** 当前笔记与账号人设高度相关，且提供可改写为新笔记的清晰选题、结构或观点
-- **THEN** 系统可以触发写笔记旁路，并把当前笔记作为参照输入进入发布生成链
+- **WHEN** edge 接收到 `interaction.comment`
+- **THEN** Electron 客户端当前 loop stage SHALL 切换为 `评论创作`
 
-#### Scenario: 普通笔记不触发写笔记
+#### Scenario: 评论真实成功后仍处于评论创作状态并计数
 
-- **WHEN** 当前笔记只是普通可读内容、泛泛共鸣或信息不足
-- **THEN** 系统 SHALL 不触发写笔记，继续按互动/跳过/返回 feed 主链路推进
+- **WHEN** edge 验证评论编辑器清空且自己的评论行出现
+- **THEN** Electron 客户端 SHALL 记录一条评论成功活动
+- **AND** 评论计数 SHALL 增加 1
+- **AND** 当前 loop stage SHALL 保持为 `评论创作`
 
-#### Scenario: 写笔记不占用互动预算
+#### Scenario: 非创作互动仍使用互动状态
 
-- **WHEN** 写笔记判定发生在阅读完成后
-- **THEN** 该判定 SHALL NOT 扣减点赞、收藏、评论或关注预算；是否触发发布生成由发布侧额度、串行占用和人审约束独立控制
+- **WHEN** edge 执行点赞、收藏、关注或评论点赞
+- **THEN** Electron 客户端 SHALL 使用既有 `互动` 状态
 
-### Requirement: 写笔记旁路 SHALL 复用既有发布链与人审闸
+### Requirement: 阅读完成 SHALL NOT 自动触发写笔记或洗稿
 
-写笔记旁路 SHALL 将来源笔记装配为发布生成输入中的参照笔记，复用既有发布链路完成生成、配图、落待审草稿、人审与下发。系统 MUST 保留参照创作的非照抄红线，MUST 保留 AC-PUB 人审闸，MUST NOT 因为写笔记来自阅读现场而绕过审批或直接发布。触发接口的成功只表示“已受理生成/进入人审链路”，MUST NOT 宣称已经发布。
+系统 SHALL NOT 在阅读完成后仅凭内容强参照程度自动触发写笔记/洗稿发布链。洗稿或参照创作 MUST 来自显式用户/后台动作、飞书命令、排期或既有发布触发器。
 
-#### Scenario: 阅读现场触发生成待审草稿
+#### Scenario: 强参照笔记也不自动发布
 
-- **WHEN** 写笔记旁路被触发且发布链空闲
-- **THEN** 系统以来源笔记为参照生成待审草稿，并通过既有渠道发送人审；审核通过前绝不发布
+- **WHEN** 浏览闭环阅读到一篇对账号人设有启发的笔记
+- **THEN** 系统 SHALL 继续既定阅读、互动、评论或返回 feed 流程
+- **AND** 系统 SHALL NOT 自动调用发布调度器生成参照草稿
 
-#### Scenario: 发布链占用时诚实拒绝
+#### Scenario: 后台手动洗稿仍可触发参照创作
 
-- **WHEN** 发布链正在生成其它草稿或依赖不可用
-- **THEN** 写笔记旁路 SHALL 返回未触发与稳定原因，MUST NOT 静默排队、MUST NOT 把拒绝染成成功
+- **WHEN** 管理后台精选内容池用户点击 `洗稿`
+- **THEN** 系统 SHALL 以该精选内容作为 `referenceNote` 进入既有发布生成和人审链路
+- **AND** 触发成功只表示已受理生成，MUST NOT 表示已经发布
 
-#### Scenario: 触发态与终态分离
+### Requirement: 精选内容池 SHALL 使用洗稿文案并避免操作列溢出
 
-- **WHEN** 写笔记旁路返回 triggered=true
-- **THEN** 该回执只表示生成链已受理；最终是否生成、是否人审通过、是否发布成功，仍 SHALL 由既有发布记录、人审卡和终态回执呈现
+管理后台精选内容池 SHALL 将参照创作动作展示为 `洗稿`，MUST NOT 在该动作上展示 `写笔记`。表格 SHALL 收窄 `纳入原因` 和 `更新时刻` 列且不折行，并为 `操作` 列预留足够宽度以容纳行内按钮。
 
-### Requirement: 写笔记旁路 SHALL 不阻塞返回续刷
+#### Scenario: 行级参照创作展示为洗稿
 
-系统 SHALL 保持“阅读/互动/返回续刷”的主循环优先级。写笔记旁路触发后，浏览主链路 SHOULD 继续返回 feed；生成草稿、人审和发布下发在既有发布链中异步完成。写笔记旁路失败、拒绝或超时 MUST NOT 让浏览闭环卡在详情页或半完成状态。
+- **WHEN** 管理后台展示精选内容池行操作
+- **THEN** 参照创作按钮、确认按钮、成功提示和失败提示 SHALL 使用 `洗稿`
 
-#### Scenario: 触发写笔记后继续返回 feed
+#### Scenario: 表格关键列不折行且操作不溢出
 
-- **WHEN** 阅读详情触发写笔记旁路并得到已受理回执
-- **THEN** 浏览主链路继续执行既定互动/返回流程，最终回到 Feed 续刷；系统不等待发布终态才继续浏览
-
-#### Scenario: 写笔记拒绝后仍续刷
-
-- **WHEN** 写笔记旁路因参照不足、发布占用、缺人设或依赖不可用而拒绝
-- **THEN** 系统记录拒因并继续返回 Feed，MUST NOT 因旁路拒绝阻塞主循环
-
-#### Scenario: 写笔记超时不拖死会话
-
-- **WHEN** 写笔记旁路的生成或判定超过有界时限
-- **THEN** 系统 SHALL 按失败/未触发处理并恢复浏览闭环，MUST NOT 等待无界发布结果
+- **WHEN** 管理后台展示精选内容池列表
+- **THEN** `纳入原因` 与 `更新时刻` 单元格 SHALL 不折行
+- **AND** `操作` 列 SHALL 能容纳 `洗稿`、`评论`、`删除` 三个按钮

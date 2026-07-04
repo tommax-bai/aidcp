@@ -1,29 +1,38 @@
-# Tasks: 阅读后写笔记旁路
+# Tasks: 发布与评论创作状态切换
 
 ## 1. OpenSpec 与设计
 
-- [x] 1.1 新增 `read-to-write-note-lane` spec delta，明确 Feed / 阅读 / 写笔记互斥切换、触发态语义和返回续刷约束。
+- [x] 1.1 修正 `read-to-write-note-lane` spec delta：移除“阅读后强参照自动触发写笔记”语义，改为 Electron 状态投影、后台洗稿文案和列宽约束。
 - [x] 1.2 运行 `openspec validate read-to-write-note-lane --strict`。
+  <!-- 2026-07-05: passed locally on control repo. -->
 
 ## 2. aidcp-cloud
 
-- [x] 2.1 在阅读完成后的决策链中增加创作机会判定；普通笔记不触发，强参照笔记才触发写笔记旁路。
-- [x] 2.2 复用发布调度器的参照创作输入，将当前笔记装配为 `referenceNote`，并保留人设、非照抄和 AC-PUB 人审约束。
-- [x] 2.3 发布链 busy、缺人设、缺标题/正文、依赖不可用时返回稳定拒因并继续浏览，不排队假装成功。
-- [x] 2.4 触发成功后不阻塞返回 feed；生成草稿/人审/发布终态仍走既有发布链回执。
-- [x] 2.5 覆盖单测与浏览闭环集成测试：触发、skip、busy、失败和返回续刷。
-<!-- aidcp-cloud: commit 5cd2eda pushed to origin/master. Validation: npm run test:acceptance passed (44 passed, 1 AIDCP_E2E-gated skipped); npx tsx --test "test/**/*.test.ts" passed (1319 tests); npm run typecheck passed. -->
+- [x] 2.1 删除阅读后自动写作机会角色、LLM prompt 目录项、server 注入和集成测试。
+- [x] 2.2 移除 `read_reference` 来源码；后台参照创作继续使用既有 `manual_reference`。
+- [x] 2.3 跑发布参照链相关测试与 typecheck。
+  <!-- aidcp-cloud 3abdc66: npx tsx --test "test/**/*.test.ts" passed 1320/1320 after rebase; npm run typecheck passed. -->
 
-## 3. aidcp-console
+## 3. aidcp-edge
 
-- [x] 3.1 让精选/阅读场景里的写笔记入口从阅读详情或明确创作按钮唤起，避免 Feed、阅读、写笔记三个主场景同屏堆叠。
-- [x] 3.2 成功提示只表达“已触发生成/请去人审”，拒绝提示映射稳定原因码，终态仍由发布记录/人审卡呈现。
-- [x] 3.3 覆盖页面测试：列表点击进入详情、详情触发写笔记、拒绝不染绿、取消/完成后回到原场景。
-<!-- aidcp-console: commit 55968e7 pushed to origin/master. Validation: npm test passed (36 passed, 1 skipped); npm run typecheck passed; npm run build passed from a clean git snapshot (Vite large chunk warning only). -->
+- [x] 3.1 发布稿件旧整页路径与原子发布指令均向 Electron 投影 `写笔记` loop stage。
+- [x] 3.2 阅读页 `interaction.comment` 与评论真实成功向 Electron 投影 `评论创作` loop stage，失败不计数。
+- [x] 3.3 Electron 渲染层新增 `写笔记` / `评论创作` 状态标签，仍保持单点亮。
+- [x] 3.4 跑 Electron UI event/renderer 相关测试与 typecheck。
+  <!-- aidcp-edge a0a6254: Electron/UI targeted tests passed 70/70; npm run typecheck passed; npm run electron:build:win produced AIDCP Setup 0.2.2.exe; GitHub Actions run 28723426706 built mac DMGs successfully. -->
 
-## 4. 验证
+## 4. aidcp-console
 
-- [x] 4.1 cloud 相关测试与 typecheck。
-- [x] 4.2 console 相关测试与 build/typecheck。
-- [x] 4.3 若实现过程中触及 edge 或协议，补跑对应 edge 测试、acceptance 与协议漂移验证。（未触及 edge / 协议）
-<!-- deploy: ECS 121.89.85.150 at 20260704-220620. Backed up /opt/aidcp/cloud, /opt/aidcp/cloud/.env, and /opt/aidcp/console; deployed cloud 5cd2eda and console dist 55968e7 from clean git snapshots. Health: aidcp-cloud active; ports 8787, 8090, and 8088 listening; console HTTP 200; PG select 1; Feishu WSClient onReady. isales services were not touched. -->
+- [x] 4.1 精选内容池 `create-post` 动作按钮、确认框、成功/失败提示和测试文案改为 `洗稿`。
+- [x] 4.2 `纳入原因` 与 `更新时刻` 列收窄且不折行，`操作` 列放宽避免按钮溢出。
+- [x] 4.3 跑精选内容池测试、typecheck 与 build。
+  <!-- aidcp-console 8947af4: npm test passed 39 + 1 skipped; npm run build passed after updating downloads.ts to 0.2.2. -->
+
+## 5. 发布
+
+- [x] 5.1 提交并推送 cloud / edge / console / OpenSpec 变更。
+  <!-- pushed: aidcp-cloud 3abdc66 -> master; aidcp-edge a0a6254 -> master; aidcp-console 8947af4 -> master. OpenSpec change is committed from control repo with this task record. -->
+- [x] 5.2 按默认分支干净快照部署 cloud 与 console；edge 产物按桌面发布流程处理或记录未发布原因。
+  <!-- cloud deployed from origin/master 3abdc66 at 20260705-075611; backup /opt/aidcp/cloud.bak.20260705-075611.tar.gz and env backup /opt/aidcp/cloud.env.bak.20260705-075611; aidcp-cloud.service active, 8787/8090 listening, /api/health ok, PG cache and Feishu WSClient ready in journal. -->
+  <!-- console deployed from dist for 8947af4 at 20260705-075646; backup /opt/aidcp/console.bak.20260705-075646.tar.gz; 8088 root and /api/health ok. -->
+  <!-- edge desktop 0.2.2 installers uploaded to /opt/aidcp/downloads/: AIDCP-0.2.2-arm64.dmg (95422377), AIDCP-0.2.2.dmg (101467018), AIDCP Setup 0.2.2.exe (78497635); all returned HTTP 200 via 127.0.0.1:8088/downloads. -->
