@@ -74,6 +74,9 @@
 
 **前置**：账号跑一段时间、精选库有沉淀。
 
+- [ ] **curated-note-actions 5.3** — 精选笔记触发洗稿：飞书人审卡出现→通过→边端发布成功，草稿正文与参照有可辨识差异
+- [ ] **curated-note-actions 5.4** — 精选笔记触发内容评论：搜索定位命中→人审→发布→去重记账；观察搜索命中率与标题截断策略
+- [ ] **curated-note-actions 5.5** — 精选笔记触发带群评论：口令追加、审=发；抽查拒绝路径（壳行 / 已评论 / 未配口令 / 评论行禁用）
 - [ ] **curated-admission-eval-roles** — 评论链路 `curated_comment_evaluator` 真机补采样本（单测已覆盖，机会性补）
 - [ ] **curated-inspiration-corpus** — Phase 2b：边端逐条评论赞数 / 笔记评论数上报（11.1/11.2 deferred，搭下次评论抽取便车）
 

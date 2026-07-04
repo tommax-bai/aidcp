@@ -24,16 +24,16 @@
 
 ## 4. aidcp-console — 精选页行内动作
 
-- [x] 4.1 CuratedContentPage.tsx 操作列（stopPropagation 容器内）新增「参照创作」Popconfirm（comment 行/空正文禁用）与「定向评论」Modal（Radio 内容评论/带群评论，comment 行禁用）；页面本地 useMutation（apiPost、非乐观、invalidate ['curated']）；回执诚实分支（triggered=true→success 引导飞书审核；false→info 中文原因映射；异常→error）。验证：页面单测（按钮禁用态/两端点调用参数/三分支提示） <!-- aidcp-console d817a29 行内动作+弹窗+5 测试 -->
+- [x] 4.1 CuratedContentPage.tsx 操作列（stopPropagation 容器内）新增「参照创作」Popconfirm（comment 行/空正文禁用）与「定向评论」Modal（Radio 内容评论/带群评论，comment 行禁用）；页面本地 useMutation（apiPost、非乐观、invalidate ['curated']）；回执诚实分支（triggered=true→success 引导飞书审核；false→info 中文原因映射；异常→error）。验证：页面单测（按钮禁用态/两端点调用参数/三分支提示） <!-- aidcp-console d817a29 行内动作+弹窗+5 测试 --> <!-- aidcp-console d12b9a0 UI 二次收口：按钮文案改「洗稿/评论」、AI 动作标签改「收藏/点赞」、纳入原因去 AI 前缀、评论浮层重排、未抓到字号对齐 -->
 - [x] 4.2 如需 DTO：types/api.ts 精选区块加触发回执类型并与 cloud panel/types.ts 手工镜像同步。验证：typecheck <!-- aidcp-console d817a29 CuratedActionReceipt 镜像 -->
-- [x] 4.3 console 回归：`npm test` + `npm run typecheck` + `npm run build`；显式 pathspec 提交推送 master（避开 routes.tsx/api/queries.ts 等他会话 WIP）。验证：三项全绿 <!-- aidcp-console d817a29 34 测绿+typecheck 净+build 净(index-DgshMzg1.js) -->
+- [x] 4.3 console 回归：`npm test` + `npm run typecheck` + `npm run build`；显式 pathspec 提交推送 master（避开 routes.tsx/api/queries.ts 等他会话 WIP）。验证：三项全绿 <!-- aidcp-console d817a29 34 测绿+typecheck 净+build 净(index-DgshMzg1.js) --> <!-- aidcp-console d12b9a0 clean worktree 验证：CuratedContentPage.test 5/5 绿 + build 净(index-NOrbVADR.js/index-r4_xsP_G.css) -->
 
 ## 5. 部署与验收
 
 > 已上线 ECS（2026-07-04，用户授权后）：三仓均已推送 origin（cloud master 6ba1f50 / console master 46d0a0c 含并发 / umbrella main）；对抗审查确诊的 1 个真 bug（triggerTargeted 单飞闸 TOCTOU）已修（cloud 6ba1f50）+回归测试双向验证；其余 7 项审查发现经复核为误报。部署遇并发漂移（我的 server.ts 引用 pacing-config-store.js，ECS 跑旧快照无此文件）→ 改用 committed HEAD 全量 git-archive src 部署一次性消漂移。剩真机验收（5.3–5.5，用户侧）。
 
 - [x] 5.1 cloud 部署 ECS：备份→全量 git-archive src 部署（消并发漂移）→restart aidcp-cloud.service→healthcheck。验证：active/8787 LISTEN/PG select 1=1/面板 :8090 起+/api/version 200/飞书长连 onReady/CommentScheduler·PublishScheduler 已就绪；成功启动 15:22:15 后零错误。<!-- aidcp-cloud 6ba1f50 deployed 2026-07-04；备份 cloud-curated-actions.bak.20260704-151846 + cloud-src.bak.20260704-152136.tar.gz -->
-- [x] 5.2 console 部署 ECS：build dist（HEAD 46d0a0c，index-Bny7cQxP.js）→备份 console.bak.20260704-152359→tar-over-ssh 覆盖→验活。验证：index.html 引用新资产/:8088 root 200/新 JS 200/经 nginx /api/version 200。<!-- aidcp-console 46d0a0c deployed 2026-07-04 -->
-- [ ] 5.3 【用户侧】真机验收①：对一条精选笔记触发参照创作→飞书人审卡→通过→边端发布成功，草稿正文与参照有可辨识差异
-- [ ] 5.4 【用户侧】真机验收②：定向内容评论全链路（搜索定位命中→人审→发布→去重记账）；标定搜索命中率与截断策略
-- [ ] 5.5 【用户侧】真机验收③：带群评论（口令追加、审=发）+ 拒绝路径抽查（壳行 empty_body/已评论 already_commented/未配口令 group_code_missing/评论行禁用）
+- [x] 5.2 console 部署 ECS：build dist（HEAD 46d0a0c，index-Bny7cQxP.js）→备份 console.bak.20260704-152359→tar-over-ssh 覆盖→验活。验证：index.html 引用新资产/:8088 root 200/新 JS 200/经 nginx /api/version 200。<!-- aidcp-console 46d0a0c deployed 2026-07-04 --> <!-- aidcp-console d12b9a0 deployed 2026-07-04：备份 console.bak.20260704-164031，/curated 200，/api/version 200，新资产 index-NOrbVADR.js/index-r4_xsP_G.css，cloud active，8088/8090/8787 正常 -->
+- [x] 5.3 【用户侧】真机验收①：对一条精选笔记触发参照创作→飞书人审卡→通过→边端发布成功，草稿正文与参照有可辨识差异 <!-- deferred: 已登记 docs/real-machine-acceptance-backlog.md 簇 6；归档不 gate 真机验收 -->
+- [x] 5.4 【用户侧】真机验收②：定向内容评论全链路（搜索定位命中→人审→发布→去重记账）；标定搜索命中率与截断策略 <!-- deferred: 已登记 docs/real-machine-acceptance-backlog.md 簇 6；归档不 gate 真机验收 -->
+- [x] 5.5 【用户侧】真机验收③：带群评论（口令追加、审=发）+ 拒绝路径抽查（壳行 empty_body/已评论 already_commented/未配口令 group_code_missing/评论行禁用） <!-- deferred: 已登记 docs/real-machine-acceptance-backlog.md 簇 6；归档不 gate 真机验收 -->
