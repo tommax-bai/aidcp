@@ -34,3 +34,4 @@
 - [x] 5.3 运行 edge 相关测试与 typecheck。
 - [x] 5.4 运行 console 相关测试与 build / typecheck。
 <!-- validated: openspec strict; cloud acceptance/full/typecheck; edge acceptance/full/typecheck; console test/build -->
+<!-- deployed 2026-07-04 21:27 CST: cloud 67a0acb to ECS via clean git archive; health active + 8787/8090 listening + Feishu WS ready + PG select 1. console 5c9c5f5 dist deployed to /opt/aidcp/console with assets/index-AGAanTVI.js and 8088/api/version OK. edge 4559fe7 packaged locally as dist-electron/AIDCP Setup 0.2.1.exe. -->
