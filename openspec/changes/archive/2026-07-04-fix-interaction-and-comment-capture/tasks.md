@@ -48,5 +48,5 @@
 ## 8. 收口
 
 - [x] 8.1 `openspec validate fix-interaction-and-comment-capture --strict`（valid）。
-- [ ] 8.2 land（rebase→ff master）+ push（edge/cloud master、本仓 main）；cloud 按安全序列部署。
-- [ ] 8.3 archive。
+- [x] 8.2 land（worktree→ff）+ push：edge `46a204e` / cloud `82941b9` 均在 origin master、本仓 `c0f698d` 在 origin main。cloud 部署：并发方 console-cloud-panel-hardening 部署整仓 master（`565d8d4`，含本 change）于 2026-07-04 09:06 上线；已核我六处改动逐字在线 + 服务 active + 飞书长连 + 8787 + PG`select 1` + isales 未碰。 <!-- cloud 82941b9 2026-07-04 deployed (随 565d8d4 整仓 master 部署) -->
+- [x] 8.3 archive。
