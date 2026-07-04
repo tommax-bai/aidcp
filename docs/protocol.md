@@ -53,7 +53,7 @@
 | --- | --- | --- | --- |
 | `hello` | edge → cloud | `welcome` | 边缘上线握手，声明能力 |
 | `welcome` | cloud → edge | — | 握手确认，下发 sessionId |
-| `ui.snapshot` | cloud → edge | — | 陪伴界面数据回填（昵称/最近发布/审批状态；hello 注册完成后全量 + 审批变化时增量） |
+| `ui.snapshot` | cloud → edge | — | 陪伴界面数据回填（昵称/最近发布/审批状态/账号今日用量；hello 注册完成后全量 + 审批变化时增量） |
 | `plan.request` | edge → cloud | `plan.response` | 高层目标拆解为步骤 |
 | `plan.response` | cloud → edge | — | 返回有序步骤清单 |
 | `select.request` | edge → cloud | `select.response` | 元素清单 + 目标，请云端选一个 |
@@ -170,7 +170,14 @@
 {
   "account": { "id": "acc-1", "nickname": "晚风手作" },   // 可选；昵称空则整个字段不带（宁缺毋假）
   "lastPublish": { "title": "上一篇", "at": 1730000000000 }, // 可选；最近一次成功发布（at=epoch ms，为草稿入库时间近似）
-  "publish": { "state": "pending", "title": "候审笔记", "code": "#83" } // 可选；审批状态增量
+  "publish": { "state": "pending", "title": "候审笔记", "code": "#83" }, // 可选；审批状态增量
+  "dailyUsage": { // 可选；账号今日用量，边缘优先用它替代本机实时计数
+    "asOf": 1730000001000,
+    "quotaLevel": "normal", // conservative / normal / aggressive
+    "totals": { "view": 10, "like": 3, "collect": 1, "comment": 0, "follow": 2, "publish": 1 },
+    "quotas": { "view": 150, "like": 50, "collect": 25, "comment": 8, "follow": 15, "publish": 1 },
+    "saturated": ["publish"] // used >= 当前档位日上限
+  }
 }
 ```
 发送时机：① 边缘 hello 注册完成后（连接进推送表且 `welcome` 已回发之后，避开「hello 处理中推送
@@ -181,6 +188,10 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 结构化行打到 stdout，由 Electron 壳解析驱动标题带与发布卡（解析器 `src/electron/ui-events.cjs`）。
 已拒草稿在 hello 快照不回放（拒绝时刻已实时推过，重启不翻旧账）。推送为 best-effort：账号无在线
 边缘即如实放弃，持久态由下次 hello 快照补齐。
+
+`dailyUsage` 由云端按账号聚合当天数据：浏览/点赞/收藏/评论/关注来自 `risk_counters`，发帖来自发布日志；
+`quotas` 来自该账号当前风控档位的有效日上限，`saturated` 表示对应维度已达到或超过当前档位上限。
+字段可缺省，旧边缘会忽略；新 Electron 客户端在该字段到达前回落展示本机实时计数。
 
 ### 3.2 任务规划
 
