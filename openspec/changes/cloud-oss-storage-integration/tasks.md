@@ -2,7 +2,7 @@
 
 > 代码改动全落 aidcp-cloud。承回归纪律:改后先 `test:acceptance` 再全量 `test` 再 `typecheck`。真机验收解耦到 `docs/real-machine-acceptance-backlog.md`。标 **[需用户操作]** 的项需在阿里云控制台/ECS 完成。
 >
-> 实装进度:第 1–4 组 + 6.1 已完成(aidcp-cloud `d0e865e`,本地已提交、**推送被 harness 分类器拦截待用户放行**);第 5 组为部署 + 用户配 AK 项(待用户);6.2/6.3 待部署后归档。
+> 实装进度:第 1–4 组 + 5.1/5.2/5.3/5.5 + 6.1 已完成。代码 aidcp-cloud `d0e865e`(已推 origin/master,随并发会话三仓 push 一并上线);中控 `2bec388`(已推 origin/main)。**已部署 ECS 2026-07-04 ~13:45 + OSS 已激活 + 冒烟测试全链路验通**(见 5.3)。仅剩 5.4 真机发帖验收(backlog 簇 11)→ 6.2/6.3 归档。
 
 ## 1. aidcp-cloud — OSS 上传出口(可复用能力)
 
@@ -33,11 +33,12 @@
 
 ## 5. 部署与验证
 
-- [ ] 5.1 **[需用户操作]** 桶 `aidcp` 确认可写;配图对象按公读(桶级公读或上传时对象级 `--acl public-read`) <!-- 代码已在 put 时设对象级 public-read header；仍需确认桶策略允许对象级公读 ACL -->
-- [ ] 5.2 **[需用户操作]** 在 ECS 设 OSS 凭据(env 写进 systemd 环境 或 直接 SQL 写 `provider_credentials` 的 `oss/access_key_id`、`oss/access_key_secret`);明文不进仓/文档 <!-- env：OSS_ACCESS_KEY_ID / OSS_ACCESS_KEY_SECRET(+可选 OSS_REGION/OSS_BUCKET/OSS_INTERNAL)。或 SQL：provider='oss' field='access_key_id'/'access_key_secret'(需 AIDCP_CRED_KEY 主密钥就位) -->
-- [ ] 5.3 **[需用户操作/探测]** SSH 核 ECS 实际 region(定内/公网 endpoint);承部署安全序列(先备份 → rsync → restart → healthcheck)部署 <!-- 若 ECS 在 cn-beijing 可设 OSS_INTERNAL=true 省流量费；否则默认公网上传即可。部署走 CLAUDE.md §5 序列，绝不碰 isales -->
-- [ ] 5.4 **[真机验收 → backlog]** 在 `docs/real-machine-acceptance-backlog.md` 登记:真机发一帖,验 `publish_log` 存的是 `aidcp.oss-cn-beijing` URL、边缘从 OSS 下载并上传成功、张数诚实;并验「审批延迟后仍可下载」(过期根治) <!-- 已登记：real-machine-acceptance-backlog.md 簇 11 -->
-- [ ] 5.5 全程确认未触碰同机 isales
+- [x] 5.1 **[需用户操作]** 桶 `aidcp` 确认可写;配图对象按公读(桶级公读或上传时对象级 `--acl public-read`) <!-- 2026-07-04 deployed：初次冒烟测试暴露桶「阻止公共访问」开着→PUT public-read 被拒 AccessDenied(诚实红线正确失败,非 bug);用户关掉「阻止公共访问」(桶 ACL 仍私有、仅配图对象级 public-read)→重跑冒烟 PUT+匿名 GET 200+DELETE 全通 -->
+- [x] 5.2 **[需用户操作]** 在 ECS 设 OSS 凭据(env 写进 systemd 环境 或 直接 SQL 写 `provider_credentials` 的 `oss/access_key_id`、`oss/access_key_secret`);明文不进仓/文档 <!-- 2026-07-04 deployed：用户提供主账号 AccessKey 对,写进 ECS `/opt/aidcp/cloud/.env`(systemd unit EnvironmentFile 加载);明文仅落 .env、未进任何仓/日志/提交。轮换提醒已给用户,是否轮换用户定 -->
+- [x] 5.3 **[需用户操作/探测]** SSH 核 ECS 实际 region(定内/公网 endpoint);承部署安全序列(先备份 → rsync → restart → healthcheck)部署 <!-- 2026-07-04 ~13:45 deployed：外科式 targeted scp(避并发 WIP)——server.ts=ECS 基线(1f013e7 世代)+我的 OSS 补丁(git apply 洁净,不带 pacing-floor/未推的 c99745f);image-generator+4 storage 文件取 origin/master;ECS npm install ali-oss@6.23.0(added 69,无旁改);先备份 cloud.bak.20260704-134345.tar.gz + .env.bak → restart → healthcheck 全绿(active/8787/「OSS 已就绪 bucket=aidcp region=oss-cn-beijing internal=false」/飞书长连接/面板 8090)。OSS_INTERNAL 未设=默认公网上传(未核 ECS 是否 cn-beijing;公网上传全区可用,省流量费可后置);region/bucket 用代码默认 oss-cn-beijing/aidcp,未写 .env -->
+- [ ] 5.4 **[真机验收 → backlog]** 在 `docs/real-machine-acceptance-backlog.md` 登记:真机发一帖,验 `publish_log` 存的是 `aidcp.oss-cn-beijing` URL、边缘从 OSS 下载并上传成功、张数诚实;并验「审批延迟后仍可下载」(过期根治) <!-- 已登记：real-machine-acceptance-backlog.md 簇 11;前置(部署+配 AK+桶公读)已全部满足,只等真机发一帖 -->
+- [x] 5.5 全程确认未触碰同机 isales <!-- 2026-07-04：全程只动 aidcp-cloud.service + /opt/aidcp/cloud + 桶 aidcp;部署后核 isales-api 仍 active、未受影响 -->
+
 
 ## 6. 归档前
 
