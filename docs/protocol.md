@@ -171,12 +171,36 @@
   "account": { "id": "acc-1", "nickname": "晚风手作" },   // 可选；昵称空则整个字段不带（宁缺毋假）
   "lastPublish": { "title": "上一篇", "at": 1730000000000 }, // 可选；最近一次成功发布（at=epoch ms，为草稿入库时间近似）
   "publish": { "state": "pending", "title": "候审笔记", "code": "#83" }, // 可选；审批状态增量
-  "dailyUsage": { // 可选；账号今日用量，边缘优先用它替代本机实时计数
+  "dailyUsage": { // 可选；账号用量与限额窗口，边缘优先用它替代本机实时计数
     "asOf": 1730000001000,
     "quotaLevel": "normal", // conservative / normal / aggressive
     "totals": { "view": 10, "like": 3, "collect": 1, "comment": 0, "follow": 2, "publish": 1 },
     "quotas": { "view": 150, "like": 50, "collect": 25, "comment": 8, "follow": 15, "publish": 1 },
-    "saturated": ["publish"] // used >= 当前档位日上限
+    "saturated": ["publish"], // 向后兼容：以上三项是 day 窗口别名
+    "windows": {
+      "session": {
+        "active": true,
+        "startedAt": 1730000000000,
+        "totals": { "like": 1, "collect": 0, "comment": 0, "follow": 0 },
+        "quotas": { "like": 10, "collect": 5, "comment": 2, "follow": 3 },
+        "saturated": []
+      },
+      "minute": {
+        "totals": { "view": 3, "like": 3, "collect": 0, "comment": 0, "follow": 0, "publish": 0 },
+        "quotas": { "view": 8, "like": 3, "collect": 2, "comment": 1, "follow": 1, "publish": 1 },
+        "saturated": ["like"]
+      },
+      "hour": {
+        "totals": { "view": 10, "like": 3, "collect": 1, "comment": 0, "follow": 2, "publish": 1 },
+        "quotas": { "view": 60, "like": 13, "collect": 7, "comment": 2, "follow": 4, "publish": 1 },
+        "saturated": []
+      },
+      "day": {
+        "totals": { "view": 10, "like": 3, "collect": 1, "comment": 0, "follow": 2, "publish": 1 },
+        "quotas": { "view": 150, "like": 50, "collect": 25, "comment": 8, "follow": 15, "publish": 1 },
+        "saturated": ["publish"]
+      }
+    }
   }
 }
 ```
@@ -189,9 +213,11 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 已拒草稿在 hello 快照不回放（拒绝时刻已实时推过，重启不翻旧账）。推送为 best-effort：账号无在线
 边缘即如实放弃，持久态由下次 hello 快照补齐。
 
-`dailyUsage` 由云端按账号聚合当天数据：浏览/点赞/收藏/评论/关注来自 `risk_counters`，发帖来自发布日志；
-`quotas` 来自该账号当前风控档位的有效日上限，`saturated` 表示对应维度已达到或超过当前档位上限。
-字段可缺省，旧边缘会忽略；新 Electron 客户端在该字段到达前回落展示本机实时计数。
+`dailyUsage.totals` / `quotas` / `saturated` 保持为日窗口别名，用于旧边缘兼容；新客户端优先读取 `windows`。
+`windows.minute|hour|day` 由云端按账号聚合风险流水：浏览/点赞/收藏/评论/关注来自 `risk_counters`，发帖来自发布日志；
+`quotas` 来自该账号当前风控档位的有效窗口上限，`saturated` 表示对应维度已达到或超过当前窗口上限。
+`windows.session` 来自当前在线连接的单场预算快照；没有活跃会话时可带 `active:false` 作为配置上下文，但不代表正在消耗预算。
+字段可缺省，旧边缘会忽略；新 Electron 客户端在该字段到达前回落展示本机实时计数，缺窗口元数据时不臆造分钟/小时/单场上限。
 
 ### 3.2 任务规划
 
