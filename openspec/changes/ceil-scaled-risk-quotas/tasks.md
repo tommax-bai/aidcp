@@ -11,5 +11,5 @@
 
 ## 3. Release
 
-- [ ] 3.1 Commit and push the control/cloud changes.
-- [ ] 3.2 Deploy cloud from the default branch snapshot and run production healthchecks.
+- [x] 3.1 Commit and push the control/cloud changes. <!-- aidcp-cloud 5987b91 is contained in origin/master; aidcp control spec committed/pushed as 6b32fc2. -->
+- [x] 3.2 Deploy cloud from the default branch snapshot and run production healthchecks. <!-- Deployed aidcp-cloud origin/master 3abdc66 (contains 5987b91) to ECS 121.89.85.150. Backups: /opt/aidcp/backups/aidcp-cloud-20260705-075704.tgz, /opt/aidcp/backups/aidcp-cloud-20260705-075704.env, and /opt/aidcp/cloud.prev-20260705-075818. Healthchecks: systemd active/running, :8787 listening, Feishu WS ready in journal, PG select 1, deployed quotas.ts uses Math.ceil. -->
