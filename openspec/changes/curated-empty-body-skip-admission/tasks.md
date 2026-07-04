@@ -15,3 +15,9 @@
 
 - [x] 3.1 将精选页清理文案调整为“历史遗留空正文壳行清理”，避免暗示新数据仍会常规产生壳行。 <!-- aidcp-console 00f8901 src/pages/CuratedContentPage.tsx + test comment wording -->
 - [x] 3.2 运行 console typecheck 或相关验证。 <!-- passed: npx vitest run src/pages/CuratedContentPage.test.tsx; npm run typecheck. Vitest emitted existing jsdom getComputedStyle warnings but tests passed. -->
+
+## 4. 发布与部署
+
+- [x] 4.1 推送 control/cloud/console 变更。 <!-- aidcp 8846277 pushed to origin/main; aidcp-cloud 5d9b11a pushed to origin/master; aidcp-console 00f8901 pushed to origin/master -->
+- [x] 4.2 部署到 ECS `121.89.85.150`。 <!-- 2026-07-04 21:51 CST clean tar deploy; cloud backup /opt/aidcp/cloud.bak.20260704-215130.tar.gz and /opt/aidcp/cloud/.env.bak.20260704-215130; console backup /opt/aidcp/console.bak.20260704-215130.tar.gz; aidcp-cloud.service restarted active -->
+- [x] 4.3 完成线上健康检查。 <!-- service active; ports 8787/8090/8088 listening; /api/version returned panelApiVersion=2; console / returned HTTP 200; postgres select 1 ok; journal confirms CuratedContentStore, WebSocket, panel API, and Feishu WS ready -->
