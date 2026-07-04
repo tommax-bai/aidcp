@@ -64,7 +64,7 @@ This file is the Codex-facing mapping of `CLAUDE.md`. Keep `CLAUDE.md` as the le
 ## 6. Git, Communication, Security
 
 - Preserve user and other-session changes. Do not revert unrelated dirty files.
-- Commit/push/deploy only when the task requires it or the user asks for that level of completion; still follow the repo's safety sequence.
+- Default closeout for code changes is automatic: after implementation, run the relevant validation, commit, push to the default branch, and deploy/publish when the changed service or artifact is production-facing.
 - Confirm before force-push, non-fast-forward pushes, or pushing to non-default/protected branches.
 - If the working tree has unrelated changes, use explicit pathspecs and/or a clean worktree/archive snapshot for final verification and deployment packaging.
 - Default prose language is Chinese. Code, comments, commit messages, PR text, commands, and file names stay in English unless the surrounding file establishes otherwise.
@@ -72,7 +72,15 @@ This file is the Codex-facing mapping of `CLAUDE.md`. Keep `CLAUDE.md` as the le
 - Never record secrets in docs, commits, or tasks. Record paths, service names, commands, and config-loading methods instead.
 - End user-facing work with a plain-language summary of what changed, system impact, and next step.
 
-## 7. Parallel Development
+## 7. Automatic Closeout
+
+- For code-bearing changes, the default finish line is: implementation complete, tests/typecheck appropriate to the touched repo pass, commit, push, and deploy/publish if runtime behavior changes.
+- For OpenSpec-backed work, update the relevant `tasks.md` with commit SHA, validation notes, deployment/publish notes, and any deviation from the proposal.
+- Deploy/publish only through the documented safe path for the affected artifact: cloud ECS deployment, console static release, edge desktop/package release, or docs/spec-only no-op.
+- Stop and ask before destructive database changes, secret/key changes, production data deletion, tests failing but user still wants release, unclear publish target, force-push, non-fast-forward push, or any action that may affect unrelated `isales` services.
+- Documentation-only or spec-only changes are still committed and pushed by default, but they do not trigger runtime deployment unless they are part of a release procedure.
+
+## 8. Parallel Development
 
 - Parallel work convention: one Codex session = one OpenSpec change = one branch = one worktree, all sharing the same change name.
 - Sibling repo worktrees live at `../<repo>.wt/<change-name>`. Control-repo OpenSpec changes are mostly additive and may share the main checkout when safe.
@@ -84,7 +92,7 @@ This file is the Codex-facing mapping of `CLAUDE.md`. Keep `CLAUDE.md` as the le
 - After deployment and validation, archive the change and remove obsolete worktrees/branches. A worktree without a matching active change is an orphan.
 - See `docs/parallel-dev-worktrees.md` and helper scripts such as `scripts/new-change`, `scripts/spawn-change`, and `scripts/land-change` for operational details.
 
-## 8. Codex Mapping Notes
+## 9. Codex Mapping Notes
 
 - Claude slash commands in `CLAUDE.md` such as `/opsx:propose`, `/opsx:apply`, `/opsx:archive`, `/impl`, and `/claim` are historical shortcuts. In Codex, perform the same workflow through natural-language intent, OpenSpec CLI, file edits, and repo helper scripts.
 - Do not install an OpenSpec skill just to follow this process. The source of truth is this repo plus the OpenSpec CLI.
