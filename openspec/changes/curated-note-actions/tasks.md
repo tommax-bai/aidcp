@@ -30,8 +30,10 @@
 
 ## 5. 部署与验收
 
-- [ ] 5.1 cloud 部署 ECS：备份→targeted-scp 本变更源文件→restart aidcp-cloud.service→healthcheck（active+8787+飞书长连+PG）。验证：healthcheck 全绿
-- [ ] 5.2 console 部署 ECS：build dist→备份 /opt/aidcp/console→tar-over-ssh 覆盖→curl :8088 新资产 hash 200。验证：验活通过
+> 已上线 ECS（2026-07-04，用户授权后）：三仓均已推送 origin（cloud master 6ba1f50 / console master 46d0a0c 含并发 / umbrella main）；对抗审查确诊的 1 个真 bug（triggerTargeted 单飞闸 TOCTOU）已修（cloud 6ba1f50）+回归测试双向验证；其余 7 项审查发现经复核为误报。部署遇并发漂移（我的 server.ts 引用 pacing-config-store.js，ECS 跑旧快照无此文件）→ 改用 committed HEAD 全量 git-archive src 部署一次性消漂移。剩真机验收（5.3–5.5，用户侧）。
+
+- [x] 5.1 cloud 部署 ECS：备份→全量 git-archive src 部署（消并发漂移）→restart aidcp-cloud.service→healthcheck。验证：active/8787 LISTEN/PG select 1=1/面板 :8090 起+/api/version 200/飞书长连 onReady/CommentScheduler·PublishScheduler 已就绪；成功启动 15:22:15 后零错误。<!-- aidcp-cloud 6ba1f50 deployed 2026-07-04；备份 cloud-curated-actions.bak.20260704-151846 + cloud-src.bak.20260704-152136.tar.gz -->
+- [x] 5.2 console 部署 ECS：build dist（HEAD 46d0a0c，index-Bny7cQxP.js）→备份 console.bak.20260704-152359→tar-over-ssh 覆盖→验活。验证：index.html 引用新资产/:8088 root 200/新 JS 200/经 nginx /api/version 200。<!-- aidcp-console 46d0a0c deployed 2026-07-04 -->
 - [ ] 5.3 【用户侧】真机验收①：对一条精选笔记触发参照创作→飞书人审卡→通过→边端发布成功，草稿正文与参照有可辨识差异
 - [ ] 5.4 【用户侧】真机验收②：定向内容评论全链路（搜索定位命中→人审→发布→去重记账）；标定搜索命中率与截断策略
 - [ ] 5.5 【用户侧】真机验收③：带群评论（口令追加、审=发）+ 拒绝路径抽查（壳行 empty_body/已评论 already_commented/未配口令 group_code_missing/评论行禁用）
