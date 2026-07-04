@@ -29,3 +29,7 @@ Validation:
 - `openspec validate edge-account-daily-quota-summary --strict`
 - `aidcp-cloud`: `npm run typecheck`; `npx tsx --test test/comm/ui-snapshot.test.ts`
 - `aidcp-edge`: `npm run typecheck`; `npx tsx --test test/flows/ui-event-lines.test.ts test/electron/ui-events.test.ts test/electron/companion-ui.test.ts`
+
+Deployment:
+
+- 2026-07-04 deployed cloud default-branch snapshot `67a0acb` to ECS `/opt/aidcp/cloud`; healthcheck passed: `aidcp-cloud.service` active, `:8787` listening, Feishu WS ready, PostgreSQL `select 1` ok. Edge/control changes pushed: edge `c422586`, control `667c410`.
