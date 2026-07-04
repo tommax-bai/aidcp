@@ -147,3 +147,15 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **未配置零回归** — 若某环境未设 OSS 凭据，启动日志见「未配置 OSS 凭据…沿用 provider 临时 URL」，发帖仍走原路径不报错（回滚路径 = 撤 OSS 凭据即回退）
 - [ ] **内/公网 endpoint（若开 OSS_INTERNAL）** — ECS 同区且设 `OSS_INTERNAL=true` 时上传走内网省流量，但存库/发边缘的 URL 仍是公网 endpoint（可匿名访问）
 - [ ] **未触碰同机 isales** — 部署与运行全程确认 isales 服务/目录/端口未受影响
+
+## 簇 12 — publish-select-mode-layout-robust 真机验收（发布选「上传图文」跨双布局稳健，登记于 2026-07-04）
+
+**前置**：edge 本地重建到 master `130acd7`（含 `runSelectMode` 双布局稳健修复）；AdsPower 该账号浏览器已登录（`user_id=k1e0ero8`=大白 / `k1e0awu5`=Tmax）。
+**背景**：创作发布页宽/窄双布局导致 tab 重复渲染两套（一套可见一套隐藏），旧 `select_mode`「取第一个文本匹配、不挑可见、只等 12s」→ 生产偶发 `no_target`（recordId=37，2026-07-03）。修复=取可见 + 幂等早退（保守 MODE_STATE）+ 有界重试（20s<云端30s）+ 辅助信号 video 否决 + 诚实失败；**窄布局精确形态是 best-effort、待此处标定**。逻辑单测已锁（587 绿），此处验真机页面行为。
+
+- [ ] **窄布局 tab 形态标定（最大不确定）** — AdsPower 起浏览器拿 debug port → `Page.navigate` 到 `https://creator.xiaohongshu.com/publish/publish?source=official` → **宽窗口和窄窗口各 dump 一次**（改 AdsPower 窗口宽度或 `Emulation.setDeviceMetricsOverride`）：`div.creator-tab`/`div.header-tabs`/`input[type=file]` 的**可见性 / 文案 / class / 激活态标记**。据此确认「上传图文」在窄布局是否收成图标/换文案/换结构；若与宽布局不同，回 `runSelectMode` 收紧窄布局候选、去掉 best-effort 猜测。（只读探针，绝不上传/发布。）
+- [ ] **宽布局取可见 tab 真点中** — 宽窗口下走真实 `select_mode`：默认停「上传视频」→ 点中**可见**的「上传图文」→ 激活 tab 变图文、编辑器（标题/正文/传图区）出现；确认没点到隐藏副本、没 `no_target`。
+- [ ] **窄布局取可见 tab 真点中** — 窄窗口下同上；确认可见性判据（`offsetParent||getClientRects`）在窄布局 `position:fixed` 下仍取到可见 tab。
+- [ ] **幂等早退真机验** — 已在图文模式时再触发 `select_mode`（或发布重入），确认直接成功、不重复点击、不误报 `no_target`。
+- [ ] **接簇 3 端到端** — 与簇 3 发布链路一并跑：`/publish` → 审批 → `navigate_entry`→`select_mode`→ 填写 → 提交 → 落地；确认 `select_mode` 不再是中止点。
+- [ ] **辅助信号 video 否决不误伤** — 观察日志：正常切换后经权威 `MODE_STATE==='image'` 判成功（辅助 IMG 信号一般用不上）；确认没有「点了没切上却因残留图片信号谎报成功」（硬化目标），也没有「真切上了却被 video 否决误判失败」。
