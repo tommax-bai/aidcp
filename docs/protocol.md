@@ -402,7 +402,8 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
     {
       "index": 0, "title": "周末好去处", "author": "小张",
       "likeCount": 1234, "collectCount": 200,
-      "coverDesc": "封面描述", "noteId": "n123"   // coverDesc / author / noteId 可选
+      "coverDesc": "封面描述", "noteId": "n123",  // coverDesc / author / noteId 可选
+      "isVideo": false                            // 可选：卡片是否为视频；供后续 note.detail 推导媒体类型
     }
   ]
 }
@@ -412,6 +413,7 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 ```jsonc
 {
   "noteId": "n123", "title": "周末好去处", "content": "完整正文…",
+  "mediaType": "image_text",                      // 可选：image_text / video；缺省按 image_text 兼容老边端
   "author": "小张", "authorId": "u456",       // author / authorId 可选
   "likeCount": 1234, "collectCount": 200,
   "authorFollowed": true,                      // 可选：作者区关注按钮当下真实态（已关注/互关→true）。
