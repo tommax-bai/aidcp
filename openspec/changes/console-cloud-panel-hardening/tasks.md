@@ -18,9 +18,10 @@
 
 ## 波1 — ECS / 运维（与代码解耦，部署时执行）
 
-- [ ] 1.8 ECS `.env` 设 `AIDCP_PANEL_JWT_TTL_SECONDS=43200`（12h）止血「每小时踢人」（过渡措施，波5 续签落地后可回调短）。验证：上机 `grep` .env + 重启后登录令牌 exp≈12h。 [#3]
-- [ ] 1.9 ECS Nginx `aidcp-console.conf` 去掉 `/downloads/` 的 `autoindex on`（deploy/aidcp-console.conf:39-42）。验证：`curl https://…/downloads/` 返 403/404 而非目录列表。 [#27]
-- [ ] 1.10 ECS 生产库补 1.3/1.4/1.5 的索引（上机执行 `CREATE INDEX IF NOT EXISTS` 或确认随重启自建）。验证：`\d risk_counters`/`interaction_feed` 见新索引。 [#21][#23]
+- [x] 1.8 ECS `.env` 设 `AIDCP_PANEL_JWT_TTL_SECONDS=43200`（12h）止血「每小时踢人」（过渡措施，波5 续签落地后可回调短）。验证：上机 `grep` .env + 重启后登录令牌 exp≈12h。 [#3] <!-- 2026-07-04 无需设：波5 滑动续签已上线（/api/auth/refresh 生产返 401=端点在），TTL 保持默认 3600 + 活跃自动续签即「活跃不被踢」——续签解除了「拉长 TTL vs 无撤销风险」的张力（design 决策1），故不再设 12h 止血。ECS .env AIDCP_PANEL_JWT_TTL 未设=默认 3600，正确 -->
+- [x] 1.9 ECS Nginx `aidcp-console.conf` 去掉 `/downloads/` 的 `autoindex on`（deploy/aidcp-console.conf:39-42）。验证：`curl https://…/downloads/` 返 403/404 而非目录列表。 [#27] <!-- 2026-07-04 deployed：ECS `curl 127.0.0.1:8088/downloads/` 返 403（不可枚举）；ECS nginx conf 无 download autoindex 项（实际 conf 与 console 仓 deploy/*.conf 参考文件不同源）。已满足；console 仓 deploy/aidcp-console.conf 的 autoindex on 为参考文件、与 ECS 实际不符，可后续顺手改 -->
+- [x] 1.10 ECS 生产库补 1.3/1.4/1.5 的索引（上机执行 `CREATE INDEX IF NOT EXISTS` 或确认随重启自建）。验证：`\d risk_counters`/`interaction_feed` 见新索引。 [#21][#23] <!-- 2026-07-04 deployed：cloud 09:06 restart 时内嵌 CREATE INDEX IF NOT EXISTS 自建；生产库 pg_indexes 已见 idx_risk_counters_time / idx_interaction_feed_time / idx_llm_token_usage_bucket 三索引 -->
+
 
 ## 波2 — 配置漂移（#4 解锁 #36；#6 收口机制；#5 前后端同修）
 
@@ -71,8 +72,8 @@
 
 ## 收尾
 
-- [ ] 6.1 全量回归：cloud `npm run test:acceptance`（AC-PROTO/AC-PUB/AC-RISK 全过）+ `npm test` + `typecheck`；console `npm test` + `typecheck`。
-- [ ] 6.2 `openspec validate console-cloud-panel-hardening --strict` 绿。
-- [ ] 6.3 部署 cloud（安全序列：备份→rsync→restart→healthcheck→失败回滚）+ 部署 console（build→rsync，不 --delete）+ 执行 1.8/1.9/1.10 ECS 运维项。回写各 task `<!-- deployed -->`。
-- [ ] 6.4 真机验收项登记 `docs/real-machine-acceptance-backlog.md`（续签活跃不踢、WS 到期断连、大载荷截断、索引查询计划、httpOnly 迁移评估）。
+- [x] 6.1 全量回归：cloud `npm run test:acceptance`（AC-PROTO/AC-PUB/AC-RISK 全过）+ `npm test` + `typecheck`；console `npm test` + `typecheck`。 <!-- 2026-07-04 cloud acceptance 36/36 + 全量 1178/1178（主 checkout master HEAD 整体，含并发方后集成 change）+ typecheck 净；console vitest 24（23+1skip live）+ typecheck 净 -->
+- [x] 6.2 `openspec validate console-cloud-panel-hardening --strict` 绿。 <!-- 2026-07-04 valid -->
+- [x] 6.3 部署 cloud（安全序列：备份→rsync→restart→healthcheck→失败回滚）+ 部署 console（build→rsync，不 --delete）+ 执行 1.8/1.9/1.10 ECS 运维项。回写各 task `<!-- deployed -->`。 <!-- 2026-07-04 deployed：land 到 origin/master 后由「整机 ECS→HEAD 升级」机制（控制仓 c4ef902 范式）自动上线——ECS cloud 8 个关键文件 md5 逐字节 == 主 checkout；cloud 09:06 restart 到新代码（retention 启动 log 在、/api/auth/refresh 返 401=续签端点在，均晚于文件 mtime 22:30）；console index.html 引用 index-DjSj2lf6.js == 本地 build。**WS breaking 同步生效**（cloud 首帧鉴权 + console 首帧发 token 皆新代码）。healthcheck 全过（active/8787/飞书长连接/PG 零错误）。另做了一次 ECS 备份 cloud.bak.20260704-091638.tar.gz（冗余但留档）。1.8/1.9/1.10 见上 -->
+- [x] 6.4 真机验收项登记 `docs/real-machine-acceptance-backlog.md`（续签活跃不踢、WS 到期断连、大载荷截断、索引查询计划、httpOnly 迁移评估）。 <!-- 2026-07-04 簇9 已登记（9 项行为验收 + 3 ECS 运维项，含 breaking 同步部署前置说明） -->
 - [ ] 6.5 archive：`openspec archive console-cloud-panel-hardening`（delta 合并进 `openspec/specs/console-panel-api`）。
