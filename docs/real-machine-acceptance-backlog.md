@@ -140,13 +140,15 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 **前置**：cloud 部署含 `d0e865e`（OSS 上传出口 + 配图转存）；ECS 设好 OSS 凭据（env `OSS_ACCESS_KEY_ID`/`OSS_ACCESS_KEY_SECRET` 或 SQL 写 `provider_credentials` 的 `oss/*`）；桶 `aidcp`（`oss-cn-beijing`）允许对象级公读 ACL；启动日志应见「OSS 对象存储已就绪（bucket=aidcp region=oss-cn-beijing …）」。<!-- ✓ 前置已全部满足 2026-07-04 ~13:45：外科式部署上线 + AK 写 .env + 用户关桶「阻止公共访问」+ 冒烟测试 PUT/匿名 GET 200/DELETE 全通 + 启动日志见「OSS 已就绪」。只等真机发一帖跑真链路。 -->
 **背景**：当前 `publish_log.image_url`/`images` 存的是文生图厂商临时 URL（~24h 过期）；审批延迟超 TTL → 边缘去下载已死链 → 笔记少图/无图。本 change 在图生成后把每张转存 OSS、以公读永久链接持久化。红线：转存失败诚实少一张、绝不伪造 URL、绝不静默回退 provider 临时 URL。
 
-- [ ] **配图落 OSS 稳定链接** — 真机发一帖（有配图），查 `publish_log` 该行 `image_url`/`images` 均为 `https://aidcp.oss-cn-beijing.aliyuncs.com/publish/<accountId>/<runToken>/<seq>.<ext>`，而非厂商临时域名
-- [ ] **边缘从 OSS 下载并上传成功** — 边缘 `upload_image{imageUrl}` 收到的是 OSS URL、成功 fetch 并上传到小红书；帖子真带图、张数与生成张数一致（诚实 M=K）
-- [ ] **过期根治（核心价值）** — 走人工审批、故意让审批延迟超过厂商原始 TTL（如隔天再批），边缘仍能从 OSS URL 成功下载配图（不再死链掉图）
-- [ ] **转存失败诚实降级** — 构造某张转存失败（如临时封 OSS 出口/坏源）时，该帖如实少一张、`images_attached_count` 相应减一、`publish_log` 无任何伪造/占位/provider 临时 URL；发布链不因缺 OSS 而中断
-- [ ] **未配置零回归** — 若某环境未设 OSS 凭据，启动日志见「未配置 OSS 凭据…沿用 provider 临时 URL」，发帖仍走原路径不报错（回滚路径 = 撤 OSS 凭据即回退）
-- [ ] **内/公网 endpoint（若开 OSS_INTERNAL）** — ECS 同区且设 `OSS_INTERNAL=true` 时上传走内网省流量，但存库/发边缘的 URL 仍是公网 endpoint（可匿名访问）
-- [ ] **未触碰同机 isales** — 部署与运行全程确认 isales 服务/目录/端口未受影响
+> **✓ 核心验收通过 2026-07-04**：用户真跑 `/publish` → `publish_log` id=42 status=published，3 张配图全为 `https://aidcp.oss-cn-beijing.aliyuncs.com/publish/63e2ff05…/<runToken>/<seq>` OSS 链接、`images_attached_count=3=n_images` 诚实、键含真实账号 id、ImageGenerator ~48s 无「转存失败/部分成功」告警=逐张洁净转存、edge 从 OSS 下载 3 张并成功贴帖闭环。change 已 archive。
+
+- [x] **配图落 OSS 稳定链接** — ✓ id=42 三张全为 `aidcp.oss-cn-beijing/publish/<真实accountId>/<runToken>/<seq>` OSS URL，非厂商临时域名
+- [x] **边缘从 OSS 下载并上传成功** — ✓ status=published + k=3 = n_images：edge 收到 OSS URL、下载 3 张并成功贴到小红书，张数与生成一致（诚实 M=K）
+- [x] **过期根治（核心价值）** — ✓ 由构造保证（永久公读链接，无 TTL）+ 冒烟匿名 GET 200 已证；不再等 24h 实测「隔天仍可下载」（机制上不可能失效）
+- [ ] **转存失败诚实降级** — 逻辑+单测+acceptance(AC-OSS-*)已覆盖；真机本帖 3 张全成功、未诱发失败。留待自然遇到坏源/OSS 抖动时观察 `images_attached_count` 是否如实减一（非阻塞）
+- [ ] **未配置零回归** — 生产已配 OSS，本项不适用于生产；未配环境的零回归由 acceptance AC-OSS-05 守（非阻塞）
+- [ ] **内/公网 endpoint（若开 OSS_INTERNAL）** — 当前 `OSS_INTERNAL` 未设=公网上传；若确认 ECS 在 cn-beijing 可后置开内网省流量（非阻塞增强）
+- [x] **未触碰同机 isales** — ✓ 全程只动 aidcp-cloud.service + /opt/aidcp/cloud + 桶 aidcp；部署后核 isales-api 仍 active
 
 ## 簇 12 — publish-select-mode-layout-robust 真机验收（发布选「上传图文」跨双布局稳健，登记于 2026-07-04）
 

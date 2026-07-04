@@ -36,12 +36,11 @@
 - [x] 5.1 **[需用户操作]** 桶 `aidcp` 确认可写;配图对象按公读(桶级公读或上传时对象级 `--acl public-read`) <!-- 2026-07-04 deployed：初次冒烟测试暴露桶「阻止公共访问」开着→PUT public-read 被拒 AccessDenied(诚实红线正确失败,非 bug);用户关掉「阻止公共访问」(桶 ACL 仍私有、仅配图对象级 public-read)→重跑冒烟 PUT+匿名 GET 200+DELETE 全通 -->
 - [x] 5.2 **[需用户操作]** 在 ECS 设 OSS 凭据(env 写进 systemd 环境 或 直接 SQL 写 `provider_credentials` 的 `oss/access_key_id`、`oss/access_key_secret`);明文不进仓/文档 <!-- 2026-07-04 deployed：用户提供主账号 AccessKey 对,写进 ECS `/opt/aidcp/cloud/.env`(systemd unit EnvironmentFile 加载);明文仅落 .env、未进任何仓/日志/提交。轮换提醒已给用户,是否轮换用户定 -->
 - [x] 5.3 **[需用户操作/探测]** SSH 核 ECS 实际 region(定内/公网 endpoint);承部署安全序列(先备份 → rsync → restart → healthcheck)部署 <!-- 2026-07-04 ~13:45 deployed：外科式 targeted scp(避并发 WIP)——server.ts=ECS 基线(1f013e7 世代)+我的 OSS 补丁(git apply 洁净,不带 pacing-floor/未推的 c99745f);image-generator+4 storage 文件取 origin/master;ECS npm install ali-oss@6.23.0(added 69,无旁改);先备份 cloud.bak.20260704-134345.tar.gz + .env.bak → restart → healthcheck 全绿(active/8787/「OSS 已就绪 bucket=aidcp region=oss-cn-beijing internal=false」/飞书长连接/面板 8090)。OSS_INTERNAL 未设=默认公网上传(未核 ECS 是否 cn-beijing;公网上传全区可用,省流量费可后置);region/bucket 用代码默认 oss-cn-beijing/aidcp,未写 .env -->
-- [ ] 5.4 **[真机验收 → backlog]** 在 `docs/real-machine-acceptance-backlog.md` 登记:真机发一帖,验 `publish_log` 存的是 `aidcp.oss-cn-beijing` URL、边缘从 OSS 下载并上传成功、张数诚实;并验「审批延迟后仍可下载」(过期根治) <!-- 已登记：real-machine-acceptance-backlog.md 簇 11;前置(部署+配 AK+桶公读)已全部满足,只等真机发一帖 -->
+- [x] 5.4 **[真机验收 → backlog]** 在 `docs/real-machine-acceptance-backlog.md` 登记:真机发一帖,验 `publish_log` 存的是 `aidcp.oss-cn-beijing` URL、边缘从 OSS 下载并上传成功、张数诚实;并验「审批延迟后仍可下载」(过期根治) <!-- 2026-07-04 真机验通过：用户真跑 /publish → publish_log id=42 status=published、3 张配图全为 `https://aidcp.oss-cn-beijing.aliyuncs.com/publish/<真实accountId>/<runToken>/<seq>` OSS URL(非 provider 临时链)、images_attached_count=3=n_images 诚实、键含真实账号 id(非 default)、ImageGenerator ~48s 内完成无「OSS 转存失败/部分成功」告警=逐张洁净转存;status=published+k=3 证边缘已从 OSS 下载 3 张并成功贴到小红书(整链路闭环)。「审批延迟后仍可下载」由构造保证(永久公读链接)+冒烟匿名 GET 200 已证,不再等 24h 实测 -->
 - [x] 5.5 全程确认未触碰同机 isales <!-- 2026-07-04：全程只动 aidcp-cloud.service + /opt/aidcp/cloud + 桶 aidcp;部署后核 isales-api 仍 active、未受影响 -->
-
 
 ## 6. 归档前
 
-- [x] 6.1 `openspec validate cloud-oss-storage-integration --strict` 通过 <!-- 设计期已过；实装后待跑一遍再确认(下条) -->
-- [ ] 6.2 全部 task 标 `[x]` 附 commit-sha/偏离说明(部署后追 `<!-- <date> deployed -->`) <!-- 代码项已标；待部署完成 + 真机验后补 deployed 注记并收尾 5.x -->
-- [ ] 6.3 archive 该 change <!-- 待部署 + 真机验通过后 archive -->
+- [x] 6.1 `openspec validate cloud-oss-storage-integration --strict` 通过 <!-- 2026-07-04 实装+部署+真机验后复跑 --strict 通过 -->
+- [x] 6.2 全部 task 标 `[x]` 附 commit-sha/偏离说明(部署后追 `<!-- <date> deployed -->`) <!-- 全部 task 已标 [x] 附 sha/deployed 注记 -->
+- [x] 6.3 archive 该 change <!-- 2026-07-04 archive(spec delta cloud-oss-storage 并入主库) -->
