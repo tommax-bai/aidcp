@@ -473,8 +473,10 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
                                                // 诚实置空：地址栏无 token 时不带、绝不用裸 id 拼假链。
   "images": [
     { "index": 0, "url": "https://sns-img-qc.xhscdn.com/...", "width": 1080, "height": 1440, "alt": "封面图" }
-  ]                                            // 可选（change curated-reference-images）：图文轮播图片引用，按视觉顺序、去重、有界。
+  ],                                           // 可选（change curated-reference-images）：图文轮播图片引用，按视觉顺序、去重、有界。
                                                // 只上报 URL/基础元数据；边缘不下载，抓不到则省略/空数组，不编造。
+  "refreshOnly": true                          // 可选（change complete-curated-reference-image-capture）：仅用于翻图后的图片快照刷新。
+                                               // 云端 MUST NOT 计为新的 view，也不触发普通详情决策链。
 }
 ```
 
