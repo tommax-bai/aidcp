@@ -13,4 +13,4 @@
 
 ## 3. Closeout
 
-- [ ] 3.1 Commit, push, and deploy the console rollback.
+- [x] 3.1 Commit, push, and deploy the console rollback. <!-- 2026-07-05: aidcp-console 57a5b7c pushed to master; deployed clean worktree dist to ECS at 20260705-104005; backup /opt/aidcp/console.bak.20260705-104005.tar.gz; 8088 root 200 and /api/health ok. -->
