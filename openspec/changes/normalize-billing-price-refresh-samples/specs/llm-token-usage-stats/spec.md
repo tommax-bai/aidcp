@@ -8,6 +8,8 @@ The manual provider/model price refresh SHALL derive prices from provider billin
 - Cloud MAY add provider-specific deterministic aliases for billing labels, but MUST NOT use fuzzy similarity, public list prices, or guessed fallback prices.
 - Alias matching MUST be specific enough to identify the model family and concrete variant; generic provider or family fragments alone MUST NOT match.
 - If billing details do not contain a matching token quantity and a billing-derived amount from the same row, cloud SHALL return `no_billing_sample` for that target and MUST NOT write a price snapshot.
+- Cloud SHALL include discounted zero-payable Aliyun billing rows so DashScope/Bailian token samples hidden by `PretaxAmount=0` can still be considered.
+- Cloud MAY derive Aliyun row amount from positive same-row gross amount fields such as `PretaxGrossAmount` when discounted net amount fields are zero, but MUST NOT write a zero-price snapshot from discounted zero amount alone.
 - Cloud MAY derive the row amount from same-row token unit price and token quantity when the provider rounds the billed amount to zero, but MUST NOT use public list prices or guessed fallback prices.
 - The console SHALL surface skipped reason counts from the refresh response, not only the number of skipped model-days.
 
@@ -26,6 +28,14 @@ The manual provider/model price refresh SHALL derive prices from provider billin
 - **WHEN** an operator triggers the manual provider model pricing refresh
 - **THEN** cloud returns `skipped[].reason='no_billing_sample'` for that target
 - **AND** cloud writes no synthetic or public-price snapshot for that target.
+
+#### Scenario: Aliyun discounted token row uses same-row gross amount
+
+- **GIVEN** local usage contains `provider='dashscope'` and model `qwen3.7-plus`
+- **AND** Aliyun billing details contain matching Bailian token rows with `UsageUnit='千tokens'`, `PretaxAmount=0`, and positive `PretaxGrossAmount`
+- **WHEN** an operator triggers the manual provider model pricing refresh
+- **THEN** cloud derives the price snapshot from the same-row gross billing amount
+- **AND** cloud MUST NOT skip the row only because the discounted payable amount is zero.
 
 #### Scenario: Volcengine rounded amount uses same-row token unit price
 

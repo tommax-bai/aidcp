@@ -7,6 +7,7 @@ The sample shows two distinct cases:
 - Aliyun billing returned no DashScope token billing rows for the checked days, so cloud must keep skipping those models honestly.
 - Volcengine returned Ark/Doubao token rows, but their billing labels were names like `Doubao-Seed-2.0-pro` and `Doubao-Seed-Character`, while runtime model ids were `doubao-seed-2-0-pro-260215` and `doubao-seed-character-260628`. Exact substring matching therefore missed valid token rows.
 - Volcengine detail rows used `Count` with `Unit=千tokens` for token quantity, and rounded tiny `PretaxAmount` values to `0.00` while retaining same-row `Price` / `PriceUnit=千tokens`.
+- A later Aliyun parameter probe found DashScope/Bailian rows are present when zero-charge rows are included. Their discounted `PretaxAmount` can be `0`, while `PretaxGrossAmount` carries the billing-derived pre-discount token amount.
 
 The console currently collapses all skip details into `跳过 N 个模型日`, hiding the reason returned by cloud.
 
@@ -44,18 +45,22 @@ The console currently collapses all skip details into `跳过 N 个模型日`, h
 
    If Aliyun billing returns no DashScope rows, or a billing row lacks token quantity or bill amount, refresh returns `no_billing_sample`. Existing latest-price fallback in `/api/llm-usage` continues to cover models that already have historical snapshots.
 
-4. **Use same-row unit price only when billed amount is rounded away.**
+4. **Include discounted Aliyun rows and prefer billing-derived gross amount when net amount is zero.**
+
+   Aliyun `DescribeInstanceBill` with `IsHideZeroCharge=true` can hide DashScope/Bailian token rows whose discounted payable amount is zero. Cloud should request those rows and derive price from positive same-row gross amount fields such as `PretaxGrossAmount` when net amount fields are zero. This still uses only provider billing detail and avoids zero-price snapshots caused by coupons, packages, or discounts.
+
+5. **Use same-row unit price only when billed amount is rounded away.**
 
    Cloud may derive the effective amount as `Price × token quantity in the price unit` when the same provider billing row has token units, a non-negative rounded bill amount, and a token-denominated `PriceUnit`. This remains billing-derived and avoids a public price table or guessed fallback. Non-token units such as image counts are ignored by token price refresh.
 
-5. **Report skip reasons in the console, not only skip counts.**
+6. **Report skip reasons in the console, not only skip counts.**
 
    The response already includes `skipped[].reason`. The console will aggregate those reasons into operator-facing labels. A refresh with zero writes and skips should use warning-level copy instead of a green-only "updated" impression.
 
 ## Risks / Trade-offs
 
 - [Overmatching Volcengine variants] -> Keep aliases provider-specific, require concrete normalized variant strings, and cover observed pro/character samples in tests.
-- [DashScope remains pending] -> This is correct if the billing account/API has no DashScope token rows; the UI will now say `无账单样本` instead of hiding the cause.
+- [DashScope remains pending] -> If zero-charge rows are included and the billing API still has only zero quantity or no gross amount for a target, the UI will now say `无账单样本` instead of hiding the cause.
 - [Provider billing fields drift] -> Row normalization accepts token quantities from observed `Count` / `Unit` and standard usage fields. New tests should pin the observed `ConfigName` / `ChargeItemCode` / `PriceUnit` Volcengine format.
 - [Message gets too long] -> Show reason counts in the toast and keep full per-model detail in the API response for later richer UI if needed.
 
