@@ -22,4 +22,5 @@
 
 - [x] 4.1 Run relevant cloud tests and typecheck. <!-- 2026-07-05 local: focused npx tsx --test test/risk-controller.test.ts test/comm/ui-snapshot.test.ts (25 pass); npm run test:acceptance (44 pass); npm test (1346 pass); npm run typecheck; openspec strict valid -->
 - [x] 4.2 Run relevant edge tests and typecheck. <!-- 2026-07-05 local: focused npx tsx --test test/flows/ui-event-lines.test.ts test/electron/companion-ui.test.ts (40 pass); npm run test:acceptance (13 pass); npm test (615 pass); npm run typecheck -->
-- [ ] 4.3 Update task notes with commits, validation, and deployment/publish outcome.
+- [x] 4.3 Update task notes with commits, validation, and deployment/publish outcome.
+  <!-- aidcp 4ea9dda created OpenSpec artifacts; aidcp-cloud e0c4a9f pushed to origin/master and deployed 2026-07-05 16:38 CST from clean origin/master archive to /opt/aidcp/cloud; backup /opt/aidcp/backups/cloud.bak.20260705-163803.tar.gz and /opt/aidcp/backups/cloud.env.bak.20260705-163803; health active, 8787/8090 listening, Feishu WS ready, PG select 1 ok, /api/health ok, remote source contains refreshAt/quotaReleaseAfterMs/dailyUsage刷新, isales-api/isales-scheduler/isales-engine active. aidcp-edge eb12ac7 pushed to origin/master; desktop package not published because no release target was specified. -->
