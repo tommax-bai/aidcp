@@ -22,6 +22,6 @@
 
 - [x] Update protocol documentation.
 - [x] Run relevant cloud and edge tests/typechecks.
-- [ ] Commit and push control/cloud/edge changes.
-- [ ] Deploy cloud runtime if server behavior changed and verify production health.
-- [ ] Rebuild/publish the Windows Electron installer.
+- [x] Commit and push control/cloud/edge changes.
+- [x] Deploy cloud runtime if server behavior changed and verify production health.
+- [x] Rebuild/publish the Windows Electron installer.
