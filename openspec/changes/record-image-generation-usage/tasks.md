@@ -18,5 +18,5 @@
 
 - [x] 4.1 Run relevant cloud tests/build. <!-- validation: npx tsx --test focused tests passed; npm test passed (1354); npm run build passed. -->
 - [x] 4.2 Run relevant console tests/build. <!-- validation: npx vitest run src/types/usageLabels.test.ts passed; npm test passed (50 passed, 1 skipped); npm run build passed; existing jsdom getComputedStyle and Vite chunk-size warnings only. -->
-- [ ] 4.3 Commit and push control/cloud/console changes.
-- [ ] 4.4 Deploy cloud and publish console if validation passes.
+- [x] 4.3 Commit and push control/cloud/console changes. <!-- pushed: aidcp-cloud feb24c3 to master; aidcp-console f822b98 to master; aidcp control 4c34d92 to main. -->
+- [x] 4.4 Deploy cloud and publish console if validation passes. <!-- deployed 2026-07-05 17:11 CST: backups /opt/aidcp/backups/cloud.bak.20260705-171113.tar.gz, cloud.env.bak.20260705-171113, console.bak.20260705-171113.tar.gz; cloud scoped rsync src/server.ts + src/publish-agent/roles/image-generator.ts, restart active since 17:12:50; ports 8787/8090/8088 listening; /api/health ok; PG select 1 ok; Feishu WS onReady; console /usage 200 with bundle assets/index-D43xnZpN.js and image-usage copy present; isales-scheduler/isales-api active by read-only check. -->
