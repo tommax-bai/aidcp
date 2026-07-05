@@ -181,21 +181,32 @@
       "session": {
         "active": true,
         "startedAt": 1730000000000,
-        "totals": { "like": 1, "collect": 0, "comment": 0, "follow": 0 },
+        "windowMs": 600000,
+        "expiresAt": 1730000600000,
+        "totals": { "view": 3, "like": 1, "collect": 0, "comment": 0, "follow": 0, "publish": 0 },
         "quotas": { "like": 10, "collect": 5, "comment": 2, "follow": 3 },
         "saturated": []
       },
       "minute": {
+        "startedAt": 1729999941000,
+        "windowMs": 60000,
+        "expiresAt": 1730000061000,
         "totals": { "view": 3, "like": 3, "collect": 0, "comment": 0, "follow": 0, "publish": 0 },
         "quotas": { "view": 8, "like": 3, "collect": 2, "comment": 1, "follow": 1, "publish": 1 },
         "saturated": ["like"]
       },
       "hour": {
+        "startedAt": 1729996401000,
+        "windowMs": 3600000,
+        "expiresAt": 1730003601000,
         "totals": { "view": 10, "like": 3, "collect": 1, "comment": 0, "follow": 2, "publish": 1 },
         "quotas": { "view": 60, "like": 13, "collect": 7, "comment": 2, "follow": 4, "publish": 1 },
         "saturated": []
       },
       "day": {
+        "startedAt": 1729958400000,
+        "windowMs": 86400000,
+        "expiresAt": 1730044800000,
         "totals": { "view": 10, "like": 3, "collect": 1, "comment": 0, "follow": 2, "publish": 1 },
         "quotas": { "view": 150, "like": 50, "collect": 25, "comment": 8, "follow": 15, "publish": 1 },
         "saturated": ["publish"]
@@ -218,6 +229,8 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 `quotas` 来自该账号当前风控档位的有效窗口上限，`saturated` 表示对应维度已达到或超过当前窗口上限。
 `windows.session` 来自当前在线连接的单场预算快照；没有活跃会话时可带 `active:false` 作为配置上下文，但不代表正在消耗预算。
 字段可缺省，旧边缘会忽略；新 Electron 客户端在该字段到达前回落展示本机实时计数，缺窗口元数据时不臆造分钟/小时/单场上限。
+
+`startedAt/windowMs/expiresAt` 为窗口时效元数据；分钟/小时是滚动窗口，Electron 可在过期且未收到新快照时停止展示过期的“已达上限”。`windows.session.totals` 可包含浏览/发帖等无单场上限动作的真实计数，但不得为这些动作复制其他窗口的上限。
 
 ### 3.2 任务规划
 
@@ -455,9 +468,13 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
   "likeCount": 1234, "collectCount": 200,
   "authorFollowed": true,                      // 可选：作者区关注按钮当下真实态（已关注/互关→true）。
                                                // 边缘在 note.open 探测、只读取上报；云端据此在评估进主页前短路已关注作者。缺省→回退原流程。
-  "url": "https://www.xiaohongshu.com/explore/n123?xsec_token=…"
+  "url": "https://www.xiaohongshu.com/explore/n123?xsec_token=…",
                                                // 可选（change interaction-feed-enrichment）：带 xsec_token 的详情页链接，供面板「按笔记互动」可点跳转。
                                                // 诚实置空：地址栏无 token 时不带、绝不用裸 id 拼假链。
+  "images": [
+    { "index": 0, "url": "https://sns-img-qc.xhscdn.com/...", "width": 1080, "height": 1440, "alt": "封面图" }
+  ]                                            // 可选（change curated-reference-images）：图文轮播图片引用，按视觉顺序、去重、有界。
+                                               // 只上报 URL/基础元数据；边缘不下载，抓不到则省略/空数组，不编造。
 }
 ```
 
