@@ -19,3 +19,4 @@
 - [x] 3.1 运行 cloud 相关单测。 <!-- aidcp-cloud 8d9536b after rebase: npm run test:acceptance 44 pass; npx tsx --test "test/**/*.test.ts" 1330 pass -->
 - [x] 3.2 运行 cloud typecheck。 <!-- aidcp-cloud 8d9536b npm run typecheck pass -->
 - [x] 3.3 回看 console 角色配置页是否数据驱动无需改；若需要类型/文案镜像，再补 console 验证。 <!-- 管理后台角色页走 /api/roles + prompt preview provider；cloud 目录/预览测试已覆盖 -->
+- [x] 3.4 从默认分支快照部署 cloud 到 ECS 并完成健康检查。 <!-- 2026-07-05 deployed aidcp-cloud origin/master 8d9536b to ECS 121.89.85.150 via clean git archive staging swap; backups: /opt/aidcp/backups/aidcp-cloud-20260705-124253.tgz and /opt/aidcp/backups/aidcp-cloud-20260705-124253.env; prev dir /opt/aidcp/cloud.prev-20260705-124253; healthchecks: aidcp-cloud active, :8787 and 127.0.0.1:8090 listening, Feishu WS onReady, PG select 1, production PublishOrchestrator lists ReferenceAnalyzer/FaithfulRewritePlanner/FaithfulDraftWriter/FidelityAuditor. -->
