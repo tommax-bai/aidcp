@@ -21,4 +21,4 @@
 
 ## 4. Closeout
 
-- [ ] 4.1 Commit, push, deploy cloud and console, and record validation/deployment notes.
+- [x] 4.1 Commit, push, deploy cloud and console, and record validation/deployment notes. <!-- 2026-07-05: aidcp-cloud 2eddb24 and aidcp-console 8633aa8 pushed; deployed to ECS with package timestamp 20260705-110306 after remote backups (/opt/aidcp/cloud.bak.20260705-110306.tar.gz, /opt/aidcp/cloud.env.bak.20260705-110306, /opt/aidcp/console.bak.20260705-110306.tar.gz). aidcp-cloud.service active; /api/health ok; console index serves index-Bl1H_ylZ.js and index-r4_xsP_G.css; authenticated /api/llm-usage returned rows with provider and costEstimate fields. -->
