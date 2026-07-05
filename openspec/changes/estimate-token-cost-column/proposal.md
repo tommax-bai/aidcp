@@ -1,23 +1,24 @@
-# Proposal: Token Usage Estimated Cost Column
+# Proposal: Billing-Only Token Cost Estimates
 
 ## Why
 
-管理后台已经能按日期 / 账号 / 角色 / 模型查看 token 消耗，但运营判断规模化成本时还要手动把输入、输出 token 乘以各厂商单价。这个计算不需要精确到财务账单，只需要在用量明细里给出一个接近量级的成本信号，帮助及时发现高成本角色或模型。
+The usage page should not show hard-coded public model prices as a fallback. Public list prices drift, discounts and resource packages change the real cost, and a stale fallback looks more authoritative than it is.
+
+Cost should only be shown when it is backed by billing-center data or a billing-derived internal price cache.
 
 ## What Changes
 
-- 在 console `/usage` 的 token 消耗明细表中，在「总 token」后新增「预估成本」列。
-- 预估成本按行内 `promptTokens` / `completionTokens` 和内置公开刊例价粗算，单位为人民币元。
-- 已知模型显示 `~¥...`；未知模型显示空值，不伪造成本。
-- 估算明确不覆盖缓存命中、Batch、免费额度、资源包、合同折扣、区域差异和按输入长度分段等账单细节。
+- Remove the console-side hard-coded token price table and the estimated-cost column that used it.
+- Preserve the current token usage table and chart unchanged.
+- Define the product rule for future cost work: any cost shown on `/usage` must be billing-derived.
 
 ## Non-goals
 
-- 不新增云端 API 字段或数据库字段。
-- 不从费用中心实时拉价格，也不做财务级对账。
-- 不改变 token 用量采集、聚合、筛选或排序语义。
+- This change does not yet integrate Alibaba Cloud or Volcengine billing APIs.
+- This change does not add cloud database tables or credentials.
+- This change does not alter token usage collection or aggregation.
 
 ## Validation
 
 - `openspec validate estimate-token-cost-column --strict`
-- console: helper unit test, `npm run typecheck`, `npm test`
+- console: `npm test`, `npm run build`
