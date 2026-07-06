@@ -65,6 +65,9 @@
 ## 6. Phase-0 Real-Machine Gates
 
 - [ ] 6.1 Run F1 gated post probe on disposable account/test target and record whether server-confirmed comment verification is possible.
+  <!-- partial 2026-07-06: edge worktree now has a gated F1 submit probe path that requires execute flag, submit flag, disposable confirmation, target URL, and comment text. Actual F1 remains blocked until an operator-owned disposable post URL is supplied and the live probe is recorded. -->
+  <!-- partial 2026-07-06: added phase0-f1-gated-submit-runbook.md with command, safety gates, pass/fail criteria, and recording template. -->
+  <!-- partial 2026-07-06: edge commit 7c01700 adds runFacebookGatedSubmitProbe and manual runner wiring. It only executes with AIDCP_FB_EXECUTE_GATED_SUBMIT=1 plus submit/disposable/target/comment gates, then reloads the target to distinguish optimistic visibility from server confirmation. -->
 - [x] 6.2 Run F2 checkpoint/login URL detection probe and record honest stop outcomes.
   <!-- partial 2026-07-06: observed and manually handled captcha/login challenge during login. This is evidence for F2 detection design, but F2 is not passed until implemented classifier proves honest stop behavior. -->
   <!-- done 2026-07-06: live Phase-0 runner recorded logged-in and logged-out F2 outcomes in phase0-live-probe-findings.md. Logged-out / and /login classify as login; logged-out /checkpoint normalizes to / but still classifies login; /two_step_verification/authentication classifies captcha. No credential/checkpoint solving attempted. -->
@@ -79,6 +82,7 @@
   <!-- done 2026-07-06: in edge worktree, git diff --check PASS; npm run typecheck PASS; focused tsx suite PASS 67/67; npm run test:acceptance PASS 13/13; npm test PASS 658/658. Rerun after any later edge changes. -->
   <!-- done 2026-07-06: after edge commit 224b196, git diff --check PASS; npm run typecheck PASS; focused Facebook/platform/CDP suite PASS 33/33; npm run test:acceptance PASS 13/13; npm test PASS 668/668. -->
   <!-- done 2026-07-06: after redaction/F2 runner changes, git diff --check PASS; npm run typecheck PASS; focused Facebook/platform/CDP suite PASS 35/35; npm run test:acceptance PASS 13/13; npm test PASS 670/670. -->
+  <!-- done 2026-07-06: after F1 gated submit probe, edge git diff --check PASS; focused Facebook/platform/CDP suite PASS 51/51; npm run typecheck PASS; npm run test:acceptance PASS 13/13; npm test PASS 674/674. -->
 - [x] 7.2 If cloud code changed, run relevant cloud focused tests, acceptance, `npm test`, and `npm run typecheck`.
   <!-- done 2026-07-06: no cloud code changed in this tranche; cloud validation not applicable. -->
 - [ ] 7.3 Record repo commit SHAs, probe outcomes, and validation notes in this `tasks.md`.
@@ -89,8 +93,11 @@
   <!-- partial 2026-07-06: Day-0 F3 read-only observation recorded in phase0-live-probe-findings.md. Remaining probe outcomes: F1 server-confirmed comment verification on an operator-owned disposable post and F3 multi-day stability. -->
   <!-- partial 2026-07-06: F3 runbook added; final SHA recording still waits for F1 and multi-day F3 outcomes. -->
   <!-- partial 2026-07-06: control commit 198767d adds phase0-f3-observation-runbook.md for F3 cadence, counted-sample criteria, failure conditions, and recording template. -->
+  <!-- partial 2026-07-06: F1 gated submit probe and runbook prepared; final SHA recording still waits for the edge commit plus a live operator-owned disposable post sample. -->
+  <!-- partial 2026-07-06: edge commit 7c01700 records F1 gated submit probe implementation and tests. Remaining probe outcomes: live F1 sample on an operator-owned disposable post and F3 multi-day stability. -->
 - [x] 7.4 Run `openspec validate facebook-browser-env-and-login --strict`.
   <!-- done 2026-07-06: PASS. Rerun after later 4.x/F-gate work changes artifacts. -->
   <!-- done 2026-07-06: PASS after storage key/name redaction spec update and F2 live probe findings. -->
   <!-- done 2026-07-06: PASS after Day-0 F3 read-only observation notes. -->
+  <!-- done 2026-07-06: PASS after F1 gated submit runbook and task notes. -->
 - [ ] 7.5 Do not start `facebook-scheduled-comment` until F1/F2/F3 are all recorded as passed or the design is revised.
