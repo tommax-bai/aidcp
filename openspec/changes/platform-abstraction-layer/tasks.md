@@ -48,4 +48,5 @@
   <!-- aidcp-edge codex/platform-abstraction-layer 0c93a83; aidcp-cloud codex/platform-abstraction-layer 8496379. Validation notes recorded in 4.1/4.2. -->
 - [x] 5.2 Run `openspec validate platform-abstraction-layer --strict`.
   <!-- control: openspec validate platform-abstraction-layer --strict passed. -->
-- [ ] 5.3 Archive only after xhs zero-regression is proven and tasks contain commit/validation notes.
+- [x] 5.3 Archive only after xhs zero-regression is proven and tasks contain commit/validation notes.
+  <!-- dev deploy 2026-07-06: target=dev 121.89.85.150, from clean aidcp-cloud master 8496379; backup cloud.bak.20260706-155654.tar.gz + cloud/.env.bak.20260706-155654; rsync excluded .env/node_modules/.git; restarted aidcp-cloud.service. Healthcheck: service active/NRestarts=0, 8787+8090 listening, panel /api/version 200, accounts.platform column present, Feishu WSClient onReady, isales services still running. -->
