@@ -95,6 +95,7 @@
   <!-- partial 2026-07-06: control commit 198767d adds phase0-f3-observation-runbook.md for F3 cadence, counted-sample criteria, failure conditions, and recording template. -->
   <!-- partial 2026-07-06: F1 gated submit probe and runbook prepared; final SHA recording still waits for the edge commit plus a live operator-owned disposable post sample. -->
   <!-- partial 2026-07-06: edge commit 7c01700 records F1 gated submit probe implementation and tests. Remaining probe outcomes: live F1 sample on an operator-owned disposable post and F3 multi-day stability. -->
+  <!-- partial 2026-07-06: control commit a74e9c5 adds phase0-f1-gated-submit-runbook.md and records the F1 implementation/validation notes. -->
 - [x] 7.4 Run `openspec validate facebook-browser-env-and-login --strict`.
   <!-- done 2026-07-06: PASS. Rerun after later 4.x/F-gate work changes artifacts. -->
   <!-- done 2026-07-06: PASS after storage key/name redaction spec update and F2 live probe findings. -->
