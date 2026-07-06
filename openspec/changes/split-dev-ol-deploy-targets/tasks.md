@@ -28,10 +28,12 @@
   <!-- key-name-only inventory added to docs/deployment-environments.md; no values recorded. -->
 - [x] 3.2 Decide whether ol uses a separate Feishu app/chat or starts with Feishu ingestion disabled; stop for user-provided credentials before enabling ol Feishu.
   <!-- decision: ol Feishu remains disabled/not enabled for real command traffic until target-specific credentials or explicit reuse approval are provided. -->
+  <!-- update 2026-07-06: user provided target-specific ol Feishu app credentials; values were written only to ol /opt/aidcp/cloud/.env and were not recorded in git. -->
 - [x] 3.3 Create `/opt/aidcp/cloud/.env` on ol atomically with target-local values, and verify `aidcp-cloud.service` loads it through `EnvironmentFile`.
   <!-- ol /opt/aidcp/cloud/.env created atomically with 600 root:root permissions; values were transferred over SSH without logging, PGHOST was set to 121.89.85.150 for the temporary bridge, and systemd shows EnvironmentFile=/opt/aidcp/cloud/.env. -->
 - [x] 3.4 Verify dev and ol do not both process real Feishu command traffic unless a temporary duplicate-handler test is explicitly recorded.
   <!-- aidcp-cloud f4316def adds AIDCP_FEISHU_WS_ENABLED; dev remains default-enabled, while ol has AIDCP_FEISHU_WS_ENABLED=false and logs "飞书长连接已禁用", so ol does not receive real Feishu command events. -->
+  <!-- update 2026-07-06: ol was moved to its own Feishu app credentials and AIDCP_FEISHU_WS_ENABLED=true; ol logs show "飞书事件接收已启动" and "WSClient onReady". dev remains active with its own default-enabled runtime. -->
 
 ## 4. Ol Bootstrap
 
@@ -67,8 +69,10 @@
   <!-- console built from clean archive SHA be0f9e5ac9764b0156811df8aa43cc20431973c8 using npm install --no-package-lock because package-lock.json is not tracked; dist/ deployed to /opt/aidcp/console. -->
 - [x] 6.4 Run ol health checks: `aidcp-cloud.service` active, `8787` listening, panel API local `8090`, console HTTP response, configured PostgreSQL `select 1`, and Feishu readiness if enabled.
   <!-- ol health 2026-07-06: service active; ss shows 0.0.0.0:8787, 127.0.0.1:8090, 0.0.0.0:8088; local and nginx /api/version return panelApiVersion=2; external http://123.56.253.183:8088/ returns console HTML; PG select 1 ok; Feishu receiver intentionally disabled on ol. -->
+  <!-- update 2026-07-06: after ol Feishu credential rotation, service active; ss shows 0.0.0.0:8787, 127.0.0.1:8090, 0.0.0.0:8088; local/nginx /api/version ok; PG select 1 ok; Feishu WS onReady ok. -->
 - [x] 6.5 Record deployed cloud/console/edge SHAs, database mode, validation results, and any temporary bridge/Feishu limitations in this tasks file.
   <!-- deployed cloud SHA f4316defd20eb0526d5e5ba578cd8e6e60766d15; deployed console SHA be0f9e5ac9764b0156811df8aa43cc20431973c8; edge not deployed in this step, current local edge HEAD cd51b0707b11892972dfbf6caaefd4a174c7d308. Database mode remains temporary ol -> dev PostgreSQL bridge. Feishu app credentials may be shared, but ol has AIDCP_FEISHU_WS_ENABLED=false so dev is the only real Feishu event consumer. Validations: cloud npm test/test:acceptance/typecheck passed; console build passed; console full vitest passed with --testTimeout=20000 after default 5000ms timeout run exposed slow jsdom tests. -->
+  <!-- update 2026-07-06: Feishu limitation changed from shared-app disabled receiver to target-specific ol app enabled receiver. Database mode remains temporary ol -> dev PostgreSQL bridge, so ol is still not final online-ready until a dedicated ol DB/RDS exists. -->
 
 ## 7. Validation And Closeout
 
