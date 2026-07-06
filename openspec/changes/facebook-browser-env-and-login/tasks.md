@@ -83,6 +83,7 @@
   <!-- partial 2026-07-06: edge commit 3a5ea7a records startup/identity/storage/fingerprint/overlay probe implementation and tests. Remaining probe outcomes: 4.x page/editor/gated submit code, F1 disposable submit, F2 implemented honest-stop real-machine run, F3 multi-day stability. -->
   <!-- partial 2026-07-06: edge commit 224b196 records Page/Group/post structure probe, read-only editor focus/type/clear probe, and gated submit preflight. Remaining probe outcomes: disposable AdsPower test target, F1 server-confirmed comment verification, F2 real-machine honest-stop run, and F3 multi-day stability. -->
   <!-- partial 2026-07-06: live F2 outcomes and redaction correction are recorded in phase0-live-probe-findings.md. Remaining probe outcomes: F1 server-confirmed comment verification on an operator-owned disposable post and F3 multi-day stability. -->
+  <!-- partial 2026-07-06: edge commit 54e07cd adds the reusable Phase-0 manual probe runner and storage/permalink redaction hardening; control commit 7f18ba1 records live F2 findings and spec/design redaction corrections. Remaining probe outcomes: F1 server-confirmed comment verification on an operator-owned disposable post and F3 multi-day stability. -->
 - [x] 7.4 Run `openspec validate facebook-browser-env-and-login --strict`.
   <!-- done 2026-07-06: PASS. Rerun after later 4.x/F-gate work changes artifacts. -->
   <!-- done 2026-07-06: PASS after storage key/name redaction spec update and F2 live probe findings. -->
