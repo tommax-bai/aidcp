@@ -51,7 +51,7 @@
 
 | type | 方向 | 关联响应 | 用途 |
 | --- | --- | --- | --- |
-| `hello` | edge → cloud | `welcome` | 边缘上线握手，声明能力 |
+| `hello` | edge → cloud | `welcome` | 边缘上线握手，声明平台、账号与能力 |
 | `welcome` | cloud → edge | — | 握手确认，下发 sessionId |
 | `ui.snapshot` | cloud → edge | — | 陪伴界面数据回填（昵称/最近发布/审批状态/账号今日用量；hello 注册完成后全量 + 审批变化时增量） |
 | `plan.request` | edge → cloud | `plan.response` | 高层目标拆解为步骤 |
@@ -142,10 +142,16 @@
 ```jsonc
 {
   "edgeId": "edge-01",        // string  边缘节点标识
+  "platform": "xiaohongshu",  // string? 运行时平台标识；缺省按历史 xhs 兼容，cloud 会与 accounts.platform 校验
   "app": "xhs",               // string? 业务/站点标识
-  "capabilities": ["click", "input", "scroll"] // string[]? 能力声明；亦携 accountId?/machineLabel?/remoteAddr?（见 HelloPayload）
+  "capabilities": ["click", "input", "scroll"], // string[]? 能力声明
+  "accountId": "acc-01",      // string? 账号标识；多账号运行时要求真实账号，default 已退役
+  "machineLabel": "win-aliyun-3", // string? 人类可读机器标签
+  "remoteAddr": "rdp://..."   // string? 人工处置入口/远程地址说明
 }
 ```
+
+`platform` 是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 57 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。
 
 **`welcome`**（cloud → edge）
 ```jsonc
