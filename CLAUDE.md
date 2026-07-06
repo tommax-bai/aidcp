@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 三仓为**同级目录**：本仓即 `.`（cwd = 仓库根），sub-repo 用相对写法 `../aidcp-edge`、`../aidcp-cloud`（文档里历史遗留的 `ai-dcp`、`/Users/bears/codes/…` 均为换机前旧值，正文已统一，勿再产出）。
 
 - **edge / cloud 两个 sub-repo 可能未在当前机器 clone**（中控仓只承载文档与契约）。涉及 edge/cloud 代码、测试或 ECS 部署前，**先 `ls -d ../aidcp-edge ../aidcp-cloud` 确认是否存在**；缺失则停手，向用户确认实际位置或先 clone，**绝不盲目照搬路径执行命令**。
-- **部署私钥 `~/codes/isales-4.pem` 可能未在当前机器**。执行任何 `ssh` / `rsync` 到 ECS 前，**先确认私钥存在且 `chmod 600`**；缺失则停手告知用户。
+- **ECS 操作必须先命名 target**。执行任何 `ssh` / `rsync` 到 ECS 前，先在中控仓运行 `scripts/deploy-target <dev|ol> --check`：`dev=121.89.85.150`（key `~/codes/isales-4.pem`），`ol=123.56.253.183`（key `/Users/baitianxing/Downloads/ol.pem`）。target 不清或 key 检查失败则停手告知用户。
 
 ## 1. 四仓关系（原三仓 + 管理后台前端 aidcp-console）
 
@@ -53,18 +53,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - edge：`cd ../aidcp-edge && npm test`（+ `npm run test:acceptance`、`npm run typecheck`）
 - cloud：`cd ../aidcp-cloud && npm test`（+ `npm run test:acceptance`、`npm run typecheck`）
-- **回归纪律**：任何协议 / 风控 / 发布改动后，**先 `npm run test:acceptance` 再全量 `npm test`，再 `npm run typecheck`**。安全红线必须全过：`AC-PROTO-*`（两份 protocol.ts 不漂移）、`AC-PUB-*`（未授权绝不静默发布）、`AC-RISK-*`（绝不自残、被禁 `record` 返 false）；`AC-E-*` 为端到端。发布审批信号文件两端契约路径 `/tmp/aidcp-publish-approve-<requestId>.json` 必须一致（edge `buildPublishApprovalSignalPath` ↔ cloud `getApprovalSignalPath`），改发布链时勿漂移。真机层 gated：`AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test`。
+- **回归纪律**：任何协议 / 风控 / 发布改动后，**先 `npm run test:acceptance` 再全量 `npm test`，再 `npm run typecheck`**。安全红线必须全过：`AC-PROTO-*`（两份 protocol.ts 不漂移）、`AC-PUB-*`（未授权绝不静默发布）、`AC-RISK-*`（绝不自残、被禁 `record` 返 false）；`AC-E-*` 为端到端。发布审批信号文件两端契约路径 `/tmp/aidcp-publish-approve-<requestId>.json` 必须一致（edge `buildPublishApprovalSignalPath` ↔ cloud `getApprovalSignalPath`），改发布链时勿漂移。真机层 gated：dev 用 `AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test`，ol 用 `AIDCP_CLOUD_URL=ws://123.56.253.183:8787`。
 - 本地只做**代码级验证**；cloud 正式运行只在 ECS，本地**不要起 cloud**。
 
 ## 5. 部署（云端 ECS，带安全闸）
 
-> **部署铁律**：cloud 只跑在 ECS `121.89.85.150`，本地永不起 cloud；edge 本地跑、连 `ws://121.89.85.150:8787`。
+> **部署铁律**：cloud 只跑在命名 ECS target，本地永不起 cloud；edge 本地跑并显式连接 dev 或 ol。dev=`ws://121.89.85.150:8787`，ol=`ws://123.56.253.183:8787`。当前权威口径见 `docs/deployment-environments.md`。
 > **同机另有 `isales` 独立运行 —— 任何 ECS 操作绝不能碰它**（不同 systemd 服务 / 目录 / 端口）。
 > 执行前先做 §0 私钥与 sub-repo 检查。
 
-- ECS 上 cloud：`/opt/aidcp/cloud`，由 systemd `aidcp-cloud.service` 托管，对外监听 `8787`，PostgreSQL 同机 `127.0.0.1:5432` 库 `aidcp`。
-- 部署**默认直接做、不用逐次问**（用户长期授权，2026-06-27）；仍**不在每次 commit 自动触发**——按需发布时即执行，但**必须严格走安全序列**：① sub-repo 测试通过 → ② ECS **先备份**（`/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`）→ ③ `rsync`（`--exclude .env --exclude node_modules --exclude .git`）→ ④ `systemctl restart aidcp-cloud.service` → ⑤ healthcheck（`active (running)` + 8787 监听 + 飞书长连接已建立 + PG `select 1`）→ ⑥ 失败即回滚。**红线不变**：绝不碰同机 isales。生产机 SSH 可能仍被 harness 安全分类器二次确认（机制层、非我方征询），照常放行即可。
-- SSH：`ssh -i ~/codes/isales-4.pem root@121.89.85.150`（私钥须 `chmod 600`）。逐条命令、版本台账详见 `docs/handoff-2026-06-05.md`（顶部最新注记块为唯一可信的现役版本来源）与 `aidcp-cloud/docs/deployment-ecs.md`。
+- ECS 上 cloud：`/opt/aidcp/cloud`，由 systemd `aidcp-cloud.service` 托管，对外监听 `8787`；panel API 默认 `127.0.0.1:8090`。数据库边界按 target 配置，ol 正式上线应使用独立 ol PostgreSQL/RDS，不把 dev 共库当最终架构。
+- 部署**默认直接做、不用逐次问**（用户长期授权，2026-06-27）；仍**不在每次 commit 自动触发**——按需发布时即执行，但**必须严格走安全序列**：① 明确 target 并 `scripts/deploy-target <dev|ol> --check` → ② sub-repo 测试通过 → ③ ECS **先备份**（`/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`）→ ④ `rsync`（`--exclude .env --exclude node_modules --exclude .git`）→ ⑤ `systemctl restart aidcp-cloud.service` → ⑥ healthcheck（`active (running)` + 8787 监听 + 飞书长连接已建立/或明确禁用 + PG `select 1`）→ ⑦ 失败即回滚。**红线不变**：绝不碰 dev 同机 isales。
+- SSH：先用 `scripts/deploy-target <dev|ol> --check` 取目标信息。逐条命令、版本台账详见 `docs/deployment-environments.md`、`docs/handoff-2026-06-05.md`（历史台账）与 `aidcp-cloud/docs/deployment-ecs.md`。
 
 ## 6. git / 沟通 / 安全边界
 
@@ -84,7 +84,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **被指派 change 即为 fleet 成员**：session 若经 `scripts/spawn-change` 启动、或用户直接说「实装 change X」，即独占该 change，按本节自主走全流程（读 change 文档 → worktree 开发 → `land-change` 集成 → tasks.md 回写 → 真机项登记 backlog → 部署前探 ECS → archive），无需逐步征询。
 - **极简启动（用户多终端并行的标准入口）**：新终端在本仓起 claude 后，`/impl <change名>` = 指派实装；`/claim` = 自主认领一个无人在做的活跃 change（**worktree = 认领锁**：建 worktree 失败即被并发抢先、换下一个；先报出所选再开工，不等确认）。命令定义在 `.claude/commands/`，指令自包含，用户无需再输入任何交代。
 - **先判定自己在哪**：`git worktree list` / `git rev-parse` 认清是「主 checkout」还是某 change 的 worktree。worktree 内 = 只在本分支开发 + 提交 + 跑 `test` / `typecheck`；主 checkout = 集成与部署位。
-- **部署只从主 checkout 的默认分支走，绝不从任何 worktree 部署**（承 §5 部署铁律）。
+- **部署只从主 checkout 的 eligible ref 走，绝不从任何 worktree 部署**（dev 可用验证后的默认分支；ol 只用 release 分支/tag 或 exact clean SHA）。
 - **热点文件单写者，并行时绝不同时碰**：两份 `protocol.ts` + `aidcp-cloud/src/comm/command-bridge.ts` 动作映射（§2 协议四处同步）、角色注册（`event-bus/types.ts` 的 `RoleName` + `src/config/role-catalog.ts`）、风控状态机 `src/risk/risk-state-machine.ts`。任务若必须动这些，标记为需串行、不与他人并行。
 - **开发并行、集成串行**：合回默认分支前先 `fetch` + rebase 到最新默认分支、解冲突、跑 `test:acceptance` + `typecheck` 再 ff 合并。**push 遇 non-ff 一律 rebase 后重来、绝不 force**（force / 非 ff 仍按 §6 需先确认）；空 diff = 已在远端、可弃（见 memory `concurrent-session-shares-subrepo-worktree`）。
 - **完成即收口**：部署 + 验证通过 → archive 该 change → 删 worktree / 分支。有 worktree 却无对应活跃 change = 孤儿，清掉。

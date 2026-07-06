@@ -47,7 +47,7 @@ PROMPT="实装 openspec change「${name}」（主目标仓 ${repo}）。你是�
 4. 在 worktree 里跑 test（有 test:acceptance 先跑）+ typecheck，全绿才算完；提交到本分支，message 前缀「${name}: 」。绝不静默假成功。
 5. 集成：scripts/land-change ${repo} ${name} --yes（fetch+rebase→全量绿→ff 推送→清理；撞 non-ff 重跑，绝不 force）。
 6. 回写 openspec/changes/${name}/tasks.md 进度（commit sha + 偏离说明）；真机验收类项登记 docs/real-machine-acceptance-backlog.md 对应簇（归档与真机解耦）；代码完成+部署后 openspec archive。
-7. 如需部署：只从主 checkout、严格走 CLAUDE.md §5 安全序列，且部署前先探 ECS 现状（近 1h 文件 mtime + md5 对 master）避免撞并发部署；cloud/console 若有接口形状联动须同批上线。"
+7. 如需部署：只从主 checkout 的 eligible ref、先 scripts/deploy-target <dev|ol> --check，再严格走部署安全序列；部署前先探目标 ECS 现状（近 1h 文件 mtime + md5 对目标 ref）避免撞并发部署；cloud/console 若有接口形状联动须同批上线。"
 
 echo
 echo "──────── 任务简报（复制给 session 或用 --launch 直接启动）────────"

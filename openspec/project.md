@@ -17,8 +17,9 @@ AIDCP（AI-Driven Control Plane）是一套 **DOM-first** 的浏览器自动化�
 
 ## 关键约束（写 change 时必须遵守）
 
-- **部署铁律**：cloud 只部署在 ECS `121.89.85.150`（systemd `aidcp-cloud.service`，端口 `8787`，
-  同机 PostgreSQL 库 `aidcp`）；本地只跑 edge 连 ECS。**同机另有 isales 独立运行，绝不能碰。**
+- **部署铁律**：cloud 只部署在命名 ECS 目标，本地只跑 edge 连 ECS。`dev=121.89.85.150`
+  用于主干高频验证，`ol=123.56.253.183` 用于稳定上线；每次 SSH/rsync 前必须明确 target
+  并通过 `scripts/deploy-target <dev|ol> --check`。`dev` 同机另有 isales 独立运行，绝不能碰。
 - **DOM 优于像素**：用 DOM 作用域区分重复元素，不靠坐标/截图。
 - **三道闸防自残**：后置校验 / 重试上限+升级 / 反污染回写。
 - **边轻云重**：边缘只做定位/执行/拟人化/本地命中；规划、编排、推理、风控、持久化在云端。

@@ -51,7 +51,7 @@ worktree 放到各仓的兄弟目录 `<repo>.wt/<change-name>`，保持主 check
 集成与部署位：
 
 ```
-../aidcp-cloud                       # 主 checkout = 集成 + 部署位（只从这里 rsync 上 ECS）
+../aidcp-cloud                       # 主 checkout = 集成 + 部署位（只从这里 rsync 到命名 ECS target）
 ../aidcp-cloud.wt/<change-a>         # fleet 成员 A（只开发 + 提交，绝不部署）
 ../aidcp-cloud.wt/<change-b>         # fleet 成员 B
 ../aidcp-edge.wt/<change-c>
@@ -105,7 +105,7 @@ cd ~/codes/aidcp && scripts/spawn-change <repo> <change-name> --launch
 - 只在**本分支**提交；commit message 前缀带 change 名（如 `<name>: …`），末尾带
   `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。
 - **在自己 worktree 里跑** `npm test` / `npm run typecheck`（sub-repo 内执行）。
-- **绝不从 worktree 部署**（部署只从主 checkout 默认分支，见 §6 与 CLAUDE.md §5）。
+- **绝不从 worktree 部署**（部署只从主 checkout 的 eligible ref，见 §6 与部署目标文档）。
 - 勤 `git fetch && git rebase origin/master`，让冲突小而早暴露。
 - 碰到**热点文件**（§5）先停手、标记为需串行。
 
@@ -146,7 +146,7 @@ git -C ../<repo> checkout master
 git -C ../<repo> merge --ff-only <name>
 git -C ../<repo> push origin master
 
-# 4) 按需部署（只从主 checkout，严格走 CLAUDE.md §5 安全序列）
+# 4) 按需部署（只从主 checkout，先 scripts/deploy-target <dev|ol> --check，再走安全序列）
 
 # 5) 收口：archive openspec change → 删 worktree/分支
 git -C ../<repo> worktree remove ../<repo>.wt/<name>
@@ -171,8 +171,9 @@ scripts/fleet-status
 
 ## 8. 部署边界（承 CLAUDE.md §5）
 
-- cloud 只跑 ECS `121.89.85.150`，本地永不起 cloud；**只从主 checkout 默认分支部署**，
-  绝不从任何 worktree。
+- cloud 只跑命名 ECS target，本地永不起 cloud；部署前必须先明确 `dev` 或 `ol` 并运行
+  `scripts/deploy-target <dev|ol> --check`。`dev` 允许验证后的默认分支高频部署；`ol` 只部署
+  release 分支/tag 或 exact clean SHA。**只从主 checkout 的 eligible ref 部署**，绝不从任何 worktree。
 - 多流并行期，一次只推一个已集成 + 验证过的 change 上线，别让半合并态堆到 ECS。
 - 同机 isales 独立运行，任何 ECS 操作绝不碰它。
 
@@ -186,7 +187,7 @@ scripts/fleet-status
   在 cloud+console 两仓实战跑通全流程；test:acceptance 仅在该仓定义时跑）
 
 **红线**：`land-change` 永不 force-push；`new-change` 不覆盖已存在分支/worktree；
-部署只从主 checkout（§8）。
+部署只从主 checkout（§8）且必须命名 target。
 
 ## 10. 常见故障与兜底
 

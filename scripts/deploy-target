@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# Print and validate aidcp deployment target metadata.
+# Read-only: does not SSH, rsync, or modify local/remote state.
+set -euo pipefail
+
+usage() {
+cat >&2 <<'EOF'
+usage: scripts/deploy-target <dev|ol> [--check|--shell]
+
+  dev      ECS 121.89.85.150, key ~/codes/isales-4.pem
+  ol       ECS 123.56.253.183, key /Users/baitianxing/Downloads/ol.pem
+
+  --check  verify the key exists and has no group/other permissions
+  --shell  print shell exports for eval/use in scripts
+EOF
+exit 1
+}
+
+[ $# -ge 1 ] || usage
+target="$1"
+mode="${2:-}"
+
+case "$target" in
+  dev)
+    host="121.89.85.150"
+    key="$HOME/codes/isales-4.pem"
+    purpose="mainline development and high-frequency validation"
+    cloud_url="ws://121.89.85.150:8787"
+    ;;
+  ol)
+    host="123.56.253.183"
+    key="/Users/baitianxing/Downloads/ol.pem"
+    purpose="stable online release deployment"
+    cloud_url="ws://123.56.253.183:8787"
+    ;;
+  *)
+    usage
+    ;;
+esac
+
+cloud_dir="/opt/aidcp/cloud"
+console_dir="/opt/aidcp/console"
+downloads_dir="/opt/aidcp/downloads"
+service="aidcp-cloud.service"
+ssh_user="root"
+
+key_perm() {
+  if stat -f '%Lp' "$1" >/dev/null 2>&1; then
+    stat -f '%Lp' "$1"
+  else
+    stat -c '%a' "$1"
+  fi
+}
+
+check_key() {
+  [ -f "$key" ] || {
+    echo "ERROR: missing SSH key: $key" >&2
+    exit 2
+  }
+  perm="$(key_perm "$key")"
+  go="${perm: -2}"
+  [ "$go" = "00" ] || {
+    echo "ERROR: unsafe SSH key permissions for $key: $perm (run chmod 600)" >&2
+    exit 2
+  }
+}
+
+case "$mode" in
+  ""|--check|--shell) ;;
+  *) usage ;;
+esac
+
+if [ "$mode" = "--check" ]; then
+  check_key
+fi
+
+if [ "$mode" = "--shell" ]; then
+  cat <<EOF
+AIDCP_DEPLOY_TARGET='$target'
+AIDCP_DEPLOY_HOST='$host'
+AIDCP_DEPLOY_SSH_KEY='$key'
+AIDCP_DEPLOY_SSH_USER='$ssh_user'
+AIDCP_DEPLOY_CLOUD_DIR='$cloud_dir'
+AIDCP_DEPLOY_CONSOLE_DIR='$console_dir'
+AIDCP_DEPLOY_DOWNLOADS_DIR='$downloads_dir'
+AIDCP_DEPLOY_SERVICE='$service'
+AIDCP_CLOUD_URL='$cloud_url'
+EOF
+else
+  cat <<EOF
+target=$target
+host=$host
+ssh_user=$ssh_user
+ssh_key=$key
+purpose=$purpose
+cloud_dir=$cloud_dir
+console_dir=$console_dir
+downloads_dir=$downloads_dir
+service=$service
+cloud_url=$cloud_url
+EOF
+fi

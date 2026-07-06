@@ -29,7 +29,7 @@
 | aidcp-edge | `../aidcp-edge` | `git@github.com:tommax-bai/aidcp-edge.git` |
 | aidcp-cloud | `../aidcp-cloud` | `git@github.com:tommax-bai/aidcp-cloud.git` |
 
-> 部署口径不变：cloud 只部署在 ECS（见 `handoff-2026-06-05.md`），本地只跑 edge 连 ECS。
+> 当前部署口径：cloud 只部署在命名 ECS target（见 `deployment-environments.md`），本地只跑 edge 连 ECS。`dev=121.89.85.150` 用于主干高频验证，`ol=123.56.253.183` 用于稳定上线。
 
 ### 1.3 关系图
 

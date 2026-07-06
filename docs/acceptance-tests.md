@@ -25,7 +25,11 @@ npm run test:acceptance  # 仅跑 test/acceptance/ 下的验收用例
 npm run typecheck        # 类型检查（协议契约漂移会在此暴露）
 
 # 真机联调（gated，需云端可达 / 本机 Chrome）：
+# dev target (high-frequency validation)
 AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test
+
+# ol target (stable online validation)
+AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://123.56.253.183:8787 npm test
 ```
 
 新增验收用例位于 `aidcp-edge/test/acceptance/` 与 `aidcp-cloud/test/acceptance/`，
@@ -113,11 +117,12 @@ AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test
 
 ## 4. 真机联调验收清单（人工执行，对应 Phase 1 收尾 / handoff 待办 A）
 
-> 部署铁律：cloud 只在 ECS，本地只起 edge 连 ECS。任何 ECS 操作不得触碰同机 `isales`。
+> 部署铁律：cloud 只在命名 ECS target，本地只起 edge 连 ECS。先运行 `scripts/deploy-target <dev|ol> --check`；任何 dev 操作不得触碰同机 `isales`。
 
 **前置**
 1. ECS cloud 健康：
    ```bash
+   scripts/deploy-target dev --check
    ssh -i ~/codes/isales-4.pem root@121.89.85.150
    systemctl status aidcp-cloud.service          # active (running)
    ss -ltnp | grep 8787                           # 0.0.0.0:8787 监听
@@ -134,8 +139,8 @@ AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test
 
 | # | 步骤 | 判据 |
 | --- | --- | --- |
-| E-1 | `AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test`（两仓） | `AC-E2E-*` 全过：握手返回 sessionId、心跳 pong |
-| E-2 | `AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm start`（edge） | 日志"已连接云端"；自动浏览启动 |
+| E-1 | `AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm test`（dev，两仓）或 `AIDCP_CLOUD_URL=ws://123.56.253.183:8787`（ol） | `AC-E2E-*` 全过：握手返回 sessionId、心跳 pong |
+| E-2 | `AIDCP_CLOUD_URL=ws://121.89.85.150:8787 npm start`（dev edge）或 `AIDCP_CLOUD_URL=ws://123.56.253.183:8787`（ol edge） | 日志"已连接云端"；自动浏览启动 |
 | E-3 | 观察浏览闭环 | edge 上报 `page.cards`/`note.detail`，云端下发 `interaction.like`/`page.scroll`/`navigation.back` |
 | E-4 | 触发发布 → 飞书收到审批卡片 | 卡片含标题/正文/标签 + [授权发布]/[取消] |
 | E-5 | 飞书点[授权发布] | `/tmp/aidcp-publish-approve-<id>.json` 出现，`approved=true` |

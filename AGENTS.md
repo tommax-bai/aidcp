@@ -17,7 +17,10 @@ This file is the Codex-facing mapping of `CLAUDE.md`. Keep `CLAUDE.md` as the le
   - `../aidcp-cloud`: cloud runtime, default branch `master`
   - `../aidcp-console`: admin console frontend, default branch `master`
 - Before touching edge/cloud/console code, tests, or deployment, confirm the sibling repo exists on this machine. Do not blindly reuse stale paths from older docs.
-- Before any SSH or `rsync` to ECS, confirm the private key exists at `~/codes/isales-4.pem` and has safe permissions. If missing, stop and report it.
+- Before any SSH or `rsync` to ECS, name the deployment target and verify it with `scripts/deploy-target <dev|ol> --check`.
+  - `dev`: `121.89.85.150`, key `~/codes/isales-4.pem`
+  - `ol`: `123.56.253.183`, key `/Users/baitianxing/Downloads/ol.pem`
+  If the target is unclear or the key check fails, stop and report it.
 
 ## 2. Architecture Invariants
 
@@ -55,11 +58,12 @@ This file is the Codex-facing mapping of `CLAUDE.md`. Keep `CLAUDE.md` as the le
 
 ## 5. Deployment
 
-- Cloud production runs only on ECS `121.89.85.150`; local cloud is not the production runtime.
-- The same ECS also hosts unrelated `isales` services. Never touch unrelated services, directories, ports, or systemd units.
+- Cloud runtime runs only on named ECS targets; local cloud is not the production runtime. See `docs/deployment-environments.md`.
+- `dev` is the high-frequency development/validation target; `ol` is the stable online target and must deploy only release branches/tags or exact clean SHAs.
+- `dev` also hosts unrelated `isales` services. Never touch unrelated services, directories, ports, or systemd units.
 - Deployment sequence, when deployment is actually required: sibling-repo tests pass, back up ECS cloud and env, `rsync` excluding secrets/deps/git metadata, restart `aidcp-cloud.service`, then healthcheck service state, port, Feishu connection, and PostgreSQL.
 - On deployment failure, roll back. Do not improvise against production.
-- Deployment must come from the main checkout/default branch snapshot, not from an arbitrary dirty shared worktree or feature worktree.
+- Deployment must come from a clean eligible checkout: default branch/main checkout for `dev`, release branch/tag or exact clean SHA for `ol`, never an arbitrary dirty shared worktree or feature worktree.
 
 ## 6. Git, Communication, Security
 
@@ -76,7 +80,7 @@ This file is the Codex-facing mapping of `CLAUDE.md`. Keep `CLAUDE.md` as the le
 
 - For code-bearing changes, the default finish line is: implementation complete, tests/typecheck appropriate to the touched repo pass, commit, push, and deploy/publish if runtime behavior changes.
 - For OpenSpec-backed work, update the relevant `tasks.md` with commit SHA, validation notes, deployment/publish notes, and any deviation from the proposal.
-- Deploy/publish only through the documented safe path for the affected artifact: cloud ECS deployment, console static release, edge desktop/package release, or docs/spec-only no-op.
+- Deploy/publish only through the documented safe path for the affected artifact and target: cloud ECS deployment, console static release, edge desktop/package release, or docs/spec-only no-op.
 - Stop and ask before destructive database changes, secret/key changes, production data deletion, tests failing but user still wants release, unclear publish target, force-push, non-fast-forward push, or any action that may affect unrelated `isales` services.
 - Documentation-only or spec-only changes are still committed and pushed by default, but they do not trigger runtime deployment unless they are part of a release procedure.
 

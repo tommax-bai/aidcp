@@ -54,7 +54,7 @@ cat <<EOF
     git -C "${rp}" worktree remove "${wt}"
     git -C "${rp}" branch -d "${name}"
     openspec archive ${name}                                                     # 收口 openspec change（控制仓）
-    # 部署（如需）：只从主 checkout、严格走 CLAUDE.md §5 安全序列
+    # 部署（如需）：只从主 checkout 的 eligible ref，先 scripts/deploy-target <dev|ol> --check，再走安全序列
   或直接重跑： scripts/land-change ${repo} ${name} --yes
 EOF
 exit 0
@@ -83,5 +83,5 @@ cat <<EOF
 
 ✔ 已集成并推送到 origin/${def} 。下一步：
     - archive openspec change：openspec archive ${name}
-    - 如需部署：只从主 checkout ${rp} 、严格走 CLAUDE.md §5 安全序列
+    - 如需部署：只从主 checkout ${rp} 的 eligible ref，先 scripts/deploy-target <dev|ol> --check，再走安全序列
 EOF

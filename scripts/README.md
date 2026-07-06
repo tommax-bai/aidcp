@@ -11,6 +11,7 @@
 | `new-change <repo> <name>` | 开一条流：建 `../<repo>.wt/<name>` 分支 `<name>` | 可逆（worktree remove + branch -d） |
 | `spawn-change <repo> <name> [--launch]` | 多终端模式：确保 worktree（幂等）+ 生成任务简报；`--launch` 直接在中控仓启动 claude | 同 new-change；`--launch` 只是启动 CLI |
 | `land-change <repo> <name> [--yes]` | 集成：fetch+rebase+测试；`--yes` 才 ff 推送+同步主 checkout+清理 | 默认只 prep 不推；push 撞 non-ff 即中止，**绝不 force** |
+| `deploy-target <dev\|ol> [--check\|--shell]` | 打印/校验 ECS 目标元数据：host、key、runtime 目录、cloud URL | 只读；`--check` 仅查本机 key 是否存在且权限安全 |
 
 ```bash
 scripts/fleet-status
@@ -18,9 +19,13 @@ scripts/new-change aidcp-cloud my-change-name
 # … 在 ../aidcp-cloud.wt/my-change-name 里开发 …
 scripts/land-change aidcp-cloud my-change-name          # 只 prep + 打印命令
 scripts/land-change aidcp-cloud my-change-name --yes    # prep 通过后自动集成
+scripts/deploy-target dev --check                       # 部署前校验目标 key
+scripts/deploy-target ol --check
 ```
 
-**红线**：部署只从主 checkout 默认分支走、绝不从 worktree（CLAUDE.md §5/§7）；
+**红线**：部署只从主 checkout 的 eligible ref 走、绝不从 worktree；部署前必须明确
+`dev` 或 `ol` 并跑 `scripts/deploy-target <target> --check`。`dev` 是主干高频验证目标，
+`ol` 是稳定上线目标（release 分支/tag 或 exact clean SHA）。
 `land-change` 永不 force-push；`new-change` 不会覆盖已存在的分支/worktree。
 
 > 状态：三者均已实战跑通（2026-07-03 dashboard-refresh-clarity 经 new-change 开流、
