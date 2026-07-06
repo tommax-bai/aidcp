@@ -16,8 +16,8 @@ Cloud startup performs many idempotent store initializers (`CREATE TABLE IF NOT 
 **Goals:**
 
 - Make `dev` and `ol` explicit deployment targets with distinct SSH keys, ECS hosts, runtime directories, service names, and validation checklists.
-- Preserve the existing fast dev loop: validated default-branch commits can deploy to `dev` frequently.
-- Make `ol` deployment release-based: only a release branch/tag or exact clean commit is eligible.
+- Preserve the existing fast dev loop: validated default-branch commits deploy to `dev` automatically after completed production-facing development work.
+- Make `ol` deployment explicit and release-branch-based: it runs only after the user requests `ol`/online deployment, and the deployed ref is a release branch.
 - Define the database boundary so `ol` does not silently share mutable runtime state with `dev`.
 - Provide a safe first-run path for preparing `ol`, including system dependencies, service files, nginx, env loading, backup/rollback, and health checks.
 - Keep secrets outside git, docs, OpenSpec tasks, command arguments, and durable memory.
@@ -46,9 +46,9 @@ Temporary bridge: `ol` may point to `dev` PostgreSQL only for bootstrap or smoke
 
 Alternative considered: use dev PostgreSQL permanently to avoid data migration. Rejected because it turns release deployment into a code-only illusion; schema and state remain shared with dev.
 
-**D3. Release promotion is commit-based, not worktree-based.**
+**D3. Release promotion is branch-based, not worktree-based.**
 
-Development can continue through the existing OpenSpec + worktree model. After a change lands and validates, it can deploy to `dev`. `ol` deployment must be from a clean main checkout at a release branch/tag or exact commit SHA, with the SHA recorded in the relevant tasks/deployment note.
+Development can continue through the existing OpenSpec + worktree model. After a production-facing change lands, validates, commits, and pushes, it deploys to `dev` by default. `ol` deployment must wait for an explicit user request, then create or select a clean release branch such as `release/<date>-<scope>` and deploy by that branch. A tag or exact commit SHA may be the source used to create the release branch, but it is not a substitute for the branch-based deployment record. The release branch and exact SHAs are recorded in the relevant tasks/deployment note.
 
 Alternative considered: deploy arbitrary feature branches to `ol` when needed. Rejected because it breaks the stable online contract and makes rollback/version audit harder.
 

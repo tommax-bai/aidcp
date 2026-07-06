@@ -105,7 +105,7 @@ cd ~/codes/aidcp && scripts/spawn-change <repo> <change-name> --launch
 - 只在**本分支**提交；commit message 前缀带 change 名（如 `<name>: …`），末尾带
   `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。
 - **在自己 worktree 里跑** `npm test` / `npm run typecheck`（sub-repo 内执行）。
-- **绝不从 worktree 部署**（部署只从主 checkout 的 eligible ref，见 §6 与部署目标文档）。
+- **绝不从 worktree 部署**（部署只从主 checkout 的 eligible ref，见 §6 与部署目标文档；dev 用默认分支，ol 只用发布分支）。
 - 勤 `git fetch && git rebase origin/master`，让冲突小而早暴露。
 - 碰到**热点文件**（§5）先停手、标记为需串行。
 
@@ -172,8 +172,8 @@ scripts/fleet-status
 ## 8. 部署边界（承 CLAUDE.md §5）
 
 - cloud 只跑命名 ECS target，本地永不起 cloud；部署前必须先明确 `dev` 或 `ol` 并运行
-  `scripts/deploy-target <dev|ol> --check`。`dev` 允许验证后的默认分支高频部署；`ol` 只部署
-  release 分支/tag 或 exact clean SHA。**只从主 checkout 的 eligible ref 部署**，绝不从任何 worktree。
+  `scripts/deploy-target <dev|ol> --check`。开发完成后默认部署 `dev`，用验证后的默认分支高频部署；
+  `ol` 只有用户明确要求时才部署，且必须建立或选定 release 分支并按分支部署。**只从主 checkout 的 eligible ref 部署**，绝不从任何 worktree。
 - 多流并行期，一次只推一个已集成 + 验证过的 change 上线，别让半合并态堆到 ECS。
 - 同机 isales 独立运行，任何 ECS 操作绝不碰它。
 

@@ -24,8 +24,8 @@ scripts/deploy-target ol --check
 ```
 
 **红线**：部署只从主 checkout 的 eligible ref 走、绝不从 worktree；部署前必须明确
-`dev` 或 `ol` 并跑 `scripts/deploy-target <target> --check`。`dev` 是主干高频验证目标，
-`ol` 是稳定上线目标（release 分支/tag 或 exact clean SHA）。
+`dev` 或 `ol` 并跑 `scripts/deploy-target <target> --check`。未指定目标的开发完成部署默认走
+`dev`；`ol` 只有用户明确要求线上部署时才走，且必须创建或选定 release 分支并按分支部署。
 `land-change` 永不 force-push；`new-change` 不会覆盖已存在的分支/worktree。
 
 > 状态：三者均已实战跑通（2026-07-03 dashboard-refresh-clarity 经 new-change 开流、

@@ -15,7 +15,7 @@
 | [**aidcp-console**](../aidcp-console) | 管理后台前端 | 统一 Web 控制台（React + Vite + TS + AntD）；只读云端面板 API + 经 `/api` 下发指令，绝不直连边缘 |
 
 > 相对路径（四仓同级）：`../aidcp-edge`、`../aidcp-cloud`、`../aidcp-console`（可能尚未在当前机器 clone）。
-> 部署目标：cloud 只跑在命名 ECS 目标，本地只起 edge 连 ECS。`dev=121.89.85.150` 用于主干高频验证，`ol=123.56.253.183` 用于稳定上线；见 [`docs/deployment-environments.md`](docs/deployment-environments.md)。
+> 部署目标：cloud 只跑在命名 ECS 目标，本地只起 edge 连 ECS。`dev=121.89.85.150` 是开发完成后的默认自动部署目标；`ol=123.56.253.183` 仅在用户明确要求线上部署时，从 release 分支按分支部署；见 [`docs/deployment-environments.md`](docs/deployment-environments.md)。
 
 ## 设计主张
 

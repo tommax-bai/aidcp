@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 三仓为**同级目录**：本仓即 `.`（cwd = 仓库根），sub-repo 用相对写法 `../aidcp-edge`、`../aidcp-cloud`（文档里历史遗留的 `ai-dcp`、`/Users/bears/codes/…` 均为换机前旧值，正文已统一，勿再产出）。
 
 - **edge / cloud 两个 sub-repo 可能未在当前机器 clone**（中控仓只承载文档与契约）。涉及 edge/cloud 代码、测试或 ECS 部署前，**先 `ls -d ../aidcp-edge ../aidcp-cloud` 确认是否存在**；缺失则停手，向用户确认实际位置或先 clone，**绝不盲目照搬路径执行命令**。
-- **ECS 操作必须先命名 target**。执行任何 `ssh` / `rsync` 到 ECS 前，先在中控仓运行 `scripts/deploy-target <dev|ol> --check`：`dev=121.89.85.150`（key `~/codes/isales-4.pem`），`ol=123.56.253.183`（key `/Users/baitianxing/Downloads/ol.pem`）。target 不清或 key 检查失败则停手告知用户。
+- **ECS 操作必须先命名 target**。执行任何 `ssh` / `rsync` 到 ECS 前，先在中控仓运行 `scripts/deploy-target <dev|ol> --check`：`dev=121.89.85.150`（key `~/codes/isales-4.pem`），`ol=123.56.253.183`（key `/Users/baitianxing/Downloads/ol.pem`）。未指定部署目标时，开发完成后的默认部署目标是 `dev`；`ol` 只有用户明确要求线上/OL部署时才执行。target 不清或 key 检查失败则停手告知用户。
 
 ## 1. 四仓关系（原三仓 + 管理后台前端 aidcp-console）
 
@@ -63,12 +63,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 > 执行前先做 §0 私钥与 sub-repo 检查。
 
 - ECS 上 cloud：`/opt/aidcp/cloud`，由 systemd `aidcp-cloud.service` 托管，对外监听 `8787`；panel API 默认 `127.0.0.1:8090`。数据库边界按 target 配置，ol 正式上线应使用独立 ol PostgreSQL/RDS，不把 dev 共库当最终架构。
-- 部署**默认直接做、不用逐次问**（用户长期授权，2026-06-27）；仍**不在每次 commit 自动触发**——按需发布时即执行，但**必须严格走安全序列**：① 明确 target 并 `scripts/deploy-target <dev|ol> --check` → ② sub-repo 测试通过 → ③ ECS **先备份**（`/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`）→ ④ `rsync`（`--exclude .env --exclude node_modules --exclude .git`）→ ⑤ `systemctl restart aidcp-cloud.service` → ⑥ healthcheck（`active (running)` + 8787 监听 + 飞书长连接已建立/或明确禁用 + PG `select 1`）→ ⑦ 失败即回滚。**红线不变**：绝不碰 dev 同机 isales。
+- 部署**默认直接做、不用逐次问**（用户长期授权，2026-06-27）；开发完成后默认 target=`dev`，代码/产物验证、提交、推送完成后自动部署 `dev`。`ol` **不参与默认部署**，只有用户明确提出线上/OL部署时才执行；执行前必须建立或选定 `release/<日期>-<范围>` 这类发布分支，并按该发布分支部署。无论目标是 `dev` 还是 `ol`，都必须严格走安全序列：① 明确 target 并 `scripts/deploy-target <dev|ol> --check` → ② sub-repo 测试通过 → ③ ECS **先备份**（`/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`）→ ④ `rsync`（`--exclude .env --exclude node_modules --exclude .git`）→ ⑤ `systemctl restart aidcp-cloud.service` → ⑥ healthcheck（`active (running)` + 8787 监听 + 飞书长连接已建立/或明确禁用 + PG `select 1`）→ ⑦ 失败即回滚。**红线不变**：绝不碰 dev 同机 isales。
 - SSH：先用 `scripts/deploy-target <dev|ol> --check` 取目标信息。逐条命令、版本台账详见 `docs/deployment-environments.md`、`docs/handoff-2026-06-05.md`（历史台账）与 `aidcp-cloud/docs/deployment-ecs.md`。
 
 ## 6. git / 沟通 / 安全边界
 
-- **默认主动 `git commit` + `git push` 到 origin，并按需直接部署**（本仓 + sub-repo 都适用），推各仓默认分支（本仓 `main`、edge/cloud/console `master`）。**提交 / 推送 / 部署都不需每次问**（用户长期授权，2026-06-27；部署安全序列与红线见 §5）。commit message 末尾带 `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。**仍需先确认**：force-push、非 fast-forward、推到非默认 protected branch。
+- **默认主动 `git commit` + `git push` 到 origin，并自动部署 `dev`**（本仓 + sub-repo 都适用），推各仓默认分支（本仓 `main`、edge/cloud/console `master`）。**提交 / 推送 / dev 部署都不需每次问**（用户长期授权，2026-06-27；部署安全序列与红线见 §5）。`ol` 部署必须等用户明确要求，并从发布分支执行。commit message 末尾带 `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。**仍需先确认**：force-push、非 fast-forward、推到非默认 protected branch。
 - **提交 / 推送 / 部署必须用干净 worktree 做最终确认**：代码改动提交推送后，若当前工作区存在任何无关改动，或处于多任务并行场景，必须从目标提交新建 clean worktree（或等价 `git archive HEAD` 快照）运行部署闸与打包；严禁从脏共享工作区直接 `rsync` / 打包上线，避免把未提交 / 他人改动混入生产。部署仍只从默认分支目标提交的快照走，worktree 用于验证与产物生成，不作为长期开发主干。
 - **语言**：正文默认中文；代码 / 注释 / commit / PR / 命令 / 文件名保持英文。
 - **问题 / 方案的说明方式（默认模式，用户偏好）**：讲逻辑、不用比喻；不点代码内部标识符（变量 / 类 / 函数 / 消息类型名），改用**功能性正文**描述组件与机制（如「执行端 / 决策端 / 监测体」「发命令给执行端的统一出口」「阻塞式 vs 临时离开式打断」）；分点、句子短、让非工程视角也能跟上；确需落到代码时再补具体 `文件:行`。
@@ -84,7 +84,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **被指派 change 即为 fleet 成员**：session 若经 `scripts/spawn-change` 启动、或用户直接说「实装 change X」，即独占该 change，按本节自主走全流程（读 change 文档 → worktree 开发 → `land-change` 集成 → tasks.md 回写 → 真机项登记 backlog → 部署前探 ECS → archive），无需逐步征询。
 - **极简启动（用户多终端并行的标准入口）**：新终端在本仓起 claude 后，`/impl <change名>` = 指派实装；`/claim` = 自主认领一个无人在做的活跃 change（**worktree = 认领锁**：建 worktree 失败即被并发抢先、换下一个；先报出所选再开工，不等确认）。命令定义在 `.claude/commands/`，指令自包含，用户无需再输入任何交代。
 - **先判定自己在哪**：`git worktree list` / `git rev-parse` 认清是「主 checkout」还是某 change 的 worktree。worktree 内 = 只在本分支开发 + 提交 + 跑 `test` / `typecheck`；主 checkout = 集成与部署位。
-- **部署只从主 checkout 的 eligible ref 走，绝不从任何 worktree 部署**（dev 可用验证后的默认分支；ol 只用 release 分支/tag 或 exact clean SHA）。
+- **部署只从主 checkout 的 eligible ref 走，绝不从任何 worktree 部署**（dev 用验证后的默认分支；ol 只用用户要求的发布分支，tag / clean SHA 只能作为创建发布分支的来源，不能直接替代分支部署）。
 - **热点文件单写者，并行时绝不同时碰**：两份 `protocol.ts` + `aidcp-cloud/src/comm/command-bridge.ts` 动作映射（§2 协议四处同步）、角色注册（`event-bus/types.ts` 的 `RoleName` + `src/config/role-catalog.ts`）、风控状态机 `src/risk/risk-state-machine.ts`。任务若必须动这些，标记为需串行、不与他人并行。
 - **开发并行、集成串行**：合回默认分支前先 `fetch` + rebase 到最新默认分支、解冲突、跑 `test:acceptance` + `typecheck` 再 ff 合并。**push 遇 non-ff 一律 rebase 后重来、绝不 force**（force / 非 ff 仍按 §6 需先确认）；空 diff = 已在远端、可弃（见 memory `concurrent-session-shares-subrepo-worktree`）。
 - **完成即收口**：部署 + 验证通过 → archive 该 change → 删 worktree / 分支。有 worktree 却无对应活跃 change = 孤儿，清掉。

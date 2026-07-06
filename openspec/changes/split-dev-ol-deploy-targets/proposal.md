@@ -7,16 +7,16 @@ The immediate risk is highest around PostgreSQL and runtime credentials: the cur
 ## What Changes
 
 - Introduce named deployment targets:
-  - `dev`: existing ECS `121.89.85.150`, key `~/codes/isales-4.pem`, used for mainline/high-frequency development deployment and real-machine validation.
-  - `ol`: new ECS `123.56.253.183`, key `/Users/baitianxing/Downloads/ol.pem`, used only for stable online deployment from release branches/tags.
+  - `dev`: existing ECS `121.89.85.150`, key `~/codes/isales-4.pem`, used as the default target for completed development deployment, mainline/high-frequency deployment, and real-machine validation.
+  - `ol`: new ECS `123.56.253.183`, key `/Users/baitianxing/Downloads/ol.pem`, used only when the user explicitly requests stable online deployment from a release branch.
 - Document and enforce that deployment target selection is explicit for cloud, console, and edge connection configuration.
 - Define a safe first ol rollout path that prepares runtime dependencies, systemd, nginx, runtime env, and health checks without writing secrets into the repo.
 - Define the database boundary:
   - Preferred: ol uses its own production PostgreSQL database or RDS instance.
   - Temporary bridge: ol may connect to dev PostgreSQL only with restricted network and `pg_hba.conf` allowlist, and only until a dedicated ol database is ready.
 - Define release flow:
-  - Development changes land to default branches and deploy to dev after validation.
-  - Online deployment uses a release branch/tag or exact committed SHA, never an arbitrary dirty worktree.
+  - Development changes land to default branches and deploy automatically to dev after validation.
+  - Online deployment is opt-in by explicit user request, creates or selects a release branch, and deploys by that branch. Tags or exact committed SHAs may seed the release branch, but do not replace branch-based deployment.
   - Hotfixes start from the release line and are merged/cherry-picked back to mainline.
 - Update docs and helper scripts so existing “cloud only deploys to `121.89.85.150`” wording no longer hides the new two-target reality.
 - Keep secrets out of git: only env key names, paths, service names, and validation commands may be recorded.

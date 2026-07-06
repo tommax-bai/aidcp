@@ -21,6 +21,8 @@ This file is the Codex-facing mapping of `CLAUDE.md`. Keep `CLAUDE.md` as the le
   - `dev`: `121.89.85.150`, key `~/codes/isales-4.pem`
   - `ol`: `123.56.253.183`, key `/Users/baitianxing/Downloads/ol.pem`
   If the target is unclear or the key check fails, stop and report it.
+- Default deployment target is `dev`: when a production-facing code/artifact change is complete and no target is specified, resolve the target to `dev`, state it, run the target check, and deploy `dev` after validation.
+- `ol` is opt-in only: deploy `ol` only when the user explicitly requests `ol`/online deployment.
 
 ## 2. Architecture Invariants
 
@@ -59,16 +61,17 @@ This file is the Codex-facing mapping of `CLAUDE.md`. Keep `CLAUDE.md` as the le
 ## 5. Deployment
 
 - Cloud runtime runs only on named ECS targets; local cloud is not the production runtime. See `docs/deployment-environments.md`.
-- `dev` is the high-frequency development/validation target; `ol` is the stable online target and must deploy only release branches/tags or exact clean SHAs.
+- `dev` is the default high-frequency development/validation target. After a production-facing change is implemented, validated, committed, and pushed, deploy `dev` automatically through the safe deployment sequence unless the user explicitly pauses deployment or a safety gate fails.
+- `ol` is the stable online target and is never the default. Deploy `ol` only after an explicit user request, and create or use a release branch such as `release/<date>-<scope>` for the deployment. Tags or clean SHAs may seed that release branch, but the deployed ref must be the release branch.
 - `dev` also hosts unrelated `isales` services. Never touch unrelated services, directories, ports, or systemd units.
 - Deployment sequence, when deployment is actually required: sibling-repo tests pass, back up ECS cloud and env, `rsync` excluding secrets/deps/git metadata, restart `aidcp-cloud.service`, then healthcheck service state, port, Feishu connection, and PostgreSQL.
 - On deployment failure, roll back. Do not improvise against production.
-- Deployment must come from a clean eligible checkout: default branch/main checkout for `dev`, release branch/tag or exact clean SHA for `ol`, never an arbitrary dirty shared worktree or feature worktree.
+- Deployment must come from a clean eligible checkout: default branch/main checkout for `dev`, release branch checkout for `ol`, never an arbitrary dirty shared worktree or feature worktree.
 
 ## 6. Git, Communication, Security
 
 - Preserve user and other-session changes. Do not revert unrelated dirty files.
-- Default closeout for code changes is automatic: after implementation, run the relevant validation, commit, push to the default branch, and deploy/publish when the changed service or artifact is production-facing.
+- Default closeout for code changes is automatic: after implementation, run the relevant validation, commit, push to the default branch, and deploy/publish to `dev` when the changed service or artifact is production-facing.
 - Confirm before force-push, non-fast-forward pushes, or pushing to non-default/protected branches.
 - If the working tree has unrelated changes, use explicit pathspecs and/or a clean worktree/archive snapshot for final verification and deployment packaging.
 - Default prose language is Chinese. Code, comments, commit messages, PR text, commands, and file names stay in English unless the surrounding file establishes otherwise.
@@ -78,9 +81,9 @@ This file is the Codex-facing mapping of `CLAUDE.md`. Keep `CLAUDE.md` as the le
 
 ## 7. Automatic Closeout
 
-- For code-bearing changes, the default finish line is: implementation complete, tests/typecheck appropriate to the touched repo pass, commit, push, and deploy/publish if runtime behavior changes.
+- For code-bearing changes, the default finish line is: implementation complete, tests/typecheck appropriate to the touched repo pass, commit, push, and deploy/publish to `dev` if runtime behavior changes.
 - For OpenSpec-backed work, update the relevant `tasks.md` with commit SHA, validation notes, deployment/publish notes, and any deviation from the proposal.
-- Deploy/publish only through the documented safe path for the affected artifact and target: cloud ECS deployment, console static release, edge desktop/package release, or docs/spec-only no-op.
+- Deploy/publish only through the documented safe path for the affected artifact and target: cloud ECS deployment, console static release, edge desktop/package release, or docs/spec-only no-op. If no target is named for production-facing development work, use `dev`; require an explicit user request before any `ol` deployment.
 - Stop and ask before destructive database changes, secret/key changes, production data deletion, tests failing but user still wants release, unclear publish target, force-push, non-fast-forward push, or any action that may affect unrelated `isales` services.
 - Documentation-only or spec-only changes are still committed and pushed by default, but they do not trigger runtime deployment unless they are part of a release procedure.
 
@@ -92,7 +95,7 @@ This file is the Codex-facing mapping of `CLAUDE.md`. Keep `CLAUDE.md` as the le
 - If assigned an existing change, treat it as owned by this session: read proposal/design/tasks, work in the matching worktree/branch, update tasks, validate, and help archive when complete.
 - First determine where you are with `git worktree list` and `git rev-parse`. Worktree means branch-local implementation and validation; main checkout means integration/deployment coordination.
 - Hotspots are single-writer during parallel work: protocol files and command mapping, role registration/catalog, and risk-state machine. Mark such changes as serial when they must be touched.
-- Development may be parallel; integration is serial. Before merging back to default branch, fetch, rebase onto latest default, resolve conflicts, run required tests/typecheck, and fast-forward merge. On non-fast-forward push, rebase and retry; do not force.
+- Development may be parallel; integration is serial. Before merging back to default branch, fetch, rebase onto latest default, resolve conflicts, run required tests/typecheck, and fast-forward merge. On non-fast-forward push, rebase and retry; do not force. Deploy `dev` only from the clean main/default checkout, and deploy `ol` only from the selected release branch.
 - After deployment and validation, archive the change and remove obsolete worktrees/branches. A worktree without a matching active change is an orphan.
 - See `docs/parallel-dev-worktrees.md` and helper scripts such as `scripts/new-change`, `scripts/spawn-change`, and `scripts/land-change` for operational details.
 

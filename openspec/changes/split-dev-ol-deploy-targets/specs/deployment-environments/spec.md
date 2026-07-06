@@ -2,7 +2,7 @@
 
 ### Requirement: Deployment targets must be explicit
 
-The project SHALL define explicit deployment targets for aidcp runtime operations. `dev` SHALL refer to ECS `121.89.85.150` with SSH key `~/codes/isales-4.pem` and SHALL be used for mainline development deployment and real-machine validation. `ol` SHALL refer to ECS `123.56.253.183` with SSH key `/Users/baitianxing/Downloads/ol.pem` and SHALL be used for stable online deployment.
+The project SHALL define explicit deployment targets for aidcp runtime operations. `dev` SHALL refer to ECS `121.89.85.150` with SSH key `~/codes/isales-4.pem` and SHALL be the default target for completed production-facing development deployment, mainline development deployment, and real-machine validation. `ol` SHALL refer to ECS `123.56.253.183` with SSH key `/Users/baitianxing/Downloads/ol.pem` and SHALL be used only when the user explicitly requests stable online deployment.
 
 Any cloud, console, or edge release operation MUST name the target before touching remote state. Deployment tools and docs MUST NOT rely on the legacy assumption that there is only one ECS target.
 
@@ -25,16 +25,30 @@ Any cloud, console, or edge release operation MUST name the target before touchi
 - **WHEN** a deployment command or runbook step would touch ECS state without naming `dev` or `ol`
 - **THEN** the operation MUST stop before SSH or rsync and report that the deployment target is missing
 
-### Requirement: Ol deployments must come from release-eligible commits
+#### Scenario: Completed development defaults to dev
 
-The system SHALL separate development deployment from online release deployment. `dev` deployments MAY use validated default-branch commits after the relevant repo tests pass. `ol` deployments MUST use a release branch, release tag, or exact committed SHA from a clean checkout; they MUST NOT deploy arbitrary dirty worktrees or uncommitted local files.
+- **WHEN** a production-facing development change is complete and deployment is required
+- **AND** the user has not named a deployment target
+- **THEN** the deployment target SHALL resolve to `dev`
+- **AND** the deployment MUST still state the resolved target and pass the `dev` preflight before touching ECS
+
+#### Scenario: Ol requires explicit user request
+
+- **WHEN** a deployment would target `ol`
+- **THEN** the operator MUST have an explicit user request for `ol` or online deployment
+- **AND** `ol` MUST NOT be selected as an implicit default
+
+### Requirement: Ol deployments must come from release branches
+
+The system SHALL separate development deployment from online release deployment. `dev` deployments SHALL use validated default-branch commits after the relevant repo tests pass. `ol` deployments MUST use a release branch from a clean checkout; they MUST NOT deploy arbitrary dirty worktrees, uncommitted local files, feature branches, default branches, tags, or raw SHAs directly. A tag or exact committed SHA MAY be used only as the source for creating the release branch.
 
 For cross-repo releases, the deployed cloud, console, and edge SHAs SHALL be recorded together when more than one artifact changes.
 
-#### Scenario: Dev accepts validated default branch
+#### Scenario: Dev auto-deploys validated default branch
 
 - **WHEN** a change has landed on the relevant repo default branch and tests/typecheck required by the change have passed
-- **THEN** it MAY be deployed to `dev` after the normal backup, rsync, restart, and healthcheck sequence
+- **AND** the changed service or artifact is production-facing
+- **THEN** it SHALL deploy to `dev` after the normal backup, rsync, restart, and healthcheck sequence unless the user explicitly paused deployment or a safety gate fails
 
 #### Scenario: Ol rejects dirty deployment source
 
@@ -42,10 +56,16 @@ For cross-repo releases, the deployed cloud, console, and edge SHAs SHALL be rec
 - **THEN** the deployment MUST stop before remote sync
 - **AND** it MUST report the checkout/ref eligibility failure
 
+#### Scenario: Ol rejects direct tag or raw SHA deployment
+
+- **WHEN** an operator attempts to deploy `ol` directly from a tag or raw committed SHA without creating/selecting a release branch
+- **THEN** the deployment MUST stop before remote sync
+- **AND** it MUST report that `ol` deployment is branch-based
+
 #### Scenario: Ol records exact release version
 
 - **WHEN** an `ol` deployment succeeds
-- **THEN** the release note or OpenSpec task SHALL record the exact committed SHA or tag for each deployed artifact
+- **THEN** the release note or OpenSpec task SHALL record the release branch and exact committed SHA for each deployed artifact
 
 ### Requirement: Dev and ol runtime state must be isolated
 

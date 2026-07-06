@@ -6,8 +6,8 @@
 
 | Target | Host | SSH key | Purpose |
 | --- | --- | --- | --- |
-| `dev` | `121.89.85.150` | `~/codes/isales-4.pem` | 主干开发、高频部署、真机验证 |
-| `ol` | `123.56.253.183` | `/Users/baitianxing/Downloads/ol.pem` | 稳定上线环境，只部署 release 分支、tag 或明确 clean SHA |
+| `dev` | `121.89.85.150` | `~/codes/isales-4.pem` | 默认部署目标；主干开发、高频部署、真机验证 |
+| `ol` | `123.56.253.183` | `/Users/baitianxing/Downloads/ol.pem` | 稳定上线环境；仅在用户明确要求时从 release 分支部署 |
 
 运行时目录约定：
 
@@ -21,9 +21,11 @@
 ## Invariants
 
 - Any SSH or `rsync` to ECS MUST name a target: `dev` or `ol`.
+- If a completed production-facing development task needs deployment and the user did not name a target, the target defaults to `dev`.
+- `ol` MUST NOT be deployed by default. It is allowed only after an explicit user request for `ol`/online deployment.
 - Before SSH or `rsync`, run `scripts/deploy-target <target> --check` or manually verify the same facts: host IP, key path, and key permissions.
 - Local cloud is not a production substitute. Run cloud tests locally, but runtime cloud lives on ECS.
-- Deploy only from a clean main checkout/default branch for `dev`, and from a release branch/tag or exact clean SHA for `ol`.
+- Deploy only from a clean main checkout/default branch for `dev`, and from a clean release branch checkout for `ol`. A tag or clean SHA may be used to create the release branch, but the deployed ref is the branch.
 - Never deploy from an arbitrary dirty worktree.
 - Never record secrets in git, OpenSpec tasks, docs, shell history snippets, or memory. Record only env key names, paths, services, and validation commands.
 - Do not touch unrelated `isales` services, directories, ports, or databases on `dev`.
@@ -108,20 +110,22 @@ or a future ol domain. Packaged edge releases intended for ol must not silently 
 ### Dev
 
 1. Land code to the relevant default branch after the required tests/typecheck.
-2. From the clean main checkout, back up cloud/env on `dev`.
-3. `rsync` excluding `.env`, `node_modules`, and `.git`.
-4. Restart only `aidcp-cloud.service`.
-5. Health-check service state, `8787`, panel `8090`, PostgreSQL, Feishu if enabled, and console if touched.
+2. If the changed service or artifact is production-facing, deploy `dev` automatically after commit/push unless the user explicitly pauses deployment or a safety gate fails.
+3. From the clean main checkout, back up cloud/env on `dev`.
+4. `rsync` excluding `.env`, `node_modules`, and `.git`.
+5. Restart only `aidcp-cloud.service`.
+6. Health-check service state, `8787`, panel `8090`, PostgreSQL, Feishu if enabled, and console if touched.
 
 ### Ol
 
-1. Select a release branch/tag or exact clean SHA.
-2. Verify all affected artifacts are built from matching release sources.
-3. Back up the existing ol runtime if present.
-4. `rsync` committed cloud files and built console static files to ol.
-5. Restart only ol `aidcp-cloud.service` and reload ol nginx when needed.
-6. Health-check cloud, panel, console, database, and Feishu if enabled.
-7. Record deployed SHAs, database mode, and validation notes in the OpenSpec task.
+1. Proceed only after the user explicitly requests `ol`/online deployment.
+2. Create or select a release branch such as `release/<yyyymmdd>-<scope>` from the chosen clean default-branch commit, tag, or SHA.
+3. Verify all affected artifacts are built from matching release branch sources.
+4. Back up the existing ol runtime if present.
+5. `rsync` committed cloud files and built console static files to ol.
+6. Restart only ol `aidcp-cloud.service` and reload ol nginx when needed.
+7. Health-check cloud, panel, console, database, and Feishu if enabled.
+8. Record the release branch, deployed SHAs, database mode, and validation notes in the OpenSpec task.
 
 ## Preflight Helper
 

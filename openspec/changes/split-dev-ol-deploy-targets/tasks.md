@@ -50,10 +50,12 @@
 
 ## 5. Release And Deployment Flow
 
-- [x] 5.1 Define the release source rule for ol: release branch/tag or exact clean SHA only; reject dirty worktree deployments.
+- [x] 5.1 Define the release source rule for ol: release branch only; reject dirty worktree deployments and direct tag/raw-SHA deployments.
   <!-- documented in docs/deployment-environments.md, AGENTS.md, CLAUDE.md, scripts/README.md, docs/parallel-dev-worktrees.md. -->
+  <!-- update 2026-07-06: user set OL policy to explicit-request-only and branch-based; tags/SHAs can seed the release branch but are not the deployed ref. -->
 - [x] 5.2 Add dev deployment notes that allow high-frequency default-branch deployment after validation.
   <!-- documented in docs/deployment-environments.md and related control docs. -->
+  <!-- update 2026-07-06: user set DEV as the default automatic deployment target after completed production-facing development. -->
 - [x] 5.3 For cloud/console API-shape changes, document that ol promotion deploys cloud and console SHAs together and verifies `/api/version`.
   <!-- documented in docs/deployment-environments.md and tasks release notes requirement. -->
 - [x] 5.4 Update edge release/operator docs so dev clients point at `ws://121.89.85.150:8787` and ol clients point at `ws://123.56.253.183:8787` or the future ol domain.
@@ -78,6 +80,7 @@
 
 - [x] 7.1 Run `openspec validate split-dev-ol-deploy-targets --strict`.
   <!-- passed on 2026-07-06 after ol deployment validation; control git diff --check and script bash/preflight checks also passed. -->
+  <!-- update 2026-07-06: passed again after DEV-default automatic deployment and explicit OL release-branch policy update. -->
 - [x] 7.2 Commit and push docs/script changes after validation passes.
   <!-- pushed on 2026-07-06: aidcp main a6d62f4 Define split dev ol deployment targets; aidcp-cloud master f4316def Add Feishu WS toggle for split deploy targets; aidcp-console master 76231fa Document split dev ol console deployment; aidcp-edge master bc2af14 Document split dev ol edge targets. -->
 - [ ] 7.3 Archive the change only after ol deployment policy is implemented, required validation passes, and any temporary bridge status is explicitly recorded.
