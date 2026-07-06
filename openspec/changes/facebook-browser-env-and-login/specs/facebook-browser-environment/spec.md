@@ -14,11 +14,11 @@ edge SHALL support starting or attaching to a Facebook AdsPower profile through 
 
 ### Requirement: Facebook storage probe redacts all secret values
 
-The Facebook storage probe SHALL inspect cookies, localStorage, sessionStorage, IndexedDB, and service-worker/cache presence only to the extent needed to understand persistence shape. Probe output MUST NOT include raw cookie values, token values, localStorage/sessionStorage values, IndexedDB record payloads, request headers, or credentials. It MAY include origin names, key names, counts, expiry presence, value length buckets, and boolean presence markers.
+The Facebook storage probe SHALL inspect cookies, localStorage, sessionStorage, IndexedDB, and service-worker/cache presence only to the extent needed to understand persistence shape. Probe output MUST NOT include raw cookie values, token values, raw localStorage/sessionStorage key names, raw IndexedDB/cache names, IndexedDB record payloads, request headers, or credentials. It MAY include origin names, counts, expiry presence, value length buckets, redacted key/name hashes, and boolean/token-like presence markers.
 
 #### Scenario: Storage summary omits values
 - **WHEN** the storage probe runs on a logged-in Facebook profile
-- **THEN** the output contains only redacted metadata such as key names/counts/origins and contains no raw cookie, token, localStorage, sessionStorage, IndexedDB, or header values
+- **THEN** the output contains only redacted metadata such as counts/origins/key-name hashes and contains no raw cookie, token, localStorage key, sessionStorage key, IndexedDB/cache name, IndexedDB payload, or header values
 
 ### Requirement: Facebook page structure probes map Page, Group, and post surfaces
 

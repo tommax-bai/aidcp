@@ -27,8 +27,8 @@ External review affects scope. Meta's official Pages API can support Page commen
 - Put probes before driver behavior.
   - Rationale: Facebook DOM, editor state, and checkpoint transitions are high drift and high risk; implementation without evidence would encode guesses.
   - Alternative considered: implement a driver directly and iterate during scheduled-comment work. That would mix feasibility failures with automation bugs.
-- Keep probes storage-safe by reporting counts, key names, origins, and boolean presence only.
-  - Rationale: cookies/localStorage/IndexedDB are credentials or session material. The useful engineering question is whether state persists and what origin owns it, not the secret value.
+- Keep probes storage-safe by reporting counts, origins, length buckets, token-like markers, and key/name hashes only.
+  - Rationale: cookies/localStorage/IndexedDB are credentials or session material, and the 2026-07-06 live probe showed storage key names can themselves contain account-scoped or HMAC-like fragments. The useful engineering question is whether state persists and roughly what shape it has, not the secret value or raw key/name.
   - Alternative considered: dump storage snapshots to reproduce sessions. That violates the repo's secret-handling boundary and is unnecessary with AdsPower profile persistence.
 - Use AdsPower profile persistence as the login/session strategy.
   - Rationale: existing anti-detection architecture already treats one account as one profile/fingerprint/IP. That is closer to real user behavior than exporting/importing storage.
