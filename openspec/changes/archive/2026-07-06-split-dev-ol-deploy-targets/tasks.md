@@ -84,4 +84,5 @@
 - [x] 7.2 Commit and push docs/script changes after validation passes.
   <!-- pushed on 2026-07-06: aidcp main a6d62f4 Define split dev ol deployment targets; aidcp-cloud master f4316def Add Feishu WS toggle for split deploy targets; aidcp-console master 76231fa Document split dev ol console deployment; aidcp-edge master bc2af14 Document split dev ol edge targets. -->
   <!-- update 2026-07-06: aidcp main 8000469 records DEV-default automatic deployment and explicit OL release-branch deployment policy. -->
-- [ ] 7.3 Archive the change only after ol deployment policy is implemented, required validation passes, and any temporary bridge status is explicitly recorded.
+- [x] 7.3 Archive the change only after ol deployment policy is implemented, required validation passes, and any temporary bridge status is explicitly recorded.
+  <!-- ready for archive on 2026-07-06: DEV-default deployment and explicit OL release-branch policy implemented; strict validation passed; temporary ol -> dev PostgreSQL bridge status remains recorded in 6.5. -->
