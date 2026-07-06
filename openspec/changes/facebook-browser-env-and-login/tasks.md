@@ -70,6 +70,7 @@
   <!-- done 2026-07-06: live Phase-0 runner recorded logged-in and logged-out F2 outcomes in phase0-live-probe-findings.md. Logged-out / and /login classify as login; logged-out /checkpoint normalizes to / but still classifies login; /two_step_verification/authentication classifies captcha. No credential/checkpoint solving attempted. -->
 - [ ] 6.3 Run F3 low-frequency AdsPower profile stability observation for several days and record result without secrets.
   <!-- partial 2026-07-06: short single-run startup/attach samples passed for k1ebny3j and k1ecc0b2 without immediate new checkpoint, but this is not multi-day low-frequency evidence. -->
+  <!-- partial 2026-07-06: Day-0 read-only F3 sample for k1ebny3j passed startup/attach, overlay none, stable identity hash, webdriver false, and clean browser stop back to Inactive. This is still not multi-day low-frequency evidence. -->
 
 ## 7. Validation and Closeout
 
@@ -84,7 +85,9 @@
   <!-- partial 2026-07-06: edge commit 224b196 records Page/Group/post structure probe, read-only editor focus/type/clear probe, and gated submit preflight. Remaining probe outcomes: disposable AdsPower test target, F1 server-confirmed comment verification, F2 real-machine honest-stop run, and F3 multi-day stability. -->
   <!-- partial 2026-07-06: live F2 outcomes and redaction correction are recorded in phase0-live-probe-findings.md. Remaining probe outcomes: F1 server-confirmed comment verification on an operator-owned disposable post and F3 multi-day stability. -->
   <!-- partial 2026-07-06: edge commit 54e07cd adds the reusable Phase-0 manual probe runner and storage/permalink redaction hardening; control commit 7f18ba1 records live F2 findings and spec/design redaction corrections. Remaining probe outcomes: F1 server-confirmed comment verification on an operator-owned disposable post and F3 multi-day stability. -->
+  <!-- partial 2026-07-06: Day-0 F3 read-only observation recorded in phase0-live-probe-findings.md. Remaining probe outcomes: F1 server-confirmed comment verification on an operator-owned disposable post and F3 multi-day stability. -->
 - [x] 7.4 Run `openspec validate facebook-browser-env-and-login --strict`.
   <!-- done 2026-07-06: PASS. Rerun after later 4.x/F-gate work changes artifacts. -->
   <!-- done 2026-07-06: PASS after storage key/name redaction spec update and F2 live probe findings. -->
+  <!-- done 2026-07-06: PASS after Day-0 F3 read-only observation notes. -->
 - [ ] 7.5 Do not start `facebook-scheduled-comment` until F1/F2/F3 are all recorded as passed or the design is revised.
