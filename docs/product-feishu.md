@@ -200,25 +200,25 @@
 
 **双轨**：结构化命令保证确定性，自然语言降低门槛；自然语言先归一到结构化命令再执行。
 
-**结构化命令**（前缀 `/aidcp`，确定性高，适合脚本化/熟练用户）：
+**结构化命令**（直接使用短命令，确定性高，适合脚本化/熟练用户）：
 
 ```
-/aidcp pause acc-01                  # 暂停账号
-/aidcp resume acc-01
-/aidcp status acc-01                 # 查单账号状态卡片
-/aidcp status group:g-beauty         # 查分组
-/aidcp tier acc-01 conservative      # 调档：conservative|normal|aggressive（升档需 Web 复核）
-/aidcp run acc-01 task:browse        # 手动触发浏览任务（product-task.md §3.1）
-/aidcp publish acc-01 content:c-101  # 手动触发某条发布（进审批）
-/aidcp pause group:g-beauty          # 批量：对一组账号同一指令（product-task.md §5）
+/pause acc-01                  # 暂停账号
+/resume acc-01
+/status acc-01                 # 查单账号状态卡片
+/status group:g-beauty         # 查分组
+/tier acc-01 conservative      # 调档：conservative|normal|aggressive（升档需 Web 复核）
+/run acc-01 task:browse        # 手动触发浏览任务（product-task.md §3.1）
+/publish 工程师大白             # 按昵称手动触发该账号发帖（进审批）
+/pause group:g-beauty          # 批量：对一组账号同一指令（product-task.md §5）
 ```
 
 **自然语言**（@Bot 后口语化，Bot 用云端 Qwen（architecture.md §2.2 QwenClient）做意图解析）：
 
 ```
-"把美妆组都先停一下"        → /aidcp pause group:g-beauty
-"acc-02 降到保守档"          → /aidcp tier acc-02 conservative
-"小张那个账号现在怎么样"      → /aidcp status acc-01
+"把美妆组都先停一下"        → /pause group:g-beauty
+"acc-02 降到保守档"          → /tier acc-02 conservative
+"小张那个账号现在怎么样"      → /status acc-01
 ```
 
 安全约束：
