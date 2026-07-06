@@ -88,6 +88,7 @@
   <!-- partial 2026-07-06: edge commit 54e07cd adds the reusable Phase-0 manual probe runner and storage/permalink redaction hardening; control commit 7f18ba1 records live F2 findings and spec/design redaction corrections. Remaining probe outcomes: F1 server-confirmed comment verification on an operator-owned disposable post and F3 multi-day stability. -->
   <!-- partial 2026-07-06: Day-0 F3 read-only observation recorded in phase0-live-probe-findings.md. Remaining probe outcomes: F1 server-confirmed comment verification on an operator-owned disposable post and F3 multi-day stability. -->
   <!-- partial 2026-07-06: F3 runbook added; final SHA recording still waits for F1 and multi-day F3 outcomes. -->
+  <!-- partial 2026-07-06: control commit 198767d adds phase0-f3-observation-runbook.md for F3 cadence, counted-sample criteria, failure conditions, and recording template. -->
 - [x] 7.4 Run `openspec validate facebook-browser-env-and-login --strict`.
   <!-- done 2026-07-06: PASS. Rerun after later 4.x/F-gate work changes artifacts. -->
   <!-- done 2026-07-06: PASS after storage key/name redaction spec update and F2 live probe findings. -->
