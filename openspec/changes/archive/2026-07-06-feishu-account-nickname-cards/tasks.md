@@ -22,3 +22,5 @@
   <!-- validation=cd ../aidcp-cloud.wt/feishu-account-nickname-cards && npm run typecheck passed -->
 - [x] 3.4 Run `openspec validate feishu-account-nickname-cards --strict`.
   <!-- validation=openspec validate feishu-account-nickname-cards --strict passed -->
+- [x] 3.5 Deploy cloud runtime to `dev` and health-check.
+  <!-- deployment=dev 2026-07-06 backup=/opt/aidcp/cloud.bak.20260706-144828.tar.gz env_backup=/opt/aidcp/cloud/.env.bak.20260706-144828 deployed=aidcp-cloud@5474800 health=service active, :8787/:8090 listening, /api/health ok, PG select 1 ok, Feishu WSClient onReady, account nickname 工程师大白 present, NRestarts=0, isales services active -->
