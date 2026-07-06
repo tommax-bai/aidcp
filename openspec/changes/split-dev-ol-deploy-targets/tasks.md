@@ -74,5 +74,6 @@
 
 - [x] 7.1 Run `openspec validate split-dev-ol-deploy-targets --strict`.
   <!-- passed on 2026-07-06 after ol deployment validation; control git diff --check and script bash/preflight checks also passed. -->
-- [ ] 7.2 Commit and push docs/script changes after validation passes.
+- [x] 7.2 Commit and push docs/script changes after validation passes.
+  <!-- pushed on 2026-07-06: aidcp main a6d62f4 Define split dev ol deployment targets; aidcp-cloud master f4316def Add Feishu WS toggle for split deploy targets; aidcp-console master 76231fa Document split dev ol console deployment; aidcp-edge master bc2af14 Document split dev ol edge targets. -->
 - [ ] 7.3 Archive the change only after ol deployment policy is implemented, required validation passes, and any temporary bridge status is explicitly recorded.
