@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 约 32 个角色，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> v2 共 **57 个消息类型**，下表按职能分组列全。
+> v2 共 **61 个消息类型**，下表按职能分组列全。
 
 ## 1. 信封（Envelope）
 
@@ -123,6 +123,10 @@
 | `risk.record.result` | cloud → edge | — | 记录结果 |
 | `risk.captcha_detected` | edge → cloud | — | 检测到验证码/未知阻断弹窗（已本地暂停），通知云端置风控态 + 停发命令 + 通知人工 |
 | `risk.captcha_cleared` | edge → cloud | — | 验证码/未知阻断弹窗已清除，已恢复浏览 |
+| `captcha.assist.capture` | cloud → edge | `captcha.assist.snapshot` | 请求原 edge 的原浏览器会话捕获当前验证码现场截图；captcha 暂停期间允许穿透 |
+| `captcha.assist.snapshot` | edge → cloud | — | 返回截图、snapshotId、crop/viewport 坐标映射和 fresh 遮罩元数据 |
+| `captcha.assist.click` | cloud → edge | `captcha.assist.click_result` | 将人工点位发送给原 edge，由 edge 映射并派发真实输入事件 |
+| `captcha.assist.click_result` | edge → cloud | — | 返回点击后 fresh 复检结果；只有清除时 edge 另发 `risk.captcha_cleared` |
 
 ### 2.6 发布编排（v2 新增，Publish Agent 驱动）
 
@@ -151,7 +155,7 @@
 }
 ```
 
-`platform` 是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 57 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。
+`platform` 是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 61 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。
 
 **`welcome`**（cloud → edge）
 ```jsonc
@@ -554,6 +558,80 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 
 **`risk.captcha_cleared`**（edge → cloud，fire-and-forget）：`{ "edgeId": "edge-1", "url": "...", "accountId": "acc-01" }`（均可选）
 > 边缘弹窗清除、已恢复浏览。云端解除该 edge 暂停；风控态不因清除自动回滚（由恢复窗口/人工恢复驱动）。
+
+**`captcha.assist.capture`**（cloud → edge）：请求原 edge 捕获验证码现场截图
+```jsonc
+{
+  "incidentId": "cap_01H...",    // string  cloud 侧远程协助 incident id
+  "reason": "initial",           // 'initial'|'refresh'|'retry'?
+  "requestedAt": 1717113600000,   // number?
+  "maxImageWidth": 1280,          // number?  edge 可继续 clamp
+  "maxImageHeight": 960,          // number?
+  "quality": 80                   // number?  JPEG 质量建议值
+}
+```
+> 该消息只允许定向发给 incident 绑定的 edge。captcha 暂停期间它可穿透传输层暂停闸；
+> 普通浏览、互动、发布页面动作仍必须被暂停闸拦截。
+
+**`captcha.assist.snapshot`**（edge → cloud）：返回现场截图和坐标映射
+```jsonc
+{
+  "incidentId": "cap_01H...",
+  "edgeId": "edge-1",
+  "accountId": "acc-01",
+  "snapshotId": "snap_01H...",
+  "capturedAt": 1717113601000,
+  "expiresAt": 1717113631000,
+  "kind": "captcha",             // 'captcha'|'unknown'
+  "url": "https://...",
+  "viewport": { "width": 1440, "height": 980, "deviceScaleFactor": 1 },
+  "crop": { "x": 0, "y": 0, "width": 821, "height": 810 },
+  "image": {
+    "mime": "image/jpeg",         // 'image/png'|'image/jpeg'
+    "data": "<base64>",           // short-lived；不得写普通日志
+    "width": 821,
+    "height": 810
+  },
+  "overlay": { /* BlockingOverlaySnapshotPayload，可选 */ }
+}
+```
+> 截图必须来自原 edge 的原浏览器会话，cloud 不得另开浏览器生成。MVP 只在 cloud 进程内保留每个
+> incident 的最新截图并依赖短 TTL 过期；不写入数据库、对象存储、Feishu 卡片或普通告警列表。扩大到
+> 多人运营或 ol 前，如需审计，只能新增 append-only 元数据表，仍不得长期保存截图二进制。
+
+**`captcha.assist.click`**（cloud → edge）：把人工点位派发到原浏览器
+```jsonc
+{
+  "incidentId": "cap_01H...",
+  "snapshotId": "snap_01H...",
+  "points": [
+    { "x": 0.35, "y": 0.42, "label": "image-1" },
+    { "x": 0.70, "y": 0.44, "label": "image-2" }
+  ],
+  "requestedAt": 1717113605000,
+  "settleMs": 1500
+}
+```
+> 点位是相对 snapshot 图片的归一化坐标 `[0,1]`。edge 必须校验 incident/snapshot/current overlay
+> 和坐标边界后，再映射到当前 viewport 并派发真实输入事件；不得用 DOM 状态篡改替代点击。
+
+**`captcha.assist.click_result`**（edge → cloud）：点击后的 fresh 复检结果
+```jsonc
+{
+  "incidentId": "cap_01H...",
+  "snapshotId": "snap_01H...",
+  "edgeId": "edge-1",
+  "accountId": "acc-01",
+  "status": "still_blocked",      // 'cleared'|'still_blocked'|'stale_snapshot'|'not_blocked'|'invalid_target'|'failed'
+  "reason": "captcha overlay still visible",
+  "checkedAt": 1717113608000,
+  "snapshot": { /* CaptchaAssistSnapshotPayload，可选，用于刷新仍阻断现场 */ }
+}
+```
+> `status:'cleared'` 只是协助命令结果；恢复下发仍只由 edge 额外发送的 `risk.captcha_cleared`
+> 触发。cloud 不得因为点击命令送达、Feishu 链接打开、协助页按钮点击或告警手动解决而 `resumeEdge`。
+> 运行兜底：未配置远程协助、scoped token 过期、edge 离线或截图失败时，飞书告警仍保留原远程桌面处置路径；
+> 操作员应远程连到原机器处理，随后等待 edge fresh probe 上报 `risk.captcha_cleared`，cloud 不能手动伪造清除。
 
 ### 3.10 发布编排
 
