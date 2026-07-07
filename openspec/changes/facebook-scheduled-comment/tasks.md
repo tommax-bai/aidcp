@@ -60,6 +60,9 @@
 - [ ] 7.3 Run a short shadow sanity pass on one disposable account (hours, not days — enough to confirm audit rows, validator reject rate, target relevance, and that the login/checkpoint alert loop fires); record findings without secrets. Multi-day shadow observation is deferred to section 8.
 - [ ] 7.4 Enable real posting on one disposable account with a 1-2/day cap (the existing global comment cooldown applies unchanged) and confirm one full verified-success path end to end. Multi-day real-posting observation is deferred to section 8.
 - [ ] 7.5 Commit sibling repo work, record commit SHAs and validation/probe/deployment notes in this `tasks.md`.
+  <!-- aidcp-cloud master 24ef9d4 (rebased onto 148b558 calendar-day-quotas, clean); aidcp-console master e13626d. -->
+  <!-- dev deploy 2026-07-07: cloud master 24ef9d4 live on dev (121.89.85.150) — rebased + re-ran typecheck/acceptance 44/44/full 1443/1443 before ff-merge; ECS probe found a concurrent session had rsynced the FB files at 19:26 but NOT restarted, so the completing step was systemctl restart aidcp-cloud.service (content already byte-identical to 24ef9d4 per rsync -c dry-run, so no re-rsync). Backups cloud.bak.20260707-192945.tar.gz + .env.bak + console.bak. Healthcheck: service active/NRestarts=0/restart 19:32:52, 8787+8090 listening, Feishu WSClient onReady, PG select 1, accounts platform still all xiaohongshu (4/4, zero-regression), account_facebook_comment_config table auto-created (0 rows, fail-closed), panel /api/version 200, /facebook-comment-config route 401 (wired), isales-api/engine/scheduler/worker all active (red line intact). console e13626d already deployed to /opt/aidcp/console at 18:23 (FB "配置搜索词" build live). FB comment EXECUTION still unwired (2.2) → whole feature fail-closed; change stays ACTIVE, not archived. -->
+
 - [ ] 7.6 Run `openspec validate facebook-scheduled-comment --strict`.
 
 ## 8. Deferred Stability Completion (batched at the end)
