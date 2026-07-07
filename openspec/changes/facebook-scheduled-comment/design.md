@@ -39,8 +39,11 @@ Official Meta Pages APIs may be useful for operator-owned Pages in a later capab
 - Keep automatic Facebook comments out of `manualCommentAccounts`.
   - Rationale: xhs manual comments skip quota because a human is in the loop. Facebook automation has no human in-loop and must be counted.
   - Alternative considered: reuse the xhs manual comment task wrapper unchanged. That would silently disable the main rate safety net.
-- Use shadow mode as the first rollout state.
-  - Rationale: text quality and target relevance can be audited without posting, recording risk, or deduping.
+- Use shadow mode as the first rollout state, but as a short sanity pass rather than a multi-day gate.
+  - Rationale: text quality and target relevance can be audited without posting, recording risk, or deduping. Under the fast-feature-push strategy, shadow proves the pipeline shape in hours; multi-day observation is batched into the final stability pass (tasks section 8), not run as a blocking rollout stage.
+- Defer long-duration stability testing and complete it in one batch at the end.
+  - Rationale: multi-day gates (F3 environment stability, sustained real-posting observation) serialize the whole feature behind calendar time. The team pushes features to an end-to-end working state first, then runs all long-duration observation together (tasks section 8) before scaling beyond one disposable account. This does not weaken any fail-closed / honest-verification safety invariant — those are enforced by code and unit/acceptance tests, not by observation duration.
+  - Alternative considered: keep F3 and multi-day observation as hard preconditions. Rejected per operator decision to prioritize feature velocity; the env-change gate itself allows proceeding when "the design is revised", which this change does explicitly.
 - Reuse the existing two comment entry points (schedule-driven comment action with `commentEnabled`/`commentDailyCap`, and Feishu `/comment`) routed by account platform; do NOT add a separate Facebook cron.
   - Rationale: both entry points already converge on the platform-aware command-style comment pipeline that resolves the per-account platform profile; Facebook only needs a `PLATFORM_REGISTRY` entry and a targeted execution path behind it. Daily caps reuse the existing per-account `commentDailyCap`/`commentedTodayCount`; `RiskController.canDo('comment')` stays the risk gate; kill switch stays an env flag (`AIDCP_FB_COMMENT_AUTO`, fail-closed default off).
   - Alternative considered: a dedicated Facebook cron. Rejected — duplicates trigger/cap/re-entrancy machinery that already exists and creates a second scheduling surface to operate.
@@ -64,13 +67,15 @@ Official Meta Pages APIs may be useful for operator-owned Pages in a later capab
 
 ## Migration Plan
 
-1. Confirm Change 1 F1/F2/F3 are recorded as passed. F1 can be unblocked immediately by having the disposable account publish its own test post; cloud-only work (target storage, entry-point routing, validators, shadow) MAY proceed in parallel during the F3 observation window, while real-posting tasks stay gated behind F1 + F3.
+Strategy: push the feature to a working end-to-end state fast; do NOT block on long-duration stability observation. F3 multi-day stability and multi-day real-posting observation are batched into a final completion pass (tasks section 8) once the feature functions. Only F1 (server-confirmation mechanism, cheap self-post) and the already-passed F2 gate feature work.
+
+1. Confirm F1 (self-owned test post) and F2 are recorded as passed; F3 multi-day observation is deferred to the final stability pass. Cloud-only work needs no real machine and starts immediately.
 2. Implement cloud target storage/API and entry-point routing (schedule-driven + Feishu `/comment`) with `AIDCP_FB_COMMENT_AUTO` default off, plus handshake insert-time platform provisioning.
 3. Implement edge Facebook targeted-comment driver capabilities.
 4. Run unit and acceptance tests for validators, risk gating, kill switch, shadow mode, and honest failure matrix.
-5. Run shadow on one disposable account; inspect the persisted audit rows.
-6. Enable real posting on one disposable account with a 1-2/day cap for several days (the existing global comment cooldown applies unchanged).
-7. Only after stable observation, deploy/publish through the documented safe paths.
+5. Run a short shadow sanity pass on one disposable account; inspect the persisted audit rows and confirm the alert loop fires.
+6. Enable real posting on one disposable account with a 1-2/day cap and confirm one full verified-success path (the existing global comment cooldown applies unchanged).
+7. Deploy/publish through the documented safe paths once the feature works end to end; then run the batched stability completion pass (section 8) before scaling caps or accounts.
 
 ## Open Questions
 

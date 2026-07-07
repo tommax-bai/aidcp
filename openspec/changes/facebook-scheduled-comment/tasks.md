@@ -1,7 +1,7 @@
 ## 1. Preconditions
 
 - [ ] 1.1 Confirm `platform-abstraction-layer` is archived with xhs zero-regression.
-- [ ] 1.2 Confirm `facebook-browser-env-and-login` has recorded passing F1/F2/F3 Phase-0 gates. F1 can be unblocked immediately by having the disposable account publish its own test post (a self-owned post removes permission-gate variables and isolates verification of the server-confirmation mechanism itself). Cloud-only work in this change (sections 2/3/5: target storage, entry-point routing, validators, shadow) MAY proceed in parallel during the F3 observation window because it never touches the Facebook real machine; real-posting tasks (section 4, 7.3, 7.4) remain gated behind F1 + F3.
+- [ ] 1.2 Confirm `facebook-browser-env-and-login` has recorded passing F1 and F2 Phase-0 gates. This change explicitly revises the env-change gate (its task 7.5 permits proceeding "or the design is revised"): F3 multi-day low-frequency stability observation is NOT a blocker for feature work — the team pushes features fast and batches all long-duration stability observation into a final completion pass (see section 8). F1 (server-confirmation mechanism) IS required and can be unblocked immediately by having the disposable account publish its own test post (a self-owned post removes permission-gate variables and isolates verification of the mechanism itself). F2 (login/checkpoint honest-stop) is already passed.
 - [ ] 1.3 Decide whether target configuration UI is in scope; if yes, open `aidcp-console` same-name worktree, otherwise keep config to cloud/API/storage.
 
 ## 2. Cloud Target Config and Cron
@@ -43,7 +43,17 @@
 
 - [ ] 7.1 Run cloud focused tests for cron, validators, kill switch, platform account enumeration, risk, and cooldown.
 - [ ] 7.2 Run edge focused tests for Facebook browse/comment/verification, then edge full tests, acceptance, and typecheck.
-- [ ] 7.3 Run shadow mode on one disposable account and record audit findings without secrets.
-- [ ] 7.4 Enable real posting only on one disposable account with a 1-2/day cap (the existing global comment cooldown applies unchanged); record multi-day observation.
+- [ ] 7.3 Run a short shadow sanity pass on one disposable account (hours, not days — enough to confirm audit rows, validator reject rate, target relevance, and that the login/checkpoint alert loop fires); record findings without secrets. Multi-day shadow observation is deferred to section 8.
+- [ ] 7.4 Enable real posting on one disposable account with a 1-2/day cap (the existing global comment cooldown applies unchanged) and confirm one full verified-success path end to end. Multi-day real-posting observation is deferred to section 8.
 - [ ] 7.5 Commit sibling repo work, record commit SHAs and validation/probe/deployment notes in this `tasks.md`.
 - [ ] 7.6 Run `openspec validate facebook-scheduled-comment --strict`.
+
+## 8. Deferred Stability Completion (batched at the end)
+
+Long-duration stability work is intentionally deferred out of the fast feature push and completed together once the feature functions end to end. None of these gate feature landing; all MUST be done before scaling beyond one disposable account or raising caps.
+
+- [ ] 8.1 F3-style multi-day low-frequency AdsPower/Facebook environment stability observation (>=3 counted calendar days), recorded without secrets.
+- [ ] 8.2 Multi-day real-posting observation on the disposable account (sustained 1-2/day) to confirm no delayed checkpoints, verification drift, or alert-noise regressions.
+- [ ] 8.3 Cooldown / daily-count persistence across restarts (currently in-memory) — required before multi-account restart-burst scenarios.
+- [ ] 8.4 Per-profile proxy/egress management and egress-stability observation before productionization.
+- [ ] 8.5 Re-evaluate caps and the Scale-out boundary checklist (proposal) using the accumulated stability evidence.
