@@ -113,8 +113,9 @@ or a future ol domain. Packaged edge releases intended for ol must not silently 
 2. If the changed service or artifact is production-facing, deploy `dev` automatically after commit/push unless the user explicitly pauses deployment or a safety gate fails.
 3. From the clean main checkout, back up cloud/env on `dev`.
 4. `rsync` excluding `.env`, `node_modules`, and `.git`.
-5. Restart only `aidcp-cloud.service`.
-6. Health-check service state, `8787`, panel `8090`, PostgreSQL, Feishu if enabled, and console if touched.
+5. If the batch changes `package.json`/`package-lock.json`, run a FULL `npm ci` on the ECS (`--registry=https://registry.npmmirror.com` as fallback). Never use `--omit=dev`: the service runs source via `npx tsx`, and `tsx`/`typescript` live in devDependencies — omitting them bricks the restart. Runtime asset dirs (e.g. `assets/fonts/`) travel with rsync automatically.
+6. Restart only `aidcp-cloud.service`.
+7. Health-check service state, `8787`, panel `8090`, PostgreSQL, Feishu if enabled, and console if touched. If the batch touches the text-card renderer (`src/render/`, `assets/fonts/`, satori/resvg deps), also run the render smoke: instantiate the renderer on the ECS and assert a golden card renders at 1728x2304 with non-zero bytes (verifies napi prebuilds against the host glibc).
 
 ### Ol
 
