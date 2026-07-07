@@ -80,7 +80,7 @@ AIDCP_E2E=1 AIDCP_CLOUD_URL=ws://123.56.253.183:8787 npm test
 | 缓存·锚点指纹 | fingerprint 一致性、schema | L | `cache.test.ts`、`concept-store.test.ts` | — |
 | 事件驱动编排 | 6 条浏览闭环路径 + SessionMonitor 配额终止 | S | `integration/role-dispatcher.test.ts` | 事件链回到 feed.entered；超预算终止 |
 | 事件驱动各角色 | 各角色订阅/产出事件正确（角色名以 `event-bus/types.ts` 的 `RoleName` + `role-dispatcher.ts` 注册为准） | L/S | `agents/*.test.ts`（18 个） | — |
-| 风控·控制器 | 三档配额、分/时/日窗口、点赞率 35% | L | `risk-controller.test.ts` | 超限拒绝 |
+| 风控·控制器 | 三档配额、分钟/小时滑窗、自然日每日窗口、点赞率 35% | L | `risk-controller.test.ts` | 超限拒绝 |
 | 风控·状态机 | normal→warned→restricted→frozen、恢复窗口 | L | `risk-state-machine.test.ts` | 迁移与恢复正确 |
 | 风控·去重/频控/预算/PG | 互动去重、搜索频控、会话预算、持久化 | L | `risk-dedup`、`risk-session-scheduler`、`risk-pg-store.test.ts` | — |
 | 飞书·Token/卡片/命令/记群 | token 续期、卡片构建、命令路由、卡片回调写信号 | L/S | `feishu-token`、`feishu-cards`、`feishu-commands`、`feishu-ws-receiver.test.ts` | — |

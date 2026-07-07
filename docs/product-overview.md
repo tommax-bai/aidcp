@@ -129,7 +129,7 @@ mindmap
 
 | # | 模块 | 实现状态 | 文档成熟度 | 已实现 / 文档与代码位置 | 缺口 |
 | --- | --- | --- | --- | --- | --- |
-| 9 | 风控模型 | `implemented`（拟人化执行层 + 控制器/状态机） | `complete` | **设计完整**：`docs/risk-control.md`。**拟人化执行层已实现**：`aidcp-edge/src/humanize/`。**风控控制器已实现**：`aidcp-cloud/src/risk/`——`RiskController` + 状态机 `normal→warned→restricted→frozen`（恢复窗口 warned 7d/restricted 3d）+ 滑窗计数（分/时/日）+ 三档配额 + 冷启动 + 时间窗调度 + 会话预算 + 互动去重 + PG 持久化 | 状态迁移目前主要由配额触发；接入真实平台封号/限流信号（confirmed/fatal）驱动待补 |
+| 9 | 风控模型 | `implemented`（拟人化执行层 + 控制器/状态机） | `complete` | **设计完整**：`docs/risk-control.md`。**拟人化执行层已实现**：`aidcp-edge/src/humanize/`。**风控控制器已实现**：`aidcp-cloud/src/risk/`——`RiskController` + 状态机 `normal→warned→restricted→frozen`（恢复窗口 warned 7d/restricted 3d）+ 分钟/小时滑窗 + Asia/Shanghai 自然日每日配额 + 三档配额 + 冷启动 + 时间窗调度 + 会话预算 + 互动去重 + PG 持久化 | 状态迁移目前主要由配额触发；接入真实平台封号/限流信号（confirmed/fatal）驱动待补 |
 | 10 | 效果度量体系 | `planned` | `designed` | `action.result` 上报通道已有（可作为过程指标数据源）；发布落库 `migrations/0001_publish_log.sql` | 过程/效果/健康三类指标的采集、聚合、看板全未做；统一口径引用 `./design-gaps-and-models.md` 的效果指标字典 |
 | 11 | 多账号协同与差异化 | `implemented`（单账号人设）+ `planned`（跨号协同） | `draft` | 单账号人设（Soul）已实现，多套 soul 可并存；概念池存储类已具备（`cache/concept-store.ts` 含 PG schema/持久化代码），但当前尚未接入运行链路（`ConceptStore` 未实例化，`concept.discovered` 仅在 `event-bus/types.ts` 声明、暂无角色发射），事件驱动产出待接通 | 矩阵号互动策略、账号梯队、跨号协同调度未做 |
 | 12 | 人机协作与止损 | `planned` | `draft` | — | 自动化分级、冻结规则、效果归因全未做（依赖风控状态机 #9 与面板 #5） |
@@ -144,7 +144,7 @@ mindmap
   （`aidcp-edge/src/browse/`：`feed-scroller` / `modal-controller` / `note-extractor` / `search-handler` / `card-filter` / `browse-session`）。
 - ✅ **事件驱动互动决策 + Qwen**：`RoleDispatcher` 调度约 32 角色，`ContentCuratorRole` 质量关卡 +
   `InteractionAppraiserRole` 点赞/收藏决策（`aidcp-cloud/src/agents/`），点赞执行 `aidcp-edge/src/client/like-runner.ts`。
-- ✅ **风控控制器**：`RiskController` 状态机 + 滑窗配额 + 冷启动 + 会话预算（`aidcp-cloud/src/risk/`）。
+- ✅ **风控控制器**：`RiskController` 状态机 + 分/时滑窗 + 自然日配额 + 冷启动 + 会话预算（`aidcp-cloud/src/risk/`）。
 - ✅ **Publish Agent（约 22 角色的多阶段角色图）**：内容侦察→创作→配图规划（ImagePlanner）/生成（ImageGenerator）→清洗评分→组装→话题/合规/可见性等决策→审批→执行 + 万象配图 + 落库
   （`aidcp-cloud/src/publish-agent/`），边缘发布六步 `aidcp-edge/src/flows/publish-post.ts` + 审批信号 `src/publish/approval-gate.ts`。
 - ✅ **飞书 Bot**：长连接 + 命令路由 + 自动记群 + 审批卡片信号（`aidcp-cloud/src/feishu/`）。

@@ -11,7 +11,7 @@
 >
 > **实现状态（2026-06）**：本文风控模型**已基本实装**于云端 `aidcp-cloud/src/risk/`——
 > `RiskController`（动作许可 `explain()`）+ `RiskStateMachine`（`normal→warned→restricted→frozen`，
-> 恢复窗口 warned 7d / restricted 3d）+ `SlidingWindowCounter`（分/时/日滑窗）+ `quotas`（保守/正常/激进三档）
+> 恢复窗口 warned 7d / restricted 3d）+ `SlidingWindowCounter`（分钟 / 小时滑窗 + Asia/Shanghai 自然日窗口）+ `quotas`（保守/正常/激进三档）
 > + `cold-start-planner`（冷启动养号）+ `time-scheduler`（作息时间窗）+ `session-budget`（会话预算）
 > + `interaction-dedup`（互动去重）+ `pg-risk-store`（PG 持久化，`migrations/0002_risk_control.sql`、
 > `0003_risk_interactions.sql`）。边缘行为拟人化见 `aidcp-edge/src/humanize/`。
@@ -103,7 +103,7 @@ decay(n) = max(0.3, 1.0 - 0.25 × (n - 1))   // 第1小时 1.0，第2小时 0.75
 
 ### 1.4 频率阈值的工程实现
 
-用**滑动窗口计数器**（内存 + 持久化到本地/PG，进程重启不丢）：
+用**窗口计数器**（内存 + 持久化到本地/PG，进程重启不丢）：分钟 / 小时用于滚动突发保护，每日额度按 Asia/Shanghai 自然日计算。
 
 ```
 counters = {

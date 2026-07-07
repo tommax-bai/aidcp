@@ -236,11 +236,12 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 
 `dailyUsage.totals` / `quotas` / `saturated` 保持为日窗口别名，用于旧边缘兼容；新客户端优先读取 `windows`。
 `windows.minute|hour|day` 由云端按账号聚合风险流水：浏览/点赞/收藏/评论/关注来自 `risk_counters`，发帖来自发布日志；
+分钟 / 小时窗口为滚动窗口；日窗口为 Asia/Shanghai 本地自然日（00:00 至次日 00:00），与风控 `quota:day` 判定同源；
 `quotas` 来自该账号当前风控档位的有效窗口上限，`saturated` 表示对应维度已达到或超过当前窗口上限。
 `windows.session` 来自当前在线连接的单场预算快照；没有活跃会话时可带 `active:false` 作为配置上下文，但不代表正在消耗预算。
 字段可缺省，旧边缘会忽略；新 Electron 客户端在该字段到达前回落展示本机实时计数，缺窗口元数据时不臆造分钟/小时/单场上限。
 
-`startedAt/windowMs/expiresAt` 为窗口时效元数据；分钟/小时是滚动窗口，Electron 可在过期且未收到新快照时停止展示过期的“已达上限”。`windows.session.totals` 可包含浏览/发帖等无单场上限动作的真实计数，但不得为这些动作复制其他窗口的上限。
+`startedAt/windowMs/expiresAt` 为窗口时效元数据；分钟/小时是滚动窗口，日窗口是本地自然日窗口，Electron 可在过期且未收到新快照时停止展示过期的“已达上限”。`windows.session.totals` 可包含浏览/发帖等无单场上限动作的真实计数，但不得为这些动作复制其他窗口的上限。
 
 ### 3.2 任务规划
 
