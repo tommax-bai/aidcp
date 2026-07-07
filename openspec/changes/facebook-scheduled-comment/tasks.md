@@ -6,7 +6,10 @@
 
 ## 2. Cloud Target Config and Cron
 
-- [ ] 2.1 Add per-account Facebook comment target config storage/API: a keyword list + an allowed-container list (operator's own / joined Pages and Groups) keyed by account. Empty keywords OR empty containers fail closed (honest no-op). (Design revised 2026-07-07: keyword+container search replaces the earlier fixed-URL list.)
+- [x] 2.1 Add per-account Facebook comment target config storage/API: a keyword list + an allowed-container list (operator's own / joined Pages and Groups) keyed by account. Empty keywords OR empty containers fail closed (honest no-op). (Design revised 2026-07-07: keyword+container search replaces the earlier fixed-URL list.)
+  <!-- aidcp-cloud 5a557d2: FacebookCommentConfigStore (account_facebook_comment_config table, JSONB keyword/container arrays) + migrations/0034; sanitize/invalid/retired/ghost-account rejects; effectiveConfigFor() is the single fail-closed point (enabled only when BOTH lists non-empty). Panel API GET+PUT /api/accounts/:id/facebook-comment-config (GET before wildcard; JWT-protected). 8 store tests; full suite 1438/1438. -->
+  <!-- aidcp-console e13626d: accounts page platform column (Tag+filter) + xhs-only profile-link gate (no broken FB link); FacebookSearchConfig modal (keyword + container tag editors) shown only for platform==='facebook', GET prefill + PUT save + invalidate(['accounts']); FacebookCommentConfig DTO. 2 component tests; full suite 58 pass/1 skip; build ok. Consumption by runFacebookTargetedTask is 2.2 remaining. -->
+  <!-- OPEN: what exactly a 'container' identifier is (Page slug / numeric group id / URL) must be pinned when edge 4.1 in-container search is implemented; UI currently accepts free-text tags. -->
 - [ ] 2.2 Route Facebook automatic comments through the EXISTING two comment entry points instead of a new cron: the schedule-driven comment action (`commentEnabled`/`commentDailyCap`) and the Feishu `/comment` command. Both already resolve the per-account platform profile via the account store; add a `facebook` entry to `PLATFORM_REGISTRY` and let both entry points reach the Facebook targeted-comment execution for `accounts.platform='facebook'`. Execution (`runFacebookTargetedTask`): pick a keyword at random from the account config, search ONLY within one configured container, pick a candidate post from the in-container results (bounded), then compose + validate (+ approval). MUST NOT whole-site search. Before dispatch check account status, kill switch (`AIDCP_FB_COMMENT_AUTO`), config non-empty (fail closed), risk gate (`canDo('comment')`), and the existing daily cap (`commentDailyCap`/`commentedTodayCount`).
   <!-- aidcp-cloud fd92ffb PARTIAL: added facebook PLATFORM_REGISTRY entry + FB_COMMENT_PROFILE (commentProfileForPlatform('facebook') no longer throws); CommentScheduler.triggerManual/triggerTargeted now honestly reject facebook (never fall back to the xhs search flow) until FB targeted execution lands. Remaining: runFacebookTargetedTask (random keyword -> in-container search -> bounded candidate extraction -> compose+validate+approve), kill switch (AIDCP_FB_COMMENT_AUTO), config + daily-cap dispatch gating. -->
 - [ ] 2.3 Add shadow mode that runs selection/composition/validators without posting, recording risk, marking cooldown, or deduping as posted.
@@ -44,8 +47,11 @@
 
 ## 6. Console/UI If Included
 
-- [ ] 6.1 Add target management UI/API integration only if required for operations in this change.
-- [ ] 6.2 Run console focused tests, full tests, typecheck, and build if console is touched.
+- [x] 6.1 Add target management UI/API integration only if required for operations in this change.
+  <!-- aidcp-console e13626d: accounts page split by platform (platform column + filter) and a Facebook-only "配置搜索词" entry (keyword + container config via panel API). Operator decision 2026-07-07: config lives in console UI + panel API. -->
+- [x] 6.2 Run console focused tests, full tests, typecheck, and build if console is touched.
+  <!-- aidcp-console e13626d: FacebookSearchConfig.test.tsx passes; full vitest 58 pass/1 skip; tsc --noEmit clean; vite build ok. -->
+
 
 ## 7. Rollout and Validation
 
