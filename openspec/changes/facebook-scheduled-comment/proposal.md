@@ -4,8 +4,8 @@ After the platform abstraction and Facebook browser Phase-0 probes pass, aidcp n
 
 ## What Changes
 
-- Add a Facebook scheduled-comment pipeline that selects posts only from operator-configured targets, triggered through the existing two comment entry points (schedule-driven comment action and Feishu `/comment`) routed by account platform; no separate Facebook cron is added.
-- Add Facebook driver targeted-comment capabilities for targeted post discovery, controlled-editor input, and server-confirmed post verification (the Facebook targeted flow MUST NOT reuse the `browse` capability string, which would attach the xhs browse session on a Facebook edge).
+- Add a Facebook scheduled-comment pipeline that selects posts by a per-account operator-configured keyword list searched ONLY within operator-configured containers (the operator's own / joined Pages and Groups), picking a keyword at random each run; triggered through the existing two comment entry points (schedule-driven comment action and Feishu `/comment`) routed by account platform; no separate Facebook cron is added. No whole-site Facebook search.
+- Add Facebook driver targeted-comment capabilities for in-container keyword search + bounded candidate extraction, controlled-editor input, and server-confirmed post verification (the Facebook targeted flow MUST NOT reuse the `browse` capability string, which would attach the xhs browse session on a Facebook edge).
 - Add unattended composition path using deterministic validators instead of xhs human review, without weakening xhs comment approval behavior.
 - Route the existing comment entry points by `accounts.platform`, respecting account status, kill switch, quotas, and daily caps for Facebook accounts; provision `accounts.platform` at handshake insert-time so new Facebook accounts are not deadlocked.
 - Add shadow/dry-run mode that logs candidate/text/validator outcomes but never posts or records risk.
@@ -29,6 +29,6 @@ After the platform abstraction and Facebook browser Phase-0 probes pass, aidcp n
 
 - Affected repos: `aidcp-cloud`, `aidcp-edge`, likely `aidcp-console` only if target configuration UI is included in this change.
 - Cloud areas: comment entry-point routing by account platform, handshake insert-time platform provisioning, target storage/API, validators, shadow mode, kill switch, risk integration, per-trigger audit rows and stall/login alerts.
-- Edge areas: Facebook targeted post extraction, comment editor execution, pre-submit block check, server-confirmed verification.
+- Edge areas: Facebook in-container keyword search + candidate post extraction, comment editor execution, pre-submit block check, server-confirmed verification.
 - Operational impact: starts disabled by default (`AIDCP_FB_COMMENT_AUTO=false` or equivalent); production rollout requires shadow, single disposable account, small quota, and multi-day observation.
 - Scale-out boundary: before operating more than ~3 Facebook accounts, the following MUST be solved first and are explicitly out of v1 scope — automated platform provisioning beyond the handshake insert-time write, per-profile proxy/egress management (re-evaluate before productionization; not gated in v1), and cooldown/daily-count persistence (currently in-memory, reset on restart). v1 is a single disposable account with shadow-first rollout.

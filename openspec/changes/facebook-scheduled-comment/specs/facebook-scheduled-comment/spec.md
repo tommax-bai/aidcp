@@ -14,15 +14,19 @@ Facebook scheduled commenting SHALL be controlled by a global kill switch that d
 
 ### Requirement: Facebook comments trigger through existing comment entry points routed by account platform
 
-Facebook automatic comments SHALL be triggered through the existing schedule-driven comment entry point (per-account comment schedule with its daily cap) and the existing Feishu `/comment` command entry point; a separate Facebook-specific cron MUST NOT be added. Both entry points SHALL resolve the account platform through the account store (`accounts.platform`) and route Facebook accounts to the Facebook targeted-comment pipeline, which SHALL load operator-configured target URLs for the account. V1 SHALL only browse configured targets; it MUST NOT perform whole-site Facebook search. Missing targets produce an honest no-op result.
+Facebook automatic comments SHALL be triggered through the existing schedule-driven comment entry point (per-account comment schedule with its daily cap) and the existing Feishu `/comment` command entry point; a separate Facebook-specific cron MUST NOT be added. Both entry points SHALL resolve the account platform through the account store (`accounts.platform`) and route Facebook accounts to the Facebook targeted-comment pipeline. For each account the pipeline SHALL read an operator-configured keyword list and an operator-configured container list (the operator's own / joined Pages and Groups), pick a keyword at random, and search ONLY within one configured container, then pick a candidate post from the in-container results (bounded extraction). It MUST NOT perform whole-site Facebook search and MUST NOT comment on posts outside the configured containers. Missing keywords OR missing containers produce an honest no-op result.
 
 #### Scenario: Schedule trigger routes by platform
 - **WHEN** the content schedule fires a comment action for an account with `accounts.platform='facebook'`
 - **THEN** the comment pipeline uses the Facebook platform profile and the targeted pipeline, not the xhs search loop
 
-#### Scenario: No configured targets yields no-op
-- **WHEN** a Facebook account is active but has no configured target Pages/Groups/posts
-- **THEN** the trigger records/returns a no-targets outcome and does not browse random Facebook surfaces
+#### Scenario: No configured keywords or containers yields no-op
+- **WHEN** a Facebook account is active but has no configured keywords, or no configured containers (Pages/Groups)
+- **THEN** the trigger records/returns a no-targets outcome and does not search whole-site or browse random Facebook surfaces
+
+#### Scenario: Search stays within configured containers
+- **WHEN** the pipeline picks a random keyword for a Facebook account
+- **THEN** it searches only inside one of the operator-configured containers and never performs a whole-site search, and any candidate post outside the configured containers is not commented on
 
 ### Requirement: Shadow mode runs to validation without posting or recording
 

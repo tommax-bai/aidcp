@@ -8,7 +8,7 @@ Official Meta Pages APIs may be useful for operator-owned Pages in a later capab
 
 **Goals:**
 - Schedule Facebook automatic comments only for accounts with `accounts.platform='facebook'`.
-- Use operator-configured target URLs; no full-site Facebook search in v1.
+- Select posts by a per-account operator-configured keyword list searched ONLY within operator-configured containers (the operator's own / joined Facebook Pages and Groups); each run picks a keyword at random. No whole-site Facebook search in v1.
 - Run shadow mode before real posting.
 - Compose comment text through the existing LLM path but require deterministic hard validators.
 - Execute Facebook comments through the platform driver and verify server-confirmed posting before reporting success.
@@ -16,7 +16,8 @@ Official Meta Pages APIs may be useful for operator-owned Pages in a later capab
 - Record risk/cooldown only after verified success.
 
 **Non-Goals:**
-- Add Facebook posting, reactions, follows, notifications, or group joining.
+- Add Facebook posting, reactions, follows, notifications, or group joining (the operator must have already joined the configured Groups).
+- Whole-site Facebook search, or commenting on posts outside the operator-configured containers.
 - Bypass Facebook login, checkpoints, 2FA, or moderation.
 - Use internal Facebook GraphQL doc IDs as production interface.
 - Weaken xhs comment human approval or reuse xhs manual-comment "skip quota" sets.
@@ -27,9 +28,11 @@ Official Meta Pages APIs may be useful for operator-owned Pages in a later capab
 - Build a separate Facebook scheduled-comment path rather than altering the xhs comment approval loop.
   - Rationale: xhs comments are manual-reviewed and event-loop attached; Facebook v1 is scheduled and unattended. Sharing composer helpers is useful, but approval semantics must not cross-contaminate.
   - Alternative considered: remove/parameterize xhs `CommentApprovalGate`. That risks deleting an existing safety gate.
-- Use target list configuration and bounded post selection.
-  - Rationale: v1 business goal is operator-specified Pages/Groups, not discovery. This keeps risk and implementation scope lower.
-  - Alternative considered: site-wide Facebook search. That creates extra anti-abuse and relevance risk and belongs in a later change.
+- Select posts via an operator-configured keyword list searched WITHIN operator-configured containers (revised 2026-07-07, reversing the earlier fixed-URL-only decision).
+  - Config is per-account: a keyword list + an allowed-container list (the operator's own / joined Pages and Groups). Each run picks a keyword at random, searches inside one configured container, and picks a candidate post from the in-container results (bounded extraction). Missing keywords OR missing containers → honest no-op.
+  - Rationale: keywords are durable and backend-configurable, unlike fixed post URLs which expire as posts scroll away; random keyword selection also adds natural behavioral variation. Constraining search to operator-controlled containers keeps the target set vetted and relevant, so the anti-abuse profile stays close to "activity within the operator's own venues" rather than commenting on strangers found site-wide.
+  - Alternative considered (kept as a hard boundary): whole-site Facebook search. Rejected for v1 — automated search-then-comment on arbitrary strangers is a classic bot signal and materially raises checkpoint/ban risk (worse still on a no-proxy China-IP profile). The deterministic relevance validator (targetKeywords) and container scoping are the guardrails; whole-site search, if ever needed, is a separate later change gated on proxy + multi-day evidence.
+  - Alternative considered: fixed operator-supplied post URLs (the original v1). Rejected per operator decision for maintainability (URLs churn); the keyword+container model subsumes it.
 - Treat server-confirmed verification as the only success signal.
   - Rationale: Facebook can optimistically render local comments before server acceptance/moderation. Success must be permalink/id or delayed reload/requery confirmation scoped to the target post and own identity/text.
   - Alternative considered: editor cleared plus visible row. That is acceptable for xhs only because prior probes proved its shape; for Facebook it is specifically unsafe.
