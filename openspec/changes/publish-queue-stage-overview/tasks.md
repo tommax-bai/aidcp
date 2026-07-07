@@ -12,5 +12,5 @@
 
 ## 3. Closeout
 
-- [ ] 3.1 Commit and push the console/control changes.
-- [ ] 3.2 Publish the rebuilt console static assets to the default `dev` target and verify the deployed page is reachable.
+- [x] 3.1 Commit and push the console/control changes. <!-- aidcp-console 8abc963 pushed to master; aidcp c215d2b pushed to main. -->
+- [x] 3.2 Publish the rebuilt console static assets to the default `dev` target and verify the deployed page is reachable. <!-- dev target verified by scripts/deploy-target dev --check; backup /opt/aidcp/console.bak.20260707-182348.tar.gz; rsynced dist to /opt/aidcp/console; https://aidcp.tommax.cc/ 200 and references assets/index-8kPw_Iiw.js + assets/index-U4uGWRub.css; deployed CSS/JS contain publish-queue-stage and 原始字段. -->
