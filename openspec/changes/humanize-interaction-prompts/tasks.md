@@ -54,6 +54,6 @@
 ## 9. 回归、集成与部署（控制仓编排）
 
 - [x] 9.1 全量回归：`test:acceptance` + `test` + `typecheck`。 <!-- aidcp-cloud 14eda68 acceptance 44/44、full 1406/1406、typecheck 净 -->
-- [ ] 9.2 集成：rebase → 推送 → 部署 dev → healthcheck + 观察互动决策日志。 <!-- aidcp-cloud 14eda68 已 land 到 master(scripts/land-change,ff 155ce52..14eda68)；dev 部署待探 ECS 现状后走安全序列 -->
-- [ ] 9.3 真机验收项登记 `docs/real-machine-acceptance-backlog.md`（簇 13）。
+- [x] 9.2 集成：rebase → 推送 → 部署 dev → healthcheck + 观察互动决策日志。 <!-- aidcp-cloud 14eda68 已 land 到 master(ff 155ce52..14eda68)；dev 部署 origin/master@5a5a556 快照(含 sibling remote-captcha-assist)，backup cloud.bak.20260707-122617.tar.gz+.env，healthcheck 全绿(active/8787/PG/飞书长连/markers 300-100+budget行删) --> <!-- 2026-07-07 dev deployed -->
+- [x] 9.3 真机验收项登记 `docs/real-machine-acceptance-backlog.md`（簇 13）。 <!-- 控制仓 defd4ee 簇13 五项 -->
 - [ ] 9.4 `openspec validate --strict` → **确认 `category-adaptive-images-and-judgment` 已先归档（spec 交织按序）** → archive 本 change。<!-- validate 通过；category-adaptive 仍活跃(32/35)未归档,归档阻塞待其先归 -->
