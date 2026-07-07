@@ -23,8 +23,11 @@
 ## 3. Composition and Validators
 
 - [ ] 3.1 Extract shared compose/cleanup helper if needed while keeping xhs approval behavior unchanged.
-- [ ] 3.2 Implement Facebook deterministic validators for URLs/domains/contact info/@mentions/length/spam phrases/relevance/empty text.
-- [ ] 3.3 Add tests for validator reject matrix and for no auto-fix/template fallback after rejection.
+- [x] 3.2 Implement Facebook deterministic validators for URLs/domains/contact info/@mentions/length/spam phrases/relevance/empty text.
+  <!-- aidcp-cloud 6269a18: src/comment-agent/facebook-comment-validators.ts — pure reject-only validateFacebookComment(text, ctx) returning first failing reason (empty/low_signal/too_short/too_long/contains_url/contains_contact/contains_mention/spam_phrase/weak_relevance). Length from FB_COMMENT_PROFILE; relevance gated on provided targetKeywords (substring match, CJK-safe). Not yet wired into an execution path (runFacebookTargetedTask is 2.2 remaining). -->
+- [x] 3.3 Add tests for validator reject matrix and for no auto-fix/template fallback after rejection.
+  <!-- aidcp-cloud 6269a18: test/comment-agent/facebook-comment-validators.test.ts — 11 tests across the full reject matrix + explicit no-auto-fix guarantee (a rejected input never returns { ok:true } with modified/postable text). full suite 1430/1430. -->
+
 
 ## 4. Edge Facebook Browse and Comment
 
