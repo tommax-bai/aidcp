@@ -6,7 +6,7 @@
 
 边端在打开小红书笔记详情并上报 `note.detail` 时 SHALL 尝试在详情页作用域内抽取图文轮播图片引用，并以可选 `images` 数组随详情一起上报。图片引用 MUST 保持页面视觉顺序、去重、限量，并且只包含可远程引用的图片 URL。抽取不到图片时 MUST 诚实上报空数组或省略字段，MUST NOT 因无图阻断标题/正文/计数详情上报，MUST NOT 编造图片 URL。
 
-边端 MUST 优先抽取真实轮播图片，避免把头像、emoji、重复 swiper clone、视频封面控制层或页面其它图片混入。URL 解析 SHOULD 优先 `currentSrc` / `src`，再退 `srcset` / `data-src`；`blob:`、`data:`、空串和重复 URL MUST 被过滤。图片数量 MUST 有上限，且该上限 MUST NOT 超过抓取参照池上限 30（与发布侧配图张数 9 解耦；见 change raise-curated-scrape-image-cap）。
+边端 MUST 优先抽取真实轮播图片，避免把头像、emoji、重复 swiper clone、视频封面控制层或页面其它图片混入。URL 解析 SHOULD 优先 `currentSrc` / `src`，再退 `srcset` / `data-src`；`blob:`、`data:`、空串和重复 URL MUST 被过滤。图片数量 MUST 有上限，且该上限 MUST NOT 超过抓取参照池上限 18（= 小红书单帖图上界；与发布侧配图张数 9 解耦；见 change refine-curated-scrape-image-cap-18）。
 
 由于 `note.detail` 是 edge -> cloud 协议，新增图片字段时 MUST 同步两份 `src/comm/protocol.ts`、云端事件类型/映射和 `docs/protocol.md`，并保持旧端/旧云对缺失字段向后兼容。
 
