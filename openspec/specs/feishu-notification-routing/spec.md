@@ -1,5 +1,8 @@
-## ADDED Requirements
+# feishu-notification-routing Specification
 
+## Purpose
+TBD - created by archiving change feishu-per-team-notification-routing. Update Purpose after archive.
+## Requirements
 ### Requirement: 账号级出站目标解析，层叠于默认群兜底之上
 
 系统 SHALL 提供一个账号级飞书目标解析 `resolveChatIdForAccount(accountId?)`，解析顺序为：读该账号的 `accounts.group_label` → 以该团队键查 `group_route` 表得 `chat_id`；命中即返回。命不中时 MUST 落回既有默认群解析链（`bot_chats` 默认群 → `FEISHU_CHAT_ID` → 空串），即 `resolveDefaultChatId` 的现有行为保持不动。**未绑定账号 MUST NOT 被静默丢弃**——一律投递到默认群。当 `group_route` 表为空时，全体账号的投递目标 MUST 与本变更前**逐字一致**（零行为变更）。
@@ -47,20 +50,20 @@
 - **THEN** 系统 SHALL 投递到默认群
 - **AND** SHALL 输出一条 config-gap 日志指出 `acc-3` 的团队键 `TeamA ` 未命中任何路由
 
-### Requirement: 自主推送按账号路由，命令回执与审批走源群
+### Requirement: 账号入站平台通知按账号路由，面向运营方的卡片 / 告警不按账号路由
 
-**自主推送**（通知巡视的评论 / @ 通知、排期发帖 / 评论 / 群评回执、persona / captcha / 参照创作等由系统主动发起的消息）SHALL 经 `resolveChatIdForAccount` 按其归属账号路由。**命令触发**的结果卡与发布 / 评论审批卡 SHALL 投递到**下达该命令的来源群**（source chat），MUST NOT 走账号→群映射。据此，从内部管理群对某账号下命令的异步结果，MUST 回到该管理群，而非该账号所属团队群。
+账号的**入站平台通知**（通知巡视产出的「评论 / @」消息——即各团队要收的"消息"）SHALL 经 `resolveChatIdForAccount` 按其归属账号路由到团队群。**面向运营方**的消息——发布 / 评论审批卡（需运营点按授权）、运维 / 配置 / 验证码告警、排期编排回执、命令结果卡——MUST NOT 走账号→群映射，SHALL 维持既有默认（管理）群 / 源群目标不变。据此，外部客户群按定义**只收账号入站通知、不收审批与运维流量**，且运营从管理群对某账号下命令的结果不会流向该账号团队群。
 
 #### Scenario: 巡视通知走账号团队群
 
 - **WHEN** 账号 `acc-1`（属 `teamA`）的通知巡视产出评论 / @ 通知
 - **THEN** 该通知 SHALL 投递到 `teamA` 对应的群
 
-#### Scenario: 命令结果卡回下命令的群
+#### Scenario: 审批卡与运维告警不按账号路由
 
-- **WHEN** 运营在内部管理群 `oc_admin` 对账号 `acc-1`（属 `teamA`）执行 `/comment`
-- **THEN** 该命令的异步结果卡与审批卡 SHALL 回到 `oc_admin`
-- **AND** MUST NOT 因 `acc-1` 属 `teamA` 而被投递到 `teamA` 群
+- **WHEN** 系统为账号 `acc-1`（属 `teamA`）发出发布 / 评论审批卡、或该账号相关的 persona / 验证码 / 排期回执告警
+- **THEN** 这些消息 MUST NOT 因 `acc-1` 属 `teamA` 而被投递到 `teamA` 群
+- **AND** SHALL 维持既有默认（管理）群目标，供运营方处置
 
 ### Requirement: 无归属账号的告警落默认群
 
@@ -108,3 +111,4 @@
 - **WHEN** 运营配置 `teamA` 的投递群
 - **THEN** 界面 SHALL 从 `GET /api/bot-chats` 返回的机器人实际所在群中选择
 - **AND** 绑定值为该群的 opaque `chat_id`，界面 MUST NOT 依赖任何新增枚举渲染目标
+
