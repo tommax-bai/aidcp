@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 约 32 个角色，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> v2 共 **61 个消息类型**，下表按职能分组列全。
+> v2 共 **65 个消息类型**，下表按职能分组列全。
 
 ## 1. 信封（Envelope）
 
@@ -138,6 +138,17 @@
 | `publish.command` | cloud → edge | 下发一条参数化发布原子指令（A 阶段1 指令驱动；`recordId+seq` 关联键，`kind` ∈ E1-E10） |
 | `publish.command.result` | edge → cloud | 单条发布指令执行结果回传（按 `recordId+seq` 关联；`ok/value/error/details`，红线不静默假成功） |
 
+### 2.7 Persona 生成（v2 新增，建号关键词驱动，客户自助 onboarding）
+
+**edge 发起的请求/响应**，回包走 pending-id 命中——不经 `command-bridge` 动作映射、不经 edge `onMessage` 主动命令白名单。大模型/密钥/校验/序列化/落库/记账全在云端；边缘只收关键词、显示草稿、回确认。
+
+| type | 方向 | 关联响应 | 用途 |
+| --- | --- | --- | --- |
+| `persona.generate` | edge → cloud | `persona.generate.result` | 按客户勾选关键词请求云端生成账号 persona 草稿（带 `idempotencyKey` 防重连/重试双计费；云端以握手绑定 `accountId` 为准） |
+| `persona.generate.result` | cloud → edge | — | 返回生成的 soul.yaml + 身份摘要；失败带 `reason`，MUST NOT 返回半成品（fail-closed、宁缺毋假） |
+| `persona.persist` | edge → cloud | `persona.persist.result` | 请求持久化客户确认后的 soul.yaml（复用云端现有校验写入通道，不新造写路径） |
+| `persona.persist.result` | cloud → edge | — | 持久化结果；失败带 `reason`（`unknown_account` / `persona_required` / `persona_invalid`） |
+
 ## 3. 各消息 payload 定义
 
 ### 3.1 握手
@@ -155,7 +166,7 @@
 }
 ```
 
-`platform` 是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 61 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。
+`platform` 是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 65 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。
 
 **`welcome`**（cloud → edge）
 ```jsonc

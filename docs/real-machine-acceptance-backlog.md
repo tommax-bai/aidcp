@@ -228,3 +228,22 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **段二人审逐条端到端** — `/api/hot-leads` 列 pending → `/api/hot-leads/comment` 选一条 → `triggerTargeted(injectGroup:true)` → 飞书人审卡 → 通过后真发带群码引流评论 → lead 置 actioned；群码 **verbatim** 追加、**缺码 fail-closed**（黄卡本次不发）、人审拒/超时/边端离线诚实失败且 lead 不置 actioned。
 - [ ] **红线核** — 浏览闭环自治评论**永不**自动带群码（结构上下发 params 无 groupChatCode）；群码只经此逐条人审路径与既有排期。
 - [ ] **段二单测补** — 7.5（逐条发出置 actioned / 缺码 fail-closed / 人审拒诚实失败）当前靠 triggerTargeted 既有回执语义 + 类型闸，未加专测；真机验收同时补面板消费层单测。
+## 簇 17 — edge-persona-keyword-generation 真机验收（客户端自助建号人设，登记于 2026-07-08）
+
+**前置**：cloud 部署含本 change（persona.generate/persist handler + PersonaGenerator + JSON→soul YAML 序列化器 + role-catalog `browse:persona_generator`）；edge 本地重建含向导（renderer 设置抽屉「账号人设」区 + stdin 桥）；一个真实账号在客户端新建环境扫码登录。角色 `browse:persona_generator` 后台可配模型（默认全局 qwen3.7-plus）。
+**背景**：客户在 Electron 客户端扫码登录后，设置抽屉选关键词 → 云端大模型生成 soul 草稿 → 确认落库开跑。逻辑单测已锁（cloud persona-generator 10 / edge persona-onboarding 5 / 两仓 AC-PROTO 65），此处验真机端到端。
+
+- [ ] **向导 gate 时序** — 未登录时「生成人设」按钮 disabled + hint 提示先登录；扫码登录 + 云端已连接后按钮启用（gate=auth='logged in' && cloud='connected'）；状态推送不重置已选关键词/草稿
+- [ ] **生成闭环** — 选关键词点「生成人设」→ 十几秒内返回草稿（身份摘要 + soul 预览），soulYaml 结构合法；「重新生成」（不限次）产出有区分度（尤其 seed_keywords 不雷同）
+- [ ] **确认落库开跑** — 点「确认使用」→ persona.persist 成功 → 该账号 persona_config 落库 + 绑定即被唤醒开始自动运营（onBound）；badge 转「已设置」
+- [ ] **生成失败硬 fail-closed** — 制造模型不可用/超时，向导诚实提示失败、绝不塞模板人设、账号维持未绑（无草稿卡出现）
+- [ ] **重连不双计费** — 生成在途遇断连/重试，云端幂等键去重、不重复调模型（观察 llm 记账 account=真实账号、无重复 ~185s 调用）
+- [ ] **stdin 桥与 browser-parking 并存** — 桌面「显示浏览器 / 重置位置」等 parking 命令仍正常，persona 命令不干扰 readline（两条 stdin 消费者按 type 各取、互不抢行）
+- [ ] **soul 序列化 round-trip 真机** — 真机生成的中文人设经 JSON→YAML 序列化后能被 loadSoulFromYaml 落库（含引号/#/特殊字符不炸）
+
+**已知接受、后续独立立项的缺口**（本 change 明确不做，见 proposal Deferred/Accepted Risks；按用户 2026-07-08 决策砍配额、暂不补鉴权）：
+- [ ] **边缘身份鉴权缺失（头号）** — 边云握手零鉴权、accountId 客户端自报；自助模型把边缘搬到客户机后隐性网络边界失效。付费生成端点在公网不鉴权 = 免费大模型刷（成本敞口无上限）+ 给尚无人设账号抢先写人设。**上任何客户可触达付费/写端点前须补**（enrollment 凭据 / 可验证扫码登录证明 + 按连接/IP 限流）。
+- [ ] **限流/配额缺失** — 生成端点不限量（本期按用户明确要求砍掉配额与重生成上限）。
+- [ ] **服务端枚举复验缺失** — 客户端封闭枚举是不可信 UI，改造客户端可直接发自由文本 keywordSelections 做 prompt 注入 / 白嫖 chatbot；须云端逐项对枚举白名单复验。
+- [ ] **只创建不覆写守护缺失** — 未防越权覆写已有人设（当前仅靠握手绑定 accountId 部分收敛，非充分）。
+- [ ] **跨账号语义去重 + 运营侧相似度报表/抽检** — 抗同质化真正承重项，后续独立 change（字面去重拦不住中文语义等价词；当前仅靠生成 prompt 内每账号差异化）。
