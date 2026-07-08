@@ -2,7 +2,7 @@
 
 > 代码改动落 `aidcp-edge`；进度回写本仓，格式 `<!-- <repo> <commit-sha> 备注 -->`。真机 / 打包验证项登记到 `docs/real-machine-acceptance-backlog.md`，不在此勾。api-key 为敏感值，只记读取方式、不写值。
 >
-> 进度说明（2026-07-08）：运行时启动 + 内核预检 + 进度门控 + 渲染进度条 + 单测已实装（edge 分支 `codex/edge-bundled-adspower-cli-runtime`，commit `ff7ae43`，未合 master）。**打包（第 1 组）与「运行时中途死亡有界重起」（2.3 后半）暂缓**：打包/签名与并发 change `edge-macos-developer-id-signing` 在同一 `edge-desktop-packaging` 面重叠，按单写者纪律待其落地后再合。未内嵌 CLI 时启动流程 no-op（mode: none/external），对现有外部客户端用户零行为变化。
+> 进度说明（2026-07-08）：运行时启动 + 内核预检 + 进度门控 + 渲染进度条 + 单测已实装并**已 ff 合入 edge master**（commit `ff7ae43`，a2fac2a..ff7ae43；typecheck + acceptance 13/13 + 全量 717 通过）。按新约定不打安装包、edge 不自动部署。**打包（第 1 组）与「运行时中途死亡有界重起」（2.3 后半）暂缓**：打包/签名与并发 change `edge-macos-developer-id-signing` 在同一 `edge-desktop-packaging` 面重叠，按单写者纪律待其落地后再做（届时新开 worktree、rebase 最新 master）。未内嵌 CLI 时启动流程 no-op（mode: none/external），对现有外部客户端用户零行为变化。
 
 ## 1. aidcp-edge — 打包内嵌运行时（edge-desktop-packaging）
 
