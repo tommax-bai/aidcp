@@ -72,6 +72,7 @@ This file is the Codex-facing mapping of `CLAUDE.md`. Keep `CLAUDE.md` as the le
 
 - Preserve user and other-session changes. Do not revert unrelated dirty files.
 - Default closeout for code changes is automatic: after implementation, run the relevant validation, commit, push to the default branch, and deploy/publish to `dev` when the changed service or artifact is production-facing.
+- Do not build the edge desktop installer by default (standing user authorization, 2026-07-08). `electron:build` / `electron-builder` (incl. `electron:build:mac` / `:win`) invoke remote GitHub services and Apple signing/notarization and are slow; build an installer only on an explicit user request to package/release. Default closeout for edge changes stops at commit/push (plus `dev` deploy and typecheck/tests where applicable) and never produces an installer on its own.
 - Confirm before force-push, non-fast-forward pushes, or pushing to non-default/protected branches.
 - If the working tree has unrelated changes, use explicit pathspecs and/or a clean worktree/archive snapshot for final verification and deployment packaging.
 - Default prose language is Chinese. Code, comments, commit messages, PR text, commands, and file names stay in English unless the surrounding file establishes otherwise.
