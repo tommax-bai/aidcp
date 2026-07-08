@@ -484,6 +484,9 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
   "mediaType": "image_text",                      // 可选：image_text / video；缺省按 image_text 兼容老边端
   "author": "小张", "authorId": "u456",       // author / authorId 可选
   "likeCount": 1234, "collectCount": 200,
+  "publishedAtText": "3小时前",                 // 可选（change feed-hot-lead-group-comment）：发布相对时刻原始文本
+                                               // （刚刚/X小时前/昨天/07-05）。边缘只从正文列底部日期容器抽原始串、不解析、不污染正文；
+                                               // 云端解析成距今小时数并算「每小时点赞」热度速率（判引流线索）。缺则诚实置空、绝不臆造。
   "authorFollowed": true,                      // 可选：作者区关注按钮当下真实态（已关注/互关→true）。
                                                // 边缘在 note.open 探测、只读取上报；云端据此在评估进主页前短路已关注作者。缺省→回退原流程。
   "url": "https://www.xiaohongshu.com/explore/n123?xsec_token=…",

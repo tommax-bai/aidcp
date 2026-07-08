@@ -214,3 +214,17 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] 复检遮罩：验证码真清除 → 回执 `cleared` + 边缘发 `risk.captcha_cleared` → 云端恢复下发；未清除 → `still_blocked` + 刷新新截图。
 - [ ] 截图只在受保护协助页出现，不落飞书卡片/普通告警列表；令牌过期后页面正确提示、不可再读。
 - [ ] 手动「解决告警」仍只记日志，不误标事故 `cleared`、不擅自恢复下发。
+
+## 簇 16 — feed-hot-lead-group-comment 真机验收（浏览闭环发现热帖→引流待评队列→人审逐条群评，登记于 2026-07-08）
+
+**前置**：cloud/edge/console 三仓各一 `feed-hot-lead-group-comment` worktree 分支（cloud `6231f9c..fb5b0eb`、edge `e033ca0`、console `8540b1e`），**尚未 land、未部署**。本地：cloud 全量 1588 测过、edge 桩测 14 过、console build 过。
+**背景**：浏览闭环打开详情→稿件价值判定 `quality.pass` 后，云端新角色 `hot_lead_detector` 算「每小时点赞」热度速率、过滤闸（帖龄≤上限 且 速率≥阈值 且 赞≥下限）命中即入 `hot_lead_queue`（只发现不发布）；人审逐条经 `/api/hot-leads/comment` → 既有 `triggerTargeted(injectGroup)` → 飞书人审=发。**边缘日期选择器与三阈值均为 best-effort 占位、待真机标定**。红线：浏览闭环永不自动发群码。
+
+- [ ] **边缘发布时刻选择器真机标定（最大不确定）** — `NOTE_PUBLISHED_AT_SELECTORS`（`.bottom-container .date` 等）在真实小红书详情页命中率与形态覆盖：刚刚 / X小时前 / 昨天[HH:MM] / 裸日期 MM-DD / 编辑于前缀 / 带地区后缀。**重点核**：广 fallback（`.date`/`[class*="date"]`）是否误命中**评论区**日期（DOM 序须保证正文发布日期在评论区之前，首命中才对）；确认是否保留或收窄这两个 fallback。
+- [ ] **抽取不污染正文（守 f8712f5）** — 真机详情：`publishedAtText` 抽到、且 `content`（正文）不含该日期串；`.closest()` 落 body 容器的候选被正确跳过。
+- [ ] **速率分布与阈值校准** — 段一先只观测：跑一段真机浏览，看 `hot_lead_detector` 日志的速率/帖龄分布，据此在「安全」页「内容热度过滤」卡片校准 `postAgeMaxHours`/`velocityMin`/`minLikeFloor`（默认 48h/300/500 为保守占位、非最终）。确认后台改阈值**热加载即时生效**（无需重启）。
+- [ ] **quality.pass 咬合** — 确认只有过稿件价值判定的帖进队列；`quality.reject`（含 LLM 出错/解析失败）的帖即使很火也不入队；缓存按 noteId 对齐正确（一次一篇、不串篇）。
+- [ ] **入队去重** — 本账号已评过（`riskStore.hasInteraction`）与队列内 pending 同 noteId 均不重复入队；按账号隔离。
+- [ ] **段二人审逐条端到端** — `/api/hot-leads` 列 pending → `/api/hot-leads/comment` 选一条 → `triggerTargeted(injectGroup:true)` → 飞书人审卡 → 通过后真发带群码引流评论 → lead 置 actioned；群码 **verbatim** 追加、**缺码 fail-closed**（黄卡本次不发）、人审拒/超时/边端离线诚实失败且 lead 不置 actioned。
+- [ ] **红线核** — 浏览闭环自治评论**永不**自动带群码（结构上下发 params 无 groupChatCode）；群码只经此逐条人审路径与既有排期。
+- [ ] **段二单测补** — 7.5（逐条发出置 actioned / 缺码 fail-closed / 人审拒诚实失败）当前靠 triggerTargeted 既有回执语义 + 类型闸，未加专测；真机验收同时补面板消费层单测。
