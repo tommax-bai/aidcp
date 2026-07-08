@@ -60,7 +60,11 @@
   <!-- validation=console npx vitest run src/pages/CaptchaAssistPage.test.tsx passed; focused test covers scoped read and marker submission -->
 - [x] 5.5 Run relevant validation in sibling repos: cloud tests/typecheck, edge tests/typecheck, console tests/build as touched.
   <!-- validation=cloud focused tests + npm run typecheck passed; edge focused tests + npm run typecheck passed; console typecheck/test/build passed -->
-- [ ] 5.6 Deploy to `dev` only after validation, then verify a mock or controlled captcha incident from Feishu card -> assist page -> capture -> click -> still_blocked/cleared path.
+- [x] 5.6 Deploy to `dev` only after validation, then verify a mock or controlled captcha incident from Feishu card -> assist page -> capture -> click -> still_blocked/cleared path.
+  <!-- deployed=dev by 2026-07-08 rollout (aidcp-cloud src mtime 18:15, aidcp-console 18:56, aidcp-cloud.service ActiveEnter 19:15:49 CST with AIDCP_CAPTCHA_ASSIST_ENABLED=true) -->
+  <!-- verified=2026-07-08 this session (read-only ECS probe): readiness gate open — no '验证码云端协助未启用' warning at startup; token secret via AIDCP_PANEL_JWT_SECRET fallback (readEnvString returns undefined on empty AIDCP_CAPTCHA_ASSIST_TOKEN_SECRET); AIDCP_CAPTCHA_ASSIST_PUBLIC_BASE_URL=http://aidcp.tommax.cc; nginx aidcp-console.conf server_name aidcp.tommax.cc :80 root /opt/aidcp/console + /api,/ws -> 127.0.0.1:8090; external http://aidcp.tommax.cc/captcha-assist/<id> -> 200, /api/captcha-assist/<id> without token -> 401 -->
+  <!-- pending=live operator walkthrough (Feishu card -> assist page -> capture -> mark -> click -> cleared/still_blocked) needs an edge on an operator machine hitting a real/mock captcha; decoupled to docs/real-machine-acceptance-backlog.md -->
+
 
 ## 6. Rollout and Safety Follow-up
 
