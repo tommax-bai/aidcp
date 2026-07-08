@@ -56,7 +56,7 @@ Why JSONB instead of a child table for the first version:
 Hard limits:
 
 - Store only for `content_type='note'`.
-- Keep at most `AIDCP_CURATED_REFERENCE_IMAGE_LIMIT` images per row, default 3, hard cap 9.
+- Keep at most `AIDCP_CURATED_REFERENCE_IMAGE_LIMIT` images per row, hard cap 30 (raised from 9 by change raise-curated-scrape-image-cap; decoupled from the publish-side ≤9 platform limit).
 - Empty or invalid arrays become `[]`.
 - Existing retention deletes DB rows; object cleanup can be a follow-up sweeper if storage growth becomes material.
 
