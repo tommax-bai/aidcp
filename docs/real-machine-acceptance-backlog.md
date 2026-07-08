@@ -185,3 +185,21 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **放行渲染真机首帖** — 准确率达标后 ECS `.env` 加 `AIDCP_PUBLISH_TEXTCARD_COVER=true` + 重启，选一条文字卡原图的精选笔记触发洗稿：审计应 `coverForm='text_card'` + `renderStatus='rendered'` + 带 themeKey；飞书人审复核卡面（排版/文案/无引流词）后放行发布；发布成功后小红书端目检封面。回滚=删该行重启。
 - [ ] **渲染降级链真机观察** — 自然遇到渲染失败/OSS 抖动时核对 `render_failed_generative` 如实落审计、封面由生成式顶上（非阻塞，机会性验）。
 - [ ] **48 组合色板目检（非阻塞 follow-up）** — 渲对比页供用户目检冻结 hex；对比度 ≥4.5 已由单测全表锁，目检只调审美。
+
+## 簇 14 — facebook-scheduled-comment 真发 真机验收（Facebook 定向评论真正发出，登记于 2026-07-08）
+
+**前置**：真发编排全链已实装 + 单测锁死（edge master `9cda1d4`→`9c3ee01`：FacebookCommentExecutor + handler + 静默丢弃修复；cloud master `757a8fc`：buildFacebookEdgeSteps + runFacebookTargetedTask 真发路径 + 防重复真发）。**全链 fail-closed：`AIDCP_FB_COMMENT_AUTO` 默认关 → 物理发不出评论**。dev cloud 需重部署 master `757a8fc` 才有真发编排（旧部署 `24ef9d4` 只到影子编排层）；edge 是本地安装包、要用需重打包分发。以下项都要一次性运营 FB 账号（一次性、非生产号）+ 已登录 + 配好关键词/容器。
+
+**BLOCKING（翻 `AIDCP_FB_COMMENT_AUTO=true` 之前必须全清）**：
+- [ ] **生产执行器上再证 F1（服务器确认可区分乐观渲染 vs 真落库）** — phase-0 gated-submit 探针用的是全页 indexOf；生产执行器 `submitComment` 改用「本人数字 id 作者链接 + 目标帖评论区 + 文本片段」三重收窄确认（`buildScopedVerifyJs`）。用一次性账号自有帖手动跑一遍生产执行器：提交后 reload，确认命中 `confirmed=true` 只在真服务器落库时、乐观渲染/草稿残留不误判。**未证之前 kill switch 一直关、只跑影子**。
+- [ ] **per-profile 代理（§8.4）** — 中国 IP 无代理写操作 checkpoint/封号风险高；真发前 AdsPower profile 必须配固定代理。
+
+**真机调参 backlog（桩测不了、需登录一次性 FB 账号）**：
+- [ ] **懒加载评论框滚动参数** — `editorScrollRounds` / `editorScrollDistancePx` / `settleMs` 真机标定（评论框在 permalink.php 首屏之下懒渲染，F1 已知需滚动催出）。
+- [ ] **scoped own-identity 确认的真实评论行 DOM 标记** — 真机核对本人评论行的作者链接形态（`profile.php?id=<numericId>` / `/people/.../<id>` / vanity URL）与评论区容器选择器；`buildScopedVerifyJs` 的选择器按真机校准，防假阴/假阳。
+- [ ] **乐观 vs 服务器确认时序** — `waitAfterSubmitMs` / `waitAfterReloadMs` 真机标定。
+- [ ] **评论框/发布按钮真实 aria-label 中英文案** — 校准 `fbIsCommentEditor` / 发布控件正则（`发布评论|发表评论|Post|Comment|Reply|Send`）。
+- [ ] **容器内搜索真行为** — group `/groups/<id>/search/?q=` 与 page 站内搜的真实路由、`search` surface 稳定性、入群问答/待批准门槛（`permission_gated` 是否如实触发、绝不回退全站）；容器标识符（当前 PIN 为运营方粘贴的 FB URL）真机确认。
+- [ ] **短影子 sanity（task 7.3）** — dev 重部署 cloud `757a8fc` + `AIDCP_FB_COMMENT_SHADOW=true`，跑数小时：查 `facebook_comment_audit` 审计行、校验器拒率、候选相关性；确认影子绝不下发命令（`posted==[]` 已单测锁，真机复核审计侧）。
+- [ ] **真发单账号首帖（task 7.4）** — F1 生产执行器复证 + 代理就绪后，`AIDCP_FB_COMMENT_AUTO=true` + 日上限 1–2/天，跑通一条「服务器确认成功」端到端；确认防重复真发（提交前打去重标记）在确认假阴性时不重复真评同一目标。
+- [ ] **纯云 follow-up（不阻塞真发、可假边端测）** — task 2.6 登录/checkpoint 告警 + 跳过账号 + `/resume` 恢复闭环；task 2.7 连续阻塞 outcome（login_required/quota_denied/no_targets/compose_skipped）告警器（仿 pacing-saturation-alerter / captcha-coordinator 的 store-then-Feishu）。当前 `login_required` 等 outcome 已如实落审计，为这两块打好了数据面。

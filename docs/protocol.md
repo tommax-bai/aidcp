@@ -380,6 +380,9 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 **`note.open`**（cloud → edge）
 ```jsonc
 { "noteId": "n123", "index": 0, "reason": "值得打开" } // 字段均可选
+// url?（change facebook-scheduled-comment，可选）：完整 permalink 直驱打开（Facebook 定向评论候选帖直达详情页），
+//   非空时边缘按此链接直接导航、不依赖 feed 卡片索引/noteId；缺省=走原有 index/noteId 卡片定位（小红书旧行为）。
+{ "url": "https://www.facebook.com/groups/123/posts/456" }
 ```
 
 **`note.close`**（cloud → edge）：`{ "reason": "..." }`（可选）
@@ -389,7 +392,11 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 {
   "keyword": "露营装备",   // string  搜索关键词
   "source": "extract_from_liked", // ? extract_from_liked | random_from_interests | new_concept | manager
-  "maxResults": 10        // number? 本次搜索最多浏览的结果数
+  "maxResults": 10,       // number? 本次搜索最多浏览的结果数
+  // container?（change facebook-scheduled-comment，可选）：站内搜索容器。非空时边缘只在该容器内搜索、绝不全站搜。
+  //   Facebook 定向评论：容器为运营方自己/已加入的主页或群完整链接；边缘先校验其为白名单合法 Facebook 链接，
+  //   非法/非成员则 honest permission_gated、绝不回退全站。缺省=无容器约束（小红书全站搜旧行为）。
+  "container": "https://www.facebook.com/groups/123"
 }
 ```
 

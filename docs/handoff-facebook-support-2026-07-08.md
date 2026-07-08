@@ -2,6 +2,19 @@
 
 > 面向接手的新 session。读完即可续做，无需回溯上一段对话。语言：正文中文，代码/命令/标识符英文（CLAUDE.md §6）。
 
+## 0-bis. 2026-07-08 晚更新：真发主线已落码（仍 fail-closed，物理不发）
+
+原文档（§0 起）写于「真发未接线（not_wired）」阶段。**此后「真正去 Facebook 发评论」的整条代码已实装 + 单测锁死 + 合入两仓 master**——但仍 **fail-closed 休眠**：kill switch `AIDCP_FB_COMMENT_AUTO` 默认关 → 物理发不出评论，对现役小红书零回归。已落码内容：
+
+- **协议**（两份 `protocol.ts` 逐字镜像 + `docs/protocol.md`）：`search.execute` 加可选 `container?`、`note.open` 加可选 `url?`（复用消息、零新增类型、计数仍 61；AC-PROTO-08 往返锁）。
+- **边缘**（aidcp-edge master `9c3ee01`）：`FacebookCommentExecutor`（把 phase-0 探针升格为生产执行器：容器内搜索→开帖→提交+服务器确认）+ `FacebookCommentHandler`（按 driver `comment` 能力注册、镜像小红书回执契约）+ **静默丢弃坑修复**（FB 无 browseHandler 导致 whitelist 命中零回执 → 现按能力注册 + 不支持命令回 `capability_unsupported`）+ 两个 F1 补丁（滚动催出懒加载评论框 / 成功判定收窄到「本人数字 id + 目标帖评论区 + 文本片段」，替换全页 indexOf）。FB driver 加 `comment` 能力（**不加 `browse`**）。
+- **云端**（aidcp-cloud master `757a8fc`）：`buildFacebookEdgeSteps`（`sendAndRace` 有界超时 28s，此路径无看门狗）+ `runFacebookTargetedTask` 真发路径替换 `not_wired`：搜索容器→选未评候选→开帖→提交；诚实 outcome 映射；**防重复真发**（提交派发前打去重标记、与成功计数解耦）；真发成功记风控走既有 `interaction.occurred` 自动路径、绝不重复 record、绝不碰 `manualCommentAccounts`。
+- **测试**：edge 全绿 743/743 + acceptance 14/14；cloud 全绿 1558/1558 + acceptance 45/45；两仓 typecheck clean；`openspec validate --strict` 通过。change 仍 **ACTIVE**（未归档）——剩真机验收（簇 14）+ 两块纯云 follow-up（task 2.6/2.7）。
+
+**真发前必清的 BLOCKING（见 `docs/real-machine-acceptance-backlog.md` 簇 14）**：① 生产执行器上再证 F1（scoped 服务器确认可区分乐观 vs 真落库）；② per-profile 代理就绪（中国 IP 无代理写操作高风险）。dev 若要观察影子，需**重部署 cloud master `757a8fc`**（旧 dev 部署 `24ef9d4` 只到影子编排层，无真发编排 + 无 `facebook-edge-steps.ts`）。edge 是本地安装包、要用需重打包。
+
+以下 §0–§9 为落码前的原始交接，`§4/§5` 的「待接入」项现已全部落码（对照上面这段读）。
+
 ## 0. 一句话现状
 
 Facebook 支持已把「从桌面建号 → 启动打开 Facebook → 云端登记账号 → 后台配搜索词 → 云端影子编排（安检+审计，不真发）」整条**入口到编排**打通并入库；**唯一剩下的主线是「真正去 Facebook 发评论」**（边缘评论能力 + 协议两个可选载荷字段 + 真机验收），这是全功能里最高风险的一段，评审已列出真发前必清的硬闸。全部已落地部分都是 **fail-closed 休眠态**（kill switch 默认关、真发未接线、物理发不出评论），对现役小红书零回归。
