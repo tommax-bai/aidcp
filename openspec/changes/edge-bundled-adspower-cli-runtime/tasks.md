@@ -35,6 +35,14 @@
 - [x] 4.3 端口/解析单测：status 端口解析、非默认端口 base、限流检测 <!-- aidcp-edge ff7ae43 parseRuntimePort/getRuntime/isThrottled 单测；main.cjs buildProviderEnv 取值走集成、未单测 -->
 - [x] 4.4 `typecheck` + `npm test` 全过 <!-- aidcp-edge ff7ae43 typecheck 干净；全量 717 pass -->
 
+## 4b. aidcp-edge — 设置页重设计（embedded-CLI 形态收敛，用户令 07-08）
+
+- [x] 4b.1 provider 选择改「本机 Chrome 开/关」开关（关=默认内置 AdsPower，开=self）；三卡分组（浏览器引擎/AdsPower 环境/窗口停放）消割裂 <!-- aidcp-edge 0d58ffb index.html+styles.css+renderer.js -->
+- [x] 4b.2 删「AdsPower 状态/检测」徽标+按钮（探测改静默填充环境列表）、删「下载 AdsPower」链接（含 renderer 死码 adsDownloadUrl/setProbeBadge/handlers） <!-- aidcp-edge 0d58ffb -->
+- [x] 4b.3 renderer-smoke 测试改开关+静默探测模型；全量 743 pass、typecheck 干净 <!-- aidcp-edge 0d58ffb -->
+- [ ] 4b.4 **待补 spec delta（change 收口前写齐，§3）**：`pluggable-browser-provider`（删「下载 AdsPower 入口」requirement/scenario；「一键切换」措辞容纳开关形态）+ `adspower-desktop-env-picker`（删「检测」按钮/「已就绪」徽标可见要求 + 失败提示不再引下载入口；探测转静默填充；主区文案去「状态/下载入口」）。暂记待办：redesign 已在 edge master、与 merged spec 有暂时漂移，收口时随其他 spec delta 一并补齐
+- [ ] 4b.5 backend 死码清理（可选，低优）：main.cjs `browser:openAdsDownload` handler + preload `openAdsDownload` + settings:get 的 adsDownloadUrl 字段（前端已不调、留着无害）
+
 ## 5. 打包 / 真机验证（登记 backlog，不在此勾）
 
 - [ ] 5.1 干净机器（mac arm64 / mac x64 / win）打包后各起一次：N-API `.node` 加载、`ads start` 起服、端点直连、`browser/start`+CDP headful <!-- 本机（mac arm64，全局装 CLI + live runtime）已验：端点直连 + kernel 148 下载 + browser/start→CDP headful Chrome/148 全通；打包态待打包组后真机验 -->
