@@ -68,9 +68,10 @@
 - [x] 9.3 console：`npm run build`（tsc --noEmit && vite build）过 <!-- console 8540b1e -->
 - [ ] 9.4 真机验收登记 `docs/real-machine-acceptance-backlog.md`（本条完成即登记）：日期选择器真机形态覆盖（刚刚/小时/昨天/裸日期/编辑于/带地区）+ 广/窄 fallback 选择器是否误命中评论区日期、速率分布与阈值校准、抽取不污染正文、后台改阈值热加载、逐条人审发引流评论端到端、群码 verbatim + 缺码 fail-closed
 
-## 10. 集成与部署（**未做——需 fleet 串行集成 + 真机校准后**）
+## 10. 集成与部署
 
-- [ ] 10.1 集成：三仓 `scripts/land-change`（fetch + rebase 到最新默认分支、解协议/角色注册热点冲突、跑 test:acceptance+typecheck 再 ff）——**未 land**
-- [ ] 10.2 段一部署：cloud dev 安全序列（备份→rsync→restart→healthcheck，`hot_lead_queue`+`hot_lead_config_global` 启动自建）；console 构建发布（rsync 不 --delete）；edge 运营机 pull+重启；观测队列与速率分布、后台校准阈值
-- [ ] 10.3 段二启用：阈值校准满意后再走人审逐条消费
-- [ ] 10.4 全 task 回写 sha 完成 → `openspec validate --strict` → archive
+- [x] 10.1 集成：三仓 `scripts/land-change --yes` 全 land 到 origin/master（cloud `fb5b0eb`、edge `a473682`、console `a2d4d20`；edge 干净 rebase、console 修好 pacing 测 mock 后 land）；均通过 rebase+全量 test+typecheck；我提交仍在 master 祖先链（并发 fleet 后续推提交在其上）<!-- landed 2026-07-08 -->
+- [x] 10.2 段一部署 dev：cloud 安全序列（备份 `cloud.bak.20260708-231424.tar.gz`+`.env.bak`→rsync 净 master 快照→restart→healthcheck：service active、8787/8090、PG `select 1`、`hot_lead_queue`+`hot_lead_config_global` 自建、`/api/hot-lead-config` 401 路由在、startup「HotLeadQueue 已就绪」无错）；console 构建 rsync（不 --delete，nginx 8088=200、新 bundle 生效）；**未碰 isales**。<!-- 2026-07-08 deployed dev -->
+  - ⚠️ **edge 未部署**：edge 跑在运营机、非 ECS——已 land origin/master，需运营机 `git pull` + 重启边端才生效（发布时刻抽取上线）。
+- [ ] 10.3 段二启用：**待真机校准段一阈值/选择器满意后**再走人审逐条消费（`/api/hot-leads*` 已部署但队列产出依赖 edge 上线+选择器命中）
+- [ ] 10.4 archive：**待真机验收（backlog 簇 16）确认段一有效后** `openspec archive`（当前保留 active；避免并发 fleet spec 合并撞车 + 未真机验证即收口）
