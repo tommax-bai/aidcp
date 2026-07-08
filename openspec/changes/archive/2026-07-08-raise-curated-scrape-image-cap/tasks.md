@@ -21,4 +21,4 @@
 ## 4. 收口
 
 - [x] 4.1 拆除 revert 地雷：把已完成未归档 change `curated-reference-images` 里 note-extraction-fidelity delta 与 design.md 的「上限 9」改 30，防其归档时把 live spec 上限退回 9
-- [ ] 4.2 `openspec validate raise-curated-scrape-image-cap --strict` 通过 → archive
+- [x] 4.2 `openspec validate raise-curated-scrape-image-cap --strict` 通过 → archive
