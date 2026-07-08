@@ -15,7 +15,9 @@
 - `adspower-cli-embedded-runtime`: 伴侣端拉起并看护随包分发的 AdsPower CLI 运行时、edge 核心连其 Local API（形态与桌面客户端无关）；启动时对所需浏览器内核做条件式预检——缺则带进度下载并门控核心启动、失败诚实可重试、绝不惰性下载；内核按需下载并落用户可写目录、不进安装包。
 
 ### Modified Capabilities
-- `edge-desktop-packaging`: 新增一条打包契约——安装包 MUST 随应用捆绑可运行的 AdsPower CLI 运行时（native 模块随 hardened runtime 签名、置于 asar 之外），并 MUST NOT 捆绑浏览器内核；运行该运行时 MUST 复用 Electron 自带 Node、不依赖目标机的 Node/npm/全局安装。
+- `edge-desktop-packaging`: 新增一条打包契约——安装包 MUST 随应用捆绑可运行的指纹浏览器 CLI 运行时（native 模块随 hardened runtime 签名、置于 asar 之外），并 MUST NOT 捆绑浏览器内核；运行该运行时 MUST 复用 Electron 自带 Node、不依赖目标机的 Node/npm/全局安装。（打包配置为后续人工触发的构建步骤，已核实可行、登记真机 backlog。）
+- `pluggable-browser-provider`: 桌面 provider 选择改为「本机 Chrome」开关形态（关=默认指纹浏览器、开=self），移除「下载 AdsPower 入口」，新增「对外文案不暴露底层方案名」约束。
+- `adspower-desktop-env-picker`: 前置探测改为**静默**填充环境列表（移除可见「检测」按钮与「已就绪」状态徽标），不可达提示不再引导下载 / 不暴露方案名；主区去掉状态徽标与下载入口。
 
 ## Impact
 

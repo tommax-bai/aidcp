@@ -228,6 +228,7 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **段二人审逐条端到端** — `/api/hot-leads` 列 pending → `/api/hot-leads/comment` 选一条 → `triggerTargeted(injectGroup:true)` → 飞书人审卡 → 通过后真发带群码引流评论 → lead 置 actioned；群码 **verbatim** 追加、**缺码 fail-closed**（黄卡本次不发）、人审拒/超时/边端离线诚实失败且 lead 不置 actioned。
 - [ ] **红线核** — 浏览闭环自治评论**永不**自动带群码（结构上下发 params 无 groupChatCode）；群码只经此逐条人审路径与既有排期。
 - [ ] **段二单测补** — 7.5（逐条发出置 actioned / 缺码 fail-closed / 人审拒诚实失败）当前靠 triggerTargeted 既有回执语义 + 类型闸，未加专测；真机验收同时补面板消费层单测。
+
 ## 簇 17 — edge-persona-keyword-generation 真机验收（客户端自助建号人设，登记于 2026-07-08）
 
 **前置**：cloud 部署含本 change（persona.generate/persist handler + PersonaGenerator + JSON→soul YAML 序列化器 + role-catalog `browse:persona_generator`）；edge 本地重建含向导（renderer 设置抽屉「账号人设」区 + stdin 桥）；一个真实账号在客户端新建环境扫码登录。角色 `browse:persona_generator` 后台可配模型（默认全局 qwen3.7-plus）。
@@ -247,3 +248,14 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **服务端枚举复验缺失** — 客户端封闭枚举是不可信 UI，改造客户端可直接发自由文本 keywordSelections 做 prompt 注入 / 白嫖 chatbot；须云端逐项对枚举白名单复验。
 - [ ] **只创建不覆写守护缺失** — 未防越权覆写已有人设（当前仅靠握手绑定 accountId 部分收敛，非充分）。
 - [ ] **跨账号语义去重 + 运营侧相似度报表/抽检** — 抗同质化真正承重项，后续独立 change（字面去重拦不住中文语义等价词；当前仅靠生成 prompt 内每账号差异化）。
+## 簇 18 — edge-bundled-adspower-cli-runtime 打包 + 真机验收（内嵌指纹浏览器 CLI 免装，登记于 2026-07-08）
+
+**背景**：change `edge-bundled-adspower-cli-runtime` 已归档——运行时启动 + 内核预检 + 进度条 + 设置页重设计 + 白标已实装并合入 edge master（d722f2a）；但**「把 CLI 打进安装包」这组 descope 为后续人工触发**（打包走远程 GitHub + 苹果签名，慢且贵，按「默认不打安装包」约定人工做）。本机（mac arm64，全局装 `adspower-browser` + live runtime）已核实：端点直连 + 内核 148 下载 + `browser/start`→CDP headful Chrome/148 全通、包体 58MB、sqlite 为 N-API。**未打包前 edge 启动走 mode: none/external、内嵌路径不激活、对现网零影响**。签名 change `edge-macos-developer-id-signing` 已 Complete、打包单写者约束已解除。
+
+- [ ] **打包实装（人工触发）** — `adspower-browser` 加入 edge 依赖；electron-builder `extraResources`/`asarUnpack`（asar 外）、native `.node` 随 hardened runtime 签名；主安装包 MUST NOT 含浏览器内核；运行时工作目录/缓存指用户可写位置（`~/.adspowerCli` + 必要时首运复制包内 `cwd/`）。
+- [ ] **干净机器起服冒烟** — mac arm64 / mac x64 / win 各打包后起一次：N-API `.node` 在 Electron 自带 Node 下加载、`ads start` 起服、`/api/v1/browser/start` 直连、CDP headful。
+- [ ] **mac 签名/公证首启 Gatekeeper** — 对运行时下载到 `~/.adspowerCli` 的内核/chromedriver 首启是否弹阻。
+- [ ] **首启内核下载全程 + 中断/重试** — 进度条门控 startEdge、断网诚实停「准备失败+重试」、`download-kernel` 续传 vs 重来行为。
+- [ ] **单账号完整 cloud 闭环灰度** — `AIDCP_BROWSER_PROVIDER=adspower` 内嵌形态跑一遍完整云端浏览闭环（对应旧 backlog `adspower-browser 8.2`）。
+- [ ] **运行时中途死亡有界重起** — 内嵌 runtime daemon 中途死：现靠核心 CDP 断→recycle→重起→再探→重拉；确认该链在真机成立，或补健康轮询。
+- [ ] **文档** — OPERATOR/README 新机装机路径（内嵌运行时 + 首启下内核，self 与外部 `AIDCP_ADS_API_BASE` 逃生阀保留）；`docs/anti-detection.md` 补内嵌 CLI 形态。

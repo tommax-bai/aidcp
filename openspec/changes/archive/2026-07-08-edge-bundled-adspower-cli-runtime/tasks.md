@@ -2,7 +2,9 @@
 
 > 代码改动落 `aidcp-edge`；进度回写本仓，格式 `<!-- <repo> <commit-sha> 备注 -->`。真机 / 打包验证项登记到 `docs/real-machine-acceptance-backlog.md`，不在此勾。api-key 为敏感值，只记读取方式、不写值。
 >
-> 进度说明（2026-07-08）：运行时启动 + 内核预检 + 进度门控 + 渲染进度条 + 单测已实装并**已 ff 合入 edge master**（commit `ff7ae43`，a2fac2a..ff7ae43；typecheck + acceptance 13/13 + 全量 717 通过）。按新约定不打安装包、edge 不自动部署。**打包（第 1 组）与「运行时中途死亡有界重起」（2.3 后半）暂缓**：打包/签名与并发 change `edge-macos-developer-id-signing` 在同一 `edge-desktop-packaging` 面重叠，按单写者纪律待其落地后再做（届时新开 worktree、rebase 最新 master）。未内嵌 CLI 时启动流程 no-op（mode: none/external），对现有外部客户端用户零行为变化。
+> 进度说明（2026-07-08）：运行时启动 + 内核预检 + 进度门控 + 渲染进度条 + 设置页重设计 + 白标 + 单测已实装并**合入 edge master**（ff7ae43 → 822401c → 0d58ffb → d722f2a；全量 743 通过、typecheck 干净）。spec delta（4b.4）已补齐、与已上线 UI 对齐。
+>
+> **归档决定（2026-07-08，用户令）**：核心运行时/内核/UI 已上线并验证，**直接归档**。**打包（第 1 组）+ 真机验证（第 5 组）+ 文档（第 6 组）+ 运行时中途死亡有界重起（2.3 后半）descope 为后续人工触发**——理由：打包（远程 GitHub + 苹果签名）慢且贵、按「默认不打安装包」约定人工触发，且已在本机核实 CLI 可行、打包属机械步骤。这些项**转登 `docs/real-machine-acceptance-backlog.md`**（内嵌 CLI 打包簇），归档后按需人工做。未内嵌 CLI 时启动流程 no-op（mode: none/external）、对现有外部客户端用户零行为变化，故先归档不影响现网。签名 change `edge-macos-developer-id-signing` 已 Complete、打包单写者约束已解除。
 
 ## 1. aidcp-edge — 打包内嵌运行时（edge-desktop-packaging）
 
@@ -40,7 +42,9 @@
 - [x] 4b.1 provider 选择改「本机 Chrome 开/关」开关（关=默认内置 AdsPower，开=self）；三卡分组（浏览器引擎/AdsPower 环境/窗口停放）消割裂 <!-- aidcp-edge 0d58ffb index.html+styles.css+renderer.js -->
 - [x] 4b.2 删「AdsPower 状态/检测」徽标+按钮（探测改静默填充环境列表）、删「下载 AdsPower」链接（含 renderer 死码 adsDownloadUrl/setProbeBadge/handlers） <!-- aidcp-edge 0d58ffb -->
 - [x] 4b.3 renderer-smoke 测试改开关+静默探测模型；全量 743 pass、typecheck 干净 <!-- aidcp-edge 0d58ffb -->
-- [ ] 4b.4 **待补 spec delta（change 收口前写齐，§3）**：`pluggable-browser-provider`（删「下载 AdsPower 入口」requirement/scenario；「一键切换」措辞容纳开关形态）+ `adspower-desktop-env-picker`（删「检测」按钮/「已就绪」徽标可见要求 + 失败提示不再引下载入口；探测转静默填充；主区文案去「状态/下载入口」）。暂记待办：redesign 已在 edge master、与 merged spec 有暂时漂移，收口时随其他 spec delta 一并补齐
+- [x] 4b.4 spec delta 已补齐（让 merged spec 对上已上线 UI）：`pluggable-browser-provider`（开关形态 + 删下载入口 + 不暴露方案名约束）+ `adspower-desktop-env-picker`（静默探测、删「检测」按钮/「已就绪」徽标、失败提示不引下载/不暴露方案名、主区去状态徽标与下载入口） <!-- 控制仓 specs/pluggable-browser-provider + specs/adspower-desktop-env-picker delta；随本次归档合入 -->
+- [x] 4b.6 白标：对外可见文案 AdsPower→指纹浏览器（index.html/renderer/main.cjs/ads-local-api/ads-write-api）；删除环境「in use」报错友好化；创建行平台/系统下拉宽度 <!-- aidcp-edge d722f2a；内部标识符/env/注释/local.adspower.net 不动 -->
+- [x] 4b.7 API Key 文案（可选→按需）、API 地址提示、「显示浏览器」措辞 <!-- aidcp-edge 822401c -->
 - [ ] 4b.5 backend 死码清理（可选，低优）：main.cjs `browser:openAdsDownload` handler + preload `openAdsDownload` + settings:get 的 adsDownloadUrl 字段（前端已不调、留着无害）
 
 ## 5. 打包 / 真机验证（登记 backlog，不在此勾）
