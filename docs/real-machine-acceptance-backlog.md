@@ -203,3 +203,14 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **短影子 sanity（task 7.3）** — dev 重部署 cloud `757a8fc` + `AIDCP_FB_COMMENT_SHADOW=true`，跑数小时：查 `facebook_comment_audit` 审计行、校验器拒率、候选相关性；确认影子绝不下发命令（`posted==[]` 已单测锁，真机复核审计侧）。
 - [ ] **真发单账号首帖（task 7.4）** — F1 生产执行器复证 + 代理就绪后，`AIDCP_FB_COMMENT_AUTO=true` + 日上限 1–2/天，跑通一条「服务器确认成功」端到端；确认防重复真发（提交前打去重标记）在确认假阴性时不重复真评同一目标。
 - [ ] **纯云 follow-up（不阻塞真发、可假边端测）** — task 2.6 登录/checkpoint 告警 + 跳过账号 + `/resume` 恢复闭环；task 2.7 连续阻塞 outcome（login_required/quota_denied/no_targets/compose_skipped）告警器（仿 pacing-saturation-alerter / captcha-coordinator 的 store-then-Feishu）。当前 `login_required` 等 outcome 已如实落审计，为这两块打好了数据面。
+
+## 簇 15 — remote-captcha-assist 真机验收（云端远程处理验证码，登记于 2026-07-08）
+
+代码与部署已就绪并经只读核验：dev 上 `AIDCP_CAPTCHA_ASSIST_ENABLED=true`、就绪门通过（token secret 走 `AIDCP_PANEL_JWT_SECRET` 回退、`AIDCP_CAPTCHA_ASSIST_PUBLIC_BASE_URL=http://aidcp.tommax.cc`）、协助页 `http://aidcp.tommax.cc/captcha-assist/<id>` 外网 200、`/api/captcha-assist/<id>` 无 token 401、启动无「未启用」告警。剩人机在环走查（需运营机 edge + 真/模拟验证码）：
+
+- [ ] 运营机 edge 连 dev（`ws://121.89.85.150:8787`），账号刷到点选类验证码浮层、进入阻断态。
+- [ ] 飞书验证码/未知告警卡出现「打开协助处理」按钮；点开进协助页，看到边缘截下的现场图（账号昵称/机器/风控态/URL 上下文齐）。
+- [ ] 图上标点（最多两点）→ 提交 → 点击真的打进原账号原会话浏览器；处理期间普通浏览/互动仍被拦、只放行截图与点击。
+- [ ] 复检遮罩：验证码真清除 → 回执 `cleared` + 边缘发 `risk.captcha_cleared` → 云端恢复下发；未清除 → `still_blocked` + 刷新新截图。
+- [ ] 截图只在受保护协助页出现，不落飞书卡片/普通告警列表；令牌过期后页面正确提示、不可再读。
+- [ ] 手动「解决告警」仍只记日志，不误标事故 `cleared`、不擅自恢复下发。
