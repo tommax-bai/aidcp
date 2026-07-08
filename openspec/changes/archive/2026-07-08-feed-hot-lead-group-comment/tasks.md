@@ -46,7 +46,8 @@
 - [x] 6.2 入队去重：队列内 pending 去重（部分唯一索引 + ON CONFLICT）；`hasInteracted` 前置在角色 5.1；按账号隔离 <!-- cloud 6231f9c + 503eb3e -->
 - [x] 6.3 队列读接口 `listPending` + `markActioned`/`markDismissed` 供段二/console 消费 <!-- cloud 6231f9c -->
 - [x] 6.4 单测：5 测全过 <!-- cloud 6231f9c test/hot-lead-queue.test.ts -->
-- [ ] 6.5 段一验收：真机看速率分布、后台校准三阈值与日期选择器（→ backlog 簇，见 9.4）
+- [x] 6.5 阈值决定：**用当前默认（帖龄≤48h / 速率≥300/h / 赞≥500）**（用户 2026-07-08 拍板，不等真机调参）；速率分布/日期选择器仍留 backlog 簇 16 观测（不阻断）<!-- 用户定：用当前阈值 -->
+
 
 ## 7. aidcp-cloud — 人审逐条消费（段二）
 
@@ -73,5 +74,6 @@
 - [x] 10.1 集成：三仓 `scripts/land-change --yes` 全 land 到 origin/master（cloud `fb5b0eb`、edge `a473682`、console `a2d4d20`；edge 干净 rebase、console 修好 pacing 测 mock 后 land）；均通过 rebase+全量 test+typecheck；我提交仍在 master 祖先链（并发 fleet 后续推提交在其上）<!-- landed 2026-07-08 -->
 - [x] 10.2 段一部署 dev：cloud 安全序列（备份 `cloud.bak.20260708-231424.tar.gz`+`.env.bak`→rsync 净 master 快照→restart→healthcheck：service active、8787/8090、PG `select 1`、`hot_lead_queue`+`hot_lead_config_global` 自建、`/api/hot-lead-config` 401 路由在、startup「HotLeadQueue 已就绪」无错）；console 构建 rsync（不 --delete，nginx 8088=200、新 bundle 生效）；**未碰 isales**。<!-- 2026-07-08 deployed dev -->
   - ⚠️ **edge 未部署**：edge 跑在运营机、非 ECS——已 land origin/master，需运营机 `git pull` + 重启边端才生效（发布时刻抽取上线）。
-- [ ] 10.3 段二启用：**待真机校准段一阈值/选择器满意后**再走人审逐条消费（`/api/hot-leads*` 已部署但队列产出依赖 edge 上线+选择器命中）
-- [ ] 10.4 archive：**待真机验收（backlog 簇 16）确认段一有效后** `openspec archive`（当前保留 active；避免并发 fleet spec 合并撞车 + 未真机验证即收口）
+- [x] 10.3 段二启用：**用当前默认阈值**；人审逐条消费接口（`/api/hot-leads*`）已部署可用。实际队列产出仍依赖 edge 运营机上线 + 日期选择器真机命中（→ backlog 簇 16 观测，不阻断收口）
+- [x] 10.4 archive：用当前阈值收口，2026-07-08 `openspec archive`（真机日期选择器验证 = backlog 簇 16 唯一待观测项，与 archive 解耦）<!-- 2026-07-08 archived -->
+> **收口后唯一运营待办**：edge 在运营机 `git pull` + 重启（发布时刻抽取上线）；随后在 backlog 簇 16 核日期选择器是否真命中（若 miss 则 publishedAtText 恒 null → 无线索，需回补选择器，非 change 级返工）。
