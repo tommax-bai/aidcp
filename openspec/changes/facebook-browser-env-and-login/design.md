@@ -70,6 +70,6 @@ External review affects scope. Meta's official Pages API can support Page commen
 
 ## Open Questions
 
-- Whether Facebook identity should use `c_user`/profile links, account switcher data, or another stable non-secret signal as primary.
+- Resolved 2026-07-09: Facebook identity uses the numeric `c_user` account-id cookie as the first stable candidate, with profile-link ids as a consistency check and DOM fallback. Authentication/session cookie values remain out of logs and persistence.
 - Whether Page targets and Group targets need separate URL templates in the first implementation.
 - Whether official Pages API should become a separate future path for Pages owned by the operator.

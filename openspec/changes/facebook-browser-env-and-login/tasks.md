@@ -17,6 +17,7 @@
 - [x] 2.3 Add identity probe logic that returns a stable id or fails honestly; reject display-name-only and conflicting candidates.
   <!-- partial 2026-07-06: post-challenge probe found logged-in candidate signals and profile-link/account-menu candidates, but did not persist a raw stable Facebook id. Identity is not considered passed yet. See post-challenge-logged-in-probe-findings.md. -->
   <!-- done 2026-07-06: edge commit 3a5ea7a implements numeric-id-only derivation; display-name-only and conflicting candidates fail honestly. Live stable-id confirmation still belongs to the Phase-0 gates. -->
+  <!-- done 2026-07-09: edge commit 887b93303e35a7940a82e7b702cd611e0d9580d3 makes Facebook identity prefer the numeric c_user account-id cookie, keeps profile-link ids as consistency/fallback signals, and fails on cookie/profile mismatch. Live read-only check against AdsPower profile k1ebny3j returned source=facebook-cookie; raw cookie/auth values were not logged or recorded. -->
 - [x] 2.4 Add tests for Facebook identity success, no-id failure, display-name-only rejection, and conflicting-candidate rejection.
   <!-- done 2026-07-06: test/facebook/identity.test.ts covers stable success, display-name-only failure, conflicting candidates, invalid JSON, and readFacebookIdentity success. -->
 
@@ -92,6 +93,8 @@
   <!-- done 2026-07-06: after F1 gated submit probe, edge git diff --check PASS; focused Facebook/platform/CDP suite PASS 51/51; npm run typecheck PASS; npm run test:acceptance PASS 13/13; npm test PASS 674/674. -->
   <!-- done 2026-07-09: after Facebook AdsPower account import and rebase onto origin/codex/facebook-browser-env-and-login, edge git diff --check PASS; sensitive pasted-account fragment scan PASS; npm run typecheck PASS; npm run test:acceptance PASS 13/13; npm test PASS 724/724; focused import/renderer/write/create tests PASS 59/59 after replacing any real pasted account fragments with synthetic fixtures. -->
   <!-- done 2026-07-09: in /Users/baitianxing/codes/aidcp-edge master after cherry-pick d644f1e, npm run build PASS; npm run typecheck PASS; npm run test:acceptance PASS 16/16; focused import/renderer/write/create tests PASS 59/59; sensitive pasted-account fragment scan PASS. -->
+  <!-- done 2026-07-09: after edge commit 887b93303e35a7940a82e7b702cd611e0d9580d3, edge git diff --check PASS; npm run typecheck PASS; focused Facebook/platform/CDP suite PASS 64/64; npm run test:acceptance PASS 13/13; npm test PASS 730/730; live read-only identity check on k1ebny3j PASS with source=facebook-cookie. -->
+  <!-- done 2026-07-09: in /Users/baitianxing/codes/aidcp-edge master after cherry-pick 2ea7e294440fd9f6542fee3b1ef10e9c69cd8ff1, focused Facebook identity test PASS 12/12; npm run typecheck PASS; npm run test:acceptance PASS 16/16; npm run build PASS. -->
 - [x] 7.2 If cloud code changed, run relevant cloud focused tests, acceptance, `npm test`, and `npm run typecheck`.
   <!-- done 2026-07-06: no cloud code changed in this tranche; cloud validation not applicable. -->
 - [ ] 7.3 Record repo commit SHAs, probe outcomes, and validation notes in this `tasks.md`.
@@ -107,10 +110,13 @@
   <!-- partial 2026-07-06: control commit a74e9c5 adds phase0-f1-gated-submit-runbook.md and records the F1 implementation/validation notes. -->
   <!-- partial 2026-07-09: edge commit adcdce0 records Facebook AdsPower one-time account import implementation and validation. Remaining final closeout still waits for F1 live disposable-post sample and F3 multi-day stability outcome. -->
   <!-- partial 2026-07-09: edge master commit d644f1e records the main-checkout cherry-pick used by local build/run; branch commit adcdce0 remains the isolated worktree implementation SHA. -->
+  <!-- partial 2026-07-09: edge commit 887b93303e35a7940a82e7b702cd611e0d9580d3 records c_user-backed Facebook identity resolution and live read-only validation. Remaining final closeout still waits for F1 live disposable-post sample and F3 multi-day stability outcome. -->
+  <!-- partial 2026-07-09: edge master commit 2ea7e294440fd9f6542fee3b1ef10e9c69cd8ff1 records the main-checkout cherry-pick used by local build/run. Remaining final closeout still waits for F1 live disposable-post sample and F3 multi-day stability outcome. -->
 - [x] 7.4 Run `openspec validate facebook-browser-env-and-login --strict`.
   <!-- done 2026-07-06: PASS. Rerun after later 4.x/F-gate work changes artifacts. -->
   <!-- done 2026-07-06: PASS after storage key/name redaction spec update and F2 live probe findings. -->
   <!-- done 2026-07-06: PASS after Day-0 F3 read-only observation notes. -->
   <!-- done 2026-07-06: PASS after F1 gated submit runbook and task notes. -->
   <!-- done 2026-07-09: PASS after adding the Facebook AdsPower account import requirement, UI/create-payload design notes, and validation/task records. -->
+  <!-- done 2026-07-09: PASS after clarifying c_user as an allowed numeric account-id identity candidate and recording the identity fix. -->
 - [ ] 7.5 Do not start `facebook-scheduled-comment` until F1/F2/F3 are all recorded as passed or the design is revised.

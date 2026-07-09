@@ -2,11 +2,15 @@
 
 ### Requirement: Facebook identity reader returns stable platform id or fails honestly
 
-The Facebook platform driver SHALL implement identity reading that returns a stable Facebook account identifier suitable for `accounts.account_id` registration/routing, plus an optional display name. Identity candidates MUST come from logged-in page/session signals that are stable enough for routing; raw session tokens, cookies, or display names alone MUST NOT be used as the account primary key. If no stable id can be read or candidates conflict, edge MUST fail honestly and MUST NOT fall back to `default`.
+The Facebook platform driver SHALL implement identity reading that returns a stable Facebook account identifier suitable for `accounts.account_id` registration/routing, plus an optional display name. Identity candidates MUST come from logged-in page/session signals that are stable enough for routing. The numeric Facebook `c_user` account-id cookie MAY be used as an identity candidate, but raw authentication/session cookies, raw tokens, raw storage values, and display names alone MUST NOT be used as the account primary key. If no stable id can be read or candidates conflict, edge MUST fail honestly and MUST NOT fall back to `default`.
 
 #### Scenario: Stable Facebook id read succeeds
 - **WHEN** a logged-in Facebook AdsPower profile exposes a consistent stable account id through approved identity signals
 - **THEN** edge uses that stable id in hello/account routing and may expose display name separately
+
+#### Scenario: Numeric c_user is available before profile links render
+- **WHEN** a logged-in Facebook profile exposes a valid numeric `c_user` account id cookie but the current DOM has not yet rendered the self-profile link
+- **THEN** edge MAY use the `c_user` account id as the stable identity and MUST NOT log raw authentication cookie values
 
 #### Scenario: Display name alone is insufficient
 - **WHEN** Facebook UI shows a name but no stable id candidate can be verified
