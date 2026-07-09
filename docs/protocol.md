@@ -161,12 +161,13 @@
   "app": "xhs",               // string? 业务/站点标识
   "capabilities": ["click", "input", "scroll"], // string[]? 能力声明
   "accountId": "acc-01",      // string? 账号标识；多账号运行时要求真实账号，default 已退役
+  "accountNickname": "小张测评", // string? 账号可读昵称；仅用于展示补充，不参与身份确立或路由
   "machineLabel": "win-aliyun-3", // string? 人类可读机器标签
   "remoteAddr": "rdp://..."   // string? 人工处置入口/远程地址说明
 }
 ```
 
-`platform` 是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 65 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。
+`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 65 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。
 
 **`welcome`**（cloud → edge）
 ```jsonc
