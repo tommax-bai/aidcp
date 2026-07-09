@@ -64,6 +64,13 @@
 - **用尽诚实结束**：所有词试完或达上限仍无强相关合格候选 → 本次不评、honest 回执，绝不在弱相关里凑一篇。
 - 备选：单次搜索挑不到就结束——否决：强相关门槛下单词常空手，换词重试才能在「严格相关」与「有产出」间取得平衡。
 
+### D9. 热帖线索来自当前笔记时，取消标题搜索兜底
+`hot_lead_detector` 的触发点已经在当前笔记详情页之后：`note.detail.arrived` 与 `quality.pass` 按同一个 noteId 对齐，云端已经拿到真实 `noteId/title/content/author/likes/collects`。此时再按标题搜索会把确定目标降级成平台搜索结果，带来搜索未收录、排序漂移、旧 keyword/page.cards 污染、相似笔记误评等失败面。
+
+决策：浏览触发的自动联系评论把当前 `note.detail` 快照传给 `CommentScheduler.triggerTargeted`，runner 走 `currentNote` 分支：不发 `search.execute`、不发 `note.open`，只在当前详情页 best-effort 补采现场评论，然后撰写、人审、发布。若当前详情 noteId 与目标不一致，直接 `read_failed`，**不退回标题搜索**。后台/飞书外部指定目标仍保留原搜索定位路径，因为它没有当前详情上下文。
+
+记账同步调整：自动联系 helper 仍在触发前检查 `canDo('comment')` 与联系评论子上限，触发成功只记录联系尝试；comment 风险配额只在异步最终结果 `outcome === commented` 后消费，避免「未产出但 comment +1」。
+
 ## Prompt 与输出契约
 
 - **搜索词生成**：给「账号身份 + 兴趣领域（人设 interests）+ 精选集高收藏标题/主题样本」→ 严格 JSON `{terms: string[], source: 'persona'|'curated'|'mixed'}`；精选稀疏则基于种子词，`terms` 非空且贴合领域；解析失败/空 → 诚实回退种子词或不出词（不编造）。
