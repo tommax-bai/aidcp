@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 约 32 个角色，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> v2 共 **65 个消息类型**，下表按职能分组列全。
+> v2 共 **66 个消息类型**，下表按职能分组列全。
 
 ## 1. 信封（Envelope）
 
@@ -79,7 +79,7 @@
 | `search.execute` | cloud → edge | 执行一次关键词搜索 |
 | `session.end` | cloud → edge | 结束本次浏览会话 |
 
-### 2.3 角色驱动指令（v2 新增，cloud → edge，`RoleDispatcher` 经 `command-bridge` 下发）
+### 2.3 角色/命令式驱动指令（v2 新增，cloud → edge）
 
 | type | 方向 | 用途 |
 | --- | --- | --- |
@@ -89,6 +89,7 @@
 | `interaction.follow` | cloud → edge | 关注作者 |
 | `interaction.comment` | cloud → edge | 在当前笔记发评论（`text` 正文；云端已撰写/去AI味/人审通过）。可选 `groupChatCode`=账号「联系方式」，非空则 verbatim 追加到评论末尾（wire 名历史保留，概念=contact info，change generalize-contact-info） |
 | `interaction.like_comment` | cloud → edge | 给详情页内某条评论点赞（`commentAnchorId` 稳定锚点定位，绝不按序号） |
+| `group.join` | cloud → edge | Facebook 加群原子指令：导航到群、回传结构化 observation；仅 `click:true` 时点击 Join 一次，必须走 Facebook `join` 能力，绝不复用 `browse` |
 | `navigation.back` | cloud → edge | 返回上一页（feed / search） |
 | `note.browse_images` | cloud → edge | 浏览笔记图片（`count` 张；DeepReader 决策下发） |
 | `note.scroll_comments` | cloud → edge | 滚动评论区（CommentReviewer 决策下发） |
@@ -167,7 +168,7 @@
 }
 ```
 
-`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 65 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。
+`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 66 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。
 
 **`welcome`**（cloud → edge）
 ```jsonc
@@ -423,8 +424,8 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 
 ### 3.7 角色驱动指令（cloud → edge）
 
-由云端 `RoleDispatcher` 产出语义动作 `EdgeCommand`，经 `command-bridge`
-（`edgeCommandToEnvelope`）翻译为以下协议消息下发：
+大部分浏览闭环动作由云端 `RoleDispatcher` 产出语义动作 `EdgeCommand`，经 `command-bridge`
+（`edgeCommandToEnvelope`）翻译为以下协议消息下发；`group.join` 由 Facebook 加群调度器按同一信封格式直发到目标 edge。
 
 ```jsonc
 // page.scroll
@@ -439,6 +440,8 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 // interaction.comment
 { "noteId": "n123", "text": "今天的分享很有启发", "thinkMs": 900, "groupChatCode": "..." } // text 必填；groupChatCode 可选=账号「联系方式」(contact info)，非空则边缘逐字敲完 text 后整段追加「\n+该串」，verbatim 不 trim
 // 注（change generalize-contact-info）：本字段承载的概念已正名为「联系方式」，内部变量为 contactInfo；wire 字段名保留 groupChatCode 作历史兼容（Method A），物理改名属后续协调步骤。
+// group.join（Facebook 加群；click 缺省/false=只观察不点击，true=cloud 已判定可点后才点击一次）
+{ "groupUrl": "https://www.facebook.com/groups/123", "click": false, "thinkMs": 900 }
 // navigation.back
 { "reason": "quality_rejected", "targetPage": "feed", "dwellMs": 2200 } // targetPage: feed | search
 // note.open
@@ -474,6 +477,7 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 `like→interaction.like`、`collect→interaction.collect`、`follow→interaction.follow`、`comment→interaction.comment`、`comment_like→interaction.like_comment`、
 `search→search.execute`、`back→navigation.back`、`browse_images→note.browse_images`、
 `scroll_comments→note.scroll_comments`、`profile_open→profile.open`、`session.end→session.end`。
+Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.join`，edge active-command 白名单必须放行。
 
 ### 3.8 结构化上报（edge → cloud）
 
@@ -526,6 +530,15 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 **`action.completed`**——确认某 action 执行完成
 ```jsonc
 { "action": "like", "ok": true, "reason": "..." } // reason 可选
+// group.join 回执：ok=true 只表示点击后观测到 member-now；observe-only / already_member / pending / questionnaire_required 均不计成功加群
+{
+  "action": "join_group",
+  "ok": false,
+  "reason": "observation_only",
+  "groupUrl": "https://www.facebook.com/groups/123",
+  "clicked": false,
+  "observation": { "mainCtaText": "Join group", "modalText": null }
+}
 ```
 
 ### 3.9 风控预算与互动判定
