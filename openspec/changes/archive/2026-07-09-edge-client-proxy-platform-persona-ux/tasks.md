@@ -64,3 +64,4 @@
   <!-- aidcp-edge 9f5e0b8 -->
 - [x] 5.3 真机验收项登记 `docs/real-machine-acceptance-backlog.md`（簇 29，原子 append）：人设闸、代理 update 语义、FB 环境推断识别、重设计视觉项；并注明簇 17/21 的徽标语义未变、hint 文案判据由簇 29 取代。
 - [x] 5.4 本仓：tasks 回写 + `openspec validate edge-client-proxy-platform-persona-ux --strict`；**归档暂缓**——本 change 的 `platform-runtime-abstraction` delta 扩展活跃 change `edge-environment-platform-select` 的回落行为，归档须排在其后（其 task 2.3 真机验收 GATED on FB driver）。
+  <!-- 2026-07-09 用户令提前归档：两 change 对 platform-runtime-abstraction 均为 ADDED、需求条目独立不冲突；platform-select 后归档时其条目照常合入，语义引用关系已写进本 change 条文 -->

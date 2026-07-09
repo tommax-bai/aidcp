@@ -36,6 +36,15 @@ AdsPower API key 与代理账号密码 SHALL 仅在创建 / 改代理批处理�
 - **WHEN** 创建或改代理时携带了代理账号密码，且某条 `user/create` / `user/update` 返回错误
 - **THEN** 账密只内存持有、不写入 settings/台账，错误信息中 `proxy_password`/`Authorization` 被脱敏，MUST NOT 出现在日志/UI
 
+## REMOVED Requirements
+
+### Requirement: 代理为软提示、非创建硬闸，无代理如实标注
+
+**Reason**: 由「代理可在客户端配置」需求取代——客户端从「只提醒、不配置」升级为可在创建时选填、对已有环境增改代理；「未配代理仍可创建」「无代理如实标注」「MUST NOT 自动采购/管理代理池」等条款全部保留并入新需求。
+**Migration**: 无代码迁移；行为为纯增量（不填代理 = 与旧行为逐位等价）。
+
+## ADDED Requirements
+
 ### Requirement: 代理可在客户端配置：创建可选填、已有环境可增改、无代理如实标注
 
 桌面外壳 SHALL 允许在客户端内完成代理配置：**创建时**表单提供可选代理区块（类型 `http`/`https`/`socks5` + host/port + 可选账密，默认「无代理」）；**已有环境**提供逐环境的「代理」编辑入口，读回现配置的非密字段预填、保存经写客户端的 `user/update` 封装下发。代理输入 SHALL 经统一归一层校验（类型枚举、host 非空、port 为 1-65535 整数、有密码必须有用户名），任一不合法 SHALL **诚实拒绝提交**（创建时拒建、编辑时拒存并说明原因），MUST NOT 静默降级成 `no_proxy` 或砍掉非法字段后照发。选「无代理」保存 SHALL 显式下发 `{ proxy_soft: 'no_proxy' }`（支持清除既有代理）。桌面外壳 SHALL NOT 因未配代理而阻止创建：未配代理时 SHALL 给出提醒，但仍允许创建；环境列表 SHALL 如实呈现「无代理」状态，该标注 MUST NOT 拦截任何操作。编辑已配代理的环境时 SHALL 提示改代理对已养成账号画像的影响（出口 IP / 时区 / 地理随代理跳变）。桌面外壳 MUST NOT 自动采购/管理代理池、MUST NOT 引用/管理 AdsPower 侧已保存代理账本（`proxyid`/`global_config` 不做）。改代理的生效时机以 AdsPower 实际行为为准，UI SHALL 按「下次启动该环境生效」的保守口径提示，MUST NOT 承诺即时生效。
