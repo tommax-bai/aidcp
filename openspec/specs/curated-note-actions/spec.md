@@ -84,25 +84,6 @@ TBD - created by archiving change curated-note-actions. Update Purpose after arc
 - **WHEN** 有实现以精选行存量 source_url 直接导航、或以裸 noteId 拼详情链接打开笔记
 - **THEN** MUST 视为违规不予合入；目标定位只允许搜索驱动+卡片点击路径
 
-### Requirement: 定向评论两型——内容评论与带群评论共用撰写链
-
-内容评论 SHALL 复用既有按需评论撰写链（读笔记现场与在场评论→人设撰写→去 AI 味→人审）。带群评论 SHALL 在相同撰写链之上追加该账号配置的群聊口令（审核卡展示合并后最终文本，审=发；边端以既有整段插入方式追加）。两型的评论正文均 SHALL 基于笔记信息自动生成，MUST NOT 要求额外人工文案输入。账号未配置群聊口令时带群评论 MUST 触发即以 group_code_missing 拒绝（fail-closed），MUST NOT 退化为内容评论静默发出。
-
-#### Scenario: 内容评论走既有撰写与人审
-
-- **WHEN** 触发内容评论且目标定位命中
-- **THEN** 评论正文由既有撰写链基于笔记现场自动生成，经人审通过后发布
-
-#### Scenario: 带群评论追加群口令且审=发
-
-- **WHEN** 触发带群评论且账号已配置群聊口令
-- **THEN** 审核卡展示「正文+群口令」合并文本，审核通过后按同一合并文本发布
-
-#### Scenario: 未配群口令触发即诚实拒绝
-
-- **WHEN** 对未配置群聊口令的账号触发带群评论
-- **THEN** 触发即以 group_code_missing 拒绝，MUST NOT 降级为内容评论发出
-
 ### Requirement: 定向评论受控独占与记账——单飞、让位、去重、跳配额保人审
 
 定向评论任务 SHALL 按账号单飞（同账号在跑中再次触发即拒绝）；SHALL 以既有评论接管语义让位（任务前结束该账号浏览会话、任务后恢复）。触发前 SHALL 查询该账号对目标笔记的评论去重记录，已评论过 MUST 以 already_commented 拒绝；发布成功后 SHALL 记入去重账本（只记真实回执）。人工触发 SHALL 跳过风控配额闸（人是刹车）但 MUST 保留人审；人审未接线时 MUST NOT 裸发。边端离线 SHALL 触发即诚实拒绝。
@@ -150,4 +131,20 @@ TBD - created by archiving change curated-note-actions. Update Purpose after arc
 
 - **WHEN** 任务触发成功但终态失败（如 note_not_found、发布失败）
 - **THEN** 终态经既有渠道如实呈现（黄/红），触发回执不被追溯性当作成功依据
+
+### Requirement: 定向评论两型——内容评论与联系评论共用撰写链
+
+内容评论 SHALL 复用既有按需评论撰写链（读笔记现场与在场评论→人设撰写→去 AI 味→人审）。联系评论 SHALL 在相同撰写链之上追加该账号配置的联系方式（审核卡展示合并后最终文本，审=发；边端以既有整段插入方式追加）。两型的评论正文均 SHALL 基于笔记信息自动生成，MUST NOT 要求额外人工文案输入。账号未配置联系方式时联系评论 MUST 触发即以 contact_info_missing 拒绝（fail-closed），MUST NOT 退化为内容评论静默发出。
+
+#### Scenario: 内容评论走既有撰写与人审
+- **WHEN** 触发内容评论且目标定位命中
+- **THEN** 评论正文由既有撰写链基于笔记现场自动生成，经人审通过后发布
+
+#### Scenario: 联系评论追加联系方式且审=发
+- **WHEN** 触发联系评论且账号已配置联系方式
+- **THEN** 审核卡展示「正文+联系方式」合并文本，审核通过后按同一合并文本发布
+
+#### Scenario: 未配联系方式触发即诚实拒绝
+- **WHEN** 对未配置联系方式的账号触发联系评论
+- **THEN** 触发即以 contact_info_missing 拒绝，MUST NOT 降级为内容评论发出
 
