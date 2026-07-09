@@ -2,16 +2,15 @@
 
 > 三期独立上线独立回滚（design.md Migration Plan）：Phase 1=下发安全阀（§1，治既存连发真空、先行）；Phase 2=并行生成核心（§2-§5）；Phase 3=候选池消费面（§6）。热点文件按 CLAUDE.md §7 串行独占：`server.ts` 装配段、`publish-scheduler.ts`、`publish-dispatcher.ts`、`panel-server.ts` `/api/content/*` 段、console `ContentPage.tsx`/`CuratedContentPage.tsx`。每期收尾：两仓 `npm run test:acceptance` → 全量 `npm test` → `npm run typecheck`，AC-PUB/AC-RISK/AC-PROTO 全过；真机项登记 `docs/real-machine-acceptance-backlog.md`。
 
-## 1. aidcp-cloud — Phase 1 下发安全阀（publish-dispatch-pacing）
+## 1. aidcp-cloud — Phase 1 下发安全阀（publish-dispatch-resilience；最小发布间隔经产品定案 2026-07-09 本期不做）
 
-- [ ] 1.1 `publish-dispatcher.ts`：runDispatch 授权复核后、onPublishStart 前加 min-interval 等待（锚=该账号上次**下发尝试**时刻的内存记录；`AIDCP_PUBLISH_MIN_INTERVAL_MS` 默认 30min、0=禁用）；醒后重核授权信号+内容版本+草稿状态，失效则按既有语义作废签名/不发
-- [ ] 1.2 `publish-dispatcher.ts`：失败路径分界——边缘离线（零副作用）→ 草稿回 `pending_approval` + 作废授权信号（复用 voidApprovalSignal）+ 飞书通知重批；序列执行失败保持 `failed` 终态不自动重试
-- [ ] 1.3 `publish-dispatcher.ts`：同账号连续 2 次序列失败熔断（内存 Map，成功清零；env 可配阈值）——兜底扫描跳过熔断账号、新 dispatch 拒绝且不烧授权信号、发飞书告警
-- [ ] 1.4 熔断清除接线（防死锁）：对熔断账号的任一批准动作（含 first-writer-wins alreadyDecided 分支的重复批准）清熔断 + 踢一次兜底扫描；`preflightApprovePublish`（server.ts:1630-1652，飞书/web 共用）批准回执附「将于最早 T 发布」（受间隔延后时）与熔断中提示
-- [ ] 1.5 `publish-dispatcher.ts:133-141`：scanAndDispatchApproved 逐条 await 改 fire-and-forget（幂等由 inFlight+accountTail 已保）
-- [ ] 1.6 「通过即切」文件头红线注释（publish-dispatcher.ts:10）与相关 AC-PUB 断言按新契约**重述**（授权仍是发布必要条件；节流只延后/阻止、绝不放行未授权、绝不静默丢授权）——重述而非删除，review 重点盯
-- [ ] 1.7 Phase 1 测试：同窗批两稿第二稿等间隔且等待期不让位；等待期被驳回/编辑则不发；连续失败吃间隔（锚=尝试）；离线回待审+信号作废+通知；连续两败熔断+告警+重批清熔断恢复；一账号等待不拖他账号扫描（用例克制，关键行为各一）
-- [ ] 1.8 Phase 1 收尾：验收+全量+typecheck 全过 → commit/push → 部署 dev（§5 安全序列）→ 真机项（30min 真实连发间隔观察、熔断告警实收）登记 backlog
+- [ ] 1.1 `publish-dispatcher.ts`：失败路径分界——边缘离线（零副作用）→ 草稿回 `pending_approval` + 作废授权信号（复用 voidApprovalSignal）+ 飞书通知重批；序列执行失败保持 `failed` 终态不自动重试
+- [ ] 1.2 `publish-dispatcher.ts`：同账号连续 2 次序列失败熔断（内存 Map，成功清零；env 可配阈值）——兜底扫描跳过熔断账号、新 dispatch 拒绝且不烧授权信号、发飞书告警
+- [ ] 1.3 熔断清除接线（防死锁）：对熔断账号的任一批准动作（含 first-writer-wins alreadyDecided 分支的重复批准）清熔断 + 踢一次兜底扫描；`preflightApprovePublish`（server.ts:1630-1652，飞书/web 共用）批准回执附熔断中提示
+- [ ] 1.4 `publish-dispatcher.ts:133-141`：scanAndDispatchApproved 逐条 await 改 fire-and-forget（多稿同窗获批时一账号背靠背下发不拖死跨账号扫描；幂等由 inFlight+accountTail 已保）
+- [ ] 1.5 「通过即切」文件头红线注释（publish-dispatcher.ts:10）与相关 AC-PUB 断言按新契约**重述**（授权仍是发布必要条件；熔断只延后不放行不烧授权、离线回待审不静默丢授权）——重述而非删除，review 重点盯
+- [ ] 1.6 Phase 1 测试：离线回待审+信号作废+通知；连续两败熔断+告警+重批清熔断恢复（含 alreadyDecided 分支清熔断）；一账号连发不拖他账号扫描（用例克制，关键行为各一）
+- [ ] 1.7 Phase 1 收尾：验收+全量+typecheck 全过 → commit/push → 部署 dev（§5 安全序列）→ 真机项（熔断告警实收、离线重批链路）登记 backlog；运营侧文档写明「同窗批多张会背靠背连发、请错峰批准」（已知缺口如实登记）
 
 ## 2. aidcp-cloud — Phase 2 第一刀：显式归账（publish-account-attribution）
 
@@ -46,6 +45,6 @@
 ## 6. Phase 3 候选池消费面 + 收尾
 
 - [ ] 6.1 `panel-store.ts` publishedHistory 加 status?/accountId? 服务端过滤（WHERE），`panel-server.ts` `/api/content/published` 透传参数；console「只看待审」改服务端过滤请求（老 pending 不被 LIMIT 50 窗口挤出）
-- [ ] 6.2 端到端验收：同账号并行洗两篇→两卡两草稿→批一驳一→批的按间隔真发（dev 环境）；AC-PUB/AC-RISK 全量回归
-- [ ] 6.3 已知缺口登记（design.md D8 全清单）：重启在途下发 at-least-once 重复发帖窗口、风控 record('publish') 死数字、跨账号草稿同质、陪伴端单槽降级、飞书僵尸卡放大——写入 backlog/handoff，不静默
+- [ ] 6.2 端到端验收：同账号并行洗两篇→两卡两草稿→批一驳一→批的真发（dev 环境）；AC-PUB/AC-RISK 全量回归
+- [ ] 6.3 已知缺口登记（design.md D8 全清单）：同窗多批背靠背连发无间隔节流（运营错峰批准控节奏、后续按需补）、重启在途下发 at-least-once 重复发帖窗口、风控 record('publish') 死数字、跨账号草稿同质、陪伴端单槽降级、飞书僵尸卡放大——写入 backlog/handoff，不静默
 - [ ] 6.4 `openspec validate parallel-rewrite-drafts --strict` → 部署验证通过 → archive → 删 worktree/分支
