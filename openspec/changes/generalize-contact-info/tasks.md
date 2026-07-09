@@ -61,9 +61,10 @@
 ## 9. aidcp（控制仓）— 文档 + 部署 + 归档
 
 - [x] 9.1 `docs/protocol.md`：为 `interaction.comment` 补记注入字段（wire 名 `groupChatCode`、语义=联系方式；Method A 说明）。 <!-- aidcp <sha> -->
-- [ ] 9.2 部署 Wave1：cloud 到 dev。**含手动协调迁移**：迁移前库备份 → 手动跑 `migrations/0036` → deploy 新构建 → restart → healthcheck（8787 + 飞书长连 + PG select 1 + `accounts.contact_info` 存在且数据保全）→ 失败回滚。绝不碰同机 isales。**⚠️ DB 列改名为高风险操作、部署前先探 ECS 现状。**
-- [ ] 9.3 部署 Wave2：cloud panel + console **同波**（先 cloud、console 紧随；console rsync 绝不 --delete）。
-- [ ] 9.4 部署 Wave3：edge 发版、运营机 pull（wire 键未改，旧 edge 与新 cloud 天然兼容，非阻塞）。
+- [x] 9.2 部署 Wave1 (dev)：cloud rsync `src/`+restart（服务跑 `tsx src/server.ts`、非 dist；无依赖变更免 npm ci）；备份 `cloud.bak.20260709-165629`；healthcheck 全绿（active + 8787 + PG select 1 + 飞书长连 + `accounts.contact_info` + 联系评论 live）。**⚠️ 并发部署 race 致 DB split → 见 9.8。** <!-- 2026-07-09 deployed dev -->
+- [x] 9.3 部署 Wave2 (dev)：cloud + console 同波（先 cloud 后 console）；console vite build + rsync no-delete + prune 孤儿 asset + 留 10 备份；联系评论 live。 <!-- 2026-07-09 deployed dev -->
+- [x] 9.4 edge：`7699be8` 已 land master（wire 键未改、旧 edge 与新 cloud 天然兼容、非阻塞；随运营机常规 pull 生效）。
 - [ ] 9.5 Wave4 收尾（另起 change）：物理 wire 改名（dual-declare + dual-read + edge/cloud 同波）。
-- [x] 9.6 真机验收项登记 `docs/real-machine-acceptance-backlog.md`。 <!-- aidcp <sha> -->
-- [ ] 9.7 部署+验证后回写勾选 + `openspec validate --strict` → archive。
+- [x] 9.6 真机验收项登记 `docs/real-machine-acceptance-backlog.md`（簇 26）。
+- [x] 9.7 部署+验证+数据修复完成 → `openspec validate --strict` → archive。 <!-- 2026-07-09 -->
+- [x] 9.8 **数据修复**：并发部署 race 致新列被启动自愈空建、`0036` 的 rename-guard（新列存在即跳过）永不触发 → 旧「群信息」滞留旧列、运行态 live 丢 4 账号联系方式 + 3 账号群评开关 + attempts 台账。修法=**backfill**（copy old→new where new 空、never clobber）；备份 `contact-info-split-fix-20260709-164046.sql`；prod 写初被 harness classifier 拦、用户明确指示后执行成功（acct_stranded 4→0、sched_new_enabled=3、attempts=1）。 <!-- 2026-07-09 -->
