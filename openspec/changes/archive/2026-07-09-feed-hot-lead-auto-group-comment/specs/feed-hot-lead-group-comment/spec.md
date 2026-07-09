@@ -1,74 +1,4 @@
-# feed-hot-lead-group-comment Specification
-
-## Purpose
-TBD - created by archiving change feed-hot-lead-group-comment. Update Purpose after archive.
-## Requirements
-### Requirement: 详情页诚实抽取原始发布时刻文本
-
-边缘 SHALL 在浏览闭环打开笔记详情页时，从**正文列底部的日期容器**（真机校准的窄选择器）抽取笔记的**原始发布相对时刻文本** `publishedAtText`（如「3小时前」「昨天 14:30」「07-05」），并原样上报。该抽取作用域 MUST 与正文抽取器物理隔离、且该选择器 MUST 加入正文抽取排除清单，绝不把发布时刻文本混入正文。边缘 MUST 只回传原始文本、不解析成小时、不做热度判定（边轻云重）。feed 卡片层 MUST NOT 采集发布时间。
-
-#### Scenario: 详情页有发布时刻文本
-
-- **WHEN** 浏览闭环打开的笔记详情页底部展示「3小时前」
-- **THEN** 边缘抽取该文本作为 `publishedAtText` 上报，且正文抽取结果不含该发布时刻文本
-
-#### Scenario: 抽取不污染正文（f8712f5 回归）
-
-- **WHEN** 对同一详情 DOM 分别跑正文抽取与发布时刻抽取
-- **THEN** 正文输出逐字不含 `publishedAtText` 串，且开启发布时刻抽取前后正文输出不变
-
-#### Scenario: 发布时刻文本缺失
-
-- **WHEN** 详情页未渲染出可识别的发布时刻文本
-- **THEN** `publishedAtText` 留空 / 不带该字段，边缘不臆造
-
-#### Scenario: feed 卡片层不采集
-
-- **WHEN** 边缘扫描 feed 瀑布流卡片
-- **THEN** 卡片上报不含发布时间，且不为取发布时间而在卡片阶段逐张打开详情
-
-### Requirement: note.detail 协议携带原始发布时刻文本单字段
-
-系统 SHALL 在 `note.detail` 上报载荷新增**单个**可选字段 `publishedAtText`（不加解析后字段，云端自行派生小时与速率）。两份 `protocol.ts`（edge/cloud）MUST 逐字一致，`command-bridge` 映射 MUST 不漂移，`docs/protocol.md` 计数与表 MUST 同步。只加上报字段、不加消息类型、不加主动命令，主动命令白名单不动。`note.detail.arrived` 事件载荷 MUST 透传该字段供判定角色消费。
-
-#### Scenario: 字段随详情上报并透传事件
-
-- **WHEN** 边缘上报某笔记 `note.detail` 且携带 `publishedAtText`
-- **THEN** 云端按同一契约读取，并经 `note.detail.arrived` 事件透传给判定角色
-
-#### Scenario: 旧边缘不带字段向后兼容
-
-- **WHEN** 未升级的边缘上报的 `note.detail` 不含 `publishedAtText`
-- **THEN** 云端不报错，按发布时刻不可得处理（该帖不入候选队列）
-
-### Requirement: 云端解析发布时刻为距今小时数
-
-云端 SHALL 把 `publishedAtText` 解析为距今小时数 `hoursAgo`：「刚刚 / X分钟前」→ `0`；「X小时前」→ `X`；「昨天 HH:MM」按时刻算、「昨天」无时刻 → 常数（约 36 小时）；裸日期（`MM-DD` / `YYYY-MM-DD`）→ 记为**超帖龄上限的哨兵值**（判超龄丢弃）；剥离「编辑于」前缀与地区后缀后仍无法匹配任何形态 → `null`。云端 MUST NOT 把无法识别的文案臆造成具体小时数。
-
-#### Scenario: 小时级文案
-
-- **WHEN** `publishedAtText` 为「5小时前」
-- **THEN** `hoursAgo` 解析为 `5`
-
-#### Scenario: 分钟级 / 刚刚
-
-- **WHEN** `publishedAtText` 为「刚刚」或「20分钟前」
-- **THEN** `hoursAgo` 解析为 `0`
-
-#### Scenario: 昨天无时刻
-
-- **WHEN** `publishedAtText` 为「昨天」（无 HH:MM）
-- **THEN** `hoursAgo` 取约 36 小时的常数
-
-#### Scenario: 裸日期视为超窗
-
-- **WHEN** `publishedAtText` 为「07-05」这类裸日期
-- **THEN** `hoursAgo` 记为超帖龄上限的哨兵值，交由过滤闸判超龄丢弃，且不做臆造的精确小时
-
-#### Scenario: 无法识别
-
-- **WHEN** 剥离前后缀后 `publishedAtText` 不匹配任何已知形态
-- **THEN** `hoursAgo` 为 `null`
+## MODIFIED Requirements
 
 ### Requirement: 云端热度速率过滤闸
 
@@ -89,24 +19,7 @@ TBD - created by archiving change feed-hot-lead-group-comment. Update Purpose af
 - **WHEN** 某帖 `hoursAgo` 为 `null`
 - **THEN** 判为非线索、不触发，不臆造速率
 
-### Requirement: 过滤阈值全局后台可配、热加载
-
-过滤闸三参数（帖龄上限 / 每小时点赞速率阈值 / 最小绝对赞数）SHALL 由**全局配置面**提供，运营可在管理后台「安全」页编辑，改后**热加载即时生效**、无需重发边缘或重启。存储 SHALL 复用「全局质量阈值」机制（单行全局表 + 自愈加列 + facade 校验 + GET/PUT 端点 + 热加载 provider），判定角色现读该 provider。速率阈值 MUST NOT 复用账号自身的每小时限频配额（那是本账号动作限频、非候选帖热度）。起步 MUST 为全局（不做每账号）。
-
-#### Scenario: 后台改阈值即时生效
-
-- **WHEN** 运营在「安全」页改「内容热度过滤(全局)」的帖龄上限/速率阈值/最小赞并保存
-- **THEN** 校验通过后热加载，后续 `note.detail.arrived` 判定即用新值，无需重发边缘/重启
-
-#### Scenario: 非法值整块拒
-
-- **WHEN** 提交的阈值非法（如负数/越界）
-- **THEN** facade 校验 400 整块拒、不落库，沿用现有质量阈值的校验纪律
-
-#### Scenario: 不接风控限频表
-
-- **WHEN** 配置速率阈值
-- **THEN** 其存储独立于账号限频配额表，二者语义不混用
+## ADDED Requirements
 
 ### Requirement: 受闸自动评论触发 helper（回执 ok 才记账）
 
@@ -186,3 +99,19 @@ TBD - created by archiving change feed-hot-lead-group-comment. Update Purpose af
 - **WHEN** 浏览路径记一条群评尝试
 - **THEN** 该行带 `source='hot_lead'` + `note_id` + 速率/帖龄快照，可回查系统自动触达了哪些帖
 
+## REMOVED Requirements
+
+### Requirement: 引流待评候选队列（只发现不发布，入队去重）
+
+**Reason**: 改为「命中即过真生效安全闸自动触发」，不再持久化候选队列（用户 2026-07-09 定：不要队列）。
+**Migration**: 去重改用 `hasInteracted` + 短时 triggered 标记 + 单飞；`hot_lead_queue` 表停用（不再读写，可后续迁移删）。
+
+### Requirement: 人审逐条消费引流候选发定向群评
+
+**Reason**: 取消人工逐条挑，改为满足条件自动触发（仍走飞书人审=发）。
+**Migration**: 移除面板 `/api/hot-leads` 列表与 `/api/hot-leads/comment` 及 `PanelHotLeads`；自动触发经共享 helper 复用同一 `triggerTargeted(injectGroup)` + 飞书人审。
+
+### Requirement: 浏览闭环永不自动发群码红线保留
+
+**Reason**: 按运营要求放开为「受真生效安全闸约束的受控自动」，由「浏览闭环自动群评的真生效安全闸」等需求取代。
+**Migration**: 不再硬禁；改由〔账号开关 + 群评日上限(触发+发出双检、唯一日顶) + canDo 状态闸 + 飞书人审=发(卡带频率/共码数) + 短时去重 + 单飞〕约束；一码一号如实为告警放行、跨账号同码靠卡面标注+人审；账号默认关＝零回归；群码注入点不变（compose-approve 去AI味后、人审前 verbatim 追加）。

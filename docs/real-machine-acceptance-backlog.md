@@ -386,3 +386,21 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] 27.5 排期口径：有洗稿候选在途时排期发帖不被堵（日上限只数自主）；账号自主轮在跑时排期顺延
 
 **已知缺口（design.md D8，如实登记不修）**：① 同窗批准多张=背靠背连发（每篇 1-3 分钟）**无间隔节流**（用户 2026-07-09 定案本期不做）——运营请错峰批准控节奏，后续按需补间隔机制；② 重启时在途下发是 at-least-once 重复发帖窗口（既存）；③ 风控 `record('publish')` 死数字、封号/限流信号驱动状态迁移缺失（全系统既存）；④ 跨账号草稿同质（素材层无账号隔离，仅自主路径）；⑤ 陪伴端单槽只显示最新一份待审（协议不动的已知降级）；⑥ 飞书僵尸卡随并行数放大（误发已被版本闸+status 闸拦住）。
+
+## 簇 28 — feed-hot-lead-auto-group-comment 真机验收 + fast-follow（浏览热帖自动联系评论,登记于 2026-07-09）
+
+**已实装+dev部署（cloud origin/master `1bb0406`）**：浏览闭环命中热帖 + 账号 `contactCommentEnabled` + 过共用评论安全闸（`canDo('comment')` 时/日 + 单场评论预算 + 子上限 `contactCommentDailyCap`）→ `triggerTargeted(injectContact)` → 飞书人审=发；helper 触发 ok 显式 `record('comment')` 消费共用配额 + 记 `contact_comment_attempts`（含审计列）。默认关＝零回归。1678 云端测试过。**未归档时的 fast-follow 已随 change 移出、留此跟踪。**
+
+### 真机验收（灰度启用后）
+- [ ] **灰度启用**：tom 分组账号（工程师大白 k1e0ero8 / Tmax k1e0awu5）配联系方式 + 后台「排期」页开总开关 + 自动联系评论 + `contactCommentDailyCap`≤2；真机刷到热帖 → 审批卡出现 → 点通过真发。
+- [ ] **共用配额真消费**：发一条联系评论后，该账号 `canDo('comment')` 余额 -1（与普通评论同池）+ `contact_comment_attempts` 当日 +1（source='hot_lead' + note_id 快照）。
+- [ ] **子上限真拦**：cap=N，触发 N 次后第 N+1 次命中被 `countContactAttemptsToday>=cap` 拦、不发。
+- [ ] **零回归**：账号不开 `contactCommentEnabled` → 命中仅日志、不发。
+- [ ] **缺联系方式 fail-closed**：开了但未配联系方式 → 不发。
+- [ ] **note_not_found 率**：triggerTargeted 按标题重搜定位可能在最热帖上落空——盯该路径落空率（若显著，follow-up 让触发吃「已打开 noteId」跳过重搜）。
+- [ ] **短时去重**：人审拒/超时后重刷同一 note，45min 窗口内不重复推审。
+
+### Fast-follow（本 change 未做，另案实装）
+- [ ] **排期评论/排期群评纳入统一账本**：让现有排期路径也经同一 helper `record('comment')` 消费共用配额（改线上现行为，单独灰度）。当前只有浏览路径记账；排期路径维持原样（过 canDo 但不 record）。
+- [ ] **审批卡标注**：「本账号今日 x/cap（排期+浏览合计）+ 风控态 + 本联系方式被 N 账号共用」——供人审对频率与跨账号同码集中把关（用户定：只按账号上限 + 卡面标注）。
+- [ ] **发出前复检**：post 步骤前再查一次 `canDo + 子上限`，闭「检测→人审延迟→发出时已超」的 TOCTOU。
