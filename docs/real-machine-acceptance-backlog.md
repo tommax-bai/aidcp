@@ -286,3 +286,6 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **入站作用域** — 设 `FEISHU_MANAGEMENT_CHAT_IDS`=管理群；在外部客户群 @ 机器人发 `/publish`/`/pause` → 诚实拒「本群无权」、不执行；管理群下同命令正常执行；`/help` 任意群放行。
 - [ ] **外部群 API 支持核对** — 确认外部群里 `im/v1/messages`（text + interactive card）+ reaction 均可发（对照飞书 43 支持 / 11 不支持清单），无因不支持 API 静默失败。
 - [ ] **零回归确认** — 未配 `FEISHU_MANAGEMENT_CHAT_IDS` 且 `group_route` 空时，命令与通知行为与改动前一字不差（现 dev 即此态）。
+- [ ] **群名显示（加权限后）** — 在飞书开发者后台给应用加 `im:chat:readonly` 权限后，后台「通知路由」的目标群下拉与已映射行显示**真实群名**（而非 oc_ 开头的 id），`source=feishu`。
+- [ ] **缺权限降级提示** — 未加 `im:chat:readonly` 时，后台顶部出现黄条「暂时无法获取真实群名，正显示群 ID」，目标仍显示 chat_id、可正常配置（`source=store`，不崩不空）。
+- [ ] **默认群一眼可见** — 「通知路由」页顶部提示条正确显示「未映射 → 默认群：<群名 / id>」，与 dev 上 is_default 群一致。
