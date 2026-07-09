@@ -190,6 +190,7 @@
 ```jsonc
 {
   "account": { "id": "acc-1", "nickname": "晚风手作" },   // 可选；昵称空则整个字段不带（宁缺毋假）
+  "personaBound": true,   // 可选（change persona-wizard-onboarding-fixes）；账号是否已绑人设，仅 true 时下发；边缘据此把徽标翻「已设置」并跳过建号人设向导
   "lastPublish": { "title": "上一篇", "at": 1730000000000 }, // 可选；最近一次成功发布（at=epoch ms，为草稿入库时间近似）
   "publish": { "state": "pending", "title": "候审笔记", "code": "#83" }, // 可选；审批状态增量
   "dailyUsage": { // 可选；账号用量与限额窗口，边缘优先用它替代本机实时计数
