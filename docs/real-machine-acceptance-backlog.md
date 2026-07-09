@@ -220,8 +220,9 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 **前置**：cloud/edge/console 三仓各一 `feed-hot-lead-group-comment` worktree 分支（cloud `6231f9c..fb5b0eb`、edge `e033ca0`、console `8540b1e`），**尚未 land、未部署**。本地：cloud 全量 1588 测过、edge 桩测 14 过、console build 过。
 **背景**：浏览闭环打开详情→稿件价值判定 `quality.pass` 后，云端新角色 `hot_lead_detector` 算「每小时点赞」热度速率、过滤闸（帖龄≤上限 且 速率≥阈值 且 赞≥下限）命中即入 `hot_lead_queue`（只发现不发布）；人审逐条经 `/api/hot-leads/comment` → 既有 `triggerTargeted(injectGroup)` → 飞书人审=发。**边缘日期选择器与三阈值均为 best-effort 占位、待真机标定**。红线：浏览闭环永不自动发群码。
 
-- [ ] **边缘发布时刻选择器真机标定（最大不确定）** — `NOTE_PUBLISHED_AT_SELECTORS`（`.bottom-container .date` 等）在真实小红书详情页命中率与形态覆盖：刚刚 / X小时前 / 昨天[HH:MM] / 裸日期 MM-DD / 编辑于前缀 / 带地区后缀。**重点核**：广 fallback（`.date`/`[class*="date"]`）是否误命中**评论区**日期（DOM 序须保证正文发布日期在评论区之前，首命中才对）；确认是否保留或收窄这两个 fallback。
-- [ ] **抽取不污染正文（守 f8712f5）** — 真机详情：`publishedAtText` 抽到、且 `content`（正文）不含该日期串；`.closest()` 落 body 容器的候选被正确跳过。
+- [x] **边缘发布时刻选择器真机标定（最大不确定）** — ✅ 2026-07-09 CDP 只读探针（`scripts/calibrate-note-date-probe.ts`，工程师大白/tom 分组，导航带 xsec_token 笔记链接开详情）：production `extractPublishedAtText` 经 **`.bottom-container .date`**（首选择器、count=1、精确）在 **宽(1512) / 窄(800) / 窄(500) 三布局均首命中**，抽到真发布时刻（实测「2天前 广东」「33分钟前 四川」，含地区后缀，云端 token 匹配自动忽略）。**广 fallback 风险坐实并已修**：`.date`/`[class*="date"]` 共命中 12 个＝1 笔记日期+11 评论时间戳（`.comment-item .date`）；正常路径被精确首选择器遮蔽、不触发，但为防 XHS 改名 `.bottom-container` 后误抓评论日期，已把评论区加入 denylist（edge `6cac9f7`）。<!-- edge 6cac9f7 verified+hardened 2026-07-09 -->
+- [x] **抽取不污染正文（守 f8712f5）** — ✅ 真机三布局：命中日期节点 `inBody=false`（在 `.interaction-container>.note-scroller>.note-content` 内、非正文文本叶子容器）；评论时间戳硬化后 `inBody=true`（被排除）。<!-- edge 6cac9f7 -->
+> **注**：`.bottom-container .date` 首命中稳定，末两条宽 fallback 现役为纯保险；边缘 landed origin/master(6cac9f7)、**运营机 pull+重启后生效**。「2天前」在默认 maxAge=48h 为边界通过（用户定用当前阈值）。
 - [ ] **速率分布与阈值校准** — 段一先只观测：跑一段真机浏览，看 `hot_lead_detector` 日志的速率/帖龄分布，据此在「安全」页「内容热度过滤」卡片校准 `postAgeMaxHours`/`velocityMin`/`minLikeFloor`（默认 48h/300/500 为保守占位、非最终）。确认后台改阈值**热加载即时生效**（无需重启）。
 - [ ] **quality.pass 咬合** — 确认只有过稿件价值判定的帖进队列；`quality.reject`（含 LLM 出错/解析失败）的帖即使很火也不入队；缓存按 noteId 对齐正确（一次一篇、不串篇）。
 - [ ] **入队去重** — 本账号已评过（`riskStore.hasInteraction`）与队列内 pending 同 noteId 均不重复入队；按账号隔离。
