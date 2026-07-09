@@ -4,7 +4,7 @@
 - TO: `### Requirement: 账号「联系方式」编辑经账号存储单写、诚实非乐观、且 verbatim 存储`
 
 - FROM: `### Requirement: 内容排期群评字段写入与开启硬校验（一码一号）`
-- TO: `### Requirement: 内容排期带联系方式评论字段写入与开启硬校验（同联系方式不跨账号复用）`
+- TO: `### Requirement: 内容排期带联系方式评论字段写入与开启校验（无联系方式硬拒、共用放行 + 提示）`
 
 ## MODIFIED Requirements
 
@@ -24,17 +24,20 @@
 - **WHEN** 分别对某账号提交空输入、对未知账号提交、对退役账号 `default` 提交、提交坏类型
 - **THEN** 空输入归 NULL 清空并回真态；未知账号 404；退役账号被拒且与成功可区分；坏类型 400——各自诚实呈现，无一乐观假成功
 
-### Requirement: 内容排期带联系方式评论字段写入与开启硬校验（同联系方式不跨账号复用）
+### Requirement: 内容排期带联系方式评论字段写入与开启校验（无联系方式硬拒、共用放行 + 提示）
 
-内容排期写通道（`PUT /api/content-schedule/:accountId`）SHALL 新增 `contactCommentEnabled`（布尔）与 `contactCommentDailyCap`（0..10 整数，硬上限与发帖 / 评论的 50 刻意分开）两字段，非法值整块拒、写后回读真态、默认 fail-closed（带联系方式评论不自动）。写入 `contactCommentEnabled=true` 时 SHALL 执行开启硬校验：该账号未配联系方式 → 具名拒 `no_contact_info`；该账号联系方式与任一其它账号 verbatim 相同 → 具名拒 `shared_contact_info`。硬校验 MUST 在每次开启写入时重跑，MUST NOT 以警告放行、MUST NOT 静默降级、MUST NOT 部分落库。
+内容排期写通道（`PUT /api/content-schedule/:accountId`）SHALL 新增 `contactCommentEnabled`（布尔）与 `contactCommentDailyCap`（0..10 整数，硬上限与发帖 / 评论的 50 刻意分开）两字段，非法值整块拒、写后回读真态、默认 fail-closed（带联系方式评论不自动）。写入 `contactCommentEnabled=true` 时 SHALL 执行开启联系方式校验，含两支：
+
+- **无联系方式硬拒**：该账号未配联系方式 → 具名拒 `no_contact_info`，整块不落库。该硬校验 MUST 在每次开启写入时重跑，MUST NOT 以警告放行、MUST NOT 静默降级、MUST NOT 部分落库。
+- **共用放行 + 提示**（一码一号从硬阻断放松，change `loosen-group-comment-shared-code`）：该账号联系方式与任一其它账号 verbatim 相同时，MUST NOT 再具名拒绝——SHALL 照常放行落库，并在成功响应带 `sharedContactInfoWarning: true`。上层 MUST 据此如实提示防关联封号风险，MUST NOT 静默把「共用联系方式 = 最强跨账号关联指纹」的风险咽下去。放松为运营知情决策，靠小日上限 + 错峰 + 人审 + 明示提示压制、诚实声明非零风险。
 
 #### Scenario: 无联系方式账号开启被拒
 - **WHEN** 为一个未配联系方式的账号提交 `contactCommentEnabled=true`
 - **THEN** 具名拒绝 `no_contact_info`、整块不落库，拒绝与成功可区分呈现
 
-#### Scenario: 同联系方式账号开启被拒（跨账号复用硬阻断）
+#### Scenario: 同联系方式账号开启放行并回带风险警告（一码一号放松）
 - **WHEN** 该账号的联系方式与另一账号的联系方式逐字节相同、提交 `contactCommentEnabled=true`
-- **THEN** 具名拒绝 `shared_contact_info`、整块不落库——绝不仅告警放行
+- **THEN** 开关照常落库、成功响应带 `sharedContactInfoWarning: true`；上层 MUST 弹一条防关联封号风险提示，MUST NOT 静默放行
 
 #### Scenario: 带联系方式评论上限越界整块拒
 - **WHEN** 提交 `contactCommentDailyCap` 为 -1、0.5 或 11

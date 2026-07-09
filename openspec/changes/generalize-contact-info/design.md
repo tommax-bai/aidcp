@@ -29,7 +29,8 @@
 ### Decision 1：术语与词形——统一 contact / 联系方式
 - 中文文案统一「联系方式」；「群评」→「带联系方式评论」。
 - 通用词形：`groupChatInfo`/`groupChatCode`(内部) → `contactInfo`；`injectGroup` → `injectContact`；`setGroupChatInfo`/`getGroupChatInfo` → `setContactInfo`/`getContactInfo`；`SetGroupChatInfoResult` → `SetContactInfoResult`；`groupComment*` → `contactComment*`；action `'group_comment'` → `'contact_comment'`；`hasGroupCode` → `hasContactInfo`。
-- 错误码：`invalid_group_chat_info` → `invalid_contact_info`；`no_group_code` → `no_contact_info`；`shared_group_code` → `shared_contact_info`；`group_code_missing` → `contact_info_missing`。
+- 错误码：`invalid_group_chat_info` → `invalid_contact_info`；`no_group_code` → `no_contact_info`；`group_code_missing` → `contact_info_missing`。
+- **携带一码一号放松**（change `loosen-group-comment-shared-code` 已归档、晚于本 change 提出）：`shared_group_code`（旧硬拒 reason）**已废除**，改名对象是成功侧警告字段 `sharedGroupCodeWarning` → `sharedContactInfoWarning`。本 change MUST 保留放松语义（共用放行 + 警告），MUST NOT 恢复 `shared_*` 硬阻断；`no_group_code`（无码硬拒）保留、改名为 `no_contact_info`。
 - HTTP 路由：`/api/accounts/:id/group-chat-info` → `/contact-info`。
 - **Why `--contact` 而非 `--connect`**：与字段 / 概念 / DB 列名 `contact` 全一致，读代码零歧义（用户拍板）。
 

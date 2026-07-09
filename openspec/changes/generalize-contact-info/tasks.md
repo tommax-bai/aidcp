@@ -16,13 +16,13 @@
 
 - [ ] 2.1 新建 `migrations/00XX_rename_group_chat_info_to_contact_info.sql`：schema-qualified 幂等 guard（`table_schema=current_schema()`，旧列存在且新列不存在才 `RENAME`）+ `SET LOCAL lock_timeout` + 末尾 `ADD COLUMN IF NOT EXISTS contact_info TEXT`；一并含群评列 `group_comment_enabled/daily_cap → contact_comment_enabled/daily_cap` 与 `group_comment_attempts` 表族的 guarded RENAME。**不改**历史 `0027_*.sql` 文件名。
 - [ ] 2.2 `account-store.ts` 自愈 DDL 与迁移文件逐字同源：列声明改 `contact_info`、**删除旧 `ADD COLUMN group_chat_info` 行**、所有 in-method SQL 与 row-shape（SELECT/UPDATE/RETURNING）改列名。
-- [ ] 2.3 `config/content-schedule-store.ts`：列读 `group_chat_info` → `contact_info`（含 `has_group_code` 别名 → `has_contact_info`、`no_group_code`/`shared_group_code` reason、`hasGroupCode` 派生字段 → `hasContactInfo`）；群评列/方法 `recordGroupCommentAttempt`/`countGroupAttemptsToday` 及其 SQL 改名。
+- [ ] 2.3 `config/content-schedule-store.ts`：列读 `group_chat_info` → `contact_info`（含 `has_group_code` 别名 → `has_contact_info`、reason `no_group_code` → `no_contact_info`、成功侧 `sharedGroupCodeWarning` → `sharedContactInfoWarning`（**保留放松、别恢复 shared 硬拒**）、`hasGroupCode` 派生字段 → `hasContactInfo`）；群评列/方法 `recordGroupCommentAttempt`/`countGroupAttemptsToday` 及其 SQL 改名。
 - [ ] 2.4 `panel/panel-store.ts`：row-shape 列 + `ACCOUNT_SELECT` 的 `a.group_chat_info` → `a.contact_info`。
 
 ## 3. aidcp-cloud — 群评特性正名 + 精选 withGroup（Wave1/2）
 
 - [ ] 3.1 `orchestrator/content-scheduler.ts`：`groupCommentEnabled/DailyCap` → `contactComment*`、`triggerGroupComment` → `triggerContactComment`、`groupAttemptsTodayCount` → `contactAttemptsTodayCount`、action 字面量 `'group_comment'` → `'contact_comment'`、注释同步。
-- [ ] 3.2 `panel/panel-server.ts`：账号联系方式写路由 `/group-chat-info` → `/contact-info`（**过渡期新旧双认**）、`setContactInfo` 调用、请求/响应 `groupChatInfo` → `contactInfo`、reason `invalid_group_chat_info` → `invalid_contact_info`；内容排期写通道 `groupCommentEnabled/DailyCap` → `contactComment*` + reason `no_group_code`/`shared_group_code` → `no_contact_info`/`shared_contact_info`。
+- [ ] 3.2 `panel/panel-server.ts`：账号联系方式写路由 `/group-chat-info` → `/contact-info`（**过渡期新旧双认**）、`setContactInfo` 调用、请求/响应 `groupChatInfo` → `contactInfo`、reason `invalid_group_chat_info` → `invalid_contact_info`；内容排期写通道 `groupCommentEnabled/DailyCap` → `contactComment*` + reason `no_group_code` → `no_contact_info` + 成功侧 `sharedGroupCodeWarning` → `sharedContactInfoWarning`（**携带放松、别恢复 shared 硬拒**）。
 - [ ] 3.3 `panel/panel-server.ts` 精选评论 `withGroup` 接收端（`:1720/1754/1755`）→ `withContact`；`panel/types.ts` `CuratedActions.commentOnNote(..., withContact)` + 导入 `SetContactInfoResult` + `setContactInfo` 签名（**必须与 console `CuratedContentPage.tsx` 同波，否则静默不注入**）。
 - [ ] 3.4 `panel/panel-store.ts` DTO 字段 `groupChatInfo` → `contactInfo`（注释同步）；`panel/version.ts` `PANEL_ACCOUNT_FIELDS` 的 `groupChatInfo` → `contactInfo`（**与 panel-store DTO 同 commit，`_AssertNever` 强制键一致**）。
 
@@ -49,7 +49,7 @@
 - [ ] 7.2 `components/AccountsTable.tsx`：列标题「群聊引流」→「联系方式」、列 key/回调 `onEditGroupChat` → `onEditContact`、局部态 `draftChat`/`editingChatId`/`beginEditChat`/`commitChat`、多账号同码告警 `codeCounts`/`isDupCode`「多账号同码」文案、placeholder/title 全部改「联系方式」。
 - [ ] 7.3 `pages/AccountsPage.tsx`：路由/命令 `/group-chat-info` → `/contact-info`、请求体与成功读键 `groupChatInfo` → `contactInfo`、toast 文案、prop 接线。
 - [ ] 7.4 `api/errorText.ts`：`invalid_group_chat_info` → `invalid_contact_info`（过渡期可同时匹配新旧串）。
-- [ ] 7.5 `pages/ContentSchedulePage.tsx`：`no_group_code`/`shared_group_code` → `no_contact_info`/`shared_contact_info`、「未配群码」→「未配联系方式」、「自动群评」列/`commitCap('group')`/`key:'group'` → contact、tooltip。
+- [ ] 7.5 `pages/ContentSchedulePage.tsx`：reason `no_group_code` → `no_contact_info` + 成功侧 `sharedGroupCodeWarning` → `sharedContactInfoWarning`（**保留共用放行+风险提示**）、「未配群码」→「未配联系方式」、「自动群评」列/`commitCap('group')`/`key:'group'` → contact、tooltip。
 - [ ] 7.6 `pages/CuratedContentPage.tsx`：`group_code_missing` → `contact_info_missing`、POST `withGroup` → `withContact`、`commentKind 'group'` 与文案「带群评论」→「带联系方式评论」。
 
 ## 8. aidcp-console — 测试（Wave2 关卡）
