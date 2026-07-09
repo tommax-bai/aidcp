@@ -87,7 +87,7 @@
 | `interaction.like` | cloud → edge | 点赞指定笔记 |
 | `interaction.collect` | cloud → edge | 收藏指定笔记 |
 | `interaction.follow` | cloud → edge | 关注作者 |
-| `interaction.comment` | cloud → edge | 在当前笔记发评论（`text` 正文；云端已撰写/去AI味/人审通过） |
+| `interaction.comment` | cloud → edge | 在当前笔记发评论（`text` 正文；云端已撰写/去AI味/人审通过）。可选 `groupChatCode`=账号「联系方式」，非空则 verbatim 追加到评论末尾（wire 名历史保留，概念=contact info，change generalize-contact-info） |
 | `interaction.like_comment` | cloud → edge | 给详情页内某条评论点赞（`commentAnchorId` 稳定锚点定位，绝不按序号） |
 | `navigation.back` | cloud → edge | 返回上一页（feed / search） |
 | `note.browse_images` | cloud → edge | 浏览笔记图片（`count` 张；DeepReader 决策下发） |
@@ -436,7 +436,8 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 // interaction.follow
 { "authorId": "u456", "reason": "持续优质", "thinkMs": 900 } // authorId 可选
 // interaction.comment
-{ "noteId": "n123", "text": "今天的分享很有启发", "thinkMs": 900 } // text 必填
+{ "noteId": "n123", "text": "今天的分享很有启发", "thinkMs": 900, "groupChatCode": "..." } // text 必填；groupChatCode 可选=账号「联系方式」(contact info)，非空则边缘逐字敲完 text 后整段追加「\n+该串」，verbatim 不 trim
+// 注（change generalize-contact-info）：本字段承载的概念已正名为「联系方式」，内部变量为 contactInfo；wire 字段名保留 groupChatCode 作历史兼容（Method A），物理改名属后续协调步骤。
 // navigation.back
 { "reason": "quality_rejected", "targetPage": "feed", "dwellMs": 2200 } // targetPage: feed | search
 // note.open

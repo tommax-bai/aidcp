@@ -365,3 +365,14 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **切环境不残留旧态** — 从已绑环境 A 切到未绑环境 B（多环境并存 / 换 handle）：B 不因 A 的已绑态误显示「已设置」（per-handle status + resetPersonaDraft 双保险）。
 - [ ] **确认后即已设置** — 新号生成→确认成功后，当前环境徽标立即「已设置」（personaLocallyBound，不等下次 hello）；切到别的环境不带走该态。
 - [ ] **同环境重启不残留 stale 已绑** — 某环境曾已绑、后台解绑、重启该环境：startEdge 清 `handle.status.personaBound`→连云后据真实（无 personaBound）显示「未设置」，不残留「已设置」。
+
+## 簇 26 — generalize-contact-info 真机验收（群聊引流码→联系方式泛化，登记于 2026-07-09；代码已 land 三仓 master、**尚未部署 dev**）
+
+**前置**：cloud `2f0ef2a` + console `49d4203` 部署 dev（**含手动跑 `migrations/0036`**：物理列/表改名 group_chat_info→contact_info、group_comment_*→contact_comment_*）；edge `7699be8`（wire 键未改、旧 edge 兼容，非阻塞）。wire 采 Method A（`groupChatCode` 保留）。
+
+- [ ] **迁移保数据** — 跑 0036 后，既有账号后台「联系方式」列仍显示原值（列/表改名不丢数据）；`accounts.contact_info` 有数据、无空 `group_chat_info` 僵尸列。
+- [ ] **命令 `--contact` 真发** — 飞书 `/comment <昵称> --contact`：已配联系方式账号 → 人审卡展示「正文+联系方式」合并终稿、通过后边缘真发带联系方式的评论（verbatim、含 emoji/换行）。
+- [ ] **旧写法不再识别** — `/comment <昵称> group:on`：`group:on` 被并入昵称、走「找不到账号」诚实失败，绝不静默注入。
+- [ ] **缺配 fail-closed** — 对未配联系方式账号 `--contact` → 告警回执「未配置联系方式」、本次不发，不静默发无联系方式评论。
+- [ ] **后台编辑回真态** — 后台「联系方式」列就地编辑保存 → 走 `/api/accounts/:id/contact-info`、回读真态（verbatim）；旧路由 `/group-chat-info` 过渡期仍受理。
+- [ ] **自动带联系方式评论 + 一码一号放松** — 内容排期开「自动带联系方式评论」：无联系方式 → `no_contact_info` 硬拒；联系方式与他号共用 → 放行 + `sharedContactInfoWarning` 风险提示（**放松未被本 change 回退**）。
