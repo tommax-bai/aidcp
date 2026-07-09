@@ -21,7 +21,7 @@
 - [x] 2.1 单测 `post-image-form-profile`：封面非卡零内页调用 / 纯卡轮播归 `all_text_card` / 混合源归 `card_cover` 不猜 / 出错·低置信·超上限各自降级枚举 / 并发有界 + senseAt 抛错兜底。 <!-- aidcp-cloud 1b202d2 test/publish-agent/post-image-form-profile.test.ts 8 例 -->
 - [x] 2.2 acceptance/单测：CoverCardWriter 影子（旗标开盖章 formProfile、封面决策不变）+ 零回归（未装配/旗标关不含 formProfile 键）；绝不把缺失猜成 `all_text_card`（形态档服务单测锁死）。 <!-- aidcp-cloud 1b202d2 cover-card-writer.test.ts 新增 4 例 -->
 - [x] 2.3 回归纪律：`npm run test:acceptance`(47) → `npm test`(1652) → `npm run typecheck` 全绿。 <!-- aidcp-cloud 1b202d2 rebase 后复跑 typecheck+acceptance(47) 全绿再 ff push -->
-- [ ] 2.4 部署 dev（安全序列：`scripts/deploy-target dev --check` → 备份 → rsync → restart → healthcheck），开 `AIDCP_POST_FORM_PROFILE` 影子；登记真机验收项到 `docs/real-machine-acceptance-backlog.md`：纯卡源稿实际频率、内页（非封面）图判定准确率。
+- [x] 2.4 部署 dev + 开 `AIDCP_POST_FORM_PROFILE` 影子；真机验收项登记 backlog 簇 23。 <!-- aidcp-cloud 1b202d2 代码经并发 fleet 部署已在 dev（md5 == 本地三文件）；本 session 仅 .env 加 AIDCP_POST_FORM_PROFILE=true（备份 .env.bak.2026-07-09-postform）+ 重启，healthcheck 全绿（active/8787/OSS/飞书/渲染出口就绪）。2026-07-09 deployed -->
 
 ## 3. GATE — 影子数据评审（阶段 1 前置闸）
 

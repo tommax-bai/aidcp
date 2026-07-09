@@ -311,3 +311,15 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **切回有记录环境被快照回填** — 再切回 A 环境重启：hello 快照到位后发布卡回填 A 的「上次发布」（标题正确），`ui-state.json` 里 `envKey` 为 `ads:<A的分身id>`
 - [ ] **同环境重启历史态保留** — 不换环境、点「按新设置重启」或暂停/恢复：「上次发布」保留展示，与改动前行为一致
 - [ ] **升级路径一次性空态自愈** — 带旧版无 `envKey` 的 `ui-state.json` 升级后首启：发布卡先空态；启动核心、快照带回真实记录后自愈且新文件带键
+
+## 簇 23 — textcard-carousel-form-parity 阶段0 影子真机验收（帖级形态档只判不渲，2026-07-09 部署 dev + 开 `AIDCP_POST_FORM_PROFILE`）
+
+**前置**：dev 已部署 cloud `1b202d2` 且 `.env` 三旗标均 true（`AIDCP_COVER_FORM_SENSING` / `AIDCP_PUBLISH_TEXTCARD_COVER` / `AIDCP_POST_FORM_PROFILE`）；需真机发若干**带参照图**的洗稿帖（含纯文字卡源稿、卡封面+照片内页混合源、普通照片封面源各若干）。
+**背景**：洗稿「文字卡」判定/渲染此前仅封面独占，纯文字卡源稿→只封面是卡、内页全 AI 图（帧内形态自相矛盾）。阶段0 影子只**判定 + 记录**帖级形态档（封面先行 + 内页有界并发判形 → `generative`/`card_cover`/`all_text_card`），**不改任何渲染**；据此攒 go/no-go 数据决定是否建阶段1（真整帖渲卡）。查 `publish_metadata->'coverFormAudit'` 的 `formProfile` / `formProfileGate` / `perImageForms`。**评审属 GATE §3.1**：达标（纯卡源稿够常见 + 内页判定够准）才进阶段1；否则本 change 作诚实信号收尾。
+
+- [ ] **纯文字卡源稿归 all_text_card** — 洗一篇源图整帧全是排版文字卡的稿，查 `formProfile='all_text_card'`、`formProfileGate='all_text_card'`，`perImageForms` 每张 `form='text_card'`；此帖当前产物仍是「封面卡 + 内页 AI 图」（阶段0 不改渲染），确认形态档记录与产物不一致是**预期**（信号先行）
+- [ ] **内页（非封面）判定准确率** — 抽 ≥5 篇 `formProfile` 非 generative 的帖，人工核对 `perImageForms` 各张 `form` 与真实源图形态是否吻合（该视觉模型此前只在封面上验证过，内页准确率是阶段1 前置未知项）；记录误判类型（如照片被误判 text_card / 反之）
+- [ ] **混合源不误判全卡** — 洗一篇「文字卡封面 + 真实照片内页」的稿，查 `formProfile='card_cover'`、`formProfileGate` 为 `downgrade_inner_not_unanimous`（内页明确异形）或 `downgrade_unknown_or_error`（内页不确定），绝不 `all_text_card`
+- [ ] **封面先行零额外成本** — 洗一篇普通照片封面稿，查 `formProfile='generative'`、`formProfileGate='generative_cover_not_card'`，且该帖**未对内页发起额外视觉调用**（对照 token 用量/日志，普通帖不多花）
+- [ ] **零回归：既有封面文字卡链路不变** — 对照开影子旗标前后，同类源稿的 `coverForm`/`renderStatus`/封面产物一致（阶段0 只并列加 formProfile 字段、不改任何既有决策与渲染）
+- [ ] **纯卡源稿频率统计** — 累计一段时间后统计 `formProfile='all_text_card'` 占带参照图洗稿帖的比例（GATE §3.1 决策依据：够常见才值得建阶段1 真渲染）
