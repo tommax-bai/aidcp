@@ -43,3 +43,15 @@ TBD - created by archiving change llm-role-review-remediation. Update Purpose af
 - **WHEN** 全局 `model_config` 行缺失或 PG 不可用
 - **THEN** 兜底默认模型为现役在售模型（`qwen3.7-plus`），调用不因兜底模型已下架而失败
 
+### Requirement: Facebook unattended comment validators reject unsafe generated text
+
+For Facebook scheduled comments, generated text SHALL pass deterministic validators before any browser submit. Validator failures are final for that attempt: the system MUST return a skipped outcome and MUST NOT silently substitute templates, placeholders, or auto-fixed text for posting.
+
+#### Scenario: Contact information is rejected
+- **WHEN** generated Facebook comment text contains phone/email/WeChat-like contact information
+- **THEN** validators reject it and no comment is submitted
+
+#### Scenario: Empty LLM output is skipped
+- **WHEN** the LLM produces empty or unparsable comment text
+- **THEN** the attempt is skipped honestly, with no template fallback and no submit
+
