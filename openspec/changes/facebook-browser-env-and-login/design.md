@@ -11,6 +11,7 @@ External review affects scope. Meta's official Pages API can support Page commen
 - Add storage-safe probes that summarize cookies/storage/indexedDB key shapes without logging raw secrets.
 - Add read-only page structure probes for Page, Group, and post URLs.
 - Add comment editor probes that verify controlled-editor input behavior without posting by default.
+- Add a one-time Facebook account import input in the companion's AdsPower environment creation UI so operators can create AdsPower profiles from `email----password----2FA----cookie` lines without storing those secrets in aidcp.
 - Add URL/location-based checkpoint and login-wall detection.
 - Implement minimal Facebook driver `readIdentity` and `detectOverlay` after probe evidence confirms stable signals.
 - Define Phase-0 gates that must pass before `facebook-scheduled-comment`.
@@ -19,6 +20,7 @@ External review affects scope. Meta's official Pages API can support Page commen
 - Build scheduled commenting, LLM composition, validators, or cron.
 - Automate credential entry, 2FA, device confirmation, or checkpoint solving.
 - Store Facebook cookies/tokens in git, docs, logs, OpenSpec tasks, or durable memory.
+- Store imported Facebook usernames, passwords, 2FA keys, or cookies in aidcp settings, local files, logs, OpenSpec artifacts, or git history.
 - Replace aidcp's CDP/LocatingEngine stack with Playwright/Puppeteer.
 - Depend on Facebook internal GraphQL doc IDs for core runtime behavior.
 
@@ -33,6 +35,9 @@ External review affects scope. Meta's official Pages API can support Page commen
 - Use AdsPower profile persistence as the login/session strategy.
   - Rationale: existing anti-detection architecture already treats one account as one profile/fingerprint/IP. That is closer to real user behavior than exporting/importing storage.
   - Alternative considered: CDP export/import of cookies and storage. Keep it as diagnostic tooling only, not the first production path.
+- Keep Facebook account import as a one-time create-profile payload.
+  - Rationale: AdsPower owns profile persistence and supports profile creation with platform credentials/cookies; aidcp should only pass the import material to AdsPower at creation time, then keep using AdsPower `user_id` as the durable handle.
+  - Alternative considered: saving account material in aidcp settings for later retries. That would create a new secret store and violate the existing no-cookie/no-token persistence boundary.
 - Detect Facebook blocking by URL/location plus page text, not DOM masks alone.
   - Rationale: Facebook often moves the whole page to `/checkpoint` or a login route; an overlay-only detector will miss the highest-value stop signal.
   - Alternative considered: extend generic overlay selectors only. That would not catch full-page redirects.

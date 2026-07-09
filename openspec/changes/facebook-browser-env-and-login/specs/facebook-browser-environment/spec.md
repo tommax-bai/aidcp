@@ -12,6 +12,22 @@ edge SHALL support starting or attaching to a Facebook AdsPower profile through 
 - **WHEN** the Facebook profile opens to login or no stable identity can be read
 - **THEN** edge reports a login/identity failure and does not start account-scoped browsing or commenting
 
+### Requirement: Facebook account import is one-time AdsPower profile creation input
+
+The companion SHALL allow operators to provide Facebook account environment information while creating AdsPower profiles. The accepted input format is one account per line: `username----password----2faKey----cookie`. For each valid line, the companion MAY pass `username`, `password`, `fakey`, and `cookie` to AdsPower profile creation together with the Facebook platform/domain metadata and `repeat_config` including Facebook `c_user` deduplication. aidcp MUST NOT persist imported passwords, 2FA keys, raw cookies, or session tokens in settings, logs, OpenSpec artifacts, durable memory, or local ledgers. Created profiles MUST remain unverified until normal startup/identity/checkpoint probes succeed.
+
+#### Scenario: Imported cookie is passed only to AdsPower create
+- **WHEN** the operator creates a Facebook AdsPower environment from an account-import line
+- **THEN** the create request includes the imported account material for AdsPower profile creation, and the companion does not save that material to settings or expose it in success/error text
+
+#### Scenario: Invalid import line fails before profile creation
+- **WHEN** an import line is missing the cookie or does not contain the four expected fields
+- **THEN** the companion rejects that line before calling AdsPower profile creation and reports a non-secret validation error
+
+#### Scenario: Imported profile is still unverified
+- **WHEN** AdsPower successfully creates a profile from imported Facebook account material
+- **THEN** aidcp records only the AdsPower profile id/label for selection, treats the profile as unverified, and still requires startup identity and checkpoint probes before account-scoped work
+
 ### Requirement: Facebook storage probe redacts all secret values
 
 The Facebook storage probe SHALL inspect cookies, localStorage, sessionStorage, IndexedDB, and service-worker/cache presence only to the extent needed to understand persistence shape. Probe output MUST NOT include raw cookie values, token values, raw localStorage/sessionStorage key names, raw IndexedDB/cache names, IndexedDB record payloads, request headers, or credentials. It MAY include origin names, counts, expiry presence, value length buckets, redacted key/name hashes, and boolean/token-like presence markers.

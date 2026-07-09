@@ -61,6 +61,12 @@
   <!-- partial 2026-07-06: test fixtures should include Simplified Chinese login labels and the public-content-with-login-overlay state so visible articles are not misclassified as logged-in readiness. -->
   <!-- partial 2026-07-06: test fixtures should include /two_step_verification/, fbsbx captcha frames, google recaptcha frames, and Simplified Chinese "进行人机身份验证" text. -->
   <!-- done 2026-07-06: test/facebook/overlay.test.ts covers checkpoint/human verification, login/recovery, temporary block, clean page, invalid JSON fail-closed, and sticky monitor errors. -->
+- [x] 5.4 Add a one-time Facebook account import input to the AdsPower create-environment UI.
+  <!-- done 2026-07-09: edge commit adcdce0 adds a Facebook-only one-time import textarea in the companion create-environment UI; the field is hidden for xiaohongshu and cleared after successful imported creation. -->
+- [x] 5.5 Pass imported Facebook `username` / `password` / `fakey` / `cookie` only into AdsPower profile creation; do not persist them in settings/logs/tasks.
+  <!-- done 2026-07-09: edge commit adcdce0 parses username/password/fakey/cookie lines in memory and maps them only into AdsPower user/create account fields. aidcp remark/settings/tasks do not store imported username/password/2FA/cookie; imported profile names use generic "Facebook import N". -->
+- [x] 5.6 Add tests for import parsing, create payload fields, non-secret renderer messaging, and invalid-line rejection before profile creation.
+  <!-- done 2026-07-09: edge commit adcdce0 adds parser, write-api, create-flow, group-recovery, and renderer smoke coverage. Invalid lines are rejected before profile creation, success/error messages do not echo account material, and test fixtures use synthetic account ids. -->
 
 ## 6. Phase-0 Real-Machine Gates
 
@@ -83,6 +89,7 @@
   <!-- done 2026-07-06: after edge commit 224b196, git diff --check PASS; npm run typecheck PASS; focused Facebook/platform/CDP suite PASS 33/33; npm run test:acceptance PASS 13/13; npm test PASS 668/668. -->
   <!-- done 2026-07-06: after redaction/F2 runner changes, git diff --check PASS; npm run typecheck PASS; focused Facebook/platform/CDP suite PASS 35/35; npm run test:acceptance PASS 13/13; npm test PASS 670/670. -->
   <!-- done 2026-07-06: after F1 gated submit probe, edge git diff --check PASS; focused Facebook/platform/CDP suite PASS 51/51; npm run typecheck PASS; npm run test:acceptance PASS 13/13; npm test PASS 674/674. -->
+  <!-- done 2026-07-09: after Facebook AdsPower account import and rebase onto origin/codex/facebook-browser-env-and-login, edge git diff --check PASS; sensitive pasted-account fragment scan PASS; npm run typecheck PASS; npm run test:acceptance PASS 13/13; npm test PASS 724/724; focused import/renderer/write/create tests PASS 59/59 after replacing any real pasted account fragments with synthetic fixtures. -->
 - [x] 7.2 If cloud code changed, run relevant cloud focused tests, acceptance, `npm test`, and `npm run typecheck`.
   <!-- done 2026-07-06: no cloud code changed in this tranche; cloud validation not applicable. -->
 - [ ] 7.3 Record repo commit SHAs, probe outcomes, and validation notes in this `tasks.md`.
@@ -96,9 +103,11 @@
   <!-- partial 2026-07-06: F1 gated submit probe and runbook prepared; final SHA recording still waits for the edge commit plus a live operator-owned disposable post sample. -->
   <!-- partial 2026-07-06: edge commit 7c01700 records F1 gated submit probe implementation and tests. Remaining probe outcomes: live F1 sample on an operator-owned disposable post and F3 multi-day stability. -->
   <!-- partial 2026-07-06: control commit a74e9c5 adds phase0-f1-gated-submit-runbook.md and records the F1 implementation/validation notes. -->
+  <!-- partial 2026-07-09: edge commit adcdce0 records Facebook AdsPower one-time account import implementation and validation. Remaining final closeout still waits for F1 live disposable-post sample and F3 multi-day stability outcome. -->
 - [x] 7.4 Run `openspec validate facebook-browser-env-and-login --strict`.
   <!-- done 2026-07-06: PASS. Rerun after later 4.x/F-gate work changes artifacts. -->
   <!-- done 2026-07-06: PASS after storage key/name redaction spec update and F2 live probe findings. -->
   <!-- done 2026-07-06: PASS after Day-0 F3 read-only observation notes. -->
   <!-- done 2026-07-06: PASS after F1 gated submit runbook and task notes. -->
+  <!-- done 2026-07-09: PASS after adding the Facebook AdsPower account import requirement, UI/create-payload design notes, and validation/task records. -->
 - [ ] 7.5 Do not start `facebook-scheduled-comment` until F1/F2/F3 are all recorded as passed or the design is revised.
