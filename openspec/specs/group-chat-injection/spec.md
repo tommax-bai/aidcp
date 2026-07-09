@@ -69,7 +69,7 @@ TBD - created by archiving change account-group-chat-injection. Update Purpose a
 
 ### Requirement: 注入仅经命令式评论任务机器，自治浏览闭环永不自动引流
 
-群聊码注入 SHALL 仅发生在命令式评论任务机器内——由飞书 `/comment group:on` 手动触发，或由内容排期调度器的群评动作触发（change `content-schedule-group-comments`）。**硬不变量保留**：系统 MUST NOT 在自治浏览闭环的评论撰写链注入任何群聊码——浏览闭环产出的评论永不携带引流码。排期触发的注入 MUST 经同一条命令式管线（缺码 fail-closed、人审卡前 verbatim 注入、人审内联），且 MUST 受排期侧刹车：每日自动尝试上限（持久、硬 ≤10）、按账号 × 动作错峰、一码一号硬阻断（开启即校验）、自动路径 `canDo('comment')` 配额。原「不做每账号引流频次上限」的留缝对**自动**情形由此正式补上；手动命令式仍无频次上限（人逐条掌控是刹车）。
+群聊码注入 SHALL 仅发生在命令式评论任务机器内——由飞书 `/comment group:on` 手动触发，或由内容排期调度器的群评动作触发（change `content-schedule-group-comments`）。**硬不变量保留**：系统 MUST NOT 在自治浏览闭环的评论撰写链注入任何群聊码——浏览闭环产出的评论永不携带引流码。排期触发的注入 MUST 经同一条命令式管线（缺码 fail-closed、人审卡前 verbatim 注入、人审内联），且 MUST 受排期侧刹车：每日自动尝试上限（持久、硬 ≤10）、按账号 × 动作错峰、一码一号群码闸（开启即校验：**无码硬拒、共用群码放行但回带风险提示**）、自动路径 `canDo('comment')` 配额。原「不做每账号引流频次上限」的留缝对**自动**情形由此正式补上；手动命令式仍无频次上限（人逐条掌控是刹车）。
 
 #### Scenario: 浏览闭环评论不含码
 - **WHEN** 自治浏览闭环自行对某笔记生成并发出评论
