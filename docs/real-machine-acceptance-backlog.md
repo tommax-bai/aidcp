@@ -392,7 +392,7 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 **已实装+dev部署（cloud origin/master `1bb0406`）**：浏览闭环命中热帖 + 账号 `contactCommentEnabled` + 过共用评论安全闸（`canDo('comment')` 时/日 + 单场评论预算 + 子上限 `contactCommentDailyCap`）→ `triggerTargeted(injectContact)` → 飞书人审=发；helper 触发 ok 显式 `record('comment')` 消费共用配额 + 记 `contact_comment_attempts`（含审计列）。默认关＝零回归。1678 云端测试过。**未归档时的 fast-follow 已随 change 移出、留此跟踪。**
 
 ### 真机验收（灰度启用后）
-- [ ] **灰度启用**：tom 分组账号（工程师大白 k1e0ero8 / Tmax k1e0awu5）配联系方式 + 后台「排期」页开总开关 + 自动联系评论 + `contactCommentDailyCap`≤2；真机刷到热帖 → 审批卡出现 → 点通过真发。
+- [x] **灰度启用 → 端到端真发成功** — ✅ 2026-07-09 真机：测试号配联系方式 + 开关 + cap 后，刷到热帖 → 触发 → 飞书审批卡 → 点通过 → **联系评论真发出成功**。核心链路（发现→过闸→触发→人审→发）端到端跑通。
 - [ ] **共用配额真消费**：发一条联系评论后，该账号 `canDo('comment')` 余额 -1（与普通评论同池）+ `contact_comment_attempts` 当日 +1（source='hot_lead' + note_id 快照）。
 - [ ] **子上限真拦**：cap=N，触发 N 次后第 N+1 次命中被 `countContactAttemptsToday>=cap` 拦、不发。
 - [ ] **零回归**：账号不开 `contactCommentEnabled` → 命中仅日志、不发。
