@@ -23,7 +23,7 @@
 
 ### Requirement: 受闸群评触发 helper（排期与浏览共用、回执 ok 才记日上限）
 
-系统 SHALL 提供一个「受闸群评触发」helper，把群评的安全闸序与记账时机收于一处，**排期自动群评与浏览自动群评两源共用**（防两份漂移）。闸序 MUST 为：账号 `group_comment_enabled`（浏览路径需）→ `canDo('comment')` 状态放行 → `countGroupAttemptsToday(accountId) < cap` → 调触发闭包（排期＝搜索选帖 `triggerManual({injectGroup})`；浏览＝按 noteId `triggerTargeted({noteId,title},{injectGroup})`）→ **仅当触发回执 `ok` 时** `recordGroupCommentAttempt(accountId, {noteId, source, velocity, ageHours})`。任一闸不过 MUST 不触发、不记账。
+系统 SHALL 提供一个「受闸群评触发」helper，把自动化评论/群评的安全闸序与记账时机收于一处，**排期评论、排期群评、浏览群评三源共用**（防漂移）。闸序 MUST 为：账号 `group_comment_enabled`（浏览群评需）→ `canDo('comment')`（共用评论安全配额，时/日）→ 单场评论预算剩余>0（场次）→ 子上限 `min(group_comment_daily_cap, 共用配额剩余, 单场预算剩余)` 未达 → 调触发闭包（排期＝搜索选帖 `triggerManual({injectGroup})`；浏览＝按 noteId `triggerTargeted({noteId,title},{injectGroup})`）→ **仅当触发回执 `ok` 时**：`record('comment')`（消费共用配额）+ 扣单场评论预算 + `recordGroupCommentAttempt(accountId, {noteId, source, velocity, ageHours})`（子上限计数 + 审计）。任一闸不过 MUST 不触发、不记账。
 
 #### Scenario: 回执 ok 才累加日上限
 
@@ -42,7 +42,7 @@
 
 ### Requirement: 引流线索命中即经 helper 自动触发群评
 
-「引流线索评估」角色（`hot_lead_detector`，订阅 `quality.pass` + 缓存 `note.detail.arrived` 按 noteId 对齐）命中热度过滤闸后，SHALL 经「受闸群评触发 helper」（source='hot_lead'、target=noteId）自动触发带群码引流评论；不再持久化「引流待评候选队列」。被 `quality.reject`（含 LLM 出错/解析失败）的笔记 MUST NOT 触发。角色回调 MUST fire-and-forget、不阻塞浏览；roleName 在 `RoleName` 穷举内、纯确定性、MUST NOT 登记 `role-catalog`。系统 MUST NOT 设「每会话自动群评计数」这类随会话重置的装饰性节流；**唯一权威跨会话日顶 = 群评日上限**。
+「引流线索评估」角色（`hot_lead_detector`，订阅 `quality.pass` + 缓存 `note.detail.arrived` 按 noteId 对齐）命中热度过滤闸后，SHALL 经「受闸群评触发 helper」（source='hot_lead'、target=noteId）自动触发带群码引流评论；不再持久化「引流待评候选队列」。被 `quality.reject`（含 LLM 出错/解析失败）的笔记 MUST NOT 触发。角色回调 MUST fire-and-forget、不阻塞浏览；roleName 在 `RoleName` 穷举内、纯确定性、MUST NOT 登记 `role-catalog`。系统 MUST NOT 设「每会话自动群评计数」这类随会话重置的装饰性节流；**权威节流 = 共用评论安全配额（时/日）+ 单场评论预算（场次）**，群评日上限为其下的子上限。
 
 #### Scenario: 命中且过闸 → 经 helper 触发（飞书审批）
 
@@ -59,24 +59,31 @@
 - **WHEN** 命中热帖但任一安全闸不过
 - **THEN** 诚实略过、不发、**不入任何持久队列**（不再有 `hot_lead_queue`）
 
-### Requirement: 浏览闭环自动群评的真生效安全闸
+### Requirement: 非人工评论/群评共用评论安全上限（统一模型）
 
-浏览闭环自动触发带群码评论 SHALL 当且仅当**全部**满足：① 账号 `group_comment_enabled=true`（默认关）；② `canDo('comment')` 放行——它对 takeover 群评**不计量频率**、仅作**风控状态闸**（账号 warned/restricted/frozen → 配额清零 → 拦）；③ 群评每日尝试上限未达（`countGroupAttemptsToday < cap`，**唯一权威日顶**，与排期共用同一台账）；④ 每条经飞书人审=发。缺群码 MUST fail-closed（本次不发、绝不降级无码评论）。系统 MUST NOT 把 `canDo`、单场评论预算宣称为群评的频率节流（评审坐实二者对 takeover 群评不计量）。账号未开 `group_comment_enabled` 时 MUST 等价现状（命中仅可记日志、不发），零回归。
+非人工命令（自动化）场景的评论触达——排期评论、排期群评、浏览触发群评——SHALL **与普通评论共用同一套评论安全上限**，含**场次（单场会话评论预算 `comments`）+ 各时间维度（小时 / 日，经 `canDo('comment')` 窗口）**，同一池、不分开。为此，自动化触达发出成功后 MUST **`record('comment')` 进风控**以消费共用配额（现有 takeover 的 `skipRiskRecord` MUST 改为**仅对人工 `/comment` 命令生效**、对自动化路径不生效）；单场评论预算 MUST 于发出成功后扣减。自动化配置量（如 `group_comment_daily_cap`）MUST 为**子上限**、**生效值 = min(配置, 共用评论安全配额剩余, 单场评论预算剩余)**，配置 MUST NOT 越过安全额。人工 `/comment` 命令 MUST 仍不占配额（人是刹车，不变）。
+
+浏览闭环自动触发带群码评论 SHALL 额外满足：账号 `group_comment_enabled=true`（默认关）；缺群码 MUST fail-closed（本次不发、绝不降级无码评论）；账号未开时 MUST 等价现状（命中仅可记日志、不发），零回归。
 
 #### Scenario: 账号未开自动群评 → 不发（零回归）
 
 - **WHEN** 命中热帖但账号 `group_comment_enabled=false`
 - **THEN** MUST NOT 自动触发群评
 
-#### Scenario: 风控状态收紧 → 拦
+#### Scenario: 自动化群评消费共用评论配额
 
-- **WHEN** 账号已开自动群评但风控态为 warned/restricted/frozen（canDo('comment') 被拒）
+- **WHEN** 某账号自动化触达（排期/浏览）发出一条群评成功
+- **THEN** MUST `record('comment')` 消费共用评论配额且扣单场评论预算；后续该账号普通评论与群评共见余额减少
+
+#### Scenario: 共用配额/单场预算耗尽 → 拦
+
+- **WHEN** 账号已开自动群评但 `canDo('comment')` 被拒（时/日共用配额耗尽或风控态收紧）或单场评论预算已耗尽
 - **THEN** MUST NOT 触发
 
-#### Scenario: 日上限已满 → 拦
+#### Scenario: 配置量被安全额封顶
 
-- **WHEN** 账号已开自动群评但 `countGroupAttemptsToday >= cap`
-- **THEN** MUST NOT 触发
+- **WHEN** `group_comment_daily_cap` 配置值大于共用评论安全配额剩余
+- **THEN** 生效上限取二者较小值（min），配置不越过安全额
 
 #### Scenario: 缺群码 fail-closed
 

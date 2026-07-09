@@ -30,22 +30,23 @@
 
 ## Decisions
 
-### D1. 抽「受闸群评触发」helper，排期 + 浏览共用（防漂移，评审 major）
-新增 `triggerGatedGroupComment({accountId, source, target?, snapshot?, triggerFn})`：顺序＝`group_comment_enabled?`（浏览路径需，排期路径由其自身开关保证）→ `canDo('comment')` 状态闸 → `countGroupAttemptsToday(accountId) < cap` → 调 `triggerFn`（排期＝`triggerManual({injectGroup})` 搜索选帖；浏览＝`triggerTargeted({noteId,title},{injectGroup})`）→ **回执 `ok` 才** `recordGroupCommentAttempt(accountId, {note_id, source, velocity, age_hours})`。**排期路径（server.ts:2340-2358）重构为调它**，浏览路径也调它——闸序与记账时机一处定义、两源一致。
-- 记账**只在 receipt.ok**（排除 running/离线/缺码等未真开跑的拒），对齐排期现写法。
+### D1. 抽「受闸群评触发」helper，三源共用（防漂移，评审 major）
+新增 `triggerGatedGroupComment({accountId, source, target?, snapshot?, triggerFn})`：顺序＝`group_comment_enabled?`（浏览群评需）→ `canDo('comment')`（共用评论安全配额，时/日）→ 单场评论预算剩余>0（场次）→ 子上限 `min(group_comment_daily_cap, 共用配额剩余, 单场预算剩余)` 未达 → 调 `triggerFn`（排期＝`triggerManual({injectGroup})`；浏览＝`triggerTargeted({noteId,title},{injectGroup})`）→ **回执 `ok` 才**：`record('comment')`（消费共用配额）+ 扣单场预算 + `recordGroupCommentAttempt({note_id,source,velocity,age_hours})`（子上限 + 审计）。**排期评论/排期群评/浏览群评三源都重构为调它**——闸序与记账一处定义、彻底防漂移。
+- 记账**只在 receipt.ok**（排除 running/离线/缺码等未真开跑的拒）。
 
-### D2. 修复日上限记账＝红线放开的前置必做（评审 blocker①）
-浏览触发经 D1 的 helper，回执 ok 后必写 `recordGroupCommentAttempt` → `countGroupAttemptsToday` 真增长 → 日上限对浏览来源真生效。**这是唯一权威跨会话日顶**。验收断言：cap=N，触发 N+1 次，第 N+1 次被 `countGroupAttemptsToday>=cap` 拦。
-- 删除 proposal/design/spec 里「triggerTargeted 自带记账」的错误表述。
+### D2. 让自动化评论真占共用配额＝红线放开的前置必做（评审 blocker①）
+关键修复：现有 takeover 评论一律 `skipRiskRecord`（`manualCommentAccounts`，server.ts:903-905/1039）→ 自动化群评不进 `record`、canDo 看不见它。改为 **`skipRiskRecord` 仅对人工 `/comment` 命令生效**，排期/浏览等自动化触达 `record('comment')` 照记 → 共用评论配额（时/日）+ 单场预算对自动化群评真生效。删除各处「triggerTargeted 自带记账」的错误表述。验收断言：自动发一条群评后，该账号 `canDo('comment')` 余额 -1 且 `group_comment_attempts` 当日 +1。
 
-### D3. 诚实降级失效的安全宣称（评审 major）
-- `canDo('comment')`：**状态闸**（warned/restricted/frozen → 配额清零 → 拦）；**不**当群评频率计数器（takeover 群评不进 record）。
-- 单场评论预算：**不消耗于群评**，不作群评节流，spec 不再宣称。
-- 每会话自动群评计数：**砍掉**（随会话重置、不消耗预算、装饰性）。
-真正对群评生效的频率闸＝**群评日上限（唯一日顶）** + 飞书人审 + 单飞。design/spec 如实这么写。
+### D3. 统一评论安全模型（用户 2026-07-09 定；替代原「降级失效宣称」）
+非人工命令场景，**群评与普通评论共用同一评论安全上限**：场次（单场评论预算 `comments`）+ 时/日（`canDo('comment')` 窗口），同一池。为让共用池成立：
+- **自动化触达发出 ok 后 MUST `record('comment')`** 消费共用配额——把现有 takeover 的 `skipRiskRecord`（`manualCommentAccounts`，server.ts:903-905/1039）改为**仅对人工 `/comment` 命令跳过**，排期评论/排期群评/浏览群评照记。这修复评审「canDo 对群评不计量」——不是降级宣称，而是让它真生效。
+- **单场评论预算**发出即扣减、真作场次节流。
+- **自动化配置量受安全额封顶**：`group_comment_daily_cap` 等为子上限，生效 = `min(配置, 共用配额剩余, 单场预算剩余)`。
+- 砍掉装饰性「每会话计数」。**权威节流 = 共用评论配额(时/日) + 单场预算(场次)**，群评日上限为子上限 + 审计。
+- **人工 `/comment` 命令仍不占配额（人是刹车），不变。**
 
 ### D4. 发出时刻复检，闭 TOCTOU（评审 major）
-`triggerTargeted` 是 fire-and-forget（检测→撰写→推审→等人点→post 可跨数分钟）。在 **post 步骤前**加一道廉价复检 `canDo('comment') + countGroupAttemptsToday<cap`，任一不过则本条 honest-fail 不发。消除「检测时过闸、发出时已超」的窗口。
+`triggerTargeted` 是 fire-and-forget（检测→撰写→推审→等人点→post 可跨数分钟）。在 **post 步骤前**加一道廉价复检 `canDo('comment') + 子上限 min(...)`，任一不过则本条 honest-fail 不发。消除「检测时过闸、发出时已超」的窗口。
 - 飞书审批卡 surface：**「本账号今日群评 x/cap（排期+浏览合计）+ 当前风控态 + 本群码已被 N 个账号共用」**，让人审对频率与跨账号同码集中真正把关（用户定：卡面标注防同码集中）。
 
 ### D5. 一码一号如实写＝告警放行；跨账号同码靠卡面 + 人审（用户定）

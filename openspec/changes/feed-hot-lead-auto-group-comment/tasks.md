@@ -3,11 +3,12 @@
 > 纯 cloud;默认关(`group_comment_enabled=false`)→ 零回归。edge/console 不动。
 > 主体＝把群评日上限对浏览触发补成真生效(评审 blocker)。热点 `role-dispatcher.ts`/`server.ts` 串行单写。
 
-## 1. aidcp-cloud — 受闸群评触发 helper（防漂移，两源共用）
+## 1. aidcp-cloud — 受闸群评触发 helper（防漂移，三源共用）
 
-- [ ] 1.1 新增 `triggerGatedGroupComment({accountId, source, target?, snapshot?, triggerFn})`:闸序 `group_comment_enabled?(浏览)` → `canDo('comment')` 状态闸 → `countGroupAttemptsToday<cap` → `triggerFn()` → **回执 ok 才** `recordGroupCommentAttempt(accountId,{noteId,source,velocity,ageHours})`;任一不过不触发不记账
-- [ ] 1.2 **排期路径重构调 helper**(server.ts:2340-2358 triggerGroupComment):行为不变(回归确认排期群评闸序/记账时机一致)
-- [ ] 1.3 单测:回执 ok→记一次;非 ok(单飞/离线/缺码)→不记;cap=N 触发 N+1 次第 N+1 被拦
+- [ ] 1.1 新增 `triggerGatedGroupComment({accountId, source, target?, snapshot?, triggerFn})`:闸序 `group_comment_enabled?(浏览群评)` → `canDo('comment')`(共用配额,时/日) → 单场评论预算剩余>0(场次) → 子上限 `min(group_comment_daily_cap, 共用配额剩余, 单场预算剩余)` 未达 → `triggerFn()` → **回执 ok 才**:`record('comment')`(消费共用) + 扣单场预算 + `recordGroupCommentAttempt({noteId,source,velocity,ageHours})`(子上限+审计);任一不过不触发不记账
+- [ ] 1.2 **排期评论/排期群评/浏览群评三源都重构为调 helper**(排期 server.ts:2340-2358 等):回归确认排期行为一致
+- [ ] 1.3 **改 record 跳过语义**:`manualCommentAccounts`/`skipRiskRecord`(server.ts:903-905/1039)仅对人工 `/comment` 命令跳过;排期/浏览等自动化触达 `record('comment')` 照记
+- [ ] 1.4 单测:自动化发 ok→record('comment') 消费共用配额+1、扣单场预算、group_comment_attempts+1;非 ok→都不记;cap/共用配额/单场预算任一满→拦;配置>安全额→生效取 min;人工 /comment→仍跳过 record
 
 ## 2. aidcp-cloud — 尝试台账加审计列 + 记账修复（blocker①）
 
