@@ -325,6 +325,18 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **零回归：既有封面文字卡链路不变** — 对照开影子旗标前后，同类源稿的 `coverForm`/`renderStatus`/封面产物一致（阶段0 只并列加 formProfile 字段、不改任何既有决策与渲染）
 - [ ] **纯卡源稿频率统计** — 累计一段时间后统计 `formProfile='all_text_card'` 占带参照图洗稿帖的比例（GATE §3.1 决策依据：够常见才值得建阶段1 真渲染）
 
+### 阶段1 真渲染（2026-07-09 部署 dev + 开 `AIDCP_PUBLISH_TEXTCARD_CAROUSEL`；用户令跳过影子灰度门直接真渲）
+
+**前置**：dev 四旗标均 true（SENSING/TEXTCARD_COVER/POST_FORM_PROFILE/TEXTCARD_CAROUSEL）；cloud `09eef52`。核心诉求：纯文字卡源稿洗稿 → **产物真变化**（整篇每张都是文字卡，不再只封面是卡、内页 AI 图）。旗标秒回滚（删 `.env` 那行 + 重启）。
+**背景**：阶段1 在 all_text_card 档一次多卡文案 → 每槽渲文字卡（cardSet）。卡面是**洗稿产物重排**、非源卡复刻（防搬运，能对齐形态非内容）。内页判定准确率未经真机验证是最大未知项。
+
+- [ ] **纯卡源稿 → 整帖文字卡轮播（核心诉求）** — 洗一篇源图整帧全是文字卡的稿（如「把 AI 记忆从云端搬去本地教程」），产物**每一张**都是排版文字卡（查 `coverFormAudit.cardRenderStatuses` 全 `rendered`、`imageUrls` 每张为 `${seq}.png`），封面+内页形态一致
+- [ ] **卡面内容合理 + 不搬运** — 人审轮播每张卡：文案通顺、覆盖正文主线、各卡不重复；与原稿无 ≥12 字逐字重叠（防搬运）；无联系方式/促销/作者名
+- [ ] **轮播视觉连贯** — 各卡同色板版式族（账号种子）、同 1728×2304 尺寸（帧内一致），逐 seq 装饰有别不单调
+- [ ] **内页判定误判的兜底** — 若某内页被误判非文字卡 → 该篇退 `card_cover`（卡封面+AI 内页），**不**在照片位捏卡、**不**假全卡；确认误判时产物仍诚实（配 backlog 阶段0「内页判定准确率」项一起核）
+- [ ] **多卡文案失败兜底** — 若某张卡违规/LLM 失败 → 整帖回落生成式（`coverFormAudit.formProfileGate='carousel_copy_failed'`），绝不半套卡+半套图
+- [ ] **零回归：非纯卡帖不受影响** — 普通照片封面帖仍全生成式、卡封面+照片混合帖仍 `card_cover`（单封面卡+AI 内页），与开轮播旗标前一致
+
 ## 簇 24 — edge-multi-environment-fleet 真机验收（一台客户端并行托管 N 个环境 + 舰队控制台，登记于 2026-07-09）
 
 **前置**：edge 本地重建到 master `c6292d8`（含 `fleet.cjs` + `main.cjs` 多环境重写 + 环境栏/引导流 renderer + 配图临时目录按 edgeId 隔离 + `browser/active` 对账）；打新安装包（当前 `../aidcp-edge/dist-electron`，版本仍 0.2.7）；≥2 个已登录目标平台的 AdsPower 分身（内存足够 ~1GB/环境）。云端与 console 本 change **零改动**（edges 已按 edgeId 独立路由）。

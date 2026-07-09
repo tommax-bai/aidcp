@@ -25,26 +25,27 @@
 
 ## 3. GATE — 影子数据评审（阶段 1 前置闸）
 
-- [ ] 3.1 复核影子数据：纯文字卡源稿是否足够常见、内页判定准确率是否达标。达标 → 进阶段 1；不达标 → 本 change 作为「诚实形态信号」收尾归档，不建阶段 1。
-- [ ] 3.2 确认 `category-adaptive-images-and-judgment` 已归档（阶段 1 单写者串行的前置）；否则等待其归档再动热点文件。
+- [x] 3.1 复核影子数据：**用户明确要求「看到产物变化」→ 跳过影子灰度门直接进阶段 1**（同 07-08 文字卡封面做法）。内页判定准确率未经真机验证，登记 backlog 簇 23 真机核（误判则该篇退 card_cover、旗标秒回滚）。 <!-- 用户令 2026-07-09：跳过 shadow gate -->
+- [x] 3.2 确认 `category-adaptive-images-and-judgment` **已归档**（origin/main 不含其活跃 change）→ 阶段 1 单写者串行前置解除。 <!-- 2026-07-09 -->
 
 ## 4. aidcp-cloud — 阶段 1：多卡文案 + 整帖渲卡（category-adaptive 归档后，单写者串行）
 
-- [ ] 4.1 `src/publish-agent/prompts.ts`：新增 `buildCardSetPrompt`（一次多卡）——只喂洗稿产物 `createdContent{title,content,tags}` + 图集选题 `themes[i]{subject,intent}`，产 N 张卡（[0] 封面钩子、[1..N-1] 正文段落），卡面短句适配版式；**绝不喂 referenceNote 原文/原图**。
-- [ ] 4.2 `src/publish-agent/roles/cover-card-writer.ts`：`all_text_card` 档 + 渲染旗标开 + 渲染器/OSS **整帖预检**通过时，一次多卡调用 → N 张卡；每张过同一 `findViolation`（≥12 逐字重叠/原作者名/引流促销/违禁词）+ 一次收紧重试；**任一张仍违规 → 整帖回落生成式**、落 `carousel_copy_failed`；产出写 `cardSet`。
-- [ ] 4.3 `src/publish-agent/roles/image-generator.ts`：把 `i===0` 渲染判据换成「该槽有 `cardSet[i]` 非空即渲染」；`renderCoverCard` 泛化为 `(card, {accountId, runToken, seq}, postKey=${sourceId}#${seq})` 写 `${seq}.png`；渲染器/OSS 可用性做**整帖预检**（不可用整帖降级、不半途裂帧）；某槽渲染中途失败只降级该槽走生成式（享完整每图槽预算）；OSS 键无碰撞（`${seq}.png` 与 `${seq}` 基名不并存）。
-- [ ] 4.4 `src/server.ts`：接旗标 `AIDCP_PUBLISH_TEXTCARD_CAROUSEL`（默认关，门控整帖渲卡）；审计扩每槽 `renderStatus`（rendered / render_failed_generative / render_failed_none）。
-- [ ] 4.5 确认**不改** `src/render/text-card.ts`（单卡 `render(copy,seed)` 复用）与 `src/cache/curated-content-store.ts`（逐项 CAS 回写复用）。
+- [x] 4.1 `src/publish-agent/prompts.ts`：新增 `buildCardSetPrompt`（一次多卡，只喂洗稿产物、绝不喂 referenceNote 原文/原图；产 N 张卡 [0] 封面钩子 [1..N-1] 正文段落）。 <!-- aidcp-cloud 09eef52 CoverCardWriter 与 ImageSetPlanner 并行、无 themes，改按 count(=源稿有效图数) 让 LLM 切段，不依赖 themes -->
+- [x] 4.2 `src/publish-agent/roles/cover-card-writer.ts`：`all_text_card` + 轮播旗标开 + 渲染器/OSS 门（gate5）过 + N≥2 → 一次多卡；每张过同一 `findViolation` + 一次收紧重试；任一违规整帖回落生成式（`formProfileGate=carousel_copy_failed`）；产出写 `cardSet`。N<2 落既有单封面卡。 <!-- aidcp-cloud 09eef52 -->
+- [x] 4.3 `src/publish-agent/roles/image-generator.ts`：`i===0` 判据→「该槽有 `cardForSlot(i)` 即渲染」；`renderCoverCard`→`renderCardAt(card,{...,seq},postKey)` 写 `${seq}.png`；整帖预检（渲染器/OSS 不可用→整帖生成式，不半途裂帧、并发预渲染）；某槽中途失败只降级该槽；每槽 `cardRenderStatuses` 入审计。单封面卡种子保旧（零churn）。 <!-- aidcp-cloud 09eef52 生成式经 relocate 也落 ${seq}.png（同键，一槽一种产出无碰撞）；区分渲染/生成看 providerPrompts+cardRenderStatuses -->
+- [x] 4.4 `src/server.ts`：接 `AIDCP_PUBLISH_TEXTCARD_CAROUSEL`；渲染出口加载 + `renderEnabled`(gate3) 任一渲染旗标(COVER‖CAROUSEL)开即放行。 <!-- aidcp-cloud 09eef52 -->
+- [x] 4.5 确认**不改** `src/render/text-card.ts` 与 `src/cache/curated-content-store.ts`（复用现状）。 <!-- aidcp-cloud 09eef52 -->
 
 ## 5. aidcp-cloud — 阶段 1：测试与部署
 
-- [ ] 5.1 acceptance AC-PUB：`buildCardSetPrompt` 输入源无关断言（不含 referenceNote 任何文本）；N 折 `findViolation`；任一张违规整帖回落生成式（不只替换违规张）。
-- [ ] 5.2 单测 `image-generator`：轮播档每槽渲染键 `${seq}.png` 无碰撞、按序收齐；某槽中途渲染失败只降级该槽、其余槽不受影响；渲染器/OSS 预检不可用整帖降级（无裂帧半成品）；帧内同尺寸。
-- [ ] 5.3 回归纪律：`npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿（AC-PUB/AC-PROTO/AC-RISK 必过）。
-- [ ] 5.4 部署 dev（安全序列），behind `AIDCP_PUBLISH_TEXTCARD_CAROUSEL`；真机验收项登记 backlog：轮播视觉连贯性（同风格族/同尺寸）、纯卡源稿产物形态一致、混合源稿仍 `card_cover` 不裂。
+- [x] 5.1 AC-PUB/单测：多卡违规整帖回落生成式（cover-card-writer.test.ts 3 例：合法多卡→cardSet；旗标关→单卡无 cardSet；任一逐字搬运→整帖生成式+carousel_copy_failed）；`buildCardSetPrompt` 输入结构上只喂洗稿产物（不接 referenceNote）。 <!-- aidcp-cloud 09eef52 -->
+- [x] 5.2 单测 `image-generator`：轮播每槽渲 `${seq}.png` 按序收齐；某槽中途失败只降级该槽、其余不受影响；渲染器/OSS 不可用整帖生成式（无裂帧）（image-generator-textcard.test.ts 3 例）。 <!-- aidcp-cloud 09eef52 -->
+- [x] 5.3 回归纪律：`npm run test:acceptance`(47) → `npm test`(1661) → `npm run typecheck` 全绿。 <!-- aidcp-cloud 09eef52 -->
+- [x] 5.4 部署 dev + 开 `AIDCP_PUBLISH_TEXTCARD_CAROUSEL`；真机验收登记 backlog 簇 23（阶段1 项）。 <!-- aidcp-cloud 09eef52 git archive 快照 rsync（备份 cloud.bak.20260709-p1carousel + .env.bak.20260709-p1carousel）+ 开旗标 + 重启；healthcheck 全绿（active/8787/OSS/渲染出口/飞书）。四旗标均 true。2026-07-09 deployed -->
 
 ## 6. 控制仓 — 收尾
 
-- [ ] 6.1 回写本 tasks.md 进度（按 sub-repo 分节、HTML 注释标 `[x]` 带 commit-sha，格式 `<!-- <repo> <sha> 备注 -->`，部署后追加 `<!-- <date> deployed -->`）。
+- [x] 6.1 回写本 tasks.md 进度（阶段0+1 全标注 sha）。 <!-- aidcp-cloud 09eef52 -->
 - [ ] 6.2 `openspec validate textcard-carousel-form-parity --strict` 通过。
-- [ ] 6.3 全部 task 完成 + dev 验证通过 → archive（排在 `category-adaptive-images-and-judgment` 归档之后，避免 `publish-multi-image` spec 交织合并冲突）。
+- [ ] 6.3 真机验收（backlog 簇 23）通过后 archive。 <!-- 代码全落地+部署 dev；真机核内页判定准确率 + 轮播视觉连贯性后再 archive -->
+
