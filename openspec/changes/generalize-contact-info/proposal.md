@@ -9,7 +9,7 @@
 - **底层物理名也改** — **BREAKING（需协调迁移）**：
   - DB 列 `accounts.group_chat_info → contact_info`：schema-qualified 幂等 guard（旧列存在且新列不存在才 RENAME）+ `SET lock_timeout`，作为协调单写迁移（非自愈），新增前向迁移文件、不改历史迁移文件名。
   - 协议 wire 字段 `groupChatCode → contactInfo`：两份 `protocol.ts` 逐字同源同 commit；过渡版本 cloud 同发两键 + edge 双读 `payload.contactInfo ?? payload.groupChatCode`，edge/cloud 协调同波，确认运营机全升级后再删旧键——绝不硬切（防「静默漏贴」红线）。
-- **邻接「群评」调度特性一并正名**为「带联系方式评论」：`groupComment*`→`contactComment*`、action `'group_comment'`→`'contact_comment'`、`group_comment_*` 列/表族、`hasGroupCode`→`hasContactInfo`、console「自动群评」列文案。
+- **邻接「群评」调度特性一并正名**为「联系评论」：`groupComment*`→`contactComment*`、action `'group_comment'`→`'contact_comment'`、`group_comment_*` 列/表族、`hasGroupCode`→`hasContactInfo`、console「自动群评」列文案。
 - **跨仓契约同波**：panel DTO 字段 / HTTP 路由 `/group-chat-info`→`/contact-info` / 错误码 `*_group_*`→`*_contact_*`，cloud + console 同一波上线（先 cloud、console 紧随），路由与错误码过渡期新旧双认，DTO 字段与 `version.ts` 指纹硬同波。
 - **文档补缺**：`docs/protocol.md` 现根本未记录 `interaction.comment` 的注入字段，本次补记（新增，非 find/replace）。
 
@@ -23,8 +23,8 @@
 ### Modified Capabilities
 - `group-chat-injection`：owner spec，6 条需求全部把「群聊引流码 / group:on」正名为「联系方式 / --contact」；命令语法从 `group:on/off` opt-in 改为 `--contact` 干净切换。（capability 目录 id 保留为历史标识，只重写需求文案——见 design 决策）
 - `console-write-operations`：账号「关联群聊信息」编辑需求、内容排期群评字段硬校验（一码一号）需求，正名为联系方式；DB 列 / 路由 / 错误码随之更新。
-- `content-schedule`：「覆盖发帖、评论与群评」「定时自动群评经同一评论机器」两条需求正名为「带联系方式评论」。
-- `curated-note-actions`：「定向评论两型——内容评论与带群评论共用撰写链」正名为「带联系方式评论」，错误码 `group_code_missing`→`contact_info_missing`。
+- `content-schedule`：「覆盖发帖、评论与群评」「定时自动群评经同一评论机器」两条需求正名为「联系评论」。
+- `curated-note-actions`：「定向评论两型——内容评论与带群评论共用撰写链」正名为「联系评论」，错误码 `group_code_missing`→`contact_info_missing`。
 
 ## Impact
 

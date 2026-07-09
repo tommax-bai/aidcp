@@ -11,7 +11,7 @@
 - [x] 1.4 `comment-agent/comment-scheduler.ts`：`getContactInfo`/`injectContact`/`contactInfo`/`withContact`/`contact_info_missing`/文案。 <!-- aidcp-cloud 2f0ef2a -->
 - [x] 1.5 `comment-agent/compose-approve.ts`：`contactInfo` + 日志。 <!-- aidcp-cloud 2f0ef2a -->
 - [x] 1.6 `comment-agent/edge-steps.ts`：`post()` 参数 → `contactInfo`；**wire 采 Method A**——发键仍 `groupChatCode`（`{ groupChatCode: contactInfo }`），未 dual-emit `contactInfo` 键（偏离原计划，见状态头）。 <!-- aidcp-cloud 2f0ef2a -->
-- [x] 1.7 `server.ts`：接线 + 结果卡文案（`/comment --contact`、排期带联系方式评论标题）。 <!-- aidcp-cloud 2f0ef2a -->
+- [x] 1.7 `server.ts`：接线 + 结果卡文案（`/comment --contact`、排期联系评论标题）。 <!-- aidcp-cloud 2f0ef2a -->
 
 ## 2. aidcp-cloud — DB 列物理改名（Wave1，协调单写迁移）
 

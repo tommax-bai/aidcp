@@ -12,7 +12,7 @@
 ## Goals / Non-Goals
 
 **Goals:**
-- 全栈把「群聊引流码 / 群码 / 引流 / 群评」正名为「联系方式 / 带联系方式评论」（contact / `contactInfo` / `contact_info` / `contactComment`）。
+- 全栈把「群聊引流码 / 群码 / 引流 / 群评」正名为「联系方式 / 联系评论」（contact / `contactInfo` / `contact_info` / `contactComment`）。
 - 命令语法 `group:on/off` → `--contact`（干净切换）。
 - 底层物理名也物理改名：DB 列 `group_chat_info → contact_info`、协议 wire 字段 `groupChatCode → contactInfo`——用硬化迁移保数据、保 wire 兼容。
 - 保持数据语义、fail-closed、「审=发」、「绝不静默假成功」全部红线不变。
@@ -27,7 +27,7 @@
 ## Decisions
 
 ### Decision 1：术语与词形——统一 contact / 联系方式
-- 中文文案统一「联系方式」；「群评」→「带联系方式评论」。
+- 中文文案统一「联系方式」；「群评」→「联系评论」。
 - 通用词形：`groupChatInfo`/`groupChatCode`(内部) → `contactInfo`；`injectGroup` → `injectContact`；`setGroupChatInfo`/`getGroupChatInfo` → `setContactInfo`/`getContactInfo`；`SetGroupChatInfoResult` → `SetContactInfoResult`；`groupComment*` → `contactComment*`；action `'group_comment'` → `'contact_comment'`；`hasGroupCode` → `hasContactInfo`。
 - 错误码：`invalid_group_chat_info` → `invalid_contact_info`；`no_group_code` → `no_contact_info`；`group_code_missing` → `contact_info_missing`。
 - **携带一码一号放松**（change `loosen-group-comment-shared-code` 已归档、晚于本 change 提出）：`shared_group_code`（旧硬拒 reason）**已废除**，改名对象是成功侧警告字段 `sharedGroupCodeWarning` → `sharedContactInfoWarning`。本 change MUST 保留放松语义（共用放行 + 警告），MUST NOT 恢复 `shared_*` 硬阻断；`no_group_code`（无码硬拒）保留、改名为 `no_contact_info`。
