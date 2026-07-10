@@ -415,3 +415,11 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **FB 平台识别（问题 3）** — 手工在 AdsPower 建的 FB 环境（remark 无 plat、domain_name=facebook.com）：加入面板平台签显示「Facebook?」（推断标注）、rail 行头像 FB 蓝、选中后顶栏头像/徽标变蓝且健康浮层显示「Facebook 登录」；启动注入 `AIDCP_PLATFORM=facebook` 打开 facebook.com。误推断环境点「改平台」纠正后持久生效、刷新列表不被改回。
 - [ ] **人设浮层重设计视觉项（问题 6）** — 560px 三段式浮层：未启动环境显空态面板+「去启动」；生成中出骨架、遮罩误点不关层；结果 identitySummary 为标题、YAML 在「查看完整人设定义」折叠内；确认后绿卡「已设置」。矮窗口下底部 CTA 始终可见（不沉折叠线下）。
 - [ ] **rail 字形（问题 7/8）** — 添加按钮加号居中、收起/展开箭头尺寸合适且方向正确（收起时指右）。
+
+## 簇 30 — 打包客户端启动浏览器修复（spawn ENOTDIR / cwd 落进 app.asar，登记于 2026-07-10；edge master `3f578b9`/`4c27e85`/`34d668e` 已 land，edge-only 无 ECS 部署，本机已打 0.3.6 dmg，运营机装新包后生效）
+
+> 复发 bug：打包态核心子进程 spawn 的工作目录被设成 `app.getAppPath()`（asar 包内是 `app.asar` **文件**、非目录）→ macOS `spawn ENOTDIR` → 核心起不来、浏览器无法启动。本地 dev / typecheck / 单测全抓不到，只在打包版暴露。曾修于签名分支 `20d3784` 未合回 master、`0.3.5` 又发出。已在本机验证：ENOTDIR 复现 + `dirname` 守卫修复 + 两份 0.3.6 dmg 的 asar 内容确认含 `cwd: edgeCwd`（非 `cwd: appRoot`）；源码级回归断言（`test/electron/lifecycle-contract.test.ts`）+ 发版 smoke 步（`docs/release-desktop.md` §2C）已加。**下面为真机 live 项**（本机无法在不驱动真实自动化的前提下确认浏览器真弹出）。
+
+- [ ] **装 0.3.6 后能启动浏览器** — 运营机装 `AIDCP-0.3.6-arm64.dmg`（或 Intel `AIDCP-0.3.6.dmg`）覆盖 0.3.5，点「启动」：核心子进程正常起来（**不再** `spawn ENOTDIR`）、走到「正在启动指纹浏览器」并真的弹出浏览器、连上云端开始浏览。
+- [ ] **app.log spawn 行 cwd 正确** — `~/Library/Application Support/aidcp-edge/logs/app.log`（或对应 userData）里 `[edge-process] spawning … cwd=` 应为 `.../Contents/Resources`，**绝不**再是 `.../Contents/Resources/app.asar`。
+- [ ] **多环境并行启动均正常** — 环境栏加入多个环境并行启动，每个环境的核心子进程都成功拉起（不因某一 spawn 失败拖累其它）。
