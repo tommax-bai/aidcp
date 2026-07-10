@@ -455,3 +455,15 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **诚实失败不误判** — 构造非 feed 页 / 按钮未浮出 / 点后未换新批等，边缘如实回 `action.completed{refresh, ok:false}`（wrong_context / no_floating_btn / not_reloaded 等），云端失败兜底发一次恢复滚动、浏览闭环不死锁；**绝不**把纯回到顶部（内容未换）当刷新成功。
 - [ ] **kill-switch 秒级回滚** — dev `.env` 设 `AIDCP_FEED_REFRESH=false` + `systemctl restart` 后，无论浏览多深都不再触发刷新、行为回退到本 change 前（一直向下滚）。
 - [ ] **宽窄双布局** — 宽窗（侧栏）与窄窗（底部栏）各验一次刷新按钮定位与点击均命中（探针已证结构同构，真机复核点击链）。
+
+## 簇 34 — comment-search-nav-confirm 真机验收（`/comment` 搜索未导航到结果页不再把 feed 当结果、失败诚实归因，登记于 2026-07-10；cloud master `8a35cbe` 已 land + **已部署 dev**、edge master `0274cf2` 已 land，edge 需运营机 pull/重建后生效）
+
+**前置**：tom 分组 headful 真机（工程师大白 `k1e0ero8` / Tmax `k1e0awu5`），飞书 `/comment` 可触发。
+
+> 事故根因（2026-07-10 dev 黑匣子）：`/comment` 搜索词「Claude Code实测」首次搜索小红书 AI 搜索框回车未提交、仍停在首页 feed，边端却把 feed 当搜索结果上报 → 云端选中无关的《GPT5.6上线》幻影候选 → 复检找不到 → `read_failed`，对运营误报「已选中，但开笔记/读正文失败（边端超时或离线）」（边端全程在线）。本 change：边端采卡前以**实时 URL** 确认到达搜索结果页，未到不采不报 + 发 `action.completed{search,ok:false,not_on_search_page}`；云端竞速消费该诚实回执 → 快速空候选 + 独立真实归因，read_failed 回执带真实原因。本 change **只保证失败诚实、不修 XHS AI 搜索提交本身的 flakiness**。
+
+- [ ] **AI 搜索是否真跳结果页** — 真机跑 `/comment`，观察小红书 AI 搜索框回车 / 点提交按钮（`.bottom-box-right-submit-button`）后**是否真导航到 `search_result_ai`**；记录真实提交机制与结果页 URL 形态（`search_result_ai` vs 裸 `/search`），确认 `SEARCH_LIST_RE`（已放宽为 `/\/search(?:_result\w*)?(?:[/?#]|$)/`）覆盖真 URL。
+- [ ] **未导航诚实回失败（核心）** — 构造 / 遇到「搜索没跳结果页仍在 feed」时：边端**不再上报 feed 卡**、发 `action.completed{search,ok:false,not_on_search_page}`；云端日志出现「搜索未导航到结果页（nav 未确认）→ 空候选」、**不再**出现幻影候选被选中、**不再**误报「边端超时或离线」；`/comment` 换下一个搜索词或诚实结束，不再干等 maxTerms×28s。
+- [ ] **happy-path 不回归** — 搜索真跳到 `search_result_ai` 时，照常应用「最多收藏/一天内」筛选、正常采卡、择优、开笔记、评论（人审通过后真发）；确认诚实闸未误伤正常路径。
+- [ ] **自治搜索不破** — 非命令的自治搜索（`search_evaluator`/`search.approved`）在 nav-fail 时也走同一诚实闸（不把 feed 当搜索结果），云端一次恢复滚动、浏览闭环不死锁、无幻影开笔记。
+- [ ] **read_failed 回执文案** — 若仍发生 read_failed，飞书卡片显示**真实原因**（如「复检时目标已不在搜索结果中（页面重排/未导航到结果页）」），**绝不**再显示「（边端超时或离线）」。
