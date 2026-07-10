@@ -500,3 +500,15 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **按钮漂移诚实失败** — Facebook 改文案/布局致接受按钮定位失败时，回报 `no_target`/`blocked_by_consent`、不乱点其他按钮、不假成功
 - [ ] **accept_all 生效 + necessary_only 可切** — 默认接受全部 cookie；设 `AIDCP_FB_COOKIE_CONSENT=necessary_only` 时改点「仅允许必要 Cookie」
 - [ ] **cookie 持久化一次性** — 接受后写入 AdsPower 持久 profile，同环境后续会话不再反复弹同意浮层
+
+## 簇 38 — browser-permission-prompt-defaults 真机验收（指纹浏览器权限弹窗抑制 + Electron 客户端通知恢复，登记于 2026-07-10；edge master `381bc4a` 已 land，edge-only 无 ECS 部署，运营机重建/pull 后生效）
+
+**前置**：edge 本地/运营机重建到 master `381bc4a`；一个可用 AdsPower 指纹浏览器环境（`tom` 分组，`k1e0ero8`=大白 / `k1e0awu5`=Tmax），首开小红书时以往会弹「是否允许通知」权限浮层。
+**背景**：客户端有两个浏览器——Electron 操作界面窗口 + AdsPower 起的指纹浏览器（真正刷小红书）。此前唯一的权限拦截（`installPermissionPolicy`，为拦地理位置加）只装在 Electron 窗口，管不到独立进程的指纹浏览器 → 小红书的通知权限弹窗照弹；且那套策略顺带把 Electron 客户端自身通知也拦了。修复=指纹浏览器两条启动路径加 `--deny-permission-prompts` + attach/重连经 CDP `Browser.setPermission=denied` 兜底（覆盖复用实例）+ self 模式反检测 query 映射改忠实（default→prompt、denied 照实，防新破绽）+ Electron allowlist 放行 notifications。逻辑单测已锁（914 绿），此处验真机页面行为。
+
+- [ ] **指纹浏览器不再弹通知权限浮层** — 新环境首开/刷小红书时不再出现「是否允许通知」弹窗（`--deny-permission-prompts` 生效；顺带确认 AdsPower 确实透传该 flag）
+- [ ] **复用实例也被抑制** — 复用一个已在跑的 AdsPower profile（未拿到本次 flag）时，attach 后 CDP `Browser.setPermission=denied` 兜底仍把弹窗压住
+- [ ] **地理位置/摄像头/麦克风弹窗一并消失** — 指纹浏览器不再弹这几类权限浮层（`--deny-permission-prompts` 覆盖全部权限类型）
+- [ ] **Electron 客户端自身通知恢复** — 客户端的状态提醒（拦截提示/运营通知等）仍能正常弹出，未被 allowlist 误拦
+- [ ] **反检测无新破绽（self 模式）** — self provider 下 `navigator.permissions.query({name:'notifications'}).state` 与 `Notification.permission` 一致（均为 denied），不再出现 query 报 prompt 而 Notification.permission 报 denied 的矛盾
+- [ ] **浏览/互动闭环零回归** — 权限抑制不影响小红书正常浏览/点赞/评论/发布链路（弹窗消失≠页面功能受损）
