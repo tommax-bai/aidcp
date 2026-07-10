@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 约 32 个角色，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> v2 共 **66 个消息类型**，下表按职能分组列全。
+> v2 共 **70 个消息类型**，下表按职能分组列全。
 
 ## 1. 信封（Envelope）
 
@@ -129,6 +129,15 @@
 | `captcha.assist.click` | cloud → edge | `captcha.assist.click_result` | 将人工点位发送给原 edge，由 edge 映射并派发真实输入事件 |
 | `captcha.assist.click_result` | edge → cloud | — | 返回点击后 fresh 复检结果；只有清除时 edge 另发 `risk.captcha_cleared` |
 
+### Edge 页面写任务租约（同一 edge/CDP 单写）
+
+| type | 方向 | 说明 |
+|---|---|---|
+| `edge.task.acquire` | cloud → edge | 申请任务级执行权，携 `taskId/kind/priority/leaseMs`；这不是“已暂停”的事实 |
+| `edge.task.acquired` | edge → cloud | edge 已在命令安全边界 quiesced、已取消未开始的普通浏览命令并授予租约；cloud 收到后才可发首条业务命令 |
+| `edge.task.release` | cloud → edge | 幂等释放指定 `taskId`，携可选 `outcome` |
+| `edge.task.released` | edge → cloud | 释放/过期/非 owner 的收敛回执 |
+
 ### 2.6 发布编排（v2 新增，Publish Agent 驱动）
 
 | type | 方向 | 用途 |
@@ -136,7 +145,7 @@
 | `publish.request` | cloud → edge | 请求在浏览器中发布一篇帖子 |
 | `publish.approval_request` | edge → cloud | 请求云端发送发布审批卡片（飞书） |
 | `publish.result` | edge → cloud | 发布结果回传（ok / postId / error；v1 整页路径） |
-| `publish.command` | cloud → edge | 下发一条参数化发布原子指令（A 阶段1 指令驱动；`recordId+seq` 关联键，`kind` ∈ E1-E10） |
+| `publish.command` | cloud → edge | 下发一条参数化发布原子指令（`taskId` 为当前发布租约；`recordId+seq` 关联键，`kind` ∈ E1-E10） |
 | `publish.command.result` | edge → cloud | 单条发布指令执行结果回传（按 `recordId+seq` 关联；`ok/value/error/details`，红线不静默假成功） |
 
 ### 2.7 Persona 生成（v2 新增，建号关键词驱动，客户自助 onboarding）
@@ -168,7 +177,7 @@
 }
 ```
 
-`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 66 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。
+`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 70 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。
 
 **`welcome`**（cloud → edge）
 ```jsonc
@@ -614,6 +623,7 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
 **`captcha.assist.snapshot`**（edge → cloud）：返回现场截图和坐标映射
 ```jsonc
 {
+  "taskId": "task-recovery-01H...", // system_recovery 租约；acquired 后才派发点击
   "incidentId": "cap_01H...",
   "edgeId": "edge-1",
   "accountId": "acc-01",
@@ -671,7 +681,42 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
 > 运行兜底：未配置远程协助、scoped token 过期、edge 离线或截图失败时，飞书告警仍保留原远程桌面处置路径；
 > 操作员应远程连到原机器处理，随后等待 edge fresh probe 上报 `risk.captcha_cleared`，cloud 不能手动伪造清除。
 
-### 3.10 发布编排
+### 3.10 Edge 页面写任务租约
+
+申请与确认：
+
+```jsonc
+// edge.task.acquire  cloud → edge
+{
+  "taskId": "task-01H...",
+  "kind": "publish", // publish|comment_prepare|comment_commit|notification|group_join|system_recovery
+  "priority": "human", // system_recovery|human|automatic
+  "leaseMs": 600000
+}
+
+// edge.task.acquired  edge → cloud
+{
+  "taskId": "task-01H...",
+  "kind": "publish",
+  "cancelledBrowseCommands": 2
+}
+```
+
+`acquired` 是唯一的 quiesced 事实：它表示当前浏览原子动作已到命令边界，尚未开始的普通浏览命令已取消，且该 `taskId` 已成为唯一页面写 owner。cloud 在此前不得发送该任务第一条业务命令。普通浏览不带 `taskId`；独占任务的 `publish.command`、评论 `search.execute/note.open/note.scroll_comments/interaction.comment`、`notification.*`、`group.join` 与验证码点击必须携当前 `taskId`。
+
+释放与确认：
+
+```jsonc
+// edge.task.release  cloud → edge
+{ "taskId": "task-01H...", "outcome": "completed" }
+
+// edge.task.released  edge → cloud
+{ "taskId": "task-01H...", "reason": "released" } // released|expired|duplicate|not_owner
+```
+
+edge 按 `system_recovery > human > automatic` 授予；同级 FIFO。发布从 `navigate_entry` 到提交后捕获全程持有一份租约。小红书评论的搜索/读取为 prepare 租约，撰写/LLM/人审期间释放，批准后 commit 重新抢占并按稳定 `noteId` 重开复检。最后一份独占任务释放后才恢复浏览并重报当前页面；被取消的旧浏览命令永不重放。
+
+### 3.11 发布编排
 
 **`publish.request`**（cloud → edge）——请求在浏览器中发布
 ```jsonc
@@ -701,7 +746,7 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
 { "ok": true, "postId": "p789", "error": null } // postId / error 二选一
 ```
 
-### 3.11 通用
+### 3.12 通用
 
 **`error`**（双向）
 ```jsonc
