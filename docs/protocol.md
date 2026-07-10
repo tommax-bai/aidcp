@@ -617,11 +617,20 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
   "requestedAt": 1717113600000,   // number?
   "maxImageWidth": 1280,          // number?  edge 可继续 clamp
   "maxImageHeight": 960,          // number?
-  "quality": 80                   // number?  JPEG 质量建议值
+  "quality": 80,                  // number?  JPEG 质量建议值
+  "live": {                       // object?  实时抓帧（change captcha-assist-live-snapshot）；缺省=单次抓帧（零回归）
+    "intervalMs": 800,            // number?  抓帧间隔 hint，edge 钳到安全区间（约 600..2000）
+    "maxDurationMs": 30000,       // number?  循环时长上界 hint，edge 钳制
+    "maxFrames": 40               // number?  循环帧数上界（iteration-bounded 自终止）
+  }
 }
 ```
 > 该消息只允许定向发给 incident 绑定的 edge。captcha 暂停期间它可穿透传输层暂停闸；
 > 普通浏览、互动、发布页面动作仍必须被暂停闸拦截。
+> 带 `live` 时 edge 进入**有界、内容去重、自终止**的实时抓帧循环：只在挑战画面变化时才推新
+> `captcha.assist.snapshot`；自主判"已清除"须连续多次无遮罩确认后才发 `risk.captcha_cleared`（绝不单次误清）。
+> live 的 snapshotId 语义：edge 每 incident 保留最近 N 帧、云端亦保留最近 N 帧集，`submitClick` 允许提交
+> **最近集内的稍旧 snapshotId**（运营冻结选点用），edge 按被点帧自己的 crop 落点。无新增 MessageType。
 
 **`captcha.assist.snapshot`**（edge → cloud）：返回现场截图和坐标映射
 ```jsonc
