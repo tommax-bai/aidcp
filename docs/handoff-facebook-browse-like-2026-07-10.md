@@ -10,6 +10,14 @@
 - **唯一缺口 = FB 浏览 + 点赞能力（Change B，本文档续做）**：FB driver 无 `browse`/`interact` 能力 → 平台闸拒（真机实测 `platform_no_browse`）→ 没 feed 可刷 → 大脑空转。
 - 全部在隔离分支 `feature/fb-full-integration`（三仓），与主版本隔离；隔离期真机在 **ol**，不碰 dev。
 
+## 0.5 本轮进度更新（2026-07-10 晚，接手先读）
+
+- **测试环境已从 iPhone 指纹修成桌面 Mac**：§1/§2 假设「UA 天然桌面、移动布局纯窗太窄」**是错的**——环境 `k1ehveal` 建出来是**整套 iPhone 移动指纹**（iPhone UA + platform + touch5 + 360×780），FB 据 UA 发移动站，与窗宽无关。已用 AdsPower `user/update` 下发**显式桌面 `ua`** 修好（保留 cookie 登录）。**教训：FB 环境建完必须验 `navigator.userAgent`，别假定桌面**。详见 memory `fb-test-env-desktop-ua-fix`。
+- **Change A 在 PC UA 上重跑 = 全绿**（握手 `sess-3`、平台闸 `platform_no_browse`、normal 档），桌面 feed 真出（`role=feed`+3×`role=article`、cookie 登录 Michelle Garcia）。
+- **边缘补 `--start-maximized`**（edge `eaec298`，AdsPower 启动层强制宽窗，对齐 self 模式；次要加固、非 UA 根因）。
+- **真机探针地基已落库**：`openspec/changes/facebook-browse-and-like-loop/facebook-browse-and-like-loop-probe-findings.md`（控制仓 `a9df78d`）——feed/detail/like 选择器全部实测钉死，**宽窄（1440/900/700）同选择器**已验（满足 spec 7.7）。**接手先读这份 findings，edge `src/facebook/` 直接照它写**（tasks 2/3/4）→ 再 cloud（task 5）→ 测试 → shadow。
+- **仍缺**：点赞「已赞」态确切标识（toggle 真值）留给 shadow（task 8.2）；探针纪律：真机导航要拉开间隔，连续 resize+navigate 会触发软阻断/hydrate 失败假象。
+
 ## 1. 用户新定案（勿再反向，2026-07-10）
 
 - **FB 自动化一律用 PC 版**：**PC / 桌面 UA**（本项目指纹模板 `DEVICE_TEMPLATES` 全是 win11/macos 桌面，无移动模板，UA 天然是桌面）+ **强制宽桌面窗（~1280px+）**。**绝不用移动版 UA / 移动布局。**
