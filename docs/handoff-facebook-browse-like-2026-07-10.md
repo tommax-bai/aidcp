@@ -10,6 +10,14 @@
 - **唯一缺口 = FB 浏览 + 点赞能力（Change B，本文档续做）**：FB driver 无 `browse`/`interact` 能力 → 平台闸拒（真机实测 `platform_no_browse`）→ 没 feed 可刷 → 大脑空转。
 - 全部在隔离分支 `feature/fb-full-integration`（三仓），与主版本隔离；隔离期真机在 **ol**，不碰 dev。
 
+## 0.4 实装完成（2026-07-10 深夜，接手先读这条）
+
+- **Change B（FB 浏览+点赞闭环）代码已全部实装 + land + 全绿**：edge `4c9ce61` / cloud `b302251`（隔离分支 `feature/fb-full-integration`，已 push）。edge 单测 913 + acceptance 16、cloud 单测 1770 + acceptance 47、两仓 typecheck 干净、`openspec validate --strict` 过、**零改 protocol.ts**。
+- **做了什么**：edge `src/facebook/` 新增 feed-reader（role=feed>role=article 扫卡、跳虚拟化空壳、collect 恒 0）、post-reader（permalink→role=dialog 深读正文+评论+计数）、like-executor（帖级 `留下心情` toggle、in-page element.click、后置校验真翻转才 ok、shadow）、cta-labels（多语言反应词匹配 + 数字守卫）、consent（forward-port）、facebook-session（独占单槽 browseHandler、内含评论/加群委托、三态 AIDCP_FB_BROWSE_AUTO kill switch、每命令恰一诚实回执 + 有界超时放行链）。driver 声明 browse/interact、main.ts 按 `usesFacebookBrowseSession` 分支、FB 验证码/软限流上报云端。cloud registry facebook 加 browse/interact/join、session-start 闸放行。
+- **对抗性评审已修**：critical bug（reactState 把「赞+数字」反应计数按钮误当已赞 toggle → 点赞在任何有反应的帖上变 no-op / 假 already_liked）已修 + jsdom 回归；FB 验证码/软限流上报云端已补（否则 Change A 的 FB 限流退避失效）。
+- **仍待真机（backlog 簇 44）**：① shadow 在 ol 跑通（AIDCP_FB_BROWSE_AUTO=shadow）+ **标定「已赞」态确切 aria-label**（唯一待确认，收紧 VERIFY）；② shadow 过后放真点赞；③ 部署 cloud `b302251` 到 ol（gate 生效，edge flag 关时 dormant 安全）+ 运营机重建 edge；④ fast-follow：FB 身份自愈 IdentityWatcher（另案，防误报砸会话）。
+- **下一步**：由用户明确后部署 ol → 用测试账号 `61591458584142`/env `k1ehveal` 连 `ws://123.56.253.183:8787` 跑 shadow。ol 部署按 CLAUDE.md §5 安全序列，默认关 kill switch。
+
 ## 0.5 本轮进度更新（2026-07-10 晚，接手先读）
 
 - **测试环境已从 iPhone 指纹修成桌面 Mac**：§1/§2 假设「UA 天然桌面、移动布局纯窗太窄」**是错的**——环境 `k1ehveal` 建出来是**整套 iPhone 移动指纹**（iPhone UA + platform + touch5 + 360×780），FB 据 UA 发移动站，与窗宽无关。已用 AdsPower `user/update` 下发**显式桌面 `ua`** 修好（保留 cookie 登录）。**教训：FB 环境建完必须验 `navigator.userAgent`，别假定桌面**。详见 memory `fb-test-env-desktop-ua-fix`。

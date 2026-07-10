@@ -423,3 +423,24 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **装 0.3.6 后能启动浏览器** — 运营机装 `AIDCP-0.3.6-arm64.dmg`（或 Intel `AIDCP-0.3.6.dmg`）覆盖 0.3.5，点「启动」：核心子进程正常起来（**不再** `spawn ENOTDIR`）、走到「正在启动指纹浏览器」并真的弹出浏览器、连上云端开始浏览。
 - [ ] **app.log spawn 行 cwd 正确** — `~/Library/Application Support/aidcp-edge/logs/app.log`（或对应 userData）里 `[edge-process] spawning … cwd=` 应为 `.../Contents/Resources`，**绝不**再是 `.../Contents/Resources/app.asar`。
 - [ ] **多环境并行启动均正常** — 环境栏加入多个环境并行启动，每个环境的核心子进程都成功拉起（不因某一 spawn 失败拖累其它）。
+
+## 簇 44 — facebook-browse-and-like-loop 真机验收（FB 浏览+点赞闭环，登记于 2026-07-10；隔离分支 feature/fb-full-integration，edge `4c9ce61`/cloud `b302251`；**尚未部署 ol**、默认关 AIDCP_FB_BROWSE_AUTO）
+
+> Facebook 浏览+点赞闭环已实装 + 全绿单测 + openspec validate --strict 过，但真机行为需在 ol 用测试账号（`61591458584142` / AdsPower env `k1ehveal`，桌面 UA、cookie 免登录）连 `ws://123.56.253.183:8787` 实测。桩测验不到的真机项如下。默认关 kill switch，先 shadow 再放真点赞。
+
+### Shadow（AIDCP_FB_BROWSE_AUTO=shadow，只浏览不真点赞）
+- [ ] **进 feed + 上报 page.cards 结构正确** — 强制宽桌面窗过 cookie 同意/新号引导后进 PC feed；`page.cards` 每张卡 noteId=规范化 permalink、author/textPreview 合理、likeCount 解析对、collectCount 恒 0（FB 无收藏）、跳过虚拟化空壳（不臆造无作者卡）。
+- [ ] **note.detail 深读正确** — 按 permalink 开帖（role=dialog）→ 正文（图片帖常空）+ 顶部他人评论 + 反应/评论计数解析对；collectCount 0。
+- [ ] **点赞「已赞」态确切标识标定（唯一待确认）** — 一次性号实测点赞【前后】帖级 `留下心情` toggle 的 aria-label + 文案（before/after 各截一份），坐实真机 flip 信号，据此收紧 like-executor 的 VERIFY/reactState（当前接受「取消赞/Remove Like」或「空→反应词」的正向信号，不确定即诚实 state_unchanged）。特别核对：反应【计数汇总】按钮（aria-label=赞 + 数字文案）确未被误当 toggle（已加数字守卫 + jsdom 回归，真机复核）。
+- [ ] **shadow 点赞诚实回执** — like 命令回 `action.completed{action:'like', ok:false, reason:'shadow'}`，云端不记 like、不扣风控；日志无 ⚠ 前缀（不触发 warned）。
+
+### 真点赞（AIDCP_FB_BROWSE_AUTO=on，shadow 通过后）
+- [ ] **点赞后置校验真翻转才 ok** — toggle 状态真翻转 → `ok:true` → 云端 RiskController.record('like') 记账；找不到/未翻转 → 诚实 no_target/state_unchanged，绝不假成功、绝不 count||1。
+- [ ] **宽窄布局同选择器成立** — 桌面 UA 下 1440/900/700 三宽度 feed/detail/like 选择器均命中（探针已验，真机跑通闭环再核）。
+
+### 看门狗 / 韧性
+- [ ] **命令超时不挂死** — 卡死命令（慢网/坏页）回诚实 timeout、放行串行链，后续命令仍执行；云端 idle 看门狗被诚实回执喂饱、不误杀。
+- [ ] **FB 验证码/软限流上报云端** — feed/点赞遇验证码或 FB「Action Blocked」软限流浮层 → overlay 上报 `risk.captcha_detected`（kind=captcha/unknown）→ 云端迁 restricted（限流退避）+ 触发远程验证码协助；清除后 `risk.captcha_cleared` 配对。
+
+### Fast-follow（本 change 未做，另案）
+- [ ] **FB 身份自愈（IdentityWatcher）** — 长跑 FB 会话中途登出/换号无自愈（当前诚实回 login_required、靠云端看门狗 + 人工重启恢复）。需 FB-aware 身份自愈设计（FB 登录墙确认，非 xhs CdpLoginModalWatcher；防 identity-watcher 误报砸会话，见 memory identity-watcher-false-positive-brick），另案实装。
