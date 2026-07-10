@@ -20,5 +20,6 @@
 - [x] 3.2 Run `openspec validate facebook-group-import-modes --strict`.
   <!-- Validation: Change 'facebook-group-import-modes' is valid. -->
 - [x] 3.3 Commit and push the control and console changes, then fast-forward the console default branch.
-  <!-- Delivery: aidcp-console master 7deb077abedaa490ef38763e54c35c961357c99c contains the implementation and was pushed by fast-forward; this control commit records the validated change artifacts. -->
-- [ ] 3.4 Publish console static assets to `dev` and verify the two modes and template control in the deployed page.
+  <!-- Delivery: aidcp-console master 7deb077abedaa490ef38763e54c35c961357c99c contains the implementation and was pushed by fast-forward; aidcp main eb291b7172b3dcc380bc061f4d53704965890d99 records the validated change artifacts before deployment. -->
+- [x] 3.4 Publish console static assets to `dev` and verify the two modes and template control in the deployed page.
+  <!-- Dev deploy 20260710-114932: scripts/deploy-target dev --check passed for 121.89.85.150; backed up /opt/aidcp/console to /opt/aidcp/console.bak.20260710-114932.tar.gz; rsync --delete published aidcp-console master dist. Verification: console HTTP 200, panel /api/health ok, aidcp-cloud.service active, and deployed JS contains 单条添加 and 下载 CSV 模板. In-app browser reached the normal login guard but had no authenticated session, so post-login visual inspection was not performed; focused component interaction tests remain the UI behavior evidence. -->
