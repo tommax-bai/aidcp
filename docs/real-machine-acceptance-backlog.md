@@ -512,3 +512,9 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **Electron 客户端自身通知恢复** — 客户端的状态提醒（拦截提示/运营通知等）仍能正常弹出，未被 allowlist 误拦
 - [ ] **反检测无新破绽（self 模式）** — self provider 下 `navigator.permissions.query({name:'notifications'}).state` 与 `Notification.permission` 一致（均为 denied），不再出现 query 报 prompt 而 Notification.permission 报 denied 的矛盾
 - [ ] **浏览/互动闭环零回归** — 权限抑制不影响小红书正常浏览/点赞/评论/发布链路（弹窗消失≠页面功能受损）
+
+## 簇 39 — pacing-tempo-follows-quota-level 真机验收（配额档接进节奏快慢，登记于 2026-07-10；cloud master `870be7b` 已 land + **已部署 dev**，纯云端、边缘无改）
+
+- [ ] **保守账号又少又慢** — 后台管理台把某测试号配额档由「正常」改「保守」，观察其后：动作前停顿 / 详情页停留 / feed 翻页停留明显变慢（约 ×1.3），且边缘日志出现 `[browse] 应用中途档位刷新：tempo=1.3`（**当场生效、无需断连重连**——这条现在真可人为触发，非 latent）。
+- [ ] **激进只多做不提速** — 配「激进」的号动作停顿与「正常」号一致（不提速到人类基线以下），只是互动配额更宽。
+- [ ] **握手即带档** — 保守账号新会话握手时 welcome 快照 tempo 即为 1.3（不用等中途推送）。
