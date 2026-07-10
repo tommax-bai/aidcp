@@ -487,3 +487,16 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **中途升档实时到边缘（latent，难触发）** — 「风控状态迁移接真实平台信号」尚未实装，状态平时恒 `normal`、tempo 恒 1.0，故 `pacing.update` 平时不触发。诱发法：真机用配额阈值（`quota_exceeded`）或验证码 / 风控浮层信号把某账号推到 `warned`/`restricted`，观察云端是否发出 `pacing.update`、边缘日志 `[browse] 应用中途档位刷新：tempo=…` 是否出现、其后动作最小间隔与详情页缺 `dwellMs` 的兜底停留是否随档位放慢。
 - [ ] **停机窗口收档位不复活（自残红线）** — 会话 `session.end` 后、或独占任务（发布 / 评论 / 验证码恢复）窗口内恰有 `pacing.update` 到达时，确认边缘只更新 tempo、**不**重启浏览循环（无「唤醒重启」日志、无异常续场）。桩测已锁，真机顺带观察。
 - [ ] **死通道移除无回归** — 确认 `session.budget` 回执仍正常（预算 + `viewOnly`）、welcome 快照兜底照常，无因移除 `session.budget.pacing` 引发的异常。
+
+## 簇 37 — facebook-consent-overlay-auto-accept 真机验收（Facebook「允许 Cookie」同意浮层边缘拟人自动接受，登记于 2026-07-10；edge master `d8a83ca` 已 land，edge-only 无 ECS 部署，运营机重建/pull 后生效）
+
+**前置**：edge 本地/运营机重建到 master `d8a83ca`；一个可用 Facebook 环境（AdsPower 指纹浏览器，已嵌入 FB 账号资料）；首次打开 `facebook.com`（或清 cookie 后）会弹「允许 Facebook 使用 Cookie」同意浮层。默认策略 `accept_all`（env `AIDCP_FB_COOKIE_CONSENT`，可切 `necessary_only`）。
+**背景**：FB 评论/加群动作前都会跑浮层探针、浮层≠none 即中止；同意浮层此前无人识别——正文含「登录 Facebook」字样可能被误判成 login（误报「需要登录」中止，账号其实已登录），或判 none 而模态挡住点击（`no_target`），导致每次新环境/清 cookie 后 FB 评论/加群必然卡住。修复=专门探测器 + 动作前拟人自动接受 + 后置校验 + 有界重试 + 诚实回执，零改 4 类分类器（`overlay.test.ts` 零回归）。逻辑单测已锁（907 绿），此处验真机页面行为。
+
+- [ ] **同意浮层被识别并自动接受** — 新环境首开 FB 触发同意浮层时，边缘拟人点掉「允许所有 Cookie」、浮层消失、页面可交互（后置复探判 clear）
+- [ ] **含「登录 Facebook」字样不误判 login** — 同意浮层正文的「…应用到你登录 Facebook 的任何地方」不再让动作被误报 `login_required`/`blocked_by_login`（账号实际已登录）
+- [ ] **接受后 FB 评论/加群不再卡** — 同意浮层清掉后，`/comment` 定向评论、`--join` 加群的整链路继续跑通、不再首屏卡死
+- [ ] **真验证码/登录门不被误点** — 真 `/checkpoint`、验证码浮层、真登录门（无 cookie 接受按钮）仍走既有 fail-closed（`blocked_by_captcha` / 远程协助 / `login_required`），绝不被同意自动接受误点穿
+- [ ] **按钮漂移诚实失败** — Facebook 改文案/布局致接受按钮定位失败时，回报 `no_target`/`blocked_by_consent`、不乱点其他按钮、不假成功
+- [ ] **accept_all 生效 + necessary_only 可切** — 默认接受全部 cookie；设 `AIDCP_FB_COOKIE_CONSENT=necessary_only` 时改点「仅允许必要 Cookie」
+- [ ] **cookie 持久化一次性** — 接受后写入 AdsPower 持久 profile，同环境后续会话不再反复弹同意浮层

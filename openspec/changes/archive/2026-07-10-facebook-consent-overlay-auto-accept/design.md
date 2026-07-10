@@ -23,10 +23,12 @@ Facebook 接入在边缘是一条**独立于小红书浏览闭环**的处理线�
 
 ## Decisions
 
-### 决策 1：`consent` 作为新的 OverlayKind 值，而非复用 `dismissible`
-在 `OverlayKind` 联合类型中新增 `'consent'`。
-- **为何不复用 `dismissible`**：`dismissible` 语义是「运营 / 营销弹窗，有关闭按钮可关」，其清理设想是点关闭（`NuisanceDismisser`，尚未落地）；同意条的动作是「点接受主按钮」，且需要 accept-all vs necessary-only 策略与严格后置校验，语义和动作都不同，复用会污染两边判定。新增独立值让 `gated-submit` / `join-executor` 的处理分支清晰、可单测。
-- **影响面**：`OverlayKind` 是被穷举 switch 的类型，新增值会让 `overlayReason`（`gated-submit.ts:87`）、`blockingReason`（`join-executor.ts:275`）等处的判定需要显式处理 `consent`——这正是我们要的（强制每个消费点决定「遇到 consent 怎么办」）。`isBlockingKind`（`overlay-monitor.ts:64`）**不**将 `consent` 计入阻断类别（consent 不暂停会话、不上报云端）。
+### 决策 1（已定稿）：专门的同意浮层探测器，**不**扩共享 `OverlayKind`、**不**改 4 类分类器
+实装采用 `src/facebook/consent.ts` 一个独立模块：纯判定 `classifyFacebookConsentFromSignals` + CDP 探测 `detectFacebookConsent` + 拟人接受器 `acceptFacebookConsent`，与既有 `classifyFacebookOverlayFromSignals`（4 类：captcha/login/unknown/none）分层平行、互不侵入。
+- **为何不扩共享 `OverlayKind`（`browse/overlay-monitor.ts`）**：那是小红书浏览闭环与 Facebook 共享的热点类型，扩它会牵动 `OverlayMonitor` 接口（`state`/`probeNow` 返回 `OverlayKind`）与所有穷举消费点，且并行有多个 FB / overlay change 在改邻近文件——按 §7 单写者纪律应避让。专门探测器把同意条完全收在 `src/facebook/`，冲突面最小。
+- **为何不复用 `dismissible`**：`dismissible` 语义是「运营 / 营销弹窗，有关闭按钮可关」，动作是点关闭；同意条动作是「点接受主按钮」+ accept-all/necessary-only 策略 + 严格后置校验，语义与动作都不同。
+- **为何无需改 4 类分类器**：自动接受作为「动作前 pre-clear 一步」置于 `classifyFacebookOverlay` 之前——同意条在分类器看到它之前已被清掉，故分类器保持 4 类不变（既有 `overlay.test.ts` 零回归，含 `text:'登录 Facebook'→login` 那条）。若探测器漏判（Facebook 改文案），退化为今日行为（分类器可能判 login），不比现状更差。
+- **消费点**：`gated-submit` preflight（classify 前）、`join-executor.joinGroup`（`blockingReason` 前）、`comment-executor.blockingReason`（`probeNow` 前）三处 fresh 复检卡点前置调用；各自 reason 联合类型加 `blocked_by_consent`（无穷举 never 检查，新增安全）。consent **不**计入阻断类别、不暂停会话、不上报云端、不进验证码远程协助。
 
 ### 决策 2：识别只锁语义锚点，判定优先级 captcha > 真登录门 > consent
 在 `classifyFacebookOverlayFromSignals` 中，于 captcha 分支之后、login 分支之前（或将 login 分支收紧为「URL 命中登录/恢复路径 且 无 cookie 接受特征」）插入 consent 判定。
