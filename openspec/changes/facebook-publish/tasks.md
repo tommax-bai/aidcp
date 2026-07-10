@@ -38,6 +38,7 @@
 - [ ] 6.2 `AC-PUB-*` (unauthorized never silently publishes) MUST pass for the Facebook path: no approval signal → no post; approve-then-edit → signature void → back to pending.
 - [ ] 6.3 `AC-PROTO-*` (two `protocol.ts` copies do not drift) MUST pass; confirm no new protocol message type was added.
 - [ ] 6.4 Add post-verification anti-false-success test cases: post visible → ok; half-executed/invisible → honest failure; sequence timeout → honest timeout.
+- [ ] 6.5 Wide/narrow composer coverage: real-machine probe the wide and narrow (and inline-vs-dialog) Facebook composer layouts; assert every composer-entry / text-field / image-attach / submit / post-visible selector resolves DOM-first on ALL variants, picks the visible/active control on duplicates, and fails honestly (never a half-executed post) on an unresolvable layout. Record findings in a `*-probe-findings.md` under this change.
 
 ## 7. Rollout (isolation window, ol)
 

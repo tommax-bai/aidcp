@@ -105,3 +105,22 @@ the PG-backed quota accounting path.
 
 - **WHEN** the kill switch is on and a valid approval has passed
 - **THEN** a real Facebook post is made, and the success is counted through the existing risk actions and PG-backed quota accounting
+
+### Requirement: Facebook publish selectors are robust across wide/narrow composer layouts and DOM variants
+
+The Facebook post composer renders in wide and narrow layout variants (and inline-vs-dialog / A-B rollout differences) that place the composer entry, text field, optional image-attach control, and submit control in different DOM structures. Every publish selector MUST resolve DOM-first — by stable roles/attributes/scoped structure, never by pixel coordinates or a single brittle absolute path — and MUST match ALL rendered variants. When a logical control is duplicated across variants, the selector MUST act on the visible/active one, never blindly the first DOM match. On any layout/version where a required composer control cannot be resolved, the publish sequence MUST report an honest failure (never a silent half-executed post) so the operator sees a truthful outcome rather than a mangled post. The post-visible success check MUST likewise tolerate both layouts.
+
+#### Scenario: Wide composer layout resolves and submits
+
+- **WHEN** the Facebook composer opens in the wide layout
+- **THEN** the entry, text field, optional image-attach, and submit controls resolve via width-agnostic DOM-first selectors and the sequence proceeds
+
+#### Scenario: Narrow / dialog composer resolves via the same selectors
+
+- **WHEN** the composer opens in the narrow or dialog variant
+- **THEN** the same logical controls resolve through the same width-agnostic selectors with no per-layout fork at the call site
+
+#### Scenario: Unresolvable composer control fails honestly, never half-posts
+
+- **WHEN** a required composer control cannot be resolved on the current layout or Facebook version
+- **THEN** the publish sequence reports an honest failure and does not leave a silent half-executed post

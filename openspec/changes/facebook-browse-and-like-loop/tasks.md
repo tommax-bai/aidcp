@@ -48,6 +48,7 @@
 - [ ] 7.4 Add explicit post-action-verification tests: like button truly toggled → `ok` + risk recorded via PG path; target not found / state unchanged → `no_target` and NO fake success, NO parallel counter.
 - [ ] 7.5 Add the route-regression and idle-watchdog tests proving Facebook commands are not silently dropped and a stuck Facebook session is bounded.
 - [ ] 7.6 Run `openspec validate facebook-browse-and-like-loop --strict`.
+- [ ] 7.7 Wide/narrow layout coverage: real-machine probe both the wide and narrow Facebook feed/detail layouts; assert every feed-card / like / scroll-container / detail-body selector resolves DOM-first on BOTH, picks the visible/active control when a wide+narrow duplicate exists, and reports `no_target` (never fake success) on an unresolvable layout. Record the probe findings in a `*-probe-findings.md` under this change.
 
 ## 8. Rollout (isolation period, ol)
 

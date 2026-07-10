@@ -92,3 +92,27 @@ Facebook automatic browsing and liking SHALL be controlled by the default-off ki
 
 - **WHEN** real Facebook likes are to be executed
 - **THEN** the kill switch is on and the shadow observation has already passed
+
+### Requirement: Facebook browse selectors are robust across wide/narrow layouts and DOM variants
+
+Facebook renders responsive wide and narrow layouts (plus logged-in variant / A-B rollout differences) that place the feed cards, post/detail body, like control, and scroll container in different DOM structures. Every Facebook edge selector used by browsing and liking MUST resolve DOM-first — by stable roles/attributes/scoped structure, never by pixel coordinates or a single brittle absolute path — and MUST match BOTH the wide and narrow layouts. When more than one layout variant renders the same logical control (a duplicated wide+narrow control), the selector MUST pick the visible/active one rather than blindly taking the first DOM match. A selector that matches only one layout MUST be treated as a defect, not shipped. On any layout where a required target cannot be resolved, the edge MUST report `no_target` (never a fake success), so the DOM-first three-gate escalation can flag a systematic layout/version change instead of silently acting on the wrong element.
+
+#### Scenario: Wide layout targets resolve
+
+- **WHEN** the Facebook feed renders in the wide layout
+- **THEN** the feed card, like control, and scroll container all resolve via the width-agnostic DOM-first selectors and the action proceeds
+
+#### Scenario: Narrow layout resolves via the same selectors
+
+- **WHEN** the same account renders the Facebook feed in the narrow layout
+- **THEN** the same logical targets resolve through the same width-agnostic selectors, with no layout-specific fork required at the call site
+
+#### Scenario: Duplicated wide+narrow control picks the visible one
+
+- **WHEN** both a wide-layout and a narrow-layout copy of the same like control exist in the DOM
+- **THEN** the selector acts on the visible/active control, never blindly the first match
+
+#### Scenario: Unresolvable target on a layout is honest
+
+- **WHEN** a required feed/like/detail target cannot be resolved on the current layout or Facebook version
+- **THEN** the edge reports `no_target` and never a fake success, letting the three-gate escalation flag a systematic layout change
