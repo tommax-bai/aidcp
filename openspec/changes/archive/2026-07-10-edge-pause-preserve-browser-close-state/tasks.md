@@ -21,9 +21,9 @@
 
 - [x] 4.1 Run targeted Electron/core tests, acceptance tests, the full aidcp-edge test suite, and typecheck.
 - [x] 4.2 Build the next desktop client packages and verify artifact versions, sizes, and hashes.
-<!-- aidcp-edge validation: 109 targeted tests, 16 acceptance tests, 847 full tests, typecheck, and build:dist passed. -->
-<!-- AIDCP 0.3.3 artifacts built for macOS arm64/x64 and Windows x64; local and dev SHA-256 values matched. -->
+<!-- aidcp-edge validation: 109 targeted tests passed on 63cd290; latest release ref e5633c4 passed 16 acceptance tests, 852 full tests, typecheck, and build:dist. -->
+<!-- AIDCP 0.3.4 artifacts built from latest master for macOS arm64/x64 and Windows x64; local and dev SHA-256 values matched. -->
 - [x] 4.3 Commit and push the edge implementation, publish packages to the dev download host, update console download metadata, deploy console static assets, and verify public URLs.
-<!-- aidcp-console commit 43cff23; 76 tests passed with 1 skipped and production build passed. -->
-<!-- dev publish: installers uploaded to /opt/aidcp/downloads, console deployed to /opt/aidcp/console, all three public 8088 download URLs returned 200 with matching Content-Length. -->
+<!-- aidcp-console commit 43cff23 first published 0.3.3; concurrent mainline release commit 0ede919 advanced the final download metadata to 0.3.4. Console had 76 tests pass with 1 skipped and production build passed. -->
+<!-- dev publish: 0.3.4 installers uploaded to /opt/aidcp/downloads, console deployed to /opt/aidcp/console, all three public 8088 download URLs returned 200 with matching Content-Length. -->
 - [x] 4.4 Record commit, validation, and dev release evidence here; run `openspec validate edge-pause-preserve-browser-close-state --strict` and archive the completed change.
