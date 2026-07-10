@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 约 32 个角色，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> v2 共 **71 个消息类型**，下表按职能分组列全。
+> v2 共 **72 个消息类型**（含 `pacing.update`），下表按职能分组列全。计数与表为人工维护，以两端 `protocol.ts` 的 `MessageType` 穷举为准（可能滞后于代码）。
 
 ## 1. 信封（Envelope）
 
@@ -85,6 +85,7 @@
 | --- | --- | --- |
 | `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll；可选 `dwellMs`：feed 翻页按本次新卡数算的停留兜底，返回未刷新时省略） |
 | `feed.refresh` | cloud → edge | 主 feed 浏览深度到阈值后，点右下「刷新」按钮回到顶部换出全新一批（`reason`: feed_refresh；可选 `thinkMs`；边缘诚实回执 `action.completed{action:'refresh'}`，非 feed 页 / 无按钮 / 点后未换新批均如实失败，绝不假成功） |
+| `pacing.update` | cloud → edge | 会话中途风控档位变化推送新 `tempo`（payload `{tempo}`）；边缘刷新兜底节奏（最小间隔 + 停留兜底）、**不重置**操作间隔锚点、不入队/不唤醒会话（change pacing-fallback-hardening） |
 | `interaction.like` | cloud → edge | 点赞指定笔记 |
 | `interaction.collect` | cloud → edge | 收藏指定笔记 |
 | `interaction.follow` | cloud → edge | 关注作者 |
@@ -178,7 +179,7 @@
 }
 ```
 
-`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 71 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。
+`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 72 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。
 
 **`welcome`**（cloud → edge）
 ```jsonc

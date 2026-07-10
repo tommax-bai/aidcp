@@ -481,3 +481,9 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **成本有界** — 带倒计时/动画的验证码页下，推帧速率受最小间隔地板约束、不全速推大图；CDP 无明显争用（不拖垮身份监测/看门狗/浏览会话）。
 - [ ] **在场 re-arm** — 运营开着处理页时实时循环随轮询续期（窗口到期后下一次轮询重新武装）；关闭处理页后循环随窗口自终止、不留孤儿抓帧。
 - [ ] **kill-switch 秒级回滚** — dev `.env` 设 `AIDCP_CAPTCHA_ASSIST_LIVE_ENABLED=false` + 重启后：capture 不再带 live、边缘回单次抓帧、处理页回今天行为（无「实时」标、无冻结/新帧提示），零回归。
+
+## 簇 36 — pacing-fallback-hardening 真机验收（中途风控档位实时传播 + 停留兜底叠档位 + 清死通道，登记于 2026-07-10；cloud master `7381c3f` 已 land + **已部署 dev**、edge master `10f5f9b` 已 land，edge 需运营机 pull/重建后生效）
+
+- [ ] **中途升档实时到边缘（latent，难触发）** — 「风控状态迁移接真实平台信号」尚未实装，状态平时恒 `normal`、tempo 恒 1.0，故 `pacing.update` 平时不触发。诱发法：真机用配额阈值（`quota_exceeded`）或验证码 / 风控浮层信号把某账号推到 `warned`/`restricted`，观察云端是否发出 `pacing.update`、边缘日志 `[browse] 应用中途档位刷新：tempo=…` 是否出现、其后动作最小间隔与详情页缺 `dwellMs` 的兜底停留是否随档位放慢。
+- [ ] **停机窗口收档位不复活（自残红线）** — 会话 `session.end` 后、或独占任务（发布 / 评论 / 验证码恢复）窗口内恰有 `pacing.update` 到达时，确认边缘只更新 tempo、**不**重启浏览循环（无「唤醒重启」日志、无异常续场）。桩测已锁，真机顺带观察。
+- [ ] **死通道移除无回归** — 确认 `session.budget` 回执仍正常（预算 + `viewOnly`）、welcome 快照兜底照常，无因移除 `session.budget.pacing` 引发的异常。
