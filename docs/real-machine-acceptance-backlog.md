@@ -545,3 +545,13 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **不再跳 /me / 不再卡超时** — 启动日志不再出现 `/me nickname probe`；无 `CDP 命令超时: Page.navigate`（取昵称路径）；FB 活标签页不被导航走。
 - [ ] **不写垃圾名** — 昵称不再出现 `(4) Facebook` 等标签栏标题、也不再把关联主页名（如 `việc làm hà nam`）当本人昵称。
 - [ ] **vanity 头像限制观察** — 采用 vanity 用户名头像链接（非 `profile.php?id=`/`/me`）的账号本轮仍可能就地读空（诚实留空、无回归）；若量大再扩 id 锚定判据。
+
+## 簇 43 — manual-comment-bypass-quota 真机验收（手动 /comment 命令绕节奏/风控配额，登记于 2026-07-10；cloud master `cb0889a` 已 land + **已部署 dev**，纯云端、边缘无改；openspec change manual-comment-bypass-quota 于 main `f6100a8`）
+
+- **背景**：飞书手动 `/comment <昵称> [--join]` 曾复用自动巡回的节奏/风控配额闸——操作员命令被「本场会话加群额度已用尽；未加群也未评论」挡下；加群成功后群内评论还会再撞评论配额/日上限。用户定案（2026-07-10）：手动命令 = 操作员全权，绕全部配额（会话加群额度 + 加群速率 + 评论速率 + 评论日上限）与硬风控状态（restricted/frozen）；自动排期路径不受影响、配额照旧；只守物理正确性闸（边端在线/单飞/无目标/无关键词/kill switch/影子/仅 FB）。
+- **验收项**：
+  1. 取一个加群会话额度已耗尽（或风控速率被拒）的真实 FB 账号，跑 `/comment <昵称> --join`：应真加入一个新群并在群内发一条评论，**不再**回「本场会话加群额度已用尽」；结果卡为「加群 + 评论成功」（评上=绿）或诚实黄卡（加了群没评上），绝不假绿。
+  2. 该账号评论日上限已满时跑手动 `/comment`：应照发（不回 quota_denied / daily_cap）。
+  3. 回归：自动排期评论 / 后台自动加群在同账号配额耗尽时**仍**被诚实挡下（quota_denied / session_budget），不因本 change 误放。
+  4. 账本诚实：手动加群成功后仍消费一格会话加群额度（recordSessionJoin），不因绕闸而漏计。
+- **回滚**：外科回滚 dev 上 3 文件 `.predeploy.20260710-214949.bak`（comment-scheduler / facebook-group-join-scheduler / server），或整包 `cloud.bak.20260710-214949.tar.gz`；restart 即回旧行为。
