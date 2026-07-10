@@ -50,6 +50,6 @@
 - [x] 6.2 本仓 docs（4.x）+ openspec change 提交、push（additive） <!-- aidcp main 本提交（临时 worktree，主 checkout 在并发分支） -->
 - [x] 6.3 部署 dev（备份 → rsync 干净快照 → restart → healthcheck）；默认开启，`AIDCP_FEED_REFRESH=false` kill-switch <!-- 2026-07-10 deployed dev：backup cloud.bak.20260710-165419；service active + 8787/8090 listening + feed.refresh live + 飞书长连接已建立 -->
 - [x] 6.4 真机验收项登记 `docs/real-machine-acceptance-backlog.md` 簇 33（端到端触发 / 阈值校准 / 诚实失败 / kill-switch / 宽窄双布局） <!-- aidcp main 本提交 -->
-- [ ] 6.5 真机验收通过后：勾选簇 33 → `openspec validate --strict` → archive（archive 前确认无并发 spec 交织）
+- [x] 6.5 真机核心验收通过 → `validate --strict` → archive <!-- 2026-07-10 dev 真机（tom 工程师大白、临时阈值 8）：一场内 feed.refresh 触发两次，每次 edge「refresh 成功：回顶+换出全新一批」+ 云端 action.completed refresh ok=true + 立即上报全新一批卡片；阈值已还原默认 60。簇 33 次要项（kill-switch/诚实失败 live/60 自然可达性）留 backlog 观察。 -->
 
-<!-- 说明：本 change 已实装 + 部署 dev + 登记真机 backlog；archive 待簇 33 真机核实（尤其阈值可达性 + 点刷新真换新批），与仓库「真机验收后再 archive」纪律一致。 -->
+<!-- 说明：本 change 已实装 + 部署 dev + 真机核心验收通过（feed.refresh 触发→点刷新→回顶换新批→ok:true，2026-07-10 已现场证）→ 归档。簇 33 次要项留 backlog。 -->

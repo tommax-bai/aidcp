@@ -450,7 +450,7 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 
 > 探针 `aidcp-edge/scripts/feed-refresh-button-probe.ts` 已真机确认按钮结构（右下 `div.floating-btn-sets` 内 `div.reload`，宽窄同构）与行为（点 reload = 回顶 + 换全新一批，前 6 卡 0 重叠）。下面为 live 端到端 + 阈值校准项。默认阈值 60 张、默认开启（env `AIDCP_FEED_REFRESH_AFTER` / `AIDCP_FEED_REFRESH` 可调 / kill-switch）。
 
-- [ ] **端到端真机触发** — dev 上真机跑 feed 浏览：累计浏览约 60 张不重复 feed 卡后，云端下发 `feed.refresh`、边缘点击右下「刷新」、feed **回到顶部并换出全新一批**（首卡 noteId 换新），随后从新批继续浏览；计数归零后再累计约 60 张再次刷新（周期性）。
+- [x] **端到端真机触发** — ✅ 2026-07-10 已现场证（tom 工程师大白连 dev，临时阈值 8）：一场会话内 `feed.refresh` 触发**两次**，每次云端 `sendCommand action=refresh` → 边缘 `[browse] 命令: feed.refresh` → `refresh 成功：回顶 + 换出全新一批` → 云端 `action.completed: refresh ok=true` → 立即上报全新一批卡片（两次的新批内容互不相同，证明换新批 + 计数复位后周期性重复）。change 已 archive。
 - [ ] **阈值可达性校准** — 观测并记录「每会话实际浏览的不重复 feed 卡数」，据此确认 60 是否合适（对抗评审提示 10min/60 动作会话下 200 常达不到，故默认降到 60）；必要时 env 调整。可临时把阈值调小（如 `AIDCP_FEED_REFRESH_AFTER=8`）在一场内快速验证触发链，验完调回。
 - [ ] **诚实失败不误判** — 构造非 feed 页 / 按钮未浮出 / 点后未换新批等，边缘如实回 `action.completed{refresh, ok:false}`（wrong_context / no_floating_btn / not_reloaded 等），云端失败兜底发一次恢复滚动、浏览闭环不死锁；**绝不**把纯回到顶部（内容未换）当刷新成功。
 - [ ] **kill-switch 秒级回滚** — dev `.env` 设 `AIDCP_FEED_REFRESH=false` + `systemctl restart` 后，无论浏览多深都不再触发刷新、行为回退到本 change 前（一直向下滚）。
