@@ -76,7 +76,7 @@
 | `browse.scroll` | cloud → edge | 在当前页面滚动 |
 | `note.open` | cloud → edge | 打开一条笔记 |
 | `note.close` | cloud → edge | 关闭当前笔记 |
-| `search.execute` | cloud → edge | 执行一次关键词搜索 |
+| `search.execute` | cloud → edge | 执行一次关键词搜索，可选携带排序/时间窗偏好 |
 | `session.end` | cloud → edge | 结束本次浏览会话 |
 
 ### 2.3 角色驱动指令（v2 新增，cloud → edge，`RoleDispatcher` 经 `command-bridge` 下发）
@@ -388,9 +388,13 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 {
   "keyword": "露营装备",   // string  搜索关键词
   "source": "extract_from_liked", // ? extract_from_liked | random_from_interests | new_concept | manager
-  "maxResults": 10        // number? 本次搜索最多浏览的结果数
+  "maxResults": 10,       // number? 本次搜索最多浏览的结果数
+  "sort": "most_collected", // string? 搜索页原生排序偏好；命令路径可用 most_collected
+  "timeWindow": "one_day" // string? 搜索页原生时间窗偏好；命令路径可用 one_day
 }
 ```
+
+`sort` 与 `timeWindow` 是 `search.execute` 的 payload 扩展，不新增消息类型；v2 消息类型计数仍为 61。边缘端若无法确认原生筛选已生效，必须诚实降级/回报未筛选，不得把综合结果冒充为目标排序/时间窗结果。
 
 **`session.end`**（cloud → edge）
 ```jsonc
@@ -468,6 +472,8 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
   ]
 }
 ```
+
+`collectCount` 在平台卡片真实暴露收藏数时填写；搜索结果卡片不暴露收藏数时可置 0 或省略，云端应以原生「最多收藏」排序后的卡片顺序作为主要排序事实，不能把其它计数误当收藏数。
 
 **`note.detail`**——上报笔记详情
 ```jsonc

@@ -37,10 +37,10 @@
 - 现在 provider 客户端还把 4 值 `imageStyle` 枚举以「，风格：<enum>」二次拼进正文，与风格档冲突（Seedream 对冲突风格指令明显劣化）——生成时不再把该枚举传给 provider。
 - `defaultSize` 由 `2048x2048` 方图改竖版 3:4（贴小红书信息流，占屏多约 40%）。**先核实线上实跑 Seedream 版本（代码默认 `4-5-251128` vs 台账 `5-0-260128`）允许的合法 size 串再改**，乱填会被 provider 直接报错；全帖同比例守帧内一致。
 
-### D4. 真人 / 封面文字：分级 + 产后校验（保守口径，用户已定）
+### D4. 真人 / 封面文字：分级 + 合规元数据（保守口径，用户已定）
 - 人物三档写进风格档：默认无人/静物 → 无脸匿名人体（背影/局部/POV/剪影）→ 需正脸用「明确非写实虚拟人物」，**绝不写实真人正脸**。
 - 封面文字默认「留白 + 后期程序化叠字」（不让模型画中文长标题，避免糊字=假成功）；合规 AI 标识走已有 `ComplianceDecision.ai/aiEnforced` + 发布声明，不靠画面水印。
-- **产后校验（新增诚实闸）**：仅对「含真人 或 封面出字」的图做——校验乱码字 / 是否像可识别真实·名人，命中即丢弃该张重生成，绝不因「prompt 写了 faceless/no-text」就假定生效。首版只覆盖这两类，其余靠内页 no-text + faceless 默认兜底。
+- **范围拆分**：本 change 已落地 prompt-level 防线与合规元数据标识；真正读取生成图并校验「乱码字 / 是否像可识别真实·名人」需要新视觉 / 多模态能力，已拆到后续 change `publish-image-postgen-safety-validation`。在该能力实现前，系统不得把 `faceless/no-text` prompt 约束标记成「产后视觉校验已通过」。
 
 ### D5. 质量评审：接人设 + 品类自适应维度（不动放行闸）
 - `buildAssemblerPrompt` 加 `soul` 入参（`quality-scorer.ts` 的 `extractInput` 从 `snapshot.trigger.generateInput.soul` 直接取，无新跨阶段 plumbing）；「内容价值」维度按品类切子标准，「真实感」改「贴合人设声音」。

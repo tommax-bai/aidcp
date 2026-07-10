@@ -17,7 +17,7 @@
 > - **✅ 已部署上线（2026-07-03）**：5 批全部在 ECS 生产运行。探测发现并发方 07-03 00:14-00:21 一次整体升 HEAD 已把 batch 1/3/6 带上线；本次 scoped rsync 只补 batch 4（`ca415da`）+ batch 5（`4a0f321`）的 5 文件（prompts/post-processor/content-cleaner/interaction-appraiser/comment-appraiser）。安全序列：备份 `cloud.bak.20260703-095110.tar.gz` + `.env` → rsync → `systemctl restart` → healthcheck 全绿（active / 8787 / PG select 1 / 存储就绪 / PublishOrchestrator 25 角色含 `CategoryClassifier` / 飞书 onReady / 零启动错误）→ isales 未碰。<!-- aidcp-cloud 4a0f321 2026-07-03 deployed（batch1/3/6 由并发方整体升 HEAD 带上、batch4/5 scoped rsync 补齐）-->
 > - **1.7 出图竖版：env 开关机制已实装 + 已推 master**（aidcp-cloud `913eca4`）。SeedreamClient/WanxiangClient `defaultSize` 增 env 回落链（`AIDCP_SEEDREAM_IMAGE_SIZE` / `AIDCP_WANXIANG_IMAGE_SIZE`），**代码默认保持方图不变**——避免并发方整体升 HEAD 自动部署误激活未验证尺寸致全部出图失败。**0.2 已确认**：线上 image_model=`doubao-seedream-5-0-260128`(volcengine/Ark)；文档确认 5.0 支持 3:4 + WxH 至 3072（候选 Seedream `1536x2048` / 万相 `1152*1536`）。**未完（待用户）**：3:4 像素级激活前需实测尺寸被接受——即席 prod 测试脚本（读加密凭据+打付费 API）被部署守卫拦下（合理），需用户授权该验证 or 接受「设 env 部署+监控+瞬间回滚」。
 > - **✅ 3:4 竖版已激活上线（2026-07-03，用户授权实测后）**：线上 key 实测确认 Seedream 5.0 size 规则（只收 `WIDTHxHEIGHT`/`2k`/`3k`/`4k`、总像素 ≥3,686,400；`1536x2048` 太小被拒、**`1728x2304` 实测出图成功**）→ 备份 `cloud.bak.20260703-105745.tar.gz` → ECS `.env` 设 `AIDCP_SEEDREAM_IMAGE_SIZE=1728x2304` + rsync `913eca4` 两 client → restart → healthcheck 全绿（active/8787/PG/飞书 onReady/零错误）。**线上配图现出竖版 3:4**；回滚=删 env 行+重启。
-> - **唯一剩余（待用户决策）**：**2.2/2.4 配图产后校验**——「乱码/像不像真人」必须看生成图 → 需**新接一个视觉/多模态模型**（现有图像模型只文生图、文本客户端只纯文本），是新能力+成本/延迟/选型决策；建假占位校验=违反无声假成功红线，故不擅自做，默认风格档 faceless/no-text 已基础兜底。其余全部完成且**全部已上线**。
+> - **收尾拆分（2026-07-10）**：**2.2/2.4 配图产后校验**已迁移到后续 change `publish-image-postgen-safety-validation`。原因：「乱码/像不像真人」必须真实看生成图 → 需新接视觉/多模态模型、成本/延迟/选型决策；建假占位校验=违反无声假成功红线。当前 change 只归档已上线的 prompt-level faceless/no-text 防线、合规元数据标识、品类自适应与门禁/评审能力。
 
 ## 0. 前置与排序（务必先做）
 
@@ -42,9 +42,9 @@
 ## 2. 配图真人/封面文字分级 + 高风险图产后校验（aidcp-cloud）
 
 - [x] 2.1 在各品类 `StyleProfile` 落人物三档（默认无人 / 无脸匿名 / 需正脸用明确非写实虚拟人物，绝不写实真脸）与封面文字策略（默认留白 + 后期叠字）。
-- [ ] 2.2 新增产后校验：仅对「含真人或封面出字」的图做（乱码字 / 是否像可识别真人·名人），命中丢弃该张重生成；无则靠内页 no-text + faceless 默认兜底。实现为轻量规则 + 可选二次模型判定（首版覆盖子集即可）。
-- [ ] 2.3 合规 AI 标识确认走既有 `ComplianceDecision.ai/aiEnforced` + 发布声明/元数据，MUST NOT 让模型画面内画水印。
-- [ ] 2.4 回归：需人物时不出写实真脸；高风险图未过校验即重生成（对应 spec「配图真人与封面文字分级并对高风险图产后校验」两 Scenario）。
+- [x] 2.2 产后视觉校验拆到后续 change：`publish-image-postgen-safety-validation`。本 change 不落占位校验、不声称已看图；只保留 prompt-level faceless/no-text 基础防线。<!-- 2026-07-10 split follow-up; no fake validation -->
+- [x] 2.3 合规 AI 标识确认走既有 `ComplianceDecision.ai/aiEnforced` + 发布声明/元数据，MUST NOT 让模型画面内画水印。<!-- aidcp-cloud evidence: seedream-client watermark=false, wanxiang-client watermark=false, metadata-aggregator aiEnforced guard -->
+- [x] 2.4 回归范围调整：prompt-level 人物/文字防线与合规元数据已覆盖；真实高风险图产后视觉 reject/retry 回归迁移到 `publish-image-postgen-safety-validation`。<!-- 2026-07-10 scope split -->
 
 ## 3. 质量评审接人设 + 品类自适应维度（aidcp-cloud）
 

@@ -42,14 +42,20 @@
 - **WHEN** 一帖生成多张图
 - **THEN** 各张使用同一竖版尺寸（provider 合法值），MUST NOT 出现同帖不同比例
 
-### Requirement: 配图真人与封面文字分级并对高风险图产后校验
+### Requirement: 配图真人与封面文字分级并走合规元数据标识
 
-系统 SHALL 以**分级**取代一刀切的「无真人 / 无文字」：默认无人 / 静物；生活感场景 SHALL 优先用无脸匿名人体（背影 / 局部 / 剪影 / POV）；需清晰人物 SHALL 用「明确非写实虚拟人物」，MUST NOT 生成写实真实人物正脸。封面文字 SHALL 默认留白由后期程序化叠字（MUST NOT 依赖模型渲染中文长标题）。对**含真人或含封面文字**的图，系统 SHALL 做一道**产后校验**（是否像可识别的真实 / 名人、文字是否乱码），命中即丢弃该张重生成，MUST NOT 因 prompt 写了 `faceless`/`no text` 就**假定生效**（守「无声假成功」红线）。合规 AI 标识 SHALL 走既有发布声明 / 元数据链路，MUST NOT 由模型在画面内绘制水印。
+系统 SHALL 以**分级提示词策略**取代一刀切的「无真人 / 无文字」：默认无人 / 静物；生活感场景 SHALL 优先请求无脸匿名人体（背影 / 局部 / 剪影 / POV）；需清晰人物时 SHALL 请求「明确非写实虚拟人物」，MUST NOT 主动请求写实真实人物正脸。封面文字 SHALL 默认留白由后期程序化叠字（MUST NOT 依赖模型渲染中文长标题）。合规 AI 标识 SHALL 走既有发布声明 / 元数据链路，MUST NOT 由模型在画面内绘制水印；生成 prompt 与 provider 请求 SHOULD 继续包含 `no text` / `no watermark` / `no realistic human face` 等约束作为基础防线。
 
-#### Scenario: 需人物时用非写实虚拟人物、不出写实真脸
+本 requirement 只覆盖已上线的 prompt-level 与元数据防线。真正读取生成图并判定「是否像可识别真人 / 名人、文字是否乱码」的**产后视觉安全校验**已拆到后续 change `publish-image-postgen-safety-validation`，在该能力实现前系统 MUST NOT 声称图片已通过视觉校验。
+
+#### Scenario: 需人物时提示词使用非写实或无脸策略
 - **WHEN** 某品类风格档要求画面出现清晰人物
-- **THEN** prompt 指向明确非写实虚拟人物，产出不含写实真实人物正脸
+- **THEN** prompt MUST 指向明确非写实虚拟人物或无脸 / 局部 / 背影策略，MUST NOT 主动请求写实真实人物正脸
 
-#### Scenario: 高风险图未过产后校验即重生成
-- **WHEN** 一张含真人或封面文字的图产后校验判为「像可识别真人 / 名人」或「文字乱码」
-- **THEN** 该张 MUST 丢弃并重生成，MUST NOT 因 prompt 含 faceless/no-text 约束就当作已合规照用
+#### Scenario: 合规标识走元数据而非画面水印
+- **WHEN** 发布链路判定该内容需要 AI 标识
+- **THEN** 系统 MUST 通过既有 `ComplianceDecision.ai/aiEnforced` 与发布声明 / 元数据链路表达，MUST NOT 要求模型在画面内绘制水印
+
+#### Scenario: 未接视觉校验时不得伪称已校验
+- **WHEN** 当前链路只应用 prompt-level 的 faceless / no-text 约束
+- **THEN** 系统 MAY 记录这些请求约束，但 MUST NOT 记录或展示为「已通过产后视觉校验」

@@ -30,23 +30,22 @@
 - **WHEN** 有实现让自动扳机（概念积累 / 风控窗口）在 `canDo('publish')` 为 false 时仍触发 `trigger()`，或新建独立 `RiskController` 实例绕过单例真实状态
 - **THEN** MUST 视为违规、不予合入；自动扳机 MUST 以共享单例的 `canDo('publish') === true` 为硬前提，仅手动 `/publish` 凭人工授权越过 `canDo`（且仍过人审）
 
-### Requirement: CommandSequencer 将 publishMetadata 与配图编排进指令序列
+### Requirement: CommandSequencer 将 publishMetadata 编排进指令序列
 
-`CommandSequencer.buildCommandSequence` SHALL 在已授权序列中，依据 `publishMetadata` 与配图（`images` / `cover`）追加并下发
-元数据/配图指令：从 `publishMetadata` emit `add_with_candidate`（`mention` / `location` / `collection`）/ `set_option`
-（`visibility` / `permissions` / 各合规声明）/ `set_schedule`（`mode === 'scheduled'` 时按 `publishTime`）；按配图 emit
-`upload_image` / `set_cover`。`PublishExecutor` MUST 读取 `publishMetadata` 并传入 sequencer；读取 MUST 有竞态保险（`publishMetadata`
-未就绪时取保守默认而非崩溃 / 跳过人审）。任一元数据/配图指令失败 MUST 如实记录失败步、MUST NOT 伪造该步成功；配图上传失败 MUST 降级纯文字、
-`imagesOk` 如实为 false，MUST NOT 伪造有图。未授权时（AC-PUB 第二闸）元数据/配图指令仍 MUST 在 `submit_publish` 前下发、但 `submit_publish` /
+`CommandSequencer.buildCommandSequence` SHALL 在已授权序列中，依据 `publishMetadata` 追加并下发元数据指令：从 `publishMetadata`
+emit `add_with_candidate`（`mention` / `location` / `collection`）/ `set_option`（`visibility` / `permissions` / 各合规声明）/
+`set_schedule`（`mode === 'scheduled'` 时按 `publishTime`）。`PublishExecutor` MUST 读取 `publishMetadata` 并传入 sequencer；
+读取 MUST 有竞态保险（`publishMetadata` 未就绪时取保守默认而非崩溃 / 跳过人审）。任一元数据指令失败 MUST 如实记录失败步，
+MUST NOT 伪造该步成功。未授权时（AC-PUB 第二闸）元数据指令仍 MAY 在 `submit_publish` 前下发、但 `submit_publish` /
 `capture_postId` 截止不入序列。
 
-#### Scenario: 已授权序列携带元数据与配图指令
-- **WHEN** 人审通过、`publishMetadata` 含 `mentions` / `location` / `visibility` / `mode==='scheduled'`，且 `imageDirective.imageUrl` 非空
-- **THEN** `buildCommandSequence` 产出含 `upload_image` / `set_cover` / `add_with_candidate(mention|location)` / `set_option(visibility)` / `set_schedule` 的有序序列，`PublishExecutor` 读 `publishMetadata` 传入 sequencer 后逐条 `send→await→advance`
+配图上传与 `upload_image` / `set_cover` 的最终语义不归本 requirement 收口；其已由后续并已归档的 `publish-media-upload`
+专门定义和实现（包括 CDP 文件输入桥、全图失败诚实 failed、`imagesOk`/落库回正、v1 带图显式改道），本 requirement MUST NOT
+重新定义或削弱该能力。
 
-#### Scenario: 配图上传失败降级纯文字且 imagesOk 如实
-- **WHEN** `upload_image` 指令回报 `ok:false`（下载失败 / 上传桥失败 / 后置校验失败）
-- **THEN** sequencer MUST 降级为纯文字发布路径、`imagesOk` 如实记为 false、不下发依赖该图的 `set_cover`，并继续余下文字/元数据指令；MUST NOT 把该帖标记为带图成功
+#### Scenario: 已授权序列携带元数据指令
+- **WHEN** 人审通过、`publishMetadata` 含 `mentions` / `location` / `visibility` / `mode==='scheduled'`
+- **THEN** `buildCommandSequence` 产出含 `add_with_candidate(mention|location)` / `set_option(visibility)` / `set_schedule` 的有序序列，`PublishExecutor` 读 `publishMetadata` 传入 sequencer 后逐条 `send→await→advance`
 
 #### Scenario: publishMetadata 未就绪时竞态保险
 - **WHEN** `PublishExecutor` 读取 `publishMetadata` 时该键尚未就绪（决策与门禁并行、无强序）
@@ -54,31 +53,29 @@
 
 #### Scenario: 红线反例——元数据指令失败仍报成功（禁止）
 - **WHEN** `set_option(visibility)` 或 `add_with_candidate(mention)` 回报 `ok:false`，但程序把整帖标记为成功 / 跳过该失败继续直发
-- **THEN** MUST 视为违规、不予合入；失败步 MUST 如实记入 `failedAt`，配图失败按降级纯文字处理、元数据失败不得静默吞，绝不伪造该步成功
+- **THEN** MUST 视为违规、不予合入；失败步 MUST 如实记入 `failedAt`，元数据失败不得静默吞，绝不伪造该步成功
 
-### Requirement: 边缘实装配图与元数据 kind 处理器并逐条后置校验
+### Requirement: 边缘实装元数据 kind 处理器并逐条后置校验
 
-边缘 SHALL 实装 stage-1 预留为 `kind_not_implemented` 的处理器：`upload_image`（图 URL → 下载到 `/tmp` → CDP 文件输入桥 →
-后置校验图已进入 → 清理临时文件）、`set_cover`、`set_option`（按 `optionKind` 路由 `visibility` / `permissions` / 各声明开关/单选）、
-`set_schedule`（定位时间选择器填 `publishTime`）。每个处理器 MUST 复用既有 `LocatingEngine` 三道闸做「定位 + 原子操作 + 后置校验」，
-MUST 在执行后按真实结果回报 `publish.command.result`（成功 `ok:true` + `value`，失败 `ok:false` + 真实 `error` 如 `no_target` /
-`post_validation_failed` / `upload_failed`）。同时 SHALL 放开 v1 整页路径的带图硬拒。MUST NOT 谎报成功、MUST NOT 在无法定位时回 `ok:true`。
+边缘 SHALL 实装 stage-1 预留的元数据处理器：`set_option`（按 `optionKind` 路由 `visibility` / `permissions` / 各声明开关/单选）、
+`set_schedule`（定位时间选择器填 `publishTime`），并支持 `add_with_candidate` 的 `mention` / `location` / `collection` 候选应用路径。
+每个处理器 MUST 复用既有定位与后置校验机制做「定位 + 原子操作 + 后置校验」，MUST 在执行后按真实结果回报
+`publish.command.result`（成功 `ok:true` + `value`，失败 `ok:false` + 真实 `error` 如 `no_target` / `post_validation_failed`）。
+MUST NOT 谎报成功、MUST NOT 在无法定位时回 `ok:true`。
 
-#### Scenario: upload_image 走下载+CDP 桥并后置校验
-- **WHEN** 边缘收到 `upload_image {imageUrl}`
-- **THEN** 处理器下载图到 `/tmp`、经 CDP 文件输入桥喂给上传控件、后置校验图已出现在编辑区、清理临时文件，回报 `publish.command.result {ok:true, value}`；定位/上传/校验任一失败回 `ok:false` + 真实 `error`
+配图处理器 `upload_image` / `set_cover` 与 v1 带图改道由 `publish-media-upload` capability 负责，本 requirement 不重复定义。
 
 #### Scenario: set_option 按 optionKind 路由并校验
 - **WHEN** 边缘收到 `set_option {optionKind:'visibility', optionValue:'self_only'}`
 - **THEN** 处理器经 `LocatingEngine` 定位对应开关/单选、设置后后置校验当前选中态等于期望值，回报 `ok:true`；校验不符回 `ok:false, error:'post_validation_failed'`
 
-#### Scenario: 放开 v1 带图硬拒
-- **WHEN** v1 整页路径收到带图 payload（`images.length > 0`）
-- **THEN** MUST NOT 再返回 `images are not supported in phase one` 硬拒，而是走配图流程（或经指令驱动路径处理），带图发布端到端可达
+#### Scenario: set_schedule 定时时间后置校验
+- **WHEN** 边缘收到 `set_schedule {publishTime}`
+- **THEN** 处理器定位时间选择器并设置时间，设置后后置校验已进入期望定时态；定位或校验失败回 `ok:false`
 
-#### Scenario: 红线反例——配图失败谎报有图（禁止）
-- **WHEN** 下载失败 / CDP 上传桥失败 / 后置校验不到图，但处理器回 `ok:true` 或伪造一个 `value` 掩盖失败
-- **THEN** MUST 视为违规、不予合入；MUST 回 `ok:false` + 真实 `error`（`upload_failed` / `no_target` / `post_validation_failed`），由云端降级纯文字，绝不静默假成功
+#### Scenario: 红线反例——元数据控件失败谎报成功（禁止）
+- **WHEN** 元数据控件定位失败或后置校验不符，但处理器回 `ok:true`
+- **THEN** MUST 视为违规、不予合入；MUST 回 `ok:false` + 真实 `error`，绝不静默假成功
 
 ### Requirement: 人审默认必过且 submit_publish 前强制授权
 

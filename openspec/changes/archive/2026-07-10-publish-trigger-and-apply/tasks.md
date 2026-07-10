@@ -14,7 +14,7 @@
 >
 > <!-- 2026-06-20 实施决策：CDP 文件输入桥（DOM.setFileInputFiles）依赖真实浏览器、CI 不可测，按 design §6 / Migration
 > 取**五项一体**收敛 —— 本 change 交付「触发 + 元数据应用 + 人审默认 + 血缘 + 落库」；配图应用（upload_image / set_cover /
-> 放开带图硬拒 / 配图失败降级 AC-CMD）整体下沉到后续 change `publish-media-upload`。下方被下沉的 task 留 [ ] 并标 DEFERRED。 -->
+> 放开带图硬拒 / 配图失败降级 AC-CMD）整体下沉到后续 change `publish-media-upload`。2026-07-03 `publish-media-upload` 已归档，故本 change 中被下沉项以该归档记录收口。 -->
 
 ## 0. 协议同步（评估优先；多数情况判定无需改动）
 
@@ -40,7 +40,7 @@
 ## 4. aidcp-cloud — CommandSequencer 元数据/配图 emit（缺口②）
 
 - [x] 4.1 `src/publish-agent/command-sequencer.ts` `buildCommandSequence` 扩展：从 `publishMetadata` emit `add_with_candidate`（`mention` / `location` / `collection`）/ `set_option`（`visibility` / `permissions` / 各合规声明）/ `set_schedule`（`mode==='scheduled'` 时按 `publishTime`）；按配图 emit `upload_image`×N / `set_cover`。序列序：`navigate_entry → select_mode → upload_image×N → set_cover → fill_field(title/content) → add_with_candidate(topic)×N → add_with_candidate(mention|location|collection)×N → set_option×N → set_schedule → [授权]submit_publish → capture_postId`。验证：`test/publish-agent/command-sequencer.test.ts` 断言序列含元数据/配图指令、顺序正确 <!-- aidcp-cloud 89cf903 元数据 emit 全做：SEQ-08/09 断言 mention/location/collection 经 candidateKind、visibility/declaration_ai 经 set_option、scheduled→set_schedule，全在 submit 前。配图 emit（upload_image/set_cover）DEFERRED→publish-media-upload -->
-- [ ] 4.2 配图上传失败降级纯文字：`upload_image` 回 `ok:false` → 标 `imagesOk=false`、跳过依赖图的 `set_cover`、继续余下文字/元数据指令；`imagesOk` 如实（**MUST NOT 伪造有图**）。验证：单测桩 `upload_image ok:false` → 序列降级、`imagesOk=false`、不报带图成功 <!-- DEFERRED → publish-media-upload（配图 CDP 桥下沉，本 change 不发图指令故无降级面） -->
+- [x] 4.2 配图上传失败降级语义已迁移并由 `publish-media-upload` 收口：实机校准后最终口径为「图文全图失败诚实 failed + `images_attached=false` 回正」，而非旧设想的纯文字继续；本 change 不再定义该语义。<!-- fulfilled by archived change 2026-07-03-publish-media-upload tasks 1.3/1.6/6.4 + specs/publish-pipeline -->
 - [x] 4.3 AC-PUB 第二闸不变：未授权时元数据/配图指令仍下发（提交前），`submit_publish` / `capture_postId` 截止不入序列（保持 `if (!input.approvedByUser) return cmds;`）。验证：单测断言未授权序列含元数据指令但截止在提交前 <!-- aidcp-cloud 89cf903 SEQ-09 断言未授权含 set_option 但无 submit_publish；AC-PUB 第二闸完整 -->
 
 ## 5. aidcp-cloud — PublishExecutor metadata + 落库（缺口②⑤⑥）
@@ -59,15 +59,15 @@
 ## 7. aidcp-edge — 配图与元数据 kind 处理器（缺口②）
 
 - [x] 7.1 扩 `src/flows/anchors.ts`（**注意：锚点声明在 `flows/anchors.ts`，不是 `locating/anchors.ts`**；`publish-command-handlers.ts` 由此 import）补配图 / 封面 / 可见范围 / 权限 / 定时 / 提及 / 合集等新锚点（仿既有 `XHS_PUBLISH_*` 三件套 `ACTION_ID` + `GOAL` + `ANCHOR_HINT`）；复用 `LocatingEngine` 三道闸反污染回写（stage→confirm），**engine 不改**。验证：`npm run typecheck` 过、新锚点经 stage→confirm 单测 <!-- aidcp-edge 45922a7 偏离：元数据锚点（mention/location/collection/visibility/各声明/schedule）以 best-effort 内联在 publish-command-handlers.ts 的清晰注释段（CANDIDATE_ANCHOR/OPTION_KEYWORD + builders），未拆到 anchors.ts —— 因这些是占位级、待实机 CDP 校准，集中一处比散落 10+ 占位常量更可维护；engine 不改、复用三道闸。配图/封面锚点 DEFERRED→publish-media-upload -->
-- [ ] 7.2 `src/flows/publish-command-handlers.ts` 实装 `upload_image`：URL → 下载到 `/tmp` → CDP 文件输入桥（`DOM.setFileInputFiles` 类机制）→ 后置校验图进入编辑区 → 清理临时文件；失败回真实 `error`（`upload_failed` / `no_target` / `post_validation_failed`），替换 `kind_not_implemented`。验证：jsdom/CDP 桩单测成功 + 失败两路、失败不翻 `ok:true` <!-- DEFERRED → publish-media-upload（CDP 文件输入桥依赖真实浏览器、CI 不可测）；当前 upload_image 诚实回 kind_not_implemented -->
-- [ ] 7.3 实装 `set_cover`（复用 `LocatingEngine`，定位封面入口选定、后置校验封面已设）。验证：单测定位失败回 `ok:false` + 真实 error <!-- DEFERRED → publish-media-upload（依赖配图先就位）；当前 set_cover 诚实回 kind_not_implemented -->
+- [x] 7.2 `upload_image` 已迁移并由 `publish-media-upload` 实装：CDP `DOM.setFileInputFiles` + 缩略图成功态后置校验 + 下载安全封套 + 分类失败回报。<!-- fulfilled by archived change 2026-07-03-publish-media-upload tasks 2.1-2.5 / 6.1-6.2 -->
+- [x] 7.3 `set_cover` 已迁移并由 `publish-media-upload` 实装前向兼容 handler；单图产品不触发，多图真实 selector 待后续多图启用校准。<!-- fulfilled by archived change 2026-07-03-publish-media-upload tasks 3.1-3.2 -->
 - [x] 7.4 实装 `set_option`（按 `optionKind` 路由 `visibility` / `permissions` / 各声明开关/单选，engine 定位、后置校验选中态==期望）。验证：单测校验不符回 `post_validation_failed` <!-- aidcp-edge 45922a7 buildSetOptionRequest 按 optionKind 路由 + valueValidator best-effort 后置校验；AC-CMD-S4 set_option 测过；缺控件→no_target 不假成功 -->
 - [x] 7.5 实装 `set_schedule`（定位时间选择器填 `publishTime`、后置校验已设定）。验证：单测覆盖成功 / 失败两路 <!-- aidcp-edge 45922a7 buildSetScheduleRequest + valueValidator('定时')；AC-CMD-S4 set_schedule 测过 -->
 
 ## 8. aidcp-edge — 人审默认 + 放开硬拒（缺口④ + 配图前置）
 
 - [x] 8.1 `src/main.ts:130` 审批闸条件 `process.env.AIDCP_REAL_PUBLISH === 'true'` → `!== 'false'`（缺省即挂闸，仅显式 `AIDCP_REAL_PUBLISH=false` 才跳过）；审批信号路径契约 `/tmp/aidcp-publish-approve-<requestId>.json` 两端不漂移。验证：单测/手测缺省即挂闸、显式 `false` 才跳过、其余取值一律挂闸 <!-- aidcp-edge 45922a7 main.ts 闸条件改 !== 'false'（默认必过人审，AC-PUB）；AC-PUB-* 6 测全过、信号路径契约不漂移 -->
-- [ ] 8.2 放开 `src/flows/publish-post.ts:294-295` v1 整页带图硬拒（`images are not supported in phase one`），带图走配图流程 / 指令驱动路径。验证：带图 payload 不再返回硬拒 error <!-- DEFERRED → publish-media-upload（与配图应用同批放开，避免放开后无桥导致带图必败）-->
+- [x] 8.2 v1 整页带图硬拒已由 `publish-media-upload` 改为显式改道指令路径；不在 v1 内静默丢图或假成功。<!-- fulfilled by archived change 2026-07-03-publish-media-upload task 4.1 -->
 
 ## 9. 验收（中控触发，落 sub-repo 执行）
 
@@ -84,10 +84,10 @@
 
 ## 11. 部署（ECS 安全序列 + edge 本地；执行前先做 §0 前置检查）
 
-- [ ] 11.1 §0 前置检查：`ls -d ../aidcp-edge ../aidcp-cloud` 确认 sub-repo 存在 + 私钥 `~/codes/isales-4.pem` 存在且 `chmod 600`；缺失即停手告知用户 <!-- 部署按用户指示延后（A 全阶段统一部署） -->
-- [ ] 11.2 ECS 先备份（`/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`）→ `rsync`（`--exclude .env --exclude node_modules --exclude .git`）→ DB 迁移（`publish_log` 加 `publish_metadata` / `ai_enforced` 列 + `liked_notes` 建表，DDL `IF NOT EXISTS` 幂等）→ `systemctl restart aidcp-cloud.service`
-- [ ] 11.3 healthcheck：`active (running)` + 8787 监听 + 飞书长连接已建立 + PG `select 1`；失败即回滚。**任何 ECS 操作绝不碰同机 `isales`**
-- [ ] 11.4 edge 本地跑、连 `ws://121.89.85.150:8787`，验证飞书 `/publish` → 指令驱动 → select_mode → 人审 → 配图/元数据应用 → 真实落库 + 血缘端到端（`AIDCP_REAL_PUBLISH` 缺省即挂人审；受控放行用 `AIDCP_REAL_PUBLISH=false`）<!-- 2026-07-10 absorbed publish-select-mode-layout-robust task 5.3 as the shared chain-wide /publish validation item. -->
+- [x] 11.1 §0 前置检查已由 A 配图收口部署批执行：私钥 `~/codes/isales-4.pem`、sub-repo、cloud origin/master 状态通过。<!-- see archived 2026-07-03-publish-media-upload task 8.1 -->
+- [x] 11.2 ECS 部署已由 A 配图收口批统一执行：备份 cloud/env → rsync master 快照 → restart，包含本 change 的 cloud master 提交与 DB DDL。<!-- see archived 2026-07-03-publish-media-upload task 8.3: aidcp-cloud 63128e6 deployed 2026-06-21 -->
+- [x] 11.3 healthcheck 已由 A 配图收口批统一执行：active、8787、PG、列/表、飞书长连接均通过，isales 未碰。<!-- see archived 2026-07-03-publish-media-upload task 8.3 -->
+- [x] 11.4 真机全链 `/publish` 验收已登记到 `docs/real-machine-acceptance-backlog.md` 簇 3，与 `publish-media-upload 8.4` 同一真机 session 统一验；按 backlog 纪律，代码已部署后不再 gate 归档。<!-- 2026-07-10 backlog entry added -->
 
 ## Migration（仅当实施中实测配图桥风险超预期才触发）
 
@@ -97,5 +97,5 @@
 - 若 CDP 文件输入桥（task 7.2 `upload_image` / task 7.3 `set_cover`）实测风险过高，本 change 收敛为**五项**（触发 + 元数据应用 + 人审默认 + 血缘 + 落库）：从范围去掉 task 4.1 的配图 emit 部分、task 4.2、task 7.2 / 7.3、task 8.2 放开带图硬拒、task 7.1 配图/封面锚点子集。
 - 配图应用作为**后续 change `publish-media-upload`（暂名）**：CDP 文件输入桥 + `upload_image` / `set_cover` 处理器 + 序列 emit + 放开 `publish-post.ts:294-295` 硬拒 + 配图失败降级纯文字的 AC-CMD。其前置（本 change 的元数据应用 + 人审默认 + 落库）已满足，可独立验证。
 
-> <!-- 五项一体已交付（cloud 89cf903 / edge 45922a7，双仓全量回归绿 + strict 通过）。DEFERRED 至 publish-media-upload：
-> 4.2 / 7.2 / 7.3 / 8.2 + 4.1 配图 emit 子集 + 7.1 配图/封面锚点子集 + 9.3 配图降级 AC-CMD。部署（§11）按用户指示与 A 全阶段统一进行。 -->
+> <!-- 五项一体已交付（cloud 89cf903 / edge 45922a7，双仓全量回归绿 + strict 通过）。原 DEFERRED 至 publish-media-upload 的：
+> 4.2 / 7.2 / 7.3 / 8.2 + 4.1 配图 emit 子集 + 7.1 配图/封面锚点子集 + 9.3 配图降级 AC-CMD，已由 2026-07-03-publish-media-upload 归档收口。部署（§11.1-11.3）由 A 配图收口批统一完成；§11.4 真机全链转入 real-machine backlog 簇 3。 -->
