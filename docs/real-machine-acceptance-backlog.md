@@ -555,3 +555,16 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
   3. 回归：自动排期评论 / 后台自动加群在同账号配额耗尽时**仍**被诚实挡下（quota_denied / session_budget），不因本 change 误放。
   4. 账本诚实：手动加群成功后仍消费一格会话加群额度（recordSessionJoin），不因绕闸而漏计。
 - **回滚**：外科回滚 dev 上 3 文件 `.predeploy.20260710-214949.bak`（comment-scheduler / facebook-group-join-scheduler / server），或整包 `cloud.bak.20260710-214949.tar.gz`；restart 即回旧行为。
+
+## 簇 44 — facebook-join-comment-resilience 真机验收（FB 加群/评论健壮性 P0+P1，登记于 2026-07-10）
+
+**前置**：cloud 部署含 `09dc642`（judge 多语确认+词表对齐、markTransientRetry 分层退避、覆盖不即时驱逐、评论长度感知超时）；edge 运营机 pull master `0d3e39f`（多语确认/待审/问卷、not_ready/post_not_confirmed_slow、不盲 Esc）后才生效。用 tom 分组（大白 `k1e0ero8` / Tmax `k1e0awu5`）或 FB 测试账号。逻辑单测已全绿（edge 938 / cloud 1778），此处验真机页面行为。
+
+- [ ] **非中英群加成功被正确识别** — 加入界面语言非中英（越南语/西语/泰语等）的公开组，加成功后按钮翻本地语「已加入/退出小组」→ 边缘判 `already_member`/joined、云端记 joined，**不再误报 join_failed**、不重复发起加入。
+- [ ] **慢网长评论不重复发** — 慢网络下对一条帖发较长评论（>150 字），确认云端按长度放大提交步超时、等到真回执打去重标记，下一轮**不再对同帖发第二条**（平台无重复评论）。
+- [ ] **覆盖 nav_error 不即时驱逐** — 已加入群覆盖评论阶段偶发一次导航失败，成员身份**仍 joined**（left_confirmations+1），需达 `AIDCP_FB_GROUP_LEFT_CONFIRMATIONS`（默认 3）次才降 `left`；一次抖动不永久丢群。
+- [ ] **慢渲染不落永久失败** — 群页加载慢/网络抖时加群走 `not_ready`/短退避重试（分钟级），**不喂 LLM、不永久 failed、不消耗尝试上限**；网络恢复后能成功加入（audit `*:transient_retry` + `attempts` 不累积到 cap）。
+- [ ] **待审/问卷浮层不被误关** — 点击加入后弹出的入群问卷/待审浮层（含词表未覆盖语种）不被边缘 Esc 关掉，诚实上报 `questionnaire_required`/`pending`。
+- [ ] **裁判多语 instant_join 不误判** — 非中英群清晰「加入」按钮走确定性 instant_join（不问 LLM）；本地语「已加入」不被误判成 instant_join 空点。
+
+> **说明**：本 change 归档时 P0-1 的「重发前重观察本人是否已评」幂等仲裁（治边端硬断线永无回执的残留场景）已 descope 到后续 change，不在本簇验收范围；本簇「慢网长评论不重复发」验的是已交付的长度感知超时。归档目录 `openspec/changes/archive/2026-07-10-facebook-join-comment-resilience`。
