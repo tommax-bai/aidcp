@@ -538,3 +538,10 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **诚实回落** — 秒点无移动（<5 样本）/ 畸形轨迹时不上送或被 sanitize 丢弃，edge 走合成路径、`replayMode:'synthetic'`，日志可观测（绝不谎称用了轨迹）。
 - [ ] **通过率/二次触发** — 按 `replayMode` 分组对比：真实轨迹回放相较合成路径是否提升人工协助通过率、降低协助后二次触发风控。
 - [ ] **成本/时长有界** — 回放时长受样本上限(250)+单帧停顿裁剪(≤120ms)约束，不超 system_recovery 60s 租约；大轨迹被降级/丢弃。
+
+## 簇 42 — facebook-nickname-inplace-read 真机验收（FB 昵称改就地 id 锚定读取、删 /me 跳转，登记于 2026-07-10；edge master `ae86cc9` 已 land，edge-only 无 ECS 部署，运营机重建/重跑 edge 后生效；云端"握手 hello 昵称仅库内为空时落库"已在 dev live）
+
+- [ ] **昵称就地读到并落库** — 现有 FB 测试号（如 `61591701813509` / `100064789146508`，当前 dev `accounts.nickname` 为空）重建 edge 后启动：昵称从顶栏头像锚点 `aria-label`（`<昵称>的头像`）就地读到，经 hello 落 dev `accounts.nickname` 非空、控制台显示真名而非数字 id。
+- [ ] **不再跳 /me / 不再卡超时** — 启动日志不再出现 `/me nickname probe`；无 `CDP 命令超时: Page.navigate`（取昵称路径）；FB 活标签页不被导航走。
+- [ ] **不写垃圾名** — 昵称不再出现 `(4) Facebook` 等标签栏标题、也不再把关联主页名（如 `việc làm hà nam`）当本人昵称。
+- [ ] **vanity 头像限制观察** — 采用 vanity 用户名头像链接（非 `profile.php?id=`/`/me`）的账号本轮仍可能就地读空（诚实留空、无回归）；若量大再扩 id 锚定判据。

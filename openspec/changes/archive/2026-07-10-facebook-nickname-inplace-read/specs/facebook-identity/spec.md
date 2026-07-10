@@ -1,0 +1,53 @@
+## ADDED Requirements
+
+### Requirement: Facebook 昵称就地读取——id 锚定头像标签，绝不导航 /me
+
+边缘读取 Facebook 登录账号昵称时 SHALL **仅就地**从当前页 DOM 读取，MUST NOT 为取昵称而 `Page.navigate` 到 `/me` 或任何其他页面。昵称来源 SHALL 为**本人 profile 锚点的 `aria-label`**：锚点 `href` 解析出的数字 id 等于该连接已确立的账号 id（或 `href` 为 `/me` 自链）方视为本人；取其 `aria-label` 去除「…的头像 / …'s profile picture」等头像后缀后得到昵称。因 id 锚定，系统 MUST NOT 把非本人锚点（其他用户/主页）的名字当作本账号昵称。数字账号 id 的确立逻辑（cookie `c_user` / profile 链接 / profile URL）SHALL 保持不变，本要求只改昵称这一路来源。
+
+#### Scenario: 就地从头像锚点读出昵称
+- **WHEN** 当前页存在一个 `href` 数字 id 等于本账号 id 的头像锚点、其 `aria-label` 形如「<昵称>的头像」
+- **THEN** 系统读出该昵称，且**不**发起任何到 `/me` 的导航
+
+#### Scenario: 绝不导航取昵称
+- **WHEN** 当前页就地读不到本人昵称
+- **THEN** 系统 MUST NOT 为取昵称发起 `Page.navigate`（对 `/me` 或其他任何页）
+
+#### Scenario: id 锚定拒绝他人名字
+- **WHEN** 当前页存在多个 profile 锚点、仅其中 id 等于本账号 id 的那个带头像标签
+- **THEN** 系统只采该锚点的名字，MUST NOT 采用其他 id 的锚点名字
+
+### Requirement: 非本人主页页禁用页面标题类昵称来源
+
+当**当前页不是本账号的个人主页**（即当前页 URL 的 profile id 不等于本账号 id）时，页面标题类信号（`document.title`、`og:title`、`h1`）MUST NOT 被用作昵称来源——这些在首页/信息流/群组页等一律是页面标题而非本人姓名。仅当**当前页就是本账号个人主页**（URL 的 profile id === 本账号 id）时，页面标题类信号方 SHALL 可作为昵称来源（本人主页标题即本人姓名）。
+
+#### Scenario: 首页/群页面不拿标签标题当昵称
+- **WHEN** 当前页是首页或群组页、`document.title` 为「(4) Facebook」或群名
+- **THEN** 系统 MUST NOT 把该标题当作昵称（此时昵称只能来自 id 锚定的头像标签，否则留空）
+
+#### Scenario: 本人主页页可用标题作昵称
+- **WHEN** 当前页 URL 为 `profile.php?id=<本账号id>`、标题为「<昵称> | Facebook」
+- **THEN** 系统 SHALL 可从标题解析出本人昵称
+
+### Requirement: 昵称清洗拒绝标签标题类垃圾
+
+昵称清洗 SHALL 剥离前导未读计数前缀 `(N) ` 后再判定，并 SHALL 把 `Facebook`、`(N) Facebook`、登录/注册页标题、账号菜单/「你的个人主页 / Your profile / 账户控制选项和设置」等通用外壳标签一律判为空。系统 MUST NOT 将上述任一垃圾字符串作为昵称写入或上报——**宁可留空，绝不写垃圾名**。
+
+#### Scenario: 未读数标题被判空
+- **WHEN** 候选昵称为「(4) Facebook」
+- **THEN** 清洗结果为空（不作为昵称）
+
+#### Scenario: 通用外壳标签被判空
+- **WHEN** 候选昵称为「你的个人主页」「Your profile」「账户控制选项和设置」之一
+- **THEN** 清洗结果为空（不作为昵称）
+
+### Requirement: 就地读不到昵称诚实留空、有界重试、不阻断身份
+
+昵称随顶栏异步渲染，系统 SHALL 按**次数上界**就地轮询等待昵称出现（不依赖注入时钟前进以免测试死循环），一旦读到即返回。若耗尽上界仍读不到昵称，系统 MUST 诚实以**空昵称**返回、且 MUST 仍返回已确立的账号 id（昵称缺失 MUST NOT 阻断身份确立），MUST NOT 猜测、MUST NOT 回落到页面标题、MUST NOT 导航。
+
+#### Scenario: 有 id 无昵称——留空但不失败
+- **WHEN** 就地能读出账号 id、但轮询耗尽仍无可用昵称
+- **THEN** 系统返回 ok（带账号 id、昵称为空），不导航、不失败
+
+#### Scenario: 昵称异步渲染——有界重试内读到
+- **WHEN** 首次就地扫描时头像标签尚未渲染、在次数上界内的后续轮询中渲染出现
+- **THEN** 系统在读到后即返回该昵称
