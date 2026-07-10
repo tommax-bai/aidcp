@@ -670,11 +670,23 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
     { "x": 0.70, "y": 0.44, "label": "image-2" }
   ],
   "requestedAt": 1717113605000,
-  "settleMs": 1500
+  "settleMs": 1500,
+  "trajectory": {                 // object?  运营真实鼠标轨迹（change captcha-assist-trajectory-replay），无/无效→edge 回落合成
+    "v": 1,
+    "samples": [                  // 归一化 {x,y}∈[0,1] + 相对首样本毫秒 t，时间序（≤250，超限判无效）
+      { "x": 0.20, "y": 0.30, "t": 0 },
+      { "x": 0.35, "y": 0.42, "t": 180 }
+    ],
+    "clicks": [1]                 // 每个 points[i] 对应的按下样本下标；length===points.length、下标∈[0,samples)
+  }
 }
 ```
 > 点位是相对 snapshot 图片的归一化坐标 `[0,1]`。edge 必须校验 incident/snapshot/current overlay
 > 和坐标边界后，再映射到当前 viewport 并派发真实输入事件；不得用 DOM 状态篡改替代点击。
+> `trajectory` 可选：落点权威仍取 `points`，样本只供"怎么移动/何时按下"。edge 回放时**每次 press 前
+> 必须补一帧 move 到权威落点**（消 mousedown 无前驱 move 的瞬移伪影）、只裁剪长停顿不等比压缩、叠 dt
+> 抖动+亚像素；`clicks` 长度≠点数 / 样本超限 / 坐标越界等一律判无效→回落合成拟人路径（change
+> captcha-assist-humanize-click），绝不硬回放、绝不谎称用了轨迹。无新增 MessageType。
 
 **`captcha.assist.click_result`**（edge → cloud）：点击后的 fresh 复检结果
 ```jsonc
@@ -686,7 +698,8 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
   "status": "still_blocked",      // 'cleared'|'still_blocked'|'stale_snapshot'|'not_blocked'|'invalid_target'|'failed'
   "reason": "captcha overlay still visible",
   "checkedAt": 1717113608000,
-  "snapshot": { /* CaptchaAssistSnapshotPayload，可选，用于刷新仍阻断现场 */ }
+  "snapshot": { /* CaptchaAssistSnapshotPayload，可选，用于刷新仍阻断现场 */ },
+  "replayMode": "synthetic"       // 'trajectory'|'synthetic'（change captcha-assist-trajectory-replay）：本次实际用的输入模式，供度量
 }
 ```
 > `status:'cleared'` 只是协助命令结果；恢复下发仍只由 edge 额外发送的 `risk.captcha_cleared`
