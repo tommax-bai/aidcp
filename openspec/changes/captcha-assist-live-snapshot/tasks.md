@@ -40,7 +40,7 @@
 - [x] 5.1 edge + cloud `npm run typecheck` 双绿（两份 protocol.ts 不漂移） + `npm run test:acceptance` 保 AC-PROTO-* / AC-RISK-*。
   <!-- edge/cloud acceptance 全绿 -->
 - [x] 5.2 CDP 争用核对：`clicking`/`capturing` 互斥 + 单 incident 单 token 循环 + 点击全程暂停 tick；实时循环只读截图。
-- [ ] 5.3 三仓 land + dev 部署 cloud + console；edge 真机在运营机 pull 后生效。
+- [x] 5.3 三仓 land + dev 部署 cloud + console；edge 真机在运营机 pull 后生效。
   <!-- landed: edge e73dd3e / cloud 210183a / console e63568c；dev 部署见收尾 -->
-- [ ] 5.4 真机验收登记 backlog：多步/换图两类真实点选验证码下活体帧更新与选点冻结、白跑率下降；确认自主清除不误解 restricted（env 开启 AIDCP_CAPTCHA_ASSIST_LIVE_ENABLED 后核）。
+- [x] 5.4 真机验收登记 backlog（簇 35）：多步/换图两类真实点选验证码下活体帧更新与选点冻结、白跑率下降；确认自主清除不误解 restricted（env 开启 AIDCP_CAPTCHA_ASSIST_LIVE_ENABLED 后核）。
 - [x] 5.5 `openspec validate captcha-assist-live-snapshot --strict` 通过。
