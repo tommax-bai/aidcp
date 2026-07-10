@@ -34,12 +34,12 @@
 
 ## 7. Rollout + deploy (dev)
 
-- [ ] 7.1 Land cloud branch to `master` (fetch + rebase + tests) and control change to `main`.
-- [ ] 7.2 Deploy cloud to `dev` via the safety sequence (deploy-target check → backup → rsync → restart → healthcheck → rollback-on-fail). NEVER touch same-host isales.
-- [ ] 7.3 Enable the auto group-join loop on `dev`: set `AIDCP_FB_GROUP_JOIN_AUTO=true` (shadow off) in `/opt/aidcp/cloud/.env`; confirm `AIDCP_CONTENT_SCHEDULE_AUTO=true` for the background loop; restart; confirm startup log shows join automation enabled.
-- [ ] 7.4 Register real-machine acceptance items in `docs/real-machine-acceptance-backlog.md`: (a) `/comment <昵称> --join` joins one new group + comments inside it; (b) `--join --contact` routes through Feishu approval; (c) background auto-join loop fires under quota; (d) honest cards for gated/no-target/disabled outcomes.
+- [x] 7.1 Land cloud branch to `master` (fetch + rebase + tests) and control change to `main`. <!-- cloud master 1037fe4 → origin/master; control 195739a → origin/main; both ff, tests green -->
+- [x] 7.2 Deploy cloud to `dev` via the safety sequence (deploy-target check → backup → rsync → restart → healthcheck → rollback-on-fail). NEVER touch same-host isales. <!-- 2026-07-10 deployed dev: backup cloud.bak.20260710-165257.tar.gz + .env.bak.20260710; rsync src (4 files); restart; active + 8787/8090 + /api/health 200 + Feishu WSClient ready + no errors -->
+- [x] 7.3 Enable the auto group-join loop on `dev`: set `AIDCP_FB_GROUP_JOIN_AUTO=true` (shadow off) in `/opt/aidcp/cloud/.env`; confirm `AIDCP_CONTENT_SCHEDULE_AUTO=true` for the background loop; restart; confirm startup log shows join automation enabled. <!-- dev .env AIDCP_FB_GROUP_JOIN_AUTO=true (shadow unset=real); AIDCP_CONTENT_SCHEDULE_AUTO already true → background join loop live; runFacebookJoinThenComment present in deployed src -->
+- [x] 7.4 Register real-machine acceptance items in `docs/real-machine-acceptance-backlog.md`: (a) `/comment <昵称> --join` joins one new group + comments inside it; (b) `--join --contact` routes through Feishu approval; (c) background auto-join loop fires under quota; (d) honest cards for gated/no-target/disabled outcomes. <!-- docs/real-machine-acceptance-backlog.md 簇 32 -->
 
 ## 8. Closeout
 
-- [ ] 8.1 `openspec validate facebook-manual-join-comment --strict`.
+- [x] 8.1 `openspec validate facebook-manual-join-comment --strict`. <!-- valid (strict) — see below -->
 - [ ] 8.2 Archive after dev verification.
