@@ -16,10 +16,10 @@
 
 ## 3. aidcp-cloud — Facebook throttling-signal backoff
 
-- [ ] 3.1 Extend the overlay/text library with Facebook soft-block phrases ("Action Blocked" / "we limit how often you can do this" / "misusing this feature" / "you can't use this feature right now" / silently-hidden-comment detection) alongside the existing checkpoint/login/captcha entries.
-- [ ] 3.2 Feed recognized Facebook throttling signals into the existing `applySignal` input so the account migrates to `restricted` (browse-only); do NOT change the transition table and keep the write single-sourced in `RiskController`.
-- [ ] 3.3 Treat N consecutive post-action verification failures on the same action as a systemic-throttling signal → report and escalate to `restricted` (N is an Open Question; see design.md).
-- [ ] 3.4 Unit tests: soft-block toast → `restricted` (interactions stopped, browse only); N consecutive post-check failures → `restricted`; recovery window auto-downgrades (existing behavior intact); final state is a cloud single write and the edge cannot set it.
+- [x] 3.1 Extend the overlay/text library with Facebook soft-block phrases ("Action Blocked" / "we limit how often you can do this" / "misusing this feature" / "you can't use this feature right now" / silently-hidden-comment detection) alongside the existing checkpoint/login/captcha entries.
+- [x] 3.2 Feed recognized Facebook throttling signals into the existing `applySignal` input so the account migrates to `restricted` (browse-only); do NOT change the transition table and keep the write single-sourced in `RiskController`. <!-- aidcp-cloud 88b7ccb: captcha-coordinator maps FB throttle overlay.text → confirmed(restricted); transition table untouched; single-write preserved -->
+- [ ] 3.3 Treat N consecutive post-action verification failures on the same action as a systemic-throttling signal → report and escalate to `restricted` (N is an Open Question; see design.md). <!-- DEFERRED: coupled to per-action post-check which lands with Change B (browse/like verified actions); revisit when B post-check exists -->
+- [~] 3.4 Unit tests: soft-block toast → `restricted` (interactions stopped, browse only); N consecutive post-check failures → `restricted`; recovery window auto-downgrades (existing behavior intact); final state is a cloud single write and the edge cannot set it. <!-- aidcp-cloud 88b7ccb: test/facebook-throttle-signal.test.ts covers soft-block→restricted + non-match→warned regression guard + captcha unchanged + cloud single-write via coordinator; N-consecutive deferred with 3.3 -->
 
 ## 4. aidcp-cloud — cooldown quiet period + online day window
 
