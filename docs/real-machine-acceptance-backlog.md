@@ -446,3 +446,12 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **跨调度器不抢边端** — 手动 `/comment --join` 进行中，后台自动加群/评论不对同账号并发触发（ContentScheduler 见 isCommentBusy/isJoinBusy 即本 tick 跳过）；反之亦然。
 - [ ] **回滚开关** — `AIDCP_FB_GROUP_JOIN_AUTO=false` 重启后：后台自动加群立停，手动 `/comment --join` 随之诚实回「自动加群功能未开启」（不真加群）。
 
+## 簇 33 — feed-refresh-on-depth 真机验收（feed 浏览深度到阈值改点右下「刷新」回顶换新批，登记于 2026-07-10；cloud master `c4545f0` 已 land + **已部署 dev**、edge master `60088d7` 已 land，edge 需运营机 pull/重建后生效）
+
+> 探针 `aidcp-edge/scripts/feed-refresh-button-probe.ts` 已真机确认按钮结构（右下 `div.floating-btn-sets` 内 `div.reload`，宽窄同构）与行为（点 reload = 回顶 + 换全新一批，前 6 卡 0 重叠）。下面为 live 端到端 + 阈值校准项。默认阈值 60 张、默认开启（env `AIDCP_FEED_REFRESH_AFTER` / `AIDCP_FEED_REFRESH` 可调 / kill-switch）。
+
+- [ ] **端到端真机触发** — dev 上真机跑 feed 浏览：累计浏览约 60 张不重复 feed 卡后，云端下发 `feed.refresh`、边缘点击右下「刷新」、feed **回到顶部并换出全新一批**（首卡 noteId 换新），随后从新批继续浏览；计数归零后再累计约 60 张再次刷新（周期性）。
+- [ ] **阈值可达性校准** — 观测并记录「每会话实际浏览的不重复 feed 卡数」，据此确认 60 是否合适（对抗评审提示 10min/60 动作会话下 200 常达不到，故默认降到 60）；必要时 env 调整。可临时把阈值调小（如 `AIDCP_FEED_REFRESH_AFTER=8`）在一场内快速验证触发链，验完调回。
+- [ ] **诚实失败不误判** — 构造非 feed 页 / 按钮未浮出 / 点后未换新批等，边缘如实回 `action.completed{refresh, ok:false}`（wrong_context / no_floating_btn / not_reloaded 等），云端失败兜底发一次恢复滚动、浏览闭环不死锁；**绝不**把纯回到顶部（内容未换）当刷新成功。
+- [ ] **kill-switch 秒级回滚** — dev `.env` 设 `AIDCP_FEED_REFRESH=false` + `systemctl restart` 后，无论浏览多深都不再触发刷新、行为回退到本 change 前（一直向下滚）。
+- [ ] **宽窄双布局** — 宽窗（侧栏）与窄窗（底部栏）各验一次刷新按钮定位与点击均命中（探针已证结构同构，真机复核点击链）。
