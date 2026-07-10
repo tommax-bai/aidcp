@@ -54,26 +54,21 @@ TBD - created by archiving change curated-note-actions. Update Purpose after arc
 - **THEN** 发布链输入携带该精选行触发时的展示血缘，后续发布记录可据此展示来稿件，即使当前精选行之后被删除
 
 ### Requirement: 定向评论目标定位——搜索驱动精确匹配、绝不导航存量链接
-
-定向评论 SHALL 以该笔记标题（截断至有界长度以守单步时限）为搜索词、以综合排序且不限时间窗发起平台搜索，并 SHALL 在返回卡片中按 noteId 精确匹配目标；命中后 SHALL 打开该卡片并以详情上报的 noteId 校验一致后方可评论。MUST NOT 导航存量 source_url（xsec_token 过期风险）、MUST NOT 由裸 noteId 伪造链接、MUST NOT 在未命中时退而评论「相似」笔记。搜索定位 SHALL 有界重试（不超过 2 次搜索尝试），用尽未命中 SHALL 以 note_not_found 诚实结束。
+定向评论 SHALL 以该笔记标题（截断至有界长度以守单步时限）为搜索词发起平台搜索，并 SHALL NOT 在 `search.execute` 中下发 `sort` 或 `timeWindow` 参数；平台默认的综合排序与不限时间窗 SHALL 通过省略筛选参数获得，而不是通过驱动原生筛选面板获得。定向评论 SHALL 在返回卡片中按 noteId 精确匹配目标；命中后 SHALL 打开该卡片并以详情上报的 noteId 校验一致后方可评论。MUST NOT 导航存量 source_url（xsec_token 过期风险）、MUST NOT 由裸 noteId 伪造链接、MUST NOT 在未命中时退而评论「相似」笔记。搜索定位 SHALL 有界重试（不超过 2 次搜索尝试），用尽未命中 SHALL 以 note_not_found 诚实结束。
 
 #### Scenario: 精确命中后才开笔记评论
-
 - **WHEN** 搜索结果卡片中存在与目标 noteId 精确相等的卡片
 - **THEN** 打开该卡片、校验详情 noteId 一致后进入撰写；校验不一致则不评论
 
-#### Scenario: 定向搜索使用综合排序与不限时间窗
-
+#### Scenario: 定向搜索不驱动原生筛选控件
 - **WHEN** 定向评论发起目标搜索
-- **THEN** 搜索携带综合排序与不限时间窗（不沿用按需评论命令的「最多收藏+一天内」默认），保证非当日老笔记可被检索
+- **THEN** 搜索命令不携带 `sort` 或 `timeWindow`，边端不得因此打开或点击搜索结果页筛选控件；平台默认综合排序与不限时间窗用于召回，保证非当日老笔记可被检索
 
 #### Scenario: 有界重试后诚实失败
-
 - **WHEN** 两次搜索尝试的返回卡片均无目标 noteId
 - **THEN** 任务以 note_not_found 终态结束并如实上报，MUST NOT 换目标补发
 
 #### Scenario: 红线反例——导航存量笔记链接（禁止）
-
 - **WHEN** 有实现以精选行存量 source_url 直接导航、或以裸 noteId 拼详情链接打开笔记
 - **THEN** MUST 视为违规不予合入；目标定位只允许搜索驱动+卡片点击路径
 
@@ -138,4 +133,28 @@ TBD - created by archiving change curated-note-actions. Update Purpose after arc
 
 - **WHEN** 任务触发成功但终态失败（如 note_not_found、发布失败）
 - **THEN** 终态经既有渠道如实呈现（黄/红），触发回执不被追溯性当作成功依据
+
+### Requirement: 行级动作 SHALL 按新类型约束可用性
+
+精选行级动作 SHALL 按 `image_text|video|comment` 约束：参照洗稿仅对 `image_text` 行开放；`video` 与 `comment` 行的洗稿入口 MUST 置灰并禁止点击，后端直接调用也 MUST 拒绝。定向评论仅对源帖（`image_text|video`）开放；`comment` 行因不代表可打开的源帖目标 MUST 禁用并拒绝。所有动作仍 MUST 按行归属账号执行，保持账号隔离。
+
+#### Scenario: 图文可洗稿
+
+- **WHEN** 管理员对正文非空的 `image_text` 精选行触发参照洗稿
+- **THEN** 端点可受理并进入既有发布链路
+
+#### Scenario: 视频洗稿置灰并拒绝
+
+- **WHEN** 管理员查看或直接调用 `video` 行的参照洗稿动作
+- **THEN** 控制台按钮置灰不可点击；后端直接调用返回稳定拒绝原因，MUST NOT 进入发布链
+
+#### Scenario: 评论行洗稿置灰并拒绝
+
+- **WHEN** 管理员查看或直接调用 `comment` 行的参照洗稿动作
+- **THEN** 控制台按钮置灰不可点击；后端直接调用返回稳定拒绝原因，MUST NOT 进入发布链
+
+#### Scenario: 视频仍可作为定向评论目标
+
+- **WHEN** 管理员对 `video` 精选源帖触发定向评论
+- **THEN** 端点按源帖目标受理并沿既有定向评论链路搜索定位该笔记
 

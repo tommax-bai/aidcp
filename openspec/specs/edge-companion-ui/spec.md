@@ -241,3 +241,130 @@ The Electron companion SHALL distinguish quota-driven waiting from generic stale
 - **WHEN** the latest presence event is stale but the relevant quota window is expired, missing, or lacks capped saturated action evidence
 - **THEN** Electron SHALL keep the existing stale-activity fallback instead of fabricating a quota-rest explanation
 
+### Requirement: Electron settings expose browser parking modes
+The Electron companion SHALL expose a persisted browser parking setting in the settings drawer with exactly three operator-selectable modes: `parking-display`, `edge-strip`, and `offscreen`. The default for missing or invalid settings SHALL be `edge-strip`. The setting SHALL be saved together with the existing browser settings and SHALL be injected into the spawned edge core process when the operator starts or restarts the edge.
+
+#### Scenario: Operator selects a parking mode
+- **WHEN** the operator opens the settings drawer and selects one of the three browser parking modes
+- **THEN** Electron persists that selected value with the local settings
+- **AND** the next start or restart injects that mode into the edge core process
+
+#### Scenario: Existing settings have no parking value
+- **WHEN** Electron loads an older settings file without a browser parking mode
+- **THEN** it treats the mode as `edge-strip`
+- **AND** the settings drawer renders `edge-strip` as selected
+
+#### Scenario: Invalid parking value is ignored
+- **WHEN** Electron loads a settings file with an unknown browser parking value
+- **THEN** it treats the mode as `edge-strip`
+- **AND** it MUST NOT pass the unknown value to the edge core process
+
+### Requirement: Electron provides browser parking recovery controls
+The Electron companion SHALL provide an operator recovery path for a parked browser window. It SHALL expose controls to show the driven browser in a normal visible position and to reset future parking coordinates. If no controllable browser window is available, the companion SHALL report that fact honestly and MUST NOT claim recovery succeeded.
+
+#### Scenario: Operator shows parked browser
+- **WHEN** the operator clicks the browser recovery control while a driven browser CDP window is available
+- **THEN** the browser window is moved to a normal visible position
+- **AND** Electron reports the recovery action as applied
+
+#### Scenario: No browser window is available
+- **WHEN** the operator clicks the browser recovery control while edge is stopped or no CDP window can be controlled
+- **THEN** Electron reports that no controllable browser window is available
+- **AND** it MUST NOT claim that the browser was shown or reset
+
+### Requirement: Daily Usage Windows Expose Refresh And Release Timing
+
+Cloud SHALL include optional timing hints on `ui.snapshot.dailyUsage.windows`
+when it can compute them without guessing. `refreshAt` SHALL mean the epoch-ms
+time when cloud plans or recommends the next usage-window snapshot refresh.
+`releaseAt` SHALL mean the epoch-ms time when a saturated quota in that window
+is expected to release according to cloud's sliding-window counter. Cloud MUST
+omit either field when the value is unknown, non-finite, or not derived from
+cloud-owned state.
+
+These fields SHALL be optional and backward compatible. Existing
+`dailyUsage.totals`, `dailyUsage.quotas`, `dailyUsage.saturated`, and
+`dailyUsage.windows.*.expiresAt` semantics MUST remain unchanged.
+
+#### Scenario: Cloud supplies next refresh time
+
+- **WHEN** cloud sends a daily usage window and knows when it will next refresh that window snapshot
+- **THEN** the window MAY include `refreshAt` as a finite epoch-ms timestamp
+- **AND** older edges can ignore `refreshAt` without losing existing daily usage rendering
+
+#### Scenario: Cloud supplies quota release time
+
+- **WHEN** a supplied minute, hour, or day window is saturated and cloud can compute the sliding-window release time
+- **THEN** the window MAY include `releaseAt` as a finite epoch-ms timestamp
+- **AND** that value MUST NOT be derived from local client clocks or aggregate totals alone
+
+#### Scenario: Timing is unknown
+
+- **WHEN** cloud cannot compute refresh or release timing for a supplied window
+- **THEN** cloud MUST omit the corresponding timing field
+- **AND** clients MUST NOT fabricate a countdown, clock time, or recovery promise for that missing field
+
+### Requirement: Electron Daily Summary Displays Window Timing Honestly
+
+The Electron companion SHALL preserve the existing expanded daily usage window
+layout and SHALL display cloud-supplied timing hints when present. If a window
+is saturated and `releaseAt` is in the future, Electron SHOULD show the release
+hint alongside the capped action context. If a window is stale or awaiting a
+new snapshot and `refreshAt` is present, Electron SHALL show the planned refresh
+time instead of only the generic `等待云端快照` copy. Electron MUST keep the
+current fallback wording when timing is absent.
+
+#### Scenario: Saturated window shows release hint
+
+- **WHEN** Electron renders an expanded quota window with a future `releaseAt`
+- **THEN** the window metadata identifies the capped action context and includes a human-readable release hint
+- **AND** global risk, captcha, or engine health states are not changed by this display-only hint
+
+#### Scenario: Waiting window shows planned refresh
+
+- **WHEN** Electron renders a minute or hour window as waiting for refresh and the window has `refreshAt`
+- **THEN** the metadata includes the planned refresh clock time or countdown
+- **AND** if that time has already passed without a newer snapshot, Electron MUST still present the state as waiting rather than marking the quota usable
+
+#### Scenario: Old snapshots still render
+
+- **WHEN** Electron receives `ui.snapshot.dailyUsage.windows` without `refreshAt` or `releaseAt`
+- **THEN** it SHALL render the existing window state, totals, quotas, and stale fallback text as before
+
+### Requirement: Cloud Refreshes Online Daily Usage Snapshots Best-Effort
+
+After sending account-scoped daily usage to an online edge, cloud SHALL schedule
+a best-effort daily-usage-only `ui.snapshot` refresh for that same account and
+edge when a finite future `refreshAt` is available. The scheduled refresh MUST
+be targeted to the same edge, MUST NOT broadcast to unrelated edges, and MUST
+stop retrying when the edge is no longer online or the targeted push is not
+delivered.
+
+#### Scenario: Online edge receives a scheduled usage refresh
+
+- **WHEN** cloud has sent daily usage with a future `refreshAt` to an online edge
+- **THEN** cloud SHALL attempt a targeted `ui.snapshot` containing fresh `dailyUsage` at or after that time
+- **AND** the refreshed snapshot MAY schedule the next refresh using its new timing metadata
+
+#### Scenario: Offline edge does not cause retry storm
+
+- **WHEN** a scheduled daily usage refresh push reaches no edge
+- **THEN** cloud MUST stop that scheduled refresh chain for the account-edge pair
+- **AND** it MUST NOT broadcast the snapshot to other edges for the account
+
+### Requirement: 异常退出详情在客户端内持久可见
+Electron 伴随窗口 SHALL 在边缘进程异常退出时保留并展示最近一次可操作失败详情，直到用户启动新的边缘进程、执行有意暂停/停止，或新的运行状态覆盖该失败。该详情 MUST 来自真实核心输出、进程退出信息或本地启动失败信息，MUST NOT 编造成功或隐藏底层失败原因。系统通知 MAY 同时发送，但 MUST NOT 成为唯一展示该失败详情的渠道。
+
+#### Scenario: AdsPower 启动被拒后详情仍在窗口可见
+- **WHEN** AdsPower 模式下核心输出 `browser/start` 失败原因并以非零 code 退出
+- **THEN** 伴随窗口在健康/状态区域展示该失败原因的可读摘要，包括 AdsPower 返回的拒绝信息
+- **AND** 该摘要在系统通知关闭后仍保持可见
+
+#### Scenario: 新运行开始后清除旧失败详情
+- **WHEN** 用户点击启动、重新登录或按新设置重启边缘进程
+- **THEN** 伴随窗口清除上一轮异常退出详情，并显示当前启动/运行状态
+
+#### Scenario: 没有核心错误行时仍显示退出事实
+- **WHEN** 边缘进程异常退出但没有可解析的 stderr 错误行
+- **THEN** 伴随窗口展示包含退出 code 或 signal 的持久失败详情
+

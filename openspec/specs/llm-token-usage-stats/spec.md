@@ -102,9 +102,16 @@ TBD - created by archiving change llm-token-usage-stats. Update Purpose after ar
 
 ### Requirement: console 提供 token 用量表格 + 10 分钟曲线页
 
-管理后台 SHALL 新增「用量」页（路由 `/usage`），展示 token 消耗的四维表格与每 10 分钟曲线。
+管理后台 SHALL 提供 `/usage` 页，展示 token 消耗的四维表格与每 10 分钟曲线，并在明细表中显示仅由 billing-derived 数据支持的估算成本。
 
-- 表格 SHALL 含列：日期、账号、角色、模型、输入 token、输出 token、**总 token（醒目主列）**、调用次数；空区间 SHALL 显式空态提示（非空白）。
+- 表格 SHALL 含列：日期、账号、角色、provider/model、输入 token、输出 token、**总 token（醒目主列）**、估算成本、调用次数。
+- Console MUST NOT 从硬编码公开模型价目表估算 token 成本，也 MUST NOT 在前端用 provider 公开 list price 本地换算成本。
+- Cloud MAY 用 billing-derived 内部价格快照乘以该行 token 量生成估算成本；价格快照 MUST 至少按 provider、model、usage day 建键。
+- 当没有同日价格时，Cloud SHALL 使用同一 provider/model 的最新可用 billing-derived 历史价格。
+- 面板 SHALL 提供一个手动动作，通过查询最近已用模型的 T-1 / T-2 provider billing samples 刷新 provider/model 价格。
+- 手动刷新 MUST NOT 实现为 scheduled task、cron job 或 background worker。
+- 成本估算 MUST 如实暴露来源/日期，避免运营把它误认为实时 provider 价目表。
+- 对没有任何历史 billing-derived 价格的 provider/model 行，估算成本列 MUST 保持可见并显示诚实的待定/空态。
 - 曲线 SHALL 为单条总量线（每 10 分钟一点），受页面筛选器（账号 / 角色 / 模型）约束，时间轴 SHALL 显式按 `Asia/Shanghai` 渲染（不依赖浏览器本地时区）。
 - 页面 SHALL 提供日期范围选择与账号/角色/模型筛选。
 - 角色列 SHALL 把原始内部 tag（如 `browse:content_evaluator` / `publish:TitleCreator` / `system:model_probe` / `untagged`）映射为人类可读中文标签展示（PG 仍存原 tag 做稳定键）；未知 tag SHALL 回落去前缀的可读形，MUST NOT 直露内部 tag 串。
@@ -129,4 +136,110 @@ TBD - created by archiving change llm-token-usage-stats. Update Purpose after ar
 
 - **WHEN** 所选区间无任何用量
 - **THEN** 表格与图各显示「暂无数据」，而非空白或报错
+
+#### Scenario: 手动价格刷新更新估算成本
+
+- **GIVEN** T-1 or T-2 billing details contain a provider/model token charge
+- **WHEN** an operator triggers the manual provider model pricing refresh
+- **THEN** cloud derives an effective token price from billed amount and billed tokens
+- **AND** stores the result as a billing-derived price snapshot
+- **AND** subsequent `/api/llm-usage` responses may use that price for matching provider/model rows.
+
+#### Scenario: 缺少近期 billing sample 时复用历史价格
+
+- **GIVEN** a provider/model already has a billing-derived price snapshot from an earlier refresh
+- **AND** T-1 and T-2 billing details contain no new sample for that provider/model
+- **WHEN** `/api/llm-usage` returns rows for that provider/model
+- **THEN** cloud estimates cost using the latest available historical billing-derived price
+- **AND** the row does not show pending solely because recent billing data is absent.
+
+#### Scenario: 无历史 billing 价格时保持待定
+
+- **GIVEN** a provider/model has no billing-derived price snapshot
+- **WHEN** `/api/llm-usage` returns rows for that provider/model
+- **THEN** `/usage` still shows the estimated-cost column
+- **AND** that row shows an honest pending/empty cost state.
+
+### Requirement: Image Generation Usage Is Recorded Honestly
+
+The system SHALL record publish image generation attempts in the usage store so operators can see image-model activity by account, role, provider, and model.
+
+- Cloud SHALL record each image provider attempt with `role='publish:ImageGenerator'`, the current publish account id, the active image provider id, and the active image model name.
+- Image usage rows SHALL increment `calls` for each provider attempt and `ok_calls` only when a real image URL is produced by the provider.
+- Because image providers do not return token usage, image usage rows SHALL store prompt, completion, and total token counts as 0. The system MUST NOT synthesize token counts from image count, prompt length, pixels, duration, cost, or any provider-specific estimate.
+- Usage recording MUST NOT block or alter the image generation result. Recorder failures SHALL be swallowed like text LLM usage failures.
+- Token billing price refresh targets SHALL ignore zero-token image usage rows and MUST NOT request token price snapshots for image-generation rows.
+- The console SHALL label `publish:ImageGenerator` as an image-generation role and SHALL avoid presenting image usage rows as token consumption beyond their honest zero-token counts and call counts.
+
+#### Scenario: Successful image generation appears in usage
+
+- **GIVEN** a publish run generates two images through provider `volcengine` and image model `doubao-seedream-4-5-251128`
+- **WHEN** the image provider returns two real image URLs
+- **THEN** the usage store records two calls for `role='publish:ImageGenerator'`, provider `volcengine`, and that model
+- **AND** `ok_calls` is 2 while prompt, completion, and total tokens are all 0.
+
+#### Scenario: Failed image generation records a failed call without fake tokens
+
+- **WHEN** an image provider attempt returns no URL
+- **THEN** the usage store records the call with `ok_calls` unchanged
+- **AND** token counts remain 0.
+
+#### Scenario: Image rows do not become token price refresh targets
+
+- **GIVEN** local usage contains only image-generation rows with total tokens equal to 0
+- **WHEN** an operator triggers provider model pricing refresh
+- **THEN** cloud does not include those image rows as token billing price targets
+- **AND** it MUST NOT write or request token price snapshots for the image model.
+
+### Requirement: Manual Billing Price Refresh Sample Matching And Reporting
+
+The manual provider/model price refresh SHALL derive prices from provider billing details when a billing sample can be deterministically matched to a local provider/model/day target, even if the provider billing label does not contain the exact internal runtime model id.
+
+- Cloud SHALL preserve exact runtime model id matching.
+- Cloud MAY add provider-specific deterministic aliases for billing labels, but MUST NOT use fuzzy similarity, public list prices, or guessed fallback prices.
+- Alias matching MUST be specific enough to identify the model family and concrete variant; generic provider or family fragments alone MUST NOT match.
+- If billing details do not contain a matching token quantity and a billing-derived amount from the same row, cloud SHALL return `no_billing_sample` for that target and MUST NOT write a price snapshot.
+- Cloud SHALL include discounted zero-payable Aliyun billing rows so DashScope/Bailian token samples hidden by `PretaxAmount=0` can still be considered.
+- Cloud MAY derive Aliyun row amount from positive same-row gross amount fields such as `PretaxGrossAmount` when discounted net amount fields are zero, but MUST NOT write a zero-price snapshot from discounted zero amount alone.
+- Cloud MAY derive the row amount from same-row token unit price and token quantity when the provider rounds the billed amount to zero, but MUST NOT use public list prices or guessed fallback prices.
+- The console SHALL surface skipped reason counts from the refresh response, not only the number of skipped model-days.
+
+#### Scenario: Volcengine billing label matches runtime model id by deterministic alias
+
+- **GIVEN** local usage contains `provider='volcengine'` and model `doubao-seed-2-0-pro-260215`
+- **AND** Volcengine billing details contain token rows labelled `Doubao-Seed-2.0-pro` or `Doubao_Seed_2.0_pro_32k_infer_input`
+- **WHEN** an operator triggers the manual provider model pricing refresh
+- **THEN** cloud derives a billing-derived price snapshot for `doubao-seed-2-0-pro-260215`
+- **AND** cloud MUST NOT require the billing row to contain the exact `-260215` runtime suffix.
+
+#### Scenario: Missing provider billing sample remains an honest skip
+
+- **GIVEN** local usage contains a DashScope model target for a checked day
+- **AND** Aliyun billing details for that day contain no DashScope token billing row for that model
+- **WHEN** an operator triggers the manual provider model pricing refresh
+- **THEN** cloud returns `skipped[].reason='no_billing_sample'` for that target
+- **AND** cloud writes no synthetic or public-price snapshot for that target.
+
+#### Scenario: Aliyun discounted token row uses same-row gross amount
+
+- **GIVEN** local usage contains `provider='dashscope'` and model `qwen3.7-plus`
+- **AND** Aliyun billing details contain matching Bailian token rows with `UsageUnit='千tokens'`, `PretaxAmount=0`, and positive `PretaxGrossAmount`
+- **WHEN** an operator triggers the manual provider model pricing refresh
+- **THEN** cloud derives the price snapshot from the same-row gross billing amount
+- **AND** cloud MUST NOT skip the row only because the discounted payable amount is zero.
+
+#### Scenario: Volcengine rounded amount uses same-row token unit price
+
+- **GIVEN** local usage contains `provider='volcengine'` and model `doubao-seed-character-260628`
+- **AND** Volcengine billing details contain matching Doubao token rows with `Count`, `Unit='千tokens'`, `Price`, `PriceUnit='千tokens'`, and rounded `PretaxAmount='0.00'`
+- **WHEN** an operator triggers the manual provider model pricing refresh
+- **THEN** cloud derives the price snapshot from same-row `Price × Count`
+- **AND** cloud MUST ignore non-token quantity rows such as image counts for token price snapshots.
+
+#### Scenario: Console summarizes refresh skip reasons
+
+- **GIVEN** the manual refresh response contains skipped targets with reasons such as `no_billing_sample` or `missing_credentials`
+- **WHEN** the usage page shows the refresh result
+- **THEN** the operator-facing message includes reason counts using readable labels
+- **AND** a zero-write refresh with skipped targets is presented as a warning or otherwise non-green outcome.
 

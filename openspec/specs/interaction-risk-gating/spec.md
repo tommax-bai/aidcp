@@ -278,3 +278,68 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 - **WHEN** 管理后台保存新的全局单场时长 / 互动预算
 - **THEN** 仅写单场上限单行表，账号风控终态（`normal` / `warned` / `restricted` / `frozen`）与档位 `quotaLevel` MUST 不被改变，风控状态仍仅由 `RiskController` 单写
 
+### Requirement: 浏览打开前必须先过 view 配额闸
+
+云端 SHALL 在把候选卡片下发为 `open_note` 之前，按该连接的真实账号调用
+`RiskController.explain('view')` 或等效只读判定。判定拒绝时，云端 MUST NOT 下发
+`open_note`，MUST NOT 伪造成功浏览，MUST 进入浏览额度休眠而不是下发 `session.end`。
+若拒绝原因为 `quota:minute`、`quota:hour`、`quota:day`，云端 SHOULD 按滑动窗口释放时间安排重判；
+无可计算释放时间时，云端 MAY 以保守周期重判，直到判定恢复或会话被其它正常终止条件结束。
+
+该闸用于阻止新的笔记详情被打开；既有 `note.detail` 到达后的 `record('view')` 计数路径
+仍作为真实成功浏览的记账来源保留。浏览额度休眠期间，普通浏览推进、打开和互动命令 MUST 被扣住；
+窗口释放后，云端 SHOULD 发送一次轻量恢复指令重新驱动浏览闭环。该休眠只作用于浏览闭环，不得影响
+定时或手动的笔记创作、发帖生成、发帖审批或发帖下发；这些流程不需要前置浏览。点赞、收藏、关注、
+评论等浏览衍生行为不会被主动触发，因为休眠期间没有新的笔记详情被打开。
+
+#### Scenario: view 配额已满时不打开下一篇笔记
+
+- **WHEN** 账号的 `RiskController.explain('view')` 返回 rejected
+- **AND** 浏览角色产出一条 `content.valuable` 候选
+- **THEN** 云端 MUST NOT 下发 `open_note`
+- **AND** 云端 MUST NOT 下发 `session.end`
+- **AND** 云端 MUST 进入浏览额度休眠并安排后续重判
+
+#### Scenario: view 配额可用时照常打开笔记
+
+- **WHEN** 账号的 `RiskController.explain('view')` 返回 allowed
+- **AND** 浏览角色产出一条 `content.valuable` 候选
+- **THEN** 云端照常下发 `open_note`
+
+#### Scenario: view 配额窗口释放后恢复浏览
+
+- **WHEN** 浏览额度休眠到期
+- **AND** 账号的 `RiskController.explain('view')` 返回 allowed
+- **THEN** 云端 SHOULD 解除浏览休眠
+- **AND** 云端 SHOULD 下发一次恢复浏览的推进指令
+
+#### Scenario: 临时 view 配额不阻止会话启动
+
+- **WHEN** 账号因 `quota:minute` 或 `quota:hour` 临时无法新增 view
+- **THEN** 云端 MAY 启动或保持浏览会话
+- **AND** 云端 MUST 在 `open_note` 前进入浏览额度休眠
+- **AND** 云端 MUST NOT 因临时 view 配额拒绝阻断手动或定时笔记创作、发布
+
+### Requirement: Scaled risk quotas must round upward
+
+When cloud computes scaled window quotas for reduced risk states, it SHALL round scaled
+quota values upward after multiplication. The scaling operation MUST still clamp negative
+or non-finite effective outputs to zero, and a zero scaling factor MUST still produce zero.
+
+`warned` accounts SHALL continue to use conservative baseline quotas scaled by `0.7` and
+SHALL continue to pause publish actions. However, a positive baseline quota such as a
+minute-window quota of `1` MUST NOT become `0` solely because of fractional scaling.
+
+#### Scenario: warned keeps sparse interaction windows available
+
+- **WHEN** an account is in `warned` and the conservative baseline minute quota for an
+  interaction action is `1`
+- **THEN** the effective minute quota for that action is `1`, not `0`
+- **AND** `canDo(action)` is not rejected merely because `0 >= 0` on an empty minute
+  window
+
+#### Scenario: frozen scaling still stops all actions
+
+- **WHEN** a quota window is scaled by factor `0`
+- **THEN** the effective quota remains `0`
+

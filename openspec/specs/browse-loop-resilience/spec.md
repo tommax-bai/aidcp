@@ -5,15 +5,15 @@ TBD - created by archiving change fix-browse-loop-resilience. Update Purpose aft
 ## Requirements
 ### Requirement: 返回 feed 后浏览循环必须续刷而非死锁
 
-返回 feed（`navigation.back`，`reason=back_to_feed`）之后，浏览循环 SHALL 继续评估并推进，MUST NOT 在「返回后首次扫描到 0 卡」时进入无限等待。无论 cloud 是否下发 `targetPage`，edge 的返回路径 MUST 等待 feed 水合后再判定可见卡片，且 MUST 在仍为空时显式上报（而非静默吞掉），以保证 cloud 决策环始终能被触发。
+返回 feed（`navigation.back`，`reason=back_to_feed`）之后，浏览循环 SHALL 继续评估并推进，MUST NOT 在「返回后首次扫描到 0 卡」时进入无限等待。无论 cloud 是否下发 `targetPage`，edge 的返回路径 MUST 优先前向导航到健康来源列表，并等待列表水合后再判定可见卡片，且 MUST 在仍为空时显式上报（而非静默吞掉），以保证 cloud 决策环始终能被触发。
 
 #### Scenario: cloud 下发的 back 不带 targetPage
 - **WHEN** edge 收到 `navigation.back{reason:'back_to_feed'}` 且 payload 无 `targetPage`
-- **THEN** edge 按等同 `targetPage='feed'` 处理：`history.back()` 后以 `waitForVisibleCards` 轮询（上限 ~8s）等待卡片出现，而非固定 `sleep(2000)` 后瞬时判断
+- **THEN** edge 按等同 `targetPage='feed'` 处理：优先 `Page.navigate(exploreUrl)` 返回 explore feed，并以 `waitForVisibleCards` 轮询（上限约 8s）等待卡片出现，而非依赖浏览器 `history.back()`
 
-#### Scenario: 轮询超时则整页重载兜底
-- **WHEN** `history.back()` 后在轮询窗口内仍未出现可见卡片
-- **THEN** edge `Page.navigate(exploreUrl)` 重载 feed 并再次按 scroller 口径确认卡片出现
+#### Scenario: 前向导航后仍未水合则重试健康校验
+- **WHEN** 前向导航到来源列表后在轮询窗口内仍未出现可见卡片
+- **THEN** edge 继续执行既有健康校验兜底：对 feed 重新确认 / 导航 `exploreUrl`，对 search 使用已记录搜索结果 URL或降级路径，并再次按 scroller 口径确认卡片出现
 
 #### Scenario: 重轮询后仍为空不得静默
 - **WHEN** 返回 feed 后重轮询仍扫到 0 张可见卡片
@@ -47,23 +47,27 @@ cloud orchestration SHALL 运行一个 wall-clock 看门狗：当超过 idle-nud
 
 ### Requirement: 返回列表页须按来源页型(sourcePageType)返回正确的列表
 
-`back_to_feed` 返回 MUST 回到笔记**来源的列表页**：来自 explore feed 的会话回 explore，来自搜索结果的会话回**搜索结果**。云端 SHALL 把会话的 `sourcePageType` 经决策指令的 `targetPage` 透传到边缘；边缘据 `targetPage` 选择返回目标，MUST NOT 把搜索来源的会话一律拽回 explore。
+`back_to_feed` 返回 MUST 回到笔记**来源的列表页**：来自 explore feed 的会话回 explore，来自搜索结果的会话回**搜索结果**。云端 SHALL 把会话的 `sourcePageType` 经决策指令的 `targetPage` 透传到边缘；边缘 SHALL 在打开笔记前记录当前来源列表 URL，并据 `targetPage` 选择返回目标，MUST NOT 把搜索来源的会话一律拽回 explore。
 
 #### Scenario: 搜索来源会话返回搜索结果
 - **WHEN** 一条笔记经搜索结果打开、深读后云端决定 `back_to_feed`，且会话 `sourcePageType==='search'`
-- **THEN** 云端下发的 `navigation.back` 携带 `targetPage='search'`，边缘返回到搜索结果列表（而非 explore feed）
+- **THEN** 云端下发的 `navigation.back` 携带 `targetPage='search'`，边缘优先 `Page.navigate` 到打开笔记前记录的搜索结果 URL（而非 explore feed）
 
 #### Scenario: feed 来源会话返回 explore
 - **WHEN** 会话 `sourcePageType==='feed'`（或缺省）时决定 `back_to_feed`
-- **THEN** 边缘返回到 explore feed
+- **THEN** 边缘通过前向导航返回到 explore feed
+
+#### Scenario: 搜索来源 URL 缺失时诚实降级
+- **WHEN** `targetPage='search'` 但边缘没有可用的已记录搜索结果 URL（如 edge 重启、直接停在详情页启动）
+- **THEN** 边缘 MUST NOT 编造搜索 URL；它可以使用既有健康校验降级路径恢复到 explore feed，并显式上报真实卡片状态
 
 ### Requirement: 返回后须对 404/坏页健壮、健康校验通过再上报
 
-边缘返回列表页时，若 `history.back()` 落到失效/过期/404 页面（如搜索来源笔记 `xsec_token` 过期导致"笔记不见了"），MUST 自动导航到已知良好的列表页兜底，并在**确认落在健康列表页（有可见卡片、非坏页）后**再上报 `page.cards`；MUST NOT 在坏页/0 卡时静默不上报而陷入边-云互等。
+边缘返回列表页时，若前向导航或必要的历史兜底落到失效/过期/404 页面（如搜索来源笔记 `xsec_token` 过期导致"笔记不见了"），MUST 自动导航到已知良好的列表页兜底，并在**确认落在健康列表页（有可见卡片、非坏页）后**再上报 `page.cards`；MUST NOT 在坏页/0 卡时静默不上报而陷入边-云互等。
 
-#### Scenario: history.back 落到过期笔记 404 → 兜底导航
-- **WHEN** 返回时 `history.back()` 落到 token 过期的笔记详情页（404/坏页）
-- **THEN** 边缘探测到非健康列表页（坏页标记或 0 卡）即 `Page.navigate` 到良好列表页（explore 或重新发起搜索），并轮询确认出现可见卡片后再上报 `page.cards`
+#### Scenario: 返回落到过期笔记 404 → 兜底导航
+- **WHEN** 返回路径落到 token 过期的笔记详情页（404/坏页）
+- **THEN** 边缘探测到非健康列表页（坏页标记或 0 卡）即 `Page.navigate` 到良好列表页（explore 或已记录搜索结果 URL），并轮询确认出现可见卡片后再上报 `page.cards`
 
 #### Scenario: 坏页不静默
 - **WHEN** 返回后页面无可见卡片且疑似坏页
@@ -115,28 +119,29 @@ CDP 重连 MUST NOT 触碰边-云会话连接、MUST NOT 重发 `edge.hello`（�
 
 ### Requirement: 无浮层的整页离页返回必须直连来源列表、不得回踩失效笔记详情
 
-边缘返回列表页时 MUST 以「返回瞬间头上是否盖着笔记浮层」决定返回方式，而非以「当前 URL 是否为作者主页」这一狭窄判据：
+边缘返回列表页时 MUST 以「直接来源列表导航」作为默认策略，而非优先依赖浏览器历史：
 
 - **已在目标列表**（feed 匹配 explore feed、search 匹配搜索结果）→ MUST NOT 触发浏览器后退或整页重载（关浮层后列表即露出、滚动位由 SPA 保住）。
-- **不在列表且头上盖着笔记浮层** → MAY 用浏览器后退（`history.back()`）回到来源列表以保住滚动位（卡片真实点击开的浮层，其上一条历史即来源列表，后退安全）。
-- **不在列表且无笔记浮层**（通知巡视 / 作者主页深读 / 任意整页离页动作返回）→ MUST 直接前向导航（`Page.navigate`）回**来源列表页**（feed 来源回 explore、search 来源回搜索结果），MUST NOT 经浏览器后退回踩到 `xsec_token` 已失效的旧笔记详情页而闪现 `error_code=300031「当前笔记暂时无法浏览」`。
+- **feed 来源** → MUST 直接前向导航（`Page.navigate(exploreUrl)`）回 explore feed，MUST NOT 为保滚动位而优先 `history.back()`。
+- **search 来源且已记录搜索结果 URL** → MUST 直接前向导航到记录的搜索结果 URL，MUST NOT 回踩失效详情。
+- **缺少可用来源列表 URL的边界情形** → MAY 使用健康校验包裹的历史兜底，但落地后仍 MUST 通过列表健康检查；一旦落坏页 MUST 立即前向导航到已知良好列表。
 
-本要求是**预防**（不落到坏页），与既有「返回后须对 404/坏页健壮、健康校验通过再上报」互补而非替代：既有要求作为**落地后的安全网**原样保留；本要求消除「无浮层整页返回」这条会渲染出坏页并被旁路监测误报的触发路径。返回完成的 `action.completed{action:'back', ok:true}` 回执契约不变。
+本要求是**预防**（不落到坏页），与既有「返回后须对 404/坏页健壮、健康校验通过再上报」互补而非替代：既有要求作为**落地后的安全网**原样保留；本要求消除会渲染出失效详情并被旁路监测误报的触发路径。返回完成的 `action.completed{action:'back', ok:true}` 回执契约不变。
 
 #### Scenario: 看笔记→开通知→返回，直连 feed 不闪坏页
 
-- **WHEN** 会话在 explore feed 打开笔记（真实点击、URL 带 `xsec_token`）后离页进入通知巡视，随后收到 `navigation.back{reason:'back_to_feed'}`，此时头上无笔记浮层、当前在 `/notification`
+- **WHEN** 会话在 explore feed 打开笔记（真实点击、URL 带 `xsec_token`）后离页进入通知巡视，随后收到 `navigation.back{reason:'back_to_feed'}`，当前在 `/notification`
 - **THEN** 边缘直接 `Page.navigate` 回 explore feed，MUST NOT `history.back()` 回踩那条 token 已失效的笔记详情；返回过程中 `error_code=300031` 坏页 MUST NOT 被经过 / 闪现，地址栏直接落在 explore feed
 
-#### Scenario: 搜索来源的无浮层返回回到搜索结果
+#### Scenario: 搜索来源的返回回到搜索结果
 
-- **WHEN** 会话 `sourcePageType==='search'`、离页动作后返回、且头上无笔记浮层
-- **THEN** 边缘前向导航回**搜索结果列表**（而非 explore feed），同样不经浏览器后退回踩失效详情
+- **WHEN** 会话 `sourcePageType==='search'`、离页动作后返回，且边缘记录了打开笔记前的搜索结果 URL
+- **THEN** 边缘前向导航回该搜索结果列表（而非 explore feed），同样不经浏览器后退回踩失效详情
 
-#### Scenario: 笔记浮层盖在列表上的普通返回仍用后退保滚动位
+#### Scenario: 笔记浮层盖在列表上的普通返回也优先直连
 
 - **WHEN** 返回瞬间笔记浮层仍盖在来源列表之上（未发生整页离页）
-- **THEN** 边缘可用 `history.back()` 关浮层回到来源列表并保住滚动位，行为与本 change 前一致
+- **THEN** feed 来源边缘仍优先 `Page.navigate(exploreUrl)` 直连列表；只有缺少可用来源列表 URL的边界情形才可使用健康校验包裹的 `history.back()`
 
 #### Scenario: 万一仍落坏页，既有兜底照旧生效
 
@@ -209,4 +214,32 @@ CDP 重连 MUST NOT 触碰边-云会话连接、MUST NOT 重发 `edge.hello`（�
 
 - **WHEN** 关注命令已下发并产生执行回执（真实新关注 / 已关注 no-op / 失败任一）
 - **THEN** 该回执用于关注配额扣减（仅真实新关注扣）与诚实成败记录，但 MUST NOT 被用作返回信息流的触发器（返回已由单一决策点触发）
+
+### Requirement: 云端 WebSocket 意外关闭后边缘必须有界重连或诚实终止
+
+边缘端与云端会话 WebSocket **意外关闭**时，边缘 SHALL 在进程内以有界退避自动重连云端，重连成功后 MUST 重新执行 `edge.hello` 以恢复云端路由注册和云端下发的会话/节奏状态。重连期间边缘 MUST 将云端连接状态标记为 reconnecting/disconnected，MUST NOT 继续把自身表现为可正常收发云端命令。
+
+重连成功后，边缘 MUST 清理旧连接上的瞬态命令状态，MUST NOT 重放旧连接断开前未完成或未确认的云端命令，并 MUST 基于当前真实浏览器页面重新上报结构化快照（如 `page.cards` 或 `note.detail`）交由云端重新决策。断线期间的 in-flight 请求或发布动作 MUST 如实失败、取消或丢弃，MUST NOT 编造成功。
+
+重试耗尽或判定不可达时，边缘 MUST 进入诚实失败路径：停止继续上报、关闭云端连接状态、通过日志/Electron 状态暴露失败原因，并以可重起语义退出或交给看护层处理；MUST NOT 长时间空转占着本地运行态而让云端继续无边缘可路由。
+
+#### Scenario: 云端服务重启后自动重连并重新注册
+- **WHEN** 浏览过程中云端 WebSocket 因 `aidcp-cloud.service` 重启而关闭，且网络随后恢复
+- **THEN** 边缘进入 reconnecting 状态并按有界退避重连云端
+- **AND** 重连成功后重新发送 `edge.hello`，云端恢复该 edge/account 的在线路由注册
+- **AND** 边缘应用新的 pacing/session 快照后重新上报当前真实页面快照，使浏览决策环继续推进
+
+#### Scenario: 重连不重放旧连接命令
+- **WHEN** 云端 WebSocket 关闭时边缘正在等待旧连接上的请求回包或执行旧连接下发的浏览/发布命令
+- **THEN** 边缘将旧连接 pending 请求按连接关闭失败处理，清理旧命令队列或旧 in-flight 状态
+- **AND** 重连成功后 MUST NOT 自动重放这些旧命令，而是上报当前页面快照交云端重新下发新命令
+
+#### Scenario: 重连耗尽后诚实失败
+- **WHEN** 云端 WebSocket 在配置的次数或时间上限内始终无法重连
+- **THEN** 边缘记录并暴露云端重连耗尽状态，停止声称云端已连接
+- **AND** 边缘以可重起失败语义退出或移交看护层，MUST NOT 保持一个本地 alive 但云端不可路由的僵尸浏览进程
+
+#### Scenario: 主动关闭不触发自动重连
+- **WHEN** 用户停止、会话正常结束或边缘主动下线而关闭云端 WebSocket
+- **THEN** 边缘不启动自动重连退避循环，不重新发送 `edge.hello`，并按正常关闭语义退出或待命
 

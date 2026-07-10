@@ -57,17 +57,20 @@ TBD - created by archiving change curated-content-admin-page. Update Purpose aft
 
 ### Requirement: 按正文为空清理壳行——非按纳入原因
 
-面板 SHALL 提供「清理空正文壳行」的接口，谓词为正文为空（NULL 或空串）且按 `account_id` 约束，MUST NOT 以「按纳入原因批量删除」实现。理由（写入约束）：`curated_content` 只存已纳入行，被拒原因从不入库；而最该清的空正文壳行恰带机器人收藏标记（高召回权重），任何「按原因 + 默认保护机器人动作行」的清理都会保护壳行、误删有正文的优质行。清理 MUST 返回真实清理条数，界面 MUST 呈现真实条数（可能因机器人并发写入而与事前预览不同），MUST NOT 回显预览数充当结果。
+面板 SHALL 保留「清理空正文壳行」的接口，谓词为正文为空（NULL 或空串）且按 `account_id` 约束，MUST NOT 以「按纳入原因批量删除」实现。该能力主要用于清理历史遗留数据或异常恢复；正常写入路径中，自有收藏缺少非空正文时 MUST NOT 再补建新的空正文精选壳行。清理 MUST 返回真实清理条数，界面 MUST 呈现真实条数（可能因并发写入或历史数据变化而与事前预览不同），MUST NOT 回显预览数充当结果。
 
-#### Scenario: 只清空正文壳行
+#### Scenario: 只清历史空正文壳行
+
 - **WHEN** 带账号 A 执行清理空正文壳行
-- **THEN** 仅删除账号 A 中正文为空（NULL 或空串）的行，所有带正文的行（含高共鸣观测行）保留
+- **THEN** 仅删除账号 A 中正文为空（NULL 或空串）的历史/异常行，所有带正文的行（含高共鸣观测行）保留
 
 #### Scenario: 清理回真实条数
+
 - **WHEN** 清理实际删除了 N 行
 - **THEN** 接口返回 N，界面呈现真实的 N，而非事前 facets 预览的估计数
 
 #### Scenario: 清理不跨账号
+
 - **WHEN** 带账号 A 执行清理
 - **THEN** 其他账号的空正文壳行不受影响
 
@@ -102,4 +105,54 @@ TBD - created by archiving change curated-content-admin-page. Update Purpose aft
 #### Scenario: 无可用图片维持空态
 - **WHEN** 精选行没有可用 `ossUrl` 或 `sourceUrl`
 - **THEN** 列表图片列显示空态，查看笔记详情显示暂无参考图，MUST NOT 提供会打开死链或下载的图片点击目标
+
+### Requirement: 精选页展示图片快照并控制洗稿是否带图参考
+
+后台精选内容页 SHALL 在笔记行展示可用的原笔记图片参考快照。列表 SHOULD 展示首张可用缩略图，详情视图 SHALL 展示有序图集、图片来源状态和可打开的原图/OSS 链接。缺少图片时 MUST 呈现为空状态，MUST NOT 渲染死链或占位假图。
+
+当运营从精选笔记触发参照洗稿时，若该行存在可用图片，界面 SHALL 让运营明确知道本次会带图参考，并允许选择“仅文本参照”。前端请求体 SHALL 携带 `useReferenceImages?: boolean`；服务端 MUST 只在该行属于请求账号且图片可用时把图片放入 `referenceNote.images`。评论行、空正文壳行和无图片行保持既有拒绝/文本-only 行为。
+
+#### Scenario: 列表展示首张缩略图
+
+- **WHEN** 一条精选笔记有至少一张可用 `ossUrl` 或 `sourceUrl`
+- **THEN** 列表展示首张图缩略图，详情视图展示按顺序排列的图集
+
+#### Scenario: 图片缺失不渲染死链
+
+- **WHEN** 一条精选笔记没有可用图片
+- **THEN** 页面显示无图片状态，不渲染打不开的链接或占位假图
+
+#### Scenario: 洗稿触发可选择带图或仅文本
+
+- **WHEN** 运营对有图精选笔记点击洗稿
+- **THEN** 界面默认带图参考，并允许改为仅文本参照；请求体中的 `useReferenceImages` 与选择一致
+
+#### Scenario: 服务端仍按账号和行类型防越权
+
+- **WHEN** 洗稿触发请求携带 `accountId` 与 `useReferenceImages`
+- **THEN** 服务端仍通过 `getOneForAccount` 读取行，仍只允许本账号 `note` 行且正文非空，MUST NOT 因图片字段泄露其它账号行
+
+#### Scenario: 红线反例 - 前端默认宣称用了图片但服务端未带图
+
+- **WHEN** 服务端发现图片不可用、provider 不支持或运营选择仅文本
+- **THEN** UI/回执/审计 MUST 可区分“未使用图片参考”，MUST NOT 用成功提示暗示图片已参与生成
+
+### Requirement: 精选面板 SHALL 按图文 / 视频 / 评论展示与筛选
+
+面板精选内容列表与 facets SHALL 使用图文、视频、评论三类展示 `content_type`，并支持按 `image_text`、`video`、`comment` 精确筛选。为兼容过渡期调用，旧查询参数 `contentType=note` MAY 被解释为源帖集合（`image_text|video`），但响应行 MUST 返回真实的新类型。facets SHOULD 提供图文数、视频数、评论数；若保留旧 `noteCount` 字段，则其值 MUST 等于图文数与视频数之和。
+
+#### Scenario: 按视频筛选
+
+- **WHEN** 管理员在精选面板选择视频筛选
+- **THEN** 列表只返回该账号 `content_type=video` 的行，total 与 facets 不跨账号
+
+#### Scenario: 旧 note 查询兼容
+
+- **WHEN** 过渡期客户端请求 `contentType=note`
+- **THEN** 服务端返回图文与视频两类源帖行，且每行的 `contentType` 仍为 `image_text` 或 `video`
+
+#### Scenario: 面板标签反映真实类型
+
+- **WHEN** 列表中同时存在图文、视频和评论
+- **THEN** 前端分别以「图文」「视频」「评论」呈现，MUST NOT 再把源帖统称为「笔记」
 
