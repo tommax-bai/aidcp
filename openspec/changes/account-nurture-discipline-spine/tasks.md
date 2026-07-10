@@ -29,19 +29,19 @@
 
 ## 5. aidcp-edge — egress reporting + FB throttling-overlay recognition (minimal)
 
-- [ ] 5.1 On Facebook session start, report the session's real egress IP/geo by reusing the existing fingerprint WebRTC = proxy probe; never leak the real-machine IP; report unknown honestly on probe failure.
-- [ ] 5.2 Extend Facebook throttling-toast/overlay recognition (inline block toasts + silently-hidden-comment) and report each as a throttling signal to the cloud. Keep the edge change minimal (recognition + report only; no local risk-state decision).
+- [ ] 5.1 On Facebook session start, report the session's real egress IP/geo by reusing the existing fingerprint WebRTC = proxy probe; never leak the real-machine IP; report unknown honestly on probe failure. <!-- DEFERRED: egress report needs a data channel to cloud (an optional protocol field/message), which is OUT of this change's no-protocol-change scope. Split into a separate small change (protocol-touching) together with §6. -->
+- [x] 5.2 Extend Facebook throttling-toast/overlay recognition (inline block toasts + silently-hidden-comment) and report each as a throttling signal to the cloud. Keep the edge change minimal (recognition + report only; no local risk-state decision). <!-- aidcp-edge 9981888: classifyFacebookOverlayFromSignals extended to full FB soft-block phrase set → 'unknown' blocking → reported via existing risk.captcha_detected with overlay.text (no protocol change) → cloud §3 escalates to restricted. THROTTLE WIRE now end-to-end. NOTE: silently-hidden-comment detection not yet done (needs per-comment post-check, couples with §3.3/Change B). -->
 
 ## 6. cloud/console — egress alerting
 
-- [ ] 6.1 Cloud: on egress matching a risk feature (mainland-China / datacenter / same-subnet-as-real-machine) raise an operations alert; never block, delay, or downgrade any action (warn-only per v1 decision).
-- [ ] 6.2 Console (read-only): surface the egress alert and the account's current risk state; no write path.
+- [ ] 6.1 Cloud: on egress matching a risk feature (mainland-China / datacenter / same-subnet-as-real-machine) raise an operations alert; never block, delay, or downgrade any action (warn-only per v1 decision). <!-- DEFERRED: depends on §5.1 egress report (blocked on the protocol data-channel decision). -->
+- [ ] 6.2 Console (read-only): surface the egress alert and the account's current risk state; no write path. <!-- DEFERRED with §5.1/§6.1; console repo not yet touched. -->
 
 ## 7. Verification
 
-- [ ] 7.1 aidcp-cloud: `npm run test:acceptance` → `npm test` → `npm run typecheck`, all green; the `AC-RISK-*` red lines MUST pass (never self-harm; a denied `record` returns false).
+- [x] 7.1 aidcp-cloud: `npm run test:acceptance` → `npm test` → `npm run typecheck`, all green; the `AC-RISK-*` red lines MUST pass (never self-harm; a denied `record` returns false). <!-- cloud: acceptance 47 + full 1770 + typecheck all green across d606d45/88b7ccb/3ef7230/07b6c18; AC-RISK intact -->
 - [x] 7.2 Prove Day-1 clamp with a stub-injected `created_at` (no real machine): fixture accounts at nurture-day 1/5/graduated assert the clamped bands and platform-curve differences. <!-- aidcp-cloud d606d45: createdAtForDay fixtures in risk-cold-start-clamp.test.ts; typecheck + acceptance 47 + full 1754 green -->
-- [ ] 7.3 Prove throttling backoff with a stub-injected Facebook soft-block signal: assert migration to `restricted` and that the edge cannot self-set the final state.
+- [x] 7.3 Prove throttling backoff with a stub-injected Facebook soft-block signal: assert migration to `restricted` and that the edge cannot self-set the final state. <!-- aidcp-cloud 88b7ccb: test/facebook-throttle-signal.test.ts — soft-block text via coordinator → restricted (cloud single-write); non-match → warned regression guard -->
 
 ## 8. Rollout (isolation window → ol)
 
