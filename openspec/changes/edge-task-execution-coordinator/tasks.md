@@ -37,8 +37,8 @@
 
 ## 7. Validation and delivery
 
-- [x] 7.1 Run edge acceptance tests, full tests, and typecheck <!-- edge: acceptance 16/16, full 854/854, typecheck passed -->
-- [x] 7.2 Run cloud acceptance tests, full tests, and typecheck <!-- cloud: acceptance 47/47, full 1714/1714, typecheck passed -->
-- [ ] 7.3 Run strict OpenSpec validation and record implementation/validation commit SHAs in this checklist
+- [x] 7.1 Run edge acceptance tests, full tests, and typecheck <!-- edge after rebase onto 0.3.4: acceptance 16/16, full 859/859, typecheck passed; commits 359563a, c8ec185 -->
+- [x] 7.2 Run cloud acceptance tests, full tests, and typecheck <!-- cloud: acceptance 47/47, final full 1715/1715, typecheck passed; commits 0e4eec6, 97c0310 -->
+- [x] 7.3 Run strict OpenSpec validation and record implementation/validation commit SHAs in this checklist <!-- openspec validate edge-task-execution-coordinator --strict passed; aidcp f654994; console f16237c; console tests 87 passed, 1 skipped, production build passed -->
 - [ ] 7.4 Rebase/fast-forward integrate, push default branches, deploy cloud to dev, publish the edge desktop package/download path, and verify dev runtime health
 - [ ] 7.5 Record dev verification and deployment notes, archive the OpenSpec change, and remove obsolete worktrees/branches

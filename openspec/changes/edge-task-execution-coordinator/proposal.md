@@ -28,6 +28,7 @@
 
 - `aidcp-edge`: protocol 定义、`EdgeClient` 路由、`BrowseSession` 命令队列、发布命令入口、主进程装配及新增任务协调器和回归测试。
 - `aidcp-cloud`: protocol 定义、任务租约客户端、发布派发器/命令序列器、评论调度器/边缘步骤、浏览接管恢复逻辑、server 装配及协议/集成测试。
+- `aidcp-console`: 将桌面客户端下载入口更新到包含本协议实现的 0.3.5 安装包。
 - `aidcp`: `docs/protocol.md`、架构说明、OpenSpec 变更与验收记录。
 - 兼容性：属于 protocol v2 的增量变更，要求 edge/cloud 同步发布；旧 edge 不会回 `task.acquired`，云端应超时并诚实拒绝任务，而不是回退到无租约写页面。
 - 风险：评论 commit 前页面上下文可能已变化，因此必须按稳定 `noteId` 重新打开并复检；已经成功提交发布后仍沿用“不得因后续超时翻成失败”的既有红线。
