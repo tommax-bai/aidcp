@@ -2,17 +2,17 @@
 
 ## 1. Preconditions
 
-- [ ] 1.1 Ground on `origin/main` (control repo) and `aidcp-cloud` / `aidcp-edge` `master`; rebase the worktree branch onto the latest default branches before starting.
-- [ ] 1.2 Confirm `ColdStartPlanner` still exists as dead code (Day1–7 bands + `quotaOverride(createdAt)`) and that `effectiveQuotas()` currently ignores `created_at`; capture the exact `file:line` before wiring so the connection is surgical.
-- [ ] 1.3 Confirm scope boundaries with the design: this change does NOT modify `protocol.ts` (either copy), does NOT add any `RISK_ACTIONS`, and does NOT change the risk state-machine transition table. Any task that would require these is out of scope.
-- [ ] 1.4 Confirm `accounts.platform` is populated for Facebook accounts (from the scheduled-comment handshake insert-time provisioning) so platform-selected cold-start curves resolve correctly.
+- [x] 1.1 Ground on `origin/main` (control repo) and `aidcp-cloud` / `aidcp-edge` `master`; rebase the worktree branch onto the latest default branches before starting. <!-- grounded on cloud master 8a35cbe; rebase-before-merge deferred to §7/§8 integration -->
+- [x] 1.2 Confirm `ColdStartPlanner` still exists as dead code (Day1–7 bands + `quotaOverride(createdAt)`) and that `effectiveQuotas()` currently ignores `created_at`; capture the exact `file:line` before wiring so the connection is surgical. <!-- confirmed: cold-start-planner.ts dead (no runtime consumer); risk-controller.ts effectiveQuotas ignored created_at pre-change -->
+- [x] 1.3 Confirm scope boundaries with the design: this change does NOT modify `protocol.ts` (either copy), does NOT add any `RISK_ACTIONS`, and does NOT change the risk state-machine transition table. Any task that would require these is out of scope. <!-- honored: no protocol / RISK_ACTIONS / transition-table edits in d606d45 -->
+- [x] 1.4 Confirm `accounts.platform` is populated for Facebook accounts (from the scheduled-comment handshake insert-time provisioning) so platform-selected cold-start curves resolve correctly. <!-- mechanism = ensureAccount insert-time platform (account-store.ts); getNurtureMeta reads created_at+platform; missing → safe no-clamp fallback; live-data check at ol rollout -->
 
 ## 2. aidcp-cloud — cold-start quota wiring
 
-- [ ] 2.1 Wire `effectiveQuotas()` to compute the cold-start age quota from `created_at` via `ColdStartPlanner` and clamp with `min(ageQuota(created_at), riskScaledQuota)` (min semantics: age ramp and risk backoff stack, neither overrides the other).
-- [ ] 2.2 Select the cold-start curve by `accounts.platform`; add a strictly-more-conservative Facebook curve (D1–3 browse + minimal likes, comments from D3, publish/group-join from D5) while leaving the xiaohongshu curve byte-for-byte unchanged.
-- [ ] 2.3 Add an env knob for the cold-start ramp (default on, safe-direction); when off, `effectiveQuotas()` returns the exact pre-change risk-scaled values (zero regression).
-- [ ] 2.4 Unit tests: Day 1 clamped to cold-start band (not `normal` full); `warned` + young takes `min` (both in force); graduated account unchanged; ramp knob off = zero regression; Facebook Day 1 has zero comment/publish quota; Facebook Day 5 opens small publish/group-join; xiaohongshu curve unchanged.
+- [x] 2.1 Wire `effectiveQuotas()` to compute the cold-start age quota from `created_at` via `ColdStartPlanner` and clamp with `min(ageQuota(created_at), riskScaledQuota)` (min semantics: age ramp and risk backoff stack, neither overrides the other). <!-- aidcp-cloud d606d45: applyColdStartClamp + minWindowQuotas; deterministic coldStartDailyCap (upper-bound, no random flicker); createdAt/platform threaded via registry nurtureMetaResolver + account-store getNurtureMeta -->
+- [x] 2.2 Select the cold-start curve by `accounts.platform`; add a strictly-more-conservative Facebook curve (D1–3 browse + minimal likes, comments from D3, publish/group-join from D5) while leaving the xiaohongshu curve byte-for-byte unchanged. <!-- aidcp-cloud d606d45: FB_COLD_START_PLANS; coldStartDailyCap picks FB curve when platform==='facebook'; xhs COLD_START_PLANS untouched -->
+- [x] 2.3 Add an env knob for the cold-start ramp (default on, safe-direction); when off, `effectiveQuotas()` returns the exact pre-change risk-scaled values (zero regression). <!-- aidcp-cloud d606d45: AIDCP_COLDSTART_RAMP !== 'false' (default on); coldStartRampEnabled=false short-circuits applyColdStartClamp -->
+- [x] 2.4 Unit tests: Day 1 clamped to cold-start band (not `normal` full); `warned` + young takes `min` (both in force); graduated account unchanged; ramp knob off = zero regression; Facebook Day 1 has zero comment/publish quota; Facebook Day 5 opens small publish/group-join; xiaohongshu curve unchanged. <!-- aidcp-cloud d606d45: test/risk-cold-start-clamp.test.ts 9 cases green -->
 
 ## 3. aidcp-cloud — Facebook throttling-signal backoff
 
@@ -40,7 +40,7 @@
 ## 7. Verification
 
 - [ ] 7.1 aidcp-cloud: `npm run test:acceptance` → `npm test` → `npm run typecheck`, all green; the `AC-RISK-*` red lines MUST pass (never self-harm; a denied `record` returns false).
-- [ ] 7.2 Prove Day-1 clamp with a stub-injected `created_at` (no real machine): fixture accounts at nurture-day 1/5/graduated assert the clamped bands and platform-curve differences.
+- [x] 7.2 Prove Day-1 clamp with a stub-injected `created_at` (no real machine): fixture accounts at nurture-day 1/5/graduated assert the clamped bands and platform-curve differences. <!-- aidcp-cloud d606d45: createdAtForDay fixtures in risk-cold-start-clamp.test.ts; typecheck + acceptance 47 + full 1754 green -->
 - [ ] 7.3 Prove throttling backoff with a stub-injected Facebook soft-block signal: assert migration to `restricted` and that the edge cannot self-set the final state.
 
 ## 8. Rollout (isolation window → ol)
