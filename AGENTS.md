@@ -68,6 +68,15 @@ This file is the Codex-facing mapping of `CLAUDE.md`. Keep `CLAUDE.md` as the le
 - On deployment failure, roll back. Do not improvise against production.
 - Deployment must come from a clean eligible checkout: default branch/main checkout for `dev`, release branch checkout for `ol`, never an arbitrary dirty shared worktree or feature worktree.
 
+### Edge desktop packaging red-lines (Electron / asar)
+
+> This bug class is **invisible to `electron .`, `npm run typecheck`, and unit tests — it only surfaces in the packaged build**, so it tends to reach operator machines before anyone notices. Read before touching any process launch under `aidcp-edge/src/electron/**`; authoritative detail lives in `aidcp-edge/CLAUDE.md`.
+
+- **A `spawn` `cwd` (or entry path) must never resolve inside `app.asar`.** In a packaged build (electron-builder defaults to `asar:true`), `app.getAppPath()` returns `.../Contents/Resources/app.asar`, which is a FILE, not a directory. Passing it as a `child_process.spawn` cwd makes macOS throw `spawn ENOTDIR`, so the edge core child never starts and the fingerprint browser never launches. Local dev is unaffected because `appRoot` is a real directory — this is a packaged-only regression.
+- **Guard:** the core spawn uses `appRoot.endsWith('.asar') ? path.dirname(appRoot) : appRoot` (`dirname` = `Contents/Resources`, the historically-working value). Any new child-process launch must apply the same guard; sites that pass no `cwd` (inheriting the main-process cwd, never asar) are safe.
+- **Packaging fixes must be forward-ported to `master`.** This fix first landed on branch `codex/edge-macos-developer-id-signing` (`20d3784`) but was never merged to master, so `0.3.5` shipped the regression again (re-fixed on edge master `3f578b9`, version bumped to `0.3.6`). A packaging fix that lives only on a feature branch recurs the moment master ships.
+- **Before releasing, run the packaged artifact once on the build machine** (start the compiled core, confirm it reaches cloud connect / the AdsPower call) instead of discovering cwd/asar regressions on the operator machine. Desktop release flow: `aidcp-edge/docs/release-desktop.md`.
+
 ## 6. Git, Communication, Security
 
 - Preserve user and other-session changes. Do not revert unrelated dirty files.
