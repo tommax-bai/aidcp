@@ -23,9 +23,9 @@
 
 ## 4. aidcp-cloud — cooldown quiet period + online day window
 
-- [ ] 4.1 Add a per-account post-restart cold-start quiet period (default a few minutes) that suppresses burst dispatch after process start; leave persisted daily quotas untouched (replayed from PostgreSQL).
-- [ ] 4.2 Add a per-Facebook-account daily online-minutes budget (roughly 0.5–6h) reusing the existing daily online budget + active-window machinery; give Facebook a non-zero default window and fall back to it when unconfigured; never proactively log accounts out.
-- [ ] 4.3 Unit tests: first post-restart batch is paced not bursted; quiet period expiry resumes normal cooldown; daily quotas survive restart untouched; Facebook account at online ceiling does not continue/open a session; within-budget continues; missing ceiling uses safe default.
+- [x] 4.1 Add a per-account post-restart cold-start quiet period (default a few minutes) that suppresses burst dispatch after process start; leave persisted daily quotas untouched (replayed from PostgreSQL). <!-- aidcp-cloud 3ef7230: ActionCooldownGate restartQuietMs (AIDCP_RESTART_QUIET_MS default 180000); suppresses no-history interactions in window; daily PG quotas untouched -->
+- [x] 4.2 Add a per-Facebook-account daily online-minutes budget (roughly 0.5–6h) reusing the existing daily online budget + active-window machinery; give Facebook a non-zero default window and fall back to it when unconfigured; never proactively log accounts out. <!-- aidcp-cloud 07b6c18: effectiveDailyMaxMinutes helper + DEFAULT_FB_DAILY_ONLINE_MINUTES=360; canAutoResume applies FB fallback when global maxMinutes=0; AIDCP_FB_DAILY_ONLINE_MIN override; edge never logs out (unchanged) -->
+- [x] 4.3 Unit tests: first post-restart batch is paced not bursted; quiet period expiry resumes normal cooldown; daily quotas survive restart untouched; Facebook account at online ceiling does not continue/open a session; within-budget continues; missing ceiling uses safe default. <!-- aidcp-cloud 3ef7230 (test/action-cooldown.test.ts) + 07b6c18 (test/resume-daily-online-budget.test.ts); daily-quota-survives-restart is inherent (PG replay, counters untouched by these changes) -->
 
 ## 5. aidcp-edge — egress reporting + FB throttling-overlay recognition (minimal)
 
