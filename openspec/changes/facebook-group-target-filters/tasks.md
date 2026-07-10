@@ -27,10 +27,12 @@
 ## 3. Validation and Delivery
 
 - [x] 3.1 Run focused cloud tests and `npm run typecheck` in `aidcp-cloud`.
-  <!-- Validation: pre-rebase npm test ran full suite because the package script includes test/**/*.test.ts: 1707 pass, 0 fail. After rebase: npx tsx --test test/comment-agent/facebook-group-store.test.ts test/panel-server.test.ts passed 28 tests; npm run typecheck pass. -->
+  <!-- Validation: pre-rebase npm test ran full suite because the package script includes test/**/*.test.ts: 1707 pass, 0 fail. After rebase: npx tsx --test test/comment-agent/facebook-group-store.test.ts test/panel-server.test.ts passed 28 tests; npm run typecheck pass. Final master deploy gate: npm test pass 1710 tests, npm run typecheck pass. -->
 - [x] 3.2 Run focused console tests and `npm run typecheck` in `aidcp-console`.
-  <!-- Validation: npm test pass 74 tests with 1 skipped before rebase. After rebase: npm test -- src/pages/facebookGroupImportParser.test.ts src/pages/facebookGroupsQuery.test.ts pass; npm run typecheck pass; npm run build pass. -->
+  <!-- Validation: npm test pass 74 tests with 1 skipped before rebase. After rebase: npm test -- src/pages/facebookGroupImportParser.test.ts src/pages/facebookGroupsQuery.test.ts pass; npm run typecheck pass; npm run build pass. Final master deploy gate: npm run typecheck pass; npm run build pass. -->
 - [x] 3.3 Run `openspec validate facebook-group-target-filters --strict`.
   <!-- Validation: passed before implementation; final validation rerun after task update. -->
-- [ ] 3.4 Commit and push the control, cloud, and console branches.
-- [ ] 3.5 Deploy/publish to dev after validation, or record why deployment was intentionally skipped.
+- [x] 3.4 Commit and push the control, cloud, and console branches.
+  <!-- Delivery: aidcp-cloud master d28a9bc2949a2b632f53861e0dc113daa93b3654 contains feature commit 1b174dee6f906015277aea9c2f09469946c32e64; aidcp-console master 94e59d687dccf05e51e5c2488a32f76791d1dc1e; aidcp main fe05a3f43cbb8622750b2ca4fd109232729d3846 pushed before deployment. -->
+- [x] 3.5 Deploy/publish to dev after validation, or record why deployment was intentionally skipped.
+  <!-- Dev deploy 20260710-112602: scripts/deploy-target dev --check passed for 121.89.85.150; backed up /opt/aidcp/cloud and .env; rsync deployed aidcp-cloud master to /opt/aidcp/cloud and aidcp-console dist to /opt/aidcp/console; restarted aidcp-cloud.service. Health checks: service active, 8787/8090/8088 listening, /api/health ok, 8787 returns HTTP 426 as expected, console returns HTTP 200, PostgreSQL select 1 ok, Feishu WSClient onReady observed, remote DB has region/park/direction columns. -->
