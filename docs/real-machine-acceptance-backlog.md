@@ -726,3 +726,16 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] 56.6 pending/问卷先于结构（回归）— 审批门群：Join→Pending 即便渲染了 composer，判 pending 不判 joined。
 
 > **说明**：edge `1442783`（`join-executor.ts` composerPresent/joinCtaPresent 观测 + `structuralJoinConfirmed` 跃迁 + 删 observe/pre-click 结构 + isDecisiveObservation）需运营机 pull master + 重建安装包后生效；cloud `6ce347e`（`facebook-group-join-judge.ts` 跃迁主判 + 删 pre-click 结构 + LLM 提示 / `facebook-group-join-scheduler.ts` 透传 pre 观测）已部署 dev（备份 `cloud.bak.20260711-162224`、外科 rsync 2 文件 md5 核对、healthcheck 全绿：active/8787/飞书长连）。两轮对抗评审：首轮揪出 fail-open false-positive（初版 `composerPresent && !joinCtaPresent` 未覆盖语种非成员误判 + observe 期无点击 markJoined 污染账本），已改跃迁 + 删 observe/pre-click 结构；二轮复验 gapClosed=true。真机测试账号只用 tom 分组。
+
+## 簇 57 — edge-adspower-name-follows-nickname 真机验收（客户端左栏环境名跟随真实账号昵称：建号不写死模板名 + 登录后渐进改名 + 显示层优先昵称，登记于 2026-07-11；edge master `7b3cea4` 已 land、需运营机 pull + 重建生效，edge-only 无 ECS 部署）
+
+**背景**：`edge-env-name-live-sync`（`1d2620a`）新增的 reconcileRosterNames 把左栏花名册名回填成 AdsPower live 名（= 客户端自建 profile 一直用的设备模板 key），而左栏取名优先级里花名册名排在真实登录昵称之前 → 昵称被模板名遮蔽（左栏全变 `win11-intel` 之类）。本 change 让 AdsPower 环境名本身跟随昵称（单一真源）+ 显示层兜底。edge-only、无协议 / 云端 / DB 改动。改 `ads-write-api.cjs`（新增 renameProfile 两键封装）、`ads-create-flow.cjs`（建号不下发模板名）、`main.cjs`（身份事件渐进改名 maybeRenameEnvToNickname）、`ui-logic.js`/`renderer.js`（显示优先昵称）。源码契约测试已锁两键改名 body / 建号空名不带模板名 / 显示优先级三态（全量 edge 1009 + acceptance 16 + typecheck 绿）。两项外部 AdsPower API 假设桩验不了、须真机核（本簇 57.1 / 57.2）。
+
+- [ ] 57.1 AdsPower `user/update` 带 name 改名生效（核心外部假设）— 对 tom 分组一个环境，登录读出真实昵称后核 AdsPower 客户端里该环境名变昵称、下次 `user/list` 读回也为昵称；确认 `user/update` 的 name 字段确被 AdsPower 接受生效（保守假设字段名为 `name`，若不生效看本簇诚实降级是否兜住）。
+- [ ] 57.2 建号不传 name 时 AdsPower 默认命名形态（核心外部假设）— 新建一个环境（不走 FB 导入），核 AdsPower 给它自动起的默认名形态（不再是 `win11-intel` 模板名）；确认左栏该环境登录前显示不呈现设备模板名（由末4位/默认名兜底）。
+- [ ] 57.3 存量环境渐进改名到位 — 一批既有环境名仍是模板名，各自下次登录读出昵称后左栏 + AdsPower 名逐个变昵称；确认是渐进（随运营）而非一次性批量，且不依赖云端。
+- [ ] 57.4 改名失败诚实降级不阻塞（红线）— 制造改名写失败（如临时断 AdsPower 服务 / 环境正被占用 `user/update` 被拒）：该环境保持原名、不假成功、浏览闭环不中断、不重试风暴；下次身份事件再试。
+- [ ] 57.5 幂等去抖不重复写 — 名已等于昵称的环境反复触发身份事件，确认不再发 `user/update`（日志无重复改名）。
+- [ ] 57.6 显示层兜底（空窗 + 写失败）— 刚建好未改名 / 改名写失败期间，左栏仍显示真实昵称（已读到时）而非模板名；实时名回填把花名册名刷成模板名也不遮蔽已知昵称。
+
+> **说明**：edge `7b3cea4`（renameProfile 两键封装 + 建号不写死模板名 + 身份事件 `maybeRenameEnvToNickname` 渐进改名 + `railDisplayName` 纯函数优先真实昵称）需运营机 pull master + 重建安装包后生效；edge-only 无 ECS 部署。写客户端 M7 红线由「`user/update` 仅改代理」放宽为「改代理或改名两个各两键封装」，回归断言分别锁两个封装的 body 键集（放行 update ≠ 打开整张写面）。真机测试账号只用 tom 分组（见 memory real-machine-test-accounts）。
