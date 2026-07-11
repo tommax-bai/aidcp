@@ -649,3 +649,17 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **并行两 GUI 各自独立** — 配合 `edge-multi-instance-isolation`：两个 GUI 各设不同 `AIDCP_USER_DATA_DIR`，各自在界面选不同云端（甲 dev、乙 ol），两者的云端选择互不影响（各自 settings.json）。
 
 > **说明**：edge-only、无 ECS 部署；源码契约测试已锁「映射两地址 / 受 fromSelection 守卫的覆盖 / **覆盖在 env 合并之后** / 留空零注入 / custom 非法降级 / snapshot 带 cloudEnv / restart-all IPC」（`test/electron/cloud-env-selector.test.ts`，980/0）。生效需运营机 pull master `4e69690` + 重建安装包。与 `edge-multi-instance-isolation`（簇 46）正交互补：多实例并行仍靠两 GUI + 独立数据目录，本 change 省去手敲 `AIDCP_CLOUD_URL`。
+
+## 簇 51 — facebook-coverage-relax-and-keyword-space 真机验收（覆盖模式放开时限兜底 + 搜索词保留空格，登记于 2026-07-11；cloud master `d2df859` + console master `6704e99` 已部署 dev）
+
+**前置**：覆盖模式只对在 `AIDCP_FB_GROUP_COVERAGE_ACCOUNTS` 白名单里的账号生效——**dev 上该白名单当前为空**，FB 评论走「配置容器模式」，放开时限兜底不触发。核第 1 组前需先把测试账号加入该白名单（env）并让其有若干加入群，全部落在冷却/预热窗内。搜索词第 2 组与覆盖模式无关、任何 FB 账号可核。用 tom 分组分身。全量单测已绿（cloud 1802 + acceptance 47 + typecheck；console 91 + typecheck）。
+**背景**：① 覆盖模式选群原本要求加入群满 24h 预热 + 距上次评论满 72h 冷却，全落空则这轮不评（账号闲置）。既然 FB 评论现已一律走飞书人审，本 change 把时限从「硬跳过」降级为「无合规群时放开时限兜底选一个（最久没评优先）+ 审核卡标注」，由人把关；`AIDCP_FB_GROUP_COVERAGE_RELAX=false` 可退回严格。② 管理后台搜索词输入原本按空格把「手冲 咖啡」切成两个词（AntD tags tokenSeparators 含空格），本 change 去掉空格分隔、多词短语算一个搜索词（后端本就保留内部空格）。**红线**：放开时限只放开单群时限、不放开账号日上限、不绕人审；relaxed pick 是真实、诚实标注、经人审的评论，绝不静默假成功；账号零加入群仍诚实 no-op。
+
+- [ ] **放开时限兜底触发 + 审核卡标注（红线）** — 覆盖白名单账号的所有加入群都在冷却/预热窗内时，排期评论仍选出一个「最久没评」的加入群，飞书审核卡标题带「⚠️ 未满足冷却/预热期，已放开时限选群，请人工确认」；人点通过后正常真发、人点不发则不发。核卡标题文案 + 选中的群确为最久没评的那个。
+- [ ] **正常约束优先（非 relaxed 不标注）** — 存在至少一个满足 24h 预热 + 72h 冷却的加入群时，走正常选群、审核卡标题**不带**放开时限警示（零回归）。
+- [ ] **日上限仍生效** — relaxed 兜底下账号当日已达 FB 评论日上限（默认 2）→ 不再发（quota_denied），放开时限绝不抬高账号日发量。
+- [ ] **kill switch 退回严格** — 设 `AIDCP_FB_GROUP_COVERAGE_RELAX=false` 后，所有加入群都在窗内 → 这轮诚实 no_targets、不评（恢复本 change 前行为）。
+- [ ] **零加入群仍诚实 no-op** — 覆盖账号无任何 `status='joined'` 群 → 正常与 relaxed 两级都空、诚实 no-op，绝不伪造目标或盲发。
+- [ ] **搜索词保留内部空格（console→edge 端到端）** — 管理后台「FB配置」关键词框输入「手冲 咖啡」回车 → 存为**一个**关键词（不被切成「手冲」「咖啡」两个）；保存后云端 `account_facebook_comment_config.keywords` 该项含空格；FB 评论时边缘按该整串（含空格）站内搜索、非拆词。逗号仍分隔多个关键词。
+
+> **说明**：cloud（覆盖选群 + 审核卡标注）+ console（关键词输入）双仓、已部署 dev；无协议 / 边端 / DB schema 改动。源码契约测试已锁「coverageCandidates relaxed 去三时限闸留 status=joined+LRU 排序」「两级选群 + relaxed 标记」「审核卡标题按 relaxed 分支」「relaxed 仍受日上限」（cloud `facebook-group-store.test.ts` / `comment-scheduler.test.ts`，1802/0）与「关键词框 tokenSeparators 去空格」（console，91/0）。搜索词多词行为本身未做单测——AntD tags 的 CJK 分词在 jsdom 下靠 fireEvent 无法稳定复现，故转本簇真机核。覆盖白名单空时本 change 全程 latent。
