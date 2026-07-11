@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Version-controlled git hook — installed into .git/hooks by scripts/install-git-hooks.
+# Guard: warn loudly if the CANONICAL aidcp checkout leaves `main`.
+# Canonical = the main worktree; linked worktrees (.../worktrees/...) stay silent.
+# Rationale + restore steps: CLAUDE.md §7 / AGENTS.md §8.
+[ "$3" = "1" ] || exit 0            # $3==1 => branch checkout (ignore file checkouts)
+case "$(git rev-parse --git-dir 2>/dev/null)" in
+  */worktrees/*) exit 0 ;;          # a linked worktree, not the canonical checkout -> silent
+esac
+br="$(git symbolic-ref --short -q HEAD 2>/dev/null || echo DETACHED)"
+[ "$br" = "main" ] && exit 0
+cat >&2 <<EOF
+
+################################################################################
+#  ⚠  规范主 checkout（~/codes/aidcp）离开了 main —— 当前分支: ${br}
+#     铁律：主 checkout 永远停 main；change 开发用 worktree，别在主目录切分支。
+#     （CLAUDE.md §7 / AGENTS.md §8）
+#     还原：git checkout main && git merge --ff-only origin/main
+################################################################################
+
+EOF
+exit 0

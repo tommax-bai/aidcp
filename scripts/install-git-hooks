@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Install repo-tracked git hooks from scripts/git-hooks/ into this checkout's
+# git hooks dir. ADDITIVE — copies only the tracked hooks, never removes or
+# overwrites unrelated existing hooks (e.g. a corporate pre-commit scanner).
+#
+# Run ONCE per fresh clone. Idempotent. Worktrees share the common hooks dir,
+# so running it once in any checkout of this repo covers all its worktrees.
+# (Git does not auto-install hooks on clone — a security design, not a bug.)
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+hooks_dir="$(cd "$(git rev-parse --git-common-dir)" && pwd)/hooks"   # common dir -> shared by all worktrees
+src="$repo_root/scripts/git-hooks"
+
+[ -d "$src" ] || { echo "ERROR: $src not found — run from inside the aidcp repo." >&2; exit 1; }
+mkdir -p "$hooks_dir"
+
+for f in "$src"/*; do
+  [ -f "$f" ] || continue
+  name="$(basename "$f")"
+  cp "$f" "$hooks_dir/$name"
+  chmod +x "$hooks_dir/$name"
+  echo "installed hook: $hooks_dir/$name"
+done
+
+echo "done. (existing unrelated hooks in $hooks_dir were left untouched.)"
