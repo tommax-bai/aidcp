@@ -102,7 +102,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 | **PgAnchorCache / ConceptStore / BotChatStore** | `src/cache/*.ts` | PG 锚点主缓存 + 暂存晋升、概念池、Bot 群绑定 |
 | **AccountStateManager** | `src/account-state.ts` | 账号 active/paused 内存状态（暂停时跳过笔记处理） |
 | **EdgeCloudServer / DefaultMessageHandler / command-bridge** | `src/comm/{ws-server,handler,command-bridge}.ts` | WS 服务端 + 消息路由 + `EdgeCommand→Envelope` 翻译 |
-| protocol | `src/comm/protocol.ts` | 边-云消息类型（`PROTOCOL_VERSION=2`，`MessageType` 穷举 70 个，含 `edge.task.*`、`notification.*` 与发布指令/回执）+ 信封 + 解析/校验 |
+| protocol | `src/comm/protocol.ts` | 边-云消息类型（`PROTOCOL_VERSION=2`，`MessageType` 穷举 72 个，含 `edge.task.*`、`notification.*` 与发布指令/回执）+ 信封 + 解析/校验 |
 | **Panel API（管理后台后端）** | `src/panel/{panel-server,jwt,auth,panel-ws,panel-store}.ts` | console 前端的进程内后端：HTTP `/api` + JWT 鉴权 + 浏览器 WS；独立端口、与 8787 边-云 ws 物理隔离 |
 
 ### 2.2 边缘端 aidcp-edge

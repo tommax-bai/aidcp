@@ -8,7 +8,7 @@
 
 - [x] 1.1 cloud+edge 两份 `src/comm/protocol.ts` 逐字一致：`SearchExecutePayload` 加可选 `sort`（如 `most_collected`）与 `timeWindow`（如 `one_day`）；搜索结果卡片 payload 加 `collectCount`。验证：两份 `protocol-contract.test.ts` 的 `Record<MessageType,true>` 穷举与计数断言更新且 `npm run typecheck` 绿。 <!-- cloud aaa5500 / edge 28db43a：SearchExecutePayload +sort/timeWindow（两份逐字一致）。**collectCount 早已在 PageCardsPayload.cards 上**（非协议缺口，仅 edge reportVisibleCards 硬编码 0→改在 task 5.2）。只加可选字段、无新 MessageType→AC-PROTO 计数无需改；cloud+edge typecheck 净、AC-PROTO 两侧 5/5 -->
 - [x] 1.2 `aidcp-cloud/src/comm/command-bridge.ts` 搜索动作映射透传新参数；如新增 cloud→edge 主动命令则补 `aidcp-edge/src/client/edge-client.ts` 主动命令路由白名单（否则静默丢弃）。验证：`npm run test:acceptance` 的 `AC-PROTO-*` 全过。 <!-- command-bridge 'search'→search.execute **本就透传 command.params**（含新 sort/timeWindow，无需改）。命令路径不经 command-bridge——edge-steps 直接 makeEnvelope('search.execute',…)（cloud e822856），search.execute 是既有已路由命令、非新主动命令，**edge-client 白名单无需改**。AC-PROTO 两侧 5/5 -->
-- [ ] 1.3 `docs/protocol.md` 头部消息计数与 §2 表同步。验证：人工核对计数与新字段在表内。
+- [x] 1.3 `docs/protocol.md` 头部消息计数与 §2 表同步。验证：人工核对计数与新字段在表内。 <!-- 2026-07-11 清账批：核对 MessageType 穷举=72（两端一致）、protocol.md 头部计数 72 正确、§2 表 72 行与代码逐一匹配（无缺无余）；search.execute 无新 MessageType（仅可选字段），已把 sort/timeWindow 两可选字段补进 §2 的 search.execute payload 块。 -->
 
 ## 2. aidcp-cloud — 飞书 /comment 命令接入
 

@@ -4,11 +4,13 @@
 
 本文档用于盘点三个仓库之间的职责关系，以及基于已核验代码结果的真实实现进度。内容仅记录当前确认事实，不对未证实能力做扩展性表述。
 
+> ⚠️ **本文 §2/§3/§4 为 2026-06-11 快照，多处已滞后近半年**（openspec 已跑过多轮 change，飞书 / 发布 / 风控 / 多环境 / Facebook 等能力远超此处描述）。**权威现状以 `openspec list`（活跃 change）/ `openspec list --specs`（已合并 spec）/ CLAUDE.md 为准**。已知已过时项：消息类型 56→**72**、角色 约32→**RoleName 穷举 43**、WS 重连状态机 / 多账号编排 / 端到端真机发布均已**完成并归档**（详见下方各行标注）。
+>
 > **本次盘点更新（2026-06-11）**：关联代码仓经过数次重构，本文已据**当前代码结构**重新核验。
-> 重点变化：①云端从"单线 Planner→PlanStep[]"重构为**事件驱动多 Agent**（`RoleDispatcher` + 约 32 角色 + `EventBus`），
+> 重点变化：①云端从"单线 Planner→PlanStep[]"重构为**事件驱动多 Agent**（`RoleDispatcher` + `RoleName` 穷举 43 角色 + `EventBus`），
 > 旧文件 `session-orchestrator.ts`/`state-machine.ts`/`engagement-decider.ts`/`concept-extractor.ts`/`src/blackboard/`/`src/publish/` **已不存在**；
 > ②`RiskController` 风控状态机已**完整实装**（不再是"仅设计"）；③飞书 Bot 已推进到 `/bind` + 自动记群 + 审批卡片信号；
-> ④边缘端 publish flow（`flows/publish-post.ts`）已实现，发布审批链路打通；⑤协议已升级到 **v2（56 个消息类型）**，
+> ④边缘端 publish flow（`flows/publish-post.ts`）已实现，发布审批链路打通；⑤协议已升级到 **v2（72 个消息类型，2026-07-11 复核）**，
 > `docs/protocol.md` 已同步。本次核验基于代码结构与源码阅读，**未重新执行 `npm test`**，测试数字以各仓 CI 为准。
 
 ## 1. 三项目关系
@@ -52,8 +54,8 @@ flowchart LR
 | stealth 注入 | aidcp-edge | 已实现，有测试 | `aidcp-edge/src/cdp/stealth-injector.ts` |
 | **边缘 publish flow** | aidcp-edge | **已实现**（推翻旧盘点"尚未看到"）；发布六步 + 审批信号等待 | `aidcp-edge/src/flows/publish-post.ts`、`src/publish/approval-gate.ts` |
 | Electron 打包 | aidcp-edge | 已实现；系统托盘 + Chrome 网关 + 控制面板 UI | `aidcp-edge/src/electron/`（main/preload/chrome-launcher.cjs + renderer/） |
-| 协议层 `protocol` | aidcp-cloud | 已实现 **v2（56 个消息类型，以 `MessageType` 穷举为准）**；`docs/protocol.md` 已同步 | `aidcp-cloud/src/comm/protocol.ts`（边侧 `aidcp-edge/src/comm/protocol.ts` 为投影） |
-| **事件驱动编排** | aidcp-cloud | **已实现（重构）**；`RoleDispatcher` 注册约 32 角色（另有评论点赞 2 角色 / 概念抽取 1 角色按开关条件注册；角色名以 `src/event-bus/types.ts` 的 `RoleName` 穷举为准），`EventBus` 解耦，`SessionContext` 存态 | `aidcp-cloud/src/orchestrator/role-dispatcher.ts`、`src/agents/*.ts`、`src/event-bus/`、`src/comm/command-bridge.ts` |
+| 协议层 `protocol` | aidcp-cloud | 已实现 **v2（72 个消息类型，以 `MessageType` 穷举为准，2026-07-11 复核）**；`docs/protocol.md` 已同步 | `aidcp-cloud/src/comm/protocol.ts`（边侧 `aidcp-edge/src/comm/protocol.ts` 为投影） |
+| **事件驱动编排** | aidcp-cloud | **已实现（重构）**；`RoleDispatcher` 运行时注册约 37 角色（`RoleName` 穷举现 43 项，含命令式 / 按开关条件注册的角色如评论点赞 / 概念抽取 / 精选准入 / FB 加群判定等；准确数以 `src/event-bus/types.ts` 的 `RoleName` + `role-dispatcher.ts` 注册为准），`EventBus` 解耦，`SessionContext` 存态 | `aidcp-cloud/src/orchestrator/role-dispatcher.ts`、`src/agents/*.ts`、`src/event-bus/`、`src/comm/command-bridge.ts` |
 | Planner（规则 + LLM 兜底） | aidcp-cloud | 已实现；服务定向"一句话目标"场景（浏览闭环改走角色驱动） | `aidcp-cloud/src/planner/simple-planner.ts` |
 | **风控 RiskController + 状态机** | aidcp-cloud | **已实现**（旧盘点标"仅设计"，已过时）；状态机 `normal→warned→restricted→frozen` + 分钟/小时滑窗 + 自然日配额 + 冷启动 + 时间窗 + 会话预算 + 去重 + PG 持久化 | `aidcp-cloud/src/risk/`（risk-controller/risk-state-machine/sliding-window-counter/quotas/cold-start-planner/time-scheduler/session-budget/interaction-dedup/pg-risk-store） |
 | 概念池 + PG anchor cache + Bot 群存储 | aidcp-cloud | 已实现 | `aidcp-cloud/src/cache/`（concept-store/pg-anchor-cache/bot-chat-store） |
@@ -65,25 +67,25 @@ flowchart LR
 
 > 旧盘点列出的四项不一致，本次更新已逐条处理：
 
-1. **协议文档落后** → **已修复**。`docs/protocol.md` 已从 v1 重写为 v2，补齐浏览编排、角色驱动指令、结构化上报、风控预算、发布审批、通知巡视等共 56 个消息类型（以 `protocol.ts` 的 `MessageType` 穷举为准）。
+1. **协议文档落后** → **已修复**。`docs/protocol.md` 已从 v1 重写为 v2，补齐浏览编排、角色驱动指令、结构化上报、风控预算、发布审批、通知巡视等共 72 个消息类型（以 `protocol.ts` 的 `MessageType` 穷举为准，2026-07-11 复核）。
 2. **飞书被低估** → **已修正**。本文与 `product-overview.md` 已将飞书从 planned 改为"部分实现"（`/bind`/记群/审批卡片已落地；多账号归属、完整审批闭环待续）。
 3. **架构文档停留在单体 Planner** → **已修复**。`docs/architecture.md` 已重画为事件驱动多 Agent，并补齐边缘端 `browse`/`humanize`/`flows`/`electron`。
 4. **风控仅设计** → **已修正**。`RiskController` 全套已实装，相关文档状态从 `designed` 改为 `implemented`。
 
 仍需留意的谨慎表述：
-- **端到端真机发布**尚未最终证实（云端管道与边缘 flow 都已具备，真机联调收尾见 `handoff-2026-06-05.md` 待办 A）。
-- **WS 重连状态机**仍有 3 个已知 bug（见 handoff 待办 C），换机后 stash 若未迁移可能已丢失。
+- ~~**端到端真机发布**尚未最终证实~~ → **已完成**（多个发布类 change 已归档 + 部署 dev，真机发布多次跑通，见 `docs/real-machine-acceptance-backlog.md` 与 archive 内发布类 change）。
+- ~~**WS 重连状态机**仍有 3 个已知 bug~~ → **已修复归档**（change `edge-ws-auto-reconnect`：sessionId 更新 / 断连补发 / 初连重试均已落地）。
 
 ## 4. 下一步可实现功能候选（按优先级）
 
 | 优先级 | 候选项 | 说明 |
 | --- | --- | --- |
 | P0 | 工作流 A 真机联调收尾：edge 连 ECS、飞书授权、`AIDCP_REAL_PUBLISH=true` 真发一条 | 验证端到端发布闭环（见 handoff 待办 A） |
-| P0 | WS 重连状态机修复（sessionId 未更新 / 断连补发只发 1 条 / 初连重试超时） | 见 handoff 待办 C；影响长跑稳定性 |
+| ~~P0~~ ✅ | WS 重连状态机修复（sessionId 未更新 / 断连补发只发 1 条 / 初连重试超时） | **已完成归档**（change `edge-ws-auto-reconnect`） |
 | P1 | 飞书从"部分实现"推进到完整审批闭环 + 多账号归属 | 已有 `/bind`、记群、卡片信号；补审批状态机与账号归属 |
 | P1 | 三仓 `ARCHITECTURE.md` / `DECISIONS.md` 防健忘文档 | 见 handoff 待办 B（尚未开始） |
 | P2 | 风控状态机接入真实平台信号（当前已实装逻辑，待接入封号/限流回执驱动 confirmed/fatal） | 让状态迁移由真实信号而非仅配额触发 |
-| P2 | 多账号编排（进程/端口/profile 隔离 + 账号梯队） | 进入 Phase 2 的前置 |
+| ~~P2~~ ✅ | 多账号编排（进程/端口/profile 隔离 + 账号梯队） | **已完成归档**（changes `edge-multi-environment-fleet` + `edge-multi-instance-userdata-isolation`：进程级监督者 + `AIDCP_USER_DATA_DIR` 隔离） |
 
 ## 5. 结论
 

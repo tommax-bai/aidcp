@@ -13,7 +13,7 @@
 > v2 在保持这条链路向后兼容的同时，新增了三大块：
 > 1. **浏览会话编排**（`note.content`/`browse.*`/`note.open` 等）——云端逐条驱动边缘刷信息流；
 > 2. **角色驱动指令 + 结构化上报**（`page.cards`/`note.detail` 上报，`interaction.like`/`page.scroll` 等下发）——
->    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 约 32 个角色，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
+>    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 多角色，`RoleName` 穷举现 43 项，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
 > v2 共 **72 个消息类型**（含 `pacing.update`），下表按职能分组列全。计数与表为人工维护，以两端 `protocol.ts` 的 `MessageType` 穷举为准（可能滞后于代码）。
@@ -418,6 +418,8 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
   "keyword": "露营装备",   // string  搜索关键词
   "source": "extract_from_liked", // ? extract_from_liked | random_from_interests | new_concept | manager
   "maxResults": 10,       // number? 本次搜索最多浏览的结果数
+  "sort": "most_collected",  // ?（change comment-search-command）搜索结果排序：如 most_collected（最多收藏）。边缘用原生排序 tab/筛选面板实现；缺省=默认（综合）排序。
+  "timeWindow": "one_day",   // ?（change comment-search-command）时间窗筛选：如 one_day（一天内）。缺省=不限时间。
   // container?（change facebook-scheduled-comment，可选）：站内搜索容器。非空时边缘只在该容器内搜索、绝不全站搜。
   //   Facebook 定向评论：容器为运营方自己/已加入的主页或群完整链接；边缘先校验其为白名单合法 Facebook 链接，
   //   非法/非成员则 honest permission_gated、绝不回退全站。缺省=无容器约束（小红书全站搜旧行为）。
@@ -789,7 +791,7 @@ edge 按 `system_recovery > human > automatic` 授予；同级 FIFO。发布从 
 ### 4.1 浏览会话闭环（v2 主路径：结构化上报 + 角色驱动）
 
 ```
-edge                                          cloud（RoleDispatcher + 约 32 角色 + EventBus）
+edge                                          cloud（RoleDispatcher + 多角色/RoleName 43 + EventBus）
  │  hello {edgeId}                             │
  │ ───────────────────────────────────────────►│  分配 session
  │  welcome {sessionId}                         │

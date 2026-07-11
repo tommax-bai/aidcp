@@ -267,7 +267,7 @@ P0 = 当前位置, P3 = 目标(带 ±3px 落点抖动)
 
 ### 4.2 发布内容相似度检测（避免模板化）
 
-模板化文案是营销号判定的直接证据。发布前做相似度自检（**本节为设计，未实装**：当前 `aidcp-cloud/src` 无 MinHash/SimHash/Jaccard/TF-IDF 相似度逻辑，发布管道 `post-processor.ts` 仅做违禁词/去 AI 味检测，不做跨篇相似度比对）：
+模板化文案是营销号判定的直接证据。发布前做相似度自检（**本节为设计，发布管道未实装跨篇正文查重**：发布管道 `post-processor.ts` 仅做违禁词/去 AI 味检测，不做跨篇已发正文相似度比对。注：`aidcp-cloud/src` 别处已有**局部** Jaccard——`publish-agent/roles/image-prompt-composer.ts` 配图 prompt 近重去重、`agents/comment-de-ai-flavor.ts` 评论 4-gram 去 AI 味——但均不作用于发布正文的跨篇查重）：
 
 - 维护近 N 篇（建议 N≥30）已发布内容的指纹：标题/正文做 **MinHash / SimHash** 或
   TF-IDF 向量；

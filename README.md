@@ -11,7 +11,7 @@
 | --- | --- | --- |
 | **aidcp**（本仓） | 总览 / 文档 | 架构、协议、数据流文档 |
 | [**aidcp-edge**](../aidcp-edge) | 边缘端 | 定位层引擎（DOM-first）+ CDP（原生 WebSocket）页面接入 + 浏览执行 + 拟人化 + 发布 + Electron 打包 |
-| [**aidcp-cloud**](../aidcp-cloud) | 云端 | 事件驱动多 Agent 编排（RoleDispatcher + 约 32 角色）+ 风控状态机 + 多模型 LLM（通义千问 / 火山方舟）+ PG 锚点缓存 + 边-云 WS 服务端 + 面板 API（管理后台后端）+ 飞书 Bot |
+| [**aidcp-cloud**](../aidcp-cloud) | 云端 | 事件驱动多 Agent 编排（RoleDispatcher + 多角色，`RoleName` 穷举现 43 项）+ 风控状态机 + 多模型 LLM（通义千问 / 火山方舟）+ PG 锚点缓存 + 边-云 WS 服务端 + 面板 API（管理后台后端）+ 飞书 Bot |
 | [**aidcp-console**](../aidcp-console) | 管理后台前端 | 统一 Web 控制台（React + Vite + TS + AntD）；只读云端面板 API + 经 `/api` 下发指令，绝不直连边缘 |
 
 > 相对路径（四仓同级）：`../aidcp-edge`、`../aidcp-cloud`、`../aidcp-console`（可能尚未在当前机器 clone）。
@@ -30,7 +30,7 @@
 4. **边轻云重**：边缘只做定位/执行/拟人化/本地命中；规划、事件驱动编排、模型推理、风控、持久化锚点在云端。
 5. **轻量优先**：CDP 走**原生 WebSocket**（不用 Playwright）；边-云通信用
    **WebSocket**（协议 v2）；不引入重型框架。
-6. **事件驱动而非单线规划**：浏览会话由云端 `RoleDispatcher` 调度约 32 个角色（核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取，准确清单以 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts` 注册为准）经 `EventBus`
+6. **事件驱动而非单线规划**：浏览会话由云端 `RoleDispatcher` 调度多角色（核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取，`RoleName` 穷举现 43 项，运行时注册数以 `event-bus/types.ts` 与 `role-dispatcher.ts` 注册为准）经 `EventBus`
    实时决策——边缘**结构化上报**（page.cards / note.detail），云端**逐动作下发**（interaction.like / page.scroll），
    贴近真人"看一条想一下"的节奏。
 
@@ -39,7 +39,7 @@
 **浏览会话闭环（v2 主路径，事件驱动）**：
 
 ```
-边缘 BrowseSession                          云端 RoleDispatcher + EventBus + 约 32 角色
+边缘 BrowseSession                          云端 RoleDispatcher + EventBus + 多角色（RoleName 43）
   page.cards 上报 ─────────────────────────► ContentEvaluator 评估价值
   note.open / page.scroll  ◄──────────────── 有价值开卡 / 无价值翻页（command-bridge 翻译）
   note.detail 上报 ────────────────────────► ContentCurator 质量关卡 → InteractionAppraiser 决策

@@ -13,6 +13,8 @@
 >
 > 建立日期 2026-07-03。来源 = 2026-07-03 openspec change 分诊清账批次。
 
+> **2026-07-11 清账批**（第二次 openspec 分诊清账）：本批归档 **32 个** landed+deployed change，真机验收项按既有簇归并——发布链路 → 簇 3（`publish-select-mode-layout-robust` 5.3）、textcard → 簇 23（`textcard-carousel-form-parity` 6.3）、FB 加群评论 → 簇 32（新增 `facebook-group-join-observe-i18n` / `fb-group-join-wait-render` 两项 i18n + 就绪修复复核，见簇 32 补登）、`/comment` 搜索闭环 → 簇 34/55（`comment-search-command` 12.1，多次已跑通）、FB 评论人审 → 簇 48（`facebook-comment-review-and-targeted-join`）、**FB 公开组放量 → 新簇 59**（`facebook-group-join-and-commenting` 9.1-9.5）。**本批刻意未归档（另有门槛）**：`publish-trigger-and-apply`（§11 统一部署待核）、`edge-environment-platform-select`（tasks 3.3 明确 gate 在 FB edge driver `facebook-browser-env-and-login` 落 master，当前仅 probes 落地）、`facebook-scheduled-comment`（active 版 target-URL 设计已被 keyword-in-container 版取代——见 `2026-07-09-facebook-scheduled-comment` 归档 + `facebook-group-join-and-commenting`，仅 2.9 昵称持久化落地，34/35 核心任务空，待 owner 决断降范围归档 / 关为 superseded）、`humanize-interaction-prompts`（代码已部署 dev，但 tasks 9.4 spec 交织须待 `category-adaptive-images-and-judgment` 先归档）。
+
 ---
 
 ## 簇 1 — 多账号 / 多租户内核 ⭐最关键
@@ -446,6 +448,8 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **跨调度器不抢边端** — 手动 `/comment --join` 进行中，后台自动加群/评论不对同账号并发触发（ContentScheduler 见 isCommentBusy/isJoinBusy 即本 tick 跳过）；反之亦然。
 - [ ] **回滚开关** — `AIDCP_FB_GROUP_JOIN_AUTO=false` 重启后：后台自动加群立停，手动 `/comment --join` 随之诚实回「自动加群功能未开启」（不真加群）。
 
+> **补登（2026-07-11 清账批）**：两处加群健壮性修复随本批归档，须在同一 `/comment --join` 真机 session 一并复核——① `facebook-group-join-observe-i18n`（edge `a6f0f3f`：Join 按钮跨语言识别，靠「composer 点前无→点后有」结构跃迁承重，修「非成员被误判 + observe 期误 markJoined 污染账本」）；② `fb-group-join-wait-render`（edge `a6f0f3f`：群页 ~7s 才渲染加入按钮，改就绪轮询等决定性信号或 12s 兜底，治「死等 2.5s 看空页 fail-closed 空跳」）。**验收点**：非 EN/ZH 群 `/comment <昵称> --join` 能越过 observation 真点 Join（服务器确认）或给诚实 gated/pending，不再 `ambiguous_skip`。
+
 ## 簇 33 — feed-refresh-on-depth 真机验收（feed 浏览深度到阈值改点右下「刷新」回顶换新批，登记于 2026-07-10；cloud master `c4545f0` 已 land + **已部署 dev**、edge master `60088d7` 已 land，edge 需运营机 pull/重建后生效）
 
 > 探针 `aidcp-edge/scripts/feed-refresh-button-probe.ts` 已真机确认按钮结构（右下 `div.floating-btn-sets` 内 `div.reload`，宽窄同构）与行为（点 reload = 回顶 + 换全新一批，前 6 卡 0 重叠）。下面为 live 端到端 + 阈值校准项。默认阈值 60 张、默认开启（env `AIDCP_FEED_REFRESH_AFTER` / `AIDCP_FEED_REFRESH` 可调 / kill-switch）。
@@ -754,3 +758,17 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] 58.8 透明标注 — 触发回执（XHS「已启动…--force：跳过强相关甄选与已评过去重」/ FB「…· --force（跳过相关性/去重）」）与加群评论合并卡的 `--force` 标注对运营可见。
 
 > **说明**：cloud `3177735`（`comment-scheduler.ts` XHS `runTask` 兜底 top-collect + 放开两处去重、FB `runFacebookTargetedTaskBody` 取首候选 + 空 `targetKeywords`、`triggerManual`/`runFacebookTargetedTask(Body)`/`runFacebookJoinThenComment` 透传 `force`；`server.ts` `actions.comment` 与 `manualOverride` 分开传 `force`；`feishu/commands.ts` 尾部 `--force` 解析 + 透传 + HELP）已 land origin/master + 部署 dev（备份 `cloud.bak.20260711-175101.tar.gz` + `.env.bak`、外科 rsync src 3 文件、healthcheck 全绿：active/8787/飞书长连接/PG 就绪）。纯云端、无协议 / 边端 / DB 改动。`force` 与既有 `manualOverride`（只绕配额）独立：manualOverride 绕风控/配额闸、force 绕相关性/去重软筛选，二者语义不合并。openspec change 修订 `manual-command-override`（ADDED `--force` 覆盖 requirement）+ `comment-search-command`（MODIFIED 强相关择优 / 命令去重两条开例外）+ `facebook-scheduled-comment`（MODIFIED 硬校验器：force 跳 `weak_relevance` 但保安全校验）。
+
+## 簇 59 — facebook-group-join-and-commenting Phase 0-4 放量 真机验收（公开组批量加入 + 按账号群评覆盖，登记于 2026-07-11；cloud master `0a0f1ae` + console `8e596f4` 已 land、部署 dev）
+
+**前置**：≥1 在线 FB 账号、目标群目录已导入（2000–5000 目标）、管理群下命令；真机账号只用 tom 分组（见 memory `real-machine-test-accounts`）。
+
+> FB 公开组闭环：批量导入目标 → 原子惰性认领（`ON CONFLICT (group_url) DO NOTHING`）→ 加群判定门 → 加入 → 服务器确认 → `facebook_group_membership` / `facebook_group_join_audit` 账本闭环；加入后按账号做情境群评覆盖，**两回路反同质化铁律**：自动情境评论禁带联系方式、联系评论必走飞书人审。风控加 `join_group` 配额（日/时/分三闸 + 单场会话额度）、判定角色 shadow 先行。整套按 Phase 0-4 灰度放量，只能真机分阶段验（对应 change tasks 9.1-9.5）。
+
+- [ ] 59.1 Phase 0（无加群 / 评论）— dev 导入 2000–5000 目标群，核去重 + 原子惰性认领 + 加群限频配置在「安全」页正确呈现；无任何真实加群 / 评论动作。
+- [ ] 59.2 Phase 1 shadow — 判定角色对数百真实目标跑影子，测「加群判定门」分类准确率（带分母的数字门）；达标才放 Phase 2。
+- [ ] 59.3 Phase 2 单弃用账号（`join_group` 日上限 1–3）— 诚实回执→账本闭环，无假 ok、无悬挂 pending、判定学习集排除 fleet 自身。
+- [ ] 59.4 Phase 3 单账号 — 自动情境覆盖（按账号门）+ 选定群的飞书人审联系评论回路。
+- [ ] 59.5 Phase 4 fleet — 逐步抬 caps，观察分区均衡、共享预算钳制、跨账号抖动。
+
+> **说明**：change tasks 9.5 明确要求把放量项登记本文件。代码全落地（cloud `0a0f1ae`：目标 / 成员 / 账本 store + 惰性认领 + 面板 API + `join_group` 风控三闸；console `8e596f4`：风控枚举镜像）+ 部署 dev。源 change 已归档，完整上下文见 `openspec/changes/archive/<date>-facebook-group-join-and-commenting/tasks.md` §9。
