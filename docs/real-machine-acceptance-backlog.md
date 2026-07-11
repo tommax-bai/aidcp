@@ -594,3 +594,16 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **未设 `AIDCP_USER_DATA_DIR` 零回归** — 旧的单实例启动方式（不设该变量）行为逐字不变、用默认目录，现役 dev GUI 不受影响。
 
 > **说明**：edge-only、无 ECS 部署；源码契约测试已锁「覆盖存在 / 受守卫 / 在单实例锁与任何 `getPath('userData')` 之前生效」三不变量（`test/electron/instance-userdata-isolation.test.ts`，964/0）。真机核并存互不干扰 + 错峰复用守护进程 + 零回归。生效需运营机重建 edge checkout 并 pull master `cdb7115`。
+
+## 簇 47 — edge-env-name-live-sync 真机验收（客户端环境展示名保真于 AdsPower 实时名，登记于 2026-07-11；edge master `1d2620a` 已 land，edge-only 无 ECS 部署，运营机 pull master + 重建安装包后生效）
+
+**前置**：edge 运营机 pull master `1d2620a` 后才生效（创建回执带回环境名 + 拉列表回填花名册名）。用 tom 分组分身或在客户端「创建环境」新建。全量单测已绿（edge 968 + acceptance 16 + typecheck 干净）；此处验真机左栏展示名与「添加环境」面板是否一致。
+**背景**：修复前左侧环境列表用「加入那刻拍下、之后不更新」的花名册名，添加面板用实时 AdsPower `user/list` 名 → 新建环境（花名册被写空名）时左栏回落「环境 …末4位」/账号昵称、与面板显示的真名不一致。
+
+- [ ] **新建环境即一致** — 在客户端「创建环境」建一个（非 FB，用模板），左侧列表对它显示的名字 = 「添加环境」面板对它显示的名字（即模板名），**不再是「环境 …末4位」占位**。
+- [ ] **FB 单账号导入即一致** — FB 平台单账号导入建环境，自动选中后左栏显示的名字与面板一致（导入标签名）。
+- [ ] **AdsPower 端改名后刷新同步** — 某已加入环境在 AdsPower 端改名，回客户端点「刷新」，左栏名字随即更新为新名、与面板一致。
+- [ ] **登录后不被账号昵称顶掉** — 环境登录账号后，左栏仍显示 AdsPower 环境名（花名册名已有值时不回落到平台昵称）。
+- [ ] **缺数据不误改（红线）** — 环境较多致列表被截断、或拉取失败/空列表时，在用环境的左栏名字**保持不变**、绝不被清空或改错。
+
+> **说明**：edge-only、无 ECS 部署；源码契约测试已锁「创建带回真名入册 / 拉列表回填空名 / 截断不回填」（`renderer-smoke.test.ts` + `ads-create-flow.test.ts`，968/0）。生效需运营机重建 edge checkout 并 pull master `1d2620a`。落地经 session scratchpad 全新 origin clone（基线 `cdb7115`）验证后 push，未触碰本机被外部清空的 edge worktree 群。
