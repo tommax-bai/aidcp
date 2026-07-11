@@ -1,8 +1,8 @@
-# 并行开发操作手册（多 Claude session / git worktree）
+# 并行开发操作手册（多 Codex / Claude session / git worktree）
 
-> 配套 `CLAUDE.md §7`。**§7 的不变量是 OVERRIDE 法条；本手册的命令序列 / 脚本为
-> 操作细节，经实战跑通验证后方视为定稿**（下方每块标注状态）。未验证前，只把 §7
-> 不变量当铁律，本手册命令按需人工确认。
+> 配套 `AGENTS.md §8` 与 `CLAUDE.md §7`。**这些不变量是 OVERRIDE 法条；本手册的命令序列 / 脚本为
+> 操作细节，经实战跑通验证后方视为定稿**（下方每块标注状态）。未验证前，只把
+> `AGENTS.md §8` / `CLAUDE.md §7` 不变量当铁律，本手册命令按需人工确认。
 >
 > **状态图例**：`[稳]` 已实战验证 · `[草案]` 待跑通验证 · `[待建]` 脚本尚未落地。
 >
@@ -23,10 +23,28 @@
 
 | 场景 | 做法 |
 | --- | --- |
-| 控制仓 aidcp 的 change（propose / spec / tasks） | **不开 worktree**。change 是 additive 目录、近零冲突，主 checkout 各写各的 change 目录即可 |
-| 两个 change 改的**文件不重叠** | 不开 worktree，串行提交到默认分支，commit 前缀带 change 名 |
+| 控制仓 aidcp 的 change（propose / spec / tasks） | 可**不开 worktree**，但只表示在规范主 checkout 的 `main` 上写 additive change 目录；绝不表示在主目录里 `git checkout` / `git checkout -b` |
+| 两个 change 改的**文件不重叠** | 可不开 worktree、串行提交到默认分支；若需要分支隔离，必须另开 worktree，不能切走主 checkout |
 | 两个 change 改的**文件重叠、且要同时推进**（尤其一条流交给 Claude、一条你自己写） | 每 change 一个 worktree 隔离 |
 | 任务要动**热点文件**（见 §5） | **不并行**，单写者串行做 |
+
+### 规范主 checkout 不变量
+
+`/Users/baitianxing/codes/aidcp` 是控制仓的规范主 checkout，必须常驻 `main`。这条目录只承担两类工作：
+
+- 在 `main` 上写 additive 的 OpenSpec change 目录、任务记录和集成文档；
+- 作为集成 / 部署协调位，读取最新主干状态。
+
+它绝不承担第三类工作：**在这个目录里切到 feature 分支开发**。需要分支隔离时，创建 `../aidcp.wt/<change-name>`，不要执行 `git checkout <feature>` 或 `git checkout -b`。`main` 也只能由 `/Users/baitianxing/codes/aidcp` 占用，不能被任何 `.wt/<change>` worktree 蹲占。
+
+每个 session 起手先做两项只读检查：
+
+```bash
+git -C /Users/baitianxing/codes/aidcp branch --show-current
+git -C /Users/baitianxing/codes/aidcp worktree list
+```
+
+第一条必须输出 `main`；第二条里 `[main]` 必须对应 `/Users/baitianxing/codes/aidcp`。不满足时先停下，不要继续在错位目录里开发；如果有人正在该 checkout 写未提交内容，不要用 `-f` 硬切，先等并发 session 收口或另开干净 worktree。
 
 ### 每仓并发软上限（避免全挤一个子系统）
 
@@ -51,6 +69,8 @@ worktree 放到各仓的兄弟目录 `<repo>.wt/<change-name>`，保持主 check
 集成与部署位：
 
 ```
+../aidcp                             # 规范主 checkout = main；只做 additive 控制仓变更 + 集成协调
+../aidcp.wt/<change-a>               # 控制仓需要分支隔离时才用；不能占用 main
 ../aidcp-cloud                       # 主 checkout = 集成 + 部署位（只从这里 rsync 到命名 ECS target）
 ../aidcp-cloud.wt/<change-a>         # fleet 成员 A（只开发 + 提交，绝不部署）
 ../aidcp-cloud.wt/<change-b>         # fleet 成员 B
@@ -70,8 +90,14 @@ scripts/new-change <aidcp-edge|aidcp-cloud|aidcp-console> <change-name>
 # 之后：cd ../<repo>.wt/<name> 里启动该 session 的开发
 ```
 
-控制仓 aidcp 侧无需 worktree：直接在主 checkout 用 openspec 流程建 change 目录
-（`/opsx:propose` 等）。
+控制仓 aidcp 侧通常无需 worktree：直接在规范主 checkout 的 `main` 上用 openspec 流程建 additive change 目录（`/opsx:propose` 等）。如果需要分支隔离，手动从 `origin/main` 开控制仓 worktree：
+
+```bash
+git -C /Users/baitianxing/codes/aidcp fetch origin
+git -C /Users/baitianxing/codes/aidcp worktree add ../aidcp.wt/<change-name> -b codex/<change-name> origin/main
+```
+
+禁止用 `git -C /Users/baitianxing/codes/aidcp checkout -b codex/<change-name>`，也禁止把 `main` checkout 到任何 `../aidcp.wt/*` 目录里。
 
 ## 3b. 多终端模式（形态 A：每终端一条流）`[稳]`
 
