@@ -1,5 +1,7 @@
 # Handoff — Facebook 浏览 + 点赞（Change B）续做（2026-07-10）
 
+> ⚠️ **续做入口已更新到 `docs/handoff-facebook-browse-like-2026-07-11.md`**（代码已全部落地 + ol 部署，只剩真机 shadow 标定）。本文档保留为深背景（探针发现 / 设计原委 / harness 搭建过程），接手先读 07-11 那份。
+>
 > 面向接手的新 session。语言：正文中文，代码/命令/标识符英文（CLAUDE.md §6）。
 > 这是把 Facebook "按人设筛选内容 → 点赞 / 评论" 真正跑起来的续做交接。**读完即可续做。**
 
