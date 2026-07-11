@@ -713,3 +713,16 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] 55.7 回执区分来源 — 自动排期评论终态卡标「排期评论（自动）」、人工 `/comment` 标人工，可区分。
 
 > **说明**：cloud `1fd65c9`（`comment-scheduler.ts` runTask 单持有租约 + `edge-steps.ts` 措辞 + `server.ts` 回执来源）已部署 dev（备份 `cloud.bak.20260711-155913`、healthcheck 全绿）；edge `4576a2a`（`browse-session.ts` 就地核对 + `search-handler.ts` nav 判据 / keyword 一致）需运营机 pull master + 重建安装包后生效。无协议消息类型改动。全量 cloud 1803 + edge 997 + 两端 acceptance + typecheck 已绿；「持锁贯穿人审浏览器不漂走」「原地发成」是 edge 运行时行为、桩验不了，由本簇真机坐实。真机测试账号只用 tom 分组（见 memory real-machine-test-accounts）。
+
+## 簇 56 — facebook-join-structural-verify（L3）真机验收（加群成败补语言无关结构真值：承重=「跃迁」composer 点前无→点后有；消灭「本地语已加入→误判 join_failed→重复加群」，登记于 2026-07-11；edge master `1442783` 已 land、需运营机 pull + 重建生效，cloud master `6ce347e` 已 land + 部署 dev）
+
+**前置**：dev 对 FB 互动号（tom 分组测试环境，见 memory real-machine-test-accounts / fb-integration-test-flow）跑加群——重点选**非英中语种群**（越南语 / 西语 / 日语 / 土耳其语等，Join/已加入按钮文案不在词表内）。**背景**：加群成败原靠多语词表判「已加入」，词表漏某语种→加成功但按钮翻本地语「已加入」未命中→边缘诚实但错误报 `join_failed`→云端重复加群（真机事故）。L3 给成败校验补语言无关结构真值。**对抗评审关键修正**：承重判据从「点后无可见 Join CTA」（`joinCtaPresent` 词表派生、未覆盖语种 fail-open→非成员误判 joined）改为**语言无关「跃迁」**（群主体可聚焦发帖/评论 composer 点前无、点后有），并**删除 observe/pre-click 结构判定**（无点击不 markJoined）。零协议改动。edge 全量 1000 + cloud 1807 + 两端 acceptance + typecheck 已绿；结构判定是真机 DOM 行为、桩验不了，由本簇坐实。
+
+- [ ] 56.1 消灭重复加群（核心）— 对未覆盖语种群加群：加成功后按钮翻本地语「已加入」（词表未命中）时，靠 composer 跃迁判 `joined`（云端 `structural_join_transition`），**不再** `join_failed`→重复加群。核 cloud 审计 outcome=joined、边缘 ok=true clicked=true；同群不被重复加。
+- [ ] 56.2 非成员不假成功（红线）— 对**未真加入**的群（审批门 / 点击没生效 / 公开组对非成员渲染 composer）：绝不误判 joined/already_member。尤其核「公开组点前已渲染发帖框」——点前已有 composer→无跃迁→诚实 `join_failed`（靠 LLM 层兜是否 joined，见 56.4），不据 fail-open 的 joinCtaPresent 假成功。
+- [ ] 56.3 composer 子树判别精度（校准）— 用 CDP 连本地浏览器看真 DOM：确认「群主体内可聚焦发帖/评论 composer」选择器（`[role=main]` 内 `[contenteditable]`/`[role=textbox]`、排除顶栏/群内搜索框）在成员态命中、非成员态（登录墙/纯浏览）不命中；记录各版式群页真实 DOM 结构以细化选择器（源码注释已标「选择器精度留真机取证细化」）。
+- [ ] 56.4 公开组点前 composer 靠 LLM 兜（观察）— 对「公开组对非成员也渲染 composer」的群，加成功后无跃迁→落云端 LLM（prompt 已喂 composerPresent/joinCtaPresent 信号 + 规则）：确认 LLM 能据结构信号正确判 joined，不误 failed→重复加群、也不误 joined 非成员。
+- [ ] 56.5 渲染时序残留（观察，理论级）— pre 观测的 composer 在就绪帧读取（早于 preClickSettleMs），懒渲染 composer 可能造成 skew。评审论证 edge 侧不可达（点击需 join 按钮词表命中=覆盖语种，覆盖语种下非成员点后 join 按钮仍在→joinCtaPresent=true 挡住跃迁）。真机若观察到覆盖语种群出现「点前无 composer→点后有 composer 但实际没加入」的假 joined，需把 pre composer 读取移到 preClickSettleMs 之后同一帧。
+- [ ] 56.6 pending/问卷先于结构（回归）— 审批门群：Join→Pending 即便渲染了 composer，判 pending 不判 joined。
+
+> **说明**：edge `1442783`（`join-executor.ts` composerPresent/joinCtaPresent 观测 + `structuralJoinConfirmed` 跃迁 + 删 observe/pre-click 结构 + isDecisiveObservation）需运营机 pull master + 重建安装包后生效；cloud `6ce347e`（`facebook-group-join-judge.ts` 跃迁主判 + 删 pre-click 结构 + LLM 提示 / `facebook-group-join-scheduler.ts` 透传 pre 观测）已部署 dev（备份 `cloud.bak.20260711-162224`、外科 rsync 2 文件 md5 核对、healthcheck 全绿：active/8787/飞书长连）。两轮对抗评审：首轮揪出 fail-open false-positive（初版 `composerPresent && !joinCtaPresent` 未覆盖语种非成员误判 + observe 期无点击 markJoined 污染账本），已改跃迁 + 删 observe/pre-click 结构；二轮复验 gapClosed=true。真机测试账号只用 tom 分组。
