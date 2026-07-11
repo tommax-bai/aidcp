@@ -565,3 +565,50 @@ delivered.
 - **THEN** cloud MUST stop that scheduled refresh chain for the account-edge pair
 - **AND** it MUST NOT broadcast the snapshot to other edges for the account
 
+### Requirement: Electron settings expose browser parking modes
+The Electron companion SHALL expose a persisted browser parking setting in the settings drawer with exactly three operator-selectable modes: `parking-display`, `edge-strip`, and `offscreen`. The default for missing or invalid settings SHALL be `edge-strip`. The setting SHALL be saved together with the existing browser settings and SHALL be injected into the spawned edge core process when the operator starts or restarts the edge.
+
+#### Scenario: Operator selects a parking mode
+- **WHEN** the operator opens the settings drawer and selects one of the three browser parking modes
+- **THEN** Electron persists that selected value with the local settings
+- **AND** the next start or restart injects that mode into the edge core process
+
+#### Scenario: Existing settings have no parking value
+- **WHEN** Electron loads an older settings file without a browser parking mode
+- **THEN** it treats the mode as `edge-strip`
+- **AND** the settings drawer renders `edge-strip` as selected
+
+#### Scenario: Invalid parking value is ignored
+- **WHEN** Electron loads a settings file with an unknown browser parking value
+- **THEN** it treats the mode as `edge-strip`
+- **AND** it MUST NOT pass the unknown value to the edge core process
+
+### Requirement: Electron provides browser parking recovery controls
+The Electron companion SHALL provide an operator recovery path for a parked browser window. It SHALL expose controls to show the driven browser in a normal visible position and to reset future parking coordinates. If no controllable browser window is available, the companion SHALL report that fact honestly and MUST NOT claim recovery succeeded.
+
+#### Scenario: Operator shows parked browser
+- **WHEN** the operator clicks the browser recovery control while a driven browser CDP window is available
+- **THEN** the browser window is moved to a normal visible position
+- **AND** Electron reports the recovery action as applied
+
+#### Scenario: No browser window is available
+- **WHEN** the operator clicks the browser recovery control while edge is stopped or no CDP window can be controlled
+- **THEN** Electron reports that no controllable browser window is available
+- **AND** it MUST NOT claim that the browser was shown or reset
+
+### Requirement: 异常退出详情在客户端内持久可见
+Electron 伴随窗口 SHALL 在边缘进程异常退出时保留并展示最近一次可操作失败详情，直到用户启动新的边缘进程、执行有意暂停/停止，或新的运行状态覆盖该失败。该详情 MUST 来自真实核心输出、进程退出信息或本地启动失败信息，MUST NOT 编造成功或隐藏底层失败原因。系统通知 MAY 同时发送，但 MUST NOT 成为唯一展示该失败详情的渠道。
+
+#### Scenario: AdsPower 启动被拒后详情仍在窗口可见
+- **WHEN** AdsPower 模式下核心输出 `browser/start` 失败原因并以非零 code 退出
+- **THEN** 伴随窗口在健康/状态区域展示该失败原因的可读摘要，包括 AdsPower 返回的拒绝信息
+- **AND** 该摘要在系统通知关闭后仍保持可见
+
+#### Scenario: 新运行开始后清除旧失败详情
+- **WHEN** 用户点击启动、重新登录或按新设置重启边缘进程
+- **THEN** 伴随窗口清除上一轮异常退出详情，并显示当前启动/运行状态
+
+#### Scenario: 没有核心错误行时仍显示退出事实
+- **WHEN** 边缘进程异常退出但没有可解析的 stderr 错误行
+- **THEN** 伴随窗口展示包含退出 code 或 signal 的持久失败详情
+

@@ -245,9 +245,11 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 
 ### Requirement: 单场会话上限为全局配置（时长 + 互动预算），取代按账号维度
 
-云端的**单场会话上限**——① 单场时长上限（`max_duration_min`）；② 单场互动预算（`likes` / `collects` / `follows` / `searches` / `comments` / `comment_likes` 六项）——SHALL 为可在管理后台编辑的**全局单例配置**：**无账号维度、无 `default`、无按账号覆盖**，一份配置管所有账号（单行表，参照模型配置单行 `id=1 CHECK` 模式）。运行时——浏览闭环时长解析（疲劳乘子用）、会话监测体到点判定、单场互动预算的初始化 / 重置——MUST 经**无账号参数的全局提供者**（`sessionDurationMs()` / `sessionBudget()`）**每次现读**当前生效值，使管理后台改完即热加载、MUST NOT 需要重启进程。
+云端的**单场会话上限**——① 单场时长上限（`max_duration_min`）；② 单场互动预算（`likes` / `collects` / `follows` / `searches` / `comments` / `comment_likes` / `join_groups` 七项）——SHALL 为可在管理后台编辑的**全局单例配置**：**无账号维度、无 `default`、无按账号覆盖**，一份配置管所有账号（单行表，参照模型配置单行 `id=1 CHECK` 模式）。运行时——浏览闭环时长解析（疲劳乘子用）、会话监测体到点判定、单场互动预算的初始化 / 重置——MUST 经**无账号参数的全局提供者**（`sessionDurationMs()` / `sessionBudget()`）**每次现读**当前生效值，使管理后台改完即热加载、MUST NOT 需要重启进程。
 
-绝不 brick（never-brick）：当全局配置缺失、或某字段非有限非负整数（时长还需 `>= 1`）时，运行时 MUST 逐项回落代码写死默认（时长 `10` 分钟；互动预算 `likes:10` / `collects:5` / `follows:3` / `searches:5` / `comments:2` / `comment_likes:3`），MUST NOT 抛错、MUST NOT 让浏览闭环崩溃。配置表为空（如迁移刚跑完）时行为 MUST 与回落默认逐位一致。会话内的「已发生计数 = 初始预算 − 当前剩余」比率闸 MUST 以会话开始时的预算快照为 `init`，会话中途的配置改动 MUST NOT 影响本场已在进行的比率闸（新值于下一场会话生效）。
+绝不 brick（never-brick）：当全局配置缺失、或某字段非有限非负整数（时长还需 `>= 1`）时，运行时 MUST 逐项回落代码写死默认（时长 `10` 分钟；互动预算 `likes:10` / `collects:5` / `follows:3` / `searches:5` / `comments:2` / `comment_likes:3` / `join_groups:1`），MUST NOT 抛错、MUST NOT 让浏览闭环崩溃。配置表为空（如迁移刚跑完）时行为 MUST 与回落默认逐位一致。会话内的「已发生计数 = 初始预算 − 当前剩余」比率闸 MUST 以会话开始时的预算快照为 `init`，会话中途的配置改动 MUST NOT 影响本场已在进行的比率闸（新值于下一场会话生效）。
+
+Facebook 加群调度在执行真实 `join_group` 前 MUST 同时检查每日/minute/hour 风控配额与单场 `join_groups` 剩余预算；当单场 `join_groups` 剩余为 0 时，MUST 不下发 edge `group.join`，MUST 记录可审计的非成功结果，MUST NOT 写入 membership `joined_at`，MUST NOT 记录 `join_group` 成功风控事件。单场 `join_groups` 只在 judgment-confirmed `joined` 且 edge 执行成功后扣减；`already_member`、`gated`、`pending`、shadow、登录/验证码阻断、导航失败、执行失败或不确定结果 MUST NOT 扣减。
 
 单场会话上限的存储与编辑 MUST 只写自己的单行表、MUST NOT 经由风控状态单写路径（`RiskController.setQuotaLevel` / `applySignal` / 状态机 / `risk_state` 表），MUST 仅作只读读取、MUST NOT 改写账号风控终态或档位。本能力 MUST NOT 经 WebSocket 协议 v2。
 
@@ -263,15 +265,31 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 - **WHEN** 管理后台把全局单场 `likes` 预算从 10 改为 6 并保存成功
 - **THEN** 无需重启，**所有账号**下一场会话 reset 后的点赞预算为 6，预算耗尽即不再下发点赞
 
+#### Scenario: 后台改全局加群预算，所有账号下场即按新值
+
+- **WHEN** 管理后台把全局单场 `join_groups` 预算从 1 改为 2 并保存成功
+- **THEN** 无需重启，**所有账号**下一场会话 reset 后的加群预算为 2，预算耗尽即不再下发真实加群
+
 #### Scenario: 全局配置缺失 / 非法值回落写死默认、绝不 brick
 
 - **WHEN** 全局单场上限配置缺失（表空），或某字段为非有限非负整数（或时长 < 1）
-- **THEN** 运行时逐项回落写死默认（时长 10min、预算 `likes:10/collects:5/follows:3/searches:5/comments:2/comment_likes:3`），不抛错，浏览闭环照常驱动
+- **THEN** 运行时逐项回落写死默认（时长 10min、预算 `likes:10/collects:5/follows:3/searches:5/comments:2/comment_likes:3/join_groups:1`），不抛错，浏览闭环照常驱动
 
 #### Scenario: 会话中途改预算不动本场比率闸
 
 - **WHEN** 某场会话进行中，管理后台改了全局单场 `likes` 预算
 - **THEN** 本场会话的「已发生点赞 = 初始预算 − 当前剩余」仍以本场开始时的初始预算为基准计算，不被中途改动扰动；新值于下一场会话生效
+
+#### Scenario: 单场加群预算耗尽不下发真实加群
+
+- **WHEN** 某账号当前会话的 `join_groups` 剩余预算为 0，且每日/minute/hour `join_group` 配额仍未耗尽
+- **THEN** Facebook 加群调度 MUST 不下发 edge `group.join`，并返回/记录单场预算耗尽的非成功结果
+
+#### Scenario: 只有确认成功加群扣减单场加群预算
+
+- **WHEN** Facebook 加群尝试返回 `joined` 且 edge 执行成功
+- **THEN** 当前会话 `join_groups` 剩余预算扣减 1
+- **AND** `already_member`、`gated`、`pending`、shadow、失败或不确定结果不扣减该预算
 
 #### Scenario: 改单场上限不改风控状态
 
@@ -341,4 +359,69 @@ Facebook join and Facebook comment for the same account SHALL be dispatched unde
 #### Scenario: One account never joins and comments simultaneously
 - **WHEN** an account has both a pending join slot and a pending comment slot in the same tick
 - **THEN** only one is dispatched, held by the same per-account single-flight lock used for commenting
+
+### Requirement: Scaled risk quotas must round upward
+
+When cloud computes scaled window quotas for reduced risk states, it SHALL round scaled
+quota values upward after multiplication. The scaling operation MUST still clamp negative
+or non-finite effective outputs to zero, and a zero scaling factor MUST still produce zero.
+
+`warned` accounts SHALL continue to use conservative baseline quotas scaled by `0.7` and
+SHALL continue to pause publish actions. However, a positive baseline quota such as a
+minute-window quota of `1` MUST NOT become `0` solely because of fractional scaling.
+
+#### Scenario: warned keeps sparse interaction windows available
+
+- **WHEN** an account is in `warned` and the conservative baseline minute quota for an
+  interaction action is `1`
+- **THEN** the effective minute quota for that action is `1`, not `0`
+- **AND** `canDo(action)` is not rejected merely because `0 >= 0` on an empty minute
+  window
+
+#### Scenario: frozen scaling still stops all actions
+
+- **WHEN** a quota window is scaled by factor `0`
+- **THEN** the effective quota remains `0`
+
+### Requirement: 浏览打开前必须先过 view 配额闸
+
+云端 SHALL 在把候选卡片下发为 `open_note` 之前，按该连接的真实账号调用
+`RiskController.explain('view')` 或等效只读判定。判定拒绝时，云端 MUST NOT 下发
+`open_note`，MUST NOT 伪造成功浏览，MUST 进入浏览额度休眠而不是下发 `session.end`。
+若拒绝原因为 `quota:minute`、`quota:hour`、`quota:day`，云端 SHOULD 按滑动窗口释放时间安排重判；
+无可计算释放时间时，云端 MAY 以保守周期重判，直到判定恢复或会话被其它正常终止条件结束。
+
+该闸用于阻止新的笔记详情被打开；既有 `note.detail` 到达后的 `record('view')` 计数路径
+仍作为真实成功浏览的记账来源保留。浏览额度休眠期间，普通浏览推进、打开和互动命令 MUST 被扣住；
+窗口释放后，云端 SHOULD 发送一次轻量恢复指令重新驱动浏览闭环。该休眠只作用于浏览闭环，不得影响
+定时或手动的笔记创作、发帖生成、发帖审批或发帖下发；这些流程不需要前置浏览。点赞、收藏、关注、
+评论等浏览衍生行为不会被主动触发，因为休眠期间没有新的笔记详情被打开。
+
+#### Scenario: view 配额已满时不打开下一篇笔记
+
+- **WHEN** 账号的 `RiskController.explain('view')` 返回 rejected
+- **AND** 浏览角色产出一条 `content.valuable` 候选
+- **THEN** 云端 MUST NOT 下发 `open_note`
+- **AND** 云端 MUST NOT 下发 `session.end`
+- **AND** 云端 MUST 进入浏览额度休眠并安排后续重判
+
+#### Scenario: view 配额可用时照常打开笔记
+
+- **WHEN** 账号的 `RiskController.explain('view')` 返回 allowed
+- **AND** 浏览角色产出一条 `content.valuable` 候选
+- **THEN** 云端照常下发 `open_note`
+
+#### Scenario: view 配额窗口释放后恢复浏览
+
+- **WHEN** 浏览额度休眠到期
+- **AND** 账号的 `RiskController.explain('view')` 返回 allowed
+- **THEN** 云端 SHOULD 解除浏览休眠
+- **AND** 云端 SHOULD 下发一次恢复浏览的推进指令
+
+#### Scenario: 临时 view 配额不阻止会话启动
+
+- **WHEN** 账号因 `quota:minute` 或 `quota:hour` 临时无法新增 view
+- **THEN** 云端 MAY 启动或保持浏览会话
+- **AND** 云端 MUST 在 `open_note` 前进入浏览额度休眠
+- **AND** 云端 MUST NOT 因临时 view 配额拒绝阻断手动或定时笔记创作、发布
 
