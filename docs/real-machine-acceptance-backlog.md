@@ -699,3 +699,17 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] 54.5（待评估，非本 change）确认 AdsPower 同账号并发到底返 `code=-1` 拒启还是 `code=0` 复用既有端口。若存在 `code=0` 复用，核心会 attach 到别处那个浏览器、正常收尾会关掉它——那是另一条危险路径，需单独加「attach 前校验非外部实例」防护。本 change 只处理明确拒启的 `code=-1`。
 
 > **说明**：edge-only、无协议 / 云端 / console / DB 改动，只改 `src/electron/fleet.cjs`（新增纯函数 `classifyAdsInUse`）+ `src/electron/main.cjs`（`handleEdgeLogLine` 置 `envInUseThisRun`、`child.on('close')` 据标志强制 `decision=stop` + 换友好文案 + 专门通知；护栏 env）。源码契约测试已锁 `classifyAdsInUse`（双闸识别拒启 + 解析账号 + 缺内核/连云失败/无关串/空 皆判否，993/0）；「命中即 stop 不重起 + 别处浏览器不被关」是 electron 外壳退出路径行为、桩验不了，由本簇真机坐实。生效需运营机 pull master `7d7d758` + 重建安装包。
+
+## 簇 55 — comment-keep-open-through-approval 真机验收（按需评论 keep-open：搜到一篇合适笔记就攥住详情页贯穿人审、原地发布，不再为它复搜；根治 target_not_found_on_commit / read_failed，登记于 2026-07-11；cloud master `1fd65c9` 已 land + 部署 dev，edge master `4576a2a` 已 land、需运营机 pull + 重建生效）
+
+**前置**：dev 对 Tmax（cloud accountId `66cd1d4f000000001d0314ee`，AdsPower env `ads-k1e0awu5`，tom 分组）跑排期自动评论（`ContentScheduler` 心跳命中）与手动 `/comment`。**背景**：原设计对同一搜索词做三次独立全量搜索（发现 / 读正文前复搜 / 发评论前复搜），每次骑在小红书 AI 搜索「提交→到结果页」这个不稳定入口上，成功率≈p³；自动路径送审时放掉浏览器→自治浏览闭环抢回把页面带走→commit 复搜必然找不回（2026-07-11 Tmax《AI自己改自己》已人审授权仍在 commit 复搜掉链、《GPT-5.6三档》prepare 复搜掉链）。本 change 改 keep-open：只搜一次，搜到合格候选后在同一持有租约内 pick→读正文→人审→原地发布，审批期不释放边端。
+
+- [ ] 55.1 审批期浏览器停在详情页不漂走（核心）— 触发一次评论、飞书出审批卡后，观察边端（CDP 连本地浏览器看真 DOM 或 edge.log）：整个人审等待窗口浏览器**停在目标笔记详情页**，不被自治浏览带去别的笔记 / feed；`edge-task acquired kind=comment_prepare` 后到发布前**只有一次** `search.execute`（无 prepare / commit 复搜）。
+- [ ] 55.2 通过后原地发成（核心）— 飞书点授权→评论在**当前详情页**原地发出，`[comment-edge] 发评论 … ok`，飞书终态卡绿；不再出现 `target_not_found_on_commit`。
+- [ ] 55.3 超时 / 被拒诚实结束 — 人审超时（90s）或点拒绝→任务结束、释放浏览器、恢复自治浏览；回执诚实（compose_skipped），不复搜、不换词、不评他篇。
+- [ ] 55.4 发现搜索不再被旧页假成功（Bug C 关）— 制造浏览器停在上一次某关键词结果页，再触发新词搜索：若提交没真导航，边端**不**把旧关键词结果页当本次成功（`未导航到结果页`）；日志 `搜索导航成功` 的 URL keyword 参数须与本次词一致才认。
+- [ ] 55.5 发前就地核对（取舍2）— 人审期间若详情页被弹层顶掉 / 被导航离开（极端），发布前就地读 noteId 不符→诚实 `note_page_mismatch` 不发（keep-open 持锁已是主保护，此为二次闸；正常流程不应触发）。
+- [ ] 55.6 空闲看门狗不误杀（观察）— 审批攥住浏览器停详情页最长约 90s，确认边端空闲看门狗（≈240s 阈值）不在持锁期误杀会话；若观察到误杀，需给人审期加轻 dwell（复用 `ensureDetailDwell`）。
+- [ ] 55.7 回执区分来源 — 自动排期评论终态卡标「排期评论（自动）」、人工 `/comment` 标人工，可区分。
+
+> **说明**：cloud `1fd65c9`（`comment-scheduler.ts` runTask 单持有租约 + `edge-steps.ts` 措辞 + `server.ts` 回执来源）已部署 dev（备份 `cloud.bak.20260711-155913`、healthcheck 全绿）；edge `4576a2a`（`browse-session.ts` 就地核对 + `search-handler.ts` nav 判据 / keyword 一致）需运营机 pull master + 重建安装包后生效。无协议消息类型改动。全量 cloud 1803 + edge 997 + 两端 acceptance + typecheck 已绿；「持锁贯穿人审浏览器不漂走」「原地发成」是 edge 运行时行为、桩验不了，由本簇真机坐实。真机测试账号只用 tom 分组（见 memory real-machine-test-accounts）。
