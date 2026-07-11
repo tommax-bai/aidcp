@@ -635,3 +635,17 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **登录态英文串对表（补 button-probe 缺口）** — 登出态探针够不着的关键业务串：登录态英文实测 Join / Pending / Joined / 评论框 label 与 edge 词表英文项一致；cookie 同意条需 GDPR 触发会话（EU 代理/首访）才弹、届时核 consent 正则（此项与 C3 consent 结构化重叠、可并轨核）。
 
 > **说明**：edge-only、无 ECS 部署；源码契约测试已锁「指纹产物 language=[en-US]+language_switch 关闭+时区仍随 IP」「language 不进四者一致断言、pin 不拒建」「launch_args 含 --lang=en-US」「cookie 缺 locale 注入 en_US / 已有不覆盖」「存量号 user/update 硬塞 fingerprint_config 进不了 body」（`ads-fingerprint.test.ts` / `browser-provider.test.ts` / `facebook-account-import.test.ts` / `ads-write-api.test.ts`，973/0）。对抗评审 6 raw findings 全被证伪（Intl seam=探针覆盖缺口非码缺陷已收本簇；fleet 语言熵下降=设计目标；stealth zh-CN 回退=empty-guard 惰性不触发；结构化 cookie 豁免=设计 belt）。C1 necessary-not-sufficient，语言无关 bug 归后续 C2（加群动作解耦+结构后置校验）/C3（同意浮层结构化）。
+
+## 簇 50 — edge-cloud-env-selector 真机验收（客户端设置内切换云端环境 dev/ol/自定义，登记于 2026-07-11；edge master `4e69690` 已 land，edge-only 无 ECS 部署，运营机 pull master + 重建安装包后生效）
+
+**前置**：edge 运营机 pull master `4e69690` + 重建安装包后生效。用 tom 分组分身。全量单测已绿（edge 980 + acceptance 16 + typecheck 干净）。此处验真机「界面选云端 + 重启生效 + 当前云端显示与实际一致 + ol 确认 + 并行两 GUI 各自独立」。
+**背景**：改前客户端连哪个云端只能靠启动环境变量 `AIDCP_CLOUD_URL`，界面无入口、顶部只显示「连没连上」不显示「连的哪个云」。本 change 在设置抽屉加「云端环境」卡（dev/ol/自定义），界面选择优先解析（合并之后覆盖继承的 `AIDCP_CLOUD_URL`，留空零回归），标题带常驻「当前云端」chip。**红线**：显示的云端=核心实际连接的云端，已切未重启显示「待重启生效」、绝不显示成已生效；切 ol 需确认。
+
+- [ ] **界面选 dev/ol 生效** — 设置里「云端环境」选 dev，点「全部重启并连接新云端」，环境重启后连的是 dev 云端（8787，dev IP）；再切 ol、确认、重启，连的是 ol。用 `logs/edge.log` 或云端在线列表核实际连的是哪个。
+- [ ] **自定义地址** — 选「自定义」填一个 `ws://` 地址，保存后重启，核心连该地址；填非 `ws(s)://` 的串 → 诚实回错、不保存、不注入垃圾。
+- [ ] **当前云端显示与实际一致（红线）** — 切换云端但**先不重启**：标题带 chip + 抽屉「当前连接」显示「<在跑的旧云> · 待重启生效」，**不**显示成已切到新云；点「全部重启」后 chip 变新云、pending 消失。
+- [ ] **ol 二次确认** — 界面把云端切到 ol 时弹确认「将连接线上生产云端」；取消则保持原选择不变；chip/徽标对 ol 有醒目标注。
+- [ ] **留空零回归** — 不在界面选任何云端（cloudEnvKey 空），以 `AIDCP_CLOUD_URL=<某地址>` 启动：核心连该继承地址，行为与本 change 前逐字一致。
+- [ ] **并行两 GUI 各自独立** — 配合 `edge-multi-instance-isolation`：两个 GUI 各设不同 `AIDCP_USER_DATA_DIR`，各自在界面选不同云端（甲 dev、乙 ol），两者的云端选择互不影响（各自 settings.json）。
+
+> **说明**：edge-only、无 ECS 部署；源码契约测试已锁「映射两地址 / 受 fromSelection 守卫的覆盖 / **覆盖在 env 合并之后** / 留空零注入 / custom 非法降级 / snapshot 带 cloudEnv / restart-all IPC」（`test/electron/cloud-env-selector.test.ts`，980/0）。生效需运营机 pull master `4e69690` + 重建安装包。与 `edge-multi-instance-isolation`（簇 46）正交互补：多实例并行仍靠两 GUI + 独立数据目录，本 change 省去手敲 `AIDCP_CLOUD_URL`。
