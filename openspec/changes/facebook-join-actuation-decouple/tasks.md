@@ -1,4 +1,11 @@
-> **实装排序**：本 change 触协议热点、收益思辨性。**先落 [[facebook-join-structural-verify]]（L3）并真机坐实「某语种 Join 按钮词表定位失败」失败模式**，再启动本 change 实装。以下任务为设计已定、待触发。
+> **实装排序**：本 change 触协议热点、收益思辨性。**先落 [[facebook-join-structural-verify]]（L3）+ 前置 [[facebook-join-candidate-scope-guard]]（作用域）+ [[facebook-join-pending-label-audit]]（状态词），并真机坐实「新页重定位保真度」失败模式**，再启动本 change 实装。以下任务为设计已定、待触发。**实装前以 proposal「2026-07-12 修订」块为准**（作用域承重、L4 随本 change 落地、管道走 edge-steps 非 command-bridge、schema 分 text/aria、触发门重述）。
+
+## 0. 2026-07-12 修订前置（实装前必做，覆盖下方旧任务对应点）
+
+- [ ] 0.1 依赖前置 change [[facebook-join-candidate-scope-guard]] 已 land：`clickTarget` 字面相等匹配**只在 `inTargetScope` 候选内**进行；作用域外字面相等一律 `stale_target`。序号降级为诊断字段、绝不作选取依据（推荐栏动态重排 + 去重后多字面相等候选不同时上报）。
+- [ ] 0.2 云端**判官候选裁定模式**（L4=本 change 云端半）：`facebook-group-join-judge.ts` 加模式——全候选清单进 prompt、返回选中候选**字面串**（含匹配源字段 text/aria）或 fail-safe 弃权 -1、置信门控；产出即 `clickTarget`。缺此步本 change 在其立论场景不可实装。
+- [ ] 0.3 管道订正：`clickTarget` 回传走**判官 → scheduler → `facebook-group-join-edge-steps.ts` 信封**（`group.join` 不走 command-bridge 动作映射，grep 零命中）；下方 4.1「command-bridge 映射」作废、以此为准。
+- [ ] 0.4 候选 schema 分 `text`/`aria` 两字段（非合并 `text||aria`）；`clickTarget` 标明匹配源字段，两侧同源字段同 normalization。下方 2.2 的「`text||aria`」以此订正。
 
 ## 1. 协议同步（热点/串行 — 单写者，与其他动协议命令的 change 排序）
 

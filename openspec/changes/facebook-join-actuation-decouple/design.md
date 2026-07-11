@@ -1,11 +1,11 @@
 ## Context
 
-加群两次边缘调用（`src/facebook/join-executor.ts`）：
-- 调用①（observe-only，`GroupJoinPayload.click` 缺省）：`Page.navigate` 到群页 → `observeUntilReady` → 回传观测 → 不点。
-- 云端裁判观测。
-- 调用②（`click=true`）：**再次 `Page.navigate`（join-executor.ts:397）到新页** → `observeUntilReady`（402）→ `relocateAndClickJoin`（325：页面内按词表重新定位加入按钮、`element.click()`）→ `observePostClickUntilSettled`（449）。
+加群两次边缘调用（`src/facebook/join-executor.ts`，函数名/行号以 HEAD 为准，2026-07-12 订正——原稿引用的 `relocateAndClickJoin` 从未存在，且行号已被 resilience `0d3e39f` / L3 `1442783` 漂移）：
+- 调用①（observe-only，`GroupJoinPayload.click` 缺省）：`Page.navigate` 到群页 → 观测就绪 → 回传观测 → 不点。
+- 云端判官裁判观测（`src/agents/facebook-group-join-judge.ts`）。
+- 调用②（`click=true`）：**再次 `Page.navigate` 到新页** → 重新观测就绪 → 页面内 IIFE `GROUP_JOIN_CLICK_JS`（经 `evalJson` 注入）按词表重新定位加入按钮、`element.click()` → 观测点后沉降（L3 `structuralJoinConfirmed` 跃迁校验）。注：文件现携 L3 字段（`composerPresent`/`joinCtaPresent`）与 resilience 结局（`not_ready`/`post_not_confirmed_slow`），调用②改动**不得扰动**这些。
 
-关键事实（评审坐实）：调用②在**新页**重新定位，调用①观测里的任何页内 DOM 句柄**必然失效**。故「点云端裁定的那个候选」不能靠页内句柄，只能靠**跨导航稳定的键**。当前调用②靠自己的词表（`classifyCtaLabel` / Join 关键词）重定位——某语种 Join 文案不在词表即定位失败、加群失败。这是本 change（L2）要治的点击动作定位语言相关缝。
+关键事实（评审坐实）：调用②在**新页**重新定位，调用①观测里的任何页内 DOM 句柄**必然失效**。故「点云端裁定的那个候选」不能靠页内句柄，只能靠**跨导航稳定的键**。当前调用②靠自己的词表（`ctaKind` / Join 关键词）重定位——某语种 Join 文案不在词表即定位失败。**但真机证据（2026-07-12 修订）更正了失败方向**：现状不是纯 fail-closed——当目标群自身 CTA 判不出（pending/member/晚渲染），页面级「文档序第一个 join」会落到**侧栏推荐群**的同字面 Join、**加错群**（fail-open）。这条即时危害由前置 change [[facebook-join-candidate-scope-guard]] 修；本 change（L2）治的是其上的**跨导航重定位保真度**，且字面相等匹配**必须**在该作用域内进行。
 
 分层定位：C1（[[facebook-locale-pin-en-us]]）治新号界面语言；L3（[[facebook-join-structural-verify]]）治成败校验、零协议、先上消灭重复加群；本 change（L2）治**点击定位**、触协议热点、思辨性收益（待真机坐实词表定位失败再实装）。
 

@@ -1,6 +1,6 @@
 ## Context
 
-同意浮层自动接受已上线（`src/facebook/consent.ts`，change `facebook-consent-overlay-auto-accept`）。现状 `CONSENT_SCAN_JS` 在页面里用三条正则：`COOKIE_COPY`（present 门）、`ACCEPT_ALL` / `NECESSARY`（按钮选取，逐语言短语，`^…$` 全串锚定）。`pickButton` 按策略取 `acceptAll` / `necessaryOnly` 坐标，缺则诚实 `no_target`。问题只在**按钮选取**：`ACCEPT_ALL`/`NECESSARY` 是逐语言列表，换语种即漏 → 认得出同意条却点不动 → 挡住后续动作。present 门里的 cookie 语义锚点其实**跨语言稳定**（`cookie` 是借词），不是痛点。
+同意浮层自动接受已上线（`src/facebook/consent.ts`，change `facebook-consent-overlay-auto-accept`）。现状 `CONSENT_SCAN_JS` 在页面里用三条正则：`COOKIE_COPY`（present 门锚点）、`ACCEPT_ALL` / `NECESSARY`（按钮选取，逐语言短语）。`pickButton` 按策略取 `acceptAll` / `necessaryOnly` 坐标，缺则诚实 `no_target`。**2026-07-12 订正（#9，超越原「问题只在按钮选取」判断）**：`present` 门是 `hasCookiePolicyCopy && 至少一个按钮词表命中`——未覆盖语种下按钮正则全 miss → `present=false` → `acceptFacebookConsent` 返 `handled=false`、**静默继续**（非 `no_target`）；且 `COOKIE_COPY` 是 **zh/en 绑定短语正则、非裸 `/cookie/i`**，未覆盖语种连同意条都认不出。故覆盖缺口**从存在性判定就开始**、不止于按钮选取；只改按钮选取扩不了覆盖。C3 首发交付因此定性为**安全加固**（容器隔离 + 登录门护栏），语种覆盖 deferred 在 D3-② 结构标志门后。
 
 这是跨语言识别分层方案 C3，与 C1（[[facebook-locale-pin-en-us]] 界面钉英文）互补：C1 治新号首屏英文，C3 治登出态 / 存量号 / 非英文残留同意条这条语言无关缝。与 C2（加群结构校验）正交，edge-only 可并行。
 
@@ -8,7 +8,7 @@
 
 **Goals:**
 - **安全优先**：无论何语种，绝不误点真登录 / 「继续」门（复验坐实的核心红线）。
-- 在**能正向识别为同意条**的前提下扩展语种覆盖：容器隔离 + 登录门负向护栏 + 文字优先；结构消歧待真机结构标志坐实再开。
+- **对既有同意路径安全加固**（容器隔离 + 登录门负向护栏 + 文字优先），在**能正向识别为同意条**的前提下运作；**语种覆盖扩展 deferred 在 D3-② 真机结构标志门后**（结构标志坐实前零新增语种覆盖，只加固安全）。
 - present 门、登录/验证码优先、后置校验、有界重试、诚实回执**全部逐字保留**。
 - 纯 edge-only、纯本地确定性 DOM 判定，零协议 / 零云端改动。
 
@@ -29,7 +29,7 @@
 
 **D3：只点正向识别的同意动作；文字优先，结构消歧门控真机标志。** 被点按钮须是正向识别的接受/拒绝动作：① 文案命中既有 accept/decline 词表（**文字优先**，英中逐字零回归）；或 ② **仅当**容器另命中一个**真机坐实的 FB 同意条结构标志**时，在该同意动作对内按结构角色（主=accept-all/次=necessary-only）消歧。**取得真机结构标志前，结构兜底绝不点未被文案命中的按钮** → 无正向识别即 `no_target`。这样 unsure→decline，红线安全；结构消歧只服务「已正向确认是同意条 + 只是不知按钮词」的窄case。备选（无标志也结构盲点）被否——复验证不安全。
 
-**D4：necessary_only 策略降级优雅（仅在已正向识别的同意动作对内）。** 若在已确认同意条内结构分不清主/次，accept_all 取更像主按钮者、necessary_only 取另一个；两者都是合法同意动作、点后横幅消失、后置校验兜底。此退化只发生在已过 D2/D3 的同意条内，不触登录门红线。
+**D4：necessary_only 分不清主/次时诚实 `no_target`（2026-07-12 订正，#4）。** 原稿「necessary_only 取另一个」是 best-guess 点击、可能落在 accept-all 上，与 proposal 逐字保留的红线「策略所需按钮结构上定位不到时诚实 `no_target`、绝不改点别的」冲突。**订正**：已确认同意条内若结构分不清主/次，necessary_only **诚实降为 `no_target`**（绝不改点别的）；accept_all 若能正向识别主按钮则点、否则亦 `no_target`。保红线逐字不动，宁可 `no_target`（后续有界重试 / 诚实 `blocked_by_consent`）不 best-guess 误点。删除原「取另一个」退化。
 
 ## Risks / Trade-offs
 
