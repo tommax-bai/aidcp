@@ -30,7 +30,12 @@ FB 页面自动化的按钮 / 状态识别本质是「按可见文字关键词�
 ### D1：新号指纹语言钉死 en-US，而非随代理 IP
 `ads-fingerprint.cjs` 的 `buildFingerprintConfig` 里 `language_switch:'1'`（随 IP）改为关闭 + 显式 `language=['en-US']`。
 - **为什么**：语言随 IP 反而制造「美国代理号突现越南语 UI」的不自洽；钉死英文让下游识别单语化。`language` 不在 `assertOsCoherent`（`ads-fingerprint.cjs:107-130`，只断言 OS 一致）里，pin 不触发 coherence 拒建。
-- **待验**：`language_switch` 的 0/1 语义与 `language` 字段确切键名需 `scripts/adspower-fingerprint-probe.ts` 真机核实，**不凭记忆写**；实装先加护栏可读的中心常量，真机确认键名后再定值。
+- **已真机实证（2026-07-11，本机 AdsPower CLI chrome_149，一次性建号读回、只删自建）**：
+  - `language_switch:'1'`（现状）→ `navigator.languages=["zh-CN","zh"]`（随中国 IP，复现问题）。
+  - `language_switch:'0'` + `language:['en-US']`（或 `['en-US','en']`）→ `navigator.languages=["en-US","en"]`、`navigator.language=en-US`、`Accept-Language` 同步英文，**不随 IP**。单值 `['en-US']` 被 AdsPower 自动补成 `['en-US','en']`。
+  - **时区独立**：三组环境 timezone 均为 `Asia/Shanghai`（仍随 IP），证明「pin 语言 + 时区随 IP」并存无冲突。
+  - 另证输出链路（读活着的 FB 环境进程命令行）：fingerprint 语言 → `--protected-langs`（navigator.languages）+ `--protected-acceptlang`（Accept-Language）+ `--lang`/`-AppleLanguages`（内核/系统 UI）。
+  - **结论**：直接用 `language_switch:'0'` + `language:['en-US']`；字段键名 / 语义已确认，无需再凭记忆或占位。
 - **备选（否决）**：只靠启动参数 `--lang` / cookie `locale`——它们只兜登出 chrome，改不了 AdsPower 指纹层与登录态群面，不足以治本。
 
 ### D2：启动参数 `--lang=en-US` 兜登出 / 未登录 chrome
@@ -62,13 +67,13 @@ FB 页面自动化的按钮 / 状态识别本质是「按可见文字关键词�
 
 1. edge 本地改 `ads-fingerprint.cjs`（language 常量单点）+ `browser-provider.ts`（`--lang`）+ `facebook-account-import.cjs`（locale 注入），加单测。
 2. `npm run typecheck` + `npm test`（edge），确认无回归。
-3. 真机：`scripts/adspower-fingerprint-probe.ts` 核 `language_switch`/`language` 键值语义；建一个新号验界面英文 + 内容不塌。
+3. 真机：`language_switch`/`language` 键值语义**已探针实证**（见 D1，2026-07-11 chrome_149）；仍需建一个 FB 登录号验「界面英文 + 内容不塌」的登录态行为。
 4. 部署 dev（edge 侧），运营机重建 / pull 后新号生效。
 5. 存量号：先 runbook 手动翻转一批验证，再评估边缘自动化。
 6. 回滚：语言常量 / `--lang` / cookie 注入均为局部可逆改动，秒级回退到「随 IP」。
 
 ## Open Questions
 
-- `language_switch:'0'` 是否等于「不随 IP、用显式 language」？`language` 是否即 AdsPower 期望键名（vs `languages`/其它）？→ 真机 probe 定。
+- ~~`language_switch:'0'` 是否等于「不随 IP、用显式 language」？`language` 是否即 AdsPower 期望键名？~~ → **已探针实证解决**（2026-07-11，见 D1）：`language_switch:'0'`+`language:['en-US']` → navigator.languages=['en-US','en']、不随 IP、时区独立。
 - 是否给「新号是否 pin」加 env 旗标（便于灰度 / 回退），还是直接改默认？→ 倾向直接改默认（现随 IP 本就是缺陷），但保留常量单点便于回滚。
 - 存量号翻转是否值得做边缘自动化，还是长期 runbook？→ 视存量号规模与翻转设置页稳定性，真机后定。
