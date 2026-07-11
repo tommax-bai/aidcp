@@ -621,3 +621,17 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **诚实失败** — 非法 URL → 「群链接不是有效的 Facebook 群地址」黄卡不加不评；群已归属别的账号 → 「已归属其他账号」黄卡不冒充成员评论；`--join=<url>` 用在非 FB 账号 → 「仅支持 Facebook」诚实拒。
 
 > **说明**：cloud-only、无协议/边端改动；源码契约测试已锁「人审全量默认开 + 未接线不裸发 + manualOverride 不绕人审 + shadow 不审不发」「`--join=<url>` 路由指定群 + 已成员快路 + 未接线不回落 + 群 UNIQUE 归属诚实」（`comment-scheduler.test.ts` / `facebook-group-join-scheduler.test.ts` / `feishu-commands.test.ts`，1797/0）。生效即用（cloud dev 已部署）；真机核人审卡文本与指定群加入判定准确率。
+
+## 簇 49 — facebook-locale-pin-en-us 真机验收（FB 互动号界面语言钉死 en-US，登记于 2026-07-11；edge master `af83f38` 已 land，edge-only 无 ECS 部署，运营机 pull master + 重建安装包后生效）
+
+**前置**：edge 运营机 pull master `af83f38` + 重建安装包后才生效（新建的 FB 环境指纹语言才带 en-US）。用 tom 分组分身。全量单测已绿（edge 973 + acceptance 16 + typecheck 干净）+ 对抗评审 0 确认缺陷。此处验真机「界面英文 + 内容不塌 + 无检测破绽」。
+**背景**：FB 按钮/状态识别本质按可见文字关键词匹配，界面语言随代理 IP 漂（中国代理号显中文 UI）→ 跨国家/跨语言群组时词表漏判 fail-closed 跳过。本 change 在建号源头把界面 chrome 语言钉成 en-US（指纹 `language_switch:'0'`+`language:['en-US']` + 启动 `--lang=en-US` + 导入 cookie `locale=en_US`），与内容语言解耦。登出态已探针实证界面渲染英文（2026-07-11 chrome_149）；登录态与内容侧待真机核。**红线**：内容（帖文/群名/人名）语言绝不塌、只塌界面 chrome；不触发指纹一致性拒建。
+
+- [ ] **新号登录态界面英文** — 新建一个 FB 互动号（指纹带 en-US），登录后 Join / Pending / Joined / Write a comment / 菜单等界面 chrome **全英文**（非随 IP 的中文）。
+- [ ] **浏览非英文群内容不塌（红线）** — 用该英文界面账号浏览/加入一个越南语（或任一非英文）群：**界面按钮/系统文案英文**，而帖文正文 / 群名 / 评论内容 / 作者人名**仍为原语言**、未被翻译或塌为英文。
+- [ ] **Intl/ICU locale seam 一致（防语言伪造破绽，评审 finding #1）** — 在该环境页面控制台核 `navigator.language` === `Intl.DateTimeFormat().resolvedOptions().locale`（并 NumberFormat/Collator）；预期两者一致为 en-US（`--lang=en-US` 同步驱动 ICU 默认 locale）。若 navigator=en-US 但 Intl.resolvedOptions 随时区/IP 漂成他值 = 经典语言伪造 tell，需补 `--accept-lang` 或 ICU 参数。
+- [ ] **指纹一致性不被拒建 + 非红旗** — 建号未因语言 pin 触发四者一致断言拒建（`language` 不在断言集，码级已证）；「英文界面 + 本地时区（Asia/Shanghai）+ 本地 IP」为可接受真实用户形态、非一眼假。
+- [ ] **存量号归一 runbook（task 3.2，设置页导航路径待真机核）** — 存量登录号指纹语言经受限写客户端**改不动**（结构性两键，码级已证），唯一路 = 一次性登入 FB → 账号设置改语言为 **English (US)** → 跨代理/会话验证界面稳定英文。**真实设置页导航路径待真机核实**（Settings & privacy → Language，具体层级/入口跨版本可能漂）；核出后补入本条与运维手册。启动参数 `--lang` / cookie `locale` **只兜登出 chrome、改不了登录态群面**，勿据此判存量号已归一。
+- [ ] **登录态英文串对表（补 button-probe 缺口）** — 登出态探针够不着的关键业务串：登录态英文实测 Join / Pending / Joined / 评论框 label 与 edge 词表英文项一致；cookie 同意条需 GDPR 触发会话（EU 代理/首访）才弹、届时核 consent 正则（此项与 C3 consent 结构化重叠、可并轨核）。
+
+> **说明**：edge-only、无 ECS 部署；源码契约测试已锁「指纹产物 language=[en-US]+language_switch 关闭+时区仍随 IP」「language 不进四者一致断言、pin 不拒建」「launch_args 含 --lang=en-US」「cookie 缺 locale 注入 en_US / 已有不覆盖」「存量号 user/update 硬塞 fingerprint_config 进不了 body」（`ads-fingerprint.test.ts` / `browser-provider.test.ts` / `facebook-account-import.test.ts` / `ads-write-api.test.ts`，973/0）。对抗评审 6 raw findings 全被证伪（Intl seam=探针覆盖缺口非码缺陷已收本簇；fleet 语言熵下降=设计目标；stealth zh-CN 回退=empty-guard 惰性不触发；结构化 cookie 豁免=设计 belt）。C1 necessary-not-sufficient，语言无关 bug 归后续 C2（加群动作解耦+结构后置校验）/C3（同意浮层结构化）。
