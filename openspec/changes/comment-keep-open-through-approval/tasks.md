@@ -19,6 +19,7 @@
 ## 3. aidcp-cloud — 回执区分来源
 
 - [x] 3.1 终态结果卡区分「排期评论（自动）」与人工 `/comment`（`commentSourceLabel(priority)` → `postResultCard(…, source)` → server 卡 command 字段）。 <!-- aidcp-cloud 1fd65c9 -->
+- [x] 3.2 `compose_skipped` 回执按判别原因诚实分文案：`composeAndApprove` 返回 `{approved}` 判别式（带 `ComposeSkipReason`）取代裸 `null`；`composeSkipDetail(reason)` 把「撰写为空 / 撞参考 / 人审口未接线 / 审批卡发送失败 / 送审后未获批(超时或被拒)」映射成人话，两个回执构造器共用。根治「已出稿送审却写『撰写为空』」的假归因（07-11 大白《Agentic RAG》即此例：真机日志 17:12:52 出稿→17:14:22 人审超时 90000ms 未获批，非撰写为空）。「拒绝」「超时」授权口层不可分，合并为「超时或被拒」。reason 缺省回落旧措辞、向后兼容。 <!-- aidcp-cloud 409ee4f 2026-07-11 deployed dev -->
 
 ## 4. 测试
 
@@ -26,10 +27,12 @@
 - [x] 4.2 edge：`search-handler` 关键词一致/旧关键词页(Bug C)/双重编码 三例。 <!-- aidcp-edge 4576a2a -->
 - [x] 4.3 edge：`interaction.comment` 就地核对不符→note_page_mismatch、一致→正常发布。 <!-- aidcp-edge 4576a2a -->
 - [x] 4.4 回归：cloud `test:acceptance` 47 + 全量 1803 + typecheck 全过；edge `test:acceptance` 16 + 全量 997 + typecheck 全过。 <!-- 1fd65c9 / 4576a2a -->
+- [x] 4.5 回执文案回归：`compose-approve.test.ts` 断言各 reason（empty_compose/approval_not_wired/approval_unapproved/approval_send_failed/overlaps_reference）；`comment-scheduler.test.ts` 断言 compose_skipped 回执「送审未获批 ≠ 撰写为空」+ reason 缺省回落。cloud `test:acceptance` 47 + 全量 1811 + typecheck 全过。 <!-- aidcp-cloud 409ee4f -->
 
 ## 5. 集成 / 部署 / 验收
 
 - [x] 5.1 `openspec validate comment-keep-open-through-approval --strict` 通过。
 - [x] 5.2 集成：cloud/edge 各 rebase origin/master（未漂移，ff）+ ff 推送 + 主 checkout 同步 + 清 worktree/分支。 <!-- cloud 7655b00..1fd65c9 / edge 7d7d758..4576a2a on origin/master -->
 - [x] 5.3 部署 dev（cloud）：备份 `cloud.bak.20260711-155913.tar.gz` → 校验和 rsync 仅 4 文件 → restart → healthcheck 全绿（active、8787 监听、PG 全 store 就绪、CommentScheduler 就绪、飞书长连接已建立）；ECS comment-scheduler.ts md5=83d3557 与本地一致。 <!-- aidcp-cloud 1fd65c9 2026-07-11 deployed dev -->
-- [ ] 5.4 真机验收（backlog 簇）：dev 对 Tmax（ads-k1e0awu5）重跑排期/手动评论——审批期浏览器停详情页不漂走、无复搜、通过后原地发成、超时/被拒诚实结束、发现搜索不再被旧页假成功；观察边端空闲看门狗是否在 ~90s 持锁期误杀（edge 需运营机 pull master + 重建生效）。
+- [x] 5.5 部署 dev（cloud，回执文案 409ee4f）：备份 `cloud.bak.20260711-174118.tar.gz`（校验含 src、node_modules 0 条）→ itemized checksum dry-run 揪出并绕开一处非我 test 文件漂移（`facebook-group-join-judge.test.ts`，ECS 07-10 旧版，非并发 WIP）→ 手术式 rsync 仅我 4 文件（ECS md5==快照）→ restart → healthcheck 全绿（active、8787、PG 全 store、CommentScheduler 就绪、飞书长连接已建立）。 <!-- aidcp-cloud 409ee4f 2026-07-11 deployed dev -->
+- [~] 5.4 真机验收（backlog 簇 55）：dev 对 Tmax（ads-k1e0awu5）重跑排期/手动评论——审批期浏览器停详情页不漂走、无复搜、通过后原地发成、超时/被拒诚实结束、发现搜索不再被旧页假成功；观察边端空闲看门狗是否在 ~90s 持锁期误杀（edge 需运营机 pull master + 重建生效）。**部分已被生产真机自证（07-11 大白 ads-k1e0ero8 自动排期评论《Agentic RAG》）**：换词只在搜空时触发（17:12:01 词1 搜空释放→17:12:18 词2 命中）、选中即定单次搜索、审批期持锁 124s（17:12:18→17:14:22，在 240s TTL 内）**无看门狗误杀/无断连/无浏览命令偷浏览器**、17:12:52 出稿→17:14:22 人审 90000ms 超时诚实不发。**仍待运营机验**：通过后原地真发成、发现搜索旧页假成功堵住、新回执文案（送审未获批 ≠ 撰写为空）呈现正确。
