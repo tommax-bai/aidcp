@@ -14,7 +14,7 @@
 - 备注：本 change 待后续分诊清账时 archive（见 §2.1）。
 - [ ] 1.7 commit + push 到 origin/main
 
-## 2. 后续（本 change 不做，登记备忘）
+## 2. 收尾
 
-- [ ] 2.1 archive 本 change（delta 并入 `openspec/specs/deployment-environments/spec.md`，需求数 6→9）——完成即随分诊清账走
+- [x] 2.1 archive 本 change（delta 并入 `openspec/specs/deployment-environments/spec.md`，需求数 6→9）——用户 2026-07-12 拍板即时归档（不等分诊清账批；本 change 干净 additive、无并发动同 spec、header 无冲突，单独归安全） <!-- aidcp -->
 - [ ] 2.2（可选 follow-up，非本 change）为「release 分支只进不退」加 CI/hook 自动 enforcement，防 force-push/rebase；YAGNI 暂缓
