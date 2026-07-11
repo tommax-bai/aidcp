@@ -687,3 +687,15 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] 53.5 误导性报错浮层：出现「无权限添加此评论」等浮层但评论实际成功时（真机探针已实证会发生）→ 最终按确认信号判成功、不被浮层带成失败。
 
 > **说明**：edge-only、无协议 / 云端 / console / DB 改动，只改 `src/facebook/comment-executor.ts` 提交后确认路径。判据源自真机探针 `scripts/fb-comment-verify-probe.ts`（本会话实测）：FB 评论回车后 ~68ms 乐观渲染带**客户端占位** `comment_id=client…`、0 个点赞/回复；服务器写入响应 ~3.5s 才到、之后 id 升级为**服务器正式**（base64 "comment:"）且点赞/回复才出现。故成功只认「本人+文本」评论行上服务器正式 id 或点赞/回复交互控件（皆 ack-gated），绝不认乐观渲染/占位 id。源码契约测试已锁就地命中不刷新 / 慢渲染有界轮询命中 / `isServerFacebookCommentId` 纯函数（990/0）；乐观占位 id 与点赞/回复计数的页内 JS 判别是 FakeCdp 桩测盲区、由真机探针坐实，本簇复核。生效需运营机 pull master `1e7e6d9` + 重建安装包。
+
+## 簇 54 — edge-adspower-env-in-use-terminal-stop 真机验收（启动撞「分身被同账号在别处占用」判为不可重起终局：直接停 +「环境被占用」提示、不空转重起、不关别处浏览器，登记于 2026-07-11；edge master `7d7d758` 已 land，edge-only 无 ECS 部署，运营机 pull master + 重建安装包后生效）
+
+**前置**：制造并发占用——用同一 AdsPower 账号在 A 处（另一台机 / 另一个 GUI 实例 / AdsPower 桌面端）打开某分身（tom 分组），再在本客户端选同一分身点「启动」。edge-only、全量 993 + acceptance 16 + typecheck 已绿；生效需运营机 pull master `7d7d758` + 重建安装包。**背景**：此前外壳把 `browser/start` 的 `code=-1 … is being used by … not allowed to open` 当普通崩溃喂进有界重起，空转 6 次（1 初始 + 5 重起、退避 1+2+4+8+16s、约 45–60s）后落到通用「本机引擎已停止」+ 生英文详情。本 change 把该拒启识别为不可重起终局：即刻停、不重起、换「环境被其它端占用…请先关闭后重试」提示；护栏 `AIDCP_EDGE_ENV_IN_USE_TERMINAL` 默认开可退回旧行为。
+
+- [ ] 54.1 直接停不空转（核心，红线）— 选中已被同账号在别处打开的分身点启动：**不再**反复 6 次重发 browser/start、约 45–60s 空转；一次失败后即停，失败详情/健康详情/系统通知显示「环境被其它设备或窗口占用（AdsPower 账号 …）；请在占用它的一端关闭后再点『启动』重试」。核 edge.log 里 `browser/start … is being used` 只出现 1 次、无后续退避重起行。
+- [ ] 54.2 不关别处浏览器（红线）— 本客户端这次失败启动**绝不**关闭 / 杀掉 A 处那个正在用的浏览器；A 处会话全程不受影响。
+- [ ] 54.3 账号解析 — 提示里带出占用账号（从拒启 msg 的 `is being used by [<account>]` 解析）；解析不到时提示不带账号但仍成立。
+- [ ] 54.4 护栏回退 — 设 `AIDCP_EDGE_ENV_IN_USE_TERMINAL=false` 后重来：退回旧的「按崩溃有界重起」行为（识别误伤时应急）。
+- [ ] 54.5（待评估，非本 change）确认 AdsPower 同账号并发到底返 `code=-1` 拒启还是 `code=0` 复用既有端口。若存在 `code=0` 复用，核心会 attach 到别处那个浏览器、正常收尾会关掉它——那是另一条危险路径，需单独加「attach 前校验非外部实例」防护。本 change 只处理明确拒启的 `code=-1`。
+
+> **说明**：edge-only、无协议 / 云端 / console / DB 改动，只改 `src/electron/fleet.cjs`（新增纯函数 `classifyAdsInUse`）+ `src/electron/main.cjs`（`handleEdgeLogLine` 置 `envInUseThisRun`、`child.on('close')` 据标志强制 `decision=stop` + 换友好文案 + 专门通知；护栏 env）。源码契约测试已锁 `classifyAdsInUse`（双闸识别拒启 + 解析账号 + 缺内核/连云失败/无关串/空 皆判否，993/0）；「命中即 stop 不重起 + 别处浏览器不被关」是 electron 外壳退出路径行为、桩验不了，由本簇真机坐实。生效需运营机 pull master `7d7d758` + 重建安装包。
