@@ -6,8 +6,17 @@
 
 | Target | Host | SSH key | Purpose |
 | --- | --- | --- | --- |
-| `dev` | `121.89.85.150` | `~/codes/isales-4.pem` | 默认部署目标；主干开发、高频部署、真机验证 |
-| `ol` | `123.56.253.183` | `/Users/baitianxing/Downloads/ol.pem` | 稳定上线环境；仅在用户明确要求时从 release 分支部署 |
+| `dev` | `121.89.85.150` | `~/codes/isales-4.pem` | **不稳定主干测试位**：主干开发（含实验性/FB 分支合并回的内容）高频部署、真机验证。 |
+| `ol` | `123.56.253.183` | `/Users/baitianxing/Downloads/ol.pem` | **稳定生产环境**：只从 `release/<yyyymmdd>-<scope>` 分支部署；**edge 安装包默认云端目标** + **`aidcp.tommax.cc` 域名宿主**。 |
+
+## 角色与发布模型（主干开发 / 分支上线，2026-07-11 定）
+
+- **主干开发**：`master`（各 sub-repo）是开发主干，落地即部署到 `dev` 做测试；`dev` 允许承载不稳定内容（实验特性、刚合并回主干的隔离分支工作）。
+- **分支上线**：`ol` 是稳定生产环境，**只从 release 分支部署**。稳定版 = 从选定的 master 提交切 `release/<yyyymmdd>-<scope>`；该 release 分支是 `ol` 的不可变部署 ref of record，保留不删。
+- **隔离分支合并纪律**：把某隔离 feature 分支合并回主干时，**若要同时保 `ol` 干净**，必须先从「合并前的 master」切好 `ol` release 分支并部署，再把 feature 合并进 master（推进 dev）。合并只推进 master，钉死的 release 分支不受影响。
+- **edge 安装包默认云环境 = 构建期注入**：master 保持 dev-default（缺省或 `cloud_default_env=dev`，零回归）；OL 安装包用 `gh workflow run build-desktop.yml -f cloud_default_env=ol` 构建（electron-builder `extraMetadata.aidcpCloudDefaultEnv=ol` 烘进包内 `package.json`，shell 启动读取后注入 `AIDCP_CLOUD_URL=ol`、芯片显示=实际连接）。**同一份 master 源码构建 dev 或 ol 安装包，靠构建 flag 区分，不靠长命 release 分支** —— 不再需要为默认环境保留分支源码分叉。OL 包分发到域名所指主机的 `/opt/aidcp/downloads/`。
+- **飞书**：dev 与 ol **各自拥有独立飞书 bot**（各自 `.env` 的 `FEISHU_APP_ID/SECRET` + `AIDCP_FEISHU_WS_ENABLED=true`），互不争用、无双消费问题；不再需要「共享单 app 时只开一端」的交接（该约束仅在退回共享单 app 时才适用，见下）。
+- **域名 `aidcp.tommax.cc`（tommax.cc 已 ICP 备案通过）**：目标 = 指向 `ol`。OL nginx 已接线（`listen 8088 + 80; server_name aidcp.tommax.cc`，反代 `/api`+`/ws` → ol 本地 `127.0.0.1:8090`，`/downloads/` alias）。**尚待两步用户侧动作**：① DNS A 记录 `121.89.85.150 → 123.56.253.183`；② 把已构建的 OL 安装包 rsync 到 ol `/opt/aidcp/downloads/`（现为空，否则域名 `/downloads/` 404）。切换后从 dev nginx 撤 `server_name aidcp.tommax.cc` 块。当前 HTTP-only（无 443）。
 
 运行时目录约定：
 
@@ -43,6 +52,13 @@ A temporary `ol -> dev PostgreSQL` bridge is allowed only for bootstrap or smoke
 5. Avoid letting both dev and ol cloud processes process real edge/Feishu traffic against the shared database.
 
 As of the 2026-07-06 probe, dev PostgreSQL was reachable from ol, listened on `*`, allowed `aidcp/aidcp` from `0.0.0.0/0`, and had SSL off. That posture is acceptable only as a finding to fix, not as a final online architecture.
+
+**Status 2026-07-11 (ol turned stable-production while still sharing dev PG — split deferred by user decision).** `ol` production and `dev` unstable-trunk both read/write `121.89.85.150/aidcp`, isolated only by `account_id`. Until `ol` gets its own PostgreSQL boundary, two guardrails are MANDATORY:
+
+1. **Freeze destructive/incompatible dev schema migrations.** `dev` runs the unstable trunk (incl. freshly merged feature work) against the *same* schema `ol` production reads. Additive DDL (`ADD COLUMN IF NOT EXISTS`) is tolerable (ol just ignores the new column); DROP/RENAME/type-narrowing is NOT — it would corrupt ol production reads. Before landing any change that introduces such a migration, split the ol DB first.
+2. **Tighten dev PostgreSQL `pg_hba`** away from `0.0.0.0/0` to local-dev + the ol source only (still pending as of 2026-07-11).
+
+Verify at every dev deploy that the batch introduces no destructive migration (`migrations/*.sql` additions are the tell). The 2026-07-11 `feature/fb-full-integration → master` merge added no migration.
 
 ## Target Selection
 
