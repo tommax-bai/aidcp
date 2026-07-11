@@ -12,11 +12,11 @@
 ## 角色与发布模型（主干开发 / 分支上线，2026-07-11 定）
 
 - **主干开发**：`master`（各 sub-repo）是开发主干，落地即部署到 `dev` 做测试；`dev` 允许承载不稳定内容（实验特性、刚合并回主干的隔离分支工作）。
-- **分支上线**：`ol` 是稳定生产环境，**只从 release 分支部署**。稳定版 = 从选定的 master 提交切 `release/<yyyymmdd>-<scope>`；该 release 分支是 `ol` 的不可变部署 ref of record，保留不删。
+- **分支上线**：`ol` 是稳定生产环境，其 ECS cloud/console 运行时**只从 release 分支部署**（edge 安装包是分发工件、走构建期选择，是此强制的**例外**，见下 edge 条）。稳定版 = 从选定的干净已提交 master commit（分支尖 / tag / SHA）切 `release/<yyyymmdd>-<scope>`；该 release 分支是 `ol` 的部署 ref of record，**在役期间保留不删**。**历史 append-only、只进不退**：向前推按 append-only——热修是 release tip 严格后代时可 fast-forward（如 console 0.3.18 下载页 bump `6bce66d→0c8db0c`），否则（trunk 已合入 `ol` 须排除的内容、热修非严格后代）以追加提交 / cherry-pick 落到 release 分支、**绝不把被排除内容拖进 `ol`**；**任何情形都绝不 force-push / rebase / reset 重写已发布历史**。被新 release 取代且不再是部署 ref 后方可归档 / 删除。
 - **隔离分支合并纪律**：把某隔离 feature 分支合并回主干时，**若要同时保 `ol` 干净**，必须先从「合并前的 master」切好 `ol` release 分支并部署，再把 feature 合并进 master（推进 dev）。合并只推进 master，钉死的 release 分支不受影响。
 - **edge 安装包默认云环境 = 构建期注入**：master 保持 dev-default（缺省或 `cloud_default_env=dev`，零回归）；OL 安装包用 `gh workflow run build-desktop.yml -f cloud_default_env=ol` 构建（electron-builder `extraMetadata.aidcpCloudDefaultEnv=ol` 烘进包内 `package.json`，shell 启动读取后注入 `AIDCP_CLOUD_URL=ol`、芯片显示=实际连接）。**同一份 master 源码构建 dev 或 ol 安装包，靠构建 flag 区分，不靠长命 release 分支** —— 不再需要为默认环境保留分支源码分叉。OL 包分发到域名所指主机的 `/opt/aidcp/downloads/`。
 - **飞书**：dev 与 ol **各自拥有独立飞书 bot**（各自 `.env` 的 `FEISHU_APP_ID/SECRET` + `AIDCP_FEISHU_WS_ENABLED=true`），互不争用、无双消费问题；不再需要「共享单 app 时只开一端」的交接（该约束仅在退回共享单 app 时才适用，见下）。
-- **域名 `aidcp.tommax.cc`（tommax.cc 已 ICP 备案通过）**：目标 = 指向 `ol`。OL nginx 已接线（`listen 8088 + 80; server_name aidcp.tommax.cc`，反代 `/api`+`/ws` → ol 本地 `127.0.0.1:8090`，`/downloads/` alias）。**尚待两步用户侧动作**：① DNS A 记录 `121.89.85.150 → 123.56.253.183`；② 把已构建的 OL 安装包 rsync 到 ol `/opt/aidcp/downloads/`（现为空，否则域名 `/downloads/` 404）。切换后从 dev nginx 撤 `server_name aidcp.tommax.cc` 块。当前 HTTP-only（无 443）。
+- **域名 `aidcp.tommax.cc`（tommax.cc 已 ICP 备案通过）**：已切至 `ol`（2026-07-11 完成）。经 Cloudflare 橙云代理 fronts `aidcp.tommax.cc`→OL；OL nginx `listen 80 + server_name aidcp.tommax.cc`→反代 `/api`+`/ws` → ol 本地 `127.0.0.1:8090`、`/downloads/` alias；Cloudflare 提供边缘 TLS、源站 HTTP-only。OL 安装包已上架（`AIDCP-0.3.18-arm64.dmg`/`AIDCP-0.3.18.dmg` + Windows 仍 `AIDCP Setup 0.3.5.exe`）。**残留待办**：从 dev nginx 撤已 inert 的 `server_name aidcp.tommax.cc` 块（Cloudflare 已只回 OL）。
 
 运行时目录约定：
 
@@ -136,7 +136,7 @@ or a future ol domain. Packaged edge releases intended for ol must not silently 
 ### Ol
 
 1. Proceed only after the user explicitly requests `ol`/online deployment.
-2. Create or select a release branch such as `release/<yyyymmdd>-<scope>` from the chosen clean default-branch commit, tag, or SHA.
+2. Create or select a release branch named `release/<yyyymmdd>-<scope>` from the chosen clean committed trunk commit (branch tip, tag, or SHA). Retain it as the ol ref of record while it backs a live ol runtime; advance it only append-only (fast-forward when the fix is a strict descendant, otherwise a cherry-picked commit appended to the branch) and never force-push, rebase, or reset it.
 3. Verify all affected artifacts are built from matching release branch sources.
 4. Back up the existing ol runtime if present.
 5. `rsync` committed cloud files and built console static files to ol.
