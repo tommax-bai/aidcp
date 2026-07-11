@@ -663,3 +663,16 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **搜索词保留内部空格（console→edge 端到端）** — 管理后台「FB配置」关键词框输入「手冲 咖啡」回车 → 存为**一个**关键词（不被切成「手冲」「咖啡」两个）；保存后云端 `account_facebook_comment_config.keywords` 该项含空格；FB 评论时边缘按该整串（含空格）站内搜索、非拆词。逗号仍分隔多个关键词。
 
 > **说明**：cloud（覆盖选群 + 审核卡标注）+ console（关键词输入）双仓、已部署 dev；无协议 / 边端 / DB schema 改动。源码契约测试已锁「coverageCandidates relaxed 去三时限闸留 status=joined+LRU 排序」「两级选群 + relaxed 标记」「审核卡标题按 relaxed 分支」「relaxed 仍受日上限」（cloud `facebook-group-store.test.ts` / `comment-scheduler.test.ts`，1802/0）与「关键词框 tokenSeparators 去空格」（console，91/0）。搜索词多词行为本身未做单测——AntD tags 的 CJK 分词在 jsdom 下靠 fireEvent 无法稳定复现，故转本簇真机核。覆盖白名单空时本 change 全程 latent。
+
+## 簇 52 — edge-adspower-close-real-teardown 真机验收（客户端「暂停→关闭」真关指纹浏览器 + 诚实收尾，登记于 2026-07-11；edge master `0e569f4` 已 land，edge-only 无 ECS 部署，运营机 pull master + 重建安装包后生效）
+
+**前置**：关闭按钮只在「已暂停」态出现，是关浏览器的唯一入口。用 tom 分组分身：启动一个 adspower 环境（指纹浏览器打开）→ 点暂停（浏览器应保持打开）→ 点关闭。edge-only、全量 987 + acceptance 16 + typecheck 已绿；生效需运营机 pull master `0e569f4` + 重建安装包。**背景**：旧关闭完全托付软性 `browser/stop` + 「查不动就当已关」的 confirmClosed（静默假成功红线）、无 OS 级实杀，故 `browser/stop` 没真杀内核时浏览器留着而界面报「已关闭」。本 change：关闭以**该分身 CDP 调试端点是否变暗**为权威判据（独立于 AdsPower 自报）、软停止未生效则升级（重发 + `AIDCP_ADS_CLOSE_OS_KILL` 默认开的 OS 级强杀）、无法确认如实报未关；外壳 no-child 分支经只读 local-active 实证后才判已关。
+
+- [ ] **暂停→关闭真关（核心，红线）** — 启动 adspower 环境后暂停（浏览器仍开）再关闭：指纹浏览器窗口**真的关掉**，界面显示「浏览器已关闭」。反例（本 change 前）：窗口留着但界面报已关。
+- [ ] **软停止失败态如实呈现** — 构造 `browser/stop` 不生效（如手动让 AdsPower 拒/无响应，或临时 `AIDCP_ADS_CLOSE_OS_KILL=false` 且软停止无效）：界面**不**假报「已关闭」，而是保持暂停 + 「关闭状态未能确认，可重试关闭」；浏览器仍开着与界面一致。
+- [ ] **OS 级强杀兜底是否触达** — 软停止确实没杀掉内核时，`AIDCP_ADS_CLOSE_OS_KILL=true`（默认）下核心日志出现「OS 级强杀调试端口 <port> 监听进程 pid=…」且随后端点变暗、真关；`=false` 时退回「仅软停止 + 诚实未确认」。核 mac 上 `lsof -iTCP@127.0.0.1:<debug_port> -sTCP:LISTEN` 命中的确是该分身内核进程、不误伤他者。
+- [ ] **no-child 分支不假关** — 若驻留核心在暂停与关闭之间已死（浏览器由 AdsPower 运行时托管仍在跑）：点关闭后界面**不**零回收直接报已关；经 local-active 实证仍在跑 → 报「浏览器仍在运行，请点恢复接管后再关闭」；点恢复能接管已开浏览器、再关闭走正常权威路径真关。
+- [ ] **暂停期拆 CDP 后仍收敛（领先假设核实）** — 复现「暂停→关闭」路径，用 CDP 连本地浏览器 + 核心日志观察：确认暂停 `session.close→cdp.close` 后 `browser/stop` 是否空转（AdsPower 是否把该驻留分身判非活跃）；无论是否属实，本 change 的「重发 stop + 端点实证 + 升级实杀」应都能真关。若属实，评估是否值得后续把「会 detach 的 CDP 拆除」推迟到真关闭（改暂停时序，本 change 未做）。
+- [ ] **退出期不留孤儿（时序）** — 关整个客户端（app quit）时，各环境浏览器随之关闭、不留孤儿；最坏（端口挂着一直超时）关闭确认仍落在 `gracefulStopAllAndQuit` 的 ~10s 有界等待内、不被截断致孤儿。
+
+> **说明**：edge-only、无协议 / 云端 / DB 改动。修改 `src/cdp/browser-provider.ts`（权威端点实证 + K=2 连读闸 + 三阶段升级 + OS 级强杀）、`src/electron/main.cjs`（no-child 诚实收尾 + 防 start/resume 竞态）、`src/electron/ads-local-api.cjs`（`listWellFormed` 区分确认为空 vs 响应不完整）。源码契约测试已锁假成功分支（`test/cdp/browser-provider.test.ts` 23/0：端点变暗判关 / OS 杀升级 / 禁用诚实 false / stop 失败端点权威 / 不可达仍活 false / K=2 瞬态不误判 / 默认探测被拒判死）。OS 级强杀与「暂停拆 CDP」这两项桩验不了、须真机核（本簇 3、5 项）。多 agent 对抗评审 5 findings（探测无超时会挂过 10s 预算、单次瞬态误判、lsof 未限地址、no-child 竞态、不完整列表当已关）均已修。
