@@ -581,3 +581,16 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **登录落点 tab 一致性（头号风险）** — 扫码登录完成后落点 tab 若与 `attachToPage` 选中 tab 不一致，就地重读永远读不到、白等到超时且 UI 仍显示「在等」＝静默假成功；须验证登录后落点 tab 与附着 tab 一致（覆盖「同 tab 内重定向」与「登录落新 tab」），不一致则记录、需后续外科处置（换附着目标/诚实提示）。
 
 > **说明**：edge-only、无 ECS 部署；`process.exit` 真退出破僵尸的「进程确实终止」由逻辑层 terminate action 断言 + 结构保证（`terminateNow` 用 `process.exit`），真机复核「不留僵尸 / 看护重起 / 启动可用」。同源姊妹僵尸 `main.ts:605-609`（身份重检刻意 stay-alive）经审计**保留原样**、不在本簇。openspec change 仍活跃，待本簇验收后归档。
+
+## 簇 46 — edge-multi-instance-userdata-isolation 真机验收（同机并行两 GUI，登记于 2026-07-11）
+
+**前置**：edge 本地重建到 master `cdb7115`（含 `AIDCP_USER_DATA_DIR` userData 隔离）；准备**两个不重叠**的 AdsPower 分身（tom 分组，如大白 `k1e0ero8` / Tmax `k1e0awu5`）。
+**背景**：桌面客户端默认「一台机一个监督者」（单实例锁按 userData 分）。本 change 让第二个 GUI 设不同 `AIDCP_USER_DATA_DIR` 即整体隔离锁/设置名册/界面状态/日志/内置运行时落地；用户诉求=同机一 GUI 连 dev、一 GUI 连 ol、各操作不同账号。本地代码验证已过（`npm test` 964/0 + typecheck），此处验真机并存互不干扰。**红线**：同一分身绝不出现在两实例名册（否则两套操纵系上同一浏览器、连不同云还不报错、静默互扰）。
+
+- [ ] **两 GUI 并存启动** — 实例甲设默认目录 + `AIDCP_CLOUD_URL=dev`，实例乙设 `AIDCP_USER_DATA_DIR=<独立目录>` + `AIDCP_CLOUD_URL=ol`；两者**均成功启动**，第二个**不被单实例锁弹「已在运行」退出**。
+- [ ] **本机状态各自独立** — 两实例的设置/名册（settings.json）、界面状态（ui-state.json）、日志（logs/edge.log）落在各自 userData、互不覆盖。
+- [ ] **分身不重叠、浏览器互不干扰** — 两实例各用不同分身，各自浏览器会话独立，无「同一窗口被两边驱动」；一边停浏览器不影响另一边。
+- [ ] **错峰启动复用守护进程** — 先起甲、待本机 AdsPower 服务（50325，机器全局）稳定后再起乙；乙**复用**已在跑的守护进程、不抢杀（无守护进程 SIGKILL 战、无 launch 大面积「Too many request per second」）。
+- [ ] **未设 `AIDCP_USER_DATA_DIR` 零回归** — 旧的单实例启动方式（不设该变量）行为逐字不变、用默认目录，现役 dev GUI 不受影响。
+
+> **说明**：edge-only、无 ECS 部署；源码契约测试已锁「覆盖存在 / 受守卫 / 在单实例锁与任何 `getPath('userData')` 之前生效」三不变量（`test/electron/instance-userdata-isolation.test.ts`，964/0）。真机核并存互不干扰 + 错峰复用守护进程 + 零回归。生效需运营机重建 edge checkout 并 pull master `cdb7115`。
