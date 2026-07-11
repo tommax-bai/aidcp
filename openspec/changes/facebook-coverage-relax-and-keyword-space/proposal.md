@@ -15,12 +15,12 @@ Two operator-facing usability gaps in the Facebook comment pipeline surfaced aft
 
 ### Modified Capabilities
 
-- `facebook-scheduled-comment`: Coverage-mode target selection gains a review-gated relaxed-timing fallback so a fully-in-cooldown account is not silently idle; operator search keywords preserve internal whitespace as a single term end-to-end.
+- `facebook-scheduled-comment`: Coverage-mode target selection is gated by a global switch that enables joined-group coverage commenting for ALL Facebook accounts (replacing the per-account allowlist as the primary gate) and gains a review-gated relaxed-timing fallback so a fully-in-cooldown account is not silently idle; operator search keywords preserve internal whitespace as a single term end-to-end.
 
 ## Impact
 
-- Affected repos: `aidcp-cloud` (coverage selection + review card note), `aidcp-console` (keyword tags input).
-- Cloud areas: coverage candidate query (relaxed variant), coverage config resolver (two-tier pick + relaxed flag), Facebook comment review card title annotation. No protocol, edge, or DB-schema change.
+- Affected repos: `aidcp-cloud` (coverage scope switch + selection + review card note), `aidcp-console` (keyword tags input).
+- Cloud areas: coverage scope gate (global switch), coverage candidate query (relaxed variant), coverage config resolver (two-tier pick + relaxed flag), Facebook comment review card title annotation. No protocol, edge, or DB-schema change.
 - Console areas: one Facebook config form component (`tokenSeparators` + help text).
-- Operational impact: the relaxed fallback only takes effect for accounts in the coverage allowlist (`AIDCP_FB_GROUP_COVERAGE_ACCOUNTS`), which is currently empty on dev — so on dev this is latent until coverage mode is enabled. Default-on behavior (relaxed fallback active) is reversible with `AIDCP_FB_GROUP_COVERAGE_RELAX=false`. No change to the per-account daily cap or the always-on human-review gate.
+- Operational impact: coverage mode is enabled for ALL Facebook accounts by a global switch `AIDCP_FB_GROUP_COVERAGE_ALL` (default off in code; turned ON on dev per operator request 2026-07-11, reversible by setting it back off). The legacy per-account allowlist `AIDCP_FB_GROUP_COVERAGE_ACCOUNTS` is kept only as an optional narrowing when the global switch is off. The relaxed-timing fallback within coverage is separately reversible with `AIDCP_FB_GROUP_COVERAGE_RELAX=false`. No change to the per-account daily cap or the always-on human-review gate. Accounts with no joined groups (and no configured containers) still produce an honest no-op.
 - Red lines preserved: never a silent false-success — a relaxed pick is a real, honestly-flagged, human-reviewed comment; a zero-joined-group account still returns an honest no-op; the human-review gate is never bypassed.
