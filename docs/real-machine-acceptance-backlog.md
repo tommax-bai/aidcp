@@ -607,3 +607,17 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **缺数据不误改（红线）** — 环境较多致列表被截断、或拉取失败/空列表时，在用环境的左栏名字**保持不变**、绝不被清空或改错。
 
 > **说明**：edge-only、无 ECS 部署；源码契约测试已锁「创建带回真名入册 / 拉列表回填空名 / 截断不回填」（`renderer-smoke.test.ts` + `ads-create-flow.test.ts`，968/0）。生效需运营机重建 edge checkout 并 pull master `1d2620a`。落地经 session scratchpad 全新 origin clone（基线 `cdb7115`）验证后 push，未触碰本机被外部清空的 edge worktree 群。
+
+## 簇 48 — facebook-comment-review-and-targeted-join 真机验收（FB 评论全量人审 + /comment --join=<url>，登记于 2026-07-11；cloud master `8062dd5` 已 land + 部署 dev）
+
+**前置**：cloud 已部署 dev（`8062dd5`）。dev 上 `AIDCP_FB_COMMENT_AUTO` / `AIDCP_CONTENT_SCHEDULE_AUTO` / `AIDCP_FB_GROUP_JOIN_AUTO` 均已 `=true`；`AIDCP_FB_COMMENT_REVIEW_ALL` 缺省（=默认开）。用 FB 测试账号（tom 分组，如 `61591458584142` / env `k1ehveal`）。全量单测已绿（cloud 1797/0 + acceptance 47/0 + typecheck 干净）；此处验真机人审卡与指定群加入行为。
+**背景**：改前 FB 不带联系方式的评论校验后**直发、无人审**；本 change 让**所有 FB 评论**（带/不带联系方式）默认走飞书人审（`AIDCP_FB_COMMENT_REVIEW_ALL`，可 env 关）。并给 `/comment --join` 加 URL 形式 `--join=<群链接>`：加入**指定群**（只归该账号，target `enabled=false` 不外泄）、已是成员则直接评论。**红线**：人审未过/未接线绝不裸发；`manualOverride` 只绕配额、不绕人审；`--join=<url>` 未接线/非法 URL 绝不回落「下一个库内群」、群被别账号占则诚实拒不冒充成员。
+
+- [ ] **非联系评论出人审卡** — 触发一次不带联系方式的 FB 自动/手动评论：飞书出**人审卡**、卡文本=纯正文（无尾部换行/联系方式），**审批通过后才真发**、拒/超时则不发。
+- [ ] **联系评论仍必审（零回归）** — `/comment <昵称> --contact`：人审卡文本=正文+换行+联系方式，通过后带联系方式真发。
+- [ ] **逃生门可关** — 临时设 `AIDCP_FB_COMMENT_REVIEW_ALL=false` 重启：不带联系方式评论恢复「校验后直发、无人审」；验完改回缺省（默认开）。
+- [ ] **`/comment <昵称> --join=<群链接>` 加入指定群再评论** — 传一个该账号未加入的公开群 URL：客户端**加入这个群**、加入成功后在**该群内**发一条评论（走人审）；结果卡显「加群 + 评论成功」。
+- [ ] **已是成员快路** — 对一个该账号**已加入**的群 URL 再发 `--join=<url>`：**跳过加群**、直接在该群评论（无多余加群回合）。
+- [ ] **诚实失败** — 非法 URL → 「群链接不是有效的 Facebook 群地址」黄卡不加不评；群已归属别的账号 → 「已归属其他账号」黄卡不冒充成员评论；`--join=<url>` 用在非 FB 账号 → 「仅支持 Facebook」诚实拒。
+
+> **说明**：cloud-only、无协议/边端改动；源码契约测试已锁「人审全量默认开 + 未接线不裸发 + manualOverride 不绕人审 + shadow 不审不发」「`--join=<url>` 路由指定群 + 已成员快路 + 未接线不回落 + 群 UNIQUE 归属诚实」（`comment-scheduler.test.ts` / `facebook-group-join-scheduler.test.ts` / `feishu-commands.test.ts`，1797/0）。生效即用（cloud dev 已部署）；真机核人审卡文本与指定群加入判定准确率。

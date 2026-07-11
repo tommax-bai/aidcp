@@ -32,10 +32,15 @@ Cloud-only change. No protocol change, no edge change, no console change. Develo
 ## 4. Integration + deploy
 
 - [x] 4.1 Rebase onto latest `origin/master`, `scripts/land-change aidcp-cloud facebook-comment-review-and-targeted-join`, update main checkout.
-- [ ] 4.2 Deploy dev (backup → rsync → restart → healthcheck), per safety sequence.
-- [ ] 4.3 Flip dev env: `AIDCP_FB_COMMENT_AUTO=true`, `AIDCP_CONTENT_SCHEDULE_AUTO=true` (AFTER 4.2 so auto-comments are reviewed). `contactCommentEnabled` unchanged.
+- [x] 4.2 Deploy dev (backup → rsync → restart → healthcheck), per safety sequence.
+- [x] 4.3 Flip dev env: `AIDCP_FB_COMMENT_AUTO=true`, `AIDCP_CONTENT_SCHEDULE_AUTO=true`. `contactCommentEnabled` unchanged.
 <!-- aidcp-cloud 8062dd5 landed to origin/master + main checkout fast-forwarded (land-change --yes). Collision analysis: 3 concurrent FB branches already merged; facebook-scheduled-comment untouched region. -->
+<!-- 2026-07-11 deployed dev: git-archive HEAD snapshot → backup (/opt/aidcp/cloud.bak.20260711-112014.tar.gz + .env.bak) → rsync (excl .env/node_modules/.git, no --delete) → restart → healthcheck green (active, :8787, PG ready, feishu WSClient onReady, ContentScheduler+CommentScheduler running). 5 changed files md5-match local. -->
+<!-- ITEM 6 finding: AIDCP_FB_COMMENT_AUTO / AIDCP_CONTENT_SCHEDULE_AUTO / AIDCP_FB_GROUP_JOIN_AUTO were ALREADY =true on dev — no flip needed. Deploying this code (AIDCP_FB_COMMENT_REVIEW_ALL absent = default ON) is what makes the already-on auto-comments human-reviewed. AIDCP_FB_COMMENT_REVIEW_ALL left absent (default-on); set =false only to restore auto-publish. contactCommentEnabled left untouched per user. -->
 
 ## 5. Real-machine acceptance (deferred to backlog)
 
-- [ ] 5.1 Register real-machine items in `docs/real-machine-acceptance-backlog.md`: non-contact FB comment shows a review card and only posts after approval; `/comment <昵称> --join=<url>` joins the exact group and comments; already-member fast path; invalid/foreign-owned URL honest cards.
+- [x] 5.1 Register real-machine items in `docs/real-machine-acceptance-backlog.md`: non-contact FB comment shows a review card and only posts after approval; `/comment <昵称> --join=<url>` joins the exact group and comments; already-member fast path; invalid/foreign-owned URL honest cards.
+<!-- registered as 簇 48 in docs/real-machine-acceptance-backlog.md (2026-07-11). -->
+
+Not archived yet — pending real-machine acceptance (簇 48). Cloud code fully landed + deployed dev + tests green.
