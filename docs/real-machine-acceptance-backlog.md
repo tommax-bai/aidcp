@@ -739,3 +739,18 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] 57.6 显示层兜底（空窗 + 写失败）— 刚建好未改名 / 改名写失败期间，左栏仍显示真实昵称（已读到时）而非模板名；实时名回填把花名册名刷成模板名也不遮蔽已知昵称。
 
 > **说明**：edge `7b3cea4`（renameProfile 两键封装 + 建号不写死模板名 + 身份事件 `maybeRenameEnvToNickname` 渐进改名 + `railDisplayName` 纯函数优先真实昵称）需运营机 pull master + 重建安装包后生效；edge-only 无 ECS 部署。写客户端 M7 红线由「`user/update` 仅改代理」放宽为「改代理或改名两个各两键封装」，回归断言分别锁两个封装的 body 键集（放行 update ≠ 打开整张写面）。真机测试账号只用 tom 分组（见 memory real-machine-test-accounts）。
+
+## 簇 58 — manual-comment-force-flag 真机验收（飞书 `/comment <昵称> --force` 放开「相关性 + 每笔记去重」两道软筛选：没强相关目标也评、已评过的也能再评；仅手动路径，仍守人审 / 内容安全校验 / 边端诚实闸，登记于 2026-07-11；cloud master `3177735` 已 land + **已部署 dev**，纯云端、边缘无改）
+
+**背景**：手动 `/comment` 此前被两道软筛选挡下——小红书「人设强相关」甄选（一篇都不强相关就换词、用尽则本次不评）、Facebook「零重叠相关性」`weak_relevance`，外加两侧「每笔记/每帖去重」。运营刻意补评 / 没强相关目标也想发 / 想再评已评过的目标时无法表达意图。本 change 加尾部开关 `--force`（复用 `--contact`/`--join` 尾部解析，任意顺序可组合）：小红书无强相关时兜底选**收藏最高的一篇**、Facebook 传空关键词让 `weak_relevance` 分支 no-op、两侧放开去重（发布成功后仍照记）。**红线不动**：飞书人审、FB 内容安全校验（链接/联系方式/@提及/刷屏/长度）、边端诚实闸、账号隔离；`--force` 只从飞书手动入口置位，自动/排期/面板路径绝不带（零回归）。桩测已锁解析组合、XHS 兜底选 top-collect、XHS/FB 去重放开、FB 跳 `weak_relevance` 但 url 仍拦、人审在 force 下仍拦（全量 cloud 1824 + acceptance 47 + typecheck 绿）。以下须真机核（桩验不了平台真实发布 / 人审闭环）。真机测试账号只用 tom 分组（见 memory real-machine-test-accounts）。
+
+- [ ] 58.1 XHS `--force` 无强相关兜底真发 — tom 分组小红书账号，选一个人设强相关笔记稀少的时段跑 `/comment <昵称> --force`：确认在「本轮无强相关候选」时兜底选**收藏最高的一篇**、开帖→撰写→飞书人审→批准后**真发**（而非回「本次不评」黄卡）；触发回执与结果卡标注 `--force`。
+- [ ] 58.2 XHS `--force` 再评已评过的笔记 — 对该账号**已评论过**的一篇笔记（去重账本命中），`/comment <昵称> --force` 能再评一条（去重放开）；发布成功后仍记一笔去重（后续不带 force 的任务对其仍去重）。
+- [ ] 58.3 FB `--force` 跳过 `weak_relevance` 真发 — tom 分组 FB 账号 `/comment <昵称> --force`：确认零重叠草稿也过相关性闸、经飞书人审后真发（对比不带 force 时零重叠被判 `weak_relevance`/compose_skipped）。
+- [ ] 58.4 FB `--force` 内容安全校验仍拦（红线）— force 下若草稿含链接 / 联系方式 / @提及 / 刷屏短语，仍 `compose_skipped`（对应 reason）、绝不发；force 只放开相关性、不放开安全校验。
+- [ ] 58.5 人审红线：`--force` 绝不绕人审 — XHS 与 FB 两侧，force 下在飞书审批卡**不点同意 / 超时**，确认不发、诚实回执（人是刹车）；force 只绕相关性/去重。
+- [ ] 58.6 组合开关按预期 — `/comment <昵称> --force --contact`（放开相关性/去重 + 注入联系方式，联系评论仍走人审）、`/comment <昵称> --join --force`（FB 加群 + 群内评论 + 放开相关性/去重）任意顺序均生效、昵称解析正确。
+- [ ] 58.7 零回归：不带 `--force` 的普通 `/comment` 行为不变 — 无强相关仍「本次不评」、已评过仍被去重挡下；自动排期 / 面板定向评论路径相关性 + 去重照旧（force 信号不出现在这些路径）。
+- [ ] 58.8 透明标注 — 触发回执（XHS「已启动…--force：跳过强相关甄选与已评过去重」/ FB「…· --force（跳过相关性/去重）」）与加群评论合并卡的 `--force` 标注对运营可见。
+
+> **说明**：cloud `3177735`（`comment-scheduler.ts` XHS `runTask` 兜底 top-collect + 放开两处去重、FB `runFacebookTargetedTaskBody` 取首候选 + 空 `targetKeywords`、`triggerManual`/`runFacebookTargetedTask(Body)`/`runFacebookJoinThenComment` 透传 `force`；`server.ts` `actions.comment` 与 `manualOverride` 分开传 `force`；`feishu/commands.ts` 尾部 `--force` 解析 + 透传 + HELP）已 land origin/master + 部署 dev（备份 `cloud.bak.20260711-175101.tar.gz` + `.env.bak`、外科 rsync src 3 文件、healthcheck 全绿：active/8787/飞书长连接/PG 就绪）。纯云端、无协议 / 边端 / DB 改动。`force` 与既有 `manualOverride`（只绕配额）独立：manualOverride 绕风控/配额闸、force 绕相关性/去重软筛选，二者语义不合并。openspec change 修订 `manual-command-override`（ADDED `--force` 覆盖 requirement）+ `comment-search-command`（MODIFIED 强相关择优 / 命令去重两条开例外）+ `facebook-scheduled-comment`（MODIFIED 硬校验器：force 跳 `weak_relevance` 但保安全校验）。
