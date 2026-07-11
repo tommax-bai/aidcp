@@ -677,3 +677,13 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **退出期不留孤儿（时序）** — 关整个客户端（app quit）时，各环境浏览器随之关闭、不留孤儿；最坏（端口挂着一直超时）关闭确认仍落在 `gracefulStopAllAndQuit` 的 ~10s 有界等待内、不被截断致孤儿。
 
 > **说明**：edge-only、无协议 / 云端 / DB 改动。修改 `src/cdp/browser-provider.ts`（权威端点实证 + K=2 连读闸 + 三阶段升级 + OS 级强杀）、`src/electron/main.cjs`（no-child 诚实收尾 + 防 start/resume 竞态）、`src/electron/ads-local-api.cjs`（`listWellFormed` 区分确认为空 vs 响应不完整）。源码契约测试已锁假成功分支（`test/cdp/browser-provider.test.ts` 23/0：端点变暗判关 / OS 杀升级 / 禁用诚实 false / stop 失败端点权威 / 不可达仍活 false / K=2 瞬态不误判 / 默认探测被拒判死）。OS 级强杀与「暂停拆 CDP」这两项桩验不了、须真机核（本簇 3、5 项）。多 agent 对抗评审 5 findings（探测无超时会挂过 10s 预算、单次瞬态误判、lsof 未限地址、no-child 竞态、不完整列表当已关）均已修。
+
+## 簇 53 — facebook-comment-inplace-ack-verify 真机验收（FB 评论发布判定改就地 ack 门控 + 刷新有界轮询，登记于 2026-07-11；edge master `1e7e6d9` 已 land，edge-only 无 ECS 部署，运营机 pull master + 重建安装包后生效）
+
+- [ ] 53.1 就地快确认：目标帖上本人发一条评论，服务器点头后（~3.5s）应**不刷新**即判成功（`serverConfirmed`），比旧「刷新+死等 5s」明显更快。
+- [ ] 53.2 绝不 over-confirm：乐观阶段（回车后 <3s、只有客户端占位 `comment_id=client…`、无点赞/回复）绝不误判成功。
+- [ ] 53.3 慢渲染不再假阴性：网络/渲染慢时评论已在服务器 → 刷新兜底有界轮询应命中判成功，而非旧的单次落空误报 `verification_ambiguous`（P2②）。
+- [ ] 53.4 真失败仍诚实：评论确实被拒（无权限/被删）→ 两条路径都确认不了 → 诚实 `verification_ambiguous`（提交过、打去重、不重发）。
+- [ ] 53.5 误导性报错浮层：出现「无权限添加此评论」等浮层但评论实际成功时（真机探针已实证会发生）→ 最终按确认信号判成功、不被浮层带成失败。
+
+> **说明**：edge-only、无协议 / 云端 / console / DB 改动，只改 `src/facebook/comment-executor.ts` 提交后确认路径。判据源自真机探针 `scripts/fb-comment-verify-probe.ts`（本会话实测）：FB 评论回车后 ~68ms 乐观渲染带**客户端占位** `comment_id=client…`、0 个点赞/回复；服务器写入响应 ~3.5s 才到、之后 id 升级为**服务器正式**（base64 "comment:"）且点赞/回复才出现。故成功只认「本人+文本」评论行上服务器正式 id 或点赞/回复交互控件（皆 ack-gated），绝不认乐观渲染/占位 id。源码契约测试已锁就地命中不刷新 / 慢渲染有界轮询命中 / `isServerFacebookCommentId` 纯函数（990/0）；乐观占位 id 与点赞/回复计数的页内 JS 判别是 FakeCdp 桩测盲区、由真机探针坐实，本簇复核。生效需运营机 pull master `1e7e6d9` + 重建安装包。
