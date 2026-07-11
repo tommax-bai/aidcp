@@ -1,0 +1,270 @@
+#!/usr/bin/env bash
+# release-desktop-macos — orchestrate the "post-CI delivery" half of a signed +
+# notarized macOS desktop release. It does NOT build/sign/notarize (that is CI-only:
+# aidcp-edge/.github/workflows/build-desktop.yml -> scripts/build-desktop-macos.sh,
+# because the Developer ID cert + notary key live in GitHub repo secrets and this
+# machine has none). This script picks up AFTER CI has published the dmgs to the
+# GitHub prerelease and carries them to the download page:
+#
+#   preflight -> download prerelease dmgs -> static trust/asar/env gates
+#             -> bump console downloads.ts -> build console
+#             -> (--yes) upload dmgs + deploy console + verify 200 + commit downloads.ts
+#
+# Default run is LOCAL / read-only (download + verify + edit + build) and stops with
+# the exact outward commands. Pass --yes to also perform the three outward actions.
+# Mirrors land-change's "prep by default, --yes to execute" convention.
+#
+# PREREQUISITES (the judgment half this script deliberately does NOT automate):
+#   1. Version already bumped in aidcp-edge/package.json and pushed to master.
+#   2. CI already run:  gh workflow run build-desktop.yml --ref master -f cloud_default_env=ol
+#      and the prerelease  desktop-v<version>  holds AIDCP-<version>-arm64.dmg + AIDCP-<version>.dmg.
+#   3. CI ended GREEN. A red CI run is a stop-and-diagnose point for a human — this script
+#      only consumes a finished, successful build.
+#
+# NOTE: static gates only (spctl / codesign / stapler / asar cwd / baked env / runtime present).
+# True launch smoke (hardened runtime actually starts the fingerprint browser) needs a real
+# clean Mac — that stays manual / real-machine (backlog 簇 60), this script cannot cover it.
+#
+# See docs/release-desktop.md, CLAUDE.md §5/§6, memory edge-mac-signed-notarized-release.
+set -euo pipefail
+_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib.sh
+source "$_DIR/lib.sh"
+
+REPO="tommax-bai/aidcp-edge"     # GitHub repo hosting the CI prerelease
+
+usage() {
+cat >&2 <<'EOF'
+usage: scripts/release-desktop-macos <version> [options]
+
+  <version>            e.g. 0.3.19  (drives tag desktop-v<version> and dmg filenames)
+
+  --target <dev|ol>    ECS to deliver to (default: dev). ol only on explicit online release.
+  --expect-env <env>   baked default cloud env the dmgs MUST carry (default: ol).
+  --tag <tag>          prerelease tag to pull (default: desktop-v<version>).
+  --work-dir <dir>     where to download dmgs (default: $TMPDIR/aidcp-desktop-release-<version>).
+  --skip-verify        skip the local static trust/asar/env gates (NOT recommended).
+  --yes                also perform the 3 outward actions: scp dmgs to ECS,
+                       build+deploy console, verify 200, commit+push downloads.ts.
+  -h, --help           this help.
+
+Without --yes: downloads + verifies + edits downloads.ts + builds console locally,
+then prints the outward commands and stops. Nothing leaves this machine.
+
+Prerequisite: CI prerelease desktop-v<version> already published (see header comment).
+EOF
+exit 1
+}
+
+# ---- args -------------------------------------------------------------------
+[ $# -ge 1 ] || usage
+VER=""
+TARGET="dev"
+EXPECT_ENV="ol"
+TAG=""
+WORK_DIR=""
+DO_VERIFY=1
+DO_YES=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) usage ;;
+    --target)     TARGET="${2:-}"; shift 2 ;;
+    --expect-env) EXPECT_ENV="${2:-}"; shift 2 ;;
+    --tag)        TAG="${2:-}"; shift 2 ;;
+    --work-dir)   WORK_DIR="${2:-}"; shift 2 ;;
+    --skip-verify) DO_VERIFY=0; shift ;;
+    --yes)        DO_YES=1; shift ;;
+    -*) die "未知选项: $1" ;;
+    *)  [ -z "$VER" ] && { VER="$1"; shift; } || die "多余参数: $1" ;;
+  esac
+done
+[ -n "$VER" ] || die "缺少 <version>（如 0.3.19）。"
+case "$TARGET" in dev|ol) ;; *) die "--target 只能是 dev|ol（收到 '$TARGET'）。" ;; esac
+case "$EXPECT_ENV" in dev|ol) ;; *) die "--expect-env 只能是 dev|ol（收到 '$EXPECT_ENV'）。" ;; esac
+[ -n "$TAG" ] || TAG="desktop-v$VER"
+[ -n "$WORK_DIR" ] || WORK_DIR="${TMPDIR:-/tmp}/aidcp-desktop-release-$VER"
+ARM_FILE="AIDCP-$VER-arm64.dmg"
+X64_FILE="AIDCP-$VER.dmg"
+DL_TS="$(repo_path aidcp-console)/src/config/downloads.ts"
+
+# ---- 0. preflight -----------------------------------------------------------
+info "== 0. preflight =="
+[ "$(uname -s)" = "Darwin" ] || die "校验需要 macOS 专有工具（hdiutil/spctl/codesign/stapler）。"
+repo_cloned aidcp-edge    || die "缺少 ../aidcp-edge（校验用其 @electron/asar 解析）。"
+repo_cloned aidcp-console || die "缺少 ../aidcp-console（下载页配置在此）。"
+command -v gh >/dev/null   || die "缺少 gh CLI。"
+gh auth status >/dev/null 2>&1 || die "gh 未登录（gh auth login）。"
+command -v node >/dev/null || die "缺少 node。"
+[ -f "$DL_TS" ] || die "找不到下载页配置: $DL_TS"
+
+# resolve + hard-check the ECS target (read-only; verifies key exists & perms are 600)
+"$_DIR/deploy-target" "$TARGET" --check >/dev/null
+eval "$("$_DIR/deploy-target" "$TARGET" --shell)"
+HOST="$AIDCP_DEPLOY_HOST"
+KEY="$AIDCP_DEPLOY_SSH_KEY"
+DOWNLOADS_DIR="$AIDCP_DEPLOY_DOWNLOADS_DIR"
+info "版本=$VER  tag=$TAG  target=$TARGET($HOST)  期望烘焙环境=$EXPECT_ENV"
+info "dmg: $ARM_FILE / $X64_FILE"
+
+# ---- 1. download prerelease dmgs (read) ------------------------------------
+info "== 1. 从 GitHub prerelease 取 dmg =="
+mkdir -p "$WORK_DIR"
+gh release download "$TAG" --repo "$REPO" --pattern '*.dmg' --dir "$WORK_DIR" --clobber \
+  || die "拉取 prerelease $TAG 的 dmg 失败——CI 是否已跑完并发布？(gh release view $TAG --repo $REPO)"
+ARM_PATH="$WORK_DIR/$ARM_FILE"
+X64_PATH="$WORK_DIR/$X64_FILE"
+[ -f "$ARM_PATH" ] || die "prerelease 缺 $ARM_FILE"
+[ -f "$X64_PATH" ] || die "prerelease 缺 $X64_FILE"
+info "已下载: $(cd "$WORK_DIR" && ls -1 *.dmg | tr '\n' ' ')"
+
+# ---- 2. static trust / asar / env gates ------------------------------------
+# _check runs a command quietly; records pass/fail without aborting (so we always detach).
+_FAILS=0
+_check() {
+  local label="$1"; shift
+  if "$@" >/dev/null 2>&1; then
+    echo "   ✓ $label"
+  else
+    echo "   ✗ $label" >&2; _FAILS=$((_FAILS+1))
+  fi
+}
+_asar_cwd_guard() {  # main.cjs must spawn with cwd:edgeCwd, never raw appRoot (packaged ENOTDIR red line)
+  (cd "$(repo_path aidcp-edge)" && node -e '
+    const a=require("@electron/asar");
+    const s=a.extractFile(process.argv[1],"src/electron/main.cjs").toString();
+    process.exit(/cwd:\s*edgeCwd/.test(s) && !/cwd:\s*appRoot\b/.test(s) ? 0 : 1);
+  ' "$1")
+}
+_baked_env() {       # packaged package.json aidcpCloudDefaultEnv must equal expected env
+  (cd "$(repo_path aidcp-edge)" && node -e '
+    const a=require("@electron/asar");
+    const pj=JSON.parse(a.extractFile(process.argv[1],"package.json").toString());
+    process.exit(pj.aidcpCloudDefaultEnv===process.argv[2] ? 0 : 1);
+  ' "$1" "$2")
+}
+verify_dmg() {
+  local dmg="$1" arch="$2"
+  info "-- 校验 $arch: $(basename "$dmg") --"
+  _check "dmg 是合法镜像 (hdiutil imageinfo)"        hdiutil imageinfo "$dmg"
+  _check "dmg 已 staple 公证票据 (stapler validate)"  xcrun stapler validate "$dmg"
+  local mnt
+  mnt="$(hdiutil attach -nobrowse -readonly "$dmg" | grep -Eo '/Volumes/.*$' | tail -1)"
+  [ -n "$mnt" ] || { echo "   ✗ 挂载失败" >&2; _FAILS=$((_FAILS+1)); return; }
+  local app="$mnt/AIDCP.app"
+  if [ ! -d "$app" ]; then
+    echo "   ✗ dmg 内找不到 AIDCP.app" >&2; _FAILS=$((_FAILS+1))
+  else
+    _check "苹果门禁判 accepted (spctl --assess exec)"  spctl --assess --type exec "$app"
+    _check "签名有效 (codesign --verify --deep --strict)" codesign --verify --deep --strict "$app"
+    _check "app 已 staple (stapler validate)"           xcrun stapler validate "$app"
+    _check "asar cwd 红线守卫 (main.cjs cwd:edgeCwd)"     _asar_cwd_guard "$app/Contents/Resources/app.asar"
+    _check "烘焙默认云端 == $EXPECT_ENV"                  _baked_env "$app/Contents/Resources/app.asar" "$EXPECT_ENV"
+    _check "自包含运行时进包 (adspower-browser/)"         test -d "$app/Contents/Resources/adspower-browser"
+    _check "运行时 baked key 进包 (ads-runtime.json)"     test -f "$app/Contents/Resources/ads-runtime.json"
+  fi
+  hdiutil detach "$mnt" -quiet 2>/dev/null || hdiutil detach "$mnt" -force 2>/dev/null || true
+}
+if [ "$DO_VERIFY" -eq 1 ]; then
+  info "== 2. 本机静态校验闸 =="
+  verify_dmg "$ARM_PATH" "arm64"
+  verify_dmg "$X64_PATH" "x64"
+  [ "$_FAILS" -eq 0 ] || die "静态校验有 $_FAILS 项未过——绝不上传坏包（真机启动闭环仍属簇 60、本脚本不覆盖）。"
+  info "静态校验全过。"
+else
+  warn "== 2. 跳过本机静态校验（--skip-verify）=="
+fi
+
+# ---- 3. bump console downloads.ts (local, needed to build) ------------------
+info "== 3. 改后台下载页配置 downloads.ts =="
+perl -0777 -pi -e "s/(version:\\s*)'[^']*'/\${1}'$VER'/"                         "$DL_TS"
+perl -pi     -e "s/(key: 'mac-arm64'[^\\n]*file: ')[^']*/\${1}$ARM_FILE/"        "$DL_TS"
+perl -pi     -e "s/(key: 'mac-x64'[^\\n]*file: ')[^']*/\${1}$X64_FILE/"          "$DL_TS"
+grep -q "version: '$VER'" "$DL_TS" || die "downloads.ts version 替换未生效（格式变了？手动核对）。"
+grep -q "$ARM_FILE" "$DL_TS"       || die "downloads.ts mac-arm64 文件名替换未生效。"
+grep -q "$X64_FILE" "$DL_TS"       || die "downloads.ts mac-x64 文件名替换未生效。"
+info "downloads.ts -> version $VER / $ARM_FILE / ${X64_FILE}（win 未动）。"
+
+# ---- 4. build console (compiles the edit; a gate before any deploy) ---------
+info "== 4. 构建 console（顺带验证配置能编译）=="
+( cd "$(repo_path aidcp-console)" && npm run build >/dev/null ) \
+  || die "console 构建失败（downloads.ts 改坏了？）——已停手，未做任何对外动作。"
+info "console 构建通过（dist/ 已生成）。"
+
+# ---- prep-only stop point ---------------------------------------------------
+if [ "$DO_YES" -eq 0 ]; then
+  cat <<EOF
+
+== 本地准备完成（未做任何对外动作）==
+已完成：下载 + 静态校验 + 改 downloads.ts + 构建 console。
+downloads.ts 已改但**未提交**；dmg 未上传；console 未部署。
+
+复核后加 --yes 一键完成剩余对外动作（传包 + 部署 console + 验活 + 提交 downloads.ts）：
+  scripts/release-desktop-macos $VER --target $TARGET --expect-env $EXPECT_ENV --yes
+
+或手动逐步（见 aidcp-edge/docs/release-desktop.md §3–6）。
+EOF
+  exit 0
+fi
+
+# ============================================================================
+#  OUTWARD ACTIONS (only past --yes). Red lines: only touch /opt/aidcp/downloads
+#  and /opt/aidcp/console — NEVER isales. Backup before overwrite. Never force-push.
+# ============================================================================
+
+# ---- 5. upload dmgs to ECS --------------------------------------------------
+info "== 5. 上传 dmg 到 $TARGET:$DOWNLOADS_DIR =="
+scp -i "$KEY" "$ARM_PATH" "$X64_PATH" "root@$HOST:$DOWNLOADS_DIR/" \
+  || die "scp dmg 到 ECS 失败。"
+info "已上传两个 dmg。"
+
+# ---- 6. deploy console (backup, then swap; isales untouched) ----------------
+info "== 6. 部署 console 到 ${TARGET}（先备份再覆盖）=="
+CONSOLE_REPO="$(repo_path aidcp-console)"
+tar czf "$WORK_DIR/console-dist.tar.gz" -C "$CONSOLE_REPO/dist" .
+scp -i "$KEY" "$WORK_DIR/console-dist.tar.gz" "root@$HOST:/tmp/" || die "scp console 产物失败。"
+ssh -i "$KEY" "root@$HOST" 'set -e; ts=$(date +%Y%m%d-%H%M%S); cd /opt/aidcp; \
+  tar czf console.bak.$ts.tar.gz console; \
+  rm -rf console/assets; \
+  tar xzf /tmp/console-dist.tar.gz -C console; \
+  rm -f /tmp/console-dist.tar.gz; \
+  echo "console deployed; bundle ->"; grep -o "assets/index-[A-Za-z0-9_-]*\.js" console/index.html' \
+  || die "console 部署失败（ECS 侧）。"
+
+# ---- 7. verify live (curl on ECS :8088) ------------------------------------
+info "== 7. 验活（ECS 本机 curl :8088）=="
+ssh -i "$KEY" "root@$HOST" "
+  echo '-- 后台首页 --'; curl -sS -o /dev/null -w 'http=%{http_code}\n' http://127.0.0.1:8088/;
+  echo '-- mac arm64 --'; curl -sSI 'http://127.0.0.1:8088/downloads/$ARM_FILE' | grep -iE 'HTTP/|content-length';
+  echo '-- mac x64  --'; curl -sSI 'http://127.0.0.1:8088/downloads/$X64_FILE' | grep -iE 'HTTP/|content-length'
+"
+info "本机 dmg 字节数（与上面 content-length 对齐核对）："
+ls -l "$ARM_PATH" "$X64_PATH" | awk '{print "   "$5"  "$NF}'
+
+# ---- 8. commit + push downloads.ts (bookkeeping; soft-fail) -----------------
+info "== 8. 提交 downloads.ts 到 console master（记账，末位软失败）=="
+CUR_BRANCH="$(git -C "$CONSOLE_REPO" branch --show-current)"
+if [ "$CUR_BRANCH" != "master" ]; then
+  warn "console 当前在 '$CUR_BRANCH' 非 master——跳过自动提交，请手动提交 downloads.ts。"
+else
+  # 只提交 downloads.ts，绝不 git add -A（单写者纪律 / 避免带入他人 WIP）
+  git -C "$CONSOLE_REPO" add src/config/downloads.ts
+  if git -C "$CONSOLE_REPO" commit -q -m "downloads: mac $VER signed+notarized ($EXPECT_ENV default)" 2>/dev/null; then
+    if git -C "$CONSOLE_REPO" push -q origin master 2>/dev/null; then
+      info "downloads.ts 已提交并推送 master。"
+    else
+      warn "push 撞 non-ff 或失败——线上下载页已更新，仅 git 记账未推。绝不 force；请手动 rebase 后推："
+      warn "  git -C '$CONSOLE_REPO' pull --rebase origin master && git -C '$CONSOLE_REPO' push origin master"
+    fi
+  else
+    warn "downloads.ts 无改动可提交（可能已提交过）。"
+  fi
+fi
+
+cat <<EOF
+
+== 交付完成 ==
+- dmg 已上传 $TARGET:$DOWNLOADS_DIR （$ARM_FILE / ${X64_FILE}）
+- console 已部署（备份在 ECS /opt/aidcp/console.bak.*.tar.gz）
+- 下载页应返回 200（见上）
+剩余（本脚本不覆盖，真机验收簇 60）：干净 Mac 真实下载不被拦 / 实连 $EXPECT_ENV / hardened runtime 起浏览器。
+EOF
