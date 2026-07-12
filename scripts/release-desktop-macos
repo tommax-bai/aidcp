@@ -41,6 +41,9 @@ usage: scripts/release-desktop-macos <version> [options]
 
   --target <dev|ol>    ECS to deliver to (default: dev). ol only on explicit online release.
   --expect-env <env>   baked default cloud env the dmgs MUST carry (default: ol).
+  --expect-client-auth-url <url>
+                       baked client auth base URL the dmgs MUST carry. For target=ol
+                       + expect-env=ol, default is https://aidcp.tommax.cc/capi.
   --tag <tag>          prerelease tag to pull (default: desktop-v<version>).
   --work-dir <dir>     where to download dmgs (default: $TMPDIR/aidcp-desktop-release-<version>).
   --skip-verify        skip the local static trust/asar/env gates (NOT recommended).
@@ -61,6 +64,7 @@ exit 1
 VER=""
 TARGET="dev"
 EXPECT_ENV="ol"
+EXPECT_AUTH_URL=""
 TAG=""
 WORK_DIR=""
 DO_VERIFY=1
@@ -70,6 +74,7 @@ while [ $# -gt 0 ]; do
     -h|--help) usage ;;
     --target)     TARGET="${2:-}"; shift 2 ;;
     --expect-env) EXPECT_ENV="${2:-}"; shift 2 ;;
+    --expect-client-auth-url) EXPECT_AUTH_URL="${2:-}"; shift 2 ;;
     --tag)        TAG="${2:-}"; shift 2 ;;
     --work-dir)   WORK_DIR="${2:-}"; shift 2 ;;
     --skip-verify) DO_VERIFY=0; shift ;;
@@ -81,6 +86,16 @@ done
 [ -n "$VER" ] || die "缺少 <version>（如 0.3.19）。"
 case "$TARGET" in dev|ol) ;; *) die "--target 只能是 dev|ol（收到 '$TARGET'）。" ;; esac
 case "$EXPECT_ENV" in dev|ol) ;; *) die "--expect-env 只能是 dev|ol（收到 '$EXPECT_ENV'）。" ;; esac
+[ -n "$EXPECT_AUTH_URL" ] || { if [ "$TARGET" = "ol" ] && [ "$EXPECT_ENV" = "ol" ]; then EXPECT_AUTH_URL="https://aidcp.tommax.cc/capi"; fi; }
+while [ -n "$EXPECT_AUTH_URL" ] && [ "${EXPECT_AUTH_URL%/}" != "$EXPECT_AUTH_URL" ]; do
+  EXPECT_AUTH_URL="${EXPECT_AUTH_URL%/}"
+done
+if [ -n "$EXPECT_AUTH_URL" ]; then
+  case "$EXPECT_AUTH_URL" in
+    http://*|https://*) ;;
+    *) die "--expect-client-auth-url 必须是 http(s)://...（收到 '$EXPECT_AUTH_URL'）。" ;;
+  esac
+fi
 [ -n "$TAG" ] || TAG="desktop-v$VER"
 [ -n "$WORK_DIR" ] || WORK_DIR="${TMPDIR:-/tmp}/aidcp-desktop-release-$VER"
 ARM_FILE="AIDCP-$VER-arm64.dmg"
@@ -103,7 +118,7 @@ eval "$("$_DIR/deploy-target" "$TARGET" --shell)"
 HOST="$AIDCP_DEPLOY_HOST"
 KEY="$AIDCP_DEPLOY_SSH_KEY"
 DOWNLOADS_DIR="$AIDCP_DEPLOY_DOWNLOADS_DIR"
-info "版本=$VER  tag=$TAG  target=$TARGET($HOST)  期望烘焙环境=$EXPECT_ENV"
+info "版本=$VER  tag=$TAG  target=$TARGET($HOST)  期望烘焙环境=$EXPECT_ENV  期望登录门=${EXPECT_AUTH_URL:-disabled}"
 info "dmg: $ARM_FILE / $X64_FILE"
 
 # ---- 1. download prerelease dmgs (read) ------------------------------------
@@ -142,6 +157,21 @@ _baked_env() {       # packaged package.json aidcpCloudDefaultEnv must equal exp
     process.exit(pj.aidcpCloudDefaultEnv===process.argv[2] ? 0 : 1);
   ' "$1" "$2")
 }
+_baked_client_auth_url() {
+  (cd "$(repo_path aidcp-edge)" && node -e '
+    const a=require("@electron/asar");
+    const pj=JSON.parse(a.extractFile(process.argv[1],"package.json").toString());
+    const actual=String(pj.aidcpClientAuthUrl||"").replace(/\/+$/,"");
+    process.exit(actual===process.argv[2] ? 0 : 1);
+  ' "$1" "$2")
+}
+_no_baked_client_auth_url() {
+  (cd "$(repo_path aidcp-edge)" && node -e '
+    const a=require("@electron/asar");
+    const pj=JSON.parse(a.extractFile(process.argv[1],"package.json").toString());
+    process.exit(pj.aidcpClientAuthUrl ? 1 : 0);
+  ' "$1")
+}
 verify_dmg() {
   local dmg="$1" arch="$2"
   info "-- 校验 $arch: $(basename "$dmg") --"
@@ -159,6 +189,11 @@ verify_dmg() {
     _check "app 已 staple (stapler validate)"           xcrun stapler validate "$app"
     _check "asar cwd 红线守卫 (main.cjs cwd:edgeCwd)"     _asar_cwd_guard "$app/Contents/Resources/app.asar"
     _check "烘焙默认云端 == $EXPECT_ENV"                  _baked_env "$app/Contents/Resources/app.asar" "$EXPECT_ENV"
+    if [ -n "$EXPECT_AUTH_URL" ]; then
+      _check "烘焙客户登录地址 == $EXPECT_AUTH_URL"        _baked_client_auth_url "$app/Contents/Resources/app.asar" "$EXPECT_AUTH_URL"
+    else
+      _check "未烘焙客户登录地址（登录门默认关闭）"          _no_baked_client_auth_url "$app/Contents/Resources/app.asar"
+    fi
     _check "自包含运行时进包 (adspower-browser/)"         test -d "$app/Contents/Resources/adspower-browser"
     _check "运行时 baked key 进包 (ads-runtime.json)"     test -f "$app/Contents/Resources/ads-runtime.json"
   fi
@@ -192,6 +227,8 @@ info "console 构建通过（dist/ 已生成）。"
 
 # ---- prep-only stop point ---------------------------------------------------
 if [ "$DO_YES" -eq 0 ]; then
+  AUTH_REPLAY=""
+  [ -z "$EXPECT_AUTH_URL" ] || AUTH_REPLAY=" --expect-client-auth-url $EXPECT_AUTH_URL"
   cat <<EOF
 
 == 本地准备完成（未做任何对外动作）==
@@ -199,7 +236,7 @@ if [ "$DO_YES" -eq 0 ]; then
 downloads.ts 已改但**未提交**；dmg 未上传；console 未部署。
 
 复核后加 --yes 一键完成剩余对外动作（传包 + 部署 console + 验活 + 提交 downloads.ts）：
-  scripts/release-desktop-macos $VER --target $TARGET --expect-env $EXPECT_ENV --yes
+  scripts/release-desktop-macos $VER --target $TARGET --expect-env $EXPECT_ENV$AUTH_REPLAY --yes
 
 或手动逐步（见 aidcp-edge/docs/release-desktop.md §3–6）。
 EOF
@@ -248,7 +285,7 @@ if [ "$CUR_BRANCH" != "master" ]; then
 else
   # 只提交 downloads.ts，绝不 git add -A（单写者纪律 / 避免带入他人 WIP）
   git -C "$CONSOLE_REPO" add src/config/downloads.ts
-  if git -C "$CONSOLE_REPO" commit -q -m "downloads: mac $VER signed+notarized ($EXPECT_ENV default)" 2>/dev/null; then
+  if git -C "$CONSOLE_REPO" commit -q -m "downloads: mac $VER signed+notarized ($EXPECT_ENV default, client auth)" 2>/dev/null; then
     if git -C "$CONSOLE_REPO" push -q origin master 2>/dev/null; then
       info "downloads.ts 已提交并推送 master。"
     else
