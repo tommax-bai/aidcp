@@ -793,5 +793,5 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] 61.2 跨客户隔离（重点，安全）— 两个客户各自登录（同机切换或异机）：各只见自己归属环境、拿不到对方环境清单；运营在后台移除某客户对某环境的归属后，该客户 ≤4min（会话维护周期）内环境栏剔除该环境；停用某客户 → 其在途客户端 ≤4min 内被踢回登录门。
 - [ ] 61.3 新建环境自动归属 — 登录态下客户端「添加/创建环境」→ 该 profileId 自动归当前客户、即时出现在环境栏，且后台该客户 scope 里可见（source=client）、可被运营调整。
 - [ ] 61.4 console 管理流 — 后台创建客户 → 一次性密钥 Modal 展示 + 复制 → 用该 key 在客户端登录成功；轮换 key 后旧 key 立即登录失败、新 key 可登录；停用后无法登录。console 页 AntD portal 交互（create→key-reveal→copy）桩验 flaky、须真机/手动核。
-- [ ] 61.5 reachability 接线 — 客户机经公网到达客户鉴权服务：dev 现绑 `127.0.0.1:8091`，需开放端口或 Nginx 反代（如 `/capi` + TLS）后客户机才连得上；edge 侧据此配 `AIDCP_CLIENT_AUTH_URL` 完整地址。ol 上线应走 Nginx + TLS，独立 ol 密钥。
+- [x] 61.5 reachability 接线（dev 已完成）— dev 已在 `aidcp-console.conf`（8088 + 80/`aidcp.tommax.cc`）加 `location /capi/ → 127.0.0.1:8091/`（带 X-Forwarded-For），公网完整登录往返已验证；客户端可达 `http://121.89.85.150:8088/capi`。**剩**：真客户机上 edge 配 `AIDCP_CLIENT_AUTH_URL=http://121.89.85.150:8088/capi` 后实连（并入 61.1 GUI 流）；**ol 上线**须独立 TLS 子域 + 独立 ol 密钥（不复用 dev）。
 - [ ] 61.6 打包态门控（asar 红线）— 打包版 edge 起独立 login 窗口 + 启动门控不被 asar/cwd 坑（login.html 走 loadFile、preload 路径正确）；发版前本机跑打包产物确认登录窗弹出 + 登录后主窗与环境启动正常。edge-only、需重建安装包。

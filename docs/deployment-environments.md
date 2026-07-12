@@ -100,7 +100,7 @@ FEISHU_CHAT_ID=
 AIDCP_FEISHU_WS_ENABLED=
 ```
 
-**对外客户鉴权（change edge-client-customer-auth）**：`AIDCP_CLIENT_AUTH_PORT` 未设则整个客户鉴权服务禁用（默认，零回归）。设了才启用；`AIDCP_CLIENT_JWT_SECRET` **必须非空且 ≠ `AIDCP_PANEL_JWT_SECRET`**（否则启动断言拒启该服务——密钥即边界）；`AIDCP_CLIENT_JWT_TTL_SECONDS` 缺省 900。服务绑 `127.0.0.1:<port>`（dev 现用 8091），需经 Nginx 反代或开放端口后客户机才可达（reachability 见真机 backlog 簇 61）。dev 已启用（8091，密钥在 ECS `.env`、不入库）。
+**对外客户鉴权（change edge-client-customer-auth）**：`AIDCP_CLIENT_AUTH_PORT` 未设则整个客户鉴权服务禁用（默认，零回归）。设了才启用；`AIDCP_CLIENT_JWT_SECRET` **必须非空且 ≠ `AIDCP_PANEL_JWT_SECRET`**（否则启动断言拒启该服务——密钥即边界）；`AIDCP_CLIENT_JWT_TTL_SECONDS` 缺省 900。服务绑 `127.0.0.1:<port>`（dev 现用 8091），经 Nginx 反代对外。**dev 已启用并接线**：`aidcp-console.conf`（8088 + 80/`aidcp.tommax.cc`）加了 `location /capi/ → 127.0.0.1:8091/`（带 `X-Forwarded-For` 供限流取真实客户 IP），客户端可达地址 = `http://121.89.85.150:8088/capi` 或 `http://aidcp.tommax.cc/capi`（经公网 nginx 完整登录往返已验证）。**edge 侧配** `AIDCP_CLIENT_AUTH_URL=<该 /capi 地址>` 即连；密钥在 ECS `.env`、不入库。ol 上线应走独立 TLS 子域 + 独立 ol 密钥（不复用 dev）。
 
 Optional feature flags such as `AIDCP_CONTENT_SCHEDULE_AUTO`, `AIDCP_COMMENT_APPROVAL`, `AIDCP_COMMENT_LIKE`, image-provider settings, and timeout overrides should be reviewed per target. If dev and ol temporarily share the same Feishu app, keep `AIDCP_FEISHU_WS_ENABLED=false` on the non-active target so only one cloud process receives real Feishu command traffic.
 
