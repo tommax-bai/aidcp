@@ -795,3 +795,12 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] 61.4 console 管理流 — 后台创建客户 → 一次性密钥 Modal 展示 + 复制 → 用该 key 在客户端登录成功；轮换 key 后旧 key 立即登录失败、新 key 可登录；停用后无法登录。console 页 AntD portal 交互（create→key-reveal→copy）桩验 flaky、须真机/手动核。**复制修复（2026-07-12，console master `efd1ea4` 已部署 dev）**：明文 HTTP（`http://<ip>:8088`）非安全上下文下 `navigator.clipboard` 为 undefined，一次性密钥复制曾恒报「复制失败，请手动选中复制」；已加 `copyToClipboard()` 兜底（async API 优先，不可用/失败退回 `textarea + execCommand('copy')` 同步选区复制），兜底不变量单测锁死（7 用例绿）。**真机核**：dev console 页点「复制密钥」实际落入剪贴板（execCommand 真写只能浏览器核）。
 - [x] 61.5 reachability 接线（dev 已完成）— dev 已在 `aidcp-console.conf`（8088 + 80/`aidcp.tommax.cc`）加 `location /capi/ → 127.0.0.1:8091/`（带 X-Forwarded-For），公网完整登录往返已验证；客户端可达 `http://121.89.85.150:8088/capi`。**剩**：真客户机上 edge 配 `AIDCP_CLIENT_AUTH_URL=http://121.89.85.150:8088/capi` 后实连（并入 61.1 GUI 流）；**ol 上线**须独立 TLS 子域 + 独立 ol 密钥（不复用 dev）。
 - [ ] 61.6 打包态门控（asar 红线）— 打包版 edge 起独立 login 窗口 + 启动门控不被 asar/cwd 坑（login.html 走 loadFile、preload 路径正确）；发版前本机跑打包产物确认登录窗弹出 + 登录后主窗与环境启动正常。edge-only、需重建安装包。
+
+### 61 增补：端用户环境选择列表（change client-user-env-picker，2026-07-12 已 land + 部署 dev；cloud master `05bd239` / console master `6a6fe92`）
+
+后台「客户端用户」页改名「端用户」；环境归属抽屉从手填 profileId 升级为「从全局环境注册表勾选加入 + 待分配/已分配筛选 + 一环境多分 + 多人标识」。cloud 新增 `GET /api/client-environments`（内部 JWT，跨用户聚合、绝不接客户服务=守 N2）。**已真机验证**：dev PG 用 ROLLBACK 事务跑真 `listAllEnvironments` SQL——多分环境返 2 assignees（多人）、独占返 1、label/platform 取非空代表值、`{userId,name}` 形状对、0 残留。GUI/交互项桩验 flaky（AntD portal + TanStack 时序）→ 真机核：
+
+- [ ] 61.7 后台勾选加入流 — 端用户页开「环境归属」抽屉：默认「待分配」列出全局注册表里未归属该端用户的环境；勾选多个 → 「加入选中（N）」→ 切「已分配」见新增；保存后该端用户 `/my-environments` 与客户端环境栏出现这些环境。
+- [ ] 61.8 一环境多分 + 多人标识 — 同一环境加入端用户 A 与 B 都成功；两侧客户端都能见到该环境；后台抽屉里该环境显示「多人（2）」、Tooltip 列出 A/B 名。**关键**：给 A 加入 B 已有的 env 并保存后，B 的归属集合不变（`setScope` 只 DELETE 当前 user_id）——真机核 B 不掉环境。
+- [ ] 61.9 暖缓存重开回归（评审揪出的 critical，已结构性修复）— 打开某端用户环境归属抽屉（有已归属环境）→ 关闭 → 5 分钟内重开同一端用户：「已分配」必须仍显示原有环境（**不得**变 0、原环境**不得**跑到「待分配」）；此时点保存**不得**清空该端用户归属。修法=rows 由 `scope.data` 单一 effect 驱动（原双 effect 竞态清空草稿）。桩测 portal 重、以真机点击 open→close→reopen 核。
+- [ ] 61.10 复制密钥（并入 61.4）— HTTP 后台点「复制密钥」实际落入剪贴板（execCommand 兜底真写只能浏览器核）。
