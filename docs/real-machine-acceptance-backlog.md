@@ -450,6 +450,8 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 
 > **补登（2026-07-11 清账批）**：两处加群健壮性修复随本批归档，须在同一 `/comment --join` 真机 session 一并复核——① `facebook-group-join-observe-i18n`（edge `a6f0f3f`：Join 按钮跨语言识别，靠「composer 点前无→点后有」结构跃迁承重，修「非成员被误判 + observe 期误 markJoined 污染账本」）；② `fb-group-join-wait-render`（edge `a6f0f3f`：群页 ~7s 才渲染加入按钮，改就绪轮询等决定性信号或 12s 兜底，治「死等 2.5s 看空页 fail-closed 空跳」）。**验收点**：非 EN/ZH 群 `/comment <昵称> --join` 能越过 observation 真点 Join（服务器确认）或给诚实 gated/pending，不再 `ambiguous_skip`。
 
+> **补登（2026-07-12）**：`facebook-join-pending-label-audit` 修中文已 pending 群按钮「取消请求」漏识别。edge `c06fa2c`（需运营机 pull master + 重建安装包后生效）把「取消请求 / 取消加入请求 / 取消申请 / 已发送请求」纳入 pending CTA，cloud `19b83b4` 已部署 dev（备份 `cloud.bak.20260712-152112`、healthcheck 全绿：active/8787/8090/PG/Feishu onReady）同步判官 pre/post-click 兜底。**验收点**：中文界面、账号已申请待审的群（真机证据群 `groups/311384382278852` 或同类 pending 群）观测腿报 `pendingRequest=true`、云端 pre-click 判 `gated_skip`，不再误报未申请/可加入；页面普通裸「取消」按钮不触发 pending。
+
 ## 簇 33 — feed-refresh-on-depth 真机验收（feed 浏览深度到阈值改点右下「刷新」回顶换新批，登记于 2026-07-10；cloud master `c4545f0` 已 land + **已部署 dev**、edge master `60088d7` 已 land，edge 需运营机 pull/重建后生效）
 
 > 探针 `aidcp-edge/scripts/feed-refresh-button-probe.ts` 已真机确认按钮结构（右下 `div.floating-btn-sets` 内 `div.reload`，宽窄同构）与行为（点 reload = 回顶 + 换全新一批，前 6 卡 0 重叠）。下面为 live 端到端 + 阈值校准项。默认阈值 60 张、默认开启（env `AIDCP_FEED_REFRESH_AFTER` / `AIDCP_FEED_REFRESH` 可调 / kill-switch）。
