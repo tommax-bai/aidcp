@@ -133,6 +133,13 @@ DEV 是否延长超时：如果 DEV 继续使用北京 bucket 且不改同地域
 | `dev` | `Dev.A` |
 | `ol` | `Red.A` |
 
+2026-07-12 运行态修正记录：此前两端 `.env` 中的飞书凭据反接（`dev -> Red.A`、`ol -> Dev.A`）。已交换运行时凭据并重启两端 cloud；备份分别为 `dev:/opt/aidcp/cloud/.env.bak.20260712-171830.feishu-swap2`、`ol:/opt/aidcp/cloud/.env.bak.20260712-171829.feishu-swap2`。交换后 `bot/v3/info` 验证为 `dev -> Dev.A`、`ol -> Red.A`。
+
+发送能力不能只看 bot 名称，必须做实际发信探针。2026-07-12 验证结果：
+
+- `ol`：`Red.A` 已在默认审批群 `AI运营`，文本探针发送并删除成功；飞书审批卡发送能力已恢复。同日因旧凭据未送达的 `publish-84` 已按当前 `content_version=2` 补发真实审批卡；`publish-83` 检查时已是 `published`，未重复补卡。
+- `dev`：`Dev.A` 已加载且服务健康，但对当前默认群发送探针仍返回 `230002 Bot/User can NOT be out of the chat`。在 DEV 依赖飞书审批前，必须把 `Dev.A` 加入目标群并重新 `/bind` 默认群，随后用发送+删除探针确认。
+
 只读核验命令（不要打印 secret）：
 
 ```bash
