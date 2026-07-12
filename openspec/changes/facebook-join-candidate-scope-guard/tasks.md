@@ -11,7 +11,9 @@
 
 - [x] 0b.1 **头部块「加群后『相关小组』takeover」过度 fail-closed 修复（承重、真机 2/2 复现）**：真机发现——加群成功后 FB 弹「相关小组」takeover，其异群 join 栏与目标 h1 **共享一个 `[role=main]` 之下的中层 `div`**（栏是目标头部的兄弟子树）。早前 v4「walk 没停在 ceiling 就拒该 heading」把**唯一的目标 h1** 也拒掉 → `scopeResolved=false` → 成员信号（收窄到未解析块）为空 → **成功加群误报 `join_failed`、已加入群误读 `not_ready`**（fail-safe，栏 join 仍全出域，但打断 happy path=真实可用性回归）。**修法**（`__resolveHeaderBlock`）：单一群名 h1（真实 FB 群页/成员页/takeover 均如此）→ 用其**最后一个干净祖先**作块（含目标自身 CTA、结构性排除兄弟栏）；多 heading → 保留 v4/v5 甄别（唯一「停在 ceiling」者，≥2 对称→歧义 fail-closed）。**真机验证**：修后 fresh 加群 `ok=true`、post `scopeResolved=true`、`mainCtaText=已加入`、`membershipSignals=[已加入]`、**`outOfScopeJoinCount=10`**（10 个别群 join 仍全出域，安全不变）。residual（真机未见、诚实记录）：目标页自身无 h1 而推荐卡片有 h1 → 单 heading 分支会误接受（真实 FB 目标恒有 h1、卡片从不用 h1，不触发）。<!-- aidcp-edge 571736b __resolveHeaderBlock 最后干净祖先 + 795 测试校正 + 新增 takeover 成员态测试 -->
 - [x] 0b.2 测试：更新旧 795（`not_ready`→`pending`，真机校正）+ 新增「加群后 takeover 成员态 → already_member、栏绝不污染」；v4/v5 合成防御全保留（双列卡片/对称歧义/成员方向均绿）。全量 1068 pass、acceptance 16、typecheck 干净。<!-- aidcp-edge 571736b -->
-- [ ] 0b.3 对抗性评审（Ultracode，承重红线判据变更）：多镜头攻击精炼规则找加错群漏洞与过度 fail-closed，对抗验证只留确认项，确认项修复后回写。
+- [x] 0b.3 对抗性评审（Ultracode，承重红线判据变更）：5 镜头攻击精炼规则 + refute-by-default 验证。**10 raised / 0 confirmed**——全被证伪且反驳扎实（逐条对齐真机事实+代码行）。两个 `wouldClickForeign=True` 红线级均伪：①目标无 h1+卡片有 h1（已文档化 residual，真机不触发→走多 heading 分支）；②pre-hydration 栏（premise 与真机事实"异群 join 恒带 2-4 跳锚点"矛盾→hydration 期真实结果 blocks=0→fail-closed 可重试，非 fail-open）。vanity/numeric id 不匹配伪（`__TARGET_GID` 取自 live location、FB 头部自引用与服务 URL 同形→匹配非异群）。一个真实非缺陷 code smell（fallback `__groupHeadings` 在 [role=main] 无 h1 时全文档扫、缺 landmark 约束）——真机不触发、fail-closed 安全，记 residual 不加启发式（守「设停止线」教训）。<!-- workflow w7hth9js8 -->
+
+**land 就绪**：0.1 真机校准 + 0b.1 回归修复 + 0b.3 对抗评审 三闸全清，可 ff master。
 
 ## 1. aidcp-edge — 作用域 helper（语言无关）
 
@@ -58,14 +60,15 @@
 ## 5. 集成与部署（edge-only）
 
 - [x] 5.1 `npm run typecheck` + `npm run test:acceptance`(16) + 全量 `npm test`(1068) 全绿（AC-* 红线过）。 <!-- aidcp-edge 571736b（含真机修复+新测） -->
-- [ ] 5.2 edge master land（无 ECS/cloud 部署）。**未 land**：代码已提交并推送分支 `facebook-join-candidate-scope-guard`（… → 3161203 → **571736b** 真机校准+回归修复）。**0.1 真机硬前置已满足**（2026-07-12 运营机实测，见 0.1/0b.1）；land 现仅剩 **0b.3 对抗评审确认项处置**后即可 ff master。<!-- branch @ 571736b, 0.1 done; awaiting 0b.3 -->
+- [x] 5.2 edge master land（无 ECS/cloud 部署）。**已 land**：三闸全清（0.1 真机 + 0b.1 修复 + 0b.3 评审）→ 干净 ff `7834e94..571736b` 推 origin/master（2026-07-12）。edge 主 checkout 有并发 WIP（他 session 的 `M package.json`/`?? main.cjs`）未扰动，其 pull 后即含。<!-- aidcp-edge master 571736b landed -->
 - [x] 5.3 真机验收（原登记 backlog，本次直接真机做完）：pending/member 作用域内正确读、可加入群正常点、成员信号不被推荐位污染、不可用群 fail-closed——**均真机实测通过**。原预警的两个 fail-closed 角落之①（目标头部与关联群栏共处中层容器 → 目标 heading 被甄别掉 → `not_ready`）**已真机命中并修复**（见 0b.1，改最后干净祖先作块）；②（嵌套 `[role=main]`）群落地页为单 main，未触发。真机三群加群/退群全流程验证、账号状态已复原。<!-- 真机 571736b -->
 
 ## 5b. 部署（真机验证后）
 
-- [ ] 5b.1 edge dev 部署（edge-only 无 cloud）：land master 后按需构建/部署 dev；本 change 纯 edge 定位逻辑，dev 冒烟走真机加群闭环。
+- [ ] 5b.1 edge 桌面安装包重建 + 运营机 pull（用户 gated，§6 打包默认不做）：本 change 纯 edge 定位逻辑已 land master，运营机 pull + 下次安装包重建后运行时生效。真机加群闭环本轮已在开发机 AdsPower 实测通过（见 0.1/0b.1），运营机侧属常规发版节奏、非本 change 单独门槛。
 
 ## 6. 收尾
 
 - [x] 6.1 `openspec validate facebook-join-candidate-scope-guard --strict` 通过。 <!-- 2026-07-12 valid -->
-- [ ] 6.2 tasks.md 勾选 + `<!-- <repo> <sha> 备注 -->` 标注（代码/测试项已标 70b53e0）；archive（**gated**：landed+deployed+0.1 真机核后）。
+- [x] 6.2a tasks.md 勾选 + `<!-- <repo> <sha> 备注 -->` 标注（代码 70b53e0；真机校准+修复 571736b；评审 workflow w7hth9js8）。
+- [ ] 6.2b archive（**留活跃、下批分诊清账**）：land + 0.1 真机核 + 0b.3 评审三闸已清；仅剩 edge 桌面安装包重建 + 运营机 pull（用户 gated 发版节奏，见 5b.1）。按 fleet 批量归档节奏，运营机 rollout 后随下批「landed+deployed」清账归档（spec delta 届时并入主 spec）。
