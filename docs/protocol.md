@@ -247,6 +247,17 @@
         "saturated": ["publish"]
       }
     }
+  },
+  "browserStandby": { // 可选；长等待时的浏览器冷待机建议，旧边缘忽略
+    "enabled": true,
+    "eligible": true,
+    "reason": "view_quota:hour", // disabled / no_wait / short_wait / hard_blocker / view_quota:*
+    "waitMs": 1800000,
+    "wakeAt": 1730001801000,
+    "generatedAt": 1730000001000,
+    "source": "risk",
+    "minWaitMs": 1200000,
+    "warmupMs": 90000
   }
 }
 ```
@@ -267,6 +278,8 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 字段可缺省，旧边缘会忽略；新 Electron 客户端在该字段到达前回落展示本机实时计数，缺窗口元数据时不臆造分钟/小时/单场上限。
 
 `startedAt/windowMs/expiresAt` 为窗口时效元数据；分钟/小时是滚动窗口，日窗口是本地自然日窗口，Electron 可在过期且未收到新快照时停止展示过期的“已达上限”。`windows.session.totals` 可包含浏览/发帖等无单场上限动作的真实计数，但不得为这些动作复制其他窗口的上限。
+
+`browserStandby` 是 cloud 对“下一个自动浏览动作还要等多久”的确定性建议，不是强制命令。`eligible=true` 只在 cloud 能从风控/配额等确定性来源算出有限长等待、且等待超过阈值时出现；验证码、登录、人工干预、环境占用或未知调度状态不得伪装成可恢复等待。Electron 仍会用本地开关、会话状态、关闭/暂停中标志和预热时间做二次判断；通过后才会在等待期间关闭浏览器，并在 `wakeAt - warmupMs` 前后恢复。
 
 ### 3.2 任务规划
 
