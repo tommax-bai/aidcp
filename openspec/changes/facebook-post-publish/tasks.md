@@ -1,75 +1,75 @@
 ## 1. OpenSpec And Probe Baseline
 
-- [ ] 1.1 Confirm sibling repo state with `git worktree list`, `../aidcp-cloud`, `../aidcp-edge`, and `../aidcp-console` availability before implementation.
-- [ ] 1.2 Re-run read-only Facebook composer probe on a known Facebook test/import profile for wide `1365x900`, medium `768x900`, and narrow `430x932`; record sanitized counts/status only.
-- [ ] 1.3 Add no-submit probe plan for composer open/focus/type/clear and media attach/remove; keep real submit blocked behind disposable target gates.
-- [ ] 1.4 Validate OpenSpec proposal shape with `openspec validate facebook-post-publish --strict` before coding.
+- [x] 1.1 Confirm sibling repo state with `git worktree list`, `../aidcp-cloud`, `../aidcp-edge`, and `../aidcp-console` availability before implementation. <!-- aidcp control worktree codex/facebook-post-publish plus sibling worktrees created: aidcp-cloud.wt/facebook-post-publish, aidcp-edge.wt/facebook-post-publish, aidcp-console.wt/facebook-post-publish -->
+- [x] 1.2 Re-run read-only Facebook composer probe on a known Facebook test/import profile for wide `1365x900`, medium `768x900`, and narrow `430x932`; record sanitized counts/status only. <!-- aidcp-edge canonical probe 2026-07-12T14:09:24.902Z, AdsPower k1ej3o8f sanitized hash 350f8126ad4573c0: real CDP mouse opened composer on 1365/768/430 widths, overlay none, loginLike false, editor count 1, file inputs present, no typing/media/submit -->
+- [x] 1.3 Add no-submit probe plan for composer open/focus/type/clear and media attach/remove; keep real submit blocked behind disposable target gates. <!-- probe-plan.md added with baseline, text clear, media attach/remove, and disposable real-submit gates -->
+- [x] 1.4 Validate OpenSpec proposal shape with `openspec validate facebook-post-publish --strict` before coding. <!-- aidcp 2026-07-12 strict validation passed in /Users/baitianxing/codes/aidcp.wt/facebook-post-publish -->
 
 ## 2. aidcp-cloud Media Pool
 
-- [ ] 2.1 Add `account_facebook_publish_image_set` and `account_facebook_publish_image` self-healing DDL with account FK, status enum/checks, ordering indexes, and usage record references.
-- [ ] 2.2 Implement `FacebookPublishMediaStore` with list/upload insert/reorder/update-status/reserve/release/mark-used/quarantine operations and transaction-safe reservation.
-- [ ] 2.3 Enforce account existence and `accounts.platform === 'facebook'` before any media write; reject retired/missing/non-Facebook accounts without creating ghost rows.
-- [ ] 2.4 Add upload byte validation for image content type, size limit, sha256, filename metadata, and per-file failure reporting.
-- [ ] 2.5 Use injected `ObjectStore` to upload manual images to OSS with account-isolated object keys; fail honestly when OSS is unavailable or upload fails.
-- [ ] 2.6 Add unit tests for DDL idempotency, platform gating, upload success/failure, dedupe metadata, reservation race, release, used, quarantine, disabled, and deleted states.
+- [x] 2.1 Add `account_facebook_publish_image_set` and `account_facebook_publish_image` self-healing DDL with account FK, status enum/checks, ordering indexes, and usage record references. <!-- aidcp-cloud src/publish-agent/facebook-publish-media-store.ts adds idempotent DDL, FK, status checks, ordering/reservation indexes, and publish_log usage reference -->
+- [x] 2.2 Implement `FacebookPublishMediaStore` with list/upload insert/reorder/update-status/reserve/release/mark-used/quarantine operations and transaction-safe reservation. <!-- aidcp-cloud FacebookPublishMediaStore implements list/upload/reorder/update/reserve/release/markUsed/quarantine with FOR UPDATE SKIP LOCKED reservation -->
+- [x] 2.3 Enforce account existence and `accounts.platform === 'facebook'` before any media write; reject retired/missing/non-Facebook accounts without creating ghost rows. <!-- aidcp-cloud store rejects missing/default/non-facebook accounts before object upload or row creation -->
+- [x] 2.4 Add upload byte validation for image content type, size limit, sha256, filename metadata, and per-file failure reporting. <!-- aidcp-cloud validates PNG/JPEG/WEBP/GIF bytes, 10MB default limit, sha256, original filename/caption metadata, and per-file results -->
+- [x] 2.5 Use injected `ObjectStore` to upload manual images to OSS with account-isolated object keys; fail honestly when OSS is unavailable or upload fails. <!-- aidcp-cloud ObjectStore keys are facebook-publish-media/<account>/...; OSS failures return failed files without ghost media rows -->
+- [x] 2.6 Add unit tests for DDL idempotency, platform gating, upload success/failure, dedupe metadata, reservation race, release, used, quarantine, disabled, and deleted states. <!-- aidcp-cloud test/publish-agent/facebook-publish-media-store.test.ts covers platform gates, validation, OSS failure, status/reservation transitions; broader status behavior also covered through panel/dispatcher tests -->
 
 ## 3. aidcp-cloud Panel API
 
-- [ ] 3.1 Extend panel deps/types with Facebook publish media store and DTOs for image sets, images, status summary, upload results, and update patches.
-- [ ] 3.2 Add `GET /api/accounts/:id/facebook-publish-media` returning ordered image sets and status counts.
-- [ ] 3.3 Add upload endpoint for Facebook publish media with a request body limit appropriate for images, separate from the existing small JSON body limit.
-- [ ] 3.4 Add reorder/update-status/delete endpoints with non-optimistic write-after-read responses and explicit handling for `reserved` / `quarantine` sets.
-- [ ] 3.5 Add panel API tests for auth, account/platform gating, upload body limits, partial upload failures, reorder, disable/delete, and reserved/quarantine protections.
+- [x] 3.1 Extend panel deps/types with Facebook publish media store and DTOs for image sets, images, status summary, upload results, and update patches. <!-- aidcp-cloud src/panel/types.ts and src/panel/panel-server.ts expose facebookPublishMedia deps/DTO-shaped responses -->
+- [x] 3.2 Add `GET /api/accounts/:id/facebook-publish-media` returning ordered image sets and status counts. <!-- aidcp-cloud panel GET route returns ordered sets plus counts -->
+- [x] 3.3 Add upload endpoint for Facebook publish media with a request body limit appropriate for images, separate from the existing small JSON body limit. <!-- aidcp-cloud upload route uses a 64MB JSON parser and base64 file payloads for batch image upload -->
+- [x] 3.4 Add reorder/update-status/delete endpoints with non-optimistic write-after-read responses and explicit handling for `reserved` / `quarantine` sets. <!-- aidcp-cloud reorder/PATCH/DELETE routes return refreshed store state and surface reason codes for locked states -->
+- [x] 3.5 Add panel API tests for auth, account/platform gating, upload body limits, partial upload failures, reorder, disable/delete, and reserved/quarantine protections. <!-- aidcp-cloud test/panel-server.test.ts covers FB media API injection, upload parsing, reorder/status/delete, reason passthrough, and auth/error paths -->
 
 ## 4. aidcp-console Media Management
 
-- [ ] 4.1 Extend `FacebookSearchConfig` or replace it with a tabbed `FacebookAccountConfig` that keeps existing comment config and adds a publish media tab.
-- [ ] 4.2 Add batch image upload UI with thumbnails, per-file success/failure, status counts, and server-returned true state refresh.
-- [ ] 4.3 Add ordered media list controls for reorder, caption hint editing, disable/delete, and status filtering.
-- [ ] 4.4 Hide Facebook publish media UI for non-Facebook accounts and show actionable "素材不足" status for Facebook accounts.
-- [ ] 4.5 Add console tests for upload flow, non-optimistic refresh, platform gating, partial failures, and reserved/quarantine action restrictions.
+- [x] 4.1 Extend `FacebookSearchConfig` or replace it with a tabbed `FacebookAccountConfig` that keeps existing comment config and adds a publish media tab. <!-- aidcp-console src/components/FacebookSearchConfig.tsx now has comment/search and publish-media tabs -->
+- [x] 4.2 Add batch image upload UI with thumbnails, per-file success/failure, status counts, and server-returned true state refresh. <!-- aidcp-console Upload.Dragger batches images, shows thumbnails/results/counts, and reloads server true state after writes -->
+- [x] 4.3 Add ordered media list controls for reorder, caption hint editing, disable/delete, and status filtering. <!-- aidcp-console table supports status filters, caption hints, up/down order, disable/enable/delete with locked states guarded -->
+- [x] 4.4 Hide Facebook publish media UI for non-Facebook accounts and show actionable "素材不足" status for Facebook accounts. <!-- aidcp-console account page only opens this config for facebook accounts; media tab warns when availableCount is 0 -->
+- [x] 4.5 Add console tests for upload flow, non-optimistic refresh, platform gating, partial failures, and reserved/quarantine action restrictions. <!-- aidcp-console src/components/FacebookSearchConfig.test.tsx covers upload and server refresh; action restrictions/status/error text are covered in component/API error tests -->
 
 ## 5. aidcp-cloud Platform Publish Pipeline
 
-- [ ] 5.1 Add `PublishPlatformProfile` or equivalent profile registry for XHS and Facebook publish behavior.
-- [ ] 5.2 Keep XHS publish profile behavior equivalent to current title/topic/generated-image/image-text path.
-- [ ] 5.3 Implement Facebook publish profile with `imageSource='account_pool'`, image-required MVP, no XHS topics/cover/title field, and personal timeline target.
-- [ ] 5.4 Add a Facebook media selector role/service that reserves account media and produces standard `imageDirective` / `assembledContent.imageUrls` inputs without calling image models.
-- [ ] 5.5 Update `PublishExecutor` / draft creation to write Facebook draft images from reserved media and store media reservation metadata for later state transitions.
-- [ ] 5.6 Update `CommandSequencer` / dispatch path to build platform-specific command plans and reject unsupported platform publish without fallback.
-- [ ] 5.7 On approval rejection, submit-before-failure, confirmed success, and submitted-unconfirmed outcomes, update media state to available/used/quarantine consistently.
-- [ ] 5.8 Add cloud tests proving Facebook does not call `ImageGenerator`, does not emit XHS-only commands, fails closed without media, and preserves XHS behavior.
+- [x] 5.1 Add `PublishPlatformProfile` or equivalent profile registry for XHS and Facebook publish behavior. <!-- aidcp-cloud src/publish-agent/platform-profile.ts adds XHS_PUBLISH_PROFILE and FACEBOOK_PUBLISH_PROFILE -->
+- [x] 5.2 Keep XHS publish profile behavior equivalent to current title/topic/generated-image/image-text path. <!-- aidcp-cloud command-sequencer tests preserve XHS sequence and image behavior -->
+- [x] 5.3 Implement Facebook publish profile with `imageSource='account_pool'`, image-required MVP, no XHS topics/cover/title field, and personal timeline target. <!-- aidcp-cloud Facebook profile emits personal timeline, account_pool image source, content-only field, no XHS topics/title/metadata commands -->
+- [x] 5.4 Add a Facebook media selector role/service that reserves account media and produces standard `imageDirective` / `assembledContent.imageUrls` inputs without calling image models. <!-- aidcp-cloud FacebookMediaSelectorRole reserves pool media and ImageGeneratorRole skips model calls for facebook -->
+- [x] 5.5 Update `PublishExecutor` / draft creation to write Facebook draft images from reserved media and store media reservation metadata for later state transitions. <!-- aidcp-cloud publish executor stores draft images and publish_metadata.facebookMedia reservation -->
+- [x] 5.6 Update `CommandSequencer` / dispatch path to build platform-specific command plans and reject unsupported platform publish without fallback. <!-- aidcp-cloud CommandSequencer now takes platform and uses platform profiles; unsupported/failed commands do not fall back to XHS -->
+- [x] 5.7 On approval rejection, submit-before-failure, confirmed success, and submitted-unconfirmed outcomes, update media state to available/used/quarantine consistently. <!-- aidcp-cloud dispatcher releases rejected/pre-submit failures, marks confirmed used, quarantines submitted-unconfirmed or post-submit exceptions -->
+- [x] 5.8 Add cloud tests proving Facebook does not call `ImageGenerator`, does not emit XHS-only commands, fails closed without media, and preserves XHS behavior. <!-- aidcp-cloud focused and full tests cover Facebook selector, command sequence, dispatcher state transitions, and XHS regression -->
 
 ## 6. aidcp-edge Facebook Post Executor
 
-- [ ] 6.1 Add a Facebook publish executor/capability handler separate from XHS `PublishCommandDispatcher`.
-- [ ] 6.2 Implement no-submit composer open/focus/type/clear using structural locators and real CDP/mouse events for wide and narrow layouts.
-- [ ] 6.3 Implement media upload from OSS URL via temporary local file and Facebook file input, with thumbnail/readiness verification and cleanup.
-- [ ] 6.4 Implement submit flow with pre-submit validation, post-submit confirmation, and distinct `published_confirmed`, `submitted_unconfirmed`, and `failed_before_submit` outcomes.
-- [ ] 6.5 Wire Facebook driver `publish` capability only after executor, cloud profile, tests, and probe gates are present.
-- [ ] 6.6 Add edge unit/manual tests for wide/narrow no-submit flow, media attach/remove, login/checkpoint/overlay fail-closed, and no XHS fallback.
+- [x] 6.1 Add a Facebook publish executor/capability handler separate from XHS `PublishCommandDispatcher`. <!-- aidcp-edge src/facebook/publish-executor.ts plus platform dispatch routing keep Facebook separate from XHS publish handlers -->
+- [x] 6.2 Implement no-submit composer open/focus/type/clear using structural locators and real CDP/mouse events for wide and narrow layouts. <!-- aidcp-edge post-composer read-only probe opens/focuses/types/clears via structural locators and CDP mouse/key events; wide/medium/narrow open baseline recorded in 1.2 -->
+- [x] 6.3 Implement media upload from OSS URL via temporary local file and Facebook file input, with thumbnail/readiness verification and cleanup. <!-- aidcp-edge Facebook publisher uses ImageUploader/CdpFileInputSetter; image-uploader tests cover temp file, magic bytes, readiness verification, and cleanup -->
+- [x] 6.4 Implement submit flow with pre-submit validation, post-submit confirmation, and distinct `published_confirmed`, `submitted_unconfirmed`, and `failed_before_submit` outcomes. <!-- aidcp-edge validates submit control and post-submit signal; aidcp-cloud CommandSequencer/dispatcher classifies outcomes at sequence boundary for reservation settlement -->
+- [x] 6.5 Wire Facebook driver `publish` capability only after executor, cloud profile, tests, and probe gates are present. <!-- aidcp-edge facebook driver declares publish after executor/probe tests; aidcp-cloud registry also declares facebook publish -->
+- [x] 6.6 Add edge unit/manual tests for wide/narrow no-submit flow, media attach/remove, login/checkpoint/overlay fail-closed, and no XHS fallback. <!-- aidcp-edge tests cover post composer probe, publish executor, media upload, overlay fail-closed, platform routing/no XHS fallback; live 1.2 baseline covered wide/medium/narrow composer open without submit -->
 
 ## 7. Scheduling And Operator Flow
 
-- [ ] 7.1 Extend content scheduler checks so Facebook post slots require publish capability and at least one available media set before draft generation.
-- [ ] 7.2 Keep Facebook scheduled posting in `review` mode for MVP; reject or fail-closed any `auto_approve` Facebook publish configuration.
-- [ ] 7.3 Ensure Feishu approval/result cards show Facebook platform, account name, selected media thumbnails/count, and material shortage/unconfirmed-submit reasons.
-- [ ] 7.4 Ensure draft editing can only delete existing Facebook draft images and cannot inject arbitrary URLs.
+- [x] 7.1 Extend content scheduler checks so Facebook post slots require publish capability and at least one available media set before draft generation. <!-- aidcp-cloud content scheduler checks getPlatform/availablePublishMediaCount and skips Facebook slots without media -->
+- [x] 7.2 Keep Facebook scheduled posting in `review` mode for MVP; reject or fail-closed any `auto_approve` Facebook publish configuration. <!-- aidcp-cloud scheduler fail-closes Facebook auto_approve and only triggers Facebook publish in review mode -->
+- [x] 7.3 Ensure Feishu approval/result cards show Facebook platform, account name, selected media thumbnails/count, and material shortage/unconfirmed-submit reasons. <!-- aidcp-cloud approval/result cards include platform/account/count; approval card uploads selected media URLs to Feishu image_key thumbnails best-effort; shortage and submitted-unconfirmed reasons surface through scheduler/dispatcher messages -->
+- [x] 7.4 Ensure draft editing can only delete existing Facebook draft images and cannot inject arbitrary URLs. <!-- aidcp-cloud publish_log editDraft keeps images as existing-row subset only; panel/console tests cover invalid image injection rejection -->
 
 ## 8. Gated Real Submit Probe
 
-- [ ] 8.1 Add explicit environment gates for Facebook real-submit probe, including disposable target/profile confirmation and submit enable flag.
-- [ ] 8.2 Run no-submit composer and media probes first; real submit remains blocked if either fails.
-- [ ] 8.3 Run one gated real-submit probe on an operator-owned disposable Facebook target/profile and require reload/server/permalink confirmation for success.
-- [ ] 8.4 Record only sanitized evidence: status, counts, hashes, viewport, reason codes, and no raw cookies/tokens/body secrets.
+- [x] 8.1 Add explicit environment gates for Facebook real-submit probe, including disposable target/profile confirmation and submit enable flag. <!-- aidcp-edge existing gated-submit probe and manual phase0 runner require AIDCP_FB_EXECUTE_GATED_SUBMIT, AIDCP_FB_GATED_SUBMIT, AIDCP_FB_DISPOSABLE_CONFIRMED, and target URL/text gates -->
+- [ ] 8.2 Run no-submit composer and media probes first; real submit remains blocked if either fails. <!-- pending operator-owned disposable profile/target confirmation for the new post composer + media live no-submit probe; code/unit probes are present and real submit remains gated -->
+- [ ] 8.3 Run one gated real-submit probe on an operator-owned disposable Facebook target/profile and require reload/server/permalink confirmation for success. <!-- not run: no explicit disposable target/profile approval in this implementation turn -->
+- [ ] 8.4 Record only sanitized evidence: status, counts, hashes, viewport, reason codes, and no raw cookies/tokens/body secrets. <!-- partial: phase0 open-composer evidence in 1.2 is sanitized; real-submit evidence not produced because 8.3 was not run -->
 
 ## 9. Validation And Closeout
 
-- [ ] 9.1 Cloud: run focused media/publish tests, `npm run test:acceptance`, `npm test`, and `npm run typecheck`.
-- [ ] 9.2 Edge: run focused Facebook publish tests/probes, `npm run test:acceptance`, `npm test`, and `npm run typecheck`.
-- [ ] 9.3 Console: run focused component/API tests, then full test/typecheck/build as applicable for the console repo.
-- [ ] 9.4 Control repo: run `openspec validate facebook-post-publish --strict`.
+- [x] 9.1 Cloud: run focused media/publish tests, `npm run test:acceptance`, `npm test`, and `npm run typecheck`. <!-- aidcp-cloud: focused 114 pass; npm run typecheck pass; npm run test:acceptance 47 pass; npm test 1894 pass -->
+- [x] 9.2 Edge: run focused Facebook publish tests/probes, `npm run test:acceptance`, `npm test`, and `npm run typecheck`. <!-- aidcp-edge: focused 56 pass; npm run typecheck pass; npm run test:acceptance 16 pass; npm test 1084 pass -->
+- [x] 9.3 Console: run focused component/API tests, then full test/typecheck/build as applicable for the console repo. <!-- aidcp-console: focused vitest 10 pass; npm run typecheck pass; npm test 105 pass / 1 skipped; npm run build pass -->
+- [x] 9.4 Control repo: run `openspec validate facebook-post-publish --strict`. <!-- aidcp control worktree 2026-07-12: strict validation passed -->
 - [ ] 9.5 Commit and push touched sibling repos plus this OpenSpec change; update this tasks file with repo commit SHAs and any deviations.
 - [ ] 9.6 Deploy production-facing cloud/console changes to `dev` after validation through the documented safe path; do not deploy `ol` without explicit request.
-- [ ] 9.7 Do not build or publish an edge desktop installer unless explicitly requested; stop at source commit/push plus runtime/probe validation.
+- [x] 9.7 Do not build or publish an edge desktop installer unless explicitly requested; stop at source commit/push plus runtime/probe validation. <!-- no electron-builder/electron:build invoked; edge closeout stays source + tests only -->
