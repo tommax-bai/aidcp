@@ -804,3 +804,6 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] 61.8 一环境多分 + 多人标识 — 同一环境加入端用户 A 与 B 都成功；两侧客户端都能见到该环境；后台抽屉里该环境显示「多人（2）」、Tooltip 列出 A/B 名。**关键**：给 A 加入 B 已有的 env 并保存后，B 的归属集合不变（`setScope` 只 DELETE 当前 user_id）——真机核 B 不掉环境。
 - [ ] 61.9 暖缓存重开回归（评审揪出的 critical，已结构性修复）— 打开某端用户环境归属抽屉（有已归属环境）→ 关闭 → 5 分钟内重开同一端用户：「已分配」必须仍显示原有环境（**不得**变 0、原环境**不得**跑到「待分配」）；此时点保存**不得**清空该端用户归属。修法=rows 由 `scope.data` 单一 effect 驱动（原双 effect 竞态清空草稿）。桩测 portal 重、以真机点击 open→close→reopen 核。
 - [ ] 61.10 复制密钥（并入 61.4）— HTTP 后台点「复制密钥」实际落入剪贴板（execCommand 兜底真写只能浏览器核）。
+- [ ] 61.11 存量环境导入 + 待分配呈现（change `client-user-env-registry`，cloud master `843a0a9` land + 部署 dev + 归档）— 后台打开任一端用户环境归属抽屉：11 个已导入的存量环境出现在「待分配」（`assigneeCount=0`、「已分配给」列显示「—」）、可勾选「加入选中」→ 保存后转「已分配」。dev 真库已直查核（11 个 count 全 0 + 已归属 k1ejvb06 并入 count 1）；GUI 呈现与勾选加入需浏览器核。导入只取 env_key/名字/平台，凭据不入库。
+- [ ] 61.12 边缘自动登记自维护（`onEdgeRegistered`）— 新 AdsPower 环境连上 dev 云端后，自动出现在后台「待分配」（source=auto），env_key=裸分身 id（无 `ads-` 前缀），且**未被误归属任何客户**（归属表无其行、assigneeCount 保持 0）。self-/host- 兜底 edge 不应出现。需真机连一个新环境核。
+- [ ] 61.13 并集读不丢已归属环境 — 某 env 只在归属表（客户端自建 attach）、注册表无：后台仍列出并带真实归属客户与人数（dev 已见 k1ejvb06 count 1 验证；GUI 核）。
