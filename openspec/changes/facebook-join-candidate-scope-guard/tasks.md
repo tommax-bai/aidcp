@@ -4,8 +4,14 @@
 
 ## 0. 实装前硬前置（真机确认探针）
 
-- [ ] 0.1 **头部块祖先判据校准 + 非锚点推荐位形态（承重、决定能否 land；二轮评审强化）**：真机捕获目标群头部块结构——群名主标题（`<h1>`/`[role="heading"][aria-level="1"]`）的祖先链、目标自身 Join 与推荐位 join 相对该块的位置——坐实「正向包含目标群头部块」能框住目标自身 Join 且推荐位 join 落块外。取窄=安全侧。**并 MUST 坐实真机「发现更多小组」推荐位卡片的导航形态**：`a[href="/groups/id"]` / `[role="link"]`+属性编码 id / 纯 JS 闭包（无任何属性带 id）。前两类 D7-1 已覆盖；若为纯不透明第三类，需补真机可辨结构信号（否则该形态头部块 fail-open）。**并 MUST 坐实真机推荐卡片是否**：① 用双列布局（异群链接在缩略图列、群名 h1+加入在内容列）；② 群名用 `<h1>`/`aria-level=1`（与目标群 heading 同级）——若是，验证「停在 ceiling」甄别能把目标 heading 与卡片 heading 分开、且目标群头部 heading 上溯确实只在 `[role=main]` 处撞见异群引用（非某中层 wrapper 与推荐位共处→那会 fail-closed 漏认目标）。**未坐实前不 land**；**land 前须真机验证一个非锚点推荐位 + 一个双列卡片、不能只重采简单锚点形态**（否则测试给假信心，二/四轮评审坐实）。
-- [ ] 0.2 E1/E2 定档：捕获推荐栏 join 候选 `href`/`[role=link]`/属性编码的祖先群引用（E1 群 id 比对，含非锚点）、推荐轮播容器结构标志（E2 选择器）。
+- [x] 0.1 **头部块祖先判据校准 + 非锚点推荐位形态（承重、决定能否 land）**：**已真机校准完成（2026-07-12，运营机 AdsPower，账号已登录、中文 chrome，群 258908555514638 / 1327258819440839 / 774476963231812）**。只读探针 `scripts/fb-group-scope-probe.ts`（原样注入发货 `SCOPE_HELPERS_JS` + 结构 dump）+ 真实 executor 驱动 `scripts/fb-join-live-drive.ts`。坐实：① 目标群名恒为 `[role=main]` 内**单一 `<h1>`**、其自身 Join「加入小组」正确在域、头部块解析到 `[role=main]`（3 群一致）；② 真实「相关小组/发现更多小组」推荐卡片**不用 `<h1>`**（用链接/纯文本）→ 页面群名 h1 唯一、v4/v5 的「卡片竞争 h1」在真机不出现；③ 每张真实推荐卡片的异群 join 是裸 `div[role=button]`、其异群 `/groups/<id>` 锚点距 join 钮仅 **2–4 跳**（`foreignDescBoundaryHops ∈ {2,3,4}，无一为 -1`）→ 承重的 `__hasForeignGroupRef` 后代扫描恒能检出，「纯 JS 闭包无属性」fail-open 形态**未出现**；④ 不可用群「内容暂时无法显示」→ `scopeResolved=false` → not_ready（fail-closed 正确）；⑤ 嵌套 `[role=main]` 见于 `/groups/discover`（2 个），但群落地页为 1。<!-- 探针 aidcp-edge 571736b -->
+- [x] 0.2 E1/E2 定档：真机确认推荐卡片异群 `/groups/<id>` 编码在**卡片内锚点**（`a[href]`，非纯闭包）、距 join 钮 2–4 跳后代；E1 候选祖先链走不到（异群锚点是兄弟子树、非候选祖先）故承重靠 D1 后代扫描而非 E1。E2 推荐轮播容器选择器未定档（`div.x9f619.x1n2onr6` 等混淆类名不稳）、暂不接线，D1 已足。<!-- 真机 571736b -->
+
+## 0b. 真机校准揭示的回归修复（2026-07-12，承重头部判据）
+
+- [x] 0b.1 **头部块「加群后『相关小组』takeover」过度 fail-closed 修复（承重、真机 2/2 复现）**：真机发现——加群成功后 FB 弹「相关小组」takeover，其异群 join 栏与目标 h1 **共享一个 `[role=main]` 之下的中层 `div`**（栏是目标头部的兄弟子树）。早前 v4「walk 没停在 ceiling 就拒该 heading」把**唯一的目标 h1** 也拒掉 → `scopeResolved=false` → 成员信号（收窄到未解析块）为空 → **成功加群误报 `join_failed`、已加入群误读 `not_ready`**（fail-safe，栏 join 仍全出域，但打断 happy path=真实可用性回归）。**修法**（`__resolveHeaderBlock`）：单一群名 h1（真实 FB 群页/成员页/takeover 均如此）→ 用其**最后一个干净祖先**作块（含目标自身 CTA、结构性排除兄弟栏）；多 heading → 保留 v4/v5 甄别（唯一「停在 ceiling」者，≥2 对称→歧义 fail-closed）。**真机验证**：修后 fresh 加群 `ok=true`、post `scopeResolved=true`、`mainCtaText=已加入`、`membershipSignals=[已加入]`、**`outOfScopeJoinCount=10`**（10 个别群 join 仍全出域，安全不变）。residual（真机未见、诚实记录）：目标页自身无 h1 而推荐卡片有 h1 → 单 heading 分支会误接受（真实 FB 目标恒有 h1、卡片从不用 h1，不触发）。<!-- aidcp-edge 571736b __resolveHeaderBlock 最后干净祖先 + 795 测试校正 + 新增 takeover 成员态测试 -->
+- [x] 0b.2 测试：更新旧 795（`not_ready`→`pending`，真机校正）+ 新增「加群后 takeover 成员态 → already_member、栏绝不污染」；v4/v5 合成防御全保留（双列卡片/对称歧义/成员方向均绿）。全量 1068 pass、acceptance 16、typecheck 干净。<!-- aidcp-edge 571736b -->
+- [ ] 0b.3 对抗性评审（Ultracode，承重红线判据变更）：多镜头攻击精炼规则找加错群漏洞与过度 fail-closed，对抗验证只留确认项，确认项修复后回写。
 
 ## 1. aidcp-edge — 作用域 helper（语言无关）
 
@@ -51,9 +57,13 @@
 
 ## 5. 集成与部署（edge-only）
 
-- [x] 5.1 `npm run typecheck` + `npm run test:acceptance`(16) + 全量 `npm test`(1060) 全绿（AC-* 红线过）。 <!-- aidcp-edge 70b53e0 -->
-- [ ] 5.2 edge master land（无 ECS/cloud 部署）。**未 land**：代码已提交并推送分支 `facebook-join-candidate-scope-guard`（aidcp-edge 70b53e0 + e554fcd + 1ae8f66），land 到 master **gated 在 0.1 真机校准**（含非锚点推荐位 + 双列卡片 heading 甄别 + 游离链接歧义 + 目标头部是否引用别群/嵌套 main 的可用性验证）。<!-- branch @ 3161203, awaiting 0.1 -->
-- [ ] 5.3 真机验收登记 backlog：0.1/0.2 探针为实装前硬前置（已单列，五轮评审强化）；再核 pending/member/晚渲染三态作用域内不误点、可加入群正常、成员信号不被推荐位污染。**并 MUST 核可用性张力（五轮评审揭示的 fail-closed 角落）**：① 目标群头部若引用兄弟/关联群 `/groups/<异 id>` 会致目标 heading 被甄别掉 → 永久 `not_ready`（真机确认 FB 头部是否引别群；若是，需据真结构放宽甄别或改判据）；② 嵌套 `[role=main]` / 推荐位铺平为 main 裸兄弟 → `no_button`。归 FB 加群真机簇。
+- [x] 5.1 `npm run typecheck` + `npm run test:acceptance`(16) + 全量 `npm test`(1068) 全绿（AC-* 红线过）。 <!-- aidcp-edge 571736b（含真机修复+新测） -->
+- [ ] 5.2 edge master land（无 ECS/cloud 部署）。**未 land**：代码已提交并推送分支 `facebook-join-candidate-scope-guard`（… → 3161203 → **571736b** 真机校准+回归修复）。**0.1 真机硬前置已满足**（2026-07-12 运营机实测，见 0.1/0b.1）；land 现仅剩 **0b.3 对抗评审确认项处置**后即可 ff master。<!-- branch @ 571736b, 0.1 done; awaiting 0b.3 -->
+- [x] 5.3 真机验收（原登记 backlog，本次直接真机做完）：pending/member 作用域内正确读、可加入群正常点、成员信号不被推荐位污染、不可用群 fail-closed——**均真机实测通过**。原预警的两个 fail-closed 角落之①（目标头部与关联群栏共处中层容器 → 目标 heading 被甄别掉 → `not_ready`）**已真机命中并修复**（见 0b.1，改最后干净祖先作块）；②（嵌套 `[role=main]`）群落地页为单 main，未触发。真机三群加群/退群全流程验证、账号状态已复原。<!-- 真机 571736b -->
+
+## 5b. 部署（真机验证后）
+
+- [ ] 5b.1 edge dev 部署（edge-only 无 cloud）：land master 后按需构建/部署 dev；本 change 纯 edge 定位逻辑，dev 冒烟走真机加群闭环。
 
 ## 6. 收尾
 

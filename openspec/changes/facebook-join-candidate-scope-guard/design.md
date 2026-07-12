@@ -66,3 +66,15 @@
 - **E2 推荐轮播容器选择器**：「发现更多小组 / 查看推荐小组」carousel 的稳定结构标志（role / 每项「移除推荐」按钮群 / 容器 aria）——真机校准，取得前只靠 D1 正向包含 + E1。落 backlog。
 - **观测腿 `mainCta` 挑选在作用域内多 join 候选时的优先级**（罕见：目标群头部多个 join 类控件）——先取作用域内文档序首个，真机若现异常再补结构判据。
 - **（五轮评审总结，承重）纯客户端启发式识别目标头部有不可消解的双向角落——0.1 真机校准是唯一权威解。** 五轮对抗评审逐层收敛（锚点→全属性→块自身→heading 甄别→歧义守卫），每轮堵住一个逃逸、下一轮现更刁钻者、现实概率逐轮降低（v5 已 LOW realism）。当前代码把所有 high/medium-realism 攻击堵成安全态，但两类角落只能靠真机 DOM 定夺：**① fail-open 残留**——异群 id 在轻 DOM 任何属性都不以 `/groups/<id>` 子串出现（JS 闭包/shadow/iframe/裸数字），或异群链接游离在卡片外形成对称歧义（后者已被歧义守卫降为 fail-closed）；**② fail-closed 可用性损失**（安全但漏认真目标）——(a) 目标群头部自身引用了兄弟/关联群 `/groups/<异 id>` → 目标 heading 被甄别掉 → 永久 `not_ready`（云端无限重试不成功）；(b) 嵌套 `[role=main]` / 推荐位铺平为 `[role=main]` 裸兄弟 → 块退化成无 join 的裸 heading → `no_button`（云端永久失败）。**0.1 真机 MUST 取证 FB 真实结构**（推荐卡片是否带自身内链、群名 heading 层级、目标头部是否引用别群、是否嵌套 main），据实把「停在 ceiling / 歧义 / heading 层级」判据校准到真值——而非继续凭猜加启发式。校准前不 land。
+
+## 真机校准结论（2026-07-12，task 0.1 已做完）
+
+运营机 AdsPower 真机实测（账号已登录、中文 chrome，只读探针 `scripts/fb-group-scope-probe.ts` 注入发货 `SCOPE_HELPERS_JS` + 真实 executor 驱动 `scripts/fb-join-live-drive.ts`；三群加群/退群全流程、账号复原）把上面的 Open Questions 逐条落地：
+
+- **推荐卡片导航形态**：真实「相关小组/发现更多小组」卡片的 join 是裸 `div[role=button]`，其异群 `/groups/<id>` 锚点在**卡片内**（`a[href]`，非纯 JS 闭包），距 join 钮仅 **2–4 跳后代**——承重的 `__hasForeignGroupRef` 后代扫描恒能检出。**「纯不透明第三类」fail-open 形态未出现**（① 的 join-click 方向残留在真机不成立）。E1 走不到（异群锚点是候选的兄弟子树、非祖先），故承重靠 D1 后代扫描、E1 仅 corroborating（与实装一致）。
+- **群名 heading 层级 + 唯一性**：目标群名恒为 `[role=main]` 内**单一 `<h1>`**；真实推荐卡片**不用 `<h1>`**（用链接/纯文本）→ 页面群名 h1 唯一。**v4/v5 为「双列卡片竞争 h1」加的甄别在真机不被触发**（合成防御保留作纵深，无害）。
+- **② fail-closed 可用性角落 (a) 真机命中并已修**：加群成功后 FB 弹「相关小组」takeover，其异群栏与目标 h1 **共享一个 `[role=main]` 之下的中层 `div`**（栏是目标头部的兄弟子树）。v4「没停 ceiling 就拒 heading」把唯一的目标 h1 也拒掉 → `scopeResolved=false` → 成员信号（收窄到未解析块）空 → **成功加群误报 `join_failed`、已加入群误读 `not_ready`**（真机 2/2 复现；fail-safe 但打断 happy path）。**修法**：`__resolveHeaderBlock` 改为——单一群名 h1（真实 FB 均如此）用其**最后一个干净祖先**作块（含目标自身 CTA、结构性排除兄弟栏）；多 heading 保留 v4/v5 甄别（唯一「停在 ceiling」者，≥2 对称→歧义 fail-closed）。**真机验证**：修后 fresh 加群 `ok=true`、post `scopeResolved=true`、`mainCtaText=已加入`、`membershipSignals=[已加入]`、`outOfScopeJoinCount=10`（10 个别群 join 仍全出域，安全不变）。
+- **② 角落 (b) 嵌套 main**：`/groups/discover` 有 2 个（嵌套），但**群落地页为单 main**，不触发块退化。
+- **修法 residual（真机未见、诚实记录）**：目标页**自身无 h1** 而某推荐卡片**有 h1** → 单 heading 分支会误接受该卡片块。真实 FB 目标群页恒有 h1、卡片从不用 h1，故不触发；交对抗评审（0b.3）复核。
+
+结论：D1 正向包含（块无异群引用 → 兄弟栏结构性出域）在真机是承重且成立的安全判据；此前 v4 的「停 ceiling 强判据」在真机过严、打断成员/takeout 态，已用「单 h1 取最后干净祖先」修回、安全不减（栏 join 恒出域，真机 `outOfScopeJoinCount=10` 实证）。
