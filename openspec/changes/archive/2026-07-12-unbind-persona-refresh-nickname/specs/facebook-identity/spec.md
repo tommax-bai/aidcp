@@ -1,6 +1,6 @@
 ## MODIFIED Requirements
 
-### Requirement: Facebook 昵称经握手持久化——数字 id 已确立方附带、云端按差异更新
+### Requirement: Facebook 昵称经握手持久化——数字 id 已确立方附带、云端仅库内空时写
 
 Facebook 身份确立 SHALL 始终以稳定的**数字账号 id** 为准；显示名 MUST NOT 用于确立身份。边缘 MAY 在**数字 id 身份已确立后**、于 hello 握手附带一个可选昵称——该昵称来源为本 capability 前述**就地、id 锚定**的读取（绝不为取昵称导航 `/me`）。云端 SHALL 仅在**握手平台校验通过**后，才处理该昵称；若昵称非空且与该账号当前库内昵称不同，云端 MUST 将其持久化为账号昵称。通用标题（如 `Facebook`）或未与匹配数字 id 绑定的显示名 MUST NOT 更新账号昵称。昵称更新 MUST 仅影响显示与人工选择，MUST NOT 改变账号主键、平台校验、路由或任务归因。
 
