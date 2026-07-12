@@ -65,10 +65,10 @@
 
 ## 5b. 部署（真机验证后）
 
-- [ ] 5b.1 edge 桌面安装包重建 + 运营机 pull（用户 gated，§6 打包默认不做）：本 change 纯 edge 定位逻辑已 land master，运营机 pull + 下次安装包重建后运行时生效。真机加群闭环本轮已在开发机 AdsPower 实测通过（见 0.1/0b.1），运营机侧属常规发版节奏、非本 change 单独门槛。
+- [x] 5b.1 edge 桌面安装包重建 + 运营机 pull（用户 gated，§6 打包默认不做）：本 change 纯 edge 定位逻辑已 land master，运营机 pull + 下次安装包重建后运行时生效。真机加群闭环本轮已在开发机 AdsPower 实测通过（见 0.1/0b.1），运营机侧属常规发版节奏、非本 change 单独门槛。用户 2026-07-12 确认“已经 OK，可以归档”；本 session 未重建 edge 安装包，仅据用户放行解除归档 gate。<!-- rollout gate cleared by user confirmation 2026-07-12 -->
 
 ## 6. 收尾
 
 - [x] 6.1 `openspec validate facebook-join-candidate-scope-guard --strict` 通过。 <!-- 2026-07-12 valid -->
 - [x] 6.2a tasks.md 勾选 + `<!-- <repo> <sha> 备注 -->` 标注（代码 70b53e0；真机校准+修复 571736b；评审 workflow w7hth9js8）。
-- [ ] 6.2b archive（**留活跃、下批分诊清账**）：land + 0.1 真机核 + 0b.3 评审三闸已清；仅剩 edge 桌面安装包重建 + 运营机 pull（用户 gated 发版节奏，见 5b.1）。按 fleet 批量归档节奏，运营机 rollout 后随下批「landed+deployed」清账归档（spec delta 届时并入主 spec）。
+- [x] 6.2b archive：land + 0.1 真机核 + 0b.3 评审三闸已清；edge 桌面安装包重建 + 运营机 pull gate 已由用户确认 OK 后解除（见 5b.1）。本次归档将 spec delta 并入主 spec。<!-- archive requested 2026-07-12 -->
