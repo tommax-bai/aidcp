@@ -21,8 +21,8 @@
 ## 3. Validation And Closeout
 
 - [x] 3.1 Run targeted cloud, console, and edge validation for the touched paths.
-  <!-- Validation: aidcp-cloud targeted tsx tests passed; aidcp-cloud npm test passed 1883 tests; aidcp-cloud npm run typecheck passed; aidcp-console targeted vitest passed; aidcp-console npm run typecheck and npm run build passed; aidcp-edge had no source change and npm run typecheck passed. -->
+  <!-- Validation: aidcp-cloud targeted tsx tests passed; aidcp-cloud npm test passed 1883 tests; aidcp-cloud npm run typecheck passed; aidcp-console targeted vitest passed; aidcp-console npm run typecheck and npm run build passed; aidcp-edge had no source change and npm run typecheck passed. Dev deploy health passed: aidcp-cloud.service active, 8787/8090/8088 listening, /api/health 200, PG ready, Feishu WSClient onReady, isales services still active. -->
 - [x] 3.2 Run `openspec validate unbind-persona-refresh-nickname --strict`.
   <!-- Validation: openspec validate unbind-persona-refresh-nickname --strict passed. -->
 - [x] 3.3 Commit and push relevant repo changes; update this task file with commits and validation notes.
-  <!-- Pushed to default branches: aidcp-cloud master c978588; aidcp-console master 4313874. This control-repo commit carries the OpenSpec proposal/tasks/spec deltas. -->
+  <!-- Pushed to default branches: aidcp-cloud master c978588; aidcp-console master 4313874; aidcp main 911def2 plus deployment-note follow-up. Deployed dev from clean master worktrees. Backups: /opt/aidcp/cloud.bak.20260712-201902.tar.gz, /opt/aidcp/cloud/.env.bak.20260712-201902, /opt/aidcp/console.bak.20260712-201919.tar.gz. -->
