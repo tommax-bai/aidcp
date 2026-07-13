@@ -45,6 +45,23 @@
 
 这版用于验证“真正分层后是否能解决重叠”。正式产品若采用 Rive，应继续将头、眼睛、眼皮、嘴、双翼、身体和道具拆成可编辑图层，再建立状态机。
 
+## 身体遮挡分层 V3
+
+`animation-rig-v3-demo.html` 修复了 V2 的肩部断口。V3 不再把翅膀直接贴在身体表面，而是采用以下渲染顺序：
+
+```text
+眼皮与表情层
+完整身体层
+独立挥手翅膀层
+```
+
+翅膀根部是实心延伸结构，并藏在完整身体轮廓后方。`connection-angle-preview.png` 覆盖 `-16deg` 到 `16deg` 的摆动范围，用于检查极限角度是否露缝。
+
+- `animation-rig-v3/mascot-body.png`：完整身体遮挡层。
+- `animation-rig-v3/mascot-wing-left.png`：无插槽、实心根部的独立翅膀层。
+- `animation-rig-v3/manifest.json`：渲染顺序、转轴和动作范围。
+- `animation-rig-v3/wave-preview.gif`：最终挥手预览。
+
 ## 源图位置
 
 源行为设定图为 4 列 2 行布局：

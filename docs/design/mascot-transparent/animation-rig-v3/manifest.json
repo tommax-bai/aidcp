@@ -1,0 +1,54 @@
+{
+  "assetSet": "aidcp-mascot-rig-v3-body-occlusion",
+  "version": 1,
+  "technique": "solid wing root rendered behind a complete body silhouette",
+  "demo": "../animation-rig-v3-demo.html",
+  "previewGif": "wave-preview.gif",
+  "connectionPreview": "connection-angle-preview.png",
+  "canvas": {
+    "width": 512,
+    "height": 512
+  },
+  "renderOrder": [
+    "left_wing",
+    "body",
+    "eyelids"
+  ],
+  "layers": [
+    {
+      "id": "left_wing",
+      "file": "mascot-wing-left.png",
+      "role": "independent waving wing with a solid extended root",
+      "zIndex": 1,
+      "pivot": {
+        "x": 133,
+        "y": 277
+      }
+    },
+    {
+      "id": "body",
+      "file": "mascot-body.png",
+      "role": "complete body silhouette that conceals the wing root",
+      "zIndex": 2
+    }
+  ],
+  "actions": [
+    {
+      "id": "wave",
+      "trigger": "is-waving",
+      "durationMs": 900,
+      "testedAngleRangeDeg": [-16, 16]
+    },
+    {
+      "id": "blink",
+      "trigger": "is-blinking",
+      "durationMs": 420
+    },
+    {
+      "id": "combo",
+      "triggers": ["is-waving", "is-blinking"],
+      "durationMs": 1000
+    }
+  ],
+  "prototypeBoundary": "This validates a seamless raster-layer shoulder connection. Production Rive work still requires editable source layers, mesh deformation, and a state machine."
+}
