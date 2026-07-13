@@ -38,8 +38,12 @@
       "file": "mascot-head.png",
       "role": "independent head with extended lower-neck feathers",
       "zIndex": 3,
+      "alignment": {
+        "xOffset": -24,
+        "yOffset": 0
+      },
       "pivot": {
-        "x": 256,
+        "x": 232,
         "y": 318
       }
     }
