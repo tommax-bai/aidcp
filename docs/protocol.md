@@ -138,7 +138,7 @@
 | `edge.task.acquire` | cloud → edge | 申请任务级执行权，携 `taskId/kind/priority/leaseMs/acquireTimeoutMs?`；edge 在该等待上限内未 quiesce 时取消排队申请；这不是“已暂停”的事实 |
 | `edge.task.acquired` | edge → cloud | edge 已在命令安全边界 quiesced、已取消未开始的普通浏览命令并授予租约；cloud 收到后才可发首条业务命令 |
 | `edge.task.release` | cloud → edge | 幂等释放指定 `taskId`，携可选 `outcome` |
-| `edge.task.released` | edge → cloud | 释放/过期/非 owner 的收敛回执 |
+| `edge.task.released` | edge → cloud | 释放/过期/非 owner 的收敛回执；`cdp_unhealthy` 表示 edge 仍在线但浏览器控制不可安全接管 |
 
 ### 2.6 发布编排（v2 新增，Publish Agent 驱动）
 
@@ -765,7 +765,7 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
 { "taskId": "task-01H...", "outcome": "completed" }
 
 // edge.task.released  edge → cloud
-{ "taskId": "task-01H...", "reason": "released" } // released|expired|duplicate|not_owner
+{ "taskId": "task-01H...", "reason": "released" } // released|expired|duplicate|not_owner|cdp_unhealthy
 ```
 
 edge 按 `system_recovery > human > automatic` 授予；同级 FIFO。发布从 `navigate_entry` 到提交后捕获全程持有一份租约。小红书评论的搜索/读取为 prepare 租约，撰写/LLM/人审期间释放，批准后 commit 重新抢占并按稳定 `noteId` 重开复检。最后一份独占任务释放后才恢复浏览并重报当前页面；被取消的旧浏览命令永不重放。
