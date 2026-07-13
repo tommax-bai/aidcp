@@ -1,0 +1,101 @@
+{
+  "assetSet": "aidcp-mascot-transparent",
+  "recommendedDirectory": "ui-512",
+  "sourceGrid": {
+    "columns": 4,
+    "rows": 2,
+    "cellWidth": 384,
+    "cellHeight": 512,
+    "readOrder": "left-to-right, top-to-bottom"
+  },
+  "states": [
+    {
+      "id": "welcome",
+      "label": "欢迎引导",
+      "gridPosition": "row 1, column 1, top-left",
+      "sourceRect": { "x": 0, "y": 0, "width": 384, "height": 512 },
+      "file": "ui-512/mascot-welcome-512.png",
+      "originalFile": "mascot-welcome.png",
+      "description": "挥手、睁大眼睛、主动打招呼，适合表达欢迎、首次引导和友好入口。",
+      "recommendedUse": ["onboarding", "empty_state", "feature_entry", "friendly_intro"],
+      "avoidUse": ["error", "risk_warning", "success_completion"]
+    },
+    {
+      "id": "thinking",
+      "label": "思考分析",
+      "gridPosition": "row 1, column 2",
+      "sourceRect": { "x": 384, "y": 0, "width": 384, "height": 512 },
+      "file": "ui-512/mascot-thinking-512.png",
+      "originalFile": "mascot-thinking.png",
+      "description": "托腮思考，旁边有灯泡和数据点，适合表达模型正在理解、分析或生成方案。",
+      "recommendedUse": ["ai_thinking", "loading_reasoning", "context_reading", "planning"],
+      "avoidUse": ["action_started", "hard_error", "completed_success"]
+    },
+    {
+      "id": "task_execution",
+      "label": "任务执行",
+      "gridPosition": "row 1, column 3",
+      "sourceRect": { "x": 768, "y": 0, "width": 384, "height": 512 },
+      "file": "ui-512/mascot-task-execution-512.png",
+      "originalFile": "mascot-task-execution.png",
+      "description": "用翅膀点击光标按钮，表情坚定，适合表达已经开始执行自动化动作或命令已下发。",
+      "recommendedUse": ["task_running", "command_sent", "automation_executing", "button_feedback"],
+      "avoidUse": ["idle_waiting", "error", "passive_monitoring"]
+    },
+    {
+      "id": "reminder",
+      "label": "温和提醒",
+      "gridPosition": "row 1, column 4, top-right",
+      "sourceRect": { "x": 1152, "y": 0, "width": 384, "height": 512 },
+      "file": "ui-512/mascot-reminder-512.png",
+      "originalFile": "mascot-reminder.png",
+      "description": "举着小铃铛，表情认真但不紧张，适合轻量提醒、配置缺失和待办提示。",
+      "recommendedUse": ["gentle_notice", "missing_config", "todo_reminder", "low_risk_prompt"],
+      "avoidUse": ["blocking_security_risk", "fatal_error", "success_completion"]
+    },
+    {
+      "id": "celebration",
+      "label": "成功庆祝",
+      "gridPosition": "row 2, column 1, bottom-left",
+      "sourceRect": { "x": 0, "y": 512, "width": 384, "height": 512 },
+      "file": "ui-512/mascot-celebration-512.png",
+      "originalFile": "mascot-celebration.png",
+      "description": "张开翅膀跳起，周围有彩纸，适合成功、完成和正向反馈。",
+      "recommendedUse": ["success", "task_completed", "saved", "published", "milestone"],
+      "avoidUse": ["warning", "loading", "error"]
+    },
+    {
+      "id": "risk_warning",
+      "label": "风险防护",
+      "gridPosition": "row 2, column 2",
+      "sourceRect": { "x": 384, "y": 512, "width": 384, "height": 512 },
+      "file": "ui-512/mascot-risk-warning-512.png",
+      "originalFile": "mascot-risk-warning.png",
+      "description": "抬手拦截并配有盾牌图标，适合风控、安全、权限和高风险动作确认。",
+      "recommendedUse": ["risk_warning", "security_prompt", "permission_check", "destructive_action_confirm"],
+      "avoidUse": ["normal_info", "success", "casual_onboarding"]
+    },
+    {
+      "id": "error_apology",
+      "label": "错误抱歉",
+      "gridPosition": "row 2, column 3",
+      "sourceRect": { "x": 768, "y": 512, "width": 384, "height": 512 },
+      "file": "ui-512/mascot-error-apology-512.png",
+      "originalFile": "mascot-error-apology.png",
+      "description": "皱眉、汗滴、拿着扳手，适合表达失败、异常和可恢复问题。",
+      "recommendedUse": ["error", "retry_needed", "recoverable_failure", "temporary_unavailable"],
+      "avoidUse": ["success", "normal_loading", "risk_prevention_before_failure"]
+    },
+    {
+      "id": "monitoring",
+      "label": "监控值守",
+      "gridPosition": "row 2, column 4, bottom-right",
+      "sourceRect": { "x": 1152, "y": 512, "width": 384, "height": 512 },
+      "file": "ui-512/mascot-monitoring-512.png",
+      "originalFile": "mascot-monitoring.png",
+      "description": "戴耳机看透明数据面板，适合后台运行、连接保持、日志和指标监控。",
+      "recommendedUse": ["monitoring", "background_running", "connection_status", "long_task_waiting", "dashboard"],
+      "avoidUse": ["one_shot_success", "hard_error", "onboarding"]
+    }
+  ]
+}
