@@ -38,15 +38,15 @@ Facebook 发帖草稿生成时，系统 SHALL 从该账号素材池选择下一�
 
 ### Requirement: Facebook 个人主页发帖执行器支持宽窄布局且独立于 XHS
 
-edge SHALL 提供 Facebook 发帖执行器，负责个人主页/首页 composer 的打开、聚焦、正文输入、图片上传、提交与确认。该执行器 MUST 使用 Facebook driver 的 `publish` 能力装配，MUST NOT 调用 XHS 发布 URL、XHS 发布 tab、XHS 标题/话题/封面处理器。执行器 MUST 覆盖宽屏与窄屏桌面布局，以结构定位和可见性判断为主，MUST NOT 依赖固定坐标或宽屏专属导航。当前页面的 dialog 消失或明确正向提交提示 SHALL 表示用户可见的“已提交”；只有从当前页面取得稳定帖子 ID/permalink 才能表示“已发布”。正常发布链路 MUST NOT 通过刷新页面获得该结论。提交前失败、页面已提交但链接缺失、以及已取得链接 MUST 区分上报。
+edge SHALL 提供 Facebook 发帖执行器，负责个人主页/首页 composer 的打开、聚焦、正文逐字输入、图片上传、提交与确认。该执行器 MUST 使用 Facebook driver 的 `publish` 能力装配，MUST NOT 调用 XHS 发布 URL、XHS 发布 tab、XHS 标题/话题/封面处理器。执行器 MUST 覆盖宽屏与窄屏桌面布局，以结构定位和可见性判断为主，MUST NOT 依赖固定坐标或宽屏专属导航。正文输入 MUST 使用逐字符的拟人化键盘节奏，MUST NOT 通过一次性整段粘贴或一次性 `Input.insertText` 灌入正文。当前页面的 dialog 消失或明确正向提交提示 SHALL 表示用户可见的“已提交”；只有从当前页面取得稳定帖子 ID/permalink 才能表示“已发布”。正常发布链路 MUST NOT 通过刷新页面获得该结论。提交前失败、页面已提交但链接缺失、以及已取得链接 MUST 区分上报。
 
 #### Scenario: 宽屏 composer 可打开并输入
 - **WHEN** Facebook edge 在 `1365x900` desktop viewport 收到 no-submit composer probe
-- **THEN** 执行器 SHALL 打开 composer、聚焦正文编辑器、输入并清空测试文本，且不提交任何内容
+- **THEN** 执行器 SHALL 打开 composer、聚焦正文编辑器、逐字输入并清空测试文本，且不提交任何内容
 
 #### Scenario: 窄屏 composer 可打开并输入
 - **WHEN** Facebook edge 在 `430x932` 或 `768x900` desktop viewport 收到 no-submit composer probe
-- **THEN** 执行器 SHALL 通过结构定位完成 composer 打开、聚焦、输入、清空，MUST NOT 依赖宽屏导航或固定坐标
+- **THEN** 执行器 SHALL 通过结构定位完成 composer 打开、聚焦、逐字输入、清空，MUST NOT 依赖宽屏导航或固定坐标
 
 #### Scenario: 不调用 XHS 发布器
 - **WHEN** Facebook 账号执行发布下发

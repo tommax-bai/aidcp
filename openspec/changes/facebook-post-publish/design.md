@@ -118,7 +118,7 @@ Executor phases:
 
 1. navigate to Facebook home/profile publish entry.
 2. open composer using real mouse/CDP events with layout-aware structural locators.
-3. focus editor, type text, and verify editor content.
+3. focus editor, type text character-by-character with the shared humanized keystroke rhythm, and verify editor content.
 4. upload image(s), wait for thumbnail/attachment readiness, and verify count.
 5. submit only after cloud authorization sequence reaches submit.
 6. first classify the current-page dialog close or positive submit message as `submitted`; then capture a post ID/permalink from the same page. Normal dispatch MUST NOT reload the page merely to upgrade that state.
