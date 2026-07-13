@@ -1,0 +1,45 @@
+{
+  "assetSet": "aidcp-mascot-rig-v2-prototype",
+  "version": 1,
+  "technique": "independent raster body and wing layers with event-driven animation",
+  "demo": "../animation-rig-v2-demo.html",
+  "previewGif": "wave-preview.gif",
+  "canvas": {
+    "width": 512,
+    "height": 512
+  },
+  "layers": [
+    {
+      "id": "body",
+      "file": "mascot-body.png",
+      "role": "static character body and head"
+    },
+    {
+      "id": "left_wing",
+      "file": "mascot-wing-left.png",
+      "role": "independent waving wing",
+      "pivot": {
+        "x": 140,
+        "y": 276
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "wave",
+      "trigger": "is-waving",
+      "durationMs": 900
+    },
+    {
+      "id": "blink",
+      "trigger": "is-blinking",
+      "durationMs": 420
+    },
+    {
+      "id": "combo",
+      "triggers": ["is-waving", "is-blinking"],
+      "durationMs": 1000
+    }
+  ],
+  "prototypeBoundary": "This validates clean separated-layer motion. A production Rive asset still requires vector redraw, final rigging, and a Rive state machine."
+}

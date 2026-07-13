@@ -34,6 +34,17 @@
 
 这版是“完整静态 PNG + 局部叠层 + CSS 动画”的快速方案。它适合先验证 UI 氛围和动效节奏；如果后续要产品级质量，需要重新生成真正分层原画，或进入 Rive/Lottie 动画工作流。
 
+## 分层动画 V2 原型
+
+`animation-rig-v2-demo.html` 使用重新生成的独立身体与翅膀图层。挥手图层不包含头部、脸部或身体像素，因此旋转时不会再出现旧版的头部贴图重叠。
+
+- `animation-rig-v2/mascot-body.png`：512x512 身体与头部层。
+- `animation-rig-v2/mascot-wing-left.png`：512x512 独立挥手翅膀层。
+- `animation-rig-v2/manifest.json`：图层、转轴与动作触发映射。
+- `animation-rig-v2/wave-preview.gif`：挥手效果预览。
+
+这版用于验证“真正分层后是否能解决重叠”。正式产品若采用 Rive，应继续将头、眼睛、眼皮、嘴、双翼、身体和道具拆成可编辑图层，再建立状态机。
+
 ## 源图位置
 
 源行为设定图为 4 列 2 行布局：
