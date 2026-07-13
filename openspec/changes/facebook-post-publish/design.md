@@ -76,14 +76,14 @@ State transitions:
 ```text
 available --reserve(recordId)--> reserved
 reserved --approval rejected / failed before submit--> available
-reserved --submit confirmed--> used
-reserved --submitted but unconfirmed--> quarantine
+reserved --same-page permalink confirmed--> used
+reserved --page accepted submit but permalink missing--> quarantine
 reserved --operator disables/deletes--> disabled
 ```
 
 If the draft is edited, the editor may remove selected images from that draft, but it must not inject arbitrary external URLs. Removing all Facebook images makes the draft unpublishable for this MVP unless a future pure-text mode is explicitly added.
 
-The important boundary is "submitted but unconfirmed". Once the edge may have clicked Post, the system must not release the media automatically, because the post may exist even if capture failed.
+The important boundary is "submitted but permalink missing". A page-level success signal means Facebook accepted the submission for the user's workflow, but it is not the same as a stable post identity. The record therefore becomes `submitted`, the media stays quarantined, and the system must not release or retry automatically because the post may already exist.
 
 ### 3. Platform publish profile owns generation and command shape
 
@@ -121,12 +121,12 @@ Executor phases:
 3. focus editor, type text, and verify editor content.
 4. upload image(s), wait for thumbnail/attachment readiness, and verify count.
 5. submit only after cloud authorization sequence reaches submit.
-6. confirm by server/reload/permalink evidence.
+6. first classify the current-page dialog close or positive submit message as `submitted`; then capture a post ID/permalink from the same page. Normal dispatch MUST NOT reload the page merely to upgrade that state.
 
 Result classes:
 
-- `published_confirmed`: post is confirmed; mark publish record success and media `used`.
-- `submitted_unconfirmed`: click may have submitted, but no reliable confirmation; mark draft/publish result for manual check and media `quarantine`.
+- `published_confirmed`: a stable post ID/permalink is present on the current page; mark publish record success and media `used`.
+- `submitted_unconfirmed`: the current page accepted the submit action but has no stable post ID/permalink; persist the user-visible `submitted` status, retain media `quarantine`, and do not retry or force a reload.
 - `failed_before_submit`: no post side effect; release media where safe.
 
 ### 5. Probe gates precede enabling the `publish` capability
@@ -151,7 +151,7 @@ The UI should be dense and operational, not a marketing page. The operator needs
 ## Risks / Trade-offs
 
 - Facebook composer DOM/layout changes -> use structural locators, wide/narrow probes, and no-submit typed-input tests before enabling submit.
-- Submit ambiguity -> split `submitted_unconfirmed` from failure; never auto-retry after possible submit.
+- Submit ambiguity -> split page-level `submitted` from permalink-confirmed `published`; never auto-retry after possible submit and never use a normal-page refresh as the confirmation mechanism.
 - Asset exhaustion -> fail-closed and notify; do not publish pure text or reuse used images silently.
 - OSS missing or upload failure -> reject upload with a clear reason; do not store local-only or fake URLs.
 - Draft rejection after media reservation -> release only if no submit was attempted.

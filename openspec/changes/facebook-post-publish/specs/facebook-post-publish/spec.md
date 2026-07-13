@@ -38,7 +38,7 @@ Facebook 发帖草稿生成时，系统 SHALL 从该账号素材池选择下一�
 
 ### Requirement: Facebook 个人主页发帖执行器支持宽窄布局且独立于 XHS
 
-edge SHALL 提供 Facebook 发帖执行器，负责个人主页/首页 composer 的打开、聚焦、正文输入、图片上传、提交与确认。该执行器 MUST 使用 Facebook driver 的 `publish` 能力装配，MUST NOT 调用 XHS 发布 URL、XHS 发布 tab、XHS 标题/话题/封面处理器。执行器 MUST 覆盖宽屏与窄屏桌面布局，以结构定位和可见性判断为主，MUST NOT 依赖固定坐标或宽屏专属导航。提交成功 MUST 以服务端/重载/ permalink/稳定帖子证据确认；点击按钮或乐观 DOM 出现不等于成功。提交前失败与提交后确认不明 MUST 区分上报。
+edge SHALL 提供 Facebook 发帖执行器，负责个人主页/首页 composer 的打开、聚焦、正文输入、图片上传、提交与确认。该执行器 MUST 使用 Facebook driver 的 `publish` 能力装配，MUST NOT 调用 XHS 发布 URL、XHS 发布 tab、XHS 标题/话题/封面处理器。执行器 MUST 覆盖宽屏与窄屏桌面布局，以结构定位和可见性判断为主，MUST NOT 依赖固定坐标或宽屏专属导航。当前页面的 dialog 消失或明确正向提交提示 SHALL 表示用户可见的“已提交”；只有从当前页面取得稳定帖子 ID/permalink 才能表示“已发布”。正常发布链路 MUST NOT 通过刷新页面获得该结论。提交前失败、页面已提交但链接缺失、以及已取得链接 MUST 区分上报。
 
 #### Scenario: 宽屏 composer 可打开并输入
 - **WHEN** Facebook edge 在 `1365x900` desktop viewport 收到 no-submit composer probe
@@ -52,9 +52,13 @@ edge SHALL 提供 Facebook 发帖执行器，负责个人主页/首页 composer 
 - **WHEN** Facebook 账号执行发布下发
 - **THEN** edge SHALL 走 Facebook 发帖执行器，MUST NOT 导航到 XHS creator URL、MUST NOT 选择“上传图文”tab、MUST NOT 执行 XHS topic/cover/title 专用步骤
 
-#### Scenario: 提交后确认不明不自动重试
-- **WHEN** Post 按钮已被点击或可能已提交，但确认阶段未拿到可靠服务端证据
-- **THEN** edge SHALL 返回 `submitted_unconfirmed` 或等价可区分状态，cloud SHALL 进入人工核查/素材隔离流程，MUST NOT 自动重试以免重复发帖
+#### Scenario: 页面已提交但未取得链接
+- **WHEN** Post 按钮点击后，当前页面的 composer 消失或出现正向提交提示，但同页没有稳定帖子 ID/permalink
+- **THEN** edge SHALL 返回 `submitted_unconfirmed` 或等价可区分状态，cloud SHALL 将发布记录置为用户可见的 `submitted`，展示“已提交，待链接确认”，并隔离素材；系统 MUST NOT 刷新页面、MUST NOT 报失败、也 MUST NOT 自动重试
+
+#### Scenario: 同页帖子链接确认发布
+- **WHEN** Post 按钮点击后，当前页面取得稳定帖子 ID/permalink
+- **THEN** edge SHALL 返回 `published_confirmed`，cloud SHALL 将发布记录置为 `published` 并将素材标记为 `used`
 
 ### Requirement: Facebook 发帖真实提交受显式探针门禁保护
 

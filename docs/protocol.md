@@ -207,7 +207,7 @@
   "account": { "id": "acc-1", "nickname": "晚风手作" },   // 可选；昵称空则整个字段不带（宁缺毋假）
   "personaBound": true,   // 可选（change persona-wizard-onboarding-fixes）；账号是否已绑人设，仅 true 时下发；边缘据此把徽标翻「已设置」并跳过建号人设向导
   "lastPublish": { "title": "上一篇", "at": 1730000000000 }, // 可选；最近一次成功发布（at=epoch ms，为草稿入库时间近似）
-  "publish": { "state": "pending", "title": "候审笔记", "code": "#83" }, // 可选；审批状态增量
+  "publish": { "state": "submitted", "title": "候审笔记", "code": "#83" }, // 可选；审批/提交状态增量
   "publishPreview": { // 可选；当前待审稿件只读预览，不含原稿标题/作者/正文/链接
     "recordId": 83,
     "code": "#83",
@@ -277,8 +277,9 @@
 ```
 发送时机：① 边缘 hello 注册完成后（连接进推送表且 `welcome` 已回发之后，避开「hello 处理中推送
 sent=0」前科）回填全量快照；② 发布审批生命周期变化时增量推送（`pending`=草稿候审、`approved`=授权
-已核、`rejected`=拒绝发布、`failed`=云端终判失败）。`published` 不经此通道——边缘在 `submit_publish`
-成功处自知并本地打 `[ui-event]` 行；`reminded` 枚举保留但云端当前无再提醒机制、不会出现。`code` 与
+已核、`submitted`=页面已接受提交但同页尚未取得帖子链接、`rejected`=拒绝发布、`failed`=云端终判失败）。
+`published` 不经此通道——边缘仅在同页 `capture_postId` 成功后本地打 `[ui-event]` 行；正常链路不得为确认而
+刷新页面。`reminded` 枚举保留但云端当前无再提醒机制、不会出现。`code` 与
 飞书审批卡「编号」字段同源（发布记录 id，如 `#83`），供界面对暗号。边缘核心收到后转成 `[ui-event]`
 结构化行打到 stdout，由 Electron 壳解析驱动标题带与发布卡（解析器 `src/electron/ui-events.cjs`）。
 已拒草稿在 hello 快照不回放（拒绝时刻已实时推过，重启不翻旧账）。推送为 best-effort：账号无在线
