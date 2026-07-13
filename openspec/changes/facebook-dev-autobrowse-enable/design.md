@@ -44,6 +44,8 @@ Mode is read by the core only during process startup. Existing single-environmen
 
 `FacebookBrowseSession` will emit structured events only at confirmed boundaries: session start, feed availability, a successfully reported `note.detail`, and a successful `action.completed{action:'like', ok:true}`. The note-detail event increments the local view fallback by one; the confirmed like event increments likes by one. Shadow-mode, failed, already-liked, and no-target paths emit no success increment. The generic Facebook like-success log is excluded from the legacy parser so the structured confirmation is the single local increment.
 
+For a confirmed `note.detail`, the activity sentence and presence text derive from the already-read author nickname and the first normalized characters of the post body (falling back to `title`). Both are bounded for a one-line desktop activity item. If either field is absent, the text degrades gracefully; it never substitutes a permalink or raw note ID as a label.
+
 ## Risks / Trade-offs
 
 - [All dev Facebook profiles can perform real likes] → The user explicitly approved this rollout. Existing cloud risk budgets, dwell delays, action validation, and failure paths remain active and are not bypassed.

@@ -20,3 +20,8 @@
 - **THEN** it emits a structured UI event that updates the activity stream and presence projection for that child
 - **AND** a successful `note.detail` contributes exactly one local view fallback increment and a confirmed like contributes exactly one local like fallback increment
 - **AND** shadow, failed, already-liked, or no-target paths MUST NOT produce a success increment
+
+#### Scenario: Facebook read activity identifies the opened content without raw identifiers
+- **WHEN** a Facebook `note.detail` has a readable author nickname and post body
+- **THEN** its desktop activity and presence text show bounded, whitespace-normalized author and leading-content excerpts
+- **AND** when either field is unavailable, the text MUST degrade to an honest generic description and MUST NOT show a permalink or raw note ID
