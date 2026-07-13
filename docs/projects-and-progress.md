@@ -10,7 +10,7 @@
 > 重点变化：①云端从"单线 Planner→PlanStep[]"重构为**事件驱动多 Agent**（`RoleDispatcher` + `RoleName` 穷举 43 角色 + `EventBus`），
 > 旧文件 `session-orchestrator.ts`/`state-machine.ts`/`engagement-decider.ts`/`concept-extractor.ts`/`src/blackboard/`/`src/publish/` **已不存在**；
 > ②`RiskController` 风控状态机已**完整实装**（不再是"仅设计"）；③飞书 Bot 已推进到 `/bind` + 自动记群 + 审批卡片信号；
-> ④边缘端 publish flow（`flows/publish-post.ts`）已实现，发布审批链路打通；⑤协议已升级到 **v2（72 个消息类型，2026-07-11 复核）**，
+> ④边缘端 publish flow（`flows/publish-post.ts`）已实现，发布审批链路打通；⑤协议已升级到 **v2（74 个消息类型，客户端稿件审批动作已接入）**，
 > `docs/protocol.md` 已同步。本次核验基于代码结构与源码阅读，**未重新执行 `npm test`**，测试数字以各仓 CI 为准。
 
 ## 1. 三项目关系
@@ -54,7 +54,7 @@ flowchart LR
 | stealth 注入 | aidcp-edge | 已实现，有测试 | `aidcp-edge/src/cdp/stealth-injector.ts` |
 | **边缘 publish flow** | aidcp-edge | **已实现**（推翻旧盘点"尚未看到"）；发布六步 + 审批信号等待 | `aidcp-edge/src/flows/publish-post.ts`、`src/publish/approval-gate.ts` |
 | Electron 打包 | aidcp-edge | 已实现；系统托盘 + Chrome 网关 + 控制面板 UI | `aidcp-edge/src/electron/`（main/preload/chrome-launcher.cjs + renderer/） |
-| 协议层 `protocol` | aidcp-cloud | 已实现 **v2（72 个消息类型，以 `MessageType` 穷举为准，2026-07-11 复核）**；`docs/protocol.md` 已同步 | `aidcp-cloud/src/comm/protocol.ts`（边侧 `aidcp-edge/src/comm/protocol.ts` 为投影） |
+| 协议层 `protocol` | aidcp-cloud | 已实现 **v2（74 个消息类型，以 `MessageType` 穷举为准）**；已支持客户端稿件预览审批动作，`docs/protocol.md` 已同步 | `aidcp-cloud/src/comm/protocol.ts`（边侧 `aidcp-edge/src/comm/protocol.ts` 为投影） |
 | **事件驱动编排** | aidcp-cloud | **已实现（重构）**；`RoleDispatcher` 运行时注册约 37 角色（`RoleName` 穷举现 43 项，含命令式 / 按开关条件注册的角色如评论点赞 / 概念抽取 / 精选准入 / FB 加群判定等；准确数以 `src/event-bus/types.ts` 的 `RoleName` + `role-dispatcher.ts` 注册为准），`EventBus` 解耦，`SessionContext` 存态 | `aidcp-cloud/src/orchestrator/role-dispatcher.ts`、`src/agents/*.ts`、`src/event-bus/`、`src/comm/command-bridge.ts` |
 | Planner（规则 + LLM 兜底） | aidcp-cloud | 已实现；服务定向"一句话目标"场景（浏览闭环改走角色驱动） | `aidcp-cloud/src/planner/simple-planner.ts` |
 | **风控 RiskController + 状态机** | aidcp-cloud | **已实现**（旧盘点标"仅设计"，已过时）；状态机 `normal→warned→restricted→frozen` + 分钟/小时滑窗 + 自然日配额 + 冷启动 + 时间窗 + 会话预算 + 去重 + PG 持久化 | `aidcp-cloud/src/risk/`（risk-controller/risk-state-machine/sliding-window-counter/quotas/cold-start-planner/time-scheduler/session-budget/interaction-dedup/pg-risk-store） |
@@ -67,7 +67,7 @@ flowchart LR
 
 > 旧盘点列出的四项不一致，本次更新已逐条处理：
 
-1. **协议文档落后** → **已修复**。`docs/protocol.md` 已从 v1 重写为 v2，补齐浏览编排、角色驱动指令、结构化上报、风控预算、发布审批、通知巡视等共 72 个消息类型（以 `protocol.ts` 的 `MessageType` 穷举为准，2026-07-11 复核）。
+1. **协议文档落后** → **已修复**。`docs/protocol.md` 已从 v1 重写为 v2，补齐浏览编排、角色驱动指令、结构化上报、风控预算、发布审批、通知巡视与客户端稿件审批动作等共 74 个消息类型（以 `protocol.ts` 的 `MessageType` 穷举为准）。
 2. **飞书被低估** → **已修正**。本文与 `product-overview.md` 已将飞书从 planned 改为"部分实现"（`/bind`/记群/审批卡片已落地；多账号归属、完整审批闭环待续）。
 3. **架构文档停留在单体 Planner** → **已修复**。`docs/architecture.md` 已重画为事件驱动多 Agent，并补齐边缘端 `browse`/`humanize`/`flows`/`electron`。
 4. **风控仅设计** → **已修正**。`RiskController` 全套已实装，相关文档状态从 `designed` 改为 `implemented`。
