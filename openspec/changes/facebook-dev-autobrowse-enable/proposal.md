@@ -7,6 +7,7 @@ Facebook 浏览闭环已经具备，但桌面端未向分身核心传入浏览�
 - 当桌面端解析出的实际云端为 `dev` 时，为每个 Facebook AdsPower 分身注入 `AIDCP_FB_BROWSE_AUTO=on`。
 - 仅对 Facebook 分身生效；小红书及其他平台不受影响。
 - 当实际云端为 `ol` 或自定义地址时，桌面端显式注入 `off`，不允许继承外壳中的误开值。
+- Facebook 核心在真实开始会话、成功读到帖子或确认点赞后，输出结构化的桌面 UI 事件，使活动流、顶部在场状态和当前客户端的即时计数与真实动作同步。
 - 保留既有浏览节奏、风险配额、延迟、失败熔断和单分身独立监督逻辑；本变更不修改这些控制。
 
 ## Capabilities
@@ -22,5 +23,6 @@ Facebook 浏览闭环已经具备，但桌面端未向分身核心传入浏览�
 ## Impact
 
 - Edge desktop spawn environment: `aidcp-edge/src/electron/main.cjs` and its tests.
+- Facebook browse session and Electron UI-event tests: `aidcp-edge/src/facebook/facebook-session.ts`, `aidcp-edge/src/electron/ui-events.cjs`.
 - Edge fleet spawn environment tests: `aidcp-edge/test/electron/fleet.test.ts`.
 - No cloud service, protocol, console, database, or `ol` deployment changes.

@@ -7,7 +7,8 @@
 
 - [x] 2.1 Run focused Electron policy tests, Edge acceptance tests, full Edge tests, and type checking. <!-- 2026-07-13: focused Electron 26/26; acceptance 16/16 (one intentional E2E skip); full Edge 1110/1110; `npm run typecheck` PASS. -->
 - [x] 2.2 Rebase, integrate, and push the Edge change to `master` without touching the dirty release checkout. <!-- 2026-07-13: edge commit `5e23261` rebased cleanly on `origin/master` and fast-forward pushed `de89150..5e23261`; dirty local release checkout was not touched. -->
-- [ ] 2.3 Restart the local development Edge client and record an honest real-profile observation for the enabled Facebook fleet.
+- [ ] 2.3 Restart the local development Edge client and record an honest real-profile observation for the enabled Facebook fleet, including the activity/presence projection and account-scoped today totals. <!-- 2026-07-13: before the UI fix, `ads-k1ei3dbi` truthfully advanced cloud today views 1→5 while the client had no Facebook activity projection. The new desktop client was restarted but remains idle by design; a resumed real profile is still needed to observe the rendered projection without fabricating another real like. -->
+- [x] 2.4 Emit structured Facebook UI events at confirmed session/read/like boundaries; keep failed or shadow actions uncounted and prevent legacy-like double counting. <!-- 2026-07-13: edge commit `bce5a1b`; focused UI/Facebook tests 38/38, acceptance 16/16 (one gated E2E skip), full Edge tests, and typecheck pass. -->
 
 ## 3. Change Record
 
