@@ -33,4 +33,4 @@
 - [x] 4.3 Run `openspec validate browser-cold-standby-next-action --strict`.
   <!-- validation: openspec validate browser-cold-standby-next-action --strict pass. -->
 - [x] 4.4 Commit/push scoped changes and record commit SHAs/validation notes.
-  <!-- commits pushed: aidcp-cloud 6be48be on codex/browser-cold-standby-next-action, aidcp-edge c6622e4 on codex/browser-cold-standby-next-action, control main 5257648 amended then superseded by this record update. -->
+  <!-- commits: aidcp-cloud 6be48be, aidcp-edge c6622e4; control commit amended with this record. Push pending after final clean status. -->
