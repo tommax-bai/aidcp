@@ -206,6 +206,18 @@
   "personaBound": true,   // 可选（change persona-wizard-onboarding-fixes）；账号是否已绑人设，仅 true 时下发；边缘据此把徽标翻「已设置」并跳过建号人设向导
   "lastPublish": { "title": "上一篇", "at": 1730000000000 }, // 可选；最近一次成功发布（at=epoch ms，为草稿入库时间近似）
   "publish": { "state": "pending", "title": "候审笔记", "code": "#83" }, // 可选；审批状态增量
+  "publishPreview": { // 可选；当前待审稿件只读预览，不含原稿标题/作者/正文/链接
+    "recordId": 83,
+    "code": "#83",
+    "kind": "rewrite", // rewrite | generated
+    "title": "洗稿后的标题",
+    "content": "洗稿后的正文",
+    "topics": ["生活方式", "周末去哪儿"],
+    "images": ["https://cdn.example.com/1.jpg"],
+    "contentVersion": 0,
+    "updatedAt": 1730000000000,
+    "imageReferenceAudit": { "requestedCount": 3, "usableCount": 3, "status": "used", "generatedCount": 3 }
+  },
   "dailyUsage": { // 可选；账号用量与限额窗口，边缘优先用它替代本机实时计数
     "asOf": 1730000001000,
     "quotaLevel": "normal", // conservative / normal / aggressive
