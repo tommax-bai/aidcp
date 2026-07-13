@@ -1,14 +1,26 @@
 {
   "assetSet": "aidcp-mascot-rig-v4-head-turn",
-  "version": 1,
-  "technique": "independent head with extended neck overlap rendered above a complete torso",
+  "version": 2,
+  "technique": "anchor-aligned independent head with a bounded neck overlap rendered above a complete torso",
   "demo": "../animation-rig-v4-demo.html",
+  "calibrationDemo": "../animation-rig-v4-calibration.html",
+  "anchorCalibrationPreview": "anchor-calibration.png",
+  "previewRenderer": "render_previews.py",
   "headTurnPreviewGif": "head-turn-preview.gif",
   "combinedPreviewGif": "combined-preview.gif",
   "headAnglePreview": "head-angle-preview.png",
   "canvas": {
     "width": 512,
     "height": 512
+  },
+  "viewportFit": {
+    "scale": 0.84,
+    "translateX": 0,
+    "translateY": 24,
+    "transformOrigin": {
+      "x": 256,
+      "y": 256
+    }
   },
   "renderOrder": [
     "left_wing",
@@ -31,23 +43,53 @@
       "id": "torso",
       "file": "mascot-torso.png",
       "role": "complete torso with a closed neck surface",
-      "zIndex": 2
+      "zIndex": 2,
+      "anchors": {
+        "neckSeat": {
+          "x": 220,
+          "y": 270
+        }
+      }
     },
     {
       "id": "head",
       "file": "mascot-head.png",
       "role": "independent head with extended lower-neck feathers",
       "zIndex": 3,
-      "alignment": {
+      "sourceExtraction": {
         "xOffset": -24,
-        "yOffset": 0
+        "yOffset": 0,
+        "bakedIntoAsset": true
+      },
+      "anchors": {
+        "neckBase": {
+          "x": 232,
+          "y": 366
+        }
+      },
+      "restTransform": {
+        "translateX": -12,
+        "translateY": -96
       },
       "pivot": {
         "x": 232,
-        "y": 318
+        "y": 366
       }
     }
   ],
+  "connection": {
+    "headAnchor": "head.neckBase",
+    "torsoAnchor": "torso.neckSeat",
+    "rule": "head.restTransform = torso.neckSeat - head.neckBase",
+    "restDelta": {
+      "x": 0,
+      "y": 0
+    },
+    "coveredTorsoBand": {
+      "top": 215,
+      "bottom": 270
+    }
+  },
   "actions": [
     {
       "id": "wave",
@@ -59,7 +101,7 @@
       "id": "head_turn",
       "trigger": "is-turning",
       "durationMs": 1200,
-      "testedAngleRangeDeg": [-7, 7]
+      "testedAngleRangeDeg": [-6, 6]
     },
     {
       "id": "blink",
@@ -72,5 +114,5 @@
       "durationMs": 1400
     }
   ],
-  "prototypeBoundary": "This raster prototype validates clean head and wing joints. Production Rive work should replace rigid head rotation with mesh deformation or directional head poses for stronger yaw."
+  "prototypeBoundary": "This raster prototype uses explicit neck anchors and a viewport fit transform. Production Rive work should keep the same anchors and replace rigid head rotation with mesh deformation or directional head poses for stronger yaw."
 }

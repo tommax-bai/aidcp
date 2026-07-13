@@ -14,6 +14,10 @@
       --line: rgba(29, 44, 48, 0.14);
       --teal: #168d96;
       --teal-dark: #0e6870;
+      --rig-scale: 0.84;
+      --rig-y: 24px;
+      --head-x: -12px;
+      --head-y: -96px;
     }
 
     * {
@@ -75,9 +79,18 @@
       background-size: 24px 24px;
     }
 
+    .rig-frame,
     .rig {
       position: absolute;
       inset: 0;
+    }
+
+    .rig-frame {
+      transform: translateY(var(--rig-y)) scale(var(--rig-scale));
+      transform-origin: 50% 50%;
+    }
+
+    .rig {
       transform-origin: 50% 82%;
       animation: breathe 3.6s ease-in-out infinite;
     }
@@ -106,11 +119,19 @@
       animation: wave 900ms cubic-bezier(0.35, 0, 0.2, 1);
     }
 
+    .head-position,
     .head-group {
       position: absolute;
       inset: 0;
+    }
+
+    .head-position {
       z-index: 3;
-      transform-origin: 45.31% 62.1%;
+      transform: translate(var(--head-x), var(--head-y));
+    }
+
+    .head-group {
+      transform-origin: 45.3125% 71.4844%;
     }
 
     .head {
@@ -203,9 +224,9 @@
     }
 
     @keyframes head-turn {
-      0%, 100% { transform: rotate(0) translateX(0); }
-      30% { transform: rotate(-6deg) translateX(-2px); }
-      68% { transform: rotate(6deg) translateX(2px); }
+      0%, 100% { transform: rotate(0); }
+      30% { transform: rotate(-6deg); }
+      68% { transform: rotate(6deg); }
     }
 
     @keyframes blink {
@@ -251,13 +272,17 @@
     </div>
 
     <section class="stage" aria-label="可交互吉祥物动作预览">
-      <div class="rig" id="rig">
-        <img class="layer wing" src="animation-rig-v4/mascot-wing-left.png" alt="">
-        <img class="layer torso" src="animation-rig-v4/mascot-torso.png" alt="">
-        <div class="head-group">
-          <img class="layer head" src="animation-rig-v4/mascot-head.png" alt="青绿色鸟类吉祥物">
-          <span class="lid left" aria-hidden="true"></span>
-          <span class="lid right" aria-hidden="true"></span>
+      <div class="rig-frame">
+        <div class="rig" id="rig">
+          <img class="layer wing" src="animation-rig-v4/mascot-wing-left.png" alt="">
+          <img class="layer torso" src="animation-rig-v4/mascot-torso.png" alt="">
+          <div class="head-position">
+            <div class="head-group">
+              <img class="layer head" src="animation-rig-v4/mascot-head.png" alt="青绿色鸟类吉祥物">
+              <span class="lid left" aria-hidden="true"></span>
+              <span class="lid right" aria-hidden="true"></span>
+            </div>
+          </div>
         </div>
       </div>
     </section>

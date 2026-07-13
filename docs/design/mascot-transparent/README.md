@@ -76,9 +76,14 @@
 - `animation-rig-v4/mascot-torso.png`：无头但颈部完整的身体层。
 - `animation-rig-v4/mascot-head.png`：带延伸颈羽的独立头部层。
 - `animation-rig-v4/mascot-wing-left.png`：复用并固化到 V4 包内的挥手层。
-- `animation-rig-v4/head-angle-preview.png`：`-7deg` 到 `7deg` 的颈部连接检查。
+- `animation-rig-v4/anchor-calibration.png`：头部颈底与身体颈口的锚点定位图。
+- `animation-rig-v4-calibration.html`：可调 X/Y、整体缩放和转角的接缝校准页。
+- `animation-rig-v4/render_previews.py`：从清单锚点参数重新生成静态图和 GIF，避免预览与运行时参数漂移。
+- `animation-rig-v4/head-angle-preview.png`：`-6deg` 到 `6deg` 的颈部连接检查。
 - `animation-rig-v4/combined-preview.gif`：挥手与转头同时播放的组合预览。
 - `animation-rig-v4/manifest.json`：渲染顺序、转轴、动作事件和测试角度。
+
+V4 使用两个明确接点定位：头部 `neckBase=(232,366)`，身体 `neckSeat=(220,270)`。运行时先用两点差值得到头部位移 `(-12,-96)`，再对完整骨架应用 `scale=0.84`、`translateY=24` 的画布适配。不要再用整张图的透明像素重心推算头部位置。
 
 V4 的转头属于小角度二维旋转。正式 Rive 若需要明显的左右朝向变化，应增加头部网格变形或左右方向姿态，而不是继续扩大刚性旋转角度。
 
