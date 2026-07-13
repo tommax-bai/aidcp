@@ -7,6 +7,7 @@
 
 | 脚本 | 作用 | 安全性 |
 | --- | --- | --- |
+| `task-preflight` | 任务准入硬门禁：检查本机存在的 canonical checkout 是否都在默认分支 | 只读；失败即阻止任务，不切分支、不修复状态 |
 | `fleet-status` | 四仓所有 worktree 一屏:分支 / ahead-behind / dirty / 孤儿标记 | 只读（仅 quiet fetch） |
 | `new-change <repo> <name>` | 开一条流：建 `../<repo>.wt/<name>` 分支 `<name>` | 可逆（worktree remove + branch -d） |
 | `spawn-change <repo> <name> [--launch]` | 多终端模式：确保 worktree（幂等）+ 生成任务简报；`--launch` 直接在中控仓启动 claude | 同 new-change；`--launch` 只是启动 CLI |
@@ -16,6 +17,7 @@
 
 ```bash
 scripts/fleet-status
+scripts/task-preflight
 scripts/new-change aidcp-cloud my-change-name
 # … 在 ../aidcp-cloud.wt/my-change-name 里开发 …
 scripts/land-change aidcp-cloud my-change-name          # 只 prep + 打印命令
@@ -31,7 +33,9 @@ scripts/release-desktop-macos 0.3.19 --yes              # prep 全绿后传包+�
 **红线**：部署只从主 checkout 的 eligible ref 走、绝不从 worktree；部署前必须明确
 `dev` 或 `ol` 并跑 `scripts/deploy-target <target> --check`。未指定目标的开发完成部署默认走
 `dev`；`ol` 只有用户明确要求线上部署时才走，且必须创建或选定 release 分支并按分支部署。
-`land-change` 永不 force-push；`new-change` 不会覆盖已存在的分支/worktree。
+`land-change` 永不 force-push；`new-change` 不会覆盖已存在的分支/worktree。`new-change` 和
+`spawn-change` 会在任何 worktree 操作前执行 `task-preflight`；门禁失败即停止，不能绕过，缺少的
+sibling clone 才会跳过。
 
 > 状态：三者均已实战跑通（2026-07-03 dashboard-refresh-clarity 经 new-change 开流、
 > land-change --yes 在 cloud+console 两仓完成 rebase→全量绿→ff 推送→清理）。

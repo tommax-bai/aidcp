@@ -46,6 +46,8 @@ git -C /Users/baitianxing/codes/aidcp worktree list
 
 第一条必须输出 `main`；第二条里 `[main]` 必须对应 `/Users/baitianxing/codes/aidcp`。不满足时先停下，不要继续在错位目录里开发；如果有人正在该 checkout 写未提交内容，不要用 `-f` 硬切，先等并发 session 收口或另开干净 worktree。
 
+开新任务或启动已有任务前，还必须运行 `scripts/task-preflight`。它会检查控制仓的 canonical checkout 是否在 `main`，以及本机存在的 edge/cloud/console canonical checkout 是否在 `master`。命令返回非零时，任务必须立即停止；门禁不会切分支、清理文件、stash、删除 worktree 或提供绕过参数。缺少的 sibling 仓库只会跳过，但至少要有一个 canonical 仓库可检查。`scripts/new-change` 和 `scripts/spawn-change` 已内置该检查。
+
 ### 每仓并发软上限（避免全挤一个子系统）
 
 - 控制仓 aidcp：不限（additive）。
@@ -84,11 +86,14 @@ worktree 放到各仓的兄弟目录 `<repo>.wt/<change-name>`，保持主 check
 ## 3. 开一条流 `new-change` `[稳]`
 
 ```bash
+scripts/task-preflight
 scripts/new-change <aidcp-edge|aidcp-cloud|aidcp-console> <change-name>
 # 等价于：fetch origin + git worktree add ../<repo>.wt/<name> -b <name> origin/<默认分支>
 # 会拒绝覆盖已存在的分支/worktree；change 名不在控制仓时 WARN 提示（不阻断）
 # 之后：cd ../<repo>.wt/<name> 里启动该 session 的开发
 ```
+
+任务入口会再次执行门禁，因此不能通过先调用底层 worktree 命令来规避检查。
 
 控制仓 aidcp 侧通常无需 worktree：直接在规范主 checkout 的 `main` 上用 openspec 流程建 additive change 目录（`/opsx:propose` 等）。如果需要分支隔离，手动从 `origin/main` 开控制仓 worktree：
 
@@ -205,14 +210,15 @@ scripts/fleet-status
 
 ## 9. helper 脚本
 
-三个薄封装已落 `scripts/`（共享 `scripts/lib.sh`），见 `scripts/README.md`：
+四个薄封装已落 `scripts/`（共享 `scripts/lib.sh`），见 `scripts/README.md`：
 
+- `scripts/task-preflight` — `[稳]`（任务准入前的 canonical 默认分支硬门禁；失败即阻止后续任务操作）
 - `scripts/new-change <repo> <name>` — `[稳]`（pilot 跑通：建 worktree/分支、拒绝覆盖、change 缺失 WARN）
 - `scripts/fleet-status` — `[稳]`（pilot 跑通：四仓扫描 + ahead/behind + dirty + 孤儿标记，只读）
 - `scripts/land-change <repo> <name> [--yes]` — `[稳]`（2026-07-03 随 dashboard-refresh-clarity
   在 cloud+console 两仓实战跑通全流程；test:acceptance 仅在该仓定义时跑）
 
-**红线**：`land-change` 永不 force-push；`new-change` 不覆盖已存在分支/worktree；
+**红线**：任务必须先通过 `scripts/task-preflight`；`land-change` 永不 force-push；`new-change` 不覆盖已存在分支/worktree；
 部署只从主 checkout（§8）且必须命名 target。
 
 ## 10. 常见故障与兜底

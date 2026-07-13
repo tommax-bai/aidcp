@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Hard admission gate for task creation/launch.
+# This check is read-only: it never switches branches or repairs worktrees.
+set -euo pipefail
+
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+failures=0
+checked=0
+
+for repo in aidcp aidcp-edge aidcp-cloud aidcp-console; do
+  repo_root="$(repo_path "$repo")"
+  expected_branch="$(_default_branch "$repo")"
+
+  if [ ! -e "$repo_root/.git" ]; then
+    echo "SKIP: ${repo} canonical checkout is not cloned at ${repo_root}" >&2
+    continue
+  fi
+
+  checked=$((checked + 1))
+  current_branch="$(git -C "$repo_root" symbolic-ref --short -q HEAD 2>/dev/null || true)"
+  git_dir="$(git -C "$repo_root" rev-parse --git-dir 2>/dev/null || true)"
+
+  if [[ "$git_dir" == */worktrees/* ]]; then
+    echo "FAIL: ${repo} canonical path is a linked worktree: ${repo_root}" >&2
+    failures=$((failures + 1))
+    continue
+  fi
+
+  if [ -z "$current_branch" ]; then
+    echo "FAIL: ${repo} canonical path is detached or has no symbolic branch: ${repo_root} (expected ${expected_branch})" >&2
+    failures=$((failures + 1))
+    continue
+  fi
+
+  if [ "$current_branch" != "$expected_branch" ]; then
+    echo "FAIL: ${repo} canonical path is on ${current_branch}: ${repo_root} (expected ${expected_branch})" >&2
+    failures=$((failures + 1))
+    continue
+  fi
+
+  echo "OK: ${repo} canonical path is on ${expected_branch}: ${repo_root}" >&2
+done
+
+if [ "$checked" -eq 0 ]; then
+  echo "ERROR: no canonical repositories are available for task admission" >&2
+  exit 1
+fi
+
+if [ "$failures" -gt 0 ]; then
+  cat >&2 <<'EOF'
+ERROR: task admission blocked by canonical branch state.
+Resolve the reported canonical checkout(s) first. Move feature/release work
+into a linked worktree; this guard will not switch branches, clean files, or
+override another session.
+EOF
+  exit 1
+fi
+
+exit 0

@@ -23,6 +23,7 @@ exit 1
 
 [ $# -ge 2 ] || usage
 repo="$1"; name="$2"; launch="${3:-}"
+"$_LIB_DIR/task-preflight"
 require_subrepo "$repo"
 repo_cloned "$repo" || die "$repo 未在本机 clone（见 CLAUDE.md §0）。"
 
