@@ -8,6 +8,7 @@ Facebook 浏览闭环已经具备，但桌面端未向分身核心传入浏览�
 - 仅对 Facebook 分身生效；小红书及其他平台不受影响。
 - 当实际云端为 `ol` 或自定义地址时，桌面端显式注入 `off`，不允许继承外壳中的误开值。
 - Facebook 核心在真实开始会话、成功读到帖子或确认点赞后，输出结构化的桌面 UI 事件，使活动流、顶部在场状态和当前客户端的即时计数与真实动作同步；阅读项优先显示已读取到的作者昵称和正文开头摘要。
+- Facebook 深读命令无法执行时，edge 仍以云端编排使用的规范动作名回报失败；云端兼容旧 edge 的协议消息名回执，避免详情页被误当作信息流继续滚动。
 - 保留既有浏览节奏、风险配额、延迟、失败熔断和单分身独立监督逻辑；本变更不修改这些控制。
 
 ## Capabilities
@@ -25,4 +26,4 @@ Facebook 浏览闭环已经具备，但桌面端未向分身核心传入浏览�
 - Edge desktop spawn environment: `aidcp-edge/src/electron/main.cjs` and its tests.
 - Facebook browse session and Electron UI-event tests: `aidcp-edge/src/facebook/facebook-session.ts`, `aidcp-edge/src/electron/ui-events.cjs`.
 - Edge fleet spawn environment tests: `aidcp-edge/test/electron/fleet.test.ts`.
-- No cloud service, protocol, console, database, or `ol` deployment changes.
+- Cloud action-completion ingress and deep-read recovery tests; wire message types不新增，console、database 与 `ol` 部署不受影响。
