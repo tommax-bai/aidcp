@@ -33,4 +33,4 @@
 - [x] 4.3 Run `openspec validate browser-cold-standby-next-action --strict`.
   <!-- validation: openspec validate browser-cold-standby-next-action --strict pass. -->
 - [x] 4.4 Commit/push scoped changes and record commit SHAs/validation notes.
-  <!-- commits pushed: aidcp-cloud 6be48be on codex/browser-cold-standby-next-action, aidcp-edge c6622e4 on codex/browser-cold-standby-next-action, control main 5257648 amended then superseded by this record update. -->
+  <!-- commits pushed: aidcp-cloud 6be48be on codex/browser-cold-standby-next-action, aidcp-edge c6622e4 on codex/browser-cold-standby-next-action, control worktree branch codex/browser-cold-standby-next-action carries 0147ac4/3d9737d. The earlier control main commits 5257648/79f7e67 were reverted on origin/main by 75d4406/62ff3fe to restore worktree isolation. -->
