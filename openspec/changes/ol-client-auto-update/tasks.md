@@ -13,14 +13,14 @@
 
 - [x] 2.1 在 `aidcp-edge` 主进程实现可注入、可测试的 macOS 更新服务，仅在已打包且烘焙 OL 更新元数据完整有效时初始化。
   <!-- aidcp-edge d98db6e: `auto-update.cjs` is injected/tested and is disabled outside packaged macOS OL metadata. -->
-- [x] 2.2 在主窗口可用（并通过已有客户登录门时）延迟发起首次检查，并实现不高于六小时一次的后续检查、无更新静默和失败的本机诊断日志。
-  <!-- aidcp-edge d98db6e: initial 15-second delay, six-hour interval, and local updater logs. -->
+- [x] 2.2 在主窗口可用（并通过已有客户登录门时）延迟发起首次检查，并实现不高于六小时一次的后续检查、无更新静默和失败的本机诊断日志；为已启用 OL 更新的客户端提供不下载、不重启的“检查更新”手动入口。
+  <!-- aidcp-edge d98db6e, df3fc48: initial 15-second delay, six-hour interval, local updater logs, and settings/tray manual checks that reuse the no-concurrency service. -->
 - [x] 2.3 实现中文更新提示、用户确认下载、下载进度/失败、更新已就绪和“稍后”状态；禁止未确认的自动下载或自动重启。
   <!-- aidcp-edge d98db6e: `autoDownload=false`; dialogs control download and restart. -->
 - [x] 2.4 将现有优雅退出逻辑拆为可 await 的“仅停止全部 edge 子进程”函数；更新安装前显示影响并二次确认，全部子进程确认退出后才调用 `quitAndInstall()`，停机超时/失败则取消安装并如实提示。
   <!-- aidcp-edge d98db6e: shared bounded `stopAllEdgeChildren` gate prevents updater restart while a child remains. -->
 - [x] 2.5 为更新通道选择、检查节流、用户取消、下载错误、已有运行任务、安全停机成功和停机失败补充 Electron 单元/契约测试。
-  <!-- aidcp-edge d98db6e: focused updater and lifecycle contracts run under the full edge suite. -->
+  <!-- aidcp-edge d98db6e, df3fc48: focused updater, manual-check and lifecycle contracts run under the full edge suite. -->
 
 ## 3. OL 更新发布与提升
 
@@ -31,7 +31,7 @@
 - [ ] 3.3 实现 promotion：先让所有带版本号文件可用，最后更新 stable `latest-mac.yml`；manifest 设重新验证缓存、版本文件设 immutable 缓存；任一闸失败必须保留旧 manifest 并以非零退出。
   <!-- Blocked 2026-07-13: script implementation is ready, but an end-to-end promotion cannot be validated until anonymous HTTPS works; old manifest remains untouched. -->
 - [x] 3.4 更新桌面发版文档，明确首次 bootstrap 包仍需手动安装、已安装的高版本不能自动降级、问题版本须发布更高修复版，以及 Windows 自动更新仍不在范围内。
-  <!-- aidcp-edge d98db6e and aidcp 2bd1b95: release checklists distinguish manual bootstrap, prompt-only OL mac updates, higher-version remediation, and Windows exclusion. -->
+  <!-- aidcp-edge d98db6e, df3fc48 and aidcp 2bd1b95: release checklists distinguish manual bootstrap, prompt-only OL mac updates, higher-version remediation, Windows exclusion, and manual checking. -->
 
 ## 4. 集成验证与 OL 发布
 
