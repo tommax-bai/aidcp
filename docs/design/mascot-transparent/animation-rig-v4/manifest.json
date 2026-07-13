@@ -4,6 +4,11 @@
   "technique": "anchor-aligned independent head with a bounded neck overlap rendered above a complete torso",
   "demo": "../animation-rig-v4-demo.html",
   "calibrationDemo": "../animation-rig-v4-calibration.html",
+  "calibration": {
+    "coordinateSpace": "512x512 logical pixels",
+    "editableAnchors": ["torso.neckSeat", "head.neckBase"],
+    "interaction": "select a layer mode, click its connection point, then copy the generated JSON"
+  },
   "anchorCalibrationPreview": "anchor-calibration.png",
   "previewRenderer": "render_previews.py",
   "headTurnPreviewGif": "head-turn-preview.gif",

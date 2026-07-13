@@ -15,10 +15,14 @@
       --teal: #168d96;
       --red: #e23d35;
       --rig-scale: 0.84;
-      --rig-y: 24px;
-      --head-x: -12px;
-      --head-y: -96px;
+      --rig-y: 4.6875%;
+      --head-x: -2.34375%;
+      --head-y: -18.75%;
       --head-angle: 0deg;
+      --torso-anchor-x: 42.96875%;
+      --torso-anchor-y: 52.734375%;
+      --head-anchor-x: 45.3125%;
+      --head-anchor-y: 71.484375%;
     }
 
     * {
@@ -36,9 +40,9 @@
 
     main {
       display: grid;
-      grid-template-columns: minmax(320px, 560px) minmax(260px, 320px);
+      grid-template-columns: minmax(320px, 560px) minmax(280px, 340px);
       gap: 24px;
-      width: min(920px, 100%);
+      width: min(940px, 100%);
       margin: 0 auto;
       align-items: start;
     }
@@ -50,6 +54,48 @@
       font-weight: 600;
       line-height: 1.3;
       letter-spacing: 0;
+    }
+
+    .preview-column {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .modes {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .mode-button {
+      width: 100%;
+      min-width: 0;
+      padding: 8px 6px;
+      border: 0;
+      border-radius: 5px;
+      color: var(--muted);
+      background: transparent;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .mode-button[aria-selected="true"] {
+      color: #ffffff;
+      background: var(--teal);
+    }
+
+    .mode-hint {
+      min-height: 20px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
     }
 
     .stage {
@@ -67,6 +113,11 @@
         linear-gradient(-45deg, transparent 75%, rgba(22, 141, 150, 0.05) 75%);
       background-position: 0 0, 0 12px, 12px -12px, -12px 0;
       background-size: 24px 24px;
+    }
+
+    .stage[data-mode="torso"],
+    .stage[data-mode="head"] {
+      cursor: crosshair;
     }
 
     .rig-frame,
@@ -109,7 +160,7 @@
 
     .head-rotation {
       transform: rotate(var(--head-angle));
-      transform-origin: 45.3125% 71.4844%;
+      transform-origin: var(--head-anchor-x) var(--head-anchor-y);
     }
 
     .marker {
@@ -121,19 +172,21 @@
     }
 
     .marker.torso-anchor {
-      left: 42.96875%;
-      top: 52.734375%;
+      left: var(--torso-anchor-x);
+      top: var(--torso-anchor-y);
       width: 22px;
       height: 22px;
       border: 2px solid var(--red);
+      color: var(--red);
     }
 
     .marker.head-anchor {
-      left: 45.3125%;
-      top: 71.484375%;
+      left: var(--head-anchor-x);
+      top: var(--head-anchor-y);
       width: 12px;
       height: 12px;
       border: 2px solid var(--teal);
+      color: var(--teal);
     }
 
     .marker::before,
@@ -155,21 +208,56 @@
       height: 30px;
     }
 
-    .torso-anchor {
-      color: var(--red);
+    .stage[data-mode="torso"] .wing,
+    .stage[data-mode="torso"] .head-position {
+      display: none;
     }
 
-    .head-anchor {
-      color: var(--teal);
+    .stage[data-mode="head"] .wing,
+    .stage[data-mode="head"] .torso,
+    .stage[data-mode="head"] .torso-anchor {
+      display: none;
+    }
+
+    .stage[data-mode="head"] .head-position {
+      transform: none;
+    }
+
+    .stage[data-mode="head"] .head-rotation {
+      transform: none;
     }
 
     .controls {
       display: grid;
-      gap: 18px;
+      gap: 16px;
       padding-top: 4px;
     }
 
-    .control {
+    fieldset {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      min-width: 0;
+      margin: 0;
+      padding: 12px 0 0;
+      border: 0;
+      border-top: 1px solid var(--line);
+    }
+
+    legend {
+      padding: 0 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .number-control {
+      display: grid;
+      grid-template-columns: 20px minmax(0, 1fr);
+      align-items: center;
+      gap: 6px;
+    }
+
+    .range-control {
       display: grid;
       grid-template-columns: 78px minmax(0, 1fr) 54px;
       align-items: center;
@@ -178,8 +266,25 @@
 
     label,
     output,
+    input,
     .status {
       font-size: 13px;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      min-width: 0;
+      padding: 7px 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink);
+      background: var(--surface);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--teal);
     }
 
     output {
@@ -188,16 +293,11 @@
       text-align: right;
     }
 
-    input[type="range"] {
-      width: 100%;
-      accent-color: var(--teal);
-    }
-
     .status {
       padding-block: 12px;
       border-block: 1px solid var(--line);
       color: var(--muted);
-      line-height: 1.6;
+      line-height: 1.7;
     }
 
     .status strong {
@@ -221,16 +321,21 @@
       background: currentColor;
     }
 
-    .legend .torso-key {
+    .torso-key {
       color: var(--red);
     }
 
-    .legend .head-key {
+    .head-key {
       color: var(--teal);
     }
 
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
     button {
-      justify-self: start;
       min-width: 88px;
       padding: 8px 14px;
       border: 1px solid var(--line);
@@ -244,6 +349,12 @@
     button:hover {
       border-color: rgba(22, 141, 150, 0.5);
       background: #f5fbfa;
+    }
+
+    button.primary {
+      border-color: var(--teal);
+      color: #ffffff;
+      background: var(--teal);
     }
 
     button:focus-visible,
@@ -271,21 +382,31 @@
   <main>
     <h1>吉祥物头颈锚点校准</h1>
 
-    <section class="stage" aria-label="头部与身体接缝校准预览">
-      <div class="rig-frame">
-        <div class="rig">
-          <img class="layer wing" src="animation-rig-v4/mascot-wing-left.png" alt="">
-          <img class="layer torso" src="animation-rig-v4/mascot-torso.png" alt="">
-          <span class="marker torso-anchor" aria-hidden="true"></span>
-          <div class="head-position">
-            <div class="head-rotation">
-              <img class="layer" src="animation-rig-v4/mascot-head.png" alt="青绿色鸟类吉祥物">
-              <span class="marker head-anchor" aria-hidden="true"></span>
+    <div class="preview-column">
+      <div class="modes" role="tablist" aria-label="校准模式">
+        <button type="button" class="mode-button" role="tab" data-mode="torso" aria-selected="false">身体锚点</button>
+        <button type="button" class="mode-button" role="tab" data-mode="head" aria-selected="false">头部锚点</button>
+        <button type="button" class="mode-button" role="tab" data-mode="preview" aria-selected="true">合成预览</button>
+      </div>
+
+      <p class="mode-hint" id="mode-hint">查看两个锚点重合后的最终接缝。</p>
+
+      <section class="stage" id="stage" data-mode="preview" aria-label="头部与身体接缝校准预览">
+        <div class="rig-frame">
+          <div class="rig">
+            <img class="layer wing" src="animation-rig-v4/mascot-wing-left.png" alt="">
+            <img class="layer torso" src="animation-rig-v4/mascot-torso.png" alt="">
+            <span class="marker torso-anchor" aria-hidden="true"></span>
+            <div class="head-position">
+              <div class="head-rotation">
+                <img class="layer" src="animation-rig-v4/mascot-head.png" alt="青绿色鸟类吉祥物">
+                <span class="marker head-anchor" aria-hidden="true"></span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
     <section class="controls" aria-label="锚点参数">
       <div class="legend">
@@ -293,82 +414,194 @@
         <span class="head-key"><span class="swatch"></span>头部 neckBase</span>
       </div>
 
-      <div class="control">
-        <label for="head-x">头部 X</label>
-        <input id="head-x" type="range" min="-40" max="20" value="-12" step="1">
-        <output for="head-x">-12</output>
-      </div>
+      <fieldset>
+        <legend>身体锚点</legend>
+        <label class="number-control" for="torso-x">X
+          <input id="torso-x" type="number" min="0" max="512" value="220" step="1">
+        </label>
+        <label class="number-control" for="torso-y">Y
+          <input id="torso-y" type="number" min="0" max="512" value="270" step="1">
+        </label>
+      </fieldset>
 
-      <div class="control">
-        <label for="head-y">头部 Y</label>
-        <input id="head-y" type="range" min="-130" max="-60" value="-96" step="1">
-        <output for="head-y">-96</output>
-      </div>
+      <fieldset>
+        <legend>头部锚点</legend>
+        <label class="number-control" for="head-anchor-x">X
+          <input id="head-anchor-x" type="number" min="0" max="512" value="232" step="1">
+        </label>
+        <label class="number-control" for="head-anchor-y">Y
+          <input id="head-anchor-y" type="number" min="0" max="512" value="366" step="1">
+        </label>
+      </fieldset>
 
-      <div class="control">
+      <div class="range-control">
         <label for="angle">头部角度</label>
         <input id="angle" type="range" min="-6" max="6" value="0" step="0.5">
         <output for="angle">0deg</output>
       </div>
 
-      <div class="control">
+      <div class="range-control">
         <label for="rig-scale">整体缩放</label>
         <input id="rig-scale" type="range" min="0.72" max="0.92" value="0.84" step="0.01">
         <output for="rig-scale">0.84</output>
       </div>
 
-      <div class="control">
+      <div class="range-control">
         <label for="rig-y">画布 Y</label>
-        <input id="rig-y" type="range" min="0" max="40" value="24" step="1">
+        <input id="rig-y" type="range" min="-20" max="60" value="24" step="1">
         <output for="rig-y">24</output>
       </div>
 
       <div class="status">
-        锚点差值：<strong id="delta">X 0 / Y 0</strong><br>
-        运行时位移：<strong id="transform">translate(-12px, -96px)</strong>
+        自动头部位移：<strong id="transform">translate(-12, -96)</strong><br>
+        锚点差值：<strong id="delta">X 0 / Y 0</strong>
       </div>
 
-      <button type="button" id="reset">重置参数</button>
+      <div class="actions">
+        <button type="button" class="primary" id="copy">复制参数</button>
+        <button type="button" id="reset">重置参数</button>
+      </div>
     </section>
   </main>
 
   <script>
+    const canvasSize = 512;
     const root = document.documentElement;
+    const stage = document.getElementById("stage");
+    const modeHint = document.getElementById("mode-hint");
+    const transformLabel = document.getElementById("transform");
+    const deltaLabel = document.getElementById("delta");
+    const copyButton = document.getElementById("copy");
+    const controls = [...document.querySelectorAll("input")];
+    const modeButtons = [...document.querySelectorAll(".mode-button[data-mode]")];
     const defaults = {
-      "head-x": -12,
-      "head-y": -96,
+      "torso-x": 220,
+      "torso-y": 270,
+      "head-anchor-x": 232,
+      "head-anchor-y": 366,
       angle: 0,
       "rig-scale": 0.84,
       "rig-y": 24,
     };
-    const controls = [...document.querySelectorAll('input[type="range"]')];
-    const delta = document.getElementById("delta");
-    const transform = document.getElementById("transform");
+    const hints = {
+      torso: "点击身体图片，设置头部应该连接到身体的位置。",
+      head: "点击头部图片，设置头部自身的连接点。",
+      preview: "查看两个锚点重合后的最终接缝。",
+    };
 
-    function update() {
-      const values = Object.fromEntries(controls.map((input) => [input.id, Number(input.value)]));
-      root.style.setProperty("--head-x", `${values["head-x"]}px`);
-      root.style.setProperty("--head-y", `${values["head-y"]}px`);
-      root.style.setProperty("--head-angle", `${values.angle}deg`);
-      root.style.setProperty("--rig-scale", values["rig-scale"]);
-      root.style.setProperty("--rig-y", `${values["rig-y"]}px`);
-
-      controls.forEach((input) => {
-        const suffix = input.id === "angle" ? "deg" : "";
-        input.nextElementSibling.textContent = `${input.value}${suffix}`;
-      });
-
-      const deltaX = 232 + values["head-x"] - 220;
-      const deltaY = 366 + values["head-y"] - 270;
-      delta.textContent = `X ${deltaX} / Y ${deltaY}`;
-      transform.textContent = `translate(${values["head-x"]}px, ${values["head-y"]}px)`;
+    function toPercent(value) {
+      return (value / canvasSize * 100) + "%";
     }
 
+    function readValues() {
+      return Object.fromEntries(controls.map((input) => [input.id, Number(input.value)]));
+    }
+
+    function update() {
+      const values = readValues();
+      const headX = values["torso-x"] - values["head-anchor-x"];
+      const headY = values["torso-y"] - values["head-anchor-y"];
+
+      root.style.setProperty("--torso-anchor-x", toPercent(values["torso-x"]));
+      root.style.setProperty("--torso-anchor-y", toPercent(values["torso-y"]));
+      root.style.setProperty("--head-anchor-x", toPercent(values["head-anchor-x"]));
+      root.style.setProperty("--head-anchor-y", toPercent(values["head-anchor-y"]));
+      root.style.setProperty("--head-x", toPercent(headX));
+      root.style.setProperty("--head-y", toPercent(headY));
+      root.style.setProperty("--head-angle", values.angle + "deg");
+      root.style.setProperty("--rig-scale", values["rig-scale"]);
+      root.style.setProperty("--rig-y", toPercent(values["rig-y"]));
+
+      document.querySelector('output[for="angle"]').textContent = values.angle + "deg";
+      document.querySelector('output[for="rig-scale"]').textContent = values["rig-scale"];
+      document.querySelector('output[for="rig-y"]').textContent = values["rig-y"];
+      transformLabel.textContent = "translate(" + headX + ", " + headY + ")";
+      deltaLabel.textContent = "X 0 / Y 0";
+    }
+
+    function setMode(mode) {
+      stage.dataset.mode = mode;
+      modeHint.textContent = hints[mode];
+      modeButtons.forEach((button) => {
+        button.setAttribute("aria-selected", String(button.dataset.mode === mode));
+      });
+    }
+
+    function stagePoint(event) {
+      const rect = stage.getBoundingClientRect();
+      const values = readValues();
+      const left = rect.left + stage.clientLeft;
+      const top = rect.top + stage.clientTop;
+      const visualX = (event.clientX - left) / stage.clientWidth * canvasSize;
+      const visualY = (event.clientY - top) / stage.clientHeight * canvasSize;
+      return {
+        x: Math.round(256 + (visualX - 256) / values["rig-scale"]),
+        y: Math.round(256 + (visualY - values["rig-y"] - 256) / values["rig-scale"]),
+      };
+    }
+
+    function setCoordinate(id, value) {
+      document.getElementById(id).value = Math.max(0, Math.min(canvasSize, value));
+    }
+
+    stage.addEventListener("pointerdown", (event) => {
+      const mode = stage.dataset.mode;
+      if (mode === "preview") {
+        return;
+      }
+      const point = stagePoint(event);
+      if (mode === "torso") {
+        setCoordinate("torso-x", point.x);
+        setCoordinate("torso-y", point.y);
+      } else {
+        setCoordinate("head-anchor-x", point.x);
+        setCoordinate("head-anchor-y", point.y);
+      }
+      update();
+    });
+
+    modeButtons.forEach((button) => {
+      button.addEventListener("click", () => setMode(button.dataset.mode));
+    });
     controls.forEach((input) => input.addEventListener("input", update));
+
+    copyButton.addEventListener("click", async () => {
+      const values = readValues();
+      const payload = {
+        torsoAnchor: { x: values["torso-x"], y: values["torso-y"] },
+        headAnchor: { x: values["head-anchor-x"], y: values["head-anchor-y"] },
+        headTransform: {
+          translateX: values["torso-x"] - values["head-anchor-x"],
+          translateY: values["torso-y"] - values["head-anchor-y"],
+        },
+        viewportFit: {
+          scale: values["rig-scale"],
+          translateY: values["rig-y"],
+        },
+        headAngle: values.angle,
+      };
+      const text = JSON.stringify(payload);
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        document.body.append(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        textarea.remove();
+      }
+      copyButton.textContent = "已复制";
+      window.setTimeout(() => {
+        copyButton.textContent = "复制参数";
+      }, 1200);
+    });
+
     document.getElementById("reset").addEventListener("click", () => {
       controls.forEach((input) => {
         input.value = defaults[input.id];
       });
+      setMode("preview");
       update();
     });
 
