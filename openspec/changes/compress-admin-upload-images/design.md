@@ -8,18 +8,17 @@ This change is intentionally frontend-only. The cloud API, stored media model, p
 
 **Goals:**
 
-- Compress large admin-uploaded Facebook publish images before they enter the media pool.
-- Skip compression for files at or below 600KB to avoid unnecessary quality loss.
+- Convert admin-uploaded Facebook publish images to compressed JPEG before they enter the media pool.
 - Preserve the full image content: no crop, no stretch, no aspect-ratio change.
 - Keep operator feedback honest by showing compressed size when compression happens.
-- Keep upload failure semantics unchanged: per-file failures remain retryable.
+- Reject files that cannot be converted to a smaller JPEG before upload, so the media pool does not keep oversized originals.
 
 **Non-Goals:**
 
 - No server-side image processing pipeline in this change.
 - No change to existing 10MB upload hard limit.
 - No change to generated publish images, curated reference images, or edge `upload_image`.
-- No unsafe GIF compression that would silently drop animation frames.
+- No preservation of animation or alpha channels; this upload path produces static JPEG publish素材.
 
 ## Decisions
 
@@ -27,21 +26,21 @@ This change is intentionally frontend-only. The cloud API, stored media model, p
 
    This keeps CPU cost on the operator machine, reduces API payload size, and avoids adding ECS image-processing dependencies. Alternative considered: server-side `sharp`; rejected for this narrow upload path because it adds deployment/runtime cost and does not reduce the panel upload request size.
 
-2. **Use 600KB as a skip threshold, not a hard output guarantee.**
+2. **Use 600KB as the target size, not a skip threshold.**
 
-   Files at or below 600KB are uploaded unchanged. Files above 600KB are decoded and compressed; if no candidate is smaller than the original, the original is retained. This preserves correctness and avoids replacing a valid image with a larger re-encode.
+   Every accepted upload is decoded, rendered to canvas, and encoded as JPEG. The encoder tries bounded quality and size candidates to get near or below 600KB. If no JPEG candidate is smaller than the source, the file is rejected rather than uploaded as an oversized original.
 
-3. **Use bounded, aspect-preserving canvas compression.**
+3. **Use bounded, aspect-preserving canvas compression with JPEG output.**
 
-   JPEG/WebP inputs are candidates for lossy quality reduction and optional proportional downscale. PNG inputs may be proportionally downscaled while preserving PNG output type. The implementation never crops, never pads, and never changes aspect ratio.
+   All accepted inputs use the same output type: `image/jpeg`. Transparent pixels are composited onto a white background because JPEG has no alpha channel. The implementation never crops, never pads, and never changes aspect ratio.
 
-4. **Skip GIF compression.**
+4. **Reject conversion failures instead of falling back to originals.**
 
-   Canvas re-encoding an animated GIF would usually keep only one frame. GIFs therefore keep existing validation and upload behavior.
+   The old conservative fallback kept uploads flowing but allowed PNG originals to remain large. The new rule treats decode/encode/no-smaller-candidate as a local validation failure and leaves the file out of the queue.
 
 ## Risks / Trade-offs
 
-- Browser canvas APIs can fail for unusual images → fall back to original file and keep upload working.
-- Compression may not reach 600KB for every large image → upload the smallest smaller candidate rather than looping indefinitely or over-degrading quality.
-- PNG photos may remain large because PNG is lossless → preserving transparency and type is safer than converting to JPEG without explicit operator intent.
+- Browser canvas APIs can fail for unusual images → show a validation error and require another file/export.
+- Compression may not reach 600KB for every large image → upload the smallest smaller JPEG candidate; reject only when no smaller JPEG exists.
+- PNG transparency is flattened to white → acceptable for Facebook post素材, but not suitable for workflows that require alpha preservation.
 - Client-side compression adds a short wait before the file appears in the pending queue → the queue label will show the resulting size so the wait is explainable.

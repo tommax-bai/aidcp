@@ -20,3 +20,14 @@
   <!-- npm test -- src/utils/imageUploadCompression.test.ts src/components/FacebookSearchConfig.test.tsx; npm run typecheck; npm run build. -->
 - [x] 3.2 Validate the OpenSpec change strictly and record final status.
   <!-- openspec validate compress-admin-upload-images --strict. Dev deploy: aidcp-console 29d8e9f dist deployed to 121.89.85.150:/opt/aidcp/console on 2026-07-13; backup console.bak.20260713-193205.tar.gz; HTTP 8088 root/public 200; /api/health 200; bundle assets/index-BRmuciUr.js contains upload compression copy. -->
+
+## 4. JPEG-only compression follow-up
+
+- [x] 4.1 Update OpenSpec artifacts to require all accepted upload images to convert to compressed JPEG and reject files that cannot be converted smaller.
+  <!-- proposal/design/spec updated: 600KB is now JPEG target, not skip threshold; decode/encode/no-smaller failures are rejected. -->
+- [x] 4.2 Update the console compression helper and Facebook publish media upload UI to queue only JPEG outputs and reject conversion failures.
+  <!-- aidcp-console 2d43980: prepareImageForUpload returns ok/reject result; Facebook upload queue stores only image/jpeg File outputs. -->
+- [x] 4.3 Update tests for PNG/GIF/JPEG-to-JPEG conversion, rejection behavior, and uploaded payload filenames/content types.
+  <!-- aidcp-console 2d43980: utility and component tests updated for JPEG filenames/content types and rejection behavior. -->
+- [x] 4.4 Re-run console validation, OpenSpec validation, commit/push, and deploy the dev console static release.
+  <!-- npm test -- src/utils/imageUploadCompression.test.ts src/components/FacebookSearchConfig.test.tsx; npm run typecheck; npm run build; openspec validate compress-admin-upload-images --strict. Dev deploy: aidcp-console 2d43980 dist deployed to 121.89.85.150:/opt/aidcp/console on 2026-07-14; backup console.bak.20260714-034849.tar.gz; HTTP 8088 root/public 200; /api/health 200; bundle assets/index-B0CYrwUy.js contains JPEG-only policy. -->
