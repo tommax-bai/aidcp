@@ -19,11 +19,17 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 - **THEN** 标题带底色相应切换（正常=平静色 / 警戒=琥珀 / 受限与冻结=警示色），状态恢复后染色随之复原
 
 ### Requirement: 五路技术状态合成一句健康结论
-渲染器 SHALL 将登录 / 云端 / 会话 / 风控 / 边缘进程五路状态合成一句健康结论（「运行中 / 就绪 / 已暂停 / 需要注意」）呈现于标题带药丸；五路明细 SHALL 可点开查看且以非技术用语呈现。
+渲染器 SHALL 将登录 / 云端 / 会话 / 风控 / 边缘进程五路状态合成一句健康结论（「运行中 / 就绪 / 已暂停 / 需要协助 / 运行异常」）呈现于标题带药丸；五路明细 SHALL 可点开查看且以非技术用语呈现。可恢复且需要用户协助的状态 MUST 使用琥珀色，真正导致运行中断的边缘进程异常或账号冻结 MUST 使用红色，二者 MUST NOT 共用同一红色警示态。
 
-#### Scenario: 任一路异常时结论为需要注意
-- **WHEN** 五路状态中任一路处于异常（需登录 / 缺 Chrome / 云端断连且会话运行 / 边缘进程异常 / 风控受限或冻结）
-- **THEN** 健康药丸呈现「需要注意」并以警示色标识，点开明细可定位异常的那一路
+#### Scenario: 登录或配置需要用户协助
+- **WHEN** 登录失效、缺少 Chrome、需要初始设置，或运行会话暂时无法连接云端
+- **THEN** 健康药丸呈现「需要协助」或明确的恢复进度并使用琥珀色
+- **AND** MUST NOT 将该状态呈现为红色系统错误
+
+#### Scenario: 真正运行异常使用红色
+- **WHEN** 边缘进程异常停止、自动重启已放弃，或账号处于冻结状态
+- **THEN** 健康药丸呈现明确的中断结论并使用红色
+- **AND** 点开明细可定位需要处理的异常
 
 #### Scenario: 正常运行时结论为运行中
 - **WHEN** 边缘进程运行且会话运行、无异常路
@@ -60,11 +66,12 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 - **THEN** 所有微光 / 呼吸动效关闭，信息呈现不受影响
 
 ### Requirement: 今日计数降级为小结条
-浏览 / 点赞 / 收藏 / 评论计数 SHALL 从首屏门面降级为界面收尾的「今日小结」横条，不再以大号 KPI 磁贴作首屏主视觉。
+浏览 / 点赞 / 收藏 / 评论计数 SHALL 从首屏门面降级为界面收尾的「今日进展」横条，不再以大号 KPI 磁贴作首屏主视觉。横条 MUST 使用进展与计划语义，MUST NOT 将正常的动作累计描述为受限用量。
 
-#### Scenario: 计数照常累计且在小结条呈现
+#### Scenario: 计数照常累计且在今日进展呈现
 - **WHEN** 会话中发生互动动作
-- **THEN** 对应计数在「今日小结」条内递增，首屏主视觉区不出现大号计数磁贴
+- **THEN** 对应计数在「今日进展」条内递增，首屏主视觉区不出现大号计数磁贴
+- **AND** 汇总标题与展开入口不使用「用量」或「限额」措辞
 
 ### Requirement: 发布等待卡纯展示、审批授权只在飞书
 发布候审期间界面 SHALL 呈现一张纯展示发布卡：白底、四节点旅程（写好内容 → 发到飞书 → 等你确认 → 择时发布）、当前节点为全卡唯一琥珀呼吸点。端上 MUST NOT 提供任何审批授权控件（无确认 / 驳回按钮）；「打开飞书」为纯导航深链且 MUST 在深链不可用时降级为纯文字。卡片状态 MUST 由真实发布链路事件驱动。
@@ -130,18 +137,24 @@ The Electron companion SHALL prefer cloud-supplied account-scoped daily usage ov
 - **THEN** it MAY continue to show local log-derived deltas for available actions, and MUST NOT present quota caps or saturation as if they were authoritative
 
 ### Requirement: Electron Daily Summary Shows Current Daily Quota Saturation
+The Electron companion SHALL show daily plan progress for each supplied action when cloud includes the current quota level's daily caps. Reaching a supplied cap SHALL be presented as completing that action's daily plan, distinct from global risk warnings, captcha restrictions, and execution failures.
 
-The Electron companion SHALL show daily quota context for each supplied action when cloud includes the current quota level's daily caps.
-
-#### Scenario: Action reaches the current level's daily limit
+#### Scenario: Action reaches the current level's daily plan
 
 - **WHEN** `ui.snapshot.dailyUsage.saturated` includes an action, or the supplied total is greater than or equal to the supplied cap for that action
-- **THEN** Electron marks that metric as saturated and presents it as a limit-reached state distinct from global risk warnings or captcha restrictions
+- **THEN** Electron marks that metric as complete with success styling and presents the action's daily plan as completed
+- **AND** it MUST NOT use red warning styling or user-facing limit terminology for that normal completion
+
+#### Scenario: Daily plan is still progressing
+
+- **WHEN** authoritative daily totals and caps are supplied but no action is complete
+- **THEN** Electron presents the summary as proceeding according to plan
+- **AND** near-complete progress remains a calm progress state rather than a warning
 
 #### Scenario: Quota metadata is missing
 
 - **WHEN** totals are supplied without quotas
-- **THEN** Electron renders the account daily totals without fabricating caps, progress, or limit-reached states
+- **THEN** Electron renders the account daily totals without fabricating caps, progress, or plan-completed states
 
 ### Requirement: Daily Usage Snapshot Remains Backward Compatible
 
@@ -153,8 +166,7 @@ Cloud and edge SHALL keep `ui.snapshot.dailyUsage` optional and backward compati
 - **THEN** the message remains a valid snapshot and the old edge can ignore the extra field without breaking identity, last publish, or publish-card rendering
 
 ### Requirement: Electron Daily Summary Shows Multi-Window Quota Status
-
-The Electron companion SHALL show quota status for each cloud-supplied quota window: current session, minute, hour, and day, while keeping the collapsed daily summary focused on today's account totals.
+The Electron companion SHALL show plan progress for each cloud-supplied quota window: current session, minute, hour, and day, while keeping the collapsed daily summary focused on today's account totals. User-facing labels SHALL translate those windows into round, current pace, stage, and daily plan concepts while expanded detail preserves exact supplied totals and caps.
 
 #### Scenario: Daily card is collapsed by default
 
@@ -162,10 +174,10 @@ The Electron companion SHALL show quota status for each cloud-supplied quota win
 - **THEN** the collapsed card renders the day-window totals for view, like, collect, comment, follow, and publish
 - **AND** it does not render session, minute, or hour action details until the user expands the card
 
-#### Scenario: User expands the daily card
+#### Scenario: User expands the daily progress card
 
-- **WHEN** the user clicks the daily usage card or its disclosure control
-- **THEN** Electron renders quota detail for each supplied window: session, minute, hour, and day
+- **WHEN** the user clicks the daily progress card or its disclosure control
+- **THEN** Electron renders plan detail for each supplied window: current round, current pace, stage, and today
 - **AND** each window detail lists view, like, collect, comment, follow, and publish as separate action rows when totals are available
 - **AND** each action row shows its supplied total and supplied cap when a cap exists
 
@@ -173,29 +185,30 @@ The Electron companion SHALL show quota status for each cloud-supplied quota win
 
 - **WHEN** `ui.snapshot.dailyUsage.windows` includes `session`, `minute`, `hour`, and `day`
 - **THEN** Electron renders those windows as peer detail groups in the expanded area
-- **AND** it marks saturated actions distinctly from near-limit actions without relying on a single worst-action summary as the only visible data
+- **AND** it marks completed actions distinctly from near-complete actions without relying on a single worst-action summary as the only visible data
 
-#### Scenario: Any window reaches its cap
+#### Scenario: Any window completes its plan
 
 - **WHEN** any supplied window's `saturated` list is non-empty, or any supplied action total is greater than or equal to that window's supplied cap
-- **THEN** Electron's aggregate quota status presents a limit-reached state and identifies the saturated window labels
-- **AND** the affected action rows are styled as saturated without changing global risk, captcha, or engine health states
+- **THEN** Electron's aggregate progress status identifies completed action plans
+- **AND** the affected action rows use green completion styling without changing global risk, captcha, or engine health states
+- **AND** an available future `releaseAt` is described as the time the action will continue, not as quota release
 
-#### Scenario: Session quota is not active
+#### Scenario: Session plan is not active
 
 - **WHEN** the session window is supplied with `active: false`
-- **THEN** Electron MAY show the configured single-session cap as inactive context, but MUST NOT imply that an active session is currently consuming that budget
+- **THEN** Electron MAY show the configured single-session plan as waiting to start, but MUST NOT imply that an active session is currently consuming that plan
 
 #### Scenario: Window quota metadata is missing
 
 - **WHEN** a window is missing, or an action total has no supplied cap
-- **THEN** Electron MUST NOT fabricate caps, percentages, or limit-reached states for that action or window
+- **THEN** Electron MUST NOT fabricate caps, percentages, or plan-completed states for that action or window
 
 #### Scenario: Rolling quota window snapshot expires
 
 - **WHEN** a minute or hour window includes timing metadata and the local clock has passed the supplied expiry time without a fresher cloud snapshot
-- **THEN** Electron MUST stop presenting that stale window as saturated
-- **AND** it MAY keep rendering the window as waiting for refresh until a new cloud snapshot or local event updates it
+- **THEN** Electron MUST stop presenting that stale window as completed
+- **AND** it MAY keep rendering the window as preparing the next round until a new cloud snapshot or local event updates it
 
 ### Requirement: Windowed Usage Snapshot Remains Backward Compatible
 
@@ -226,20 +239,21 @@ Cloud and edge SHALL preserve the existing `ui.snapshot.dailyUsage` daily aliase
 - **AND** older edges can ignore those fields without changing daily alias behavior
 
 ### Requirement: Electron Presence Explains Quota Rest State
+The Electron companion SHALL distinguish pacing-driven waiting from generic stale activity in the presence strip when cloud-supplied quota-window data shows that the current running or resting session has completed an active capped action. The message SHALL frame the reached cap as a completed round, stage, or daily action plan and explain the next step without implying risk or failure.
 
-The Electron companion SHALL distinguish quota-driven waiting from generic stale activity in the presence strip when cloud-supplied quota-window data shows that the current running session has reached an active limit.
+#### Scenario: Current pacing window is complete
 
-#### Scenario: Current quota window is saturated
-
-- **WHEN** Electron is in a running session, the latest presence event is stale, and `ui.snapshot.dailyUsage.windows` shows a current session, minute, hour, or day window with at least one saturated capped action
-- **THEN** the presence strip SHALL render a quota-specific rest message naming the action and window
+- **WHEN** Electron is in a running or resting session, the latest presence event is stale, and `ui.snapshot.dailyUsage.windows` shows a current session, minute, hour, or day window with at least one saturated capped action
+- **THEN** the presence strip SHALL render a completion message naming the action or its user-facing activity
+- **AND** it SHALL state that the platform is being given time to learn from the current activity
 - **AND** it SHALL include the estimated remaining wait until `releaseAt` when that timestamp is available and in the future
-- **AND** the presence strip MUST NOT animate as if work is still happening
+- **AND** the presence strip MUST NOT animate as if the completed action is still happening
+- **AND** it MUST NOT use red warning styling or claim that unrelated actions have stopped
 
-#### Scenario: Quota evidence is stale or incomplete
+#### Scenario: Pacing evidence is stale or incomplete
 
 - **WHEN** the latest presence event is stale but the relevant quota window is expired, missing, or lacks capped saturated action evidence
-- **THEN** Electron SHALL keep the existing stale-activity fallback instead of fabricating a quota-rest explanation
+- **THEN** Electron SHALL keep the existing stale-activity fallback instead of fabricating a plan-completion explanation
 
 ### Requirement: 发布卡「上次发布」历史态按环境归属、跨环境不串显
 主进程 SHALL 为「上次发布」历史态记录环境归属键（自起浏览器为固定键，指纹浏览器为环境 id 派生键），归属键在核心进程 spawn 时刻快照、随历史态一并持久化。当历史态的归属键与当前生效环境不一致、或持久化数据缺失归属键时，界面 MUST NOT 展示该历史态，发布卡 MUST 回落「还没有发布过内容」空态占位（宁缺毋假：归属不明的内容不得挂在当前账号名下）。云端快照带回当前账号的真实发布记录时 SHALL 照常覆盖本地历史态；同环境重启 SHALL 保留历史态（现状不变）。
