@@ -1,0 +1,71 @@
+{
+  "assetSet": "aidcp-mascot-short-term-animation-demo",
+  "version": 1,
+  "technique": "static full PNG plus local overlay layers controlled by CSS animations",
+  "demo": "../animation-demo.html",
+  "previewGif": "animation-preview.gif",
+  "limitations": [
+    "This is a short-term prototype using overlay layers, not a fully separated character rig.",
+    "Wave and head-turn motions intentionally keep the full static mascot below the moving layer to avoid holes.",
+    "For production-level animation, regenerate true separated parts or move to Rive/Lottie."
+  ],
+  "animations": [
+    {
+      "id": "wave",
+      "label": "挥手",
+      "recommendedUse": ["welcome", "onboarding", "friendly_intro"],
+      "base": "animation/wave-base.png",
+      "layers": [
+        {
+          "file": "animation/wave-wing.png",
+          "cssClass": "wave-wing",
+          "motion": "rotate around shoulder"
+        }
+      ]
+    },
+    {
+      "id": "blink",
+      "label": "眨眼",
+      "recommendedUse": ["idle", "thinking", "waiting"],
+      "base": "animation/thinking-full.png",
+      "layers": [
+        {
+          "type": "css-shape",
+          "cssClass": "blink-lid",
+          "motion": "scale eyelid mask on both eyes"
+        }
+      ]
+    },
+    {
+      "id": "head_turn",
+      "label": "转头",
+      "recommendedUse": ["monitoring", "attention_shift", "status_change"],
+      "base": "animation/turn-base.png",
+      "layers": [
+        {
+          "file": "animation/turn-head.png",
+          "cssClass": "turn-head",
+          "motion": "small rotation around neck"
+        }
+      ]
+    },
+    {
+      "id": "click",
+      "label": "点击按钮",
+      "recommendedUse": ["task_execution", "command_sent", "button_feedback"],
+      "base": "animation/click-base.png",
+      "layers": [
+        {
+          "file": "animation/click-layer.png",
+          "cssClass": "click-layer",
+          "motion": "short press translate and scale"
+        },
+        {
+          "type": "css-shape",
+          "cssClass": "ripple",
+          "motion": "target ripple"
+        }
+      ]
+    }
+  ]
+}

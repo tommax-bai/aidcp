@@ -24,6 +24,16 @@
 - 已经失败且需要用户重新操作、重试或联系支持时，用 `error_apology`。
 - 长时间后台运行、连接保持、巡检和值守场景，用 `monitoring`。
 
+## 短期动画 Demo
+
+短期动效预览入口：
+
+- `animation-demo.html`：本地 HTML 预览页，展示挥手、眨眼、转头、点击按钮。
+- `animation/manifest.json`：动画动作与图层映射，供开发接入时读取。
+- `animation/animation-preview.gif`：GIF 预览，便于快速评审动效方向。
+
+这版是“完整静态 PNG + 局部叠层 + CSS 动画”的快速方案。它适合先验证 UI 氛围和动效节奏；如果后续要产品级质量，需要重新生成真正分层原画，或进入 Rive/Lottie 动画工作流。
+
 ## 源图位置
 
 源行为设定图为 4 列 2 行布局：
