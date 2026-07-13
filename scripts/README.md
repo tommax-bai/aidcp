@@ -14,6 +14,7 @@
 | `land-change <repo> <name> [--yes]` | 集成：fetch+rebase+测试；`--yes` 才 ff 推送+同步主 checkout+清理 | 默认只 prep 不推；push 撞 non-ff 即中止，**绝不 force** |
 | `deploy-target <dev\|ol> [--check\|--shell]` | 打印/校验 ECS 目标元数据：host、key、runtime 目录、cloud URL | 只读；`--check` 仅查本机 key 是否存在且权限安全 |
 | `release-desktop-macos <version> [--target dev\|ol] [--expect-env ol] [--yes]` | 桌面签名包**出包后交付**编排：下载 CI prerelease 的 dmg → 静态校验（spctl/codesign/stapler/asar/烘焙环境/运行时）→ 改 console `downloads.ts` → 构建 console；`--yes` 才传包+部署 console+验活+提交 | 默认只做本地只读段（下载+校验+改配置+构建）并打印剩余命令；`--yes` 才做 3 个对外动作。构建/签名/公证仍是 CI 专属、脚本不碰。push 撞 non-ff 软失败不 force |
+| `promote-ol-auto-update <version> [--yes]` | OL macOS 自动更新发布：下载完整 CI 资产，核验 manifest SHA-512、两个 dmg 的签名/公证和包内固定更新源；`--yes` 才 stage 到 OSS、匿名 HTTPS 校验、最后提升 manifest | 默认只读，绝不写 OSS；`--yes` 只在 bucket 匿名 HTTPS 已确认可读时使用。版本化资产先验证，`latest-mac.yml` 最后写入，因此失败不会把已安装客户端切到半成品 |
 
 ```bash
 scripts/fleet-status
@@ -28,6 +29,10 @@ scripts/deploy-target ol --check
 # 桌面签名包出包后交付（先 CI 出包：gh workflow run build-desktop.yml --ref master -f cloud_default_env=ol）
 scripts/release-desktop-macos 0.3.19                    # prep：下载+校验+改配置+构建，打印剩余命令
 scripts/release-desktop-macos 0.3.19 --yes              # prep 全绿后传包+部署 console+验活+提交
+
+# OL macOS 自动更新（先确认 OSS 更新目录匿名 HTTPS 可读）
+scripts/promote-ol-auto-update 0.3.20                   # 只读：下载并校验 CI 完整资产
+scripts/promote-ol-auto-update 0.3.20 --yes             # staging→公开校验→最后提升 latest-mac.yml
 ```
 
 **红线**：部署只从主 checkout 的 eligible ref 走、绝不从 worktree；部署前必须明确

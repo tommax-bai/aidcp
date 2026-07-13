@@ -1,0 +1,263 @@
+#!/usr/bin/env bash
+# promote-ol-auto-update — promote a signed macOS OL update only after every immutable
+# artifact is verified. GitHub prerelease is a transfer channel; installed clients read
+# only UPDATE_URL/latest-mac.yml from OSS/static HTTPS. Default mode has no OSS writes.
+set -euo pipefail
+
+_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib.sh
+source "$_DIR/lib.sh"
+
+REPO="tommax-bai/aidcp-edge"
+DEFAULT_UPDATE_URL="https://aidcp.oss-cn-beijing.aliyuncs.com/updates/ol/stable"
+DEFAULT_OSS_PREFIX="oss://aidcp/updates/ol/stable"
+
+usage() {
+  cat >&2 <<'EOF'
+usage: scripts/promote-ol-auto-update <version> [options]
+
+  <version>             e.g. 0.3.20 (must match package + latest-mac.yml)
+  --tag <tag>           GitHub prerelease tag (default: desktop-v<version>)
+  --update-url <https>  public generic update base (default: OSS OL stable prefix)
+  --oss-prefix <oss>    matching OSS destination (default: oss://aidcp/updates/ol/stable)
+  --work-dir <dir>      artifact directory (default: $TMPDIR/aidcp-ol-update-<version>)
+  --yes                 write to OSS: stage -> verify public files -> promote manifest
+  -h, --help            show this help
+
+Without --yes, downloads the complete CI artifact set and verifies local manifest SHA-512,
+DMG signatures/notarization, and baked OL update metadata. It performs no OSS write.
+
+With --yes, this script requires locally configured ossutil credentials. It never prints
+credentials, uploads immutable artifacts first, verifies anonymous HTTPS, and uploads
+latest-mac.yml only as the final promotion step. Do not use it until the OSS bucket/object
+ACL permits anonymous read of the configured public update URL.
+EOF
+}
+
+usage_error() { usage; exit 1; }
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+VER=""
+TAG=""
+UPDATE_URL="$DEFAULT_UPDATE_URL"
+OSS_PREFIX="$DEFAULT_OSS_PREFIX"
+WORK_DIR=""
+DO_YES=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --tag) TAG="${2:-}"; shift 2 ;;
+    --update-url) UPDATE_URL="${2:-}"; shift 2 ;;
+    --oss-prefix) OSS_PREFIX="${2:-}"; shift 2 ;;
+    --work-dir) WORK_DIR="${2:-}"; shift 2 ;;
+    --yes) DO_YES=1; shift ;;
+    -*) die "unknown option: $1" ;;
+    *) [ -z "$VER" ] && { VER="$1"; shift; } || die "unexpected argument: $1" ;;
+  esac
+done
+
+[ -n "$VER" ] || usage_error
+[ -n "$TAG" ] || TAG="desktop-v$VER"
+[ -n "$WORK_DIR" ] || WORK_DIR="${TMPDIR:-/tmp}/aidcp-ol-update-$VER"
+UPDATE_URL="${UPDATE_URL%/}"
+OSS_PREFIX="${OSS_PREFIX%/}"
+case "$UPDATE_URL" in https://*) ;; *) die "--update-url must be https://..." ;; esac
+case "$OSS_PREFIX" in oss://*) ;; *) die "--oss-prefix must be oss://..." ;; esac
+
+ARM_ZIP="AIDCP-$VER-arm64-mac.zip"
+X64_ZIP="AIDCP-$VER-mac.zip"
+ARM_DMG="AIDCP-$VER-arm64.dmg"
+X64_DMG="AIDCP-$VER.dmg"
+MANIFEST="latest-mac.yml"
+ARTIFACTS=("$ARM_ZIP" "$X64_ZIP" "$ARM_DMG" "$X64_DMG" "$ARM_ZIP.blockmap" "$X64_ZIP.blockmap" "$MANIFEST")
+
+info "== OL auto-update promotion preflight =="
+info "version=$VER tag=$TAG update_url=$UPDATE_URL oss_prefix=$OSS_PREFIX"
+command -v gh >/dev/null || die "gh CLI is required"
+gh auth status >/dev/null 2>&1 || die "gh is not authenticated"
+command -v node >/dev/null || die "node is required"
+command -v hdiutil >/dev/null || die "macOS hdiutil is required for DMG verification"
+command -v codesign >/dev/null || die "codesign is required"
+command -v spctl >/dev/null || die "spctl is required"
+command -v xcrun >/dev/null || die "xcrun is required"
+repo_cloned aidcp-edge || die "missing sibling aidcp-edge checkout"
+
+mkdir -p "$WORK_DIR"
+info "== Download complete CI artifact set from $TAG =="
+for artifact in "${ARTIFACTS[@]}"; do
+  gh release download "$TAG" --repo "$REPO" --pattern "$artifact" --dir "$WORK_DIR" --clobber \
+    || die "prerelease $TAG is missing $artifact"
+done
+for artifact in "${ARTIFACTS[@]}"; do
+  [ -s "$WORK_DIR/$artifact" ] || die "artifact is missing or empty: $artifact"
+done
+
+# Verify version, every manifest file reference and its SHA-512 before anything is uploaded.
+node --input-type=module - "$WORK_DIR" "$VER" "$ARM_ZIP" "$X64_ZIP" "$ARM_DMG" "$X64_DMG" <<'NODE'
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { join } from 'node:path';
+const [dir, version, ...files] = process.argv.slice(2);
+const yaml = readFileSync(join(dir, 'latest-mac.yml'), 'utf8');
+const versionMatch = yaml.match(/^version:\s*(.+?)\s*$/m);
+if (!versionMatch || versionMatch[1].replace(/["']/g, '') !== version) throw new Error(`manifest version is not ${version}`);
+const rows = [...yaml.matchAll(/^\s*- url:\s*(.+?)\s*\n\s*sha512:\s*(.+?)\s*\n\s*size:\s*(\d+)\s*$/gm)];
+const expected = new Map(rows.map((match) => [match[1].trim(), { sha512: match[2].trim(), size: Number(match[3]) }]));
+for (const file of files) {
+  const entry = expected.get(file);
+  if (!entry) throw new Error(`manifest does not include ${file}`);
+  const bytes = readFileSync(join(dir, file));
+  if (bytes.byteLength !== entry.size) throw new Error(`${file} length differs from manifest`);
+  const sha512 = createHash('sha512').update(bytes).digest('base64');
+  if (sha512 !== entry.sha512) throw new Error(`${file} sha512 differs from manifest`);
+}
+console.log(`manifest and SHA-512 verified for ${version}`);
+NODE
+
+# Inspect each signed/notarized DMG and the packaged app's fixed update configuration.
+_FAILS=0
+check() {
+  local label="$1"; shift
+  if "$@" >/dev/null 2>&1; then echo "  ✓ $label"; else echo "  ✗ $label" >&2; _FAILS=$((_FAILS + 1)); fi
+}
+verify_baked_update_config() {
+  local app="$1" expected="$2" version="$3"
+  (
+    cd "$(repo_path aidcp-edge)"
+    node --input-type=module - "$app/Contents/Resources" "$expected" "$version" <<'NODE'
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const require = createRequire(import.meta.url);
+const asar = require('@electron/asar');
+const [resources, expected, version] = process.argv.slice(2);
+const packageJson = JSON.parse(asar.extractFile(join(resources, 'app.asar'), 'package.json').toString());
+const updateYaml = readFileSync(join(resources, 'app-update.yml'), 'utf8');
+const value = (key) => {
+  const match = updateYaml.match(new RegExp(`^${key}:\\s*(.+?)\\s*$`, 'm'));
+  return (match?.[1] ?? '').replace(/^["']|["']$/g, '').replace(/\\/+$/, '');
+};
+if (
+  packageJson.version !== version ||
+  packageJson.aidcpUpdateChannel !== 'ol' ||
+  String(packageJson.aidcpUpdateUrl ?? '').replace(/\\/+$/, '') !== expected ||
+  value('provider') !== 'generic' ||
+  value('url') !== expected
+) {
+  throw new Error('packaged app does not contain the expected OL generic updater configuration');
+}
+NODE
+  )
+}
+verify_dmg() {
+  local dmg="$1" arch="$2"
+  info "== Verify $arch DMG =="
+  check "valid disk image" hdiutil imageinfo "$dmg"
+  check "stapled notarization ticket" xcrun stapler validate "$dmg"
+  local mount
+  mount="$(hdiutil attach -nobrowse -readonly "$dmg" | grep -Eo '/Volumes/.*$' | tail -1 || true)"
+  [ -n "$mount" ] || { echo "  ✗ unable to mount DMG" >&2; _FAILS=$((_FAILS + 1)); return; }
+  local app="$mount/AIDCP.app"
+  if [ ! -d "$app" ]; then
+    echo "  ✗ AIDCP.app missing from DMG" >&2; _FAILS=$((_FAILS + 1))
+  else
+    check "Developer ID signature" codesign --verify --deep --strict "$app"
+    check "Gatekeeper assessment" spctl --assess --type exec "$app"
+    check "app notarization ticket" xcrun stapler validate "$app"
+    check "baked OL generic updater config" verify_baked_update_config "$app" "$UPDATE_URL" "$VER"
+  fi
+  hdiutil detach "$mount" -quiet 2>/dev/null || hdiutil detach "$mount" -force 2>/dev/null || true
+}
+verify_dmg "$WORK_DIR/$ARM_DMG" arm64
+verify_dmg "$WORK_DIR/$X64_DMG" x64
+[ "$_FAILS" -eq 0 ] || die "local trust/update verification failed; nothing was uploaded"
+
+if [ "$DO_YES" -eq 0 ]; then
+  cat <<EOF
+
+== Local verification complete; no OSS action was performed ==
+To stage, public-verify and promote this exact artifact set, first confirm the bucket permits
+anonymous HTTPS GET/HEAD at $UPDATE_URL, then run:
+
+  scripts/promote-ol-auto-update $VER --update-url $UPDATE_URL --oss-prefix $OSS_PREFIX --yes
+
+The manifest is deliberately the last object uploaded. Do not use --yes against a private
+bucket or an unverified custom domain.
+EOF
+  exit 0
+fi
+
+command -v ossutil >/dev/null || die "ossutil is required for --yes"
+STAGING_PREFIX="$OSS_PREFIX/staging/$VER"
+
+upload_stage() {
+  local file="$1" meta="$2"
+  ossutil cp "$WORK_DIR/$file" "$STAGING_PREFIX/$file" --acl public-read --meta "$meta" \
+    || die "failed to stage $file"
+}
+immutable_meta='Cache-Control:public, max-age=31536000, immutable#Content-Type:application/octet-stream'
+for file in "$ARM_ZIP" "$X64_ZIP" "$ARM_DMG" "$X64_DMG" "$ARM_ZIP.blockmap" "$X64_ZIP.blockmap"; do
+  upload_stage "$file" "$immutable_meta"
+done
+upload_stage "$MANIFEST" 'Cache-Control:no-cache, must-revalidate#Content-Type:text/yaml'
+
+# Copy immutable, version-named files into the stable prefix first. They are harmless until
+# latest-mac.yml is updated, and this check rejects accidental same-version overwrites.
+for file in "$ARM_ZIP" "$X64_ZIP" "$ARM_DMG" "$X64_DMG" "$ARM_ZIP.blockmap" "$X64_ZIP.blockmap"; do
+  if ossutil stat "$OSS_PREFIX/$file" >/dev/null 2>&1; then
+    die "refusing to overwrite immutable stable object: $OSS_PREFIX/$file"
+  fi
+  ossutil cp "$STAGING_PREFIX/$file" "$OSS_PREFIX/$file" --acl public-read --meta "$immutable_meta" \
+    || die "failed to publish immutable object $file"
+done
+
+manifest_sha512() {
+  node --input-type=module - "$WORK_DIR" "$1" <<'NODE'
+import { readFileSync } from 'node:fs';
+const [dir, name] = process.argv.slice(2);
+const yaml = readFileSync(`${dir}/latest-mac.yml`, 'utf8');
+const row = [...yaml.matchAll(/^\s*- url:\s*(.+?)\s*\n\s*sha512:\s*(.+?)\s*\n\s*size:\s*(\d+)\s*$/gm)].find((match) => match[1].trim() === name);
+if (!row) process.exit(1);
+process.stdout.write(row[2].trim());
+NODE
+}
+verify_public() {
+  local file="$1" cache_pattern="$2" expected_size expected_sha actual_sha headers
+  expected_size="$(wc -c < "$WORK_DIR/$file" | tr -d ' ')"
+  headers="$(curl -fsSI --max-time 60 "$UPDATE_URL/$file")" || die "anonymous HTTPS HEAD failed: $file"
+  printf '%s\n' "$headers" | grep -qiE '^HTTP/.* 200' || die "public HEAD is not 200: $file"
+  printf '%s\n' "$headers" | grep -qiE "^content-length: *$expected_size" || die "public length differs: $file"
+  printf '%s\n' "$headers" | grep -qiE "^cache-control:.*$cache_pattern" || die "public cache header differs: $file"
+  case "$file" in
+    *.zip|*.dmg) expected_sha="$(manifest_sha512 "$file")" ;;
+    *) expected_sha="$(openssl dgst -sha512 -binary "$WORK_DIR/$file" | base64)" ;;
+  esac
+  actual_sha="$(curl -fsSL --max-time 900 "$UPDATE_URL/$file" | openssl dgst -sha512 -binary | base64)" \
+    || die "anonymous HTTPS SHA-512 download failed: $file"
+  [ "$actual_sha" = "$expected_sha" ] || die "public SHA-512 differs: $file"
+}
+
+info "== Verify public immutable artifacts before promotion =="
+for file in "$ARM_ZIP" "$X64_ZIP" "$ARM_DMG" "$X64_DMG" "$ARM_ZIP.blockmap" "$X64_ZIP.blockmap"; do
+  verify_public "$file" 'immutable'
+done
+
+# This is the promotion point. All referenced bytes are already anonymously readable and
+# verified; replacing this single no-cache manifest is the only mutable update operation.
+ossutil cp "$STAGING_PREFIX/$MANIFEST" "$OSS_PREFIX/$MANIFEST" --acl public-read \
+  --meta 'Cache-Control:no-cache, must-revalidate#Content-Type:text/yaml' \
+  || die "failed to promote latest-mac.yml; previous manifest remains authoritative"
+verify_public "$MANIFEST" 'no-cache'
+
+cat <<EOF
+
+== OL update promotion complete ==
+Stable manifest: $UPDATE_URL/$MANIFEST
+Version: $VER
+
+Do not claim installed-client acceptance until both arm64 and x64 staging upgrade tests pass.
+If this version needs a fix after installation, publish a higher version; do not attempt
+automatic downgrade by rewriting the manifest to an older version.
+EOF
