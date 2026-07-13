@@ -79,11 +79,11 @@
 - `animation-rig-v4/anchor-calibration.png`：头部颈底与身体颈口的锚点定位图。
 - `animation-rig-v4-calibration.html`：可直接点击设置身体/头部锚点，并自动计算位移的接缝校准页。
 - `animation-rig-v4/render_previews.py`：从清单锚点参数重新生成静态图和 GIF，避免预览与运行时参数漂移。
-- `animation-rig-v4/head-angle-preview.png`：`-6deg` 到 `6deg` 的颈部连接检查。
+- `animation-rig-v4/head-angle-preview.png`：以默认 `-3deg` 为中心、相对 `-6deg` 到 `6deg` 的颈部连接检查。
 - `animation-rig-v4/combined-preview.gif`：挥手与转头同时播放的组合预览。
 - `animation-rig-v4/manifest.json`：渲染顺序、转轴、动作事件和测试角度。
 
-V4 使用两个明确接点定位：头部 `neckBase=(232,366)`，身体 `neckSeat=(220,270)`。运行时先用两点差值得到头部位移 `(-12,-96)`，再对完整骨架应用 `scale=0.84`、`translateY=24` 的画布适配。不要再用整张图的透明像素重心推算头部位置。
+V4 使用两个明确接点定位：头部 `neckBase=(209,325)`，身体 `neckSeat=(207,252)`。运行时先用两点差值得到头部位移 `(-2,-73)`，以 `-3deg` 为默认角度，再对完整骨架应用 `scale=0.84`、`translateY=24` 的画布适配。不要再用整张图的透明像素重心推算头部位置。
 
 校准页中的数值使用 512x512 逻辑画布坐标，页面渲染时转换为百分比，因此桌面和移动窗口下不会因 CSS 像素尺寸变化而漂移。分别进入“身体锚点”和“头部锚点”模式点击图片，再到“合成预览”检查结果；“复制参数”会生成可直接回填到清单的 JSON。
 

@@ -16,8 +16,9 @@
       --teal-dark: #0e6870;
       --rig-scale: 0.84;
       --rig-y: 4.6875%;
-      --head-x: -2.34375%;
-      --head-y: -18.75%;
+      --head-x: -0.390625%;
+      --head-y: -14.2578125%;
+      --head-rest-angle: -3deg;
     }
 
     * {
@@ -131,7 +132,8 @@
     }
 
     .head-group {
-      transform-origin: 45.3125% 71.4844%;
+      transform: rotate(var(--head-rest-angle));
+      transform-origin: 40.8203125% 63.4765625%;
     }
 
     .head {
@@ -224,9 +226,9 @@
     }
 
     @keyframes head-turn {
-      0%, 100% { transform: rotate(0); }
-      30% { transform: rotate(-6deg); }
-      68% { transform: rotate(6deg); }
+      0%, 100% { transform: rotate(-3deg); }
+      30% { transform: rotate(-9deg); }
+      68% { transform: rotate(3deg); }
     }
 
     @keyframes blink {

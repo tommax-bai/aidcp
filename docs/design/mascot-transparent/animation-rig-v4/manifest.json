@@ -1,6 +1,6 @@
 {
   "assetSet": "aidcp-mascot-rig-v4-head-turn",
-  "version": 2,
+  "version": 3,
   "technique": "anchor-aligned independent head with a bounded neck overlap rendered above a complete torso",
   "demo": "../animation-rig-v4-demo.html",
   "calibrationDemo": "../animation-rig-v4-calibration.html",
@@ -51,8 +51,8 @@
       "zIndex": 2,
       "anchors": {
         "neckSeat": {
-          "x": 220,
-          "y": 270
+          "x": 207,
+          "y": 252
         }
       }
     },
@@ -68,17 +68,18 @@
       },
       "anchors": {
         "neckBase": {
-          "x": 232,
-          "y": 366
+          "x": 209,
+          "y": 325
         }
       },
       "restTransform": {
-        "translateX": -12,
-        "translateY": -96
+        "translateX": -2,
+        "translateY": -73
       },
+      "restAngleDeg": -3,
       "pivot": {
-        "x": 232,
-        "y": 366
+        "x": 209,
+        "y": 325
       }
     }
   ],
@@ -92,7 +93,7 @@
     },
     "coveredTorsoBand": {
       "top": 215,
-      "bottom": 270
+      "bottom": 252
     }
   },
   "actions": [
@@ -106,7 +107,9 @@
       "id": "head_turn",
       "trigger": "is-turning",
       "durationMs": 1200,
-      "testedAngleRangeDeg": [-6, 6]
+      "restAngleDeg": -3,
+      "relativeTestedAngleRangeDeg": [-6, 6],
+      "testedAngleRangeDeg": [-9, 3]
     },
     {
       "id": "blink",

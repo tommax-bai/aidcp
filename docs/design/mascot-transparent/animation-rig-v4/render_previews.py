@@ -31,6 +31,7 @@ HEAD_OFFSET = (
     HEAD["restTransform"]["translateY"],
 )
 HEAD_PIVOT = (HEAD["pivot"]["x"], HEAD["pivot"]["y"])
+REST_HEAD_ANGLE = HEAD.get("restAngleDeg", 0)
 WING_PIVOT = (
     LAYERS["left_wing"]["pivot"]["x"],
     LAYERS["left_wing"]["pivot"]["y"],
@@ -81,10 +82,12 @@ def fit_to_canvas(scene: Image.Image) -> Image.Image:
 
 
 def render_scene(
-    head_angle: float = 0,
+    head_angle: float | None = None,
     wing_angle: float = -8,
     include: tuple[str, ...] = ("left_wing", "torso", "head"),
 ) -> Image.Image:
+    if head_angle is None:
+        head_angle = REST_HEAD_ANGLE
     scene = Image.new("RGBA", (LARGE, LARGE), (0, 0, 0, 0))
     if "left_wing" in include:
         scene.alpha_composite(
@@ -133,7 +136,9 @@ def save_gif(path: Path, frames: list[Image.Image], size: int, duration: int) ->
 
 
 def render_angle_strip() -> None:
-    angles = [-6, -3, 0, 3, 6]
+    action = next(item for item in MANIFEST["actions"] if item["id"] == "head_turn")
+    relative_min, relative_max = action["relativeTestedAngleRangeDeg"]
+    angles = [REST_HEAD_ANGLE + value for value in [relative_min, -3, 0, 3, relative_max]]
     strip = Image.new("RGB", (256 * len(angles), 256), "white")
     for index, angle in enumerate(angles):
         frame = render_scene(head_angle=angle).resize((256, 256), Image.Resampling.LANCZOS)
@@ -157,7 +162,7 @@ def render_anchor_calibration() -> None:
     head_point = map_point(head_anchor, HEAD_OFFSET)
 
     panels = [
-        ("1. Torso neckSeat (220, 270)", render_scene(include=("torso",))),
+        (f"1. Torso neckSeat {torso_anchor}", render_scene(include=("torso",))),
         ("2. Head neckBase + rest transform", render_scene(include=("head",))),
         ("3. Snapped anchors: delta (0, 0)", render_scene()),
     ]
@@ -189,7 +194,7 @@ def main() -> None:
     combined_frames = []
     for index in range(frame_count):
         phase = index / (frame_count - 1)
-        head_angle = 6 * math.sin(phase * math.tau)
+        head_angle = REST_HEAD_ANGLE + 6 * math.sin(phase * math.tau)
         turn_frames.append(render_scene(head_angle=head_angle))
         wing_angle = -8 + 18 * math.sin(phase * math.tau * 2)
         combined_frames.append(render_scene(head_angle=head_angle, wing_angle=wing_angle))

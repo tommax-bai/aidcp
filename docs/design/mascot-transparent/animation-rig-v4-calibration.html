@@ -16,13 +16,13 @@
       --red: #e23d35;
       --rig-scale: 0.84;
       --rig-y: 4.6875%;
-      --head-x: -2.34375%;
-      --head-y: -18.75%;
-      --head-angle: 0deg;
-      --torso-anchor-x: 42.96875%;
-      --torso-anchor-y: 52.734375%;
-      --head-anchor-x: 45.3125%;
-      --head-anchor-y: 71.484375%;
+      --head-x: -0.390625%;
+      --head-y: -14.2578125%;
+      --head-angle: -3deg;
+      --torso-anchor-x: 40.4296875%;
+      --torso-anchor-y: 49.21875%;
+      --head-anchor-x: 40.8203125%;
+      --head-anchor-y: 63.4765625%;
     }
 
     * {
@@ -417,27 +417,27 @@
       <fieldset>
         <legend>身体锚点</legend>
         <label class="number-control" for="torso-x">X
-          <input id="torso-x" type="number" min="0" max="512" value="220" step="1">
+          <input id="torso-x" type="number" min="0" max="512" value="207" step="1">
         </label>
         <label class="number-control" for="torso-y">Y
-          <input id="torso-y" type="number" min="0" max="512" value="270" step="1">
+          <input id="torso-y" type="number" min="0" max="512" value="252" step="1">
         </label>
       </fieldset>
 
       <fieldset>
         <legend>头部锚点</legend>
         <label class="number-control" for="head-anchor-x">X
-          <input id="head-anchor-x" type="number" min="0" max="512" value="232" step="1">
+          <input id="head-anchor-x" type="number" min="0" max="512" value="209" step="1">
         </label>
         <label class="number-control" for="head-anchor-y">Y
-          <input id="head-anchor-y" type="number" min="0" max="512" value="366" step="1">
+          <input id="head-anchor-y" type="number" min="0" max="512" value="325" step="1">
         </label>
       </fieldset>
 
       <div class="range-control">
         <label for="angle">头部角度</label>
-        <input id="angle" type="range" min="-6" max="6" value="0" step="0.5">
-        <output for="angle">0deg</output>
+        <input id="angle" type="range" min="-9" max="3" value="-3" step="0.5">
+        <output for="angle">-3deg</output>
       </div>
 
       <div class="range-control">
@@ -453,7 +453,7 @@
       </div>
 
       <div class="status">
-        自动头部位移：<strong id="transform">translate(-12, -96)</strong><br>
+        自动头部位移：<strong id="transform">translate(-2, -73)</strong><br>
         锚点差值：<strong id="delta">X 0 / Y 0</strong>
       </div>
 
@@ -475,11 +475,11 @@
     const controls = [...document.querySelectorAll("input")];
     const modeButtons = [...document.querySelectorAll(".mode-button[data-mode]")];
     const defaults = {
-      "torso-x": 220,
-      "torso-y": 270,
-      "head-anchor-x": 232,
-      "head-anchor-y": 366,
-      angle: 0,
+      "torso-x": 207,
+      "torso-y": 252,
+      "head-anchor-x": 209,
+      "head-anchor-y": 325,
+      angle: -3,
       "rig-scale": 0.84,
       "rig-y": 24,
     };
