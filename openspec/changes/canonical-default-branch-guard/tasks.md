@@ -11,6 +11,6 @@
 ## 3. Norms And Validation
 
 - [x] 3.1 Update `AGENTS.md`, `docs/parallel-dev-worktrees.md`, and `scripts/README.md` with the mandatory task-admission gate and non-repairing behavior.
-  <!-- control repo: documented mandatory preflight and read-only failure behavior; implementation commit 845062a. -->
+  <!-- control repo: documented mandatory preflight and read-only failure behavior; implementation commit f970815. -->
 - [x] 3.2 Validate shell syntax, the current workspace failure path, the clean/default positive path in a temporary fixture, and `openspec validate canonical-default-branch-guard --strict`.
   <!-- control repo: bash -n and diff check pass; current canonical drift blocks with exit 1; temporary default and drift fixtures pass; OpenSpec strict validation passes. -->
