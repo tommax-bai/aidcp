@@ -27,10 +27,12 @@
 ## 4. Validation and closeout
 
 - [x] 4.1 Run relevant cloud tests/typecheck.
-  <!-- validation: targeted cloud tests pass; npm run typecheck pass. Initial npm test attempt accidentally invoked full glob and failed due worktree dependency resolution, not test failures. -->
+  <!-- integration: aidcp-cloud 6be48be was cherry-picked to master as a564b36; mirror-contract coverage landed as 5fba9e7. Validation on master: npm run test:acceptance (49/49), npm test (1914/1914), npm run typecheck all pass. -->
 - [x] 4.2 Run relevant edge tests/typecheck.
-  <!-- validation: targeted edge tests pass; npm run typecheck pass. Initial npm test attempt accidentally invoked full glob and was interrupted after dependency-resolution failures. -->
+  <!-- integration: aidcp-edge c6622e4 was cherry-picked to master as 6d4815a. Validation on master: npm run test:acceptance (18/18), npm test (1124/1124), npm run typecheck all pass. -->
 - [x] 4.3 Run `openspec validate browser-cold-standby-next-action --strict`.
   <!-- validation: openspec validate browser-cold-standby-next-action --strict pass. -->
 - [x] 4.4 Commit/push scoped changes and record commit SHAs/validation notes.
-  <!-- commits pushed: aidcp-cloud 6be48be on codex/browser-cold-standby-next-action, aidcp-edge c6622e4 on codex/browser-cold-standby-next-action, control worktree branch codex/browser-cold-standby-next-action carries 0147ac4/3d9737d. The earlier control main commits 5257648/79f7e67 were reverted on origin/main by 75d4406/62ff3fe to restore worktree isolation. -->
+  <!-- pushed to default branches: aidcp-cloud master a564b36 plus 5fba9e7; aidcp-edge master 6d4815a. The integration commits retain the original feature commit provenance. -->
+- [ ] 4.5 Deploy clean aidcp-cloud/master to dev and verify service health.
+  <!-- blocked 2026-07-13: pre-deploy probe found dev active from 14:28 with cloud source files modified at 14:18 and 14:27; browser-standby.ts was absent. No ECS files were written and no service was restarted to avoid overwriting a concurrent deployment. -->
