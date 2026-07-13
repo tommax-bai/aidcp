@@ -34,5 +34,5 @@
   <!-- validation: openspec validate browser-cold-standby-next-action --strict pass. -->
 - [x] 4.4 Commit/push scoped changes and record commit SHAs/validation notes.
   <!-- pushed to default branches: aidcp-cloud master a564b36 plus 5fba9e7; aidcp-edge master 6d4815a. The integration commits retain the original feature commit provenance. -->
-- [ ] 4.5 Deploy clean aidcp-cloud/master to dev and verify service health.
-  <!-- blocked 2026-07-13: pre-deploy probe found dev active from 14:28 with cloud source files modified at 14:18 and 14:27; browser-standby.ts was absent. No ECS files were written and no service was restarted to avoid overwriting a concurrent deployment. -->
+- [x] 4.5 Deploy clean aidcp-cloud/master to dev and verify service health.
+  <!-- deployed dev 2026-07-13 from aidcp-cloud master 5fba9e7. Backups: /opt/aidcp/cloud.bak.20260713-145213.tar.gz and /opt/aidcp/cloud/.env.bak.20260713-145213. Applied only server.ts plus the three cold-standby protocol/snapshot files after checksum dry-run; package manifests were unchanged. Verified aidcp-cloud active, :8787 listener (HTTP probe 426), panel health 200, PostgreSQL select 1, Feishu WSClient onReady, matching deployed file hashes, and isales-api still active. -->
