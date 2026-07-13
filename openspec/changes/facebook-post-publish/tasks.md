@@ -60,7 +60,7 @@
 ## 8. Gated Real Submit Probe
 
 - [x] 8.1 Add explicit environment gates for Facebook real-submit probe, including disposable target/profile confirmation and submit enable flag. <!-- aidcp-edge existing gated-submit probe and manual phase0 runner require AIDCP_FB_EXECUTE_GATED_SUBMIT, AIDCP_FB_GATED_SUBMIT, AIDCP_FB_DISPOSABLE_CONFIRMED, and target URL/text gates -->
-- [ ] 8.2 Run no-submit composer and media probes first; real submit remains blocked if either fails. <!-- pending operator-owned disposable profile/target confirmation for the new post composer + media live no-submit probe; code/unit probes are present and real submit remains gated -->
+- [x] 8.2 Run no-submit composer and media probes first; real submit remains blocked if either fails. <!-- aidcp-edge live no-submit probe: composer marker accepted then cleared (marker hash 2c80ef4b8c2c76b0); submit control "发帖" observed enabled; image attachment and removal both confirmed; submitted=false throughout -->
 - [ ] 8.3 Run one gated real-submit probe on an operator-owned disposable Facebook target/profile and require reload/server/permalink confirmation for success. <!-- not run: no explicit disposable target/profile approval in this implementation turn -->
 - [ ] 8.4 Record only sanitized evidence: status, counts, hashes, viewport, reason codes, and no raw cookies/tokens/body secrets. <!-- partial: phase0 open-composer evidence in 1.2 is sanitized; real-submit evidence not produced because 8.3 was not run -->
 
