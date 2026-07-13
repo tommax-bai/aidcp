@@ -135,7 +135,7 @@
 
 | type | 方向 | 说明 |
 |---|---|---|
-| `edge.task.acquire` | cloud → edge | 申请任务级执行权，携 `taskId/kind/priority/leaseMs`；这不是“已暂停”的事实 |
+| `edge.task.acquire` | cloud → edge | 申请任务级执行权，携 `taskId/kind/priority/leaseMs/acquireTimeoutMs?`；edge 在该等待上限内未 quiesce 时取消排队申请；这不是“已暂停”的事实 |
 | `edge.task.acquired` | edge → cloud | edge 已在命令安全边界 quiesced、已取消未开始的普通浏览命令并授予租约；cloud 收到后才可发首条业务命令 |
 | `edge.task.release` | cloud → edge | 幂等释放指定 `taskId`，携可选 `outcome` |
 | `edge.task.released` | edge → cloud | 释放/过期/非 owner 的收敛回执 |
@@ -732,7 +732,8 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
   "taskId": "task-01H...",
   "kind": "publish", // publish|comment_prepare|comment_commit|notification|group_join|system_recovery
   "priority": "human", // system_recovery|human|automatic
-  "leaseMs": 600000
+  "leaseMs": 600000,
+  "acquireTimeoutMs": 45000 // edge 本地等待 quiesce 的上限；届满不再授予该任务
 }
 
 // edge.task.acquired  edge → cloud
