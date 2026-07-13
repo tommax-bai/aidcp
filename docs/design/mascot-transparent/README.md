@@ -62,6 +62,26 @@
 - `animation-rig-v3/manifest.json`：渲染顺序、转轴和动作范围。
 - `animation-rig-v3/wave-preview.gif`：最终挥手预览。
 
+## 头部独立分层 V4
+
+`animation-rig-v4-demo.html` 在 V3 挥手结构上增加了独立头部层。身体包含封闭完整的颈部表面，头部下方保留延伸羽毛并渲染在身体上方，因此左右转动时不会出现空洞或双重头部贴图。
+
+```text
+眼皮与表情层
+独立头部层
+完整身体层
+独立挥手翅膀层
+```
+
+- `animation-rig-v4/mascot-torso.png`：无头但颈部完整的身体层。
+- `animation-rig-v4/mascot-head.png`：带延伸颈羽的独立头部层。
+- `animation-rig-v4/mascot-wing-left.png`：复用并固化到 V4 包内的挥手层。
+- `animation-rig-v4/head-angle-preview.png`：`-7deg` 到 `7deg` 的颈部连接检查。
+- `animation-rig-v4/combined-preview.gif`：挥手与转头同时播放的组合预览。
+- `animation-rig-v4/manifest.json`：渲染顺序、转轴、动作事件和测试角度。
+
+V4 的转头属于小角度二维旋转。正式 Rive 若需要明显的左右朝向变化，应增加头部网格变形或左右方向姿态，而不是继续扩大刚性旋转角度。
+
 ## 源图位置
 
 源行为设定图为 4 列 2 行布局：

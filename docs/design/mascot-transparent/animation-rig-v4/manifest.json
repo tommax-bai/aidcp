@@ -1,0 +1,72 @@
+{
+  "assetSet": "aidcp-mascot-rig-v4-head-turn",
+  "version": 1,
+  "technique": "independent head with extended neck overlap rendered above a complete torso",
+  "demo": "../animation-rig-v4-demo.html",
+  "headTurnPreviewGif": "head-turn-preview.gif",
+  "combinedPreviewGif": "combined-preview.gif",
+  "headAnglePreview": "head-angle-preview.png",
+  "canvas": {
+    "width": 512,
+    "height": 512
+  },
+  "renderOrder": [
+    "left_wing",
+    "torso",
+    "head",
+    "eyelids"
+  ],
+  "layers": [
+    {
+      "id": "left_wing",
+      "file": "mascot-wing-left.png",
+      "role": "independent waving wing reused from V3",
+      "zIndex": 1,
+      "pivot": {
+        "x": 133,
+        "y": 277
+      }
+    },
+    {
+      "id": "torso",
+      "file": "mascot-torso.png",
+      "role": "complete torso with a closed neck surface",
+      "zIndex": 2
+    },
+    {
+      "id": "head",
+      "file": "mascot-head.png",
+      "role": "independent head with extended lower-neck feathers",
+      "zIndex": 3,
+      "pivot": {
+        "x": 256,
+        "y": 318
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "wave",
+      "trigger": "is-waving",
+      "durationMs": 900,
+      "testedAngleRangeDeg": [-16, 16]
+    },
+    {
+      "id": "head_turn",
+      "trigger": "is-turning",
+      "durationMs": 1200,
+      "testedAngleRangeDeg": [-7, 7]
+    },
+    {
+      "id": "blink",
+      "trigger": "is-blinking",
+      "durationMs": 420
+    },
+    {
+      "id": "combo",
+      "triggers": ["is-waving", "is-turning", "is-blinking"],
+      "durationMs": 1400
+    }
+  ],
+  "prototypeBoundary": "This raster prototype validates clean head and wing joints. Production Rive work should replace rigid head rotation with mesh deformation or directional head poses for stronger yaw."
+}

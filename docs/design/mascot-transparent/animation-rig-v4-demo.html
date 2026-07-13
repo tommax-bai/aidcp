@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIDCP Mascot Rig V4 Demo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #eef3f2;
+      --surface: #ffffff;
+      --ink: #1d2c30;
+      --muted: #627176;
+      --line: rgba(29, 44, 48, 0.14);
+      --teal: #168d96;
+      --teal-dark: #0e6870;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--page);
+    }
+
+    main {
+      width: min(720px, 100%);
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.3;
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    .state {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .stage {
+      position: relative;
+      width: min(100%, 560px);
+      aspect-ratio: 1;
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background-color: var(--surface);
+      background-image:
+        linear-gradient(45deg, rgba(22, 141, 150, 0.04) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(22, 141, 150, 0.04) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(22, 141, 150, 0.04) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(22, 141, 150, 0.04) 75%);
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+      background-size: 24px 24px;
+    }
+
+    .rig {
+      position: absolute;
+      inset: 0;
+      transform-origin: 50% 82%;
+      animation: breathe 3.6s ease-in-out infinite;
+    }
+
+    .layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .torso {
+      z-index: 2;
+    }
+
+    .wing {
+      z-index: 1;
+      transform-origin: 25.98% 54.1%;
+      transform: rotate(-8deg);
+    }
+
+    .rig.is-waving .wing {
+      animation: wave 900ms cubic-bezier(0.35, 0, 0.2, 1);
+    }
+
+    .head-group {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      transform-origin: 50% 62.1%;
+    }
+
+    .head {
+      z-index: 1;
+    }
+
+    .rig.is-turning .head-group {
+      animation: head-turn 1.2s cubic-bezier(0.35, 0, 0.2, 1);
+    }
+
+    .lid {
+      position: absolute;
+      z-index: 2;
+      width: 8.8%;
+      height: 6.4%;
+      border-radius: 50%;
+      border-bottom: 3px solid var(--teal-dark);
+      background: #fbf6e9;
+      opacity: 0;
+      transform: scaleY(0.2);
+      pointer-events: none;
+    }
+
+    .lid.left {
+      left: 33.5%;
+      top: 38.3%;
+      rotate: -4deg;
+    }
+
+    .lid.right {
+      left: 52.4%;
+      top: 39.2%;
+      rotate: 3deg;
+    }
+
+    .rig.is-blinking .lid {
+      animation: blink 420ms ease-in-out;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      min-width: 92px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 9px 14px;
+      color: var(--ink);
+      background: var(--surface);
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: rgba(22, 141, 150, 0.5);
+      background: #f5fbfa;
+    }
+
+    button:focus-visible {
+      outline: 3px solid rgba(22, 141, 150, 0.24);
+      outline-offset: 2px;
+    }
+
+    button.primary {
+      border-color: var(--teal);
+      color: #ffffff;
+      background: var(--teal);
+    }
+
+    button.primary:hover {
+      background: var(--teal-dark);
+    }
+
+    @keyframes breathe {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-2px) scale(1.006); }
+    }
+
+    @keyframes wave {
+      0%, 100% { transform: rotate(-8deg); }
+      24% { transform: rotate(10deg); }
+      48% { transform: rotate(-15deg); }
+      72% { transform: rotate(9deg); }
+    }
+
+    @keyframes head-turn {
+      0%, 100% { transform: rotate(0) translateX(0); }
+      30% { transform: rotate(-6deg) translateX(-2px); }
+      68% { transform: rotate(6deg) translateX(2px); }
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 0; transform: scaleY(0.2); }
+      42%, 58% { opacity: 1; transform: scaleY(1); }
+    }
+
+    @media (max-width: 520px) {
+      body {
+        padding: 12px;
+      }
+
+      .toolbar {
+        align-items: flex-start;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      button {
+        min-width: 0;
+        padding-inline: 8px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .rig,
+      .rig.is-waving .wing,
+      .rig.is-turning .head-group,
+      .rig.is-blinking .lid {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="toolbar">
+      <h1>吉祥物头部独立分层原型</h1>
+      <div class="state" id="state" aria-live="polite">idle</div>
+    </div>
+
+    <section class="stage" aria-label="可交互吉祥物动作预览">
+      <div class="rig" id="rig">
+        <img class="layer wing" src="animation-rig-v4/mascot-wing-left.png" alt="">
+        <img class="layer torso" src="animation-rig-v4/mascot-torso.png" alt="">
+        <div class="head-group">
+          <img class="layer head" src="animation-rig-v4/mascot-head.png" alt="青绿色鸟类吉祥物">
+          <span class="lid left" aria-hidden="true"></span>
+          <span class="lid right" aria-hidden="true"></span>
+        </div>
+      </div>
+    </section>
+
+    <div class="controls" aria-label="动作控制">
+      <button type="button" class="primary" data-action="wave">挥手</button>
+      <button type="button" data-action="turn">转头</button>
+      <button type="button" data-action="blink">眨眼</button>
+      <button type="button" data-action="combo">组合</button>
+    </div>
+  </main>
+
+  <script>
+    const rig = document.getElementById("rig");
+    const state = document.getElementById("state");
+    let timer = 0;
+
+    function play(action) {
+      window.clearTimeout(timer);
+      rig.classList.remove("is-waving", "is-turning", "is-blinking");
+      void rig.offsetWidth;
+
+      if (action === "wave" || action === "combo") {
+        rig.classList.add("is-waving");
+      }
+      if (action === "turn" || action === "combo") {
+        rig.classList.add("is-turning");
+      }
+      if (action === "blink" || action === "combo") {
+        rig.classList.add("is-blinking");
+      }
+
+      state.textContent = action;
+      timer = window.setTimeout(() => {
+        rig.classList.remove("is-waving", "is-turning", "is-blinking");
+        state.textContent = "idle";
+      }, 1400);
+    }
+
+    document.querySelectorAll("[data-action]").forEach((button) => {
+      button.addEventListener("click", () => play(button.dataset.action));
+    });
+
+    window.setTimeout(() => play("combo"), 450);
+  </script>
+</body>
+</html>
