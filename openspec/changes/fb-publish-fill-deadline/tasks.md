@@ -29,6 +29,7 @@
 - [x] 3.1 edge 补五例：编辑器吞字 / 预算耗尽停手 / 预算够用打完长正文 / 脏 composer 先清空 / 清场失败诚实失败。用推进虚拟墙钟的假时钟——原 `instantSleep` 让墙钟恒为 0，deadline 分支在那种桩下不可测。 <!-- aidcp-edge 4162339 test/facebook/publish-executor.test.ts -->
 - [x] 3.2 cloud 补五例：预算随长度伸缩并被上限钳 / 上限按租约收敛 / **XHS 指令 MUST NOT 带预算**（反回归）/ 越界诚实失败且零下发 / 带预算者等待窗口叠余量。 <!-- aidcp-cloud cf6cd8c test/publish-agent/fill-budget.test.ts -->
 - [x] 3.3 两仓回归：`test:acceptance` → `npm test` → `typecheck` 全过。 <!-- aidcp-cloud: acceptance 50 pass / npm test 1930 pass / typecheck pass；aidcp-edge: acceptance 19 pass / npm test 1175 pass / typecheck pass -->
+- [x] 3.4 部署 dev（云端）。edge 为客户端侧改动、无 ECS 部署，需运营 / 客户机重建安装包后生效（按约定本批不出安装包）。 <!-- 2026-07-14 deployed：从 origin/master 干净快照（cf6cd8c，git archive，非脏共享工作区）部署 dev；部署前核实 ECS 上 command-sequencer.ts 的 md5 恰等于 cf6cd8c^（无并发漂移可被覆盖）；备份 /opt/aidcp/cloud.bak.20260714-141047.tar.gz + .env.bak.20260714；无依赖变更故未跑 npm ci。健康：aidcp-cloud.service active，8787/8090/8088 监听，panel /api/health {"ok":true}，公网 8088 /api/health 200，飞书长连接 onReady，无启动错误、无预算钳位告警（600s 租约 > 240s 上限）。未碰同机 isales。 -->
 
 ## 4. 真机验收（登记入 backlog，簇：Facebook dev 环境）
 
