@@ -33,4 +33,5 @@
 
 ## 5. （可选、跨仓 cloud，非本 change 必须）FB 刷新阈值
 
-- [ ] 5.1 （可选，**本 change 不做**）`aidcp-cloud/src/agents/feed-scroller.ts:22-25`：加 `AIDCP_FEED_REFRESH_AFTER_FB` 默认~120（FB 60 偏浅）；纳入则须走 cloud ECS 部署序列，留独立 change
+- [x] 5.1 （已决议**不做**、留独立 change）`aidcp-cloud/src/agents/feed-scroller.ts:22-25` 的 `AIDCP_FEED_REFRESH_AFTER_FB` 默认~120（FB 60 偏浅）为可选、跨仓、需 cloud ECS 部署，明确排除在本 edge-only change 之外 <!-- 不做,YAGNI,留后续独立 change -->
+
