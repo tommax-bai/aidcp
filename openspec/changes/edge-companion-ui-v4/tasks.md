@@ -20,3 +20,4 @@
 
 - [x] 4.1 Commit the Edge implementation on the `edge-companion-ui-v4` branch before further visual iteration. <!-- aidcp-edge becc0f6 -->
 - [x] 4.2 Record the Edge commit and validation evidence in this task file; keep installer packaging out of scope unless explicitly requested. <!-- No installer built or published. -->
+- [x] 4.3 Fast-forward the canonical `aidcp-edge` master checkout and push `origin/master`. <!-- aidcp-edge master/origin/master becc0f6 -->
