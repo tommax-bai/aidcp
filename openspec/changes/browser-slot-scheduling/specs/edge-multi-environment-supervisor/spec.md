@@ -28,6 +28,16 @@
 - **WHEN** a cold-standby wake would push memory past the admission ceiling
 - **THEN** the wake is refused honestly with a memory reason, and MUST NOT proceed on the grounds that it is "only a wake"
 
+### Requirement: 「可用内存」MUST 按可回收量读，MUST NOT 用完全空闲页数
+
+准入闸与槽位推算所依据的「可用内存」SHALL 是本机**可回收后真正能拿来用**的量：Linux 取 `MemAvailable`，macOS 取 free + inactive + speculative。MUST NOT 用「完全空闲的物理页数」（Node 的 `os.freemem()`）——两个系统都会把绝大部分闲置内存拿去做文件缓存，那些页随时可回收却不计入，于是一台内存充裕的机器会被判成一个浏览器都开不起来。
+
+平台探测失败 SHALL 回落到保守读数，MUST NOT 假装内存充裕。两个上限的推算与准入闸 SHALL 共用同一个读数；界面呈现的可用内存 SHALL 就是闸实际用的那个数。
+
+#### Scenario: 缓存占满的机器仍能开浏览器
+- **WHEN** 本机大量内存被文件缓存占用（完全空闲页数远低于单环境估值），但可回收内存充裕
+- **THEN** 准入闸放行、槽位按可回收内存推算，MUST NOT 因空闲页数低而拦阻全部开浏览器路径
+
 ## ADDED Requirements
 
 ### Requirement: 浏览器槽位池 SHALL 按内存封顶、并以 1:2 限制可设账号数
