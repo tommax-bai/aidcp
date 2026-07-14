@@ -16,6 +16,8 @@
 - [x] 2.6 cloud `e2e9f88`（飞书群选项从已验证存储恢复）→ master `ecefe7c`（冲突解决：与主干新增的图片上传测试为干净 union） <!-- aidcp-cloud ecefe7c -->
 - [x] 2.7 console `958384f`（FB 上传 nginx 限额）→ 核验**内容已在主干**，弃掉 <!-- verified 2026-07-14 -->
 - [x] 2.8 回归：edge 1183 pass + acceptance 19、cloud 1940 pass + acceptance 50、双 typecheck 干净；两次 push 撞 non-ff 均 rebase 重来（未 force） <!-- 2026-07-14 -->
+- [x] 2.9 cloud 部署 dev（`ecefe7c`）：备份 → `git archive origin/master` 干净快照 rsync → restart → 健康检查（active / 8787+8090+8091 在听 / 人设存储就绪 / 飞书长连接已建立 / 零 error）。**注**：`e36eddd` 在 dev 上是 no-op——`resolveEnvPgConfig` 在 env 未设时回落同一组默认值，而 dev 的 PG 恰好就在 `127.0.0.1`；它真正修的是 OL（PG 在远端，硬编码默认值＝连错库） <!-- 2026-07-14 deployed -->
+- [ ] 2.10 边缘改动需重启桌面客户端才生效；**canonical `aidcp-edge` 工作区当时被并发 session 占用（有未提交改动），未做 ff 更新**——下次在那里跑 `electron:dev` 前需先 `git pull`（内容已在 origin/master）
 
 ## 3. 工件指针（例外条款，需人工决策，未合并）
 
