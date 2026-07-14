@@ -28,6 +28,29 @@
 - **WHEN** a cold-standby wake would push memory past the admission ceiling
 - **THEN** the wake is refused honestly with a memory reason, and MUST NOT proceed on the grounds that it is "only a wake"
 
+### Requirement: 抢不到槽位的启动 SHALL 排队等待，MUST NOT 被丢弃
+
+抢不到槽位时「排队还是拒绝」SHALL 取决于**有没有调用方在死线上等这个结果**，MUST NOT 取决于哪道闸满了：
+
+- **无人在死线上等**（运维点启动 / 全部启动 / 崩溃后续场恢复 / 到点的普通唤醒）：该请求 SHALL 进**等槽位队列**；任一环境进入冷待机或退出而让出槽位时，队头 SHALL 自动被放行。MUST NOT 丢弃该请求（丢弃即等于废掉 1:2：多挂的账号会永久停在「未启动」，槽位后来空出来也无人取用）。
+- **有调用方在死线上等**（云端派任务来唤醒 / 手动任务）：SHALL 当场诚实失败并说明原因，MUST NOT 排队（调用方数十秒即超时；等它排到时结果已无人需要，白占槽位还挤掉真正在等的账号）。
+
+等槽位队列 SHALL 严格 FIFO：队头过不了准入闸时整队等待，MUST NOT 让后来者插队（否则先到的账号被反复挤掉而饿死）。排队状态 SHALL 如实呈现（「排队等槽位 · 前面还有 k 个」），MUST NOT 伪装成「正在启动」或「已停止」。
+
+**真正该硬性拒绝的是挂载账号数**：配置的账号数达到「最大挂载账号数」上限时，新增环境 SHALL 被诚实拒绝，并告知可在设置中调高该上限。
+
+#### Scenario: 多挂的账号排队而非趴窝
+- **WHEN** 挂载 12 个账号、槽位上限 6，运维点「全部启动」
+- **THEN** 6 个启动、另 6 个进等槽位队列并如实显示排队位次；MUST NOT 出现「一个都不启动」或「6 个永久停在未启动态」
+
+#### Scenario: 槽位释放后队头自动顶上
+- **WHEN** 某账号进入冷待机、让出其浏览器槽位
+- **THEN** 等槽位队列的队头 SHALL 被自动放行启动 / 唤醒，无需运维再点一次
+
+#### Scenario: 挂满账号时诚实拒绝
+- **WHEN** 已挂载账号数达到「最大挂载账号数」，运维再新建一个环境
+- **THEN** 诚实拒绝并指明可在设置里调高该上限，MUST NOT 静默接受
+
 ### Requirement: 「可用内存」MUST 按可回收量读，MUST NOT 用完全空闲页数
 
 准入闸与槽位推算所依据的「可用内存」SHALL 是本机**可回收后真正能拿来用**的量：Linux 取 `MemAvailable`，macOS 取 free + inactive + speculative。MUST NOT 用「完全空闲的物理页数」（Node 的 `os.freemem()`）——两个系统都会把绝大部分闲置内存拿去做文件缓存，那些页随时可回收却不计入，于是一台内存充裕的机器会被判成一个浏览器都开不起来。
@@ -48,9 +71,9 @@
 
 槽位 SHALL **仅由冷待机自然释放**（长确定性等待 → 释放浏览器层）。外壳 MUST NOT 抢占、MUST NOT 踢掉正在运行的环境来腾槽位。
 
-#### Scenario: 槽位满时诚实拒绝
-- **WHEN** 一个开浏览器请求到来而槽位已满、且无环境可自然释放
-- **THEN** 外壳诚实拒绝并说明槽位已满，MUST NOT 排队无限等待，MUST NOT 踢掉在跑环境
+#### Scenario: 槽位满时按「有没有人在死线上等」分流
+- **WHEN** 一个开浏览器请求到来而槽位已满、且无环境可立即释放
+- **THEN** 若**无人在死线上等这个结果**（运维点启动 / 全部启动 / 续场恢复 / 到点的普通唤醒），该请求 SHALL 进等槽位队列、槽位释放后自动放行，MUST NOT 被丢弃；若**有人在死线上等**（云端派任务来唤醒 / 手动任务），SHALL 当场诚实失败。两种情况都 MUST NOT 踢掉在跑环境
 
 #### Scenario: 停泊释放的槽位可被他人取用
 - **WHEN** an environment enters cold standby and releases its browser
