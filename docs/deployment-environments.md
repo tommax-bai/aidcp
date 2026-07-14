@@ -13,6 +13,11 @@
 
 - **主干开发**：`master`（各 sub-repo）是开发主干，落地即部署到 `dev` 做测试；`dev` 允许承载不稳定内容（实验特性、刚合并回主干的隔离分支工作）。
 - **分支上线**：`ol` 是稳定生产环境，其 ECS cloud/console 运行时**只从 release 分支部署**（edge 安装包是分发工件、走构建期选择，是此强制的**例外**，见下 edge 条）。稳定版 = 从选定的干净已提交 master commit（分支尖 / tag / SHA）切 `release/<yyyymmdd>-<scope>`；该 release 分支是 `ol` 的部署 ref of record，**在役期间保留不删**。**历史 append-only、只进不退**：向前推按 append-only——热修是 release tip 严格后代时可 fast-forward（如 console 0.3.18 下载页 bump `6bce66d→0c8db0c`），否则（trunk 已合入 `ol` 须排除的内容、热修非严格后代）以追加提交 / cherry-pick 落到 release 分支、**绝不把被排除内容拖进 `ol`**；**任何情形都绝不 force-push / rebase / reset 重写已发布历史**。被新 release 取代且不再是部署 ref 后方可归档 / 删除。
+- **发布分支上的任何改动必须回流主干（铁律，2026-07-14）**：release 分支是「已上线」的，主干是「将上线」的。热修只落在 release 分支上，等于给下一次从主干切版埋一颗同样的雷，而且没有机械手段会提醒（控制仓对这些 sha 全文 grep 零命中）。**已付过两次代价**：`210f386`（人设弹窗竞态）只活在 `release/20260712-ol-recut`，用户跑的 master 客户端从来没拿到它 →「修了几次还复发」；打包 spawn cwd/asar 的 fix 只活在签名分支 → master 发版把同一个 regression 原样发出。
+  - 验收口径＝**主干上有等价行为 + 有测试覆盖**，不是 patch-id 相同：cherry-pick / 冲突解决 / 在主干新代码上重新实现都算完成（`git cherry` 的 `+` 只是线索，不是判决）。
+  - 回流不成（受阻 / 已被取代 / 需重写）**必须当场登记**（change 的 tasks.md + 真机 backlog，写清 sha 与原因），绝不静默留在 release 分支上。
+  - **唯一例外＝发布态工件指针**（安装包版本号、下载页指向哪个包）：那是「哪台机器上放了哪个包」的部署状态，照搬会让主干指向另一台机器上并不存在的产物。必须显式对账，但不得机械照搬。
+  - **切下一个 release 分支前**先跑 `git cherry -v origin/master origin/release/<上一个>`，凡 `+` 逐条给出「已回流 / 已被取代 / 工件指针」的结论。
 - **隔离分支合并纪律**：把某隔离 feature 分支合并回主干时，**若要同时保 `ol` 干净**，必须先从「合并前的 master」切好 `ol` release 分支并部署，再把 feature 合并进 master（推进 dev）。合并只推进 master，钉死的 release 分支不受影响。
 - **edge 安装包默认云环境 = 构建期注入**：master 保持 dev-default（缺省或 `cloud_default_env=dev`，零回归）；OL 安装包用 `gh workflow run build-desktop.yml -f cloud_default_env=ol` 构建（electron-builder `extraMetadata.aidcpCloudDefaultEnv=ol` 烘进包内 `package.json`，shell 启动读取后注入 `AIDCP_CLOUD_URL=ol`、芯片显示=实际连接）。**同一份 master 源码构建 dev 或 ol 安装包，靠构建 flag 区分，不靠长命 release 分支** —— 不再需要为默认环境保留分支源码分叉。OL 包分发到域名所指主机的 `/opt/aidcp/downloads/`。
 - **飞书**：dev 与 ol **各自拥有独立飞书 bot**（各自 `.env` 的 `FEISHU_APP_ID/SECRET` + `AIDCP_FEISHU_WS_ENABLED=true`），互不争用、无双消费问题；不再需要「共享单 app 时只开一端」的交接（该约束仅在退回共享单 app 时才适用，见下）。期望绑定为 `dev -> Dev.A`、`ol -> Red.A`；若 `bot/v3/info` 查到相反名称，说明目标 `.env` 凭据串环境反了，必须先修正运行时凭据再排查消息发送。
