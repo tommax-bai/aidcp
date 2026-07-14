@@ -29,7 +29,17 @@
 - [x] 3.1 edge 补五例：编辑器吞字 / 预算耗尽停手 / 预算够用打完长正文 / 脏 composer 先清空 / 清场失败诚实失败。用推进虚拟墙钟的假时钟——原 `instantSleep` 让墙钟恒为 0，deadline 分支在那种桩下不可测。 <!-- aidcp-edge 4162339 test/facebook/publish-executor.test.ts -->
 - [x] 3.2 cloud 补五例：预算随长度伸缩并被上限钳 / 上限按租约收敛 / **XHS 指令 MUST NOT 带预算**（反回归）/ 越界诚实失败且零下发 / 带预算者等待窗口叠余量。 <!-- aidcp-cloud cf6cd8c test/publish-agent/fill-budget.test.ts -->
 - [x] 3.3 两仓回归：`test:acceptance` → `npm test` → `typecheck` 全过。 <!-- aidcp-cloud: acceptance 50 pass / npm test 1930 pass / typecheck pass；aidcp-edge: acceptance 19 pass / npm test 1175 pass / typecheck pass -->
-- [x] 3.4 部署 dev（云端）。edge 为客户端侧改动、无 ECS 部署，需运营 / 客户机重建安装包后生效（按约定本批不出安装包）。 <!-- 2026-07-14 deployed：从 origin/master 干净快照（cf6cd8c，git archive，非脏共享工作区）部署 dev；部署前核实 ECS 上 command-sequencer.ts 的 md5 恰等于 cf6cd8c^（无并发漂移可被覆盖）；备份 /opt/aidcp/cloud.bak.20260714-141047.tar.gz + .env.bak.20260714；无依赖变更故未跑 npm ci。健康：aidcp-cloud.service active，8787/8090/8088 监听，panel /api/health {"ok":true}，公网 8088 /api/health 200，飞书长连接 onReady，无启动错误、无预算钳位告警（600s 租约 > 240s 上限）。未碰同机 isales。 -->
+- [x] 3.4 部署 dev（云端，两轮：初版 + 复审补洞版）。edge 为客户端侧改动、无 ECS 部署，需运营 / 客户机重建安装包后生效（按约定本批不出安装包）。 <!-- 2026-07-14 deployed：从 origin/master 干净快照（cf6cd8c，git archive，非脏共享工作区）部署 dev；部署前核实 ECS 上 command-sequencer.ts 的 md5 恰等于 cf6cd8c^（无并发漂移可被覆盖）；备份 /opt/aidcp/cloud.bak.20260714-141047.tar.gz + .env.bak.20260714；无依赖变更故未跑 npm ci。健康：aidcp-cloud.service active，8787/8090/8088 监听，panel /api/health {"ok":true}，公网 8088 /api/health 200，飞书长连接 onReady，无启动错误、无预算钳位告警（600s 租约 > 240s 上限）。未碰同机 isales。 --> <!-- 2026-07-14 15:08 复审补洞版重新部署：origin/master 2944fbf 干净快照（git archive），备份 cloud.bak.20260714-150819.tar.gz；部署后三文件 md5 与 origin/master 逐字节一致；健康：service active，8787/8090/8088 监听，panel /api/health {"ok":true}，飞书长连接已建立，**预算告警 0 条 + 错误 0 条**（配置健全）。注：本次 land 时 canonical cloud checkout 的 master 上有并发 session 未推送的提交、致 land-change 同步主 checkout 未能 ff——部署一律以 origin/master 为准（eligible ref），未把他人未推送 WIP 带上线。 -->
+
+## 3b. 对抗性复审补洞（5 视角 × 逐条反驳；15 条候选，10 条被反驳，5 条成立）
+
+- [x] 3b.1 edge：打字途中抛出的 CDP 异常（命令超时 / 协议错误 / 断连）**绕过了清场**——半篇正文留在活着的编辑器里，却报成不带 dirty 标记的「干净失败」，下一篇在复用的编辑区里接着追加。所有 mid-typing 失败统一走 `abandonFill`。 <!-- aidcp-edge 26233b6；这是上一版自己新立的契约被自己破坏 -->
+- [x] 3b.2 edge：清场结果改三态——清干净 / 编辑器已消失（`_composer_gone`，无残文可留）/ 真脏页（`_dirty_composer`）。原先「编辑器不在」被误报成 `composer_not_clean: ""`（自相矛盾）。打字前编辑器就不在 → 诚实 `no_target`。 <!-- aidcp-edge 26233b6 -->
+- [x] 3b.3 cloud：发布租约 env 原用裸 `Number()`（抄自旧写法），而同批三个新旋钮走 NaN-safe 的 `readEnvNumber`。写成 `600_000` / `10m` → NaN → 预算 NaN → 下发 `timeoutMs: NaN` → 云端 `setTimeout(NaN)` 约 1ms 触发，**把本 change 刚拆掉的孤儿打字级联原样复活**，同时诚实长度闸（`chars > NaN` 恒 false）失效。 <!-- aidcp-cloud 2944fbf -->
+- [x] 3b.4 cloud：预算上限只有上界没有下界——租约调到 60s，正文上限就变成 16 字，**每一篇 FB 帖都以 `content_too_long` 失败**，而错误信息把矛头指向内容生成侧。新增 `sanitizeFillBudget`（非有限/非正/base≥max 一律回落 + 告警）+ `warnIfFillBudgetUnusable`（启动时吼「真凶是配置不是内容生成」）+ 非法租约不得污染天花板 + Sequencer 构造处再挡一道。`AIDCP_PUBLISH_FILL_PER_CHAR_MS=0` 会让上限变成无穷、诚实闸整个关掉，同批堵上。 <!-- aidcp-cloud 2944fbf -->
+- [x] 3b.5 cloud：修一条**本 change 自己引入的失败延迟回归**——等待窗口从常数 30s 变成随长度伸缩（可达数分钟），而发布按账号串行；边缘一死若还傻等满预算，该账号后面所有已审稿件都被堵住。新增 `CommandSequencer.invalidateEdge`，边缘断开即诚实失败其在途指令。 <!-- aidcp-cloud 2944fbf -->
+- [x] 3b.6 复审后回归：cloud acceptance 50 / npm test 1935 / typecheck；edge acceptance 19 / npm test 1179 / typecheck，全过。
+- [x] 3b.7 复审存活但**不修**的一条（已核实非本 change 引入、不破红线）：预算是**自我计时、不是取消令牌**。云端 WS 断连时边缘会 reset 租约并恢复浏览循环，而打字循环仍在跑（现在**有界**、且全文回读会诚实失败、提交被租约闸挡住 `task_lease_mismatch`）。改动前那条循环**完全无界且每篇必触发**，故本 change 严格改善。彻底消灭需要「租约 / 连接 epoch 取消令牌」，属 edge 生命周期层，见 5.3。
 
 ## 4. 真机验收（登记入 backlog，簇：Facebook dev 环境）
 
@@ -40,4 +50,5 @@
 ## 5. 后续（不在本批，单列以免与并行 FB change 撞热点文件）
 
 - [ ] 5.1 FB 评论路径用的是同一条无界逐字循环（`comment-executor.ts`）：云端虽已按长度算等待窗口（18s + 220ms/字，上限 90s），但**边缘侧仍无截止时刻**——长评论同样会留下孤儿打字循环。把 deadline 一并传下去。
-- [ ] 5.2 内容管线不区分平台：FB 正文走小红书形状的 prompt（「正文 200–500 字」）且**正文无任何长度 clamp**（只 clamp 标题）。`content_too_long` 是诚实闸、不是解法——真正该收的是生成侧。
+- [ ] 5.2 **edge 生命周期层：给逐字输入接「取消令牌」**（复审存活项 3b.7）。今天的预算是自我计时——云端 WS 断连时边缘 reset 租约、恢复浏览循环，而打字循环仍在有界地跑，两个写者短暂共用同一个 CDP 页面。彻底消灭要让租约 / 连接 epoch 在 `reset()` / `finishActive()` 时自增，逐字循环在每个字符间与 `deadlineAt` 一并检查。属 `edge-task-coordinator` / `main.ts` 热点，单列串行做。
+- [ ] 5.3 内容管线不区分平台：FB 正文走小红书形状的 prompt（「正文 200–500 字」）且**正文无任何长度 clamp**（只 clamp 标题）。`content_too_long` 是诚实闸、不是解法——真正该收的是生成侧。
