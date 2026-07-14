@@ -534,7 +534,8 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
       "coverDesc": "封面描述", "noteId": "n123",  // coverDesc / author / noteId 可选
       "isVideo": false                            // 可选：卡片是否为视频；供后续 note.detail 推导媒体类型
     }
-  ]
+  ],
+  "startupId": "ads-k1e0ero8:12345:lz7abc"        // 可选：完整 core/browser 启动代号；同一次启动内稳定，完整重启后变化，用于云端限定启动期昵称采集
 }
 ```
 
