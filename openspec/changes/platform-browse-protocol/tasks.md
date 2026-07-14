@@ -1,6 +1,54 @@
+<!-- ============================================================================
+     GROUNDING HANDOFF (2026-07-14, done by the session that landed C1a cc2a146).
+     Start FRESH via `/impl platform-browse-protocol` (or scripts/new-change for BOTH aidcp-cloud and aidcp-edge) —
+     no worktree pre-exists (I created then removed empty ones so the base wouldn't go stale against the churning
+     protocol.ts; new-change will branch from the latest master, which is what you want). Symlink node_modules from
+     the canonical checkout into each worktree for test/typecheck (never `git add -A` — never commit the symlink).
+     No files edited yet — clean start. C1a (platform-registry-shape) is LANDED on cloud master (cc2a146); this
+     change's surface resolvers (resolveReadSurface/resolveCommentSurface/loopClosure) + registry noteActions/
+     noteSurfaces are already available to import from `src/platform/index.js`.
+
+     ⚠️ CRITICAL FINDINGS from grounding (do not re-derive; do not repeat the mistakes):
+
+     A. `ActionCompletedPayload.observation?: unknown` ALREADY EXISTS (cloud protocol.ts:1149 / edge :1147),
+        added by the group-join change (carries group.join click observation). DO NOT add a second `observation`
+        field. REUSE it for the note-scoped witness packet (it is already `unknown`, action-discriminated) — just
+        extend its doc comment to cover the note-scoped {surface?;listKey?;author?;textPreviewHead?;reactionText?;
+        articleIndex?} use, and keep the type `unknown` (narrowing would break group.join). So task 1.1 really adds
+        only THREE fields: NoteOpenPayload.surface?, NoteOpenPayload.purpose?, ActionCompletedPayload.noteId?.
+
+     B. The two protocol.ts currently DIFFER (transient cross-repo drift): cloud master has client-preview-image-delete
+        (protocol 74→76: +publish.draft_image_remove{,.result} MessageTypes + payloads + a few field-order/wording
+        deltas) that edge master has NOT received yet. This is ORTHOGONAL to C1b — my 3 additions go into
+        NoteOpenPayload (cloud :420 / edge :418) and ActionCompletedPayload (cloud :1142 / edge :1140), which ARE
+        byte-identical between the two repos (only global line-offset differs). Add the SAME lines to both. Do NOT
+        try to reconcile the client-preview drift — that resolves when edge catches up.
+
+     C. Exact insertion points (byte-identical in both files):
+        - NoteOpenPayload: after `url?: string;`, before the `thinkMs?` comment — add surface? then purpose?.
+        - ActionCompletedPayload: after `reason?: string;`, before the group.join `groupUrl?` comment — add noteId?.
+        MessageType enum UNTOUCHED ⇒ AC-PROTO stays green, count unchanged. edge-client.ts:487-529 allowlist needs
+        NO change (note.open/page.scroll/interaction.like/interaction.comment already in it) — task 1.3 just records this.
+
+     D. handler.ts accounting assumption to replace (task 2.x): the "like always follows note.detail so currentNoteId
+        is the interacted note" logic is around handler.ts:409-410 (verify live line). Keep XHS/detail fallback to
+        currentNoteId byte-for-byte (zero regression); only feed-surface + missing-noteId path refuses.
+
+     E. STAGE-0 ZERO BEHAVIOR: FB noteSurfaces are all 'detail' (set in C1a) ⇒ resolveCommentSurface===resolveReadSurface
+        ⇒ comment migration STRUCTURALLY UNREACHABLE ⇒ all C1b machinery (arbitration/migration/feed_exhausted/idle-
+        suppress) is DORMANT scaffolding for C2. Correctness bar = XHS zero-regression + AC-PROTO/AC-PUB/AC-RISK green.
+
+     F. HOTSPOT CHURN: cloud+edge protocol.ts changed within the last hour (fleet very active). Do C1b END-TO-END and
+        land BOTH repos in one focused pass (edge protocol delta + cloud everything), then `land-change` each — the
+        longer this WIP sits, the worse the rebase against the churning protocol.ts. C1b MUST land before
+        facebook-join-actuation-decouple touches protocol.ts (adds clickToken).
+
+     G. Deploy C1a + C1b to dev TOGETHER at the end (C1a's dev deploy was deferred to batch here; both zero-behavior).
+     ============================================================================ -->
+
 ## 1. Protocol delta (four optional fields, four-place sync)
 
-- [ ] 1.1 Add to both `src/comm/protocol.ts` (edge + cloud, verbatim-identical) four optional fields: `NoteOpenPayload.surface?:'feed'|'detail'`, `NoteOpenPayload.purpose?:'read'|'navigate'`, `ActionCompletedPayload.noteId?:string`, `ActionCompletedPayload.observation?:{surface?;listKey?;author?;textPreviewHead?;reactionText?;articleIndex?}`; keep the `MessageType` enum unchanged.
+- [ ] 1.1 Add to both `src/comm/protocol.ts` (edge + cloud, verbatim-identical) four optional fields: `NoteOpenPayload.surface?:'feed'|'detail'`, `NoteOpenPayload.purpose?:'read'|'navigate'`, `ActionCompletedPayload.noteId?:string`, `ActionCompletedPayload.observation?:{surface?;listKey?;author?;textPreviewHead?;reactionText?;articleIndex?}`; keep the `MessageType` enum unchanged. <!-- NB per finding A: `observation?: unknown` already exists (group.join) — REUSE it (only add surface?/purpose?/noteId?, 3 new fields not 4). -->
 - [ ] 1.2 `aidcp-cloud/src/comm/command-bridge.ts`: mapping table unchanged; transparently pass `surface`/`purpose` in the `open_note`/`scroll` payload construction.
 - [ ] 1.3 Confirm and record in this file: `aidcp-edge/src/client/edge-client.ts:487-529` allowlist needs **no change** (no new active command type); append the two field notes to `aidcp/docs/protocol.md` without changing the header count.
 
