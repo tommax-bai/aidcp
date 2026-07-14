@@ -1,5 +1,8 @@
-## ADDED Requirements
+# facebook-post-publish Specification
 
+## Purpose
+TBD - created by archiving change facebook-post-publish. Update Purpose after archive.
+## Requirements
 ### Requirement: Facebook 发帖图片素材池按账号管理
 
 系统 SHALL 为 Facebook 账号提供独立的发帖图片素材池。运营在控制台按账号批量上传图片后，cloud MUST 校验图片类型与大小、通过可注入 `ObjectStore` 转存到 OSS 稳定公网 URL，并把图片写入该账号的素材池。素材池 MUST 记录图片组、组内顺序、状态、原文件名、内容类型、字节数、sha256、OSS URL、可选素材说明、创建/更新时间。素材池写入 MUST 先确认账号存在且 `accounts.platform === 'facebook'`，MUST NOT 为不存在账号、退役账号、或非 Facebook 账号创建素材。上传失败、OSS 未配置、类型非法、大小超限时 MUST 诚实拒绝，MUST NOT 写入假 URL 或本地临时路径。
@@ -48,6 +51,44 @@ edge SHALL 提供 Facebook 发帖执行器，负责个人主页/首页 composer 
 - **WHEN** Facebook edge 在 `430x932` 或 `768x900` desktop viewport 收到 no-submit composer probe
 - **THEN** 执行器 SHALL 通过结构定位完成 composer 打开、聚焦、逐字输入、清空，MUST NOT 依赖宽屏导航或固定坐标
 
+### Requirement: 正文填写的单步预算随长度伸缩，且边缘必先于云端答复
+
+逐字符输入是 O(正文长度) 的操作，MUST NOT 由云端用与长度无关的常数窗口去等它——否则云端先判失败、边缘仍在往活着的编辑器里写字，形成「记录已 failed、页面上却躺着半篇正文」的错位。
+
+cloud SHALL 按正文长度算出 Facebook `fill_field` 的执行预算，随指令下发（`PublishCommandPayload.timeoutMs`）。云端等待窗口 SHALL 为「下发预算 + 兜底余量」，使边缘**必定先答**；该 timer 的语义 SHALL 退化为「边缘真的失联」的兜底，MUST NOT 作为正常路径的收敛手段。指令**不带**预算时（小红书全路径）等待窗口 MUST 逐字节沿用既有常数窗口。
+
+预算上限 MUST 严格小于边缘发布租约 TTL（安全比例 0.4），否则边缘会在打字途中单方面过期租约、恢复浏览循环去驱动半写的编辑器。正文长度超出预算上限所能打完的范围时，cloud MUST 诚实失败（`content_too_long`）并 MUST NOT 截断正文发出。
+
+edge SHALL 按下发预算自我掐表：预算耗尽即停止输入、清空编辑器、诚实回报，MUST NOT 继续写入已被上游放弃的编辑器。清场失败 MUST 如实上报（而非谎报干净页）。
+
+#### Scenario: 长正文在下发预算内打完
+- **WHEN** 云端为一篇 300 字正文下发按长度算出的 `fill_field` 预算
+- **THEN** edge SHALL 在预算内逐字输完全文并通过校验；cloud MUST NOT 在边缘答复之前判超时
+
+#### Scenario: 预算耗尽即停手清场
+- **WHEN** 正文在下发预算内打不完
+- **THEN** edge SHALL 停止输入、清空编辑器、回报 `fill_deadline_exceeded`（清不干净则回报为 dirty），MUST NOT 提交，MUST NOT 让输入循环继续写入编辑器
+
+#### Scenario: 正文超出可打完的上限
+- **WHEN** 正文长度超出预算上限所能容纳的字符数
+- **THEN** cloud SHALL 诚实 `failed`，MUST NOT 截断正文，MUST NOT 下发任何指令
+
+### Requirement: 正文校验必须回读全文
+
+「插入调用没报错」不等于「文本进去了」。正文校验 MUST 回读编辑器**全文**并确认完整包含终稿正文；MUST NOT 以正文前缀片段作为接受判据——前缀探针会把「编辑器吞掉正文主体」判成成功，从而真的发出一篇被截断的帖子。
+
+编辑器内出现超出终稿正文的额外内容（如打字途中被 typeahead 劫持插入）MUST 视为失败，MUST NOT 提交。
+
+打字前 edge MUST 先清空编辑器并校验其为空：composer 复用已存在的编辑区、输入在光标处追加，不清空即会把上一次失败留下的残稿与本篇拼接后发出。
+
+#### Scenario: 编辑器吞掉正文主体
+- **WHEN** 编辑器只接受了正文的前若干字符，其余被静默丢弃
+- **THEN** edge SHALL 回报 `content_not_accepted` 并清空编辑器，MUST NOT 判成功、MUST NOT 提交
+
+#### Scenario: composer 带着上一篇残稿
+- **WHEN** 打开的 composer 内已存在上一次失败留下的正文
+- **THEN** edge SHALL 先清空并校验为空再开始输入；清不干净则回报 `composer_not_clean`，MUST NOT 在残文之上追加
+
 #### Scenario: 不调用 XHS 发布器
 - **WHEN** Facebook 账号执行发布下发
 - **THEN** edge SHALL 走 Facebook 发帖执行器，MUST NOT 导航到 XHS creator URL、MUST NOT 选择“上传图文”tab、MUST NOT 执行 XHS topic/cover/title 专用步骤
@@ -91,3 +132,4 @@ Facebook 发帖真实提交 SHALL 在 no-submit composer 和媒体探针通过�
 #### Scenario: 上传成功后回读真态
 - **WHEN** 运营上传图片并服务端写入成功
 - **THEN** 控制台 SHALL 依据服务端返回的素材列表/状态刷新展示，MUST NOT 在请求未完成时乐观宣称已入库
+
