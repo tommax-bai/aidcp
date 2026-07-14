@@ -1,6 +1,6 @@
 ## 0. Blocker
 
-- [ ] 0.1 Confirm `humanize-interaction-prompts` is archived before authoring any MODIFIED delta against `comment-interaction` / `interaction-appraisal`; author threshold MODIFIED against post-humanize spec text (do not revert humanize). <!-- STILL BLOCKED：humanize 22/23 未归档（其 9.4 卡 category-adaptive 先归）。故 4.1 的**代码**已落、**spec MODIFIED delta 未写**（见 4.1）。 -->
+- [x] 0.1 Confirm `humanize-interaction-prompts` is archived before authoring any MODIFIED delta against `comment-interaction` / `interaction-appraisal`; author threshold MODIFIED against post-humanize spec text (do not revert humanize). <!-- 2026-07-15 解除：category-adaptive → humanize 已按序归档，主 spec 已含「通用默认地板 赞>300 且（藏>100 或 赞>10000）」+ 500/150 scenario。4.1 的 MODIFIED delta 已对着 post-humanize 主文写（见 specs/comment-interaction/spec.md）。 -->
 
 ## 1. aidcp-cloud — Vocabulary platform-ization (ADDED capability)
 
@@ -20,7 +20,7 @@
 
 ## 4. Thresholds (post-humanize, MODIFIED)
 
-- [~] 4.1 Parameterize the quality-comment threshold per platform: collect-less platforms relax only the collect conjunct, the main like threshold is preserved, MUST NOT degrade to no threshold. <!-- cloud 695d5f3 **代码已落**：comment-appraiser `hasCollect = metrics.collect!==''`；`collectOk = !hasCollect || collectCount>100 || likeCount>10000`；主 `likeCount>300` 恒保留。修「FB 只有万赞爆帖能评」旧 bug（collectCount 恒 0 让 collectOk 退化成只认 >10000）。测试：FB 500 赞/0 藏过、300 赞不过（无零门槛）、XHS 零回归。**spec MODIFIED delta 仍待 post-humanize 写**（0.1 未解），且需登记 spec↔code 门槛漂移（spec 1000/300 vs code 300/100/10000）。 -->
+- [x] 4.1 Parameterize the quality-comment threshold per platform: collect-less platforms relax only the collect conjunct, the main like threshold is preserved, MUST NOT degrade to no threshold. <!-- cloud 695d5f3 **代码已落**：comment-appraiser `hasCollect = metrics.collect!==''`；`collectOk = !hasCollect || collectCount>100 || likeCount>10000`；主 `likeCount>300` 恒保留。修「FB 只有万赞爆帖能评」旧 bug（collectCount 恒 0 让 collectOk 退化成只认 >10000）。测试：FB 500 赞/0 藏过、300 赞不过（无零门槛）、XHS 零回归。**spec MODIFIED delta 已写**（2026-07-15，对着 post-humanize 主文 `specs/comment-interaction/spec.md`）：copy 主门槛条文逐字 + 加「无收藏概念平台只放宽收藏合取项、主门槛 likeCount>300 恒守、不退化为无门槛」+ 两 scenario（FB 500/0 过、FB 300 不过）。spec↔code 门槛已对齐（主 spec 现 300/100/10000 = 代码常量），漂移消除。 -->
 
 ## 5. contentTruncated + N6 (conditional, C2 P1)
 
