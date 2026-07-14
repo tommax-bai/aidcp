@@ -51,11 +51,22 @@
 
 - [~] 7.1 Stage 2: land feed continuity (no flag), verify a real-machine round (cluster 66): no reload-to-top, page.cards only new top-level cards, front door still runs each scroll, depth threshold ⇒ controlled refresh, zero-new ⇒ bounded scroll ⇒ feed_exhausted, taken-over-to-group-page ⇒ listKey mismatch not adopted + recovery. <!-- edge bae3ad4: CODE LANDED (cursor + feed_exhausted are NOT flag-gated; active when AIDCP_FB_BROWSE_AUTO=on). Real-machine round VERIFICATION pending → cluster 66 (backlog). Dormant until edge rebuilt on dev. -->
 - [x] 7.2 Stage 3: land inline code with all flags off (zero behavior). <!-- edge bae3ad4: inline reader + two-step + surface/purpose routing landed; cloud flags default off + edge declares inline_targeting (cloud version-skew gate only opens inline when its flag on) ⇒ zero behavior at stage 0. -->
-- <!-- 7.3–7.5 (shadow like / real like / inline read) are cloud-flag grayscale on dev+test acct — deploy-time, after real-machine verification. Left [ ]. -->
+<!-- 设计适配（2026-07-14 灰度接线时坐实）：原 7.3–7.5 假设 env 旗标 AIDCP_FB_INLINE_LIKE / AIDCP_FB_INLINE_READ，
+     但 C1a 落地用的是 **registry noteSurfaces 值 + 版本偏斜能力闸**（不是 env 旗标）。且发现 C1b 漏接了**云端命令侧**：
+     云端从不在 open_note 上带 surface、dispatcher 也不读 inline_targeting ⇒ 单翻 registry 会「云端以为 feed、边缘却开 detail」。
+     故「开关打开」= 先补命令脊柱 + 能力闸（见下方 §7 云端接线），再翻 registry read/like→feed。以下按此口径记账。 -->
 
-- [ ] 7.3 Stage 4: dev `AIDCP_FB_INLINE_LIKE` shadow — inline lock runs, not clicked; cloud compares independent witness vs selected card; sample P4 (already-liked state) on dev + test account (authorized).
-- [ ] 7.4 Stage 5: enable real like — hard precondition P0+P3+P4 pass + shadow witness 100% match + no_target rate <10%; remove FB like from `RETRIABLE_INTERACTION_REASONS`.
-- [ ] 7.5 Stage 6: enable inline read `AIDCP_FB_INLINE_READ` — hard precondition P1+P2; observe expand_no_effect rate / content completeness / feed navigation → 0 / view rate / like-view ratio.
+### §7 云端接线：开关打开（cloud LANDED + DEPLOYED 2026-07-14）
+
+**cloud master `22dede9`（接线，休眠）+ `c04051e`（翻转，开关打开）**，已部署 dev（`c04051e` 快照，backup `cloud.bak.fbinline-20260714-220651.tar.gz`+`.env.bak.20260714`，healthcheck 全绿：active/NRestarts=0/8787/PG select 1/飞书长连接/registry FB read=like=feed）。
+- `22dede9`：新 `hasInlineTargeting()` 选项 + `effectiveReadSurface()`（registry read=feed **且**边缘声明 inline_targeting 才 feed，否则 detail）。全部控制流（下发 open_note surface / 循环闭合 back-vs-scroll / 评论迁移触发 / observedSurface 审计 / feed no_target 重扫）改读 effectiveReadSurface。connection-runtime 把握手 capabilities 快照穿进 dispatcher（每连接、重连安全）；server 接线 hasInlineTargeting。registry 仍 detail ⇒ 零行为。
+- `c04051e`：FB registry read_content/like→'feed'（comment 留 detail）。read=feed 驱动下发 surface:feed + 就地读循环闭合；因 comment 仍 detail ⇒ read≠comment ⇒ 自动触发**已落地的 C1b 回执驱动两步评论迁移**（navigate→确认→comment，fail-closed）。like surface 由边缘按 DOM 自判（无云端消费者），设 feed 仅语义。
+- **四路对抗评审全 SAFE/severity=none**（老边端版本偏斜零回归 / XHS 逐位不变 / 重连生命周期无过期窗 / 迁移 fail-closed）。typecheck 净、acceptance 50/50、full 2023/2023。
+- **安全性质**：版本偏斜闸 ⇒ 只有重打包（声明 inline_targeting）的边缘收到 surface:feed；老边端逐位等今天。**回滚不需重发客户端**：registry 值改回 detail 重部署 cloud。
+
+- [x] 7.5 就地读已开（云端）：registry read_content='feed' + 命令脊柱接线，dev 已部署。<!-- cloud c04051e deployed dev 2026-07-14。就地读在**重打包的 dev 边缘**（声明 inline_targeting，canonical aidcp-edge master 已含 bae3ad4）上生效；真机观测（expand_no_effect 率 / 正文完整率 / 导航归零 / view 速率 / like-view 比）→ 簇 68 backlog。 -->
+- [~] 7.4 真点赞：云端已就绪（surface:feed ⇒ 边缘就地开 ⇒ like 落 feed 两段）。**真-vs-影子是边缘启动 env `AIDCP_FB_BROWSE_AUTO`（shadow/on），非云端旗标**。硬前置「shadow 见证 100% 一致 + no_target 率<10%」需先跑一轮 shadow 观测窗才有数据 ⇒ 待运营在 dev 边缘先 `=shadow` 跑一轮、对齐见证后再 `=on`。<!-- 云端命令侧 c04051e 已开；边缘真点赞由 AIDCP_FB_BROWSE_AUTO=on 触发；RETRIABLE_INTERACTION_REASONS 移除 FB like 待真开前做。 -->
+- [~] 7.3 影子点赞观测：dev 现可跑（边缘 `=shadow` + 开关已开 ⇒ 云端下发 surface:feed、边缘就地锁卡不点、回执带独立见证 → 云端仲裁比对）。待实际跑一轮采样 P4 已赞态 + 统计见证一致率 / no_target 率 → 簇 66/68。<!-- 云端 c04051e 已就绪；缺真机 shadow 窗运行。 -->
 
 ## 8. Change Record
 
