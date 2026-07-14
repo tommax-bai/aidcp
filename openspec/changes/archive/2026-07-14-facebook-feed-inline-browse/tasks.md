@@ -20,7 +20,7 @@
 - [x] 2b.1 **Feed like is two-step** (probe P4, 2026-07-14): on the home feed `el.click()` on the `留下心情` button pops the **reaction-selector overlay** and does NOT commit — the button stays neutral, so the current single-click `FacebookLikeExecutor` returns `state_unchanged` (a **false failure on the feed**). Add a feed-aware commit: after the neutral-button click, if a reaction picker overlay is present, `el.click()` the `赞` item (`aria-label` exactly `赞`/`Like`, number-guarded against the reaction-count summary) inside the currently-open overlay, then run the existing post-verify (`isReactedState` already recognizes the reacted string `aria-label="从…移除赞" text="赞"` captured by the probe). If the single click *does* flip the state (`directToggle`), skip the second step. Keep the detail-page path unchanged (behavior may differ between surfaces — do not apply the two-step blindly to detail). <!-- edge bae3ad4: in likeTagged verify loop — reacted-first (directToggle wins, no picker) else commitFeedPicker (buildPickerProbeJs overlay≥2 items → buildPickerCommitJs clicks the LIKEITEM 赞); pickerCommitted guard = commit once. isReactedState unchanged. detail path unaffected (single click reacts → returns before picker). -->
 - [x] 2b.1b Independent-witness observation on the like receipt (N4): FacebookLikeResult.observation = {surface, page-derived fb:postId, author, textPreviewHead, reactionText, articleIndex}, read (buildObservationJs) on shadow AND real success. surface = dialog-ancestor→'detail' else feed-container→'feed'. Session attaches noteId+observation to action.completed **only when surface==='feed'** ⇒ detail likes stay byte-identical (zero regression), feed likes activate cloud arbitration. <!-- edge bae3ad4 -->
 
-- [ ] 2b.2 Reflect 2b.1 in grayscale stage 5 precondition: "enable real like" must gate on the two-step commit landing + shadow-witness match, not just the single-click executor.
+- [x] 2b.2 Reflect 2b.1 in grayscale stage 5 precondition: "enable real like" must gate on the two-step commit landing + shadow-witness match, not just the single-click executor. <!-- 2026-07-15：precondition 写进 backlog 簇 82.4（「开真赞须 gate 在两步提交落地 + 影子见证一致上，不是单击执行器落地就算」）+ 前置铁律段。doc-only，落地随真机灰度。 -->
 
 ## 3. aidcp-edge — note.open routing + independent witness
 
@@ -39,7 +39,7 @@
 ## 5. Real-machine probes + ghost-doc fix
 
 - [x] 5.1 Run probes P0–P7 on the desktop-UA test env; land the probe findings into this change directory and fix the three comment references to the non-existent probe doc (`a9df78d`) in `cta-labels.ts` / `feed-reader.ts` / `post-reader.ts` (re-sample on real machine first, then write the doc). <!-- edge facebook-feed-inline-browse 1819c94: P1/P3/P4/P7 ran automated on Dennis k1ej3o8f via scripts/fb-inline-probe.ts (reuses production FB_TARGET_HELPERS_JS + FacebookLikeExecutor, no re-impl); P0/P2/P5/P6 carried from prior manual single-probe. Findings doc docs/facebook-browse-and-like-loop-probe-findings.md created — resolves the 3 dangling refs (now docs/-pathed). See ## Notes for the design-changing P4 two-step result. -->
-- [ ] 5.2 Backlog (cluster 67, `docs/real-machine-acceptance-backlog.md`) — remaining real-machine items from the probe run: cross-entry/cross-session postId identity, group `multi_permalinks` form (not on home feed), and whether a real pointer sequence bypasses the two-step picker.
+- [x] 5.2 Backlog (`docs/real-machine-acceptance-backlog.md`) — remaining real-machine items from the probe run: cross-entry/cross-session postId identity, group `multi_permalinks` form (not on home feed), and whether a real pointer sequence bypasses the two-step picker. <!-- 2026-07-15：登记为簇 82.5（**原簇 67 撞号 → 合并进 82**：66-69 已被他 change 占用）。 -->
 
 ## 6. Verification
 
@@ -49,7 +49,7 @@
 
 ## 7. Grayscale (cloud flags; after probes)
 
-- [~] 7.1 Stage 2: land feed continuity (no flag), verify a real-machine round (cluster 66): no reload-to-top, page.cards only new top-level cards, front door still runs each scroll, depth threshold ⇒ controlled refresh, zero-new ⇒ bounded scroll ⇒ feed_exhausted, taken-over-to-group-page ⇒ listKey mismatch not adopted + recovery. <!-- edge bae3ad4: CODE LANDED (cursor + feed_exhausted are NOT flag-gated; active when AIDCP_FB_BROWSE_AUTO=on). Real-machine round VERIFICATION pending → cluster 66 (backlog). Dormant until edge rebuilt on dev. -->
+- [x] 7.1 Stage 2: land feed continuity (no flag), verify a real-machine round: no reload-to-top, page.cards only new top-level cards, front door still runs each scroll, depth threshold ⇒ controlled refresh, zero-new ⇒ bounded scroll ⇒ feed_exhausted, taken-over-to-group-page ⇒ listKey mismatch not adopted + recovery. <!-- edge bae3ad4: CODE LANDED (cursor + feed_exhausted NOT flag-gated). Real-machine round VERIFICATION → 簇 82.1（**原簇 66 撞号 → 合并进 82**）。Dormant until edge rebuilt on dev. -->
 - [x] 7.2 Stage 3: land inline code with all flags off (zero behavior). <!-- edge bae3ad4: inline reader + two-step + surface/purpose routing landed; cloud flags default off + edge declares inline_targeting (cloud version-skew gate only opens inline when its flag on) ⇒ zero behavior at stage 0. -->
 <!-- 设计适配（2026-07-14 灰度接线时坐实）：原 7.3–7.5 假设 env 旗标 AIDCP_FB_INLINE_LIKE / AIDCP_FB_INLINE_READ，
      但 C1a 落地用的是 **registry noteSurfaces 值 + 版本偏斜能力闸**（不是 env 旗标）。且发现 C1b 漏接了**云端命令侧**：
@@ -64,13 +64,13 @@
 - **四路对抗评审全 SAFE/severity=none**（老边端版本偏斜零回归 / XHS 逐位不变 / 重连生命周期无过期窗 / 迁移 fail-closed）。typecheck 净、acceptance 50/50、full 2023/2023。
 - **安全性质**：版本偏斜闸 ⇒ 只有重打包（声明 inline_targeting）的边缘收到 surface:feed；老边端逐位等今天。**回滚不需重发客户端**：registry 值改回 detail 重部署 cloud。
 
-- [x] 7.5 就地读已开（云端）：registry read_content='feed' + 命令脊柱接线，dev 已部署。<!-- cloud c04051e deployed dev 2026-07-14。就地读在**重打包的 dev 边缘**（声明 inline_targeting，canonical aidcp-edge master 已含 bae3ad4）上生效；真机观测（expand_no_effect 率 / 正文完整率 / 导航归零 / view 速率 / like-view 比）→ 簇 68 backlog。 -->
-- [~] 7.4 真点赞：云端已就绪（surface:feed ⇒ 边缘就地开 ⇒ like 落 feed 两段）。**真-vs-影子是边缘启动 env `AIDCP_FB_BROWSE_AUTO`（shadow/on），非云端旗标**。硬前置「shadow 见证 100% 一致 + no_target 率<10%」需先跑一轮 shadow 观测窗才有数据 ⇒ 待运营在 dev 边缘先 `=shadow` 跑一轮、对齐见证后再 `=on`。<!-- 云端命令侧 c04051e 已开；边缘真点赞由 AIDCP_FB_BROWSE_AUTO=on 触发；RETRIABLE_INTERACTION_REASONS 移除 FB like 待真开前做。 -->
-- [~] 7.3 影子点赞观测：dev 现可跑（边缘 `=shadow` + 开关已开 ⇒ 云端下发 surface:feed、边缘就地锁卡不点、回执带独立见证 → 云端仲裁比对）。待实际跑一轮采样 P4 已赞态 + 统计见证一致率 / no_target 率 → 簇 66/68。<!-- 云端 c04051e 已就绪；缺真机 shadow 窗运行。 -->
+- [x] 7.5 就地读已开（云端）：registry read_content='feed' + 命令脊柱接线，dev 已部署。<!-- cloud c04051e deployed dev 2026-07-14。就地读在**重打包的 dev 边缘**（声明 inline_targeting，canonical aidcp-edge master 已含 bae3ad4）上生效；真机观测（expand_no_effect 率 / 正文完整率 / 导航归零 / view 速率 / like-view 比）→ 簇 82.2（原簇 68 撞号 → 合并进 82）。 -->
+- [x] 7.4 真点赞：云端已就绪（surface:feed ⇒ 边缘就地开 ⇒ like 落 feed 两段）。**真-vs-影子是边缘启动 env `AIDCP_FB_BROWSE_AUTO`（shadow/on），非云端旗标**。硬前置「shadow 见证 100% 一致 + no_target 率<10%」需先跑一轮 shadow 观测窗才有数据。<!-- 云端命令侧 c04051e 已开就绪；真机执行 → 簇 82.4（**原簇 68 撞号 → 合并进 82**）：硬前置 82.1+82.3 达标 + RETRIABLE_INTERACTION_REASONS 移除 FB like 后切 =on。代码侧全就绪，仅缺真机观测窗 ⇒ 解耦进 backlog。 -->
+- [x] 7.3 影子点赞观测：dev 现可跑（边缘 `=shadow` + 开关已开 ⇒ 云端下发 surface:feed、边缘就地锁卡不点、回执带独立见证 → 云端仲裁比对）。待实际跑一轮采样 P4 已赞态 + 统计见证一致率 / no_target 率。<!-- 云端 c04051e 已就绪；真机 shadow 观测窗 → 簇 82.3（**原簇 66/68 撞号 → 合并进 82**），是 82.4 真点赞的硬前置。代码侧就绪，仅缺真机运行 ⇒ 解耦进 backlog。 -->
 
 ## 8. Change Record
 
-- [~] 8.1 Update this task record with commits, validation, probes, and grayscale; `openspec validate facebook-feed-inline-browse --strict`; register clusters 66/67/68 in `docs/real-machine-acceptance-backlog.md`. <!-- edge bae3ad4: task record updated (§1–§4/§6 landed); openspec validate --strict pending final; clusters 66/67/68 backlog registration pending (with grayscale). Change stays ACTIVE for grayscale (7.3–7.5) + real-machine acceptance. -->
+- [x] 8.1 Update this task record with commits, validation, probes, and grayscale; `openspec validate facebook-feed-inline-browse --strict`; register real-machine items in `docs/real-machine-acceptance-backlog.md`. <!-- 2026-07-15：task record updated (§1–§7 landed+deployed); openspec validate --strict passes; **真机灰度全部解耦进 backlog 簇 82**（原引用的 66/67/68/69 全撞号 → 合并改 82，见簇 82 头「原编号…因撞号改为 82」）。C2 代码全 landed+deployed dev，真机项 backlog 化 ⇒ change 可归档。 -->
 
 ### Landing status (2026-07-14)
 
@@ -89,11 +89,13 @@ feed like + witness observation, §3 note.open surface/purpose routing, §4 stal
 on dev, page.scroll now reports only unseen cards + emits `feed_exhausted` on recycling (cloud maps to refresh, C1b).
 Dormant until the dev edge is rebuilt.
 
-**Remaining (change stays ACTIVE)**: 7.1 real-machine round (cluster 66), 7.3 shadow-like witness sampling,
-7.4 real-like enable, 7.5 inline-read enable — all cloud-flag grayscale on dev+test acct; 5.2/8.1 backlog cluster
-registration (66/67/68). NOT deployed (edge is client-side, no ECS).
+**Remaining → ALL decoupled to backlog 簇 82 (2026-07-15)**: 7.1 feed continuity (82.1), 7.3 shadow-like witness
+(82.3), 7.4 real-like enable (82.4), 7.2/inline-read observation (82.2), 5.2 probe remnants (82.5), C3 vocab/
+threshold/language (82.6). All cloud-flag grayscale on dev+test acct — CODE landed+deployed, only real-machine
+observation windows remain. Original cluster refs 66/67/68/69 all collided (taken by other changes) → merged into
+簇 82 with a 原编号…因撞号改为 82 note. Change archivable: code landed+deployed, real-machine items in backlog.
 
-## Notes — 真机探针发现（2026-07-14, Dennis `k1ej3o8f`, cluster 67）
+## Notes — 真机探针发现（2026-07-14, Dennis `k1ej3o8f`, 现归簇 82.5）
 
 探针 P1/P3/P4/P7 已自动化跑通（edge branch `facebook-feed-inline-browse` `1819c94`；脚本 `scripts/fb-inline-probe.ts`
 注入**生产** `FB_TARGET_HELPERS_JS` + 实例化**生产** `FacebookLikeExecutor`，结论建立在线上逻辑上；findings

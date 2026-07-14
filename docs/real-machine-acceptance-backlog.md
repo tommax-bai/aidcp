@@ -1161,3 +1161,20 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 - [ ] 81.2 **额度未满时绝不自称今日完成（红线：不静默假成功）** — 额度没满、执行端长时间无新事件时，在场感 MUST NOT 出现任何「今日已完成」的字样。桩测只能证明拿不到额度依据时不出终态；要防的是真机上云端下发了**残缺**的额度窗口而客户端误判成已满。
 - [ ] 81.3 「已等待 · N 分钟」如实走字 — 进作者主页后云端要过一次大模型定夺是否关注：观察在场感应在约 1 分钟后**停掉呼吸动效**、标签从「刚刚更新」变为「已等待 · N 分钟」，文案本身保留（运营仍需知道最后推进到哪一步）。动效是「此刻正在做」的视觉承诺，停不掉 = 修复没生效。
 - [ ] 81.4 断连时在场感不再演戏 — 把客户端与云端断开（停 dev 云端或断网）：在场感应改写为「与云端连接中断，正在重连…」，MUST NOT 继续显示断连前的中途动作文案；**恢复连接后应翻回**（`云端已重连` 在翻译规则表里没有条目、不会自己被顶掉，靠本次在 `main.cjs` 补的翻回；若卡在「中断」不动 = 翻回没生效）。
+
+## 簇 82
+
+### FB feed 就地读 + 就地赞 灰度真机验收（C2 `facebook-feed-inline-browse` + C3 `platform-vocabulary-and-thresholds`；edge master `bae3ad4` + cloud master `22dede9`/`c04051e`/`695d5f3`/`1cfddb5` 均已 land + 已部署 dev，登记于 2026-07-15；**原编号 66/67/68/69 四处，2026-07-15 因撞号（66-69 已被 compress-admin-upload-images / edge-cdp-health-recovery / edge-task-acquire-timeout-recovery / facebook-humanized-scroll 占用）合并改为本簇 82**）
+
+**背景**：Facebook 浏览闭环从「进详情页才能读 / 赞」改成「首页就地展开读全文 + 就地逐帖点赞」（读=feed / 赞=feed，评论仍 detail ⇒ 回执驱动两步迁移）。云端命令侧已开（对声明 `inline_targeting` 的重打包边缘下发 `surface:'feed'`），但**要不要真点由边缘启动 env `AIDCP_FB_BROWSE_AUTO` 决定**（off / shadow / on），硬闸是「先影子后真开」。这一整套只在真机 + 观测窗才验得了：桩测证了控制流与协议装配，证不了真实 DOM 上的展开 / 锁卡 / 两步点赞 / 独立见证一致率。C3 同批把浏览闭环 prompt 平台化（去「小红书/笔记/收藏」）+ 门槛放宽（FB 现对 300+ 赞正常帖评论、不再只万赞）+ 补语言规则（当地语言、不丢中文评论）+ 空正文诚实提示——这些措辞 / 门槛效果同样只能真机肉眼核。
+
+**修法（已 land 部分）**：edge `bae3ad4`（inline-reader / 两步 feed 点赞 / surface·purpose 路由 / 就地读停留地板 / feed 光标只报新顶层卡 + feed_exhausted / 独立见证）；cloud `22dede9`+`c04051e`（版本偏斜能力闸 `effectiveReadSurface` + 翻 registry read/like=feed + 回执驱动两步评论迁移）；cloud `695d5f3`+`1cfddb5`（C3 词汇平台化 + 门槛平台化修 FB 评论恒关 bug + deep-read 空正文 + 撰写器去硬编码 + 语言规则 + 评论进撰写）。4×N 路对抗评审全 SAFE。以下为桩验不了、必须真机核的部分。
+
+**前置**：dev 云端已含上述 cloud 提交；**客户机以 edge master（含 `bae3ad4`）重建客户端**（就地读 / 两步赞只随重打包边缘声明 `inline_targeting` 才收到 `surface:'feed'`，老包逐位等今天）；用 tom 分组测试号（大白 / Tmax，见 memory `real-machine-test-accounts`）；`AIDCP_FB_BROWSE_AUTO` 分档跑：先 `=shadow` 后 `=on`。**硬前置铁律**：82.3 影子见证 100% 一致 + `no_target(stale)` 率 <10% + 82.1 feed 连续性通过，**才**可切 82.4 真点赞。**真开前**须把 FB like 从 edge 的 `RETRIABLE_INTERACTION_REASONS` 移除（避免对可能已赞的两段 toggle 二次点成撤销）。**回滚不需重发客户端**：cloud registry read/like 改回 `'detail'` 重部署 dev，或边缘 `AIDCP_FB_BROWSE_AUTO≠on`。
+
+- [ ] 82.1 **feed 连续性（原簇 66；shadow 即可验）** — 边缘 `=shadow` 跑一轮 FB feed：**不整页回顶重载**、`page.cards` 只报新顶层卡（回收复现的卡不误报）、每次滚动仍跑一次「前门」`ensureFeed`、深度到阈值 ⇒ 受控点首页图标刷新回顶换新批、零新卡 ⇒ 有界滚动 ⇒ `feed_exhausted`、被接管到群组页 ⇒ `listKey` 不匹配不采纳 + 恢复。交叉核 memory `fb-feed-never-scrolls-down` 那条独立缺陷是否复发（连续滚过 3+ 帖不回顶）。
+- [ ] 82.2 **就地读质量（原簇 68；shadow 即可验）** — 边缘 `=shadow` + 开关已开：统计 `expand_no_effect` 率、正文完整率（就地 textContent 捷径 / 点展开是否拿到全文）、**导航次数是否归零**（不再进详情页读）、view 速率、like-view 比。查 journalctl（cloud dev）关键字 `observedSurface 漂移` / `feed-surface 互动 no_target`。
+- [ ] 82.3 **影子点赞见证一致（原簇 66/68；真开的硬前置）** — 边缘 `=shadow` ⇒ 云端下发 `surface:feed`、边缘就地锁卡**不点**、回执带独立见证（page-derived postId / author / 正文头 / reaction / articleIndex）。核：影子见证与云端选中卡是否 **100% 一致**、`no_target(stale)` 率 **<10%**、顺带采 P4 已赞态串。见证不一致或 no_target 高 = 绝不可切真点赞。
+- [ ] 82.4 **真点赞（原簇 68；硬前置＝82.1+82.3 达标 + RETRIABLE 移除 FB like）** — 达标后切 `AIDCP_FB_BROWSE_AUTO=on`：FB feed 就地逐帖真点赞（两步 = 中性按钮点击 → reaction 浮层里点「赞」；单击直翻则跳过第二步）。核：真点成功（`isReactedState` 认「从…移除赞」串）、**MUST NOT 对已赞帖二次 toggle 成撤销**、detail 路径逐位不变。**灰度 stage 5 前置（原 task 2b.2）**：「开真赞」须 gate 在**两步提交落地 + 影子见证一致**上，不是单击执行器落地就算。
+- [ ] 82.5 **探针残项（原簇 67）** — 跨入口 / 跨会话 postId 身份一致；群组 `multi_permalinks` 表单形态（首页 feed 上没有）；真实 pointer 序列是否绕过两步 picker。
+- [ ] 82.6 **C3 词汇 / 门槛 / 语言 真机核（原簇 69）** — FB 会话跑一轮：① 浏览闭环 prompt 无「小红书 / 笔记 / 收藏」幻影、用「帖子」；② 门槛放宽生效（FB 对 300+ 赞正常热度帖评论、不再只万赞），仍过人审（除非账号 `auto_approve`，见 memory `auto-approve-and-persona-unbind`）；③ **语言规则生效**——当地语言的 FB 群里产出的评论用当地语言、MUST NOT 丢中文评论进去；④ FB 空正文图片帖：撰写诚实（就着评论区语境写 / 没有可写就弃权），MUST NOT 臆造画面内容。
