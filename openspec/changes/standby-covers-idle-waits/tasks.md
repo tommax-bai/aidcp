@@ -30,8 +30,19 @@
 - [x] 1.6 `src/comm/browser-standby.ts`：默认门槛 `DEFAULT_BROWSER_STANDBY_MIN_WAIT_MS` **20min → 5min**（与边缘 2.1 同改，缺一不可）。 <!-- aidcp-cloud 33934d6 20min→5min -->
 - [x] 1.7 `src/server.ts`：把续场闸裁决接进 `buildBrowserStandbyForAccount`（`:1718`，`runtimes` 在该闭包已可用，见 `:1609` 的先例）。 <!-- aidcp-cloud 33934d6 -->
 - [x] 1.8 **加固 60s 心跳链**（本 change 的唤醒地基）：`src/comm/ui-snapshot.ts:215` 现在只在 `sent > 0 && dailyUsage` 时重排下一跳——**dailyUsage 一旦为空，链就永久断**，即使待机提示仍在。改为 `sent > 0 && (dailyUsage || browserStandby)`。**不改这条，冻结账号的唤醒路径就悬在一个可能断的链上。** <!-- aidcp-cloud 33934d6 心跳链两条断裂路径都堵上（用量缺失 / 无窗口刷新时刻） -->
-- [x] 1.9 单测：各来源 eligible / 门槛边界 / 跨午夜窗口 / **本地日界（非上海）** / 冻结与整周全关走回访 / 验证码不让位 / `canAutoResume` 零行为回归 / 心跳链在 dailyUsage 为空时不断。 <!-- aidcp-cloud 33934d6 browser-standby 14 例 + resume-limits-next-at 7 例 + ui-snapshot 心跳链 2 例 -->
+- [x] 1.9 单测：各来源 eligible / 门槛边界 / 跨午夜窗口 / **本地日界（非上海）** / 冻结与整周全关走回访 / `canAutoResume` 零行为回归 / 心跳链在 dailyUsage 为空时不断。 <!-- aidcp-cloud 33934d6 browser-standby 14 例 + resume-limits-next-at 7 例 + ui-snapshot 心跳链 2 例 -->
+      **台账更正（d83cb45）**：33934d6 里那三条号称「验证码 / 登录 / 未知状态不让位」的用例是**假覆盖**——它们喂给桩的 `explain()` 理由（`captcha_required` / `login_required` / `unknown_scheduler_state`）真实风控对 `view` 动作**永远不会返回**（只会返回 allowed / `state:frozen` / `quota:*`）。它们守的是一段到不了的代码，而**真实的验证码路径当时没有任何测试、也没有任何实现**（见 1.11）。已删除，换成走真实可达路径的用例。
 - [x] 1.10 `npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿。 <!-- aidcp-cloud 33934d6 acceptance 50/50 · test 2017/2017 · typecheck 0 -->
+
+### 1.11–1.13 验证码安全回归修复（对抗性评审发现，d83cb45）
+
+> **这是 33934d6 上线到 dev 之后才发现的一条真实安全回归。** 本 change 把判据换成「解除阻塞需不需要浏览器」，却**只接了「不需要」那一半的证据**——「需要浏览器」那一半没有任何输入，于是判据只剩半边。
+> **失败链**：边缘上报验证码 → 风控信号把账号迁到 `restricted` → 续场闸据此判停工 → 待机闸判「可以让位」→ 而 `ui.snapshot` **有意豁免**验证码暂停闸（它是界面数据、不是页面命令，`ws-server.ts:213-224`）→ 提示照常送达 → **运营正被要求去解验证码的那个浏览器被关掉**。边缘侧的浮层标志不是防线（会被「浏览循环结束」等无关事件清掉，`main.cjs:3186`）。
+> **波及面不止 restricted**：验证码期间账号同样可能排期外 / 每日上限满 / 配额耗尽，那几支照样让位——故闸必须压在**所有**来源之前。
+
+- [x] 1.11 `src/comm/browser-standby.ts`：新增 `needsBrowserToUnblock` 输入，命中即 `eligible=false` / `reason='hard_blocker'`，且**短路在所有来源判定之前**（不能只补在受限那一支）。 <!-- aidcp-cloud d83cb45 一票否决闸压在全部来源之前 -->
+- [x] 1.12 `src/server.ts`：该输入由**云端权威**填充（`server.isEdgePaused(edgeId)` = 该边缘是否正处于验证码暂停态），**MUST NOT 依赖边缘自报的浮层标志**。 <!-- aidcp-cloud d83cb45 buildBrowserStandbyForAccount 接入 isEdgePaused -->
+- [x] 1.13 单测：验证码期间四类来源（受限 / 排期外 / 每日上限 / 配额）**全部**不让位；验证码解除后恢复正常让位（该闸 MUST NOT 永久禁用让位）。附带修复 `resumeGateSnapshot` 的副作用——它原会调用 `canStartSession()`（含两次告警 + 会话拒绝回调），被 60s 心跳链每分钟触发一次，使未绑人设的账号每分钟误发一次「会话被拒」；已拆出纯判定函数，`canAutoResume` 仍保留告警。 <!-- aidcp-cloud d83cb45 acceptance 50/50 · test 2020/2020 · typecheck 0 -->
 
 ## 2. aidcp-edge — 门槛与抗抖动
 
@@ -45,9 +56,9 @@
 
 ## 3. 集成与部署
 
-- [x] 3.1 cloud 合回 master，按 CLAUDE.md §5 安全序列部署 `dev`（备份 → rsync → restart → healthcheck）。 <!-- aidcp-cloud 33934d6 2026-07-14 deployed(dev) 备份 cloud.bak.20260714-203023.tar.gz → git archive 快照 rsync → restart → healthcheck 全过（NRestarts=0 / 8787 / 飞书长连接 / panel 8090 / isales 三服务未受影响） -->
+- [x] 3.1 cloud 合回 master，按 CLAUDE.md §5 安全序列部署 `dev`（备份 → rsync → restart → healthcheck）。 <!-- aidcp-cloud 33934d6 2026-07-14 deployed(dev) 备份 cloud.bak.20260714-203023.tar.gz → git archive 快照 rsync → restart → healthcheck 全过（NRestarts=0 / 8787 / 飞书长连接 / panel 8090 / isales 三服务未受影响） --> <!-- aidcp-cloud d83cb45 2026-07-14 deployed(dev) 验证码修复补部署；部署前已核 ECS 上跑的确为 33934d6（md5 比对）；备份 cloud.bak.captchafix-20260714-211739.tar.gz；healthcheck 全过 -->
 - [x] 3.2 edge 合回 master；**不出安装包**（CLAUDE.md §6：打包需用户显式要求）。本机验证走 `npm run build:dist` + 重启客户端。 <!-- aidcp-edge 5b9b5b9 已合 master + 主 checkout 已 build:dist；按 CLAUDE.md §6 不出安装包 -->
-- [ ] 3.3 观测：dev 上确认「排期外 / 时长满 / 冻结」三类各至少产出一次 `source='session'` 或冻结让位，且槽位真的空出来（客户端左栏可见环境进入「浏览器已关闭，云端连接保持中」）。
+- [x] 3.3 观测：dev 上确认「排期外 / 时长满 / 冻结」三类各至少产出一次 `source='session'` 或冻结让位，且槽位真的空出来（客户端左栏可见环境进入「浏览器已关闭，云端连接保持中」）。 <!-- aidcp 2026-07-14 解耦到真机 backlog 簇 80.2/80.4（需真账号跑满一天才观测得到，桩测证明不了；不阻塞归档） -->
 
 ## 4. 真机验收（解耦收拢，不阻塞归档）
 
@@ -55,4 +66,4 @@
 
 ## 5. 明确不做
 
-- [ ] 5.1 **不做需求驱动的「让位 / 槽位借调」**（请一个休息中的账号提前腾位子）。理由见 `browser-slot-scheduling` task 5.8：它在**任何**密度下都错——会掐掉正在跑的会话、绕过唯一那道安全闸（暂停 / 验证码 / 稿件待审 / 未登录），且合格供体仅占约 3% 的时间。本 change 是纯供给侧的，密度越高越管用。
+- [x] 5.1 **不做需求驱动的「让位 / 槽位借调」**（决策已记录，非待办）（请一个休息中的账号提前腾位子）。理由见 `browser-slot-scheduling` task 5.8：它在**任何**密度下都错——会掐掉正在跑的会话、绕过唯一那道安全闸（暂停 / 验证码 / 稿件待审 / 未登录），且合格供体仅占约 3% 的时间。本 change 是纯供给侧的，密度越高越管用。

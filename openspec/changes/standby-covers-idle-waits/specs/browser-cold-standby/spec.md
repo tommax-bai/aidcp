@@ -1,12 +1,21 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: 云端发布确定性的浏览器冷待机提示`
+- TO: `### Requirement: 云端发布浏览器冷待机提示（判据＝解除阻塞是否需要浏览器）`
+
+> 标题里的「**确定性**」正是本 change 推翻的那条判据（「无确定恢复时刻即不让位」）。留着它，主 spec 最显眼的那一行就会与自己的正文、以及已上线的代码直接矛盾，而此后每一条 MODIFIED delta 还得逐字引用这个已经作废的名字作为定位键。
+
 ## MODIFIED Requirements
 
-### Requirement: 云端发布确定性的浏览器冷待机提示
+### Requirement: 云端发布浏览器冷待机提示（判据＝解除阻塞是否需要浏览器）
 
 Cloud SHALL publish an optional `browserStandby` object on the existing `ui.snapshot` stream whenever it can determine that automated browser work is blocked by a wait that **does not require the browser to stay open in order to be resolved**. The payload MUST include whether the feature is enabled, whether the current wait is eligible, a machine-readable reason, `waitMs`, `wakeAt`, `generatedAt`, `source`, `minWaitMs`, and `warmupMs`.
 
 **准入判据 SHALL 是「解除这个阻塞需不需要浏览器」，MUST NOT 是「有没有确定的恢复时刻」。** 前一版判据（无确定恢复时刻即不让位）把**冻结账号**——等待最长、可能永远不再干活的那一类——恰好排除在让位之外，使最不该占着浏览器的账号占得最牢。
 
 - **需要浏览器才能解除的阻塞 MUST NOT 产出可待机提示**：验证码、登录、运维在浏览器里手动介入、未知的调度器状态、环境被他处占用。这些情形 MUST 保持既有的诚实告警 / 在线状态行为。
+
+  **这一半 MUST 有真实输入，MUST NOT 只写在规范里。** 判据是「解除阻塞需不需要浏览器」，若系统只接了「不需要」那一半的证据、而「需要」那一半无人提供，判据就只剩半边，所有阻塞都会被当成「不需要浏览器」。**「需要浏览器」的事实 SHALL 由云端权威持有**（当前来源：该边缘是否正处于验证码暂停态），**MUST NOT 依赖边缘自报的浮层标志**——那个标志会被「浏览循环结束」等无关事件清掉。该闸 SHALL 压在**所有**停工来源之前一票否决：验证码期间，账号同样可能排期外 / 时长满 / 配额耗尽，若只在某一个来源分支上补闸，其余来源仍会让位。
 - **不需要浏览器即可解除的等待 SHALL 产出可待机提示**（等待时长 ≥ 门槛时 `eligible=true`），覆盖**全部**使账号停工的来源，而不只是风控配额：
   1. 风控配额窗口未释放（`source='risk'`，既有行为）
   2. 周历排期关闭 / 活跃时段窗口外（`source='session'`）
@@ -30,6 +39,20 @@ Cloud SHALL publish an optional `browserStandby` object on the existing `ui.snap
 #### Scenario: 需要浏览器才能解除的阻塞 MUST NOT 让位
 - **WHEN** 账号需要过验证码、需要重新登录、或需要运维在浏览器里手动介入
 - **THEN** 云端 MUST NOT 置 `eligible=true`，浏览器保持打开，既有的诚实告警行为不变
+
+#### Scenario: 验证码把账号打成受限时 MUST NOT 让位
+- **WHEN** 边缘上报验证码 → 风控信号把账号迁到 `restricted` → 续场闸据此判停工
+- **AND** 该边缘正处于验证码暂停态
+- **THEN** 云端 MUST 置 `eligible=false`、`reason='hard_blocker'`——**绝不能关掉运维正要去解验证码的那个浏览器**。
+  注：`ui.snapshot` 有意豁免验证码暂停闸（它是界面数据、不是页面命令），故提示**会**送达该边缘；边缘侧的浮层标志会被「浏览循环结束」清掉，**MUST NOT 被当作这条的防线**。
+
+#### Scenario: 验证码期间任何停工来源都 MUST NOT 让位
+- **WHEN** 边缘正处于验证码暂停态，且该账号同时满足某个让位来源（排期外 / 每日上限已满 / 配额耗尽 / 周历关闭）
+- **THEN** 云端 MUST 一律置 `eligible=false`——该闸 SHALL 压在所有来源之前，MUST NOT 只补在受限那一支
+
+#### Scenario: 验证码解除后恢复正常让位
+- **WHEN** 验证码已解除，边缘不再处于暂停态，而账号仍因某个来源停工
+- **THEN** 云端按正常判据产出可待机提示——该闸 MUST NOT 永久禁用让位
 
 #### Scenario: 短等待不触发待机
 - **WHEN** 距下一次可执行动作的预计等待时间低于门槛（默认 5 分钟）

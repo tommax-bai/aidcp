@@ -28,6 +28,8 @@
 - **WHEN** a cold-standby wake would push memory past the admission ceiling
 - **THEN** the wake is refused honestly with a memory reason, and MUST NOT proceed on the grounds that it is "only a wake"
 
+## ADDED Requirements
+
 ### Requirement: 「槽位被占」SHALL 是排队原因，MUST NOT 是失败原因
 
 槽位 / 内存暂时不够时，**任何**开浏览器的请求 SHALL 进等槽位队列，MUST NOT 因此判失败——**无论请求方是谁**。判失败的判据只能是「结构上做不到」，MUST NOT 是「有人在死线上等」：一个排在队里的任务，与一个不可能完成的任务，是两件不同的事。
@@ -75,8 +77,6 @@
 #### Scenario: 缓存占满的机器仍能开浏览器
 - **WHEN** 本机大量内存被文件缓存占用（完全空闲页数远低于单环境估值），但可回收内存充裕
 - **THEN** 准入闸放行、槽位按可回收内存推算，MUST NOT 因空闲页数低而拦阻全部开浏览器路径
-
-## ADDED Requirements
 
 ### Requirement: 浏览器槽位池 SHALL 按内存封顶、并以 1:2 限制可设账号数
 
