@@ -985,3 +985,17 @@ FB 发帖的正文填写是 O(正文长度) 的逐字输入，却被云端用常
 - [ ] 71.8 刷新诊断不泄密 + 缺凭据时诚实 — 刷新响应体只含写入 / 价格 / 跳过 / 缺凭据四类字段，**不含任何 AK/SK/token 明文**；某厂商账单凭据未配置时，它出现在「缺凭据」里并被如实跳过，**绝不写入任何伪造 / 兜底价格**（守「不静默假成功」红线），UI 提示为警告态而非绿色成功态。
 - [ ] 71.9 用量页其余能力无回归 — 新增成本列后，日期范围 / 账号 / 角色 / 模型筛选、10 分钟总量曲线、角色中文标签、空区间空态均照旧工作，表格不因新列被挤破版。
 - [ ] 71.10 图片生成行不当作 token 计价目标 — 零 token 的图片生成行**不得**被纳入价格刷新目标、也不得为其请求或写入 token 价格快照（主 spec 已有此条，随本批一并核）。
+
+## 簇 72
+
+### change `facebook-feed-scroll-refresh-fix` 真机验收（FB 首页浏览回归修复 + `feed.refresh` 实装，登记于 2026-07-14；edge master `adf10f8` 已 land，edge-only 无 ECS 部署，运营 / 客户机 pull master + 重建安装包后生效）
+
+**背景**：FB 首页「看一两条就整页刷新、永远滚不下去、每屏只报 1 张卡」。三层根因已修（全 edge-only、不改协议）：① `ensureFeed` 改幂等（已在目标列表面且无 dialog 就不再整页 `Page.navigate`，消掉 `7b9b37e` 的滚动重置回归，fail-closed 复检两条路径都跑）；② `settleCards` 以 loading-aware 累积判稳替换两道 existence gate（相邻两轮真卡集合稳 + 无 `role=progressbar`/`aria-busy` + wall-clock 兜底，空壳仍拒）；③ `feed.refresh` 实装为页内点顶栏首页图标 `[role=banner] a[href="/"]` 换批、后置校验「首卡 permalink 变更且非空」、`Page.reload` 带 ≥3min 频率下限兜底；附带修 split-brain（`backToFeed`/`navigateFeedBestEffort` 回 `activeFeedUrl` 而非会话初始首页）。桩测/jsdom 全绿（feed-reader 幂等/判稳/点击 + session split-brain/refresh，1191 全量 + 19 acceptance + typecheck 绿），但下列真机行为桩验不了、须运营机核。
+
+**前置**：运营/客户机 pull edge master 并以带 Facebook 的默认分支重建安装包运行；一个 FB 互动号（headful）、`AIDCP_FB_BROWSE_AUTO=on`、连 dev 云端；用只读 CDP 连活浏览器看 `performance.timeOrigin` 判有无整页重载。
+
+- [ ] 72.1 连续滚动不再整页重载（核心回归项）— FB 首页自动浏览时连续多条 `page.scroll`：`scrollY` 单调增长、能真正往下看多屏；只读 CDP 观察 `performance.timeOrigin` **全程不变**（无整页重载），对比修复前「44s 重载 5 次、scrollY 每次归零」。
+- [ ] 72.2 每屏上报多卡而非 1 张 — feed 稳定后每次 `page.cards` 上报的真卡数 > 1（虚拟化空壳仍被正确跳过、绝不臆造），对比修复前每屏 1 张。
+- [ ] 72.3 `feed.refresh` 真换批不重载 — 深度到阈值云端下发 `feed.refresh`：边缘点顶栏首页图标后 feed 首卡 permalink 变成新的一批、`timeOrigin` 不变（SPA 换批非整页重载）；首卡未变时诚实回 `not_refreshed`、不报陈旧卡。
+- [ ] 72.4 搜索浏览返回不丢结果（split-brain）— 从 FB 全站搜索结果开一篇帖子后返回：落回**原搜索结果页**继续下滑，而非被带回 explore 首页从头重搜。
+- [ ] 72.5 fail-closed 未因省导航而漏 — 在首页态弹出验证码/登录浮层时收到 `page.scroll`：边缘诚实回 `blocked_by_captcha`/`login_required` 且**不滚动**（确认幂等放行路径仍复检阻断，未因跳过导航而漏掉前置门）。
