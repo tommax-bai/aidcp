@@ -94,6 +94,17 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 - **WHEN** status 推送缺失新增的 presence / publish 字段
 - **THEN** 渲染器按待命态安全降级渲染，不抛错、不白屏
 
+#### Scenario: Facebook confirmed browse actions produce structured desktop events
+- **WHEN** a Facebook child has actually started its enabled browse session, successfully reported `note.detail`, or confirmed `action.completed` for a like
+- **THEN** it emits a structured UI event that updates the activity stream and presence projection for that child
+- **AND** a successful `note.detail` contributes exactly one local view fallback increment and a confirmed like contributes exactly one local like fallback increment
+- **AND** shadow, failed, already-liked, or no-target paths MUST NOT produce a success increment
+
+#### Scenario: Facebook read activity identifies the opened content without raw identifiers
+- **WHEN** a Facebook `note.detail` has a readable author nickname and post body
+- **THEN** its desktop activity and presence text show bounded, whitespace-normalized author and leading-content excerpts
+- **AND** when either field is unavailable, the text MUST degrade to an honest generic description and MUST NOT show a permalink or raw note ID
+
 ### Requirement: 客户端启动不自动开跑任务
 应用启动后 MUST NOT 自动启动自动运营任务；任务 SHALL 由用户经会话控制按钮手动启动。应用启动时 SHALL 做一次轻量预检：配置缺失则呈现待配置引导，配置齐备则如实呈现「就绪」。
 
