@@ -37,6 +37,7 @@
 - [x] 2.6 排队等待计入死线：轮到它时已超死线即**立刻诚实失败**，绝不再启动一个没人等的浏览器（它会白占槽位）。<!-- aidcp-edge 7226f01 -->
 - [x] 2.7 拆掉零抖动唤醒羊群：到点的唤醒**投进串行队列**逐个放行（用户已否决抖动方案）。<!-- aidcp-edge 7226f01 -->
 - [x] 2.9 1:2 上限：账号数 > 2 × 槽位时诚实告警「部分账号可能长期排不到槽位」。<!-- aidcp-edge 7226f01 -->
+- [x] 2.11 **两个上限进客户端设置页**（原本只有 `AIDCP_BROWSER_SLOTS` / `AIDCP_PER_ENV_MB` 两个环境变量——分发出去的安装包里运营根本改不了）。设置抽屉新增「浏览器并发」卡：并发浏览器数 + 最大账号数，留空 = 自动。优先级 **界面 > 环境变量 > 按内存自动推**；0 / 空 = 自动而非「上限 0」；上界 64 防手滑。算法权威只在主进程一处（渲染层只显示、不重算——两处各算一遍必然漂移）。账号上限允许设到 1:2 之上，但诚实告警「部分账号可能长期排不到槽位」。改完即刻生效，不需重启核心。<!-- aidcp-edge ede64c4 -->
 - [x] 2.10 单测：队列串行性（并发下峰值并发 = 1）；优先级 + FIFO；一个失败不阻塞其余；超死线不启动；槽位上限 / 1:2 / 700MB 估值。<!-- aidcp-edge 7226f01 -->
 - [ ] 2.8 **手动任务策略未实装**：插队首 → 起浏览器 → 执行 → 完成后关闭归还槽位。队列已支持 `kind:'manual'` 优先级，但「跑完就关」这一段还没接（现在手动任务唤醒后走的是 1.9「重判待机」的通用逻辑）。
 - [ ] 1.9-b **「任务完成后重判待机」未单独实装**：目前依赖云端下一次的待机提示来重新停泊，而不是任务一结束就立刻判。行为正确（不会漏关），但会多占一小会儿槽位。
@@ -52,9 +53,9 @@
 
 ## 4. 验收与部署
 
-- [x] 4.1 edge：`test:acceptance` 19/19、`test` 1192/1192、`typecheck` 全过。<!-- aidcp-edge 7226f01 -->
+- [x] 4.1 edge：`test:acceptance` 19/19、`test` 1224/1224、`typecheck` 全过。<!-- aidcp-edge ede64c4 -->
 - [x] 4.2 cloud：`test:acceptance` 50/50、`test` 1933/1933、`typecheck` 全过（安全红线 `AC-PROTO-*` / `AC-PUB-*` / `AC-RISK-*` 全绿）。<!-- aidcp-cloud 87f53b9 -->
-- [ ] 4.3 **cloud 部署 dev 未做**。两个 canonical checkout 当时都有并发 session 的未提交改动（edge 在改 renderer、cloud 在改 panel），按 CLAUDE.md §6「严禁从脏共享工作区上线」暂缓；须从 `origin/master` 的干净快照走安全序列（target check → 探 ECS 现状 → 备份 → rsync → restart → healthcheck）。**本 change 无依赖变更**，不需要全量 `npm ci`。
+- [x] 4.3 **cloud 已在 dev 生效**（无需本 session 再 rsync）。探 ECS 时发现并发 session 于 15:49 已把其工作树 rsync 上去，**其中已包含本 change 落在 master 的全部云端提交**，服务 15:50:58 重启（晚于文件落地）。逐文件核对指纹：`MAX_RETRIES_PER_CELL`×3、`browser_wake_failed`（`edge-task-lease-client.ts`×4 / `protocol.ts`×2）、`onScheduledTaskNotStarted`×3。healthcheck：`active (running)`、8787 + 8090 监听、飞书长连接已建立、「PG 锚点缓存已就绪」、`NRestarts=0`、isales 未受影响。**故意不再从 `origin/master` 覆盖 rsync**——那会顶掉该 session 尚未入库的 panel 工作（`src/panel/downloads-manifest.ts` 在机器上但不在 git 里），等于把他们正在 dev 上测的东西悄悄回滚。**本 change 无依赖变更**，不需要全量 `npm ci`。<!-- 2026-07-14 deployed (dev) -->
 - [ ] 4.4 真机验收项登记 `docs/real-machine-acceptance-backlog.md`：
   - 停泊 → 唤醒 → 执行 → 重判待机一整圈，**云端连接全程不断**（这是本方案相对「杀进程重启」的核心可观测差别）。
   - 唤醒后登录态与身份被**重新确认**（而非沿用释放前缓存）。
