@@ -90,6 +90,11 @@
 
 ## Notes
 
+- **Follow-up hardening `e750831` (cloud master, deployed dev 18:32:30)** — adversarial review of `bf3d75a` caught a real regression + two gaps, all fixed:
+  1. (HIGH, real XHS regression) `approvalInFlight` stuck `true` in the **unwired-approval default config**: `CommentApprovalGate` subscribes to `comment.cleared` before the dispatcher and, when unwired, synchronously `skip()`s → nested `comment.skipped` cleared the flag *before* the dispatcher's `comment.cleared` handler set it true → idle-nudge recovery permanently suppressed for the session. Fixed: only set the flag when approval is genuinely wired (`if (this.commentApproval)`).
+  2. (compounding) the cross-session reset was only in `startSession()` (test-only); production (re)starts use `restartSession()`, which lacked it — added there.
+  3. (C2 hardening) migration second-step `landed` now requires a matching derived `noteId` (was accepting missing) — fail-closed per spec, never send an approved comment to an unverified target.
+  Tests: unwired-config regression + wired genuine-wait suppression + navigate-missing-noteId fail-closed. full 2000/2000, acceptance 50/50, typecheck clean.
 - **`facebook-join-actuation-decouple` MUST rebase after this** (it also touches protocol.ts to add clickToken; still 0/24, hasn't started). C1b landed first as planned.
 - **C1a's own deploy is now satisfied** (it was already on dev; this batch confirmed both zero-behavior on dev). C1a archive travels with C1b in the next triage batch.
 - **C2 handoff**: edge must (a) populate `action.completed.noteId` (derived) + note-scoped `observation` on inline like, (b) honor `purpose:'navigate'` by skipping reportNoteDetail (task 3.2), (c) supply the target URL for FB comment migration. Flip FB `noteSurfaces.read_content`/`like` to 'feed' in the registry (data change) to activate all C1b machinery.
