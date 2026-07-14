@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 多角色，`RoleName` 穷举现 43 项，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> v2 共 **74 个消息类型**（含 `pacing.update`），下表按职能分组列全。计数与表为人工维护，以两端 `protocol.ts` 的 `MessageType` 穷举为准（可能滞后于代码）。
+> v2 共 **76 个消息类型**（含 `pacing.update`），下表按职能分组列全。计数与表为人工维护，以两端 `protocol.ts` 的 `MessageType` 穷举为准（可能滞后于代码）。
 
 ## 1. 信封（Envelope）
 
@@ -148,6 +148,8 @@
 | `publish.approval_request` | edge → cloud | 请求云端发送发布审批卡片（飞书） |
 | `publish.approval_action` | edge → cloud | 客户端稿件预览内提交发布/取消审批动作，携稿件版本 |
 | `publish.approval_action.result` | cloud → edge | 返回审批动作受理结果；不代表已完成发帖 |
+| `publish.draft_image_remove` | edge → cloud | 客户端稿件预览内删除待审稿件的某张配图，携稿件版本 |
+| `publish.draft_image_remove.result` | cloud → edge | 返回删配图结果（成功回带写后真态 images + 新版本）|
 | `publish.result` | edge → cloud | 发布结果回传（ok / postId / error；v1 整页路径） |
 | `publish.command` | cloud → edge | 下发一条参数化发布原子指令（`taskId` 为当前发布租约；`recordId+seq` 关联键，`kind` ∈ E1-E10） |
 | `publish.command.result` | edge → cloud | 单条发布指令执行结果回传（按 `recordId+seq` 关联；`ok/value/error/details`，红线不静默假成功） |
@@ -181,7 +183,7 @@
 }
 ```
 
-`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 74 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。
+`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 76 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。
 
 **`welcome`**（cloud → edge）
 ```jsonc
@@ -822,6 +824,35 @@ first-writer-wins 审批信号。动作成功只表示审批决定已受理：`a
   "currentVersion": 1         // 可选；版本过期时返回当前版本
 }
 ```
+
+**`publish.draft_image_remove`**（edge → cloud）——客户端稿件预览内删除某张配图
+```jsonc
+{
+  "requestId": "publish-89",          // string；仅接受 publish-<数字>
+  "contentVersion": 0,                 // number；客户端所见版本（必填，云端落库前复核）
+  "imageUrl": "https://.../2.jpg"     // string；待删的那张，MUST 是该稿当前 images 成员
+}
+```
+只表达“删这一张”的意图：**保留子集由云端在库内真态上算出**，绝不采信客户端提交的列表。
+云端闸序（任一不过即具名拒因）：`invalid_request` → `account_unavailable` → `not_found` →
+`account_mismatch`（草稿须属于握手确立的会话账号）→ `already_decided` → `not_pending` →
+`version_stale` → `image_not_found`（只删不注入）→ `last_image`（**最后一张不可删**：无图的
+图文帖会被下发段诚实判 failed）。落库复用与控制台编辑同一个乐观 CAS 单写方法
+（事务内 FOR UPDATE + `content_version` CAS），成功即 `content_version + 1`、原飞书审核卡失效。
+
+**`publish.draft_image_remove.result`**（cloud → edge）
+```jsonc
+{
+  "requestId": "publish-89",
+  "ok": true,
+  "images": ["https://.../1.jpg", "https://.../3.jpg"], // 成功：写后回读真态（保序）
+  "contentVersion": 1,                                    // 成功：自增后的版本
+  "reason": "last_image",                                 // 可选；失败原因
+  "currentVersion": 2                                     // 可选；版本过期时返回当前版本
+}
+```
+`ok:true` 仅表示“该配图已从待审稿件移除”，**不代表已发布**。客户端 MUST 以本应答回带的真态
+刷新所持稿件（云端另会 best-effort 重推一帧 `ui.snapshot` 预览，但可能落空，不可作为唯一刷新手段）。
 
 **`publish.result`**（edge → cloud）
 ```jsonc
