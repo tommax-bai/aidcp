@@ -3,3 +3,6 @@ dist/
 *.log
 .env
 .DS_Store
+
+# openspec CLI 生成的 agent skill 脚手架（.claude/skills 的镜像，非人工维护）
+.agents/

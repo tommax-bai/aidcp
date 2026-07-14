@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/Users/baitianxing/codes/aidcp/.codex/hooks/check-canonical-main.sh'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
