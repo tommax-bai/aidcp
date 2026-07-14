@@ -74,7 +74,7 @@
 | `note.ack` | cloud → edge | 确认收到笔记，异步处理中 |
 | `browse.next` | cloud → edge | 滚动/滑到下一条笔记 |
 | `browse.scroll` | cloud → edge | 在当前页面滚动 |
-| `note.open` | cloud → edge | 打开一条笔记 |
+| `note.open` | cloud → edge | 打开一条笔记（可选 `surface`:'feed'\|'detail' 就地读/进详情；可选 `purpose`:'read'\|'navigate'，navigate=只带浏览器到详情供评论迁移、MUST NOT 上报 note.detail；change platform-browse-protocol，均 optional、缺省=今天） |
 | `note.close` | cloud → edge | 关闭当前笔记 |
 | `search.execute` | cloud → edge | 执行一次关键词搜索 |
 | `session.end` | cloud → edge | 结束本次浏览会话 |
@@ -109,7 +109,7 @@
 | `page.cards` | edge → cloud | 上报当前可见卡片列表（index/title/author/计数） |
 | `note.detail` | edge → cloud | 上报笔记详情（正文/作者/计数） |
 | `profile.detail` | edge → cloud | 上报作者主页数据（粉丝数/作品数） |
-| `action.completed` | edge → cloud | 确认某个 action 执行完成 |
+| `action.completed` | edge → cloud | 确认某个 action 执行完成（可选 `noteId`=从被点 article DOM 派生的规范 postId、MUST NOT 抄命令 payload；可选 `observation`=独立见证包 {surface?/listKey?/author?/textPreviewHead?/reactionText?/articleIndex?}，供云端归账仲裁逐字段比对选中卡；change platform-browse-protocol，均 optional、缺省=今天回落 currentNoteId） |
 | `notification.detected` | edge → cloud | 检测到「消息」有未读（仅信号；`epoch` 每次由无变有 +1，去重用） |
 | `notification.home` | edge → cloud | 通知首页各类未读快照（评论/赞收藏/关注计数，喂分诊） |
 | `notification.items` | edge → cloud | 上报本次巡视抽取的通知项（`NotificationItem`：`kind`=comment/mention/like/collect/follow、`fromUser`昵称、`fromUserId?`主页ID稳定身份、`content`、`noteTitle?`、`itemKey?`；是否通知由云端判，发送者沉淀进通知联系人名册） |
