@@ -135,6 +135,23 @@ X64_PATH="$WORK_DIR/$X64_FILE"
 info "已下载: $(cd "$WORK_DIR" && ls -1 *.dmg | tr '\n' ' ')"
 
 # ---- 2. static trust / asar / env gates ------------------------------------
+#
+# ⚠ NEVER hand-run the @electron/asar *CLI* to inspect a dmg's contents:
+#
+#     npx @electron/asar extract-file app.asar package.json     # ← WRITES package.json INTO CWD
+#     npx @electron/asar ef app.asar package.json               # ← same, short form
+#
+# The CLI *writes the extracted file into the current directory*. Run it from a repo root and it
+# silently overwrites whatever file has that name. This已经发生过一次: verifying the 0.3.21 OL dmg
+# from the control-repo root overwrote aidcp/package.json with the edge app's PACKAGED manifest
+# (name=aidcp-edge, version=0.3.21, aidcpCloudDefaultEnv=ol) — a control repo that suddenly claimed
+# to be the edge client, pointing at OL. No error, no warning; it just looked like the repo was
+# broken.
+#
+# The gates below use the *library* form instead — `require("@electron/asar").extractFile()` returns
+# a Buffer and writes nothing. Keep it that way. If you must poke at an asar by hand, do it from a
+# scratch directory, never from a repo root.
+#
 # _check runs a command quietly; records pass/fail without aborting (so we always detach).
 _FAILS=0
 _check() {
