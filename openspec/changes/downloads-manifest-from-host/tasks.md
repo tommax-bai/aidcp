@@ -21,7 +21,8 @@
 - [x] 3.3 部署 dev（cloud `38f3082` + console `aa3461d`）：cloud 备份→干净快照 rsync→restart→active；console 备份（留最近 10 个 tar）→**不带 `--delete`** rsync→nginx :8088 index=200、`/api/downloads` 经反代 401（受鉴权，符合预期）。**端到端实证**：在 ECS 上对 dev 真实目录跑 `readDownloadsManifest()` → `{version:"0.3.18", items:[mac-arm64 0.3.18, mac-x64 0.3.18, win-x64 0.3.5]}`——正是 dev 目录里真实存在的包，`.bak` 与历史版本全部正确忽略 <!-- 2026-07-14 deployed -->
 - [x] 3.4 记录：console 的两条「工件指针」搁浅提交（`7a1b718` / `88ce4c8`）**自动作废**——下载页版本不再是源码，无物可回流。`e5a4d1d`（edge `package.json` 版本）**不作废**：那是构建版本、合法地属于源码；纪律不变（出包前先抬版本，且必须严格高于已分发的 0.3.20 → 下次出包用 **≥0.3.21**） <!-- 2026-07-14 -->
 
-## 4. 后续（不在本 change）
+## 4. 发版链路收口（本 change 内必做——不做就是坏的）
 
-- [ ] 4.1 `scripts/release-desktop-macos` 删掉「改 console 源码版本号 + 重新构建部署 console」那一步（本 change 只去掉必要性）
-- [ ] 4.2 OL 部署（需用户明确要求）：OL 下载页应自动显示 0.3.20（其目录里真实存在的包）
+- [x] 4.1 `scripts/release-desktop-macos`：删掉「改 console 源码版本号 → 构建 console → 部署 console → 提交 downloads.ts」四步。**这不是可选清理**——脚本原第 217 行 `grep -q "version: '$VER'" "$DL_TS" || die` 会因为那个常量已不存在而**直接 die**，发版链路当场是坏的。现在交付 = 下载 → 静态校验 → 传包 → 验活；`bash -n` + `--help` 已验 <!-- aidcp (本 change) -->
+- [x] 4.2 `aidcp-edge/docs/release-desktop.md`：§0 事实、§4/§5 两节改写为「已删除」并说明为什么，末尾指针指向新的清单来源 <!-- aidcp-edge -->
+- [x] 4.3 OL 部署需用户明确要求（§5 铁律），故不在本 change 执行；已解耦登记到真机 backlog **簇 65.2**——同一份代码部署到 OL 后下载页应自动显示 0.3.20，这是本 change 核心主张「两台机器各说各的真话」的最终验收。 <!-- 2026-07-14 backlog 簇65 -->

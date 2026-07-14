@@ -7,12 +7,16 @@
 # GitHub prerelease and carries them to the download page:
 #
 #   preflight -> download prerelease dmgs -> static trust/asar/env gates
-#             -> bump console downloads.ts -> build console
-#             -> (--yes) upload dmgs + deploy console + verify 200 + commit downloads.ts
+#             -> (--yes) upload dmgs to the target's downloads dir + verify 200
 #
-# Default run is LOCAL / read-only (download + verify + edit + build) and stops with
-# the exact outward commands. Pass --yes to also perform the three outward actions.
-# Mirrors land-change's "prep by default, --yes to execute" convention.
+# Publishing IS the upload. The download page reads its version by scanning that host's
+# /opt/aidcp/downloads at request time (change downloads-manifest-from-host), so there is
+# no console source to bump, build, deploy, or commit — those four steps used to live here
+# and are gone. A version baked into source described "which binary sits on which host",
+# which made it a lie on every host but one.
+#
+# Default run is LOCAL / read-only (download + verify) and stops with the exact outward
+# command. Pass --yes to also upload. Mirrors land-change's "prep by default, --yes to execute".
 #
 # PREREQUISITES (the judgment half this script deliberately does NOT automate):
 #   1. Version already bumped in aidcp-edge/package.json and pushed to master.
@@ -47,12 +51,13 @@ usage: scripts/release-desktop-macos <version> [options]
   --tag <tag>          prerelease tag to pull (default: desktop-v<version>).
   --work-dir <dir>     where to download dmgs (default: $TMPDIR/aidcp-desktop-release-<version>).
   --skip-verify        skip the local static trust/asar/env gates (NOT recommended).
-  --yes                also perform the 3 outward actions: scp dmgs to ECS,
-                       build+deploy console, verify 200, commit+push downloads.ts.
+  --yes                also perform the outward actions: scp dmgs to the target's
+                       downloads dir, then verify the page serves them (200).
   -h, --help           this help.
 
-Without --yes: downloads + verifies + edits downloads.ts + builds console locally,
-then prints the outward commands and stops. Nothing leaves this machine.
+Without --yes: downloads + verifies locally, prints the outward command and stops.
+Nothing leaves this machine. The download page needs no source change or rebuild —
+it reports whatever installers that host actually holds.
 
 Prerequisite: CI prerelease desktop-v<version> already published (see header comment).
 EOF
@@ -100,17 +105,14 @@ fi
 [ -n "$WORK_DIR" ] || WORK_DIR="${TMPDIR:-/tmp}/aidcp-desktop-release-$VER"
 ARM_FILE="AIDCP-$VER-arm64.dmg"
 X64_FILE="AIDCP-$VER.dmg"
-DL_TS="$(repo_path aidcp-console)/src/config/downloads.ts"
 
 # ---- 0. preflight -----------------------------------------------------------
 info "== 0. preflight =="
 [ "$(uname -s)" = "Darwin" ] || die "校验需要 macOS 专有工具（hdiutil/spctl/codesign/stapler）。"
 repo_cloned aidcp-edge    || die "缺少 ../aidcp-edge（校验用其 @electron/asar 解析）。"
-repo_cloned aidcp-console || die "缺少 ../aidcp-console（下载页配置在此）。"
 command -v gh >/dev/null   || die "缺少 gh CLI。"
 gh auth status >/dev/null 2>&1 || die "gh 未登录（gh auth login）。"
 command -v node >/dev/null || die "缺少 node。"
-[ -f "$DL_TS" ] || die "找不到下载页配置: $DL_TS"
 
 # resolve + hard-check the ECS target (read-only; verifies key exists & perms are 600)
 "$_DIR/deploy-target" "$TARGET" --check >/dev/null
@@ -209,35 +211,22 @@ else
   warn "== 2. 跳过本机静态校验（--skip-verify）=="
 fi
 
-# ---- 3. bump console downloads.ts (local, needed to build) ------------------
-info "== 3. 改后台下载页配置 downloads.ts =="
-perl -0777 -pi -e "s/(version:\\s*)'[^']*'/\${1}'$VER'/"                         "$DL_TS"
-perl -pi     -e "s/(key: 'mac-arm64'[^\\n]*file: ')[^']*/\${1}$ARM_FILE/"        "$DL_TS"
-perl -pi     -e "s/(key: 'mac-x64'[^\\n]*file: ')[^']*/\${1}$X64_FILE/"          "$DL_TS"
-grep -q "version: '$VER'" "$DL_TS" || die "downloads.ts version 替换未生效（格式变了？手动核对）。"
-grep -q "$ARM_FILE" "$DL_TS"       || die "downloads.ts mac-arm64 文件名替换未生效。"
-grep -q "$X64_FILE" "$DL_TS"       || die "downloads.ts mac-x64 文件名替换未生效。"
-info "downloads.ts -> version $VER / $ARM_FILE / ${X64_FILE}（win 未动）。"
-
-# ---- 4. build console (compiles the edit; a gate before any deploy) ---------
-info "== 4. 构建 console（顺带验证配置能编译）=="
-( cd "$(repo_path aidcp-console)" && npm run build >/dev/null ) \
-  || die "console 构建失败（downloads.ts 改坏了？）——已停手，未做任何对外动作。"
-info "console 构建通过（dist/ 已生成）。"
-
 # ---- prep-only stop point ---------------------------------------------------
+# 注：曾经这里还有「改 console downloads.ts 版本号 + 重新构建部署 console」两步。它们已随
+# change downloads-manifest-from-host 消失——下载页版本不再是源码，而是由云端**现扫该机
+# /opt/aidcp/downloads 目录**得出。交付新包 = 把包放到那台机器上，页面自动跟上。
 if [ "$DO_YES" -eq 0 ]; then
   AUTH_REPLAY=""
   [ -z "$EXPECT_AUTH_URL" ] || AUTH_REPLAY=" --expect-client-auth-url $EXPECT_AUTH_URL"
   cat <<EOF
 
 == 本地准备完成（未做任何对外动作）==
-已完成：下载 + 静态校验 + 改 downloads.ts + 构建 console。
-downloads.ts 已改但**未提交**；dmg 未上传；console 未部署。
+已完成：下载 + 静态校验。dmg 未上传。
 
-复核后加 --yes 一键完成剩余对外动作（传包 + 部署 console + 验活 + 提交 downloads.ts）：
+复核后加 --yes 完成剩余对外动作（传包 + 验活）：
   scripts/release-desktop-macos $VER --target $TARGET --expect-env $EXPECT_ENV$AUTH_REPLAY --yes
 
+下载页无需任何改动 / 重新构建：包一落到 $TARGET 的 downloads 目录，页面下次打开即显示该版本。
 或手动逐步（见 aidcp-edge/docs/release-desktop.md §3–6）。
 EOF
   exit 0
@@ -248,27 +237,16 @@ fi
 #  and /opt/aidcp/console — NEVER isales. Backup before overwrite. Never force-push.
 # ============================================================================
 
-# ---- 5. upload dmgs to ECS --------------------------------------------------
-info "== 5. 上传 dmg 到 $TARGET:$DOWNLOADS_DIR =="
+# ---- 3. upload dmgs to ECS --------------------------------------------------
+# 这一步就是「发布」的全部：包一落进该机 downloads 目录，其下载页下次打开即显示该版本
+# （云端现扫目录得出清单，见 change downloads-manifest-from-host）。不需要改代码、不需要重新构建 console。
+info "== 3. 上传 dmg 到 $TARGET:$DOWNLOADS_DIR =="
 scp -i "$KEY" "$ARM_PATH" "$X64_PATH" "root@$HOST:$DOWNLOADS_DIR/" \
   || die "scp dmg 到 ECS 失败。"
 info "已上传两个 dmg。"
 
-# ---- 6. deploy console (backup, then swap; isales untouched) ----------------
-info "== 6. 部署 console 到 ${TARGET}（先备份再覆盖）=="
-CONSOLE_REPO="$(repo_path aidcp-console)"
-tar czf "$WORK_DIR/console-dist.tar.gz" -C "$CONSOLE_REPO/dist" .
-scp -i "$KEY" "$WORK_DIR/console-dist.tar.gz" "root@$HOST:/tmp/" || die "scp console 产物失败。"
-ssh -i "$KEY" "root@$HOST" 'set -e; ts=$(date +%Y%m%d-%H%M%S); cd /opt/aidcp; \
-  tar czf console.bak.$ts.tar.gz console; \
-  rm -rf console/assets; \
-  tar xzf /tmp/console-dist.tar.gz -C console; \
-  rm -f /tmp/console-dist.tar.gz; \
-  echo "console deployed; bundle ->"; grep -o "assets/index-[A-Za-z0-9_-]*\.js" console/index.html' \
-  || die "console 部署失败（ECS 侧）。"
-
-# ---- 7. verify live (curl on ECS :8088) ------------------------------------
-info "== 7. 验活（ECS 本机 curl :8088）=="
+# ---- 4. verify live (curl on ECS :8088) ------------------------------------
+info "== 4. 验活（ECS 本机 curl :8088）=="
 ssh -i "$KEY" "root@$HOST" "
   echo '-- 后台首页 --'; curl -sS -o /dev/null -w 'http=%{http_code}\n' http://127.0.0.1:8088/;
   echo '-- mac arm64 --'; curl -sSI 'http://127.0.0.1:8088/downloads/$ARM_FILE' | grep -iE 'HTTP/|content-length';
@@ -277,31 +255,10 @@ ssh -i "$KEY" "root@$HOST" "
 info "本机 dmg 字节数（与上面 content-length 对齐核对）："
 ls -l "$ARM_PATH" "$X64_PATH" | awk '{print "   "$5"  "$NF}'
 
-# ---- 8. commit + push downloads.ts (bookkeeping; soft-fail) -----------------
-info "== 8. 提交 downloads.ts 到 console master（记账，末位软失败）=="
-CUR_BRANCH="$(git -C "$CONSOLE_REPO" branch --show-current)"
-if [ "$CUR_BRANCH" != "master" ]; then
-  warn "console 当前在 '$CUR_BRANCH' 非 master——跳过自动提交，请手动提交 downloads.ts。"
-else
-  # 只提交 downloads.ts，绝不 git add -A（单写者纪律 / 避免带入他人 WIP）
-  git -C "$CONSOLE_REPO" add src/config/downloads.ts
-  if git -C "$CONSOLE_REPO" commit -q -m "downloads: mac $VER signed+notarized ($EXPECT_ENV default, client auth)" 2>/dev/null; then
-    if git -C "$CONSOLE_REPO" push -q origin master 2>/dev/null; then
-      info "downloads.ts 已提交并推送 master。"
-    else
-      warn "push 撞 non-ff 或失败——线上下载页已更新，仅 git 记账未推。绝不 force；请手动 rebase 后推："
-      warn "  git -C '$CONSOLE_REPO' pull --rebase origin master && git -C '$CONSOLE_REPO' push origin master"
-    fi
-  else
-    warn "downloads.ts 无改动可提交（可能已提交过）。"
-  fi
-fi
-
 cat <<EOF
 
 == 交付完成 ==
 - dmg 已上传 $TARGET:$DOWNLOADS_DIR （$ARM_FILE / ${X64_FILE}）
-- console 已部署（备份在 ECS /opt/aidcp/console.bak.*.tar.gz）
-- 下载页应返回 200（见上）
+- 下载页应返回 200（见上）；页面版本由云端现扫该目录得出，无需改代码 / 重新构建 console
 剩余（本脚本不覆盖，真机验收簇 60）：干净 Mac 真实下载不被拦 / 实连 $EXPECT_ENV / hardened runtime 起浏览器。
 EOF

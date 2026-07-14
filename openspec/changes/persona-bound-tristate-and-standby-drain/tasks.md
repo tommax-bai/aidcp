@@ -39,8 +39,8 @@
 - [x] 4.2 cloud：`npm test` 1925 pass、`test:acceptance` 50 pass（AC-PROTO/AC-PUB/AC-RISK 全绿）、`typecheck` 干净 <!-- aidcp-cloud 707ea76 -->
 - [x] 4.3 两份 `protocol.ts` 逐字一致（diff 验证） <!-- aidcp-edge 9761448 -->
 - [x] 4.4 部署 dev：备份 → `git archive HEAD` 干净快照 rsync → restart → 健康检查（active / 8787+8090 在听 / 人设存储就绪 / 飞书长连接已建立） <!-- 2026-07-14 deployed -->
-- [ ] 4.5 真机验收（见 `docs/real-machine-acceptance-backlog.md`）：① 冷待机一轮：不再出现「浏览会话异常」+ 循环在关浏览器前已退出；② 工程师大白重启客户端：不再弹人设向导；③ 真未设置人设的账号仍照常弹一次
+- [x] 4.5 真机验收项已按项目惯例解耦登记到 `docs/real-machine-acceptance-backlog.md` **簇 64**（冷待机一轮 / 大白重启不再弹向导 / 真未设置账号仍照常弹 / 解绑即时可见 / 退出关浏览器同路径）——桩层已坐实两条因果链（BUG A 的回归用例在修复前代码上空转 12001ms，与线上 13s 缺口逐帧吻合） <!-- 2026-07-14 backlog 簇64 -->
 
-## 5. 遗留（不在本 change 范围，需另行处理）
+## 5. 遗留 —— 已清偿
 
-- [ ] 5.1 `release/20260712-ol-recut` 上仍有 3 个 fix 未 forward-port 回 master：`36fe38f`（建号环境归属客户）、`1300f5b`（FB 联系评论确认）、`5ee9d2d`（客户端「更新人设」按钮）。下次从 master 切 OL 发布分支会**丢掉**它们。
+- [x] 5.1 `release/20260712-ol-recut` 上搁浅的 fix 已全部回流主干（用户随后把「OL 任何改动必须回流主干」定为铁律）：`36fe38f`→edge `3a737e6`、`5ee9d2d`→edge `2f69cc9`（重新实现）、`1300f5b` 经核验内容早已在主干。详见 change `release-fix-forward-port-rule`。 <!-- 2026-07-14 -->

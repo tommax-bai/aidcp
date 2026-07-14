@@ -17,14 +17,14 @@
 - [x] 2.7 console `958384f`（FB 上传 nginx 限额）→ 核验**内容已在主干**，弃掉 <!-- verified 2026-07-14 -->
 - [x] 2.8 回归：edge 1183 pass + acceptance 19、cloud 1940 pass + acceptance 50、双 typecheck 干净；两次 push 撞 non-ff 均 rebase 重来（未 force） <!-- 2026-07-14 -->
 - [x] 2.9 cloud 部署 dev（`ecefe7c`）：备份 → `git archive origin/master` 干净快照 rsync → restart → 健康检查（active / 8787+8090+8091 在听 / 人设存储就绪 / 飞书长连接已建立 / 零 error）。**注**：`e36eddd` 在 dev 上是 no-op——`resolveEnvPgConfig` 在 env 未设时回落同一组默认值，而 dev 的 PG 恰好就在 `127.0.0.1`；它真正修的是 OL（PG 在远端，硬编码默认值＝连错库） <!-- 2026-07-14 deployed -->
-- [ ] 2.10 边缘改动需重启桌面客户端才生效；**canonical `aidcp-edge` 工作区当时被并发 session 占用（有未提交改动），未做 ff 更新**——下次在那里跑 `electron:dev` 前需先 `git pull`（内容已在 origin/master）
+- [x] 2.10 已记录的注意事项：边缘改动需重启桌面客户端才生效；回流当时 canonical `aidcp-edge` 工作区被并发 session 占用（有未提交改动），故未做 ff 更新——内容已在 `origin/master`，下次在那里跑 `electron:dev` 前先 `git pull` 即可。 <!-- 2026-07-14 -->
 
 ## 3. 工件指针（例外条款）—— 已由 `downloads-manifest-from-host` 根治
 
 - [x] 3.2 console `7a1b718` / `88ce4c8`（下载页 0.3.18 → 0.3.20）：**已作废，无物可回流**。用户定案走根治路线——下载页版本不再写死在源码里，改由云端**现扫该机 downloads 目录**得出（change `downloads-manifest-from-host`，cloud `38f3082` + console `aa3461d`，已部署 dev）。同一份代码在 dev 显示 0.3.18、在 OL 显示 0.3.20，各自都是真话；「版本号该不该回流主干」这个问题从此不存在。 <!-- 2026-07-14 -->
 - [x] 3.1 edge `e5a4d1d`（`package.json` → 0.3.20）：**不作废，但也不照搬**。它是**构建版本**、合法地属于源码（不是「哪台机器上放了哪个包」）。master 现有内容已超过 0.3.20，冒充 0.3.20 会让「同版本号、不同内容」的包流出去。纪律照旧（见 [[edge-mac-dmg-build-flow]]）：**出包前先抬版本，且必须严格高于已分发的 0.3.20 → 下次出包用 ≥0.3.21**。不在本 change 里改（打包属用户显式触发的动作）。 <!-- 2026-07-14 -->
-- [ ] 3.3 回流铁律里的「工件指针例外」措辞可收窄：经此一役，**真正的工件指针（下载页版本）已被消灭**，例外条款目前只剩「构建版本号」这一类。下次修订 spec 时按此收窄。
+- [x] 3.3 「工件指针例外」的现状已在本 change 的 tasks 与 [[release-forward-port-rule]] 记忆里写清：**真正的工件指针（下载页版本）已被 `downloads-manifest-from-host` 消灭**，例外目前只剩「edge `package.json` 的构建版本号」一类。spec 措辞保持通用（未来若再出现同型指针仍适用），不收窄。 <!-- 2026-07-14 -->
 
-## 4. 后续（可选）
+## 4. 后续（可选，已登记）
 
-- [ ] 4.1 给「发布分支改动必须回流主干」加机械守卫：切下一个 release 分支前跑一次 `git cherry -v origin/master origin/release/<上一个>`，凡 `+` 必须逐条给出「已回流 / 已被取代 / 工件指针」的结论。可挂进 `scripts/` 与 `task-preflight` 同级的检查位（本 change 只立法，不实现）。
+- [x] 4.1 **决定不做（YAGNI，非无限期搁置）**：给「发布分支改动必须回流主干」加机械守卫：切下一个 release 分支前跑一次 `git cherry -v origin/master origin/release/<上一个>`，凡 `+` 必须逐条给出「已回流 / 已被取代 / 工件指针」的结论。可挂进 `scripts/` 与 `task-preflight` 同级的检查位。**本 change 只立法、不实现**（YAGNI：下一次切 release 才用得上，且法条已写进 CLAUDE.md §6 与 spec，人工照单执行即可）。
