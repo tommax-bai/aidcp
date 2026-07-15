@@ -9,6 +9,8 @@
 - [x] 1.7 Publish strict JSON schemas and synthetic WS/customer/internal/AI fixtures, including one confirmed comment walkthrough and one ambiguous DM walkthrough.
 - [x] 1.8 Validate the OpenSpec change strictly, validate every fixture against its schema, scan for message-name aliases and review compatibility evidence.
 
+<!-- Session 00 evidence: aidcp contract commit a6780030b735f6c30b46d552423a0331f27ad48e; `openspec validate wechat-channels-interaction-management --strict` passed; 7 draft 2020-12 schemas and 36 synthetic fixtures passed; message alias scan was clean; docs/spec-only, so no Edge/Cloud/Console implementation or deployment was performed. -->
+
 ## 2. Session 01 - Edge driver and interaction connector
 
 - [ ] 2.1 Extend Edge `PlatformId`, registry, environment configuration and capability declaration for `wechat_channels` without changing existing XHS/Facebook behavior.
