@@ -453,6 +453,8 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 
 > **补登（2026-07-12）**：`facebook-join-pending-label-audit` 修中文已 pending 群按钮「取消请求」漏识别。edge `c06fa2c`（需运营机 pull master + 重建安装包后生效）把「取消请求 / 取消加入请求 / 取消申请 / 已发送请求」纳入 pending CTA，cloud `19b83b4` 已部署 dev（备份 `cloud.bak.20260712-152112`、healthcheck 全绿：active/8787/8090/PG/Feishu onReady）同步判官 pre/post-click 兜底。**验收点**：中文界面、账号已申请待审的群（真机证据群 `groups/311384382278852` 或同类 pending 群）观测腿报 `pendingRequest=true`、云端 pre-click 判 `gated_skip`，不再误报未申请/可加入；页面普通裸「取消」按钮不触发 pending。
 
+> **补登（2026-07-15，`facebook-manual-comment-keepopen-lease`，landed cloud `0bb45f6` + deployed dev）**：修真机事故「`/comment --join` 开帖后没等审批完就返回首页 → `editor_not_found`」。根因=FB 定向评论路径全程不握边端租约，审批阻塞期被同账号并发的自治浏览闭环（无 taskId 的 page.scroll/返回）把页面滚回首页。改法=把「搜索→开帖→撰写→人审→提交」整段包进 `comment_prepare` keep-open 租约（6min，严格覆盖撰写~180s+人审90s）+ 给三条 FB 命令透传 lease taskId（否则边端持租约期把评论自己的命令也挡死）。**验收点（须在有并发自治浏览的在线 FB 账号上验）**：① 运营 `/comment <昵称> --join`（或 `--contact`）→ 边端加群、开帖后**审批等待的整段时间里页面钉在目标帖上、不被滚回首页**（可看边端日志「Facebook 命令被任务租约抑制」= 并发浏览命令被挡）；② 人审通过后在**同一目标帖**上真发成功（不再 `editor_not_found`）；③ 人审超时/拒 → 诚实非提交、不打去重、可重试；④ 拿不到租约（边端占用/无响应）→ 诚实非提交卡、不下发搜索。**与已归档 `comment-approval-target-hold`（浏览闭环内部就地评论）是两个正交洞**。
+
 ## 簇 33 — feed-refresh-on-depth 真机验收（feed 浏览深度到阈值改点右下「刷新」回顶换新批，登记于 2026-07-10；cloud master `c4545f0` 已 land + **已部署 dev**、edge master `60088d7` 已 land，edge 需运营机 pull/重建后生效）
 
 > 探针 `aidcp-edge/scripts/feed-refresh-button-probe.ts` 已真机确认按钮结构（右下 `div.floating-btn-sets` 内 `div.reload`，宽窄同构）与行为（点 reload = 回顶 + 换全新一批，前 6 卡 0 重叠）。下面为 live 端到端 + 阈值校准项。默认阈值 60 张、默认开启（env `AIDCP_FEED_REFRESH_AFTER` / `AIDCP_FEED_REFRESH` 可调 / kill-switch）。
