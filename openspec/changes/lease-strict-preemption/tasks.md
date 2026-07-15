@@ -1,8 +1,16 @@
 # tasks — lease-strict-preemption
 
-> **串行标记（热点文件）**：本 change 要改**两份 `protocol.ts`**（租约释放原因新增 3 个值 + 发布结果新增「已派发提交」位）。按 CLAUDE.md §2 必须四处同步，且**不与他人并行**。
-> **占用中的文件，本 change 不碰**：`aidcp-edge/src/main.ts` 的 FB 租约闸节奏豁免段（用户并行占用中）。其余 `main.ts` 改动（发布执行流注册为页面写者、静默丢弃补回执）必须先与用户协调。
-> **取证来源**：workflow `wf_66958524-d70`（5 路代码取证 + 3 视角对抗验证 + 定案）。全部结论带 `文件:行`。
+> **串行标记（热点文件）**：本 change 要改**两份 `protocol.ts`**（租约释放原因新增 3 个值 + 发布结果新增「已派发提交」位）+ `aidcp-edge/src/execution/edge-task-coordinator.ts`（写者注册表 + 抢占）+ `aidcp-edge/src/main.ts`（发布写者注册 + 删遗留处理器 + 静默丢弃补回执）+ **`aidcp-cloud/src/publish-agent/command-sequencer.ts`**（🔴 设计评审新点名的 BLOCKER 落点，见下）。按 CLAUDE.md §2 必须四处同步，且**不与他人并行**。
+> **占用中的文件，本 change 不碰**：`aidcp-edge/src/main.ts` 的 FB 租约闸节奏豁免段——**⚠️ 设计评审实测：该段在本 worktree/master/全部分支里目前根本不存在，是用户未提交的并行工作**（唯一同型存在物是 XHS 的 pacing 穿透 `main.ts:1145`）。§8.1 要补回执的 FB 两处（定向评论 879-884、浏览 1075-1080）**就是禁区本身**，不是相邻——必须排在用户 FB pacing 豁免落地/合并之后、按内容特征定位、动前与用户协调。
+> **取证来源**：workflow `wf_66958524-d70`（初次取证 5 路 + 3 视角对抗）+ **`wf_18b37a11-416`（2026-07-15 抢占核心动手前复核：5 路重新坐实 + 3 视角对抗 + 总装配）**。全部结论带 `文件:行`。**复核产物**：`handoff-section-5-preemption-core.md`（接手主文档：fleet 闸已清证据 + 锚点漂移表 + holes + 分批序列）、`design-review-synthesis-wf18b37a11.md`（总装配方案原文）。
+
+## 🔴 设计评审复核结论（2026-07-15，wf_18b37a11-416）——抢占核心动手前必读
+
+- **Fleet 定序闸已清**：并行 change `browser-slot-scheduling` 对协调器/main.ts 的改动**已全部落进本分支地基**（其 edge 提交经 `merge-base --is-ancestor` 验证既在 master 也在本分叉点 `e30c211`；协调器内容哈希在 base/master/slot 三处全等 `b569764`；我落后 master 的 8 提交无一碰协调器/main.ts；edge 仓无 browser-slot 活跃 worktree）。§5 原「等 slot 落定」的推进边界**解除**，可独占实装。
+- **🔴 BLOCKER（tasks 从没点名的层）**：被抢占的发布在边缘一律以普通命令结果 `ok:false` 浮现（edge `main.ts:780/758/744` 三条出口），云端 `command-sequencer.ts:238/258` 把任何核心步 `ok:false` 归 `failed_before_submit` → `publish-dispatcher.ts:380` 写**不可逆 failed + 熔断**。**即便 §5+6+7 按原锚点全落地，被抢占的发布仍被烧成 failed**——§7「被抢占≠失败」的核心目标不达成。**修法**：command-sequencer 的 `ok:false` 分支与 catch 识别抢占原因串 → 产出独立 `preempted` outcome、绝不并入 failed_before_submit；publish-dispatcher `:380` 前加 `preempted` → 保持 pending 分支。列为本批必改热点，与 5.3/5.4/6.1/7.4 同批。
+- **落地序焊死（P0-c，单边接线=烧稿）**：批 1 先落**协议**（6.x，inert 安全）→ 批 2 落 **cloud「认而不烧」**（7.x 大半是修今日既存烧稿，先落只让 cloud 更宽容）→ 批 3 **edge 真 emit + 协调器 + main.ts + cloud 主动抢占 co-deploy**（不可分单元，批 2 须已在生产）。§8 静默丢弃收口**绑进批 3**（8.1↔7.8 单边会净新增兜底滚动污染）。假成功修复链 = 5.2+5.3+5.9+6.2+7.1+**command-sequencer 分类**，必须一起部署。
+- **6.2 置位语义**（评审新增红线）：「已派发提交」布尔位 MUST 在「按下事件真正发出那一刻」置真（XHS `publish-command-handlers.ts:942` 点击成功后、pollBounded 前；FB `publish-executor.ts:498` dispatchClick 后），center 查找类失败保持 false，**MUST NOT 复用 5.1 的提交窗口标志**（语义/时机相反）。6.4/11.9 往返断言范围要扩到「原因字符串 + 发布回执布尔位」。
+- **锚点漂移**：tasks §5-8 行号写于早期基线、被 §1-4 下移（main.ts 早段+17/晚段+23、coordinator+5、通知巡视分类栏目严重漂到 3019/3068、cloud 目录多处缺 `src/publish-agent/`|`src/comment-agent/`、7.8 约错 120 行到 2269-2282）。**edge/cloud 一律以 handoff §5.3 的修正表为准，勿信 tasks 原行号。**
 
 ---
 
@@ -72,7 +80,7 @@
 
 ## 5. aidcp-edge — 提交窗口标志 + 页面写者注册表 + 抢占
 
-> **推进边界（2026-07-15，fleet 定序，用户拍板）**：抢占核心（5.1–5.5 / 5.8 / 5.9 + 第 6 节协议 + 第 7 节云端）的两个主要落点——协调器 `edge-task-coordinator.ts` 与装配入口 `main.ts`——**正被并行 change `browser-slot-scheduling`（活跃）重改**（master 已前进到 `809e15d`，本 change worktree 分叉于 `84267f2`、落后需 rebase）。按 fleet 单写者纪律，两个 change 不同时大改协调器。**已先行落地**的是第 5 节里**完全不碰协调器/main.ts** 的边缘安全项：**5.7**（验证码回放前复检）+ **5.10(a)**（`waitUntil` 迭代帽），见 `aidcp-edge 35d3aec`。**抢占核心延后**：等 `browser-slot-scheduling` 落定 / 归档、协调器稳定后，先把本 worktree rebase 到最新 master、消化第 1–4 节与 slot 改动的交叉，再独占协调器实装 5+6+7（实装前先跑一轮设计对抗评审确认 tasks 方案无洞）。
+> **推进边界（2026-07-15 更新，fleet 闸已清）**：原「等 `browser-slot-scheduling` 落定再动协调器」的定序**已解除**——实测其协调器/main.ts 改动已全部落进本分支地基、逐字节等同 master、edge 仓无活跃 slot worktree（证据见上「设计评审复核结论」与 `handoff-section-5-preemption-core.md §3`）。**已先行落地**：**5.7**（验证码回放前复检）+ **5.10(a)**（`waitUntil` 迭代帽），见 `aidcp-edge 35d3aec`。**抢占核心可动手**：动手前设计对抗评审（`wf_18b37a11-416`）已完成、结论见上及两份复核产物；**rebase 推迟到最终集成**（本 base ↔ master 在协调器/main.ts/protocol 逐字节相同，评审直接以本 HEAD 35d3aec 为准坐实；冲突面仅 `browse-session.ts`/`facebook-session.ts` 两文件+测试，留最终并线一次解）。按 handoff §6 分批序列开工；**动 main.ts 前先与用户协调**（禁区=用户未提交工作）。
 
 - [ ] 5.1 **提交窗口标志（六处）**：进入不可逆动作**之前**同步置位「已进入提交窗口 + 预算上限」，拿到确认或预算耗尽后清位。协调器只在标志为假时才允许抢占
   - XHS 发布提交 `publish-command-handlers.ts:725`（窗口 ≈15s）
@@ -88,7 +96,7 @@
 - [ ] 5.9 **（第 4 节登记）浏览恢复的导航必须让位于在途发布写**：钩子卡在 `edge-task-coordinator.ts` 的 `resumeBrowseIfIdle`（**不是** `quiesceForTask`——队列为空时 drain 直接 return、走不到 quiesce）。这是上面那条「已离开发布页 ⇒ 判成功」假成功的根治点，与 5.2/5.3 同批
 - [~] 5.10 **（第 4 节登记）顺手项**：
   - [x] (a) `facebook/publish-executor.ts` 的 `waitUntil`（第 8 个纯墙钟 `for(;;)`、旧无迭代帽 → 注入恒定 now 即死循环）已补双闸=墙钟 + 迭代帽 `ceil(timeout/interval)+2`，同 `flows/bounded-poll`；护栏语义已由 `bounded-poll.test.ts` 覆盖，按补测克制不重复造桩 <!-- aidcp-edge 35d3aec 分支 lease-strict-preemption -->
-  - [ ] (b) FB 加群接取消点（`comment-handler.ts` 的 `onJoin` 今天不收 checkpoint，整段 ≈78s 不可中断）**留抢占核心批次**：checkpoint 在抢占落地前永不 throw、无法测试，且「哪段受保护（点击 + 短确认）、哪段可中断（观察段）」是 **5.1 加群提交窗口**设计的一部分，孤立接线会做偏
+  - [ ] (b) FB 加群接取消点（`comment-handler.ts` 的 `onJoin` 今天不收 checkpoint，整段 ≈78s 不可中断）**⚠️ 设计评审提级：必须与 5.1 的 FB 加群提交窗口同批原子交付，不再是可延后顺手项**。理由：5.1 给 FB 加群设「受保护段≤~18.5s」的前提，正是把点击后 46.5s 的观察轮询拆成「窗口内短确认 + 可中断尾巴」；若本项掉队，真实不可取消区仍是 46.5s > 30s 的 quiesce 预算 → 每次 FB 加群被抢占必然 quiesce timeout → 5.5 每次误报控制面故障、误命令运营重启浏览器（把逃生梯变成常态误触发）。二者不可一个 blocking 一个 deferrable
 - [ ] 5.6 边缘排队默认值与云端不一致（边缘 45s vs 云端 200s，`edge-task-coordinator.ts:58`）：改成同值，或对缺失该字段的申请**诚实拒绝**，别用不一致的表默默摘掉任务
 - [x] 5.7 **验证码落点回放前强制复检**（`browse/captcha-assist.ts`）：回放前重新探阻断类型 + 读当前 URL。阻断已消失 → `not_blocked`（绝不在已无验证码的页面盲点）；阻断类型或 URL 变了 → `stale_snapshot` + 重抓帧让运营在新帧上重标；复检本身失败 → 诚实 `failed`。复用现有回执枚举、**零协议改动**。URL 仅比 origin+pathname（验证码 token 每刷新都变、纳入会误判）。**硬前置**——今天靠「租约拿不到」挡着（安全的失败）；抢占之后会变成「抢到了 → 在发布编辑页上按几分钟前的旧坐标盲点真实鼠标」（**不安全的成功**）。回归：回放前阻断消失 → not_blocked 且**零鼠标派发**；回放前 URL 变 → stale_snapshot + 重抓帧且**零鼠标派发** <!-- aidcp-edge 35d3aec 分支 lease-strict-preemption -->
 - [ ] 5.8 删除遗留的整页发布处理器（`main.ts:579-639`，全程不过租约闸，云端已无发送方）
