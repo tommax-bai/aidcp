@@ -80,4 +80,5 @@
 - validation：cloud 全量 `2082/2082`、目标回归首轮 `64/64` 与收口 `38/38`、typecheck、build；console 全量 `123/123`（另 1 skipped）、目标 `20/20`、build；OpenSpec strict 均通过。
 - dev 备份：`/opt/aidcp/cloud.bak.20260715-1405-image-content.tar.gz`、`/opt/aidcp/cloud/.env.bak.20260715-1405-image-content`、`/opt/aidcp/console.bak.20260715-1405-image-content.tar.gz`。部署后 cloud/console 干净提交快照按 checksum 复核无内容漂移。
 - dev 健康：`aidcp-cloud.service=active`、`NRestarts=0`、8787 返回预期 426、8090/8088 health 均 `{"ok":true}`、console HTTP 200、PG 校验 `ok=1`、飞书 `WSClient onReady`；四个 isales 服务均 active/running。四个视觉旗标均为 `true`。
+- 本次发布后 cloud `master` 并行快进到后继 `354d6a6`（独立 Facebook note key 修复，`c77683e` 仍为其祖先）并由对应任务在 14:09 重启；最终 dev cloud 与 `354d6a6` 干净归档按 checksum 无内容漂移，因此本变更与并行修复均在当前运行态，未互相覆盖。
 - 未代用户再次触发真实人物洗稿，因而没有宣称新链路已通过同素材真人视觉验收；6.6 与 7.2 继续 pending，待用户试跑后核对 v3 反推、逐槽 brief、`contentAlignment` 和最终人物神态。
