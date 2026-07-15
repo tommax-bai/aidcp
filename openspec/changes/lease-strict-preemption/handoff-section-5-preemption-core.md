@@ -41,6 +41,27 @@
 
 ---
 
+## 0.6 进度更新（2026-07-15 尾场，edge 批 B 已完整落地 + 对抗复核加固）
+
+**edge 抢占核心全部落地并激活，门禁全绿（edge full 1363 / typecheck 0 / acceptance 21），已推 `origin/lease-strict-preemption`：**
+
+| 提交 | 内容 |
+| --- | --- |
+| `bc3e774` B-2a | 5.1 六站提交窗口 enter/dispose + 5.10b 加群短确认拆分 + 6.2 边缘 submitDispatched；main.ts 创建/注入 publishGuard·browseGuard，**未 wire writers（inert）** |
+| `b9fdfa5` B-2b | main.ts wire 协调器 writers（combineCommitWindows + publishInFlight=inFlightPublishes.size>0 + cancelPublish 真取消）**= 抢占引擎激活** + notifyPublishSettled 接线 + 5.9 收紧假成功 CHECK（去 URL 判据） |
+| `9a9ebda` B-2c | 5.8 删遗留整页发布处理器 onPublishCommand + 三个孤立 import |
+| `6d87e39` B-2d | **对抗复核 `wf_1657e89b-85a` 加固**（下述 2 BLOCKER + 1 MEDIUM） |
+
+**对抗复核结论（5 视角 + 逐条对抗验证，1359 单测全绿仍揪出，已全修 6d87e39）：**
+- 🔴 **BLOCKER FB 发帖双发**：`publish-executor.ts` submit 全程无取消点，提交窗口打开前的 target 查找期间被抢占 → cancelPublish 的 abort 对 submit 无效（不读 signal）→ 点击照发帖子发出，协调器却因 quiesce「收敛」判 preempted_by_task 可重投 → 双发。修：submit 接 TakeoverCtx，target 查找后 / enter() 前**同步** checkpoint（无 await），catch 加 rethrowIfTakeover；dispatch submit_publish case 传 takeover。
+- 🔴 **BLOCKER 加群点击前冻结**：`join-executor.ts` observeUntilReady（点击前，最长 30s）无取消点，被抢占超 30s quiesce 预算 → 误判 yield_timeout + 浏览永久冻结 + 抢占者被拒。5.10b 只做了点击后尾巴。修：observeUntilReady 接 checkpoint 每轮检查（点击前完全可取消、无窗口门控）+ enter() 前补 checkpoint。
+- 🟡 **MEDIUM submitDispatched 时机**：press 已注入但 CDP 响应抛错时，旧实现在 dispatchClick 返回后才置真 → 回执 submitDispatched=false → 双发。修：`cdp-util` dispatchClick 加 onPressDispatched 回调（commitLeftClick 前触发）+ runSubmit 两分支据此置位 + **catch 的 engine_error return 补带 submitDispatched**（原漏带）。
+- 驳回（不改）：join 动作名有云端归一表、两 Map 去同步不可达、遗留 handler 已删、窗口预算 ~1s 尾巴 graceful 非双发。
+
+**下一步 = 批 C（cloud，co-deploy 另一半，绝不可让 edge 单独部署）**，cloud worktree 已建 `../aidcp-cloud.wt/lease-strict-preemption`（批 A 已在其中）。锚点见 §5.3 表 cloud 部分：**command-sequencer BLOCKER**（`src/publish-agent/command-sequencer.ts:238/258` 把 ok:false 归 failed_before_submit → 识别抢占原因串产出独立 `preempted` outcome，绝不并入 failed_before_submit）+ publish-dispatcher `:380` 前加 preempted 保 pending 分支 + 7.1-7.11。5.6（边缘 45s vs 云端）与 7.10 同批坐实。批 C 完成后 co-deploy dev → 批 D（§8，含 FB 禁区，动前协调）→ 批 E 收口。
+
+---
+
 ## 1. 快速定位（分支 / worktree / SHA）
 
 | 项 | 值 |
