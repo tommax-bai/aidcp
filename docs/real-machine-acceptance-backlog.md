@@ -474,6 +474,10 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **自治搜索不破** — 非命令的自治搜索（`search_evaluator`/`search.approved`）在 nav-fail 时也走同一诚实闸（不把 feed 当搜索结果），云端一次恢复滚动、浏览闭环不死锁、无幻影开笔记。
 - [ ] **read_failed 回执文案** — 若仍发生 read_failed，飞书卡片显示**真实原因**（如「复检时目标已不在搜索结果中（页面重排/未导航到结果页）」），**绝不**再显示「（边端超时或离线）」。
 
+> **2026-07-15 补登 — `xhs-search-submit-gesture`（AI 搜索提交本身的 flakiness 根因 + 修复；edge master `cb9aeba`，簇 34 归属）**：上面「AI 搜索是否真跳结果页」这条的**根因已定位并修复**。真机 CDP 逐项取证（dev「工程师大白」`ads-k1e0ero8`）：AI 搜索框 `textarea[name=aiSearchTextarea]`（结果落 `/search_result_ai`）的回车导航**不认程序化 `el.focus()` + 不带 text 的裸回车**，且兜底提交按钮 `.bottom-box-right-submit-button` 常**不可见(0×0)**——三条路全断 → 大面积 `not_on_search_page`（该账号一天约 30 次搜索失败、几乎评不出）。修法：**真实指针点击聚焦 + 携带 `text:'\r'` 的回车（产生真实 keypress）+ ~700ms 停顿地板 + 未跳转有界重试回车（≤3）**；提交按钮仅在确可见时作附加尝试。用真机 CDP adapter 驱动**仓库实际 `executeSearch`** 验证：warm 页 5/5、cold-navigate 4/5（唯一失手为冷启首搜、经重试与云端换词自愈），对照现状约 0%。`/search_result` 与 `/search_result_ai` 两页型的 URL 判定 / 关键词双重编码归一 / 卡片提取（真机两页各 30 张 `.note-item`）均已支持。剩余真机项：
+> - [ ] **全闭环把评论真发出** — dev 工程师大白跑真实排期评论（`ContentScheduler` 心跳命中）：搜索连续命中 `/search_result_ai`、不再 `not_on_search_page`；采卡 → 择优 → 开笔记 → 人审 → 发布走通，飞书出成功回执；日志不再出现该账号搜索大面积失败。
+> - [ ] **happy-path 与自治搜索不回归** — 经典 `/search_result` 页型账号（如 Tmax）与自治浏览搜索（`search_evaluator`/`search.approved`）在真实点击聚焦 + 重试新路径下照常命中、不误伤、不多点不可见按钮。
+
 ## 簇 35 — captcha-assist-live-snapshot 真机验收（验证码远程协助改「近实时活体帧 + 选点期冻结」，登记于 2026-07-10；cloud master `210183a` 已 land + **已部署 dev（旗标默认关）**、console master `e63568c` 已 land + **已部署 dev**、edge master `e73dd3e` 已 land，edge 需运营机 pull/重建后生效）
 
 **前置（关键）**：本功能 **env 旗标默认关**，零回归。真机验收前须在 dev ECS `.env` 设 `AIDCP_CAPTCHA_ASSIST_LIVE_ENABLED=true`（可选 `AIDCP_CAPTCHA_ASSIST_LIVE_INTERVAL_MS` / `_MAX_DURATION_MS` / `_MAX_FRAMES` 调 hint）+ `systemctl restart aidcp-cloud.service`，并让运营机 edge pull/重建。范围仅**自刷新 / 多步换图的点选类**验证码；滑块/拖拽不在内。
