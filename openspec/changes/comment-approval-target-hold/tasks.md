@@ -34,6 +34,9 @@
 ## 4. 集成 / 部署 / 回写
 
 - [x] 4.1 合入 master：两轮 rebase 解 `role-dispatcher.ts` 与 mandatory-persona/其它已 landed change 的冲突（reconcile mandatory auto_approve 豁免 + mandatoryInteraction 透传），复跑 acceptance+full+typecheck 全绿。<!-- aidcp-cloud decd7f1 landed master -->
-- [ ] 4.2 默认部署 `dev`（安全序列：`scripts/deploy-target dev --check` → 备份 → clean snapshot rsync → restart → healthcheck）。
+- [x] 4.2 默认部署 `dev`：clean snapshot(git archive decd7f1) rsync（deps 未变、免 npm ci）→ restart → healthcheck 全绿（svc active / 8787+8090 监听 / 飞书长连接已建立 / 无错误、无重启循环）。<!-- 2026-07-15 deployed dev 121.89.85.150; 备份 cloud.bak.20260715-211742.tar.gz -->
+<!-- 注：dev 部署即当前 master decd7f1，含同批 landed 的 mandatory-persona/auth/migrations/feishu-queue 等他人 change（dev 追随 master）。 -->
+
 - [x] 4.3 tasks.md 回写 commit-sha；真机灰度项归 `docs/real-machine-acceptance-backlog.md`。<!-- 见 backlog 簇 -->
-- [ ] 4.4 `openspec validate --strict` 通过 → 部署+真机验收后 archive。
+- [x] 4.4 `openspec validate --strict` 通过 → landed+deployed → archive（真机验收解耦到 backlog 簇4）。<!-- 2026-07-15 archived -->
+
