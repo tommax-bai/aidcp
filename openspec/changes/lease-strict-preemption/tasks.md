@@ -187,7 +187,8 @@
 - [x] 13.1 `openspec validate lease-strict-preemption --strict` **通过**（含 HOLE-5 RENAMED 修复后）
 - [ ] 13.2 真机项归并入 backlog（本次已把 12.1–12.8 登记进 `docs/real-machine-acceptance-backlog.md` 抢占簇）
 - [~] 13.3 **部署**：**cloud 半边已部署 dev**（用户 2026-07-15 拍板「现在就部署 cloud 到 dev」——cloud 单独上是「认而不烧」安全方向、preempted 分支在 edge 未发 preempted 前休眠）。流程：force-push feature 分支（origin/lease-strict-preemption 8ba60f4）→ 合并进 cloud master（merge commit **bda5846**，保留批 C 各 reviewed sha）→ merged master full 2207 pass/3 skip + acceptance 54 + typecheck 0 全绿 → §5 安全序列部署 ECS dev（备份 cloud.bak.20260715-191231.tar.gz + .env.bak.20260715 → git archive 干净快照 rsync 无 --delete → restart → healthcheck 全过：active/8787/飞书长连接/panel 8090/PG select 1/无崩溃/isales 未碰）。<!-- aidcp-cloud bda5846 / 2026-07-15 deployed dev -->
-  - **edge 侧 co-deploy 待用户协调**：dev 客户机需跑 edge `6d87e39` 才端到端生效（抢占真正发生）。绝不 edge 先上；cloud 已在前（认而不烧就位）。真机验收（簇 85）等 edge 到位后跑。
+  - **edge 半边已合并进 master + 主目录已更新（2026-07-15，用户拍板「你来合并回去」）**：merge `origin/lease-strict-preemption` 进 edge master（merge commit，保留批 B 各 sha），解 4 处冲突（cdp-util commitLeftClick 保留 + master dispatchKey 文档；search-handler 保留 master 真指针点击/停留地板 **且** 批 B 取消点 checkpoint；facebook-session 两常量块合并 + ensureFeedDwell 保留 master 就地读地板但改用批 B 可打断 sleep+throwIfTakeover；protocol 契约测试 AC-PROTO 撞名同 cloud 重编号 15/16）→ 期间并入 fleet 并发推的 2 提交（FB 昵称就地读时机 / 首作庆祝样式）→ merged full **1424** / acceptance 22 / typecheck 0 全绿 → push edge master **`f5fec3b`**。**canonical `../aidcp-edge` 主目录现在 master、含批 B**（`electron:dev` 跑的即带抢占版本）。
+  - **🔴 剩最后一步（运营操作）**：dev 客户机把 edge 客户端**重启**（从更新后的主目录 `electron:dev`，或等打包版）才真正加载批 B → 抢占端到端生效。之后跑真机验收（簇 85）→ archive。
 - [ ] 13.4 archive（co-deploy + dev 真机 F 验收后）
 
 ### 🔶 批 C 延后清单（landed 主体之外，非假成功修复链必需；落地时逐条销账）
