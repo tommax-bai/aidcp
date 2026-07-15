@@ -58,6 +58,7 @@
 - [ ] **fix-interaction-and-comment-capture 7.2** — 评论行 `[id^="comment-"]` 与可滚容器种子选择器真机校准（定评论采集命中率；核评论行真实 id 前缀与内容/作者 class）
 - [ ] **edge-companion-ui 顺手修（评论点赞白名单）** — edge ≥b0055bd 分发后观察：云端 `comment_like`→`interaction.like_comment` 此前在边缘入口被静默丢弃（云端 sent=1 边缘零执行零回执），修复后评论点赞**首次真实执行**——观察边缘日志「✓ 评论点赞成功」出现、云端配额/风控计数口径符合预期（AIDCP_COMMENT_LIKE 线上已开，行为从无害空转变为真点击）
 - [ ] **fix-interaction-and-comment-capture 7.3** — 线上抓日志佐证：`skip reason=cooldown`（限流占比、佐证「偶尔没点着」主因是设计限速）、`recover_after_like_failed|recover_after_collect_failed` 频次应降、`未找到可滚动的评论区容器`(no_target) vs candidates 长度分布、`btn_no-bar` vs `state_unchanged` 分布（验 E1 是否消掉 no-bar）（2026-07-03 实装，部署后观察）
+- [ ] **comment-approval-target-hold（landed cloud decd7f1，2026-07-15）** — 浏览闭环触发评论进人审时账号**停在待评论帖上**、不被滚走/换帖，审通过/超时后再继续浏览。真机观察点：① XHS 触发一篇值得评的帖 → 飞书人审卡出现的整段等待里 feed **不滚动**、账号钉在该帖（旧行为会因并行点赞 no_target 重扫或撰写窗 stray 命令滚走）；② 审通过 → 评论真发到该帖；超时/拒绝 → 该帖不评、继续浏览；③ 抓日志佐证：`idle_nudge 落评论支线在途窗内 → 抑制`、`no_target(stale) 落评论支线在途窗 → 不重扫`、`评论支线在途，巡视让位`（若期间来通知）出现，且评论结算后被让位的巡视**补跑**（不丢未读）；④ 审批窗内不因动作数/时长/配额**提前结束会话**废掉在审评论。FB 就地读评论迁移路径（读 feed / 评 detail）同样观察：审通过后 `open_note{navigate}` 按 permalink 回到该帖再发，不落到别帖。
 
 ## 簇 5 — 后台配置生效（浏览器点后台 UI）
 
