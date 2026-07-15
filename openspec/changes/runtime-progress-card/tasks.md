@@ -27,3 +27,11 @@
   <!-- Post-rebase validation on aidcp-edge 2740a10: focused companion UI 47/47, full npm test 1347/1347, typecheck passed; OpenSpec strict validation passed. -->
 - [x] 6.6 提交并推送 `aidcp-edge` 与 `aidcp` 默认分支；不构建桌面安装包。
   <!-- aidcp-edge 2740a10 on master and origin/master; aidcp recorded in this closeout commit and pushed to main after strict validation. No desktop installer was built. -->
+
+- [x] 7.1 定位圆点只走半程的刷新竞态，并补充规格：1 秒时间走字不得重启 2.2 秒连接器动画。
+- [x] 7.2 在 `aidcp-edge` 复用同结构的阶段与连接器 DOM，仅原位更新阶段文案和状态类。
+- [x] 7.3 补充 renderer 回归测试，验证连续状态推送后两条连接器保持同一 DOM 身份。
+- [x] 7.4 运行视觉/时序检查、focused tests、Edge 全量测试、typecheck 与 OpenSpec strict validation。
+  <!-- 1s refresh timing preview: 72.27px connector continued through refreshes and reached 72.27px before looping; focused companion UI 48/48; post-rebase full npm test 1353/1353, typecheck and OpenSpec strict validation passed. -->
+- [x] 7.5 提交并推送 `aidcp-edge` 与 `aidcp` 默认分支；不构建桌面安装包。
+  <!-- aidcp-edge bc6e570 on master and origin/master; aidcp recorded in this closeout commit and pushed to main after strict validation. No desktop installer was built. -->
