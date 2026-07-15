@@ -138,7 +138,7 @@
 | `edge.task.acquire` | cloud → edge | 申请任务级执行权，携 `taskId/kind/priority/leaseMs/acquireTimeoutMs?`；edge 在该等待上限内未 quiesce 时取消排队申请；这不是“已暂停”的事实 |
 | `edge.task.acquired` | edge → cloud | edge 已在命令安全边界 quiesced、已取消未开始的普通浏览命令并授予租约；cloud 收到后才可发首条业务命令 |
 | `edge.task.release` | cloud → edge | 幂等释放指定 `taskId`，携可选 `outcome` |
-| `edge.task.released` | edge → cloud | 释放/过期/非 owner 的收敛回执；`cdp_unhealthy` 表示 edge 仍在线但浏览器控制不可安全接管 |
+| `edge.task.released` | edge → cloud | 释放/过期/非 owner 的收敛回执；`cdp_unhealthy`=在线但浏览器控制不可安全接管，`browser_wake_failed`=冷待机停靠的浏览器在唤醒死线内唤不醒（可恢复、别与 `cdp_unhealthy` 混淆），`preempted_by_task`=被严格更高档任务抢占（云端**不得判失败**，保持待审待抢占方释放后重投），`window_busy`=holder 处不可抢占的提交窗口（携 `windowRemainingMs` 剩余预算，供云端精确等待而非空转），`yield_timeout`=收到取消仍不停手→判控制面故障（需人工重启客户端，非自愈） |
 
 ### 2.6 发布编排（v2 新增，Publish Agent 驱动）
 
@@ -152,7 +152,7 @@
 | `publish.draft_image_remove.result` | cloud → edge | 返回删配图结果（成功回带写后真态 images + 新版本）|
 | `publish.result` | edge → cloud | 发布结果回传（ok / postId / error；v1 整页路径） |
 | `publish.command` | cloud → edge | 下发一条参数化发布原子指令（`taskId` 为当前发布租约；`recordId+seq` 关联键，`kind` ∈ E1-E10） |
-| `publish.command.result` | edge → cloud | 单条发布指令执行结果回传（按 `recordId+seq` 关联；`ok/value/error/details`，红线不静默假成功） |
+| `publish.command.result` | edge → cloud | 单条发布指令执行结果回传（按 `recordId+seq` 关联；`ok/value/error/details`，红线不静默假成功；`submitDispatched`=提交「按下」事件已真正派发——`ok:false` 但该位为真时帖子可能已发出，云端按「已提交待确认」处置、绝不烧 failed、绝不自动重投） |
 
 ### 2.7 Persona 生成（v2 新增，建号关键词驱动，客户自助 onboarding）
 
@@ -771,7 +771,7 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
 { "taskId": "task-01H...", "outcome": "completed" }
 
 // edge.task.released  edge → cloud
-{ "taskId": "task-01H...", "reason": "released" } // released|expired|duplicate|not_owner|cdp_unhealthy
+{ "taskId": "task-01H...", "reason": "released" } // released|expired|duplicate|not_owner|cdp_unhealthy|browser_wake_failed|preempted_by_task|window_busy|yield_timeout（window_busy 携 windowRemainingMs 剩余预算）
 ```
 
 edge 按 `system_recovery > human > automatic` 授予；同级 FIFO。发布从 `navigate_entry` 到提交后捕获全程持有一份租约。小红书评论的搜索/读取为 prepare 租约，撰写/LLM/人审期间释放，批准后 commit 重新抢占并按稳定 `noteId` 重开复检。最后一份独占任务释放后才恢复浏览并重报当前页面；被取消的旧浏览命令永不重放。
