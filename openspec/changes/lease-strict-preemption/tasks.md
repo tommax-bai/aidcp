@@ -103,10 +103,10 @@
 
 ## 6. 协议（🔴 热点文件，两份逐字同改 + docs/protocol.md）
 
-- [ ] 6.1 租约释放原因新增 3 个值：**被抢占 / 提交窗口占用中 / 让位超时（控制面故障）**（`protocol.ts:1296` edge / `:1289` cloud）
-- [ ] 6.2 发布结果回执新增「**已派发提交动作**」布尔位——今天「已点未确认」与「压根没点」回执面完全相同，云端一律判提交前失败 ⇒ **帖子可能已发出却被记成失败**
-- [ ] 6.3 `docs/protocol.md` 同步（含头部消息计数）
-- [ ] 6.4 新增的原因字符串两端都是**裸值、typecheck 抓不到漂移** → 手写往返断言焊住
+- [x] 6.1 租约释放原因新增 3 个值：**被抢占 `preempted_by_task` / 提交窗口占用中 `window_busy` / 让位超时 `yield_timeout`（控制面故障）**（`protocol.ts:1296` edge / `:1289` cloud）；`window_busy` 另附可选 `windowRemainingMs`（剩余预算，让 11.4「不让抢占者空等」可实装），两份 protocol.ts 改动区逐字一致 <!-- aidcp-edge 9bc6c6b / aidcp-cloud 9f0194b 批 A -->
+- [x] 6.2 发布结果回执新增「**已派发提交动作**」布尔位 `submitDispatched`——今天「已点未确认」与「压根没点」回执面完全相同，云端一律判提交前失败 ⇒ **帖子可能已发出却被记成失败**（**置位语义=按下那一刻置真、center 查找类失败保持 false，属批 B/5.1+6.2 边缘侧接线，本条只落协议类型**） <!-- aidcp-edge 9bc6c6b / aidcp-cloud 9f0194b 批 A -->
+- [x] 6.3 `docs/protocol.md` 同步：`edge.task.released`/`publish.command.result` 两表行 + 释放 JSONC 示例，**回填既有缺口 `browser_wake_failed`**（合计 9 原因值）；头部消息计数 76 **不变**（§6 不新增 MessageType） <!-- aidcp 098a394 批 A -->
+- [x] 6.4 新增的原因字符串两端都是**裸值、typecheck 抓不到漂移** → 手写往返断言焊住：AC-PROTO-14（原因串 + `windowRemainingMs`）/ AC-PROTO-15（`submitDispatched` 有值/缺省两态），edge + cloud 两份 `protocol-contract.test.ts` 各一份、两端全绿 <!-- aidcp-edge 9bc6c6b / aidcp-cloud 9f0194b 批 A -->
 
 ## 7. aidcp-cloud — 失败语义（被抢占 ≠ 失败）
 
@@ -156,7 +156,8 @@
 - [ ] 11.6 清场：抢占一个填了正文的发布 → 编辑器被清空 → 重发时**正文不拼接**
 - [ ] 11.7 巡视窗口保护：点分类栏目之后抢占 MUST 被拒（回「窗口占用中、剩余 ≤20s」）
 - [ ] 11.8 参数一致性断言：云端受理预算 > 最长提交窗口 + 取消停手 + 让位 + 往返
-- [ ] 11.9 协议往返断言（新原因字符串两端都是裸值，typecheck 抓不到）
+- [x] 11.9 协议往返断言（新原因字符串两端都是裸值，typecheck 抓不到）：AC-PROTO-14/15 两端各一份，edge full 1338 / cloud full 2044 全绿 <!-- aidcp-edge 9bc6c6b / aidcp-cloud 9f0194b 批 A -->
+- [ ] **批 A（协议地基）已落地** — 上述 6.1/6.2/6.3/6.4 + 11.9；inert 未接线，安全独立部署。下一步批 B（edge 抢占，**动 main.ts 前与用户协调禁区**）→ 批 C（cloud，含 command-sequencer BLOCKER）。假成功修复链（5.2+5.3+5.9+6.2 置位+7.1+command-sequencer 分类）必须整批 B/C 同部署
 - [ ] 11.10 `test:acceptance` → 全量 `test` → `typecheck`，edge / cloud 两侧
 
 ## 12. 真机验收（dev；登记 `docs/real-machine-acceptance-backlog.md`）
