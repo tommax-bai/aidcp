@@ -14,4 +14,4 @@
 
 ## 3. 部署
 
-- [ ] 3.1 部署 cloud `dev` 并 healthcheck <!-- <date> deployed -->
+- [x] 3.1 部署 cloud `dev` 并 healthcheck（active / 8787 / 8090 / PG / 飞书长连接均绿；backup `cloud.bak.20260715-204854.tar.gz`）<!-- aidcp-cloud 821ecef 2026-07-15 deployed dev -->
