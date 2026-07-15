@@ -559,6 +559,13 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **不写垃圾名** — 昵称不再出现 `(4) Facebook` 等标签栏标题、也不再把关联主页名（如 `việc làm hà nam`）当本人昵称。
 - [ ] **vanity 头像限制观察** — 采用 vanity 用户名头像链接（非 `profile.php?id=`/`/me`）的账号本轮仍可能就地读空（诚实留空、无回归）；若量大再扩 id 锚定判据。
 
+**补登（change `facebook-nickname-capture-timing`，2026-07-15；cloud master `1cd809d` 已 land + 已部署 dev；edge master `9430479` 已 land，edge-only 运营机重建 edge 后生效）——同一 FB 号真机 session 一并验**：把 FB 昵称采集**时机对齐小红书**（放开采集准入闸到 FB + 边端本人采集改就地读、不导航），治「启动后不更新昵称」（原只搭 hello 那一趟车、握手 3s 时机赛跑 / 等登录门丢昵称 / 会话内不再补读）：
+
+- [ ] **首批 feed 后自动补上昵称（不再只靠握手）** — 空昵称 FB 号（含**导入号 / 换语言号**）重建 edge 后启动：即便握手那一下没读到，等**首批 feed 卡片到达**后云端自动武装本人采集、边端就地读顶栏头像 → dev `accounts.nickname` 落非空、控制台显真名。日志见 `[nickname_enricher] 完整启动首批 page.cards … account=<fbid>` + edge `[fb-session] profile.detail direct authorId=<fbid> nickname="…"（就地读、无导航）`。
+- [ ] **采集就地读、绝不导航** — 本人采集全程无 `Page.navigate` 到 `profile.php`/`/me`（edge 日志 `就地读、无导航`）；FB 活标签页不被导航走、采集完不整页重载（`back` 经幂等 `ensureFeed` 空操作）。
+- [ ] **走过等登录门的号也能补上** — 首启需人工扫码（走等登录门）的 FB 号，登录后首批 feed 到达时仍能补读昵称落库（不再因启动首读失败而整段丢昵称）。
+- [ ] **换语言号读法短板确认（非本 change 范围）** — 头像标签仅覆盖中英文；越/泰/印尼语等 UI 的号本轮仍可能就地读空（诚实留空、无回归、不写垃圾），记录为「读法多语言」单独跟进项，不阻本 change 验收。
+
 ## 簇 43 — manual-comment-bypass-quota 真机验收（手动 /comment 命令绕节奏/风控配额，登记于 2026-07-10；cloud master `cb0889a` 已 land + **已部署 dev**，纯云端、边缘无改；openspec change manual-comment-bypass-quota 于 main `f6100a8`）
 
 - **背景**：飞书手动 `/comment <昵称> [--join]` 曾复用自动巡回的节奏/风控配额闸——操作员命令被「本场会话加群额度已用尽；未加群也未评论」挡下；加群成功后群内评论还会再撞评论配额/日上限。用户定案（2026-07-10）：手动命令 = 操作员全权，绕全部配额（会话加群额度 + 加群速率 + 评论速率 + 评论日上限）与硬风控状态（restricted/frozen）；自动排期路径不受影响、配额照旧；只守物理正确性闸（边端在线/单飞/无目标/无关键词/kill switch/影子/仅 FB）。
