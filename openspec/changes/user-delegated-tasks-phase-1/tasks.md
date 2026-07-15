@@ -56,9 +56,9 @@
 
 ## 8. 验证、提交、集成与 dev 部署
 
-- [x] 8.1 cloud 依次运行相关 acceptance、full tests、typecheck；edge 依次运行 acceptance、full tests、typecheck；console 运行 full tests/build/typecheck（如脚本存在）。 <!-- cloud acceptance 50/50 + full 2114/2114 + typecheck; edge acceptance 19/19 + full pass + typecheck + Electron JS check; console 123 pass/1 skip + production build (chunk-size warning only) -->
-- [x] 8.2 再次运行 `openspec validate user-delegated-tasks-phase-1 --strict`，更新 tasks 注释记录各仓 commit、验证结果、偏差与 Facebook/Edge 交付闸。 <!-- strict pass before closeout; aidcp b8d04fd, cloud 5667479, edge 80a2c47, console 928e034. Deviation: today-inspiration gained explicit Shanghai-day filtering after adversarial implementation review. FB stays runtime-gated Beta; Edge source is committed but no installer was built or published. -->
-- [ ] 8.3 各同名 worktree 仅提交本 change 文件并推送；随后按 helper 安全落默认分支，遇 non-fast-forward 只 rebase/retry、不 force。
+- [x] 8.1 cloud 依次运行相关 acceptance、full tests、typecheck；edge 依次运行 acceptance、full tests、typecheck；console 运行 full tests/build/typecheck（如脚本存在）。 <!-- post-rebase: cloud acceptance 52/52 + full 2139/2139 + typecheck; edge acceptance 20/20 + full 1352/1352 + typecheck; console full 125 pass/1 skip with maxWorkers=1 + typecheck. Console production build is rerun from integrated master before dev publish. -->
+- [x] 8.2 再次运行 `openspec validate user-delegated-tasks-phase-1 --strict`，更新 tasks 注释记录各仓 commit、验证结果、偏差与 Facebook/Edge 交付闸。 <!-- strict pass before closeout; proposal seed aidcp b8d04fd; integrated cloud 6d43460, edge e62def6, console 0c573cc. Deviation: today-inspiration gained explicit Shanghai-day filtering after adversarial implementation review. FB stays runtime-gated Beta; Edge source is committed but no installer was built or published. -->
+- [x] 8.3 各同名 worktree 仅提交本 change 文件并推送；随后按 helper 安全落默认分支，遇 non-fast-forward 只 rebase/retry、不 force。 <!-- feature branches pushed first; cloud landed by helper. Edge rebase preserved master removal of legacy runtime-step UI plus delegated tests. Console rebase preserved master visual-audit UX plus confirmed candidate actions; its helper-equivalent final push used controlled Vitest workers after the default parallel run hit unrelated timeout-only failures. No force push. -->
 - [ ] 8.4 运行 `scripts/deploy-target dev --check`，从 clean eligible default checkout 备份并部署 cloud/console 到 dev，不触碰 isales、不部署 OL。
 - [ ] 8.5 验证 `aidcp-cloud.service`、8787/8090/8088、公开 health、Feishu onReady、PostgreSQL 与新 task API；失败则按安全路径回滚。
 - [ ] 8.6 完成 plain-language 交付说明：已可用入口、真实验证边界、Facebook Beta、Edge 安装端尚未发布、第二批后续范围。
