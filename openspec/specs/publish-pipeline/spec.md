@@ -843,7 +843,7 @@ v1 整页发布路径（无上传步骤）收到带图 payload 时 SHALL **显�
 
 ### Requirement: Manual Feishu publish approvals route to the triggering conversation
 
-When a publish generation is triggered by a Feishu command event, the generated publish approval card SHALL be sent to the same Feishu conversation that delivered that command when the event provides a source `chatId`. A private-chat `/publish` command SHALL therefore receive its approval card in that private chat, and a group-chat `/publish` command SHALL receive its approval card in that group. Publish triggers without a source conversation SHALL continue to use the configured default approval group.
+When a publish generation is triggered by a Feishu command event, the generated publish approval card SHALL be sent to the same Feishu conversation that delivered that command when the event provides a source `chatId`. A private-chat `/publish` command SHALL therefore receive its approval card in that private chat, and a group-chat `/publish` command SHALL receive its approval card in that group. This routing SHALL hold regardless of whether the command reaches publish generation via the direct trigger path or via the delegated-task orchestration path; a delegated task created from a `/publish` command MUST propagate the command's source `chatId` into the approval-card target resolution. Publish triggers without a source conversation SHALL continue to use the configured default approval group.
 
 The system MUST NOT treat a failed approval-card send as a successful delivery. If the source or default target rejects the card send, the system SHALL log the failed delivery and keep the draft in an honest pending state; it MUST NOT claim that the card was sent.
 
@@ -858,6 +858,12 @@ The system MUST NOT treat a failed approval-card send as a successful delivery. 
 - **WHEN** a Feishu group-message command `/publish <nickname>` triggers a publish generation and the event includes `chatId=G`
 - **THEN** the publish approval card is sent to `G`
 - **AND** the default approval group is not used for that manual command
+
+#### Scenario: Delegated-path command still reaches the command chat
+
+- **WHEN** a `/publish <nickname>` command is ingested through the delegated-task orchestration path (the active production path) with source `chatId=P` and later reaches publish generation
+- **THEN** the publish approval card is sent to `P`
+- **AND** the card MUST NOT fall back to the default approval group merely because generation was triggered by the delegated worker rather than the direct trigger
 
 #### Scenario: Non-command publish still uses default approval group
 

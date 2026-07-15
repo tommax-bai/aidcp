@@ -57,6 +57,8 @@ TBD - created by archiving change feishu-per-team-notification-routing. Update P
 1. **入站平台通知**——通知巡视产出的「评论 / @」消息（各团队要收的"消息"）；
 2. **账号维度的业务结果卡**——该账号的运营结果回执：排期发帖结果卡、评论终态结果卡（含自动排期与人工 `/comment`）、排期评论 / 排期联系评论触发回执、排期评论 / 排期联系评论免审通知卡、参照创作结果卡。这些卡的正文本就渲染了归属账号，其收件人 SHALL 是该账号的团队。
 
+**例外——命令触发的发帖终态结果卡回来源会话**：当发帖终态失败 / 部分完成结果卡属于一个**由飞书命令创建、且持有非空来源会话**的委托任务时，该卡 SHALL 投递到该来源会话（下命令的私聊或群），MUST NOT 走账号→团队群路由。此例外只覆盖**命令触发**的发帖终态卡；自动 / 排期发帖等无来源命令会话的业务结果卡仍按上述第 2 类走账号团队群，逐字不变。（手动 `/comment` 终态结果卡暂不在此例外内，仍走团队群——登记为后续对齐项。）
+
 **面向运营方**的消息 MUST NOT 走账号→群映射，SHALL 维持既有默认（管理）群 / 源群目标不变，具体为：发布 / 评论**审批卡**（需运营点按授权）、**运维 / 配置 / 验证码 / 风控告警**（边缘离线、CDP 不健康、发布熔断、握手 config-error 等）。据此，外部客户群按定义**只收该客户账号自己的入站通知与业务结果，不收审批与运维流量**——客户 MUST NOT 被诱导点按授权，也 MUST NOT 看到内部运维状态。
 
 无归属账号（`accountId` 缺失）的任何消息 SHALL 落默认群，MUST NOT 为其臆造账号作用域。
@@ -71,6 +73,12 @@ TBD - created by archiving change feishu-per-team-notification-routing. Update P
 - **WHEN** 账号 `acc-1`（属 `teamA`，`group_route` 有 `teamA → oc_team_a_chat`）的排期发帖产出「本槽无新素材」结果卡、或排期评论产出「按需评论未产出」终态卡
 - **THEN** 该卡 SHALL 投递到 `oc_team_a_chat`
 - **AND** MUST NOT 因「卡片属命令回执类」而被硬绑默认（管理）群
+
+#### Scenario: 命令触发的发帖终态失败卡回来源会话、不走团队群
+
+- **WHEN** 账号 `acc-1`（属 `teamA`，`group_route` 有 `teamA → oc_team_a_chat`）由飞书私聊 `/publish` 命令触发的委托发帖终态失败、其任务持有来源会话 `P`
+- **THEN** 该失败结果卡 SHALL 投递到 `P`
+- **AND** MUST NOT 投递到 `oc_team_a_chat`
 
 #### Scenario: 未绑定团队的业务结果卡仍落默认群、绝不丢
 
