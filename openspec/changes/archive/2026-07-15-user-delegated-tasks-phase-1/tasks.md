@@ -62,3 +62,16 @@
 - [x] 8.4 运行 `scripts/deploy-target dev --check`，从 clean eligible default checkout 备份并部署 cloud/console 到 dev，不触碰 isales、不部署 OL。 <!-- dev target check passed for 121.89.85.150. Cloud was deployed from a clean `git archive origin/master` snapshot because canonical had preserved unrelated untracked WIP; console was built/deployed from clean integrated master. Backups: cloud.bak.20260715-164421.tar.gz, cloud/.env.bak.20260715-164421, console.bak.20260715-164421.tar.gz. No OL action; isales running-service count remained 4. -->
 - [x] 8.5 验证 `aidcp-cloud.service`、8787/8090/8088、公开 health、Feishu onReady、PostgreSQL 与新 task API；失败则按安全路径回滚。 <!-- service active, NRestarts=0; 8787/8090/8088 listeners and public/panel health passed; Feishu WS onReady and PostgreSQL select 1 passed; delegated task tables=3; unauthenticated panel/client task routes returned 401, proving deployed routes are loaded and protected. Post-restart systemd error-priority journal has zero entries, and clean-snapshot hashes match ECS for the task service/store/card/migration wiring. -->
 - [x] 8.6 完成 plain-language 交付说明：已可用入口、真实验证边界、Facebook Beta、Edge 安装端尚未发布、第二批后续范围。 <!-- Closeout must state: cloud/console dev behavior is deployed; no real user task or destructive publish/comment was executed; Facebook remains capability/runtime-gated Beta; Edge source is complete but installed clients do not receive it until a separately authorized package release; long-term rules remain Phase 2. -->
+
+## 9. Post-archive 修复（真机 200672）
+
+归档后首个真机点击暴露：飞书「请确认用户委托任务」卡片点「确认并排队」→ 飞书错误 `200672`。8.5 的部署验证只覆盖了未鉴权 panel 路由返 401，未覆盖飞书 `card.action.trigger` 回调这条真机面，故本回归在归档时未被拦下。
+
+- [x] 9.1 根因定位：`aidcp-cloud/src/feishu/delegated-task-card.ts` `handleDelegatedTaskCardAction` 的回调响应把 `card` 回成裸 `FeishuCard`；`card.action.trigger` 规范要求包成 `{ type: 'raw', data }`（与发布审批卡同源坑，先例见 cloud `18c6f2b` / `docs/feishu-publish-approval-e2e.md`）。typecheck 抓不到（边界类型 `card?: unknown`）。 <!-- confirmed by adversarial verify workflow: refuted=false, all alternatives ruled out (throw→toast-only 非 200672；toast 格式合法；SENT 卡渲染正常；progress 卡 schema 合法) -->
+- [x] 9.2 修复：两处 return（success + version_conflict）均包 `{ type: 'raw', data }`，返回类型收成 `{ type: 'raw'; data: FeishuCard }` 让 typecheck 锁死；测试断言 confirm/duplicate-confirm 的 `card.type==='raw'`。同类漏网卡片扫描为空（回调响应面仅 `ws-receiver.handleCardAction` + `handleDelegatedTaskCardAction` 两处，均已包）。 <!-- cloud 9e1d815 -->
+- [x] 9.3 验证：cloud typecheck 干净、`test:acceptance` 52/52、feishu 套件 134/134（含集成 tip 复跑）。 <!-- ran on 9e1d815 and on integrated tip 2c3d6e5 -->
+- [x] 9.4 部署 dev：从 clean `git archive` 快照按集成 tip 部署（含并行会话同批落地的 `disable-account-age-coldstart-ramp`，默认关闭、inert），备份 `cloud.bak.20260715-171530.tar.gz` + `.env.bak`，`systemctl restart aidcp-cloud`。healthcheck：service active、NRestarts=0、8787/8090 listen、Feishu WSClient onReady、PostgreSQL 无 app 层 DB error、DelegatedTaskStore/Worker/Panel 就绪；部署后确认 ECS 上裸卡返回归零。 <!-- cloud 9e1d815 (deployed as integrated 2c3d6e5); 2026-07-15 deployed; store 为 PG-backed，归档后重启不丢任务，既有确认卡可直接重点 -->
+- [x] 9.5 真机验收口径：用户重点「确认并排队」即验收；对抗复核已证「点击能触发回调」（200672 是点击后的响应格式错，证明 trigger 已成功到达 handler），故按钮裸 `value` 形态无碍、补壳即充分。 <!-- residual real-machine risk 由复核逻辑自证消解；bare-value vs behaviors 仅风格不一致，非缺陷 -->
+<!-- 2026-07-15 deployed -->
+
+未清理（无关、已知）：cloud canonical 里前序会话保留的杂散文件 `./1`（见 1.1），本修复提交与部署均未纳入。
