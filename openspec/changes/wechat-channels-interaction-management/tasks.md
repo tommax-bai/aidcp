@@ -24,13 +24,15 @@
 
 ## 3. Session 02 - Cloud inbox, workflow and APIs
 
-- [ ] 3.1 Allocate the next migration ID from current Cloud `master`, create the additive interaction/config/audit tables and enforce all frozen unique keys and account/env scope indexes.
-- [ ] 3.2 Implement transactional sync batch ingestion, duplicate ack replay and authoritative cursor advancement without reusing outbound `interaction_feed`.
-- [ ] 3.3 Implement unique reply jobs, monotonic CAS, send attempts, state transitions, ambiguous verification and no automatic ambiguous retry.
-- [ ] 3.4 Implement deterministic rule/template rendering, immutable published config snapshots, the three strict AI roles and their fail-closed fallbacks.
-- [ ] 3.5 Implement all-send/auto-only gates, `dm_reply` fallback quotas of zero, single-account send serialization and confirmed-only `RiskController.record`.
-- [ ] 3.6 Implement customer-auth and internal APIs exactly as frozen, including JWT domains, enabled-user/env scope checks, permissions, opaque pagination, preview and audit.
-- [ ] 3.7 Implement runtime controls, kill switches, retention/purge jobs, redacted logs and metrics with all real write flags defaulting off.
+- [x] 3.1 Allocate the next migration ID from current Cloud `master`, create the additive interaction/config/audit tables and enforce all frozen unique keys and account/env scope indexes.
+- [x] 3.2 Implement transactional sync batch ingestion, duplicate ack replay and authoritative cursor advancement without reusing outbound `interaction_feed`.
+- [x] 3.3 Implement unique reply jobs, monotonic CAS, send attempts, state transitions, ambiguous verification and no automatic ambiguous retry.
+- [x] 3.4 Implement deterministic rule/template rendering, immutable published config snapshots, the three strict AI roles and their fail-closed fallbacks.
+- [x] 3.5 Implement all-send/auto-only gates, `dm_reply` fallback quotas of zero, single-account send serialization and confirmed-only `RiskController.record`.
+- [x] 3.6 Implement customer-auth and internal APIs exactly as frozen, including JWT domains, enabled-user/env scope checks, permissions, opaque pagination, preview and audit.
+- [x] 3.7 Implement runtime controls, kill switches, retention/purge jobs, redacted logs and metrics with all real write flags defaulting off.
+
+<!-- Session 02 evidence: aidcp-cloud implementation commit c9de73c833715d2a4590b609a691c4885280d974 was fast-forwarded to and pushed on `master`, then deployed to `dev` (121.89.85.150) from a clean snapshot. Migration `0039_interaction_inbox.sql` applied transactionally after Cloud, `.env`, and PostgreSQL schema backups (`cloud-session02-20260715-184142*`); all 15 domain tables, reply-job uniqueness, active job/account attempt indexes, and the widened `dm_reply` risk constraint were verified. Local full tests, PostgreSQL interaction integration, typecheck, build, exact frozen-fixture comparison, and all five contract schema validations passed; ECS typecheck also passed after sync. Post-restart evidence: `aidcp-cloud.service` active with `NRestarts=0`, listeners 8787/8090/8091/8088 present, panel/public health both `{"ok":true}`, PostgreSQL healthy, interaction domain ready, customer-auth/panel unauthenticated probes returned 401, and Feishu `WSClient onReady` was observed. The global interaction write flag, auto allowlist, DM AI, per-channel runtime writes, and `dm_reply` quota overrides remain off/empty; no real Video Channels login, read, or write was performed, so real-account acceptance remains Session 05. -->
 
 ## 4. Session 03 - Console reply settings
 
