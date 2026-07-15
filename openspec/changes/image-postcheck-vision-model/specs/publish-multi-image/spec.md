@@ -86,6 +86,22 @@
 - **WHEN** 目标画面为场景摄影、静物、插画/3D 或混合拼贴
 - **THEN** 分类 brief SHALL 分别描述事件痕迹/空间关系、物件使用状态/生活痕迹、隐喻/象征/叙事阶段、分区职责/阅读顺序，MUST NOT 统一退化为泛化情绪与装饰词
 
+### Requirement: 自主创作 SHALL 先规划图集叙事和逐槽职责
+
+自主创作稿件没有来源图片提供序列结构时，系统 SHALL 在逐槽类型化 brief 之前或同一次规划调用内生成文章级图集策略，至少包含整组叙事弧、连续性规则和类型组合理由；每槽 SHALL 使用固定 `slotRole` 表达封面钩子、语境、问题、解释、证据、过程、对比、行动或结论职责。槽位职责、视觉类型、具体内容、风格来源和生成路由 MUST 分字段保存，MUST NOT 混成单一风格描述。模型漏字段/无效枚举/调用失败时 SHALL 有确定性保守兜底，且不得声称模型策略完整可用。
+
+#### Scenario: 原创多图形成叙事而不是重复插图
+- **WHEN** 自主创作正文规划出多于一张图片
+- **THEN** 图 0 SHALL 为 `cover_hook`，其余槽按正文语义承担语境、问题、解释、证据、过程、对比、行动或结论；系统 SHALL 给出整组叙事弧与连续性规则，MUST NOT 仅以不同措辞重复同一槽位职责
+
+#### Scenario: 类型组合服从内容而非表面多样
+- **WHEN** 正文最适合全部使用文字卡或同一摄影类型形成连续叙事
+- **THEN** 系统 MAY 重复同一视觉类型，但每槽职责和内容 MUST 不同；系统 MUST NOT 为凑齐多种类型而编造数据、UI、人物或场景
+
+#### Scenario: 原创类型决定诚实生成路由
+- **WHEN** 自主创作槽选择文字卡、UI/文档、图表信息图或混合拼贴
+- **THEN** 计划 SHALL 分别记录确定性文字卡、类型专用生成或分区引导路由；未接结构化 UI/图表绘制器时 MUST NOT 标记为 deterministic redraw
+
 ### Requirement: 高风险配图产后视觉校验
 
 产后审计旗标开启且槽位存在主参考图时，系统 SHALL 用视觉 / 多模态模型比较主参考与生成图，输出形态、主体、构图、色彩、风格五项分数；生成式槽存在 `contentVisualBrief` 时还 SHALL 输出 `contentAlignment`，并按 `categoryBrief.kind` 核验人物表演、文字信息结构、图表关系、场景事件、静物状态、插画隐喻、UI 任务或拼贴分区。确定性文字卡继续由既有卡面文案合规链核验内容，视觉保真审计 MUST NOT 为计算 `contentAlignment` 去 OCR 卡面文字，但 metadata 仍 SHALL 保留该槽正文 brief。系统同时核验来源真人/名人身份相似、乱码、画内水印、逐字复制与原创风险；清晰露脸的虚构人物本身 MUST NOT 被误判为可识别真人风险。内容不一致、硬风险或阈值不通过 SHALL 丢弃该次结果：生成式带审计指导有界重生成一次，确定性文字卡以严格来源设计令牌有界重渲染一次；第二次仍不过 SHALL 丢弃该槽。MUST NOT 因 prompt 写了 `faceless`/`no text`、provider 声称 `referenceStatus='used'` 或文字卡 renderer 返回成功就假定保真/合规。首轮视觉模型不可用时 MUST 标 `unverified` 并诚实保留原因；已有失败尝试后，后续 `unverified` MUST 丢槽，MUST NOT 用未知结果覆盖已知失败。合规 AI 标识仍走既有发布声明 / 元数据链路，MUST NOT 由模型在画面内绘制水印。
@@ -114,9 +130,25 @@
 - **WHEN** 文字卡 renderer 成功生成 PNG，产后审计旗标开启且槽位存在主参考图
 - **THEN** 系统 SHALL 比较主参考与该 PNG 的形态/构图/色彩/风格，正文 brief 只存审计 metadata 而不触发 OCR 式 `contentAlignment`；首次失败以严格来源令牌重渲染一次，第二次仍失败则丢槽，MUST NOT 以 `deterministic text-card renderer` 为由直接标 skipped
 
+### Requirement: 自主创作配图 SHALL 支持无参考图内容视觉核验
+
+自主创作审计旗标开启且槽位存在有效 `contentVisualBrief` 时，系统 SHALL 在没有主参考图的情况下用视觉模型比较生成结果与 `slotRole`、目标类型、公共 brief 和分类 brief，并显式记录 `auditMode=content_alignment`。形态分 SHALL 表示目标类型匹配，主体/构图/色彩/风格/内容一致性 SHALL 相对正文语义评估；来源复制检查 SHALL 标为 `not_applicable`，MUST NOT 伪造参考图比较或来源保真结论。内容错位、乱码、水印、可识别真人或高风险不通过时 SHALL 有界重生成/重渲染一次，第二次仍失败则丢槽；首轮视觉模型不可用时 SHALL `unverified` 并保留图片进入既有人审草稿链。
+
+#### Scenario: 原创图片按类型和正文核验
+- **WHEN** 自主创作生成一个 `infographic_chart` 槽且正文没有可靠数字
+- **THEN** 内容审计 SHALL 检查输出是否为无数值关系表达、是否编造数字以及是否体现分类 brief 的关系和方向；不得因不存在参考图而直接 skipped
+
+#### Scenario: 原创审计不伪造复制结论
+- **WHEN** 内容审计只有生成图、槽位职责和正文 brief，没有来源图片
+- **THEN** metadata SHALL 记录 `copyCheck=not_applicable`，控制台不得显示“未复制来源”或“参考保真通过”
+
+#### Scenario: 原创审计可独立回滚
+- **WHEN** `AIDCP_AUTONOMOUS_VISUAL_AUDIT` 关闭
+- **THEN** 自主创作保持类型化规划和生成，但不调用无参考图视觉审计；参照洗稿的 `AIDCP_VISUAL_FIDELITY_AUDIT` 行为不受影响
+
 ### Requirement: 视觉参考和保真结果 SHALL 可审计
 
-发布 metadata SHALL 逐槽持久化风格来源、公共内容视觉 brief、判别式分类 brief、生成路由、source→slot→output 绑定、provider 参考使用状态、视觉审计状态/分数/风险/尝试次数，并区分 `used`（provider 声称消费参考图）与 `passed`（生成后视觉与正文语义审计通过）。控制台 SHALL 按分类使用可读标签与字段展示，不得只显示原始 JSON；历史记录无新字段时读取 SHALL null-safe。模型不可用、旗标关闭、路由降级和槽位丢弃均 MUST 有诚实状态，不得统一包装为成功。
+发布 metadata SHALL 逐槽持久化图集策略、槽位职责、风格来源、公共内容视觉 brief、判别式分类 brief、生成路由、source→slot→output 绑定、provider 参考使用状态、审计模式、复制检查适用性、视觉审计状态/分数/风险/尝试次数，并区分 `used`（provider 声称消费参考图）、`reference_fidelity`（有来源比较）与 `content_alignment`（仅正文/类型核验）。控制台 SHALL 按分类使用可读标签与字段展示，不得只显示原始 JSON；历史记录无新字段时读取 SHALL null-safe。模型不可用、旗标关闭、路由降级和槽位丢弃均 MUST 有诚实状态，不得统一包装为成功。
 
 #### Scenario: provider used 不等于保真 passed
 - **WHEN** provider 返回 `referenceStatus='used'` 但产后视觉审计失败

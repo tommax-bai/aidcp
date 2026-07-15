@@ -23,6 +23,8 @@
 - [x] 3.5 为确定性文字卡派生白名单来源设计令牌（内部色板、渐变/网格、信息卡、分页、密度、中文词组断行），旗标关或分析不可用保持现有模板行为。 <!-- aidcp-cloud 753d66b -->
 - [x] 3.6 将 `ImageSetPlanner` 补成内容视觉导演：读取有界首/中/尾正文，为每槽生成 `contentVisualBrief`；composer 明确正文人物表演优先、参考只管摄影语言及人物身份泛化。 <!-- aidcp-cloud c77683e -->
 - [x] 3.7 将 `contentVisualBrief` 扩为公共字段 + 八类判别式 `categoryBrief`；反推 frame 可用时按源图类型校正，composer/fallback/文字卡文案分别消费对应分类语义。
+- [x] 3.8 自主创作新增文章级 `visualSetBrief` 和固定枚举 `slotRole`；LLM 缺失/非法/失败时确定性兜底，洗稿张数和来源绑定行为零回归。
+- [x] 3.9 composer 将原创槽位职责、整组连续性和类型参数写入生成指令，并按 `categoryBrief.kind` 诚实标记 generative/deterministic/specialized/region-guided 路由。
 
 ## 4. aidcp-cloud — visual fidelity audit
 
@@ -32,6 +34,7 @@
 - [x] 4.4 确定性文字卡同样执行产后视觉比较；首次失败以严格来源令牌重渲染一次，二次失败丢槽，模型不可用诚实 `unverified`。 <!-- aidcp-cloud 753d66b -->
 - [x] 4.5 审计增加 `contentAlignment` 与逐槽 brief；已有失败后重试审计 `unverified` 必须丢槽，不得覆盖已知真人/乱码/原创风险。 <!-- aidcp-cloud c77683e -->
 - [x] 4.6 `contentAlignment` 按分类字段核验人物、文字信息结构、图表关系、场景事件、静物状态、插画隐喻、UI 任务和拼贴分区；图表/UI 增加禁止编造数据/能力的提示约束。
+- [x] 4.7 新增自主创作 `content_alignment` 审计模式：无主参考图时按 slot/type/brief 核验，复制检查标不适用，失败有界重试且未知不得覆盖已知失败。
 
 ## 5. aidcp-console — explainable audit
 
@@ -39,6 +42,7 @@
 - [x] 5.2 发布详情显示 source→output 槽位绑定、生成路由、是否使用参考图、逐槽评分/风险/重试与未核验原因；不得把 `used` 等同于“保真通过”。
 - [x] 5.3 发布详情展示逐槽正文情绪/人物表演 brief 与内容一致性分数，历史记录 null-safe。 <!-- aidcp-console 2b58528 -->
 - [x] 5.4 发布详情按八类可读展示 `categoryBrief`，不直接 dump JSON，历史无分类字段时维持现有展示。
+- [x] 5.5 发布详情展示原创图集策略、槽位职责和审计模式；原创内容核验不得显示成参考图保真，复制检查不适用须可解释且历史 null-safe。
 
 ## 6. Verification and rollout
 
@@ -51,6 +55,8 @@
 - [x] 6.7 补齐轻量 set/specialist 分批、来源文字卡设计令牌、中文词组断行、确定性卡审计/重渲染/丢槽及 flag-off 回归测试。 <!-- aidcp-cloud 753d66b；2026-07-15 deployed dev -->
 - [x] 6.8 补齐正文首/中/尾摘录、视觉 brief 解析/兜底、人物 prompt 冲突优先级、人物反推 v3、contentAlignment 及 failed→unverified 丢槽回归测试。 <!-- cloud full 2082/2082; targeted 64/64 + 38/38; console 123/123 + 1 skipped -->
 - [x] 6.9 覆盖八类严格解析、分类兜底/源类型校正、分类 prompt、文字卡首/中/尾语义、分类审计与控制台 null-safe 展示；通过 acceptance、全量测试、typecheck、build 和 OpenSpec strict。
+- [x] 6.10 覆盖原创 1/多图策略、槽位职责兜底、类型路由、内容审计 pass/fail/retry/unavailable、copy not-applicable 和参照路径零回归。
+- [ ] 6.11 cloud/console acceptance、目标测试、全量测试、typecheck/build 与 OpenSpec strict 通过；提交推送、快进默认分支、部署 dev 并回写健康与未完成真实样本边界。
 
 ## 7. Change record
 

@@ -12,7 +12,9 @@
 - 建立稳定的 source→slot→output 绑定，避免每槽共享整组参考图。
 - 让源图视觉语言优先于硬编码内容品类风格，并保留 flag-off 等价行为。
 - 让洗稿后的正文语义按画面类型明确控制人物表演、文字信息结构、图表关系、场景事件、静物状态、插画隐喻、UI 任务和拼贴分区，避免主题在层间压缩成泛化装饰图。
+- 让自主创作先形成文章级图集叙事与逐槽职责，再选择视觉类型和分类参数，避免各槽独立合理但整组重复或失序。
 - 用产后视觉比较确认保真和高风险约束，失败时有界重试、不可用时诚实未核验。
+- 在没有主参考图时按目标类型和正文 brief 做内容视觉核验，并明确复制检查不适用。
 - 缓存、记账、可审计、面板可解释；不增加 edge/protocol 变化。
 
 **Non-Goals:**
@@ -77,6 +79,18 @@
 
 确定性文字卡因防搬运校验与图集规划并行，不直接信任 planner 文案覆盖卡面；其专用文案角色 SHALL 使用同一有界首/中/尾正文口径，并显式提炼核心结论、信息层级、重点词、阅读顺序和密度，继续通过既有原文重叠/违禁词闸。这样文字卡消费等价分类语义，又不绕过防搬运审计。
 
+### D4.3：自主创作先规划图集职责，再选择类型
+
+自主创作没有来源图片提供序列结构，`ImageSetPlanner` SHALL 在同一次文本模型调用中额外输出文章级 `visualSetBrief`：
+
+- `narrativeArc`：整组图片如何从钩子推进到结论；
+- `continuityRules[]`：跨槽保持一致的色彩、主体或符号规则，只写抽象连续性，不写 provider prompt；
+- `typeMixRationale`：为什么选择当前类型组合，必须服务正文而不是追求表面多样。
+
+每个主题额外输出 `slotRole`，固定枚举为 `cover_hook | context | problem | explanation | evidence | process | contrast | action | conclusion`。`slotRole` 回答“本槽为什么存在”，`categoryBrief.kind` 回答“用什么视觉形式表达”，公共/分类 brief 回答“具体表达什么”，风格档回答“画面语言如何统一”，生成路由回答“由什么执行器实现”。这些概念 MUST NOT 合并成一个自由文本风格词。
+
+模型漏字段、未知枚举或调用失败时，代码 SHALL 按槽位和正文生成保守 `visualSetBrief`/`slotRole`，保持图 0 为封面钩子、最后一图优先结论，中间槽依次承载语境、解释/过程或证据。兜底不得声称模型已经给出完整视觉策略。洗稿模式继续以来源序列为主，不因本决策改变张数/绑定语义。
+
 ### D5：产后审计是视觉比较，不是 prompt 自证
 
 `VisualFidelityAuditor` 输入主参考、生成图、期望 frame/style 摘要及本槽 `contentVisualBrief`，严格输出：
@@ -87,12 +101,22 @@
 
 通过阈值由代码默认值 + env 可调；内容一致性与硬风险任一不通过都 fail。生成式失败只为该槽重生成一次，并把 audit guidance 附到第二次 prompt；确定性文字卡失败则以严格来源设计令牌重渲染一次。第二次仍失败则丢槽。首轮审计模型未配置、超时或解析失败时可按既有人审草稿链保留但状态必须为 `unverified`；若已有任一失败尝试，后续审计 `unverified` 必须丢槽，不能用不可用结果覆盖已知失败。确定性 renderer 成功只表示“渲染成功”，不得因此把视觉审计记为 `skipped` 或 `passed`。
 
+### D5.1：原创内容审计不伪造参考比较
+
+审计输入的 `referenceUrl` 改为可选，并显式区分：
+
+- `reference_fidelity`：有主参考图，比较参考与输出，检查来源保真、正文一致性和复制风险；
+- `content_alignment`：无主参考图，仅检查输出是否符合 `slotRole + expectedKind + contentVisualBrief`，其中 `form` 表示目标类型匹配，`color/style` 表示是否支持正文情绪与信息层级，不表示相对某张来源图的相似度。
+
+`content_alignment` 必须把复制检查标为 `not_applicable`，不得以 `copiedText=false` 暗示做过来源比对。两种模式共用乱码、水印、可识别真人和高风险检查，也共用 failed → 一次定向重试 → 再失败丢槽、首轮 unavailable → `unverified` 的诚实状态机。逐槽 metadata 保存审计模式、槽位职责和复制检查适用性；控制台名称使用“配图视觉审计”，不得把原创内容核验显示成“参考图保真”。
+
 ### D6：角色、旗标与超时
 
 - `AIDCP_REFERENCE_VISUAL_ANALYSIS`：执行并缓存反推；默认 off。
 - `AIDCP_REFERENCE_VISUAL_BINDING`：启用逐槽绑定；默认 off，关时维持整组参考图旧行为。
 - `AIDCP_REFERENCE_SOURCE_STYLE`：源风格优先；默认 off。
 - `AIDCP_VISUAL_FIDELITY_AUDIT`：产后审计和有界重试；默认 off。
+- `AIDCP_AUTONOMOUS_VISUAL_AUDIT`：自主创作无参考图的内容视觉审计；默认 off，与参照保真旗标独立。
 - `AIDCP_REFERENCE_VISUAL_TIMEOUT_MS`：单次视觉分析调用超时；整组轻量 pass 与 specialist 小批次共用，默认 120s。
 - `AIDCP_REFERENCE_VISUAL_SPECIALIST_BATCH_SIZE`：单个 specialist 请求的图片上限，默认 3，非法值回落默认。
 - 分析/审计 provider/model 分别可由独立 env 覆盖，默认 DashScope + `qwen3.7-plus`。
@@ -108,12 +132,15 @@ referenceNote.images
   -> setStyleBible + styleClusters + frameSpecs
 rewritten title/body/tone
   -> ImageSetPlanner as typed content visual director (common brief + categoryBrief)
+autonomous title/body/tone
+  -> visualSetBrief + slotRole + common brief + categoryBrief
 reference analysis + contentVisualBrief
   -> ImagePromptComposer (typed content semantics first; source form/style; category fallback)
   -> text-card design tokens (palette/grid/cards/pagination; no source pixels or OCR)
   -> ImagePlan.referenceBindings[slot]
   -> ImageGenerator / deterministic renderer / provider (slot-local refs, primary last)
   -> VisualFidelityAuditor (reference vs output)
+  -> autonomous content audit (slot/type/brief vs output; no fake source comparison)
   -> bounded regenerate or rerender / discard
   -> ImageDirective + publish metadata + console audit
 ```
