@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 多角色，`RoleName` 穷举现 43 项，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> v2 共 **76 个消息类型**（含 `pacing.update`），下表按职能分组列全。计数与表为人工维护，以两端 `protocol.ts` 的 `MessageType` 穷举为准（可能滞后于代码）。
+> 本 change 冻结后的 v2 目标为 **83 个消息类型**（现有 76 个 + 视频号互动管理 7 个），下表按职能分组列全。Session 01/02 完成两端实现前，运行时代码仍为 76 个，不能把合同冻结表述成已经上线。计数与表为人工维护，落地后仍以两端 `protocol.ts` 的 `MessageType` 穷举与已注册 handler/routing 为准。
 
 ## 1. 信封（Envelope）
 
@@ -175,6 +175,20 @@
 该字段不是“当前有没有人设”的别名。更新人设、重复请求、解绑后重绑或账号已经建立过首作状态时为
 `false`/缺省；Edge 只有看到明确的 `true` 才展示“人设已成形”后的第一篇作品引导。
 
+### 2.8 视频号入站互动管理（v2 扩展，合同目标）
+
+> 精确合同见 `docs/contracts/wechat-channels-interaction/v1/`。新增消息只有在 `hello` 与 `welcome` 双方都确认 `interaction_inbox_v1` 后才能使用。
+
+| type | 方向 | 关联响应 | 用途 |
+| --- | --- | --- | --- |
+| `interaction.auth.status` | edge → cloud | — | 上报视频号 auth/browser/capability/identity 真态 |
+| `interaction.sync.batch` | edge → cloud | `interaction.sync.ack` | 按账号、渠道、scope 上报可重放批次 |
+| `interaction.sync.ack` | cloud → edge | — | 确认整批 accepted/duplicate/rejected；只有前两者可推进 checkpoint |
+| `interaction.reply.result` | edge → cloud | — | 回填 reply.send 的 confirmed/failed/ambiguous 真态 |
+| `interaction.sync.request` | cloud → edge | 后续 `interaction.sync.batch` | 触发用户请求、恢复、定时或回查同步 |
+| `interaction.reply.send` | cloud → edge | `interaction.reply.result` | 下发带稳定幂等键的 text 回复指令 |
+| `interaction.auth.reopen` | cloud → edge | 后续 `interaction.auth.status` | 请求在原 Edge 打开所属登录/挑战现场 |
+
 ## 3. 各消息 payload 定义
 
 ### 3.1 握手
@@ -185,7 +199,7 @@
   "edgeId": "edge-01",        // string  边缘节点标识
   "platform": "xiaohongshu",  // string? 运行时平台标识；缺省按历史 xhs 兼容，cloud 会与 accounts.platform 校验
   "app": "xhs",               // string? 业务/站点标识
-  "capabilities": ["click", "input", "scroll"], // string[]? 能力声明
+  "capabilities": ["click", "input", "scroll", "interaction_inbox_v1"], // string[]? 能力声明
   "accountId": "acc-01",      // string? 账号标识；多账号运行时要求真实账号，default 已退役
   "accountNickname": "小张测评", // string? 账号可读昵称；仅用于展示补充，不参与身份确立或路由
   "machineLabel": "win-aliyun-3", // string? 人类可读机器标签
@@ -193,13 +207,14 @@
 }
 ```
 
-`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型、不改变 v2 的 76 个消息类型计数。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge 接管 Facebook 账号或反向混跑。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。
+`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge、Facebook edge 或视频号 edge 跨平台接管账号。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。`interaction_inbox_v1` 是 optional capability：旧端可忽略；新 Edge 只有收到 `welcome.capabilities` 回显后才启用 §2.8 消息。
 
 **`welcome`**（cloud → edge）
 ```jsonc
 {
   "sessionId": "sess-1",      // string  云端分配的会话 id
   "serverVersion": "0.1.0",   // string  服务端版本
+  "capabilities": ["interaction_inbox_v1"], // string[]? Cloud 确认支持的协商能力；旧端忽略
   "pacing": {                 // object?  可选节奏快照（change pacing-floor-config-min-interval）；旧端忽略
     "tempo": 1.0,             //   number  风控档全局节奏乘子（normal=1.0/warned=1.3/restricted=1.6），边缘乘算
     "opFloorsMs": {           //   object  每类操作兜底 floor 默认区间（已含云端读出口 clamp 护栏、非零）；逐字段可缺、边缘逐项回落内置默认
@@ -892,6 +907,108 @@ first-writer-wins 审批信号。动作成功只表示审批决定已受理：`a
 
 **`ping` / `pong`**：payload 为空对象 `{}`；服务端收到 `ping` 回 `pong`（回填同一 `id`）。
 
+### 3.13 视频号入站互动管理
+
+本节只给出 wire 语义；字段、required、枚举、上限与条件约束的唯一机器合同是
+`docs/contracts/wechat-channels-interaction/v1/schemas/ws-v2.schema.json`，对应正常和降级样例在同目录 `fixtures/ws/`。所有时间均为 epoch milliseconds，payload 不重复 envelope 的 `type`。
+
+**`interaction.auth.status`**（edge → cloud）
+
+```jsonc
+{
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "status": "active", "browserState": "closed",
+  "capabilities": {
+    "commentsRead": true, "commentsReply": false,
+    "dmRead": true, "dmSendText": false, "dmSendImage": false
+  },
+  "identity": { "externalId": "finder-demo-001", "displayName": "示例视频号", "identityHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111" },
+  "checkedAt": 1784044801000, "reasonCode": null
+}
+```
+
+`active + closed` 是合法组合。capability 表示该账号此刻有效可用，不是 build 可能支持；身份错配、挑战、schema 漂移或开关关闭时必须降级且 fail closed。凭证、二维码和调试地址不得进入 payload。
+
+**`interaction.sync.batch` / `interaction.sync.ack`**
+
+```jsonc
+// edge -> cloud
+{
+  "batchId": "batch-comment-001", "requestId": null,
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "channel": "comment", "scopeExternalId": "video-demo-001",
+  "cursorBefore": null, "cursorAfter": "opaque-platform-cursor", "hasMore": false,
+  "threads": [], "messages": [], "observedAt": 1784044802000
+}
+
+// cloud -> edge，envelope id 原样回填 batch 的 id
+{
+  "batchId": "batch-comment-001",
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "channel": "comment", "scopeExternalId": "video-demo-001",
+  "status": "accepted", "cursorAfter": "opaque-platform-cursor",
+  "persisted": { "threads": 1, "messages": 1 },
+  "errorCode": null, "receivedAt": 1784044802100
+}
+```
+
+一个 batch 只能含一个 account/env/channel/scope。Cloud 在同一事务完成 scope 校验、batch/thread/message 幂等写和 cursor 推进后才回 `accepted`；已落库重放回 `duplicate`。`rejected`、断连、部分失败或 ack cursor 不一致都不能推进 Edge checkpoint。
+
+**`interaction.sync.request`**（cloud → edge）
+
+```jsonc
+{
+  "requestId": "sync-request-comment-001",
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "channel": "comment", "scopeExternalId": "video-demo-001",
+  "reason": "user_requested", "requestedAt": 1784044838000
+}
+```
+
+后续 batch 以 payload `requestId` 关联该请求；不使用 envelope id 作为跨多个 batch 的唯一关联键。
+
+**`interaction.reply.send` / `interaction.reply.result`**
+
+```jsonc
+// cloud -> edge
+{
+  "jobId": "job_comment_100", "attemptId": "attempt_comment_100_1",
+  "idempotencyKey": "e0e055e5abfced94f0e808eb5745a36b5f9f7aecc75c2d0377f5b2f692ae2ae9",
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "channel": "comment",
+  "target": {
+    "threadExternalId": "comment_msg_100", "inboundMessageExternalId": "comment_msg_100",
+    "parentExternalId": null
+  },
+  "content": { "type": "text", "text": "谢谢你的喜欢，欢迎继续交流。" },
+  "expiresAt": 1784044900000
+}
+
+// edge -> cloud，envelope id 原样回填 send 的 id
+{
+  "jobId": "job_comment_100", "attemptId": "attempt_comment_100_1",
+  "idempotencyKey": "e0e055e5abfced94f0e808eb5745a36b5f9f7aecc75c2d0377f5b2f692ae2ae9",
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "channel": "comment", "status": "confirmed", "externalMessageId": "reply-comment-100",
+  "errorCategory": null, "errorCode": null, "verification": "comment_lookup",
+  "retryAfterMs": null, "finishedAt": 1784044824000
+}
+```
+
+`confirmed` 只允许来自平台 ack 或回查证据；超时、断连、解析失败或落地无法确认必须回 `ambiguous`，不能回 `failed` 触发盲重试。v1 只允许 text，`dmSendImage` 恒 false。
+
+**`interaction.auth.reopen`**（cloud → edge）
+
+```jsonc
+{
+  "requestId": "auth-reopen-001",
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "reason": "user_requested", "requestedAt": 1784044840000
+}
+```
+
+Edge 必须只打开该 env/account 所属 sidecar，并用后续 `interaction.auth.status` 报 `authenticating`、`active` 或挑战真态；不得把“已打开浏览器”当登录成功。
+
 ## 4. 典型时序
 
 ### 4.1 浏览会话闭环（v2 主路径：结构化上报 + 角色驱动）
@@ -966,6 +1083,12 @@ cloud（Publish Agent）          edge                         飞书（云端 B
 客户端稿件预览的“发布 / 取消”按钮走 `publish.approval_action`，与飞书按钮共享同一
 审批信号和 first-writer-wins 规则；预览内的“查看稿件 ↗”只打开本地抽屉，不再跳转飞书。
 
+### 4.4 视频号评论确认与私信待核验
+
+评论完整合同走读见 `docs/contracts/wechat-channels-interaction/v1/fixtures/walkthroughs/comment-confirmed-flow.json`：只有双方协商能力、Cloud 整批落库并 ack、人工批准、Edge 回 `confirmed` 后，job 才能成为 `sent`。
+
+私信降级走读见 `docs/contracts/wechat-channels-interaction/v1/fixtures/walkthroughs/dm-ambiguous-flow.json`：Edge 派发后无法取得平台证据时必须回 `ambiguous`，Cloud 保持阻断且不自动重投，客户界面显示“待核验”。两条 fixture 都只证明合同，不代表真实账号执行过写操作。
+
 ## 5. 错误与兼容性
 
 - **未知 type**：服务端回 `error`（code=`unsupported_type`）。
@@ -973,3 +1096,6 @@ cloud（Publish Agent）          edge                         飞书（云端 B
 - **坏帧**：`parseEnvelope` 返回 null → `error`（code=`bad_envelope`）。
 - **版本演进**：`v` 用于灰度；新增字段应保持向后兼容（旧端忽略未知字段）。v2 对 v1
   的全部消息保持兼容，新增消息类型旧端可安全忽略。
+- **视频号互动能力协商**：Edge 与 Cloud 都确认 `interaction_inbox_v1` 前，双方均不得发送
+  §2.8 的新增消息。新 Cloud 遇旧 Edge 不派 interaction 命令；新 Edge 遇旧 Cloud 不启动
+  batch 上报；未知 type 不得导致连接崩溃或重试风暴。

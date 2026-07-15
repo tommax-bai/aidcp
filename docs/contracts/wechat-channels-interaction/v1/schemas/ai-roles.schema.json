@@ -1,0 +1,225 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-roles.schema.json",
+  "title": "AIDCP Interaction Reply AI Roles v1",
+  "oneOf": [
+    { "$ref": "#/$defs/IntentClassifierInput" },
+    { "$ref": "#/$defs/IntentClassifierOutput" },
+    { "$ref": "#/$defs/PolisherInput" },
+    { "$ref": "#/$defs/PolisherOutput" },
+    { "$ref": "#/$defs/RiskReviewerInput" },
+    { "$ref": "#/$defs/RiskReviewerOutput" }
+  ],
+  "$defs": {
+    "Intent": {
+      "enum": [
+        "gratitude",
+        "general_question",
+        "product_question",
+        "support_request",
+        "complaint",
+        "order",
+        "refund",
+        "pricing",
+        "promotion",
+        "inventory",
+        "shipping",
+        "personal_data",
+        "medical",
+        "legal",
+        "abuse",
+        "minor_safety",
+        "other",
+        "unknown"
+      ]
+    },
+    "RecentMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["direction", "text"],
+      "properties": {
+        "direction": { "$ref": "common.schema.json#/$defs/Direction" },
+        "text": { "type": "string", "maxLength": 2000 }
+      }
+    },
+    "MinimalInbound": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "messageType", "text", "userName", "videoTitle", "recentMessages"],
+      "properties": {
+        "channel": { "$ref": "common.schema.json#/$defs/Channel" },
+        "messageType": { "$ref": "common.schema.json#/$defs/MessageType" },
+        "text": { "$ref": "common.schema.json#/$defs/NullableString" },
+        "userName": { "$ref": "common.schema.json#/$defs/NullableString" },
+        "videoTitle": { "$ref": "common.schema.json#/$defs/NullableString" },
+        "recentMessages": {
+          "type": "array",
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/RecentMessage" }
+        }
+      }
+    },
+    "IntentClassifierInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "requestId", "accountId", "inbound"],
+      "properties": {
+        "role": { "const": "reply_intent_classifier" },
+        "requestId": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "inbound": { "$ref": "#/$defs/MinimalInbound" }
+      }
+    },
+    "IntentClassifierOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "intent", "confidence", "riskTags", "reasons"],
+      "properties": {
+        "role": { "const": "reply_intent_classifier" },
+        "intent": { "$ref": "#/$defs/Intent" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "riskTags": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "$ref": "common.schema.json#/$defs/RiskTag" },
+          "uniqueItems": true
+        },
+        "reasons": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        }
+      }
+    },
+    "ProfileSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tone", "maxLength", "allowEmoji", "allowLinks", "blockedPhrases", "requiredDisclaimer"],
+      "properties": {
+        "tone": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": { "enum": ["professional", "friendly", "concise"] },
+          "uniqueItems": true
+        },
+        "maxLength": { "type": "integer", "minimum": 1, "maximum": 4000 },
+        "allowEmoji": { "type": "boolean" },
+        "allowLinks": { "type": "boolean" },
+        "blockedPhrases": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "uniqueItems": true
+        },
+        "requiredDisclaimer": { "$ref": "common.schema.json#/$defs/NullableString" }
+      }
+    },
+    "PolisherInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "requestId", "accountId", "inbound", "renderedText", "profile"],
+      "properties": {
+        "role": { "const": "reply_polisher" },
+        "requestId": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "inbound": { "$ref": "#/$defs/MinimalInbound" },
+        "renderedText": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "profile": { "$ref": "#/$defs/ProfileSummary" }
+      }
+    },
+    "PolisherOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "polishedText", "meaningChanged", "introducedClaims", "riskTags"],
+      "properties": {
+        "role": { "const": "reply_polisher" },
+        "polishedText": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "meaningChanged": { "type": "boolean" },
+        "introducedClaims": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "riskTags": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "$ref": "common.schema.json#/$defs/RiskTag" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "RiskPolicySummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "hardRiskTags"],
+      "properties": {
+        "mode": { "enum": ["draft_only", "review_before_send", "auto_safe"] },
+        "hardRiskTags": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": { "$ref": "common.schema.json#/$defs/RiskTag" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "RiskReviewerInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "requestId",
+        "accountId",
+        "inbound",
+        "renderedText",
+        "candidateText",
+        "meaningChanged",
+        "introducedClaims",
+        "policy"
+      ],
+      "properties": {
+        "role": { "const": "reply_risk_reviewer" },
+        "requestId": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "inbound": { "$ref": "#/$defs/MinimalInbound" },
+        "renderedText": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "candidateText": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "meaningChanged": { "type": "boolean" },
+        "introducedClaims": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "policy": { "$ref": "#/$defs/RiskPolicySummary" }
+      }
+    },
+    "RiskReviewerOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "riskLevel", "riskTags", "reasons", "allowAutoSend"],
+      "properties": {
+        "role": { "const": "reply_risk_reviewer" },
+        "riskLevel": { "$ref": "common.schema.json#/$defs/RiskLevel" },
+        "riskTags": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "$ref": "common.schema.json#/$defs/RiskTag" },
+          "uniqueItems": true
+        },
+        "reasons": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "allowAutoSend": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "riskLevel": { "enum": ["medium", "high", "unknown"] } } },
+          "then": { "properties": { "allowAutoSend": { "const": false } } }
+        }
+      ]
+    }
+  }
+}
