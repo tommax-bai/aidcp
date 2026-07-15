@@ -12,6 +12,35 @@
 
 ---
 
+## 0.5 进度更新（2026-07-15 下半场，接手看这里）
+
+**已落地并推送（全部本地门禁全绿：edge full 1356 / cloud full 2044 / 两端 typecheck 0）：**
+
+| 单元 | 内容 | SHA |
+| --- | --- | --- |
+| 批 A 协议地基 | 6.1（3 释放原因 preempted_by_task/window_busy(+windowRemainingMs)/yield_timeout）+ 6.2（PublishCommandResultPayload.submitDispatched）+ 6.3 docs + 6.4/11.9 AC-PROTO-14/15。inert 未接线 | edge `9bc6c6b` / cloud `9f0194b` / 控制仓 `098a394`+台账 |
+| 批 B-1 协调器抢占核心 | 5.2 EdgeTaskPageWriterProbe（inCommitWindow/commitWindowRemainingMs/publishInFlight/cancelPublish 全可选）+ 5.4 drainOrPreempt 三态 + 5.5 yield_timeout 控制面故障 + 5.9 publishInFlight 让位。**探针门控休眠**（main.ts 未 wire writers → 与今日逐字同行为） | edge `52d2a78` |
+| 批 B-1 加固 | 对抗性复核 `wf_3a8e8996` 揪出并修：**BLOCKER**（cancel-before-declare：preemptedPending，被抢占 preempted_by_task 只在 quiesce 确认写者停后才发，cancel 抛出→yield_timeout，防云端重投未停发布=双发）+ **HIGH #1**（yield_timeout 后 browse 保持冻结）+ **HIGH #A**（canExecute active 分支也认 publishInFlight）+ LOW（quiesceAllWriters sync-throw 安全）。coordinator 27 单测 | edge `1f67249` |
+| 批 B-1b 提交窗口守卫 | `src/execution/commit-window.ts` `CommitWindowGuard`（时基兜底自动过期 + 世代守卫）+ `combineCommitWindows`。5 单测。**未接线**（5.1 六站 enter/exit + main.ts wire） | edge `a062cbd` |
+
+**cloud worktree 已建**：`../aidcp-cloud.wt/lease-strict-preemption`（分支同名，从 master `1cfddb5`）。批 A 的 cloud protocol.ts 已在其中。
+
+**下一步＝把休眠的抢占引擎接线激活（5.1 + 5.3 + main.ts wiring）。已坐实的接线方案（省下重新推导）：**
+
+- **publishInFlight 探针** ＝ `() => inFlightPublishes.size > 0`（main.ts:373 现成的 Map，发布 dispatch 期间有 entry，含后置校验窗口）。
+- **cancelPublish 探针** ＝ 把 `inFlightPublishes` 的 failer 从「只发失败回执」升级为**真取消**：给每条发布 dispatch 建一个 takeover（AbortController + Checkpoint，见 `src/execution/takeover.ts`），`onPublishAtomCommand`（main.ts:735-800）把它传给 `publishDispatcher.dispatch(env.payload, takeoverCtx)`（dispatch 已收 takeover 第二参、见 publish-command-handlers.ts:300），cancelPublish(ms) = 触发 takeover + 有界等 dispatch settle。
+- **inCommitWindow/commitWindowRemainingMs 探针** ＝ `combineCommitWindows([publishGuard, browseGuard])`。**publishGuard** 归 PublishCommandDispatcher 所有（runSubmit 的不可逆点击 publish-command-handlers.ts:923/933 处 enter/dispose；FB submit publish-executor.ts:498 处），**browseGuard** 归 browse session 所有（XHS 评论提交 browse-session.ts:2511、通知分类 3019/3068、FB 评论 Enter comment-executor.ts:536、FB 加群 join-executor.ts:592）。两个 guard 由各自 owner 暴露给 main.ts 聚合。
+- **notifyPublishSettled** ＝ `onPublishAtomCommand` 的 finally（inFlightPublishes.delete 之后）调 `taskCoordinator.notifyPublishSettled()`——**复核 finding C：此钩当前零调用者，5.3 必须接上，否则发布 dispatch 结束后浏览永久冻结**。
+- **6.2 submitDispatched 置位** ＝ XHS 在 publish-command-handlers.ts:942（点击 try 成功后、pollBounded 前）、FB 在 publish-executor.ts:498（dispatchClick 后）置真；center 查找类失败保持 false；**MUST NOT 复用 5.1 提交窗口标志**（语义/时机相反）。回执带上 submitDispatched。
+- **5.9 收紧假成功 CHECK** ＝ publish-command-handlers.ts:947 的 CHECK 去掉 `|| !location.href.includes('/publish/publish')`，改正证据优先（只认成功文案/落地 URL）。
+- **5.1 六站清单 + 窗口预算**（handoff §5.3 修正锚点已核）：XHS 发布提交 ~15s、FB 发布提交 ~20s、XHS 评论提交 ~4s、FB 评论回车 ~20s、FB 加群「点击+短确认≤~18.5s」（+ **5.10b 同批**把点击后 46.5s 观察轮询拆成窗口内短确认+可中断尾巴）、通知分类栏目 ~15-20s（无回滚→窗口内 MUST 拒抢占）。统一上界取 FB 评论 20s。
+- **落地序**（红线）：5.1（六站 enter/exit + 两 guard 暴露，inert）**先** → 5.3 + main.ts wire writers（此刻抢占**真激活**，须五站窗口都已 enter/exit，否则窗口内会被强杀）→ 一起构成假成功修复链的 edge 半边，**须与批 C（cloud，含 command-sequencer BLOCKER）co-deploy**。
+- **禁区仍在**：8.1 FB 两处（main.ts:879-884 / 1075-1080）＝用户未提交的 FB pacing 豁免段，动前协调、按内容特征定位、保留 `env.type!=='pacing.update'` 穿透。5.3/5.8 的 main.ts 发布 handler 区与禁区结构隔离，安全。
+
+**剩余**：5.1+5.3+main.ts wiring + 5.6 + 5.8 + 6.2-edge + 收紧 CHECK（批 B 尾）→ 批 C cloud（command-sequencer preempted 分类 BLOCKER + 7.x）→ 批 D §8 → 批 E spec/测试/部署/archive。
+
+---
+
 ## 1. 快速定位（分支 / worktree / SHA）
 
 | 项 | 值 |
