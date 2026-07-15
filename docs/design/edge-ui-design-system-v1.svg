@@ -1,0 +1,255 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200" role="img" aria-labelledby="title desc">
+  <title id="title">AIDCP Edge Design System v1.0 视觉速查板</title>
+  <desc id="desc">包含设计原则、颜色语义、字体、间距、核心组件与禁止模式。</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#172238" flood-opacity="0.08"/>
+    </filter>
+    <linearGradient id="flow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3478F6"/>
+      <stop offset="1" stop-color="#1496A5"/>
+    </linearGradient>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #172238; }
+      .panel { fill: #FFFFFF; stroke: #DFE6F0; stroke-width: 1; filter: url(#shadow); }
+      .eyebrow { font-size: 13px; font-weight: 650; letter-spacing: 1.2px; fill: #3478F6; }
+      .h1 { font-size: 36px; font-weight: 650; }
+      .h2 { font-size: 21px; font-weight: 650; }
+      .h3 { font-size: 15px; font-weight: 650; }
+      .body { font-size: 14px; font-weight: 450; fill: #56657E; }
+      .small { font-size: 12px; font-weight: 500; fill: #56657E; }
+      .caption { font-size: 11px; font-weight: 550; fill: #8B9AB2; }
+      .token { font-size: 11px; font-weight: 650; fill: #56657E; }
+      .hex { font-size: 10px; font-weight: 550; fill: #8B9AB2; }
+      .divider { stroke: #DFE6F0; stroke-width: 1; }
+      .soft-blue { fill: #F2F7FF; stroke: #CFDAE8; }
+      .soft-teal { fill: #EAF7F7; stroke: #B8E0E4; }
+      .soft-green { fill: #E6F7F0; stroke: #A9DDC8; }
+      .soft-amber { fill: #FDF1DC; stroke: #F2D39C; }
+      .soft-red { fill: #FEE2E2; stroke: #FECACA; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1200" fill="#F4F7FB"/>
+  <circle cx="1470" cy="70" r="140" fill="#EAF7F7" opacity="0.9"/>
+  <circle cx="1525" cy="145" r="54" fill="#FFF2ED" opacity="0.92"/>
+
+  <g transform="translate(70 62)">
+    <text class="eyebrow" x="0" y="0">AIDCP EDGE · DESIGN BASELINE</text>
+    <text class="h1" x="0" y="52">安静、可信、紧凑、诚实</text>
+    <text class="body" x="0" y="86">这是一套可复用的视觉与交互规则，不是一张固定页面模板。</text>
+  </g>
+  <g transform="translate(1320 68)">
+    <rect width="160" height="38" rx="19" fill="#FFFFFF" stroke="#B8E0E4"/>
+    <circle cx="23" cy="19" r="6" fill="#1496A5"/>
+    <text x="41" y="24" font-size="12" font-weight="650" fill="#087482">BASELINE v1.0</text>
+  </g>
+
+  <g transform="translate(70 178)">
+    <g>
+      <rect width="340" height="92" rx="16" class="panel"/>
+      <circle cx="36" cy="32" r="12" fill="#3478F6"/>
+      <text class="h3" x="60" y="37">结果优先</text>
+      <text class="small" x="24" y="66">先说正在做什么、为什么有价值、取得了什么。</text>
+    </g>
+    <g transform="translate(370 0)">
+      <rect width="340" height="92" rx="16" class="panel"/>
+      <circle cx="36" cy="32" r="12" fill="#1496A5"/>
+      <text class="h3" x="60" y="37">语义正交</text>
+      <text class="small" x="24" y="66">交互、品牌、平台、状态四类颜色各司其职。</text>
+    </g>
+    <g transform="translate(740 0)">
+      <rect width="340" height="92" rx="16" class="panel"/>
+      <circle cx="36" cy="32" r="12" fill="#F4B63D"/>
+      <text class="h3" x="60" y="37">渐进披露</text>
+      <text class="small" x="24" y="66">主界面讲价值，内部执行步骤按需展开。</text>
+    </g>
+    <g transform="translate(1110 0)">
+      <rect width="340" height="92" rx="16" class="panel"/>
+      <circle cx="36" cy="32" r="12" fill="#159A68"/>
+      <text class="h3" x="60" y="37">真实状态</text>
+      <text class="small" x="24" y="66">失败、停止、等待与完成都必须如实呈现。</text>
+    </g>
+  </g>
+
+  <g transform="translate(70 300)">
+    <rect width="700" height="830" rx="22" class="panel"/>
+    <text class="eyebrow" x="28" y="38">01 · FOUNDATIONS</text>
+    <text class="h2" x="28" y="72">基础令牌</text>
+    <line class="divider" x1="28" x2="672" y1="94" y2="94"/>
+
+    <text class="h3" x="28" y="130">四类颜色语义</text>
+    <g transform="translate(28 150)">
+      <g>
+        <rect width="148" height="78" rx="12" fill="#F2F7FF" stroke="#CFDAE8"/>
+        <circle cx="24" cy="25" r="11" fill="#3478F6"/>
+        <text class="token" x="44" y="29">交互</text>
+        <text class="hex" x="16" y="58">#3478F6 · 选择 / 焦点</text>
+      </g>
+      <g transform="translate(164 0)">
+        <rect width="148" height="78" rx="12" fill="#EAF7F7" stroke="#B8E0E4"/>
+        <circle cx="24" cy="25" r="11" fill="#1496A5"/>
+        <text class="token" x="44" y="29">智能能力</text>
+        <text class="hex" x="16" y="58">#1496A5 · 人设 / 吉祥物</text>
+      </g>
+      <g transform="translate(328 0)">
+        <rect width="148" height="78" rx="12" fill="#FFF2ED" stroke="#F6D2C7"/>
+        <circle cx="24" cy="25" r="11" fill="#F05A3D"/>
+        <text class="token" x="44" y="29">平台身份</text>
+        <text class="hex" x="16" y="58">珊瑚 / Facebook 蓝</text>
+      </g>
+      <g transform="translate(492 0)">
+        <rect width="152" height="78" rx="12" fill="#E6F7F0" stroke="#A9DDC8"/>
+        <circle cx="24" cy="25" r="11" fill="#159A68"/>
+        <text class="token" x="44" y="29">运行状态</text>
+        <text class="hex" x="16" y="58">成功 / 等待 / 失败 / 离线</text>
+      </g>
+    </g>
+
+    <text class="h3" x="28" y="264">基础色板</text>
+    <g transform="translate(28 282)">
+      <g><rect width="72" height="52" rx="10" fill="#172238"/><text x="0" y="70" class="hex">Ink</text></g>
+      <g transform="translate(84 0)"><rect width="72" height="52" rx="10" fill="#56657E"/><text x="0" y="70" class="hex">Muted</text></g>
+      <g transform="translate(168 0)"><rect width="72" height="52" rx="10" fill="#8B9AB2"/><text x="0" y="70" class="hex">Faint</text></g>
+      <g transform="translate(252 0)"><rect width="72" height="52" rx="10" fill="#DFE6F0"/><text x="0" y="70" class="hex">Border</text></g>
+      <g transform="translate(336 0)"><rect width="72" height="52" rx="10" fill="#F4B63D"/><text x="0" y="70" class="hex">Gold</text></g>
+      <g transform="translate(420 0)"><rect width="72" height="52" rx="10" fill="#FF365D"/><text x="0" y="70" class="hex">XHS</text></g>
+      <g transform="translate(504 0)"><rect width="72" height="52" rx="10" fill="#1877F2"/><text x="0" y="70" class="hex">Facebook</text></g>
+      <g transform="translate(588 0)"><rect width="56" height="52" rx="10" fill="#FFFFFF" stroke="#DFE6F0"/><text x="0" y="70" class="hex">Surface</text></g>
+    </g>
+
+    <line class="divider" x1="28" x2="672" y1="382" y2="382"/>
+    <text class="h3" x="28" y="420">字体层级</text>
+    <g transform="translate(28 446)">
+      <text x="0" y="0" font-size="20" font-weight="600">运行价值标题 · 20 / 600</text>
+      <text x="0" y="42" font-size="16" font-weight="600">区块标题 · 16 / 600</text>
+      <text x="0" y="78" font-size="14" font-weight="600">账号名与卡片标题 · 14 / 600</text>
+      <text x="0" y="112" font-size="13.5" font-weight="450" fill="#56657E">价值说明与正文 · 13.5 / 400–500</text>
+      <text x="0" y="144" font-size="12.5" font-weight="500" fill="#56657E">选项与活动记录 · 12.5 / 500</text>
+      <text x="0" y="174" font-size="11" font-weight="550" fill="#8B9AB2">标签与元信息 · 11 / 500–600</text>
+    </g>
+    <rect x="420" y="438" width="224" height="192" rx="14" fill="#F7FBFB" stroke="#DAEAEC"/>
+    <text class="caption" x="440" y="468">字重原则</text>
+    <text class="h3" x="440" y="500">大多数文字使用 400–500</text>
+    <text class="small" x="440" y="532">选中不依赖粗体，</text>
+    <text class="small" x="440" y="556">用颜色、浅底、边框、</text>
+    <text class="small" x="440" y="580">指示器建立状态。</text>
+
+    <line class="divider" x1="28" x2="672" y1="662" y2="662"/>
+    <text class="h3" x="28" y="700">间距与形状</text>
+    <g transform="translate(28 724)">
+      <text class="caption" x="0" y="0">4px 基准网格</text>
+      <g transform="translate(0 18)">
+        <rect width="4" height="20" rx="2" fill="#3478F6"/><text class="hex" x="0" y="56">4</text>
+        <rect x="42" width="8" height="20" rx="2" fill="#3478F6"/><text class="hex" x="42" y="56">8</text>
+        <rect x="88" width="12" height="20" rx="2" fill="#3478F6"/><text class="hex" x="88" y="56">12</text>
+        <rect x="138" width="16" height="20" rx="2" fill="#3478F6"/><text class="hex" x="138" y="56">16</text>
+        <rect x="192" width="24" height="20" rx="2" fill="#3478F6"/><text class="hex" x="192" y="56">24</text>
+        <rect x="252" width="32" height="20" rx="2" fill="#3478F6"/><text class="hex" x="252" y="56">32</text>
+      </g>
+      <g transform="translate(360 0)">
+        <text class="caption" x="0" y="0">圆角</text>
+        <rect x="0" y="18" width="64" height="48" rx="8" fill="#F2F7FF" stroke="#CFDAE8"/>
+        <rect x="78" y="18" width="64" height="48" rx="12" fill="#EAF7F7" stroke="#B8E0E4"/>
+        <rect x="156" y="18" width="64" height="48" rx="16" fill="#FFFFFF" stroke="#DFE6F0"/>
+        <text class="hex" x="16" y="86">8</text><text class="hex" x="94" y="86">12</text><text class="hex" x="170" y="86">16</text>
+      </g>
+    </g>
+  </g>
+
+  <g transform="translate(800 300)">
+    <rect width="730" height="830" rx="22" class="panel"/>
+    <text class="eyebrow" x="28" y="38">02 · COMPONENTS</text>
+    <text class="h2" x="28" y="72">核心组件</text>
+    <line class="divider" x1="28" x2="702" y1="94" y2="94"/>
+
+    <text class="h3" x="28" y="130">环境账号行</text>
+    <g transform="translate(28 148)">
+      <rect width="310" height="70" rx="12" fill="#E8F0FF"/>
+      <rect width="4" height="38" x="0" y="16" rx="2" fill="#3478F6"/>
+      <rect x="18" y="13" width="44" height="44" rx="12" fill="#FF365D"/>
+      <text x="40" y="41" text-anchor="middle" font-size="12" font-weight="700" fill="#FFFFFF">书</text>
+      <circle cx="57" cy="53" r="6" fill="#159A68" stroke="#FFFFFF" stroke-width="2"/>
+      <text class="h3" x="78" y="31">工程师大白</text>
+      <text class="caption" x="78" y="52">小红书 · 运行中</text>
+      <rect x="266" y="21" width="28" height="28" rx="8" fill="#EAF7F7" stroke="#B8E0E4"/>
+      <circle cx="280" cy="32" r="4" fill="#1496A5"/>
+      <path d="M273 43c1-5 13-5 14 0" fill="none" stroke="#1496A5" stroke-width="1.7" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(360 148)">
+      <rect width="342" height="70" rx="12" fill="#FFFFFF" stroke="#DFE6F0"/>
+      <rect x="18" y="13" width="44" height="44" rx="12" fill="#1877F2"/>
+      <text x="40" y="44" text-anchor="middle" font-size="25" font-weight="700" fill="#FFFFFF">f</text>
+      <circle cx="57" cy="53" r="6" fill="#64748B" stroke="#FFFFFF" stroke-width="2"/>
+      <text class="h3" x="78" y="31">Tianxing Bai</text>
+      <text class="caption" x="78" y="52">Facebook · 已停止</text>
+    </g>
+
+    <text class="h3" x="28" y="258">按钮与状态</text>
+    <g transform="translate(28 278)">
+      <rect width="120" height="38" rx="10" fill="#3478F6"/><text x="60" y="24" text-anchor="middle" font-size="12" font-weight="600" fill="#FFFFFF">主要操作</text>
+      <rect x="136" width="120" height="38" rx="10" fill="#FFFFFF" stroke="#CFDAE8"/><text x="196" y="24" text-anchor="middle" font-size="12" font-weight="550">次要操作</text>
+      <rect x="272" width="110" height="38" rx="10" fill="transparent"/><text x="327" y="24" text-anchor="middle" font-size="12" font-weight="550" fill="#3478F6">查看步骤</text>
+      <rect x="398" width="104" height="38" rx="10" fill="#FFFFFF" stroke="#D89235"/><circle cx="420" cy="19" r="5" fill="#D89235"/><text x="464" y="24" text-anchor="middle" font-size="12" font-weight="600" fill="#9A6413">暂停</text>
+      <rect x="520" width="94" height="38" rx="19" class="soft-green"/><circle cx="540" cy="19" r="5" fill="#159A68"/><text x="574" y="24" text-anchor="middle" font-size="12" font-weight="600" fill="#0E8058">运行中</text>
+    </g>
+
+    <text class="h3" x="28" y="358">展开 / 收起</text>
+    <g transform="translate(28 378)">
+      <rect width="126" height="34" rx="8" fill="transparent"/>
+      <text class="small" x="14" y="22">收起</text>
+      <path d="M66 21l5-5 5 5" fill="none" stroke="#71829F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <text class="caption" x="150" y="22">透明背景 · 无圆形描边 · 几何 chevron</text>
+    </g>
+
+    <text class="h3" x="28" y="452">三阶段 Flow</text>
+    <g transform="translate(28 474)">
+      <rect width="674" height="106" rx="14" fill="#F7FAFF" stroke="#CFDAE8"/>
+      <g transform="translate(22 24)">
+        <circle cx="11" cy="11" r="9" fill="#E8F0FF" stroke="#3478F6"/>
+        <text class="token" x="30" y="10" fill="#3478F6">浏览与互动</text>
+        <text class="caption" x="30" y="30">正在查看第 165 条</text>
+        <rect x="164" y="9" width="80" height="3" rx="2" fill="url(#flow)"/>
+        <circle cx="204" cy="10.5" r="5" fill="#FFFFFF" stroke="#1496A5" stroke-width="2"/>
+      </g>
+      <g transform="translate(278 24)">
+        <rect x="2" y="2" width="18" height="18" rx="6" fill="#EAF7F7" stroke="#1496A5"/>
+        <text class="token" x="30" y="10" fill="#1496A5">判断匹配度</text>
+        <text class="caption" x="30" y="30">4 条进入候选</text>
+        <rect x="164" y="9" width="68" height="3" rx="2" fill="url(#flow)"/>
+      </g>
+      <g transform="translate(520 24)">
+        <circle cx="11" cy="11" r="9" fill="#EAF7F7" stroke="#1496A5"/>
+        <text class="token" x="30" y="10" fill="#1496A5">继续寻找灵感</text>
+        <text class="caption" x="30" y="30">持续筛选中</text>
+      </g>
+      <text class="small" x="22" y="84">正在查看第 165 条推荐内容</text>
+      <text class="caption" x="442" y="84">165/300 · 进展实时记录 ·</text>
+      <text x="607" y="84" font-size="11" font-weight="600" fill="#3478F6">查看运行步骤</text>
+    </g>
+
+    <text class="h3" x="28" y="620">人设选择项</text>
+    <g transform="translate(28 642)">
+      <rect width="204" height="44" rx="10" fill="#EAF7F7" stroke="#1496A5"/>
+      <circle cx="24" cy="22" r="8" fill="#1496A5"/>
+      <path d="M20 22l3 3 5-6" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="44" y="27" font-size="12.5" font-weight="550" fill="#087482">亲切接地气</text>
+      <rect x="220" width="204" height="44" rx="10" fill="#FBFDFD" stroke="#D5E3E5"/>
+      <circle cx="244" cy="22" r="8" fill="#FFFFFF" stroke="#B9CBD0"/>
+      <text x="264" y="27" font-size="12.5" font-weight="500" fill="#536C76">专业理性</text>
+      <rect x="440" width="204" height="44" rx="10" fill="#FFFFFF" stroke="#BFD1D5" stroke-dasharray="5 4"/>
+      <path d="M532 22h12M538 16v12" fill="none" stroke="#718991" stroke-width="1.7" stroke-linecap="round"/>
+    </g>
+    <text class="caption" x="28" y="714">选中依赖浅底、边框和指示器，文字保持 500–600；加号使用几何线条。</text>
+
+    <g transform="translate(28 752)">
+      <rect width="674" height="56" rx="12" fill="#FFF7F5" stroke="#F6D2C7"/>
+      <circle cx="28" cy="28" r="12" fill="#F05A3D"/>
+      <path d="M23 23l10 10M33 23L23 33" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+      <text class="h3" x="52" y="25">禁止把四类语义叠在一起</text>
+      <text class="small" x="52" y="44">无多层头像环、无常驻内部流程、无卡片套卡片、无假成功。</text>
+    </g>
+  </g>
+
+  <text x="80" y="1170" class="caption">完整规范：docs/design/edge-ui-design-system-v1.md · 视觉示例仅作组合参考，文字规范与 token 优先。</text>
+</svg>
