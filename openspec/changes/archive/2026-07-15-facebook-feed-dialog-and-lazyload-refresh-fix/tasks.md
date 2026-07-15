@@ -21,5 +21,6 @@
 ## 4. 收尾
 
 - [x] 4.1 提交推送 edge master <!-- aidcp-edge fb8c5b3 pushed -->
-- [ ] 4.2 `openspec validate facebook-feed-dialog-and-lazyload-refresh-fix --strict` 通过后归档；delta 并入 `facebook-feed-continuity`
-- [ ] 4.3 客户端重打包生效（按惯例默认不做，等显式发版）——真机复验「运营肉眼看浏览器不再刷新」登记 backlog 簇 82
+- [x] 4.2 `openspec validate --strict` 通过后归档；delta 并入 `facebook-feed-continuity` <!-- 2026-07-15 archived -->
+- [x] 4.3 客户端重打包 + 运营肉眼复验「浏览器不再刷新」——真机项已登记 backlog 簇 82.1（出包默认不做、等显式发版）<!-- 2026-07-15 → backlog 82.1 -->
+

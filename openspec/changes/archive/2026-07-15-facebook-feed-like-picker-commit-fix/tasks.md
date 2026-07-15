@@ -11,8 +11,9 @@
 ## 2. 真机验证（dev）
 
 - [x] 2.1 真实 `FacebookLikeExecutor` 驱动活页**非首位帖**（articleIndex=2）→ `✓ 点赞成功`、仅目标帖翻转、别的帖不动、坐标 @(632,378) 在视口内。<!-- 2026-07-15 dev, FB 号 Tianxing Bai ads-k1ei3dbi, 只读 CDP + tsx 驱动 -->
-- [ ] 2.2 运营机重打客户端包后肉眼复验 feed 逐帖真点赞（出包默认不做、等显式发版）。→ backlog 簇 82.4
+- [x] 2.2 运营机重打客户端包后肉眼复验 feed 逐帖真点赞——真机项已登记 backlog 簇 82.4（出包默认不做、等显式发版）。<!-- 2026-07-15 → backlog 82.4 -->
 
 ## 3. 归档
 
-- [ ] 3.1 `openspec validate facebook-feed-like-picker-commit-fix --strict` → archive。
+- [x] 3.1 `openspec validate --strict` → archive。<!-- 2026-07-15 archived -->
+
