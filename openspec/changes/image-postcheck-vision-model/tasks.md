@@ -12,6 +12,7 @@
 - [x] 2.2 严格 JSON 解析、调用超时、分组有界并发、token usage 记账与诚实 `unavailable/partial` 状态；默认旗标关闭并支持影子落库。
 - [x] 2.3 管线角色恒写键并接入 planner/composer；反推可用时源风格优先，现有内容品类风格仅作兜底。
 - [x] 2.4 将整组分析改为轻量 set pass + specialist 小批次有界并发，提升 7–9 张文字卡分析可靠性；升级 cache schema，超时/失败状态不得在执行审计中丢成 `none`。 <!-- aidcp-cloud 753d66b -->
+- [x] 2.5 扩展人物摄影 specialist：表情、视线、头部角度、身体姿态、手势、姿态能量及情绪效价/唤醒度；升级 cache schema，历史 v2 自动失效重算。 <!-- aidcp-cloud c77683e -->
 
 ## 3. aidcp-cloud — slot binding and provider
 
@@ -20,6 +21,7 @@
 - [x] 3.3 Wan 多图请求明确各图片角色并保证主参考图最后；provider 返回真实参考使用状态，失败不进入发布 URL。
 - [x] 3.4 文字卡保留确定性渲染；UI/文档、图表、混合类记录诚实路由状态，未接结构化重绘器时不得标为 deterministic redraw。
 - [x] 3.5 为确定性文字卡派生白名单来源设计令牌（内部色板、渐变/网格、信息卡、分页、密度、中文词组断行），旗标关或分析不可用保持现有模板行为。 <!-- aidcp-cloud 753d66b -->
+- [x] 3.6 将 `ImageSetPlanner` 补成内容视觉导演：读取有界首/中/尾正文，为每槽生成 `contentVisualBrief`；composer 明确正文人物表演优先、参考只管摄影语言及人物身份泛化。 <!-- aidcp-cloud c77683e -->
 
 ## 4. aidcp-cloud — visual fidelity audit
 
@@ -27,11 +29,13 @@
 - [x] 4.2 不通过时每槽有界重生成一次；重试仍失败则丢弃该槽。视觉模型不可用时标 `unverified`，MUST NOT 假 pass。
 - [x] 4.3 逐槽绑定、路由、分析来源和审计结果汇总到 `ImageDirective`/发布 metadata，M<N 继续按既有保序语义发布。
 - [x] 4.4 确定性文字卡同样执行产后视觉比较；首次失败以严格来源令牌重渲染一次，二次失败丢槽，模型不可用诚实 `unverified`。 <!-- aidcp-cloud 753d66b -->
+- [x] 4.5 审计增加 `contentAlignment` 与逐槽 brief；已有失败后重试审计 `unverified` 必须丢槽，不得覆盖已知真人/乱码/原创风险。 <!-- aidcp-cloud c77683e -->
 
 ## 5. aidcp-console — explainable audit
 
 - [x] 5.1 精选素材详情显示视觉分析状态、风格来源、类型/风格簇与缓存模型；旧行无字段时显示未分析、不报错。
 - [x] 5.2 发布详情显示 source→output 槽位绑定、生成路由、是否使用参考图、逐槽评分/风险/重试与未核验原因；不得把 `used` 等同于“保真通过”。
+- [x] 5.3 发布详情展示逐槽正文情绪/人物表演 brief 与内容一致性分数，历史记录 null-safe。 <!-- aidcp-console 2b58528 -->
 
 ## 6. Verification and rollout
 
@@ -42,6 +46,7 @@
 - [x] 6.5 提交、推送、落默认分支并部署 dev；只开启反推影子并完成一组真实 UI/文档样本反推与缓存复用验证，绑定/源风格/审计保持关闭。
 - [ ] 6.6 按 `docs/real-machine-acceptance-backlog.md` 簇 83 完成同素材生成 A/B、逐槽绑定、源风格与产后审计真图验收，再逐阶段开 dev 旗标。
 - [x] 6.7 补齐轻量 set/specialist 分批、来源文字卡设计令牌、中文词组断行、确定性卡审计/重渲染/丢槽及 flag-off 回归测试。 <!-- aidcp-cloud 753d66b；2026-07-15 deployed dev -->
+- [x] 6.8 补齐正文首/中/尾摘录、视觉 brief 解析/兜底、人物 prompt 冲突优先级、人物反推 v3、contentAlignment 及 failed→unverified 丢槽回归测试。 <!-- cloud full 2082/2082; targeted 64/64 + 38/38; console 123/123 + 1 skipped -->
 
 ## 7. Change record
 

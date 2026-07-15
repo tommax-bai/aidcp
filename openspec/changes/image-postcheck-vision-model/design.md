@@ -11,6 +11,7 @@
 - 对整组原图先建视觉模型，再规划输出；摄影与非摄影使用不同反推维度。
 - 建立稳定的 source→slot→output 绑定，避免每槽共享整组参考图。
 - 让源图视觉语言优先于硬编码内容品类风格，并保留 flag-off 等价行为。
+- 让洗稿后的正文语义明确控制人物神态、视线、动作和肢体语言，避免主题在层间压缩成中性“端正人像”。
 - 用产后视觉比较确认保真和高风险约束，失败时有界重试、不可用时诚实未核验。
 - 缓存、记账、可审计、面板可解释；不增加 edge/protocol 变化。
 
@@ -34,7 +35,7 @@
 
 公共字段描述画幅、主色、色温、对比、密度、留白、视觉层级、情绪、材质、构图锚和禁止项。专用字段分别为：
 
-- 摄影：镜头观感/等效焦段区间、机位、景深、对焦、自然/硬/柔/逆光、色彩处理、颗粒/锐度；只输出可从像素合理观察的区间，不伪造 EXIF/摄影师身份。
+- 摄影：镜头观感/等效焦段区间、机位、景深、对焦、自然/硬/柔/逆光、色彩处理、颗粒/锐度；人物摄影另输出可观察的表情、视线、头部角度、身体姿态、手势、姿态能量和情绪效价/唤醒度。只输出可从像素合理观察的区间，不伪造 EXIF/摄影师身份。
 - 插画/3D：媒介、笔触/渲染、造型语言、轮廓、材质、光照模型、透视、细节等级。
 - 文字卡/海报：网格、文本块占比、层级、对齐、字重对比、色块/装饰、留白；不输出具体文字。
 - UI/文档：设备/视口、网格、组件密度、边框/圆角、层级、信息分区、背景；不抄界面内容。
@@ -55,15 +56,24 @@
 
 文字卡仍由确定性 renderer 处理，但源风格可用时先从 frame/style bible 派生白名单设计令牌：内部色板键、版式、背景处理、装饰网格、要点卡形态、分页标记和中文词组断行。渲染器只接这些离散令牌与洗稿文案，不接原图 URL、像素、坐标或 OCR 文本；源风格关闭/不可用时仍逐字节回落现有账号模板。UI/文档、图表首版 route=`specialized_generative`，混合类 route=`region_guided_generative`；审计明确 `structuredRedraw=false`，不声称已结构化重绘。
 
+### D4.1：正文视觉导演决定人物表演，参考图不决定人物身份
+
+`ImageSetPlanner` 在现有一次模型调用内同时完成槽位选题和内容视觉导演，不新增串行模型调用。输入正文采用有界首/中/尾摘录，避免只读前 400 字丢失情绪转折；每槽输出：
+
+- `narrativeMoment / emotion / emotionIntensity / action / environment / avoid`；
+- 人物画面可选 `facialExpression / gazeDirection / headAngle / bodyLanguage`。
+
+`ImagePromptComposer` 必须把该 brief 原样纳入提示词，并声明冲突优先级：参考图只约束视觉类型、景别、构图关系、光影、色调和材质；人物神态、视线、动作与姿态由正文 brief 决定。人物参考只作为抽象摄影锚，输出人物必须身份泛化为与来源人物无关的虚构主体，不得保留可识别五官、名人相似度、品牌 logo 或平台标识。
+
 ### D5：产后审计是视觉比较，不是 prompt 自证
 
-`VisualFidelityAuditor` 输入主参考、生成图、期望 frame/style 摘要，严格输出：
+`VisualFidelityAuditor` 输入主参考、生成图、期望 frame/style 摘要及本槽 `contentVisualBrief`，严格输出：
 
-- `form/subject/composition/color/style` 五项 0–1 分；
+- `form/subject/composition/color/style` 五项 0–1 分；有正文 brief 时另输出 `contentAlignment`，核验叙事瞬间、情绪、神态、视线、动作和禁用姿态；
 - `recognizableRealPerson/garbledText/watermark/copiedText/originalityRisk` 风险布尔或等级；
 - `pass`、失败原因与可操作 retry guidance。
 
-通过阈值由代码默认值 + env 可调；硬风险直接 fail。生成式失败只为该槽重生成一次，并把 audit guidance 附到第二次 prompt；确定性文字卡失败则以严格来源设计令牌重渲染一次。第二次仍失败则丢槽。审计模型未配置、超时或解析失败时状态=`unverified`，不静默写 pass；发布仍可按既有人审草稿链继续，但元数据和面板必须显示未核验。确定性 renderer 成功只表示“渲染成功”，不得因此把视觉审计记为 `skipped` 或 `passed`。
+通过阈值由代码默认值 + env 可调；内容一致性与硬风险任一不通过都 fail。生成式失败只为该槽重生成一次，并把 audit guidance 附到第二次 prompt；确定性文字卡失败则以严格来源设计令牌重渲染一次。第二次仍失败则丢槽。首轮审计模型未配置、超时或解析失败时可按既有人审草稿链保留但状态必须为 `unverified`；若已有任一失败尝试，后续审计 `unverified` 必须丢槽，不能用不可用结果覆盖已知失败。确定性 renderer 成功只表示“渲染成功”，不得因此把视觉审计记为 `skipped` 或 `passed`。
 
 ### D6：角色、旗标与超时
 
@@ -84,8 +94,10 @@ referenceNote.images
   -> cache lookup / VisualReferenceAnalyzer
   -> lightweight set pass + bounded specialist batches
   -> setStyleBible + styleClusters + frameSpecs
-  -> ImageSetPlanner (source order + slot themes)
-  -> ImagePromptComposer (source style first, category fallback)
+rewritten title/body/tone
+  -> ImageSetPlanner as content visual director (slot theme + contentVisualBrief)
+reference analysis + contentVisualBrief
+  -> ImagePromptComposer (content performance first; source camera/style; category fallback)
   -> text-card design tokens (palette/grid/cards/pagination; no source pixels or OCR)
   -> ImagePlan.referenceBindings[slot]
   -> ImageGenerator / deterministic renderer / provider (slot-local refs, primary last)
@@ -105,6 +117,7 @@ referenceNote.images
 | provider does not support refs | existing fallback/failure semantics | `unsupported/unavailable`, never `used` |
 | deterministic text-card rendered | compare against the slot primary reference | `passed/failed/unverified`, never automatic `skipped` |
 | auditor unavailable | no fake pass; keep draft under existing human approval semantics | `unverified` + reason |
+| retry audit unavailable after a prior failure | discard slot; do not let unknown override known failure | failed + unverified attempts retained, final `discarded` |
 | audit fail twice | discard slot, preserve remaining order | attempts and fail reasons retained |
 
 ## Risks / Trade-offs
@@ -113,6 +126,7 @@ referenceNote.images
 - **多类型组增加延迟**：先整组一次、再按 family 批量；并发上限与总图数上限沿现有 9 图约束。
 - **源风格可能包含平台水印或侵权元素**：风格只提取抽象视觉属性；禁止项、无水印、无逐字复制及原创风险审计仍优先。
 - **自动相似度与原创性冲突**：审计同时要求结构/风格保真和不逐字复刻，分项展示而不是单一“越像越好”。
+- **正文情绪与参考人物姿态冲突**：参考图只保留摄影语言，人物表演以正文 brief 为准；身份始终泛化，不把“内容提到某人”理解为允许复刻其脸。
 - **与 OCR change 都会读取图片/扩精选行**：字段、角色和用途完全分离；视觉分析不得输出文本，OCR 不参与视觉风格 prompt。
 
 ## Migration / Rollout
