@@ -8,9 +8,9 @@
 
 ## 2. aidcp-console — 移除确认 Modal
 
-- [ ] 2.1 `CuratedContentPage`：移除「请确认用户委托任务」Modal + `pendingTask` + `confirmTask`；洗稿 / 定向评论直接入队 + 成功 toast；「生成确认」文案改诚实动作名 <!-- aidcp-console <sha> -->
-- [ ] 2.2 `ContentPage`：移除确认 Modal + `pendingTask` + `confirmTask`；候选稿批准 / 驳回 / 修改、待审删图直接入队 + 成功 toast <!-- aidcp-console <sha> -->
-- [ ] 2.3 两页测试改写到新契约（无确认卡、无 /confirm、诚实 toast、错误路径、CAS 版本、执行前零副作用）；`npm run typecheck` + `npx vitest run` 全绿 <!-- aidcp-console <sha> -->
+- [x] 2.1 `CuratedContentPage`：移除「请确认用户委托任务」Modal + `pendingTask` + `confirmTask`；洗稿 / 定向评论直接入队 + 成功 toast；「生成确认」文案改诚实动作名（洗稿 / 开始洗稿 / 发起评论） <!-- aidcp-console 9d0d017 -->
+- [x] 2.2 `ContentPage`：移除确认 Modal + `pendingTask` + `confirmTask`；候选稿批准 / 驳回 / 修改、待审删图直接入队 + 成功 toast <!-- aidcp-console 9d0d017 -->
+- [x] 2.3 两页测试改写到新契约（无确认卡、无 /confirm、诚实 toast、错误路径、CAS 版本 409 诚实拒、执行前零副作用）；`npm run typecheck` 净 + `npx vitest run`（31 pass）全绿 <!-- aidcp-console 9d0d017 -->
 
 ## 3. aidcp-edge — 快捷入口直接入队
 
@@ -24,4 +24,4 @@
 ## 5. 部署
 
 - [x] 5.1 部署 cloud `dev` 并 healthcheck（active / NRestarts=0 / 8787 / PG / 飞书长连接均绿；backup `cloud.bak.20260715-223732.tar.gz`；仅 4 文件增量）<!-- aidcp-cloud 7144be3 2026-07-15 deployed dev -->
-- [ ] 5.2 部署 console `dev`（构建 + rsync + 无 --delete） <!-- <date> deployed -->
+- [x] 5.2 部署 console `dev`（vite build + rsync 无 --delete；backup `console.bak.20260715-224856.tar.gz` 留最近 10；新 JS chunk `index-CnWjm6_o.js` 8088 返 200） <!-- aidcp-console 9d0d017 2026-07-15 deployed dev -->
