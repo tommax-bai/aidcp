@@ -22,6 +22,7 @@
 - [x] 3.4 文字卡保留确定性渲染；UI/文档、图表、混合类记录诚实路由状态，未接结构化重绘器时不得标为 deterministic redraw。
 - [x] 3.5 为确定性文字卡派生白名单来源设计令牌（内部色板、渐变/网格、信息卡、分页、密度、中文词组断行），旗标关或分析不可用保持现有模板行为。 <!-- aidcp-cloud 753d66b -->
 - [x] 3.6 将 `ImageSetPlanner` 补成内容视觉导演：读取有界首/中/尾正文，为每槽生成 `contentVisualBrief`；composer 明确正文人物表演优先、参考只管摄影语言及人物身份泛化。 <!-- aidcp-cloud c77683e -->
+- [x] 3.7 将 `contentVisualBrief` 扩为公共字段 + 八类判别式 `categoryBrief`；反推 frame 可用时按源图类型校正，composer/fallback/文字卡文案分别消费对应分类语义。
 
 ## 4. aidcp-cloud — visual fidelity audit
 
@@ -30,12 +31,14 @@
 - [x] 4.3 逐槽绑定、路由、分析来源和审计结果汇总到 `ImageDirective`/发布 metadata，M<N 继续按既有保序语义发布。
 - [x] 4.4 确定性文字卡同样执行产后视觉比较；首次失败以严格来源令牌重渲染一次，二次失败丢槽，模型不可用诚实 `unverified`。 <!-- aidcp-cloud 753d66b -->
 - [x] 4.5 审计增加 `contentAlignment` 与逐槽 brief；已有失败后重试审计 `unverified` 必须丢槽，不得覆盖已知真人/乱码/原创风险。 <!-- aidcp-cloud c77683e -->
+- [x] 4.6 `contentAlignment` 按分类字段核验人物、文字信息结构、图表关系、场景事件、静物状态、插画隐喻、UI 任务和拼贴分区；图表/UI 增加禁止编造数据/能力的提示约束。
 
 ## 5. aidcp-console — explainable audit
 
 - [x] 5.1 精选素材详情显示视觉分析状态、风格来源、类型/风格簇与缓存模型；旧行无字段时显示未分析、不报错。
 - [x] 5.2 发布详情显示 source→output 槽位绑定、生成路由、是否使用参考图、逐槽评分/风险/重试与未核验原因；不得把 `used` 等同于“保真通过”。
 - [x] 5.3 发布详情展示逐槽正文情绪/人物表演 brief 与内容一致性分数，历史记录 null-safe。 <!-- aidcp-console 2b58528 -->
+- [x] 5.4 发布详情按八类可读展示 `categoryBrief`，不直接 dump JSON，历史无分类字段时维持现有展示。
 
 ## 6. Verification and rollout
 
@@ -47,6 +50,7 @@
 - [ ] 6.6 按 `docs/real-machine-acceptance-backlog.md` 簇 83 完成同素材生成 A/B、逐槽绑定、源风格与产后审计真图验收，再逐阶段开 dev 旗标。
 - [x] 6.7 补齐轻量 set/specialist 分批、来源文字卡设计令牌、中文词组断行、确定性卡审计/重渲染/丢槽及 flag-off 回归测试。 <!-- aidcp-cloud 753d66b；2026-07-15 deployed dev -->
 - [x] 6.8 补齐正文首/中/尾摘录、视觉 brief 解析/兜底、人物 prompt 冲突优先级、人物反推 v3、contentAlignment 及 failed→unverified 丢槽回归测试。 <!-- cloud full 2082/2082; targeted 64/64 + 38/38; console 123/123 + 1 skipped -->
+- [x] 6.9 覆盖八类严格解析、分类兜底/源类型校正、分类 prompt、文字卡首/中/尾语义、分类审计与控制台 null-safe 展示；通过 acceptance、全量测试、typecheck、build 和 OpenSpec strict。
 
 ## 7. Change record
 
@@ -82,3 +86,13 @@
 - dev 健康：`aidcp-cloud.service=active`、`NRestarts=0`、8787 返回预期 426、8090/8088 health 均 `{"ok":true}`、console HTTP 200、PG 校验 `ok=1`、飞书 `WSClient onReady`；四个 isales 服务均 active/running。四个视觉旗标均为 `true`。
 - 本次发布后 cloud `master` 并行快进到后继 `354d6a6`（独立 Facebook note key 修复，`c77683e` 仍为其祖先）并由对应任务在 14:09 重启；最终 dev cloud 与 `354d6a6` 干净归档按 checksum 无内容漂移，因此本变更与并行修复均在当前运行态，未互相覆盖。
 - 未代用户再次触发真实人物洗稿，因而没有宣称新链路已通过同素材真人视觉验收；6.6 与 7.2 继续 pending，待用户试跑后核对 v3 反推、逐槽 brief、`contentAlignment` 和最终人物神态。
+
+### 7.1 Typed-category follow-up record (2026-07-15 14:50)
+
+- cloud `45b0411`、console `e7d3046` 已快进到各自 `origin/master`；cloud 提交包含同期默认分支上的 Facebook feed 点赞竞态修复 `56112be`，未覆盖并行变更。
+- `contentVisualBrief` 已扩为公共叙事字段 + 八类判别式 `categoryBrief`；planner 严格解析并分类兜底，反推 frame 可按源图类型纠正分类，composer/fallback/产后 `contentAlignment` 均消费类型专用语义。信息图禁止编造数字，UI/文档禁止暗示未证明的已上线能力。
+- 确定性文字卡文案读取洗稿后正文的有界首/中/尾语义，并显式组织核心结论、信息层级、重点词、阅读顺序和信息密度；原文重叠与禁用词校验保持不变。发布详情按八类展示可读标签与关键字段，历史无分类字段继续兼容旧人物展示。
+- validation：cloud acceptance `50/50`、全量 `2095/2095`、分类目标回归 `45/45`、typecheck、build；console 全量 `124/124`（另 1 skipped，`maxWorkers=2`）、相关目标 `21/21`、typecheck、build；OpenSpec strict 均通过。console 首次默认并发全量有 1 条未改动 Facebook 图片用例超时，随后该文件独立 `8/8` 及降并发全量均通过。
+- dev 备份：`/opt/aidcp/cloud.bak.20260715-144625.image-category-brief.tar.gz`、`/opt/aidcp/cloud/.env.bak.20260715-144625.image-category-brief`、`/opt/aidcp/console.bak.20260715-144625.image-category-brief.tar.gz`。cloud/console 均由干净提交归档构建部署，部署后 checksum dry-run 无内容漂移。
+- dev 健康：`aidcp-cloud.service=active/running`、`NRestarts=0`、8787 返回预期 426、8090/8088 health 均 `{"ok":true}`、console 新资产 HTTP 200、PG `ok=1`、飞书 `WSClient onReady`；四个 isales 服务均 active/running。四个视觉旗标均保持 `true`。
+- 未代用户触发新的真实洗稿，也未替用户评价最终图片质量；6.6 与 7.2 继续 pending，待用户试跑后按同素材逐槽核对类型 brief、正文一致性、视觉风格和人物神态。

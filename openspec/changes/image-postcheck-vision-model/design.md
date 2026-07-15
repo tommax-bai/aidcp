@@ -11,7 +11,7 @@
 - 对整组原图先建视觉模型，再规划输出；摄影与非摄影使用不同反推维度。
 - 建立稳定的 source→slot→output 绑定，避免每槽共享整组参考图。
 - 让源图视觉语言优先于硬编码内容品类风格，并保留 flag-off 等价行为。
-- 让洗稿后的正文语义明确控制人物神态、视线、动作和肢体语言，避免主题在层间压缩成中性“端正人像”。
+- 让洗稿后的正文语义按画面类型明确控制人物表演、文字信息结构、图表关系、场景事件、静物状态、插画隐喻、UI 任务和拼贴分区，避免主题在层间压缩成泛化装饰图。
 - 用产后视觉比较确认保真和高风险约束，失败时有界重试、不可用时诚实未核验。
 - 缓存、记账、可审计、面板可解释；不增加 edge/protocol 变化。
 
@@ -56,20 +56,32 @@
 
 文字卡仍由确定性 renderer 处理，但源风格可用时先从 frame/style bible 派生白名单设计令牌：内部色板键、版式、背景处理、装饰网格、要点卡形态、分页标记和中文词组断行。渲染器只接这些离散令牌与洗稿文案，不接原图 URL、像素、坐标或 OCR 文本；源风格关闭/不可用时仍逐字节回落现有账号模板。UI/文档、图表首版 route=`specialized_generative`，混合类 route=`region_guided_generative`；审计明确 `structuredRedraw=false`，不声称已结构化重绘。
 
-### D4.1：正文视觉导演决定人物表演，参考图不决定人物身份
+### D4.1：正文视觉导演使用公共字段 + 判别式分类字段
 
-`ImageSetPlanner` 在现有一次模型调用内同时完成槽位选题和内容视觉导演，不新增串行模型调用。输入正文采用有界首/中/尾摘录，避免只读前 400 字丢失情绪转折；每槽输出：
+`ImageSetPlanner` 在现有一次模型调用内同时完成槽位选题和内容视觉导演，不新增串行模型调用。输入正文采用有界首/中/尾摘录，避免只读前 400 字丢失情绪转折；每槽先输出公共字段 `narrativeMoment / emotion / emotionIntensity / action / environment / avoid`，再输出一个与目标画面类型对应的 `categoryBrief`：
 
-- `narrativeMoment / emotion / emotionIntensity / action / environment / avoid`；
-- 人物画面可选 `facialExpression / gazeDirection / headAngle / bodyLanguage`。
+- `portrait_photo`：表情、视线、头部角度、肢体语言、手势、姿态能量；
+- `text_layout`：核心结论、信息层级、重点词、阅读顺序、信息密度、卡片结构；
+- `infographic_chart`：主张、关系类型、对象、变化/因果方向、步骤、数据政策；
+- `scene_photo`：时间/天气、地点、人物存在方式、事件痕迹、空间关系、动态程度；
+- `still_life_photo`：核心物件、使用状态、物件关系、生活痕迹、材质重点、手部互动；
+- `illustration_3d`：核心隐喻、角色关系、象征物、运动方向、夸张程度、叙事阶段；
+- `ui_document`：用户任务、界面状态、组件层级、操作路径、信息重点、概念/真实边界；
+- `collage_mixed`：分区职责/内容/优先级、阅读顺序、主次比例、连续元素。
 
-`ImagePromptComposer` 必须把该 brief 原样纳入提示词，并声明冲突优先级：参考图只约束视觉类型、景别、构图关系、光影、色调和材质；人物神态、视线、动作与姿态由正文 brief 决定。人物参考只作为抽象摄影锚，输出人物必须身份泛化为与来源人物无关的虚构主体，不得保留可识别五官、名人相似度、品牌 logo 或平台标识。
+分类字段使用判别式 union，历史无 `categoryBrief` 的记录继续可读；模型漏字段或返回未知类型时，代码按主题语义生成同类型的保守兜底，禁止把所有非人物画面退成同一句“与正文一致”。洗稿且反推 frame 可用时，目标类型以对应 source frame 为准并重建同类型分类 brief，避免 planner 看不到图片而把文字卡误当场景图。
+
+### D4.2：分类正文 brief 决定内容，参考图只决定形式
+
+`ImagePromptComposer` 必须把公共 brief 和分类 brief 原样纳入提示词，并声明冲突优先级：参考图只约束视觉类型、景别/网格、构图关系、光影、色调、材质与抽象风格；正文分类 brief 决定人物表演、文字层级、数据关系、场景事件、物件使用状态、视觉隐喻、界面任务和分区叙事。人物参考只作为抽象摄影锚，输出人物必须身份泛化为与来源人物无关的虚构主体，不得保留可识别五官、名人相似度、品牌 logo 或平台标识。
+
+确定性文字卡因防搬运校验与图集规划并行，不直接信任 planner 文案覆盖卡面；其专用文案角色 SHALL 使用同一有界首/中/尾正文口径，并显式提炼核心结论、信息层级、重点词、阅读顺序和密度，继续通过既有原文重叠/违禁词闸。这样文字卡消费等价分类语义，又不绕过防搬运审计。
 
 ### D5：产后审计是视觉比较，不是 prompt 自证
 
 `VisualFidelityAuditor` 输入主参考、生成图、期望 frame/style 摘要及本槽 `contentVisualBrief`，严格输出：
 
-- `form/subject/composition/color/style` 五项 0–1 分；有正文 brief 时另输出 `contentAlignment`，核验叙事瞬间、情绪、神态、视线、动作和禁用姿态；
+- `form/subject/composition/color/style` 五项 0–1 分；生成式槽有正文 brief 时另输出 `contentAlignment`，按 `categoryBrief.kind` 核验对应分类语义，而不是只检查人物神态；
 - `recognizableRealPerson/garbledText/watermark/copiedText/originalityRisk` 风险布尔或等级；
 - `pass`、失败原因与可操作 retry guidance。
 
@@ -95,9 +107,9 @@ referenceNote.images
   -> lightweight set pass + bounded specialist batches
   -> setStyleBible + styleClusters + frameSpecs
 rewritten title/body/tone
-  -> ImageSetPlanner as content visual director (slot theme + contentVisualBrief)
+  -> ImageSetPlanner as typed content visual director (common brief + categoryBrief)
 reference analysis + contentVisualBrief
-  -> ImagePromptComposer (content performance first; source camera/style; category fallback)
+  -> ImagePromptComposer (typed content semantics first; source form/style; category fallback)
   -> text-card design tokens (palette/grid/cards/pagination; no source pixels or OCR)
   -> ImagePlan.referenceBindings[slot]
   -> ImageGenerator / deterministic renderer / provider (slot-local refs, primary last)
@@ -126,7 +138,7 @@ reference analysis + contentVisualBrief
 - **多类型组增加延迟**：先整组一次、再按 family 批量；并发上限与总图数上限沿现有 9 图约束。
 - **源风格可能包含平台水印或侵权元素**：风格只提取抽象视觉属性；禁止项、无水印、无逐字复制及原创风险审计仍优先。
 - **自动相似度与原创性冲突**：审计同时要求结构/风格保真和不逐字复刻，分项展示而不是单一“越像越好”。
-- **正文情绪与参考人物姿态冲突**：参考图只保留摄影语言，人物表演以正文 brief 为准；身份始终泛化，不把“内容提到某人”理解为允许复刻其脸。
+- **正文语义与参考内容冲突**：参考图只保留视觉形式与抽象风格，具体人物表演、文字层级、图表关系、场景事件等以分类 brief 为准；人物身份始终泛化，不把“内容提到某人”理解为允许复刻其脸。
 - **与 OCR change 都会读取图片/扩精选行**：字段、角色和用途完全分离；视觉分析不得输出文本，OCR 不参与视觉风格 prompt。
 
 ## Migration / Rollout

@@ -54,9 +54,9 @@
 - **WHEN** 七至九张参考图属于同一文字卡 specialist family
 - **THEN** 整组 pass SHALL 保持轻量，逐图公共结构和专用字段 SHALL 按固定小批量有界并发分析，MUST NOT 把全部大字段塞入一次易超时调用
 
-### Requirement: 洗稿正文语义 SHALL 驱动逐槽人物表演
+### Requirement: 洗稿正文语义 SHALL 按画面类型驱动逐槽表达
 
-系统 SHALL 从洗稿后的标题、tone 与有界首/中/尾正文摘录中，为每个配图槽生成 `contentVisualBrief`，至少包含叙事瞬间、情绪、情绪强度、动作、环境和禁用项；人物画面 SHALL 进一步明确表情、视线、头部角度和肢体语言。最终生图提示 MUST 把参考图的职责限制为视觉类型、镜头/景别、构图、光影、色调与材质，把人物神态、动作和姿态交由正文 brief 决定；冲突时正文语义优先。人物参考 MUST 身份泛化，MUST NOT 复刻来源真人/名人五官、品牌 logo 或平台标识。
+系统 SHALL 从洗稿后的标题、tone 与有界首/中/尾正文摘录中，为每个配图槽生成 `contentVisualBrief`，至少包含叙事瞬间、情绪、情绪强度、动作、环境和禁用项，并包含一个判别式 `categoryBrief`。分类 SHALL 覆盖人物、文字卡、图表信息图、场景摄影、静物、插画/3D、UI/文档和混合拼贴；每类字段 SHALL 描述正文要表达的具体内容而不是参考图风格。最终提示 MUST 把参考图职责限制为视觉类型、景别/网格、构图、光影、色调、材质与抽象风格，把具体人物表演、文字层级、关系结构、场景事件、物件状态、视觉隐喻、界面任务和分区叙事交由正文分类 brief 决定；冲突时正文语义优先。人物参考 MUST 身份泛化，MUST NOT 复刻来源真人/名人五官、品牌 logo 或平台标识。
 
 #### Scenario: 脆弱与行动力不生成证件照式人物
 - **WHEN** 正文表达“脆弱、容易被触动，但能自我消化并保持行动力”，参考图是居中头肩人像
@@ -70,9 +70,25 @@
 - **WHEN** frame kind 为 `portrait_photo`
 - **THEN** specialist SHALL 除镜头/光影字段外，输出可观察的表情、视线、头部角度、身体姿态、手势、姿态能量和情绪效价/唤醒度；这些字段描述来源画面，不得被当作覆盖正文 brief 的人物表演指令
 
+#### Scenario: 文字卡表达正文信息结构
+- **WHEN** 目标画面为 `text_layout`
+- **THEN** 分类 brief SHALL 给出核心结论、信息层级、重点词、阅读顺序、信息密度和卡片结构；确定性卡面文案 SHALL 使用同一首/中/尾正文语义并继续通过防搬运校验，MUST NOT 只生成一个大标题和无意义留白
+
+#### Scenario: 图表不编造数据
+- **WHEN** 目标画面为 `infographic_chart` 且正文只描述方向/关系而没有可靠数值
+- **THEN** 分类 brief SHALL 给出主张、对象、关系和方向，并明确无数值表达政策；生成提示 MUST NOT 编造百分比、坐标值或样本量
+
+#### Scenario: UI 不虚构产品能力
+- **WHEN** 目标画面为 `ui_document`
+- **THEN** 分类 brief SHALL 给出用户任务、界面状态、组件层级、操作路径、信息重点和概念/真实边界；生成提示 MUST 把未由正文支持的界面标为概念示意，不得暗示不存在的已上线功能
+
+#### Scenario: 其余视觉类型使用独立内容维度
+- **WHEN** 目标画面为场景摄影、静物、插画/3D 或混合拼贴
+- **THEN** 分类 brief SHALL 分别描述事件痕迹/空间关系、物件使用状态/生活痕迹、隐喻/象征/叙事阶段、分区职责/阅读顺序，MUST NOT 统一退化为泛化情绪与装饰词
+
 ### Requirement: 高风险配图产后视觉校验
 
-产后审计旗标开启且槽位存在主参考图时，系统 SHALL 用视觉 / 多模态模型比较主参考与生成图，输出形态、主体、构图、色彩、风格五项分数；生成式槽存在 `contentVisualBrief` 时还 SHALL 输出 `contentAlignment`，核验叙事瞬间、情绪、神态、视线、动作和禁用姿态。确定性文字卡继续由既有卡面文案合规链核验内容，视觉保真审计 MUST NOT 为计算 `contentAlignment` 去 OCR 卡面文字，但 metadata 仍 SHALL 保留该槽正文 brief。系统同时核验来源真人/名人身份相似、乱码、画内水印、逐字复制与原创风险；清晰露脸的虚构人物本身 MUST NOT 被误判为可识别真人风险。内容不一致、硬风险或阈值不通过 SHALL 丢弃该次结果：生成式带审计指导有界重生成一次，确定性文字卡以严格来源设计令牌有界重渲染一次；第二次仍不过 SHALL 丢弃该槽。MUST NOT 因 prompt 写了 `faceless`/`no text`、provider 声称 `referenceStatus='used'` 或文字卡 renderer 返回成功就假定保真/合规。首轮视觉模型不可用时 MUST 标 `unverified` 并诚实保留原因；已有失败尝试后，后续 `unverified` MUST 丢槽，MUST NOT 用未知结果覆盖已知失败。合规 AI 标识仍走既有发布声明 / 元数据链路，MUST NOT 由模型在画面内绘制水印。
+产后审计旗标开启且槽位存在主参考图时，系统 SHALL 用视觉 / 多模态模型比较主参考与生成图，输出形态、主体、构图、色彩、风格五项分数；生成式槽存在 `contentVisualBrief` 时还 SHALL 输出 `contentAlignment`，并按 `categoryBrief.kind` 核验人物表演、文字信息结构、图表关系、场景事件、静物状态、插画隐喻、UI 任务或拼贴分区。确定性文字卡继续由既有卡面文案合规链核验内容，视觉保真审计 MUST NOT 为计算 `contentAlignment` 去 OCR 卡面文字，但 metadata 仍 SHALL 保留该槽正文 brief。系统同时核验来源真人/名人身份相似、乱码、画内水印、逐字复制与原创风险；清晰露脸的虚构人物本身 MUST NOT 被误判为可识别真人风险。内容不一致、硬风险或阈值不通过 SHALL 丢弃该次结果：生成式带审计指导有界重生成一次，确定性文字卡以严格来源设计令牌有界重渲染一次；第二次仍不过 SHALL 丢弃该槽。MUST NOT 因 prompt 写了 `faceless`/`no text`、provider 声称 `referenceStatus='used'` 或文字卡 renderer 返回成功就假定保真/合规。首轮视觉模型不可用时 MUST 标 `unverified` 并诚实保留原因；已有失败尝试后，后续 `unverified` MUST 丢槽，MUST NOT 用未知结果覆盖已知失败。合规 AI 标识仍走既有发布声明 / 元数据链路，MUST NOT 由模型在画面内绘制水印。
 
 #### Scenario: 高风险图未过产后校验即重生成
 - **WHEN** 一张含真人或封面文字的图产后校验判为「像可识别真人 / 名人」或「文字乱码」
@@ -100,7 +116,7 @@
 
 ### Requirement: 视觉参考和保真结果 SHALL 可审计
 
-发布 metadata SHALL 逐槽持久化风格来源、内容视觉 brief、生成路由、source→slot→output 绑定、provider 参考使用状态、视觉审计状态/分数/风险/尝试次数，并区分 `used`（provider 声称消费参考图）与 `passed`（生成后视觉与正文语义审计通过）。历史记录无新字段时读取 SHALL null-safe。模型不可用、旗标关闭、路由降级和槽位丢弃均 MUST 有诚实状态，不得统一包装为成功。
+发布 metadata SHALL 逐槽持久化风格来源、公共内容视觉 brief、判别式分类 brief、生成路由、source→slot→output 绑定、provider 参考使用状态、视觉审计状态/分数/风险/尝试次数，并区分 `used`（provider 声称消费参考图）与 `passed`（生成后视觉与正文语义审计通过）。控制台 SHALL 按分类使用可读标签与字段展示，不得只显示原始 JSON；历史记录无新字段时读取 SHALL null-safe。模型不可用、旗标关闭、路由降级和槽位丢弃均 MUST 有诚实状态，不得统一包装为成功。
 
 #### Scenario: provider used 不等于保真 passed
 - **WHEN** provider 返回 `referenceStatus='used'` 但产后视觉审计失败
