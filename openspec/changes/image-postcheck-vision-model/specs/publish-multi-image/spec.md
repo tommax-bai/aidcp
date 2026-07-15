@@ -36,7 +36,7 @@
 
 ### Requirement: 源图视觉语言 SHALL 优先于内容品类通用风格
 
-源风格旗标开启且本槽 frame spec 可用时，提示词 SHALL 以本槽构图/主体/类型、所属风格簇和整组 style bible 为主；内容品类通用风格只补安全/合规约束，不得覆盖源风格。分析关闭、不可用或低置信时 SHALL 完整回落现版内容品类风格。文字卡继续使用既有确定性渲染；UI/文档、图表、混合类在没有结构化重绘器时 SHALL 诚实标为 specialized/region-guided generative，MUST NOT 标为 deterministic redraw。
+源风格旗标开启且本槽 frame spec 可用时，提示词 SHALL 以本槽构图/主体/类型、所属风格簇和整组 style bible 为主；内容品类通用风格只补安全/合规约束，不得覆盖源风格。分析关闭、不可用或低置信时 SHALL 完整回落现版内容品类风格。文字卡 SHALL 继续使用确定性渲染，但 frame spec 可用时 SHALL 通过白名单设计令牌继承来源色板、背景处理、网格/装饰、信息卡形态、分页和层级；渲染器 MUST NOT 接收原图 URL、像素、坐标或 OCR 文本。UI/文档、图表、混合类在没有结构化重绘器时 SHALL 诚实标为 specialized/region-guided generative，MUST NOT 标为 deterministic redraw。
 
 #### Scenario: 源风格覆盖通用品类风格
 - **WHEN** 美食内容源图实际为冷色硬光、高对比极简静物，而通用品类档建议暖色生活感
@@ -46,9 +46,17 @@
 - **WHEN** 本槽视觉分析 unavailable 或低置信
 - **THEN** 使用现版品类风格并在审计标明 fallback，MUST NOT 编造源图风格
 
+#### Scenario: 文字卡继承抽象版式而不搬运文本
+- **WHEN** 一组参考图被识别为带薄荷色背景、细网格、圆角信息卡和分页标记的文字知识卡，且源风格旗标开启
+- **THEN** 确定性渲染 SHALL 使用对应内部色板、网格、信息卡和分页令牌重排洗稿文案，不得继续使用无关账号色板，也不得读取或复制原图具体文案
+
+#### Scenario: 大图集 specialist 有界分批
+- **WHEN** 七至九张参考图属于同一文字卡 specialist family
+- **THEN** 整组 pass SHALL 保持轻量，逐图公共结构和专用字段 SHALL 按固定小批量有界并发分析，MUST NOT 把全部大字段塞入一次易超时调用
+
 ### Requirement: 高风险配图产后视觉校验
 
-产后审计旗标开启且槽位存在主参考图时，系统 SHALL 用视觉 / 多模态模型比较主参考与生成图，输出形态、主体、构图、色彩、风格五项分数，并核验可识别真人/名人、乱码、画内水印、逐字复制与原创风险。硬风险或阈值不通过 SHALL 丢弃该次结果，带审计指导有界重生成一次；第二次仍不过 SHALL 丢弃该槽。MUST NOT 因 prompt 写了 `faceless`/`no text` 或 provider 声称 `referenceStatus='used'` 就假定保真/合规。视觉模型不可用时 MUST 标 `unverified` 并诚实保留原因，MUST NOT 让校验静默返回 pass。合规 AI 标识仍走既有发布声明 / 元数据链路，MUST NOT 由模型在画面内绘制水印。
+产后审计旗标开启且槽位存在主参考图时，系统 SHALL 用视觉 / 多模态模型比较主参考与生成图，输出形态、主体、构图、色彩、风格五项分数，并核验可识别真人/名人、乱码、画内水印、逐字复制与原创风险。硬风险或阈值不通过 SHALL 丢弃该次结果：生成式带审计指导有界重生成一次，确定性文字卡以严格来源设计令牌有界重渲染一次；第二次仍不过 SHALL 丢弃该槽。MUST NOT 因 prompt 写了 `faceless`/`no text`、provider 声称 `referenceStatus='used'` 或文字卡 renderer 返回成功就假定保真/合规。视觉模型不可用时 MUST 标 `unverified` 并诚实保留原因，MUST NOT 让校验静默返回 pass。合规 AI 标识仍走既有发布声明 / 元数据链路，MUST NOT 由模型在画面内绘制水印。
 
 #### Scenario: 高风险图未过产后校验即重生成
 - **WHEN** 一张含真人或封面文字的图产后校验判为「像可识别真人 / 名人」或「文字乱码」
@@ -65,6 +73,10 @@
 #### Scenario: 二次仍不通过则丢槽
 - **WHEN** 某槽首次审计失败并重生成一次，第二次仍存在硬风险或低于阈值
 - **THEN** 该槽不进入最终 imageUrls，审计保留两次结果与丢弃原因，其余槽按既有保序语义继续
+
+#### Scenario: 确定性文字卡也进入保真审计
+- **WHEN** 文字卡 renderer 成功生成 PNG，产后审计旗标开启且槽位存在主参考图
+- **THEN** 系统 SHALL 比较主参考与该 PNG；首次失败以严格来源令牌重渲染一次，第二次仍失败则丢槽，MUST NOT 以 `deterministic text-card renderer` 为由直接标 skipped
 
 ### Requirement: 视觉参考和保真结果 SHALL 可审计
 

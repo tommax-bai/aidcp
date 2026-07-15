@@ -26,8 +26,8 @@
 
 `VisualReferenceAnalyzer` 内部执行：
 
-1. **Set pass**：看全部有效图，输出顺序语义、统一性、风格簇及每图视觉类型。
-2. **Specialist pass**：按 specialist family 分组调用；同类图一次批量分析，调用数受类型数上限约束，不按图片数线性无界增长。
+1. **Set pass**：看全部有效图，只输出顺序语义、统一性、风格簇及每图视觉类型，不在这一轮重复输出逐图公共细节。
+2. **Specialist pass**：按 specialist family 分组，并按固定小批量有界并发调用；每批补齐逐图公共结构和类型专用字段，避免七至九张文字卡在一次大输出中触发超时。
 3. **Aggregate**：纯代码校验和归一化为 `setStyleBible + styleClusters + frameSpecs`。
 
 类型枚举：`portrait_photo | still_life_photo | scene_photo | illustration_3d | text_layout | ui_document | infographic_chart | collage_mixed`。
@@ -53,7 +53,7 @@
 
 当 frame spec 有效且源风格旗标开启时，prompt 由 frame spec 的构图/主体/视觉类型 + 所属 style cluster + set style bible 组成；内容品类风格档只补安全约束（no watermark、避免逐字复制等），不得覆盖源风格。分析关闭、不可用或低置信时完整回落现版品类风格。
 
-文字卡仍由现有确定性 renderer 处理。UI/文档、图表首版 route=`specialized_generative`，混合类 route=`region_guided_generative`；审计明确 `structuredRedraw=false`，不声称已结构化重绘。
+文字卡仍由确定性 renderer 处理，但源风格可用时先从 frame/style bible 派生白名单设计令牌：内部色板键、版式、背景处理、装饰网格、要点卡形态、分页标记和中文词组断行。渲染器只接这些离散令牌与洗稿文案，不接原图 URL、像素、坐标或 OCR 文本；源风格关闭/不可用时仍逐字节回落现有账号模板。UI/文档、图表首版 route=`specialized_generative`，混合类 route=`region_guided_generative`；审计明确 `structuredRedraw=false`，不声称已结构化重绘。
 
 ### D5：产后审计是视觉比较，不是 prompt 自证
 
@@ -63,7 +63,7 @@
 - `recognizableRealPerson/garbledText/watermark/copiedText/originalityRisk` 风险布尔或等级；
 - `pass`、失败原因与可操作 retry guidance。
 
-通过阈值由代码默认值 + env 可调；硬风险直接 fail。失败只为该槽重生成一次，并把 audit guidance 附到第二次 prompt。第二次仍失败则丢槽。审计模型未配置、超时或解析失败时状态=`unverified`，不静默写 pass；发布仍可按既有人审草稿链继续，但元数据和面板必须显示未核验。
+通过阈值由代码默认值 + env 可调；硬风险直接 fail。生成式失败只为该槽重生成一次，并把 audit guidance 附到第二次 prompt；确定性文字卡失败则以严格来源设计令牌重渲染一次。第二次仍失败则丢槽。审计模型未配置、超时或解析失败时状态=`unverified`，不静默写 pass；发布仍可按既有人审草稿链继续，但元数据和面板必须显示未核验。确定性 renderer 成功只表示“渲染成功”，不得因此把视觉审计记为 `skipped` 或 `passed`。
 
 ### D6：角色、旗标与超时
 
@@ -71,6 +71,8 @@
 - `AIDCP_REFERENCE_VISUAL_BINDING`：启用逐槽绑定；默认 off，关时维持整组参考图旧行为。
 - `AIDCP_REFERENCE_SOURCE_STYLE`：源风格优先；默认 off。
 - `AIDCP_VISUAL_FIDELITY_AUDIT`：产后审计和有界重试；默认 off。
+- `AIDCP_REFERENCE_VISUAL_TIMEOUT_MS`：单次视觉分析调用超时；整组轻量 pass 与 specialist 小批次共用，默认 120s。
+- `AIDCP_REFERENCE_VISUAL_SPECIALIST_BATCH_SIZE`：单个 specialist 请求的图片上限，默认 3，非法值回落默认。
 - 分析/审计 provider/model 分别可由独立 env 覆盖，默认 DashScope + `qwen3.7-plus`。
 
 角色恒写管线键，未触发写 `none/disabled`，异常写 `unavailable`，避免 waitAll 挂死。所有调用经现有 usage hook 记账，绝不硬编码厂商价格。
@@ -80,13 +82,15 @@
 ```text
 referenceNote.images
   -> cache lookup / VisualReferenceAnalyzer
+  -> lightweight set pass + bounded specialist batches
   -> setStyleBible + styleClusters + frameSpecs
   -> ImageSetPlanner (source order + slot themes)
   -> ImagePromptComposer (source style first, category fallback)
+  -> text-card design tokens (palette/grid/cards/pagination; no source pixels or OCR)
   -> ImagePlan.referenceBindings[slot]
-  -> ImageGenerator / provider (slot-local refs, primary last)
+  -> ImageGenerator / deterministic renderer / provider (slot-local refs, primary last)
   -> VisualFidelityAuditor (reference vs output)
-  -> bounded retry / discard
+  -> bounded regenerate or rerender / discard
   -> ImageDirective + publish metadata + console audit
 ```
 
@@ -95,10 +99,11 @@ referenceNote.images
 | Failure | Runtime behavior | Audit truth |
 |---|---|---|
 | analyzer disabled | existing planning/generation | `analysis.status=disabled` |
-| analyzer unavailable/invalid JSON | category style fallback | `unavailable` + reason |
+| analyzer unavailable/invalid JSON | category style fallback；状态继续透传到执行审计 | `unavailable` + reason，不得降成 `none` |
 | cached analysis stale | recompute; failure does not reuse stale as current | provenance shows current failure |
 | binding disabled | exact legacy all-reference behavior | binding mode=`legacy_all` |
 | provider does not support refs | existing fallback/failure semantics | `unsupported/unavailable`, never `used` |
+| deterministic text-card rendered | compare against the slot primary reference | `passed/failed/unverified`, never automatic `skipped` |
 | auditor unavailable | no fake pass; keep draft under existing human approval semantics | `unverified` + reason |
 | audit fail twice | discard slot, preserve remaining order | attempts and fail reasons retained |
 

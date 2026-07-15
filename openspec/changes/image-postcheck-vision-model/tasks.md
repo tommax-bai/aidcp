@@ -11,6 +11,7 @@
 - [x] 2.1 新增 `VisualReferenceAnalyzer`：整组分类/序列/聚类 → 按摄影、插画/3D、文字卡、UI/文档、图表信息图、混合类型分组专用分析 → 汇总 `setStyleBible + styleClusters + frameSpecs`。
 - [x] 2.2 严格 JSON 解析、调用超时、分组有界并发、token usage 记账与诚实 `unavailable/partial` 状态；默认旗标关闭并支持影子落库。
 - [x] 2.3 管线角色恒写键并接入 planner/composer；反推可用时源风格优先，现有内容品类风格仅作兜底。
+- [x] 2.4 将整组分析改为轻量 set pass + specialist 小批次有界并发，提升 7–9 张文字卡分析可靠性；升级 cache schema，超时/失败状态不得在执行审计中丢成 `none`。 <!-- aidcp-cloud 753d66b -->
 
 ## 3. aidcp-cloud — slot binding and provider
 
@@ -18,12 +19,14 @@
 - [x] 3.2 `ImagePlan` 为每槽生成独立参考绑定；默认仅绑定该槽主参考，绝不再把整组参考图传给每槽。
 - [x] 3.3 Wan 多图请求明确各图片角色并保证主参考图最后；provider 返回真实参考使用状态，失败不进入发布 URL。
 - [x] 3.4 文字卡保留确定性渲染；UI/文档、图表、混合类记录诚实路由状态，未接结构化重绘器时不得标为 deterministic redraw。
+- [x] 3.5 为确定性文字卡派生白名单来源设计令牌（内部色板、渐变/网格、信息卡、分页、密度、中文词组断行），旗标关或分析不可用保持现有模板行为。 <!-- aidcp-cloud 753d66b -->
 
 ## 4. aidcp-cloud — visual fidelity audit
 
 - [x] 4.1 新增 `VisualFidelityAuditor`，比较主参考与生成图，输出形态/主体/构图/色彩/风格分数及真人、乱码、水印、逐字复制/原创风险。
 - [x] 4.2 不通过时每槽有界重生成一次；重试仍失败则丢弃该槽。视觉模型不可用时标 `unverified`，MUST NOT 假 pass。
 - [x] 4.3 逐槽绑定、路由、分析来源和审计结果汇总到 `ImageDirective`/发布 metadata，M<N 继续按既有保序语义发布。
+- [x] 4.4 确定性文字卡同样执行产后视觉比较；首次失败以严格来源令牌重渲染一次，二次失败丢槽，模型不可用诚实 `unverified`。 <!-- aidcp-cloud 753d66b -->
 
 ## 5. aidcp-console — explainable audit
 
@@ -38,6 +41,7 @@
 - [x] 6.4 cloud/console typecheck 与目标测试通过；`openspec validate image-postcheck-vision-model --strict` 通过。
 - [x] 6.5 提交、推送、落默认分支并部署 dev；只开启反推影子并完成一组真实 UI/文档样本反推与缓存复用验证，绑定/源风格/审计保持关闭。
 - [ ] 6.6 按 `docs/real-machine-acceptance-backlog.md` 簇 83 完成同素材生成 A/B、逐槽绑定、源风格与产后审计真图验收，再逐阶段开 dev 旗标。
+- [x] 6.7 补齐轻量 set/specialist 分批、来源文字卡设计令牌、中文词组断行、确定性卡审计/重渲染/丢槽及 flag-off 回归测试。 <!-- aidcp-cloud 753d66b；2026-07-15 deployed dev -->
 
 ## 7. Change record
 
@@ -52,3 +56,13 @@
 - dev 健康：`aidcp-cloud.service=active`、`NRestarts=0`、8787 返回预期 426、8090/8088 health 均 `{"ok":true}`、console 新资产 HTTP 200、飞书 `WSClient onReady`。
 - DB：`curated_content.visual_analysis` 已以幂等启动 DDL 建为 `jsonb`。真实影子样本 row 342（2 图）由 `dashscope/qwen3.7-plus` 得到 `analyzed`，两帧均为 `ui_document` + `ui_document` 专用字段；未混入摄影参数。首次整组+专用两次调用分别 7712/6967 tokens，第二次复跑缓存命中且零模型调用。
 - dev 当前仅 `AIDCP_REFERENCE_VISUAL_ANALYSIS=true`；`AIDCP_REFERENCE_VISUAL_BINDING=false`、`AIDCP_REFERENCE_SOURCE_STYLE=false`、`AIDCP_VISUAL_FIDELITY_AUDIT=false`。未触发真实洗稿、未生成草稿、未做真人/摄影/文字卡/图表同素材 A/B；这些边界登记在簇 83。
+
+### 7.1 Follow-up record (2026-07-15 12:10)
+
+- cloud `753d66b` 已 fast-forward 到 `origin/master` 并部署 dev；控制面四个视觉旗标均保持开启，新增超时/分批使用代码默认 `120s / 3张`。
+- 反推改为轻量 set pass + specialist 三张一批有界并发，cache schema 升为 `visual-reference-v2`；七张同类文字卡测试确认调用为 `1 + 3` 批。
+- 确定性文字卡现在从反推结果派生内部色板、渐变/细网格、信息卡、页码和中文词组断行，并进入主参考图产后审计；首次失败严格重渲染，二次失败丢槽，模型不可用保留并标 `unverified`。
+- validation：acceptance `50/50`、cloud 全量 `2072/2072`、目标回归 `59/59`、typecheck、build、OpenSpec strict 均通过；视觉样张复核为 1728×2304，薄荷渐变/细网格/卡片/分页已生效，“模型”未跨行拆字。
+- dev 备份：`/opt/aidcp/cloud.bak.20260715-120918.textcard-style-fidelity.tar.gz`、`/opt/aidcp/cloud/.env.bak.20260715-120918`；部署内容 checksum 与 `753d66b` 快照一致。
+- dev 健康：`aidcp-cloud.service=active`、`NRestarts=0`、8787 返回预期 426、8090/8088 health 均 `{"ok":true}`、PG `select 1`、飞书 `WSClient onReady`；同机四个 isales 服务保持 running。
+- 尚未代用户再次触发真实洗稿，6.6 保持 pending；下一次同素材测试将验证 v2 反推、来源文字卡令牌与产后审计的真实记录。
