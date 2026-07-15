@@ -72,6 +72,8 @@
 
 ## 5. aidcp-edge — 提交窗口标志 + 页面写者注册表 + 抢占
 
+> **推进边界（2026-07-15，fleet 定序，用户拍板）**：抢占核心（5.1–5.5 / 5.8 / 5.9 + 第 6 节协议 + 第 7 节云端）的两个主要落点——协调器 `edge-task-coordinator.ts` 与装配入口 `main.ts`——**正被并行 change `browser-slot-scheduling`（活跃）重改**（master 已前进到 `809e15d`，本 change worktree 分叉于 `84267f2`、落后需 rebase）。按 fleet 单写者纪律，两个 change 不同时大改协调器。**已先行落地**的是第 5 节里**完全不碰协调器/main.ts** 的边缘安全项：**5.7**（验证码回放前复检）+ **5.10(a)**（`waitUntil` 迭代帽），见 `aidcp-edge 35d3aec`。**抢占核心延后**：等 `browser-slot-scheduling` 落定 / 归档、协调器稳定后，先把本 worktree rebase 到最新 master、消化第 1–4 节与 slot 改动的交叉，再独占协调器实装 5+6+7（实装前先跑一轮设计对抗评审确认 tasks 方案无洞）。
+
 - [ ] 5.1 **提交窗口标志（六处）**：进入不可逆动作**之前**同步置位「已进入提交窗口 + 预算上限」，拿到确认或预算耗尽后清位。协调器只在标志为假时才允许抢占
   - XHS 发布提交 `publish-command-handlers.ts:725`（窗口 ≈15s）
   - FB 发布提交 `facebook/publish-executor.ts:435`（≈20s）
@@ -84,9 +86,11 @@
 - [ ] 5.4 **抢占**（`edge-task-coordinator.ts:288-289 / :254-266 / :300-308`）：入队时若来者档位**严格高于**在跑者 → 触发取消 → 有界等停 → 授予。**同档不抢占**（FIFO，事实源改为「申请到达时刻」）。窗口占用时**立刻回「窗口占用中 + 剩余预算」**，不让抢占者空等
 - [ ] 5.5 **等停到期仍未停手 → 判控制面故障并整体升级回收**（不是「诚实的永久失败」，也不是死等）：一个页面写者收到取消后仍不停手，本质就是控制面故障。整队诚实拒绝、退出让位态。**前提是 4.x 全做完**（已完成）——否则等停会天天超时、验证码协助常态性拿不到锁
 - [ ] 5.9 **（第 4 节登记）浏览恢复的导航必须让位于在途发布写**：钩子卡在 `edge-task-coordinator.ts` 的 `resumeBrowseIfIdle`（**不是** `quiesceForTask`——队列为空时 drain 直接 return、走不到 quiesce）。这是上面那条「已离开发布页 ⇒ 判成功」假成功的根治点，与 5.2/5.3 同批
-- [ ] 5.10 **（第 4 节登记）顺手项**：FB 加群接取消点（`comment-handler.ts` 的 `onJoin` 今天不收 checkpoint，整段 ≈78s 不可中断）；`facebook/publish-executor.ts` 的 `waitUntil` 是第 8 个纯墙钟 `for(;;)`、**无迭代帽**（注入恒定 now 即死循环），被四处回读使用
+- [~] 5.10 **（第 4 节登记）顺手项**：
+  - [x] (a) `facebook/publish-executor.ts` 的 `waitUntil`（第 8 个纯墙钟 `for(;;)`、旧无迭代帽 → 注入恒定 now 即死循环）已补双闸=墙钟 + 迭代帽 `ceil(timeout/interval)+2`，同 `flows/bounded-poll`；护栏语义已由 `bounded-poll.test.ts` 覆盖，按补测克制不重复造桩 <!-- aidcp-edge 35d3aec 分支 lease-strict-preemption -->
+  - [ ] (b) FB 加群接取消点（`comment-handler.ts` 的 `onJoin` 今天不收 checkpoint，整段 ≈78s 不可中断）**留抢占核心批次**：checkpoint 在抢占落地前永不 throw、无法测试，且「哪段受保护（点击 + 短确认）、哪段可中断（观察段）」是 **5.1 加群提交窗口**设计的一部分，孤立接线会做偏
 - [ ] 5.6 边缘排队默认值与云端不一致（边缘 45s vs 云端 200s，`edge-task-coordinator.ts:58`）：改成同值，或对缺失该字段的申请**诚实拒绝**，别用不一致的表默默摘掉任务
-- [ ] 5.7 **验证码落点回放前强制复检**（`browse/captcha-assist.ts:198-270`）：同类阻断仍在 + 页面与快照一致，不一致即诚实拒绝并重抓帧。**硬前置**——今天靠「租约拿不到」挡着（安全的失败）；抢占之后会变成「抢到了 → 在发布编辑页上按几分钟前的旧坐标盲点真实鼠标」（**不安全的成功**）
+- [x] 5.7 **验证码落点回放前强制复检**（`browse/captcha-assist.ts`）：回放前重新探阻断类型 + 读当前 URL。阻断已消失 → `not_blocked`（绝不在已无验证码的页面盲点）；阻断类型或 URL 变了 → `stale_snapshot` + 重抓帧让运营在新帧上重标；复检本身失败 → 诚实 `failed`。复用现有回执枚举、**零协议改动**。URL 仅比 origin+pathname（验证码 token 每刷新都变、纳入会误判）。**硬前置**——今天靠「租约拿不到」挡着（安全的失败）；抢占之后会变成「抢到了 → 在发布编辑页上按几分钟前的旧坐标盲点真实鼠标」（**不安全的成功**）。回归：回放前阻断消失 → not_blocked 且**零鼠标派发**；回放前 URL 变 → stale_snapshot + 重抓帧且**零鼠标派发** <!-- aidcp-edge 35d3aec 分支 lease-strict-preemption -->
 - [ ] 5.8 删除遗留的整页发布处理器（`main.ts:579-639`，全程不过租约闸，云端已无发送方）
 
 ## 6. 协议（🔴 热点文件，两份逐字同改 + docs/protocol.md）
