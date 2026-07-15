@@ -113,7 +113,9 @@
 
 ## 7. aidcp-cloud — 失败语义（被抢占 ≠ 失败）
 
-> **批 C 落地（cloud，2026-07-15）**：在 cloud worktree `lease-strict-preemption` 上，先 rebase 批 A 到 origin/master（批 A commit 9f0194b→ea7eee5；协议往返断言因与 master 首作引导 AC-PROTO-14 撞名，抢占两条重编号为 **AC-PROTO-15/16**；edge 侧仍 14/15）。假成功修复链 cloud 半边（BLOCKER command-sequencer 分类 + 6.2 消费 + 7.1 + 7.2 + 7.3 + 7.5 + 9.1 + HOLE-13）+ 7.8 + 7.6 + 7.10 + 7.11 全落地并测；新增单一事实源 `src/comm/preemption.ts`（isPreemptionReason + CommandPreemptedError）。cloud full **2162** / acceptance 54 / typecheck 0 全绿。**7.7、7.9 与 7.10b/7.11d 尾巴延后**（见各条登记 + 顶部「批 C 延后清单」）。**co-deploy 未做**：必与 edge `6d87e39` 同批部署（cloud 单独上会把 edge 已在回的 preempted 认下而不烧——安全方向，但 edge 的抢占能力尚未随 cloud 主动接线到位，仍以整批同部署为红线）。
+> **批 C 落地（cloud，2026-07-15）**：在 cloud worktree `lease-strict-preemption` 上，先 rebase 批 A 到 origin/master（批 A commit 9f0194b→ea7eee5；协议往返断言因与 master 首作引导 AC-PROTO-14 撞名，抢占两条重编号为 **AC-PROTO-15/16**；edge 侧仍 14/15）。假成功修复链 cloud 半边（BLOCKER command-sequencer 分类 + 6.2 消费 + 7.1 + 7.2 + 7.3 + 7.5 + 9.1 + HOLE-13）+ 7.8 + 7.6 + 7.10 + 7.11 全落地并测；新增单一事实源 `src/comm/preemption.ts`（isPreemptionReason + CommandPreemptedError）。commit 7c0b7a7/d3221d2/0daf0bb/fae46d3。**7.7、7.9 与 7.10b/7.11d/windowRemainingMs 消费者延后**（见各条登记 + 下方「批 C 延后清单」）。**co-deploy 未做**：必与 edge `6d87e39` 同批部署（cloud 单独上会把 edge 已在回的 preempted 认下而不烧——安全方向，但 edge 的抢占能力尚未随 cloud 主动接线到位，仍以整批同部署为红线）。
+>
+> **对抗复核（wf_d2def24b，4 视角 find→逐条 verify）：2165 单测全绿仍揪出 2 HIGH+1 MED+2 LOW，已全修（commit 8ba60f4）**：① yield_timeout 曾被归 re-runnable preempted → 自动重投控制面故障 / 卡死写者最终提交则双发 → 改归 submitted_unconfirmed（页面状态未知、绝不重投）；② 委托执行器 commentResult 未认评论新增两态 → /comment --force 走 worker 重入重复评论 → 补 submitted_unknown / deferred 分支；③ 7.2 退避被 60s 兜底扫描击穿（草稿仍 pending+授权在被反复捞起）→ 达阈值**作废授权签名**；④ 7.3 暂停通知每轮重复 ping 运维 → dedup（进入暂停态只发一次）；⑤ windowRemainingMs 保留字段无消费者 → doc 如实标 + 延后。动手前另跑 7 路 read-only 锚点映射（wf_27cf5744）复核漂移。**cloud full 2165 / acceptance 54 / typecheck 0 全绿**。
 
 - [x] 7.1 **发布第四种终局**：outcome 新增 `preempted`；被抢占＝保持待审（不写终态）、不计熔断、FB 素材归还、保留授权签名、事件驱动重投（schedulePreemptedRedispatch：重触发 dispatch 在租约队列上等抢占方释放，非 60s 盲投）。`failed` 不可逆已复核（publish-log-store 无 failed→pending）。HOLE-13「已开始」下移到提交点击真正下发前（onFirstSideEffect），此前零副作用意外失败走 !sequenceStarted 回待审 <!-- aidcp-cloud 7c0b7a7 -->
 - [x] 7.2 **抢占计数 + 退避**：独立 consecutivePreemptions（按 recordId），达阈值（默认 3）→ 停自动重投 + 通知运营 preempted_exhausted（仍保持待审、绝不烧稿），与熔断 consecutiveSeqFails 解耦 <!-- aidcp-cloud 7c0b7a7 -->
@@ -194,6 +196,7 @@
 3. **7.10b 同一验证码多次提交改续租**：今天回 task_busy 拒绝（已避免重复抢占，安全）；改续租＝UX 增强，无 lease.renew 协议消息需设计。
 4. **7.11d yield_timeout 排除出加群瞬态重试白名单**：window_busy 已经瞬态短退避重试（对）；yield_timeout（控制面故障）今天也落该白名单会无限退避空转，应排除（同 comment 侧 isEdgeTaskAcquireFailure 已排除的处置）。
 5. **5.6 边缘排队默认 45s vs 云端 200s 对齐**：edge-task-coordinator.ts 边缘侧改，延后与 7.10 同批坐实（两端受理预算一致，避免单改成不一致的表）。
+6. **window_busy 精确重排消费者**（对抗复核 LOW-5）：EdgeTaskLeaseError.windowRemainingMs 已透传但无消费者——今天 window_busy 的 acquire 失败走各调用方既有「下一轮重触发 / 有界退避」（非空转），尚未实装「按剩余预算 setTimeout 精确重排」。字段 doc 已如实标为保留。落地时挑一个 challenger 调用方在此值上挂重排。
 
 ---
 
