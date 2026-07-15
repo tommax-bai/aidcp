@@ -35,3 +35,11 @@
   <!-- 1s refresh timing preview: 72.27px connector continued through refreshes and reached 72.27px before looping; focused companion UI 48/48; post-rebase full npm test 1353/1353, typecheck and OpenSpec strict validation passed. -->
 - [x] 7.5 提交并推送 `aidcp-edge` 与 `aidcp` 默认分支；不构建桌面安装包。
   <!-- aidcp-edge bc6e570 on master and origin/master; aidcp recorded in this closeout commit and pushed to main after strict validation. No desktop installer was built. -->
+
+- [x] 8.1 根据视觉复核撤回“移除按钮后放宽三阶段”的设计，规格恢复既有三等分布局与右侧呼吸空间。
+- [x] 8.2 在 `aidcp-edge` 将三阶段恢复为三等分网格；两条独立连接器覆盖在前两个阶段列尾部，不占用额外布局列。
+- [x] 8.3 同步窄屏和 renderer CSS 回归断言，确保四种运行状态统一回退且颜色、完整行程、刷新连续性不回归。
+- [x] 8.4 运行四状态视觉检查、focused tests、Edge 全量测试、typecheck 与 OpenSpec strict validation。
+  <!-- Four-mode browser preview measured stage starts at 0%, 33.6%, and 67.2%; both connectors stayed 28px with blue/teal/green semantic colors. Focused companion UI 50/50; post-rebase full npm test 1360/1360, typecheck and OpenSpec strict validation passed. -->
+- [x] 8.5 提交并推送 `aidcp-edge` 与 `aidcp` 默认分支；不构建桌面安装包。
+  <!-- aidcp-edge bbbf656 on master and origin/master; aidcp recorded in this closeout commit and pushed to main after strict validation. No desktop installer was built. -->
