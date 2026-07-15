@@ -186,7 +186,8 @@
 
 - [x] 13.1 `openspec validate lease-strict-preemption --strict` **通过**（含 HOLE-5 RENAMED 修复后）
 - [ ] 13.2 真机项归并入 backlog（本次已把 12.1–12.8 登记进 `docs/real-machine-acceptance-backlog.md` 抢占簇）
-- [ ] 13.3 **co-deploy dev**：cloud 批 C（本 worktree 4 提交，HEAD 待定）**必与 edge `6d87e39` 同批**部署，绝不 cloud/edge 单独上。走 CLAUDE.md §5 安全序列。**cloud 分支 push 需 force**（批 A 已 rebase 到 master，origin/lease-strict-preemption 从 9f0194b→本 HEAD 为非 ff）——按 §6 需先与用户确认
+- [~] 13.3 **部署**：**cloud 半边已部署 dev**（用户 2026-07-15 拍板「现在就部署 cloud 到 dev」——cloud 单独上是「认而不烧」安全方向、preempted 分支在 edge 未发 preempted 前休眠）。流程：force-push feature 分支（origin/lease-strict-preemption 8ba60f4）→ 合并进 cloud master（merge commit **bda5846**，保留批 C 各 reviewed sha）→ merged master full 2207 pass/3 skip + acceptance 54 + typecheck 0 全绿 → §5 安全序列部署 ECS dev（备份 cloud.bak.20260715-191231.tar.gz + .env.bak.20260715 → git archive 干净快照 rsync 无 --delete → restart → healthcheck 全过：active/8787/飞书长连接/panel 8090/PG select 1/无崩溃/isales 未碰）。<!-- aidcp-cloud bda5846 / 2026-07-15 deployed dev -->
+  - **edge 侧 co-deploy 待用户协调**：dev 客户机需跑 edge `6d87e39` 才端到端生效（抢占真正发生）。绝不 edge 先上；cloud 已在前（认而不烧就位）。真机验收（簇 85）等 edge 到位后跑。
 - [ ] 13.4 archive（co-deploy + dev 真机 F 验收后）
 
 ### 🔶 批 C 延后清单（landed 主体之外，非假成功修复链必需；落地时逐条销账）
