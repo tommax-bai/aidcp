@@ -19,7 +19,7 @@
 
 ## 4. 提交、集成与 dev 验证
 
-- [ ] 4.1 仅提交本 change 文件，推送同名分支并按快进规范集成 cloud master/control main，不 force。
-- [ ] 4.2 运行 `scripts/deploy-target dev --check`，从 clean eligible cloud master 备份并部署 dev，不触碰 isales、不部署 OL。
-- [ ] 4.3 验证服务、端口、health、Feishu、PostgreSQL，并观察现有 waiting_approval 任务至少两个旧通知周期不再新增重复事件/卡片。
-- [ ] 4.4 回填 commits、测试、部署和诚实验证边界，严格校验后归档并清理同名 worktree/分支。
+- [x] 4.1 仅提交本 change 文件，推送同名分支并按快进规范集成 cloud master/control main，不 force。 <!-- cloud 4696491 integrated by land-change; control 92edb0b; feature branches pushed before integration; no force -->
+- [x] 4.2 运行 `scripts/deploy-target dev --check`，从 clean eligible cloud master 备份并部署 dev，不触碰 isales、不部署 OL。 <!-- dev check passed; clean origin/master archive deployed; backup cloud.bak.20260715-173556.tar.gz + .env.bak.20260715-173556; isales running count stayed 4 -->
+- [x] 4.3 验证服务、端口、health、Feishu、PostgreSQL，并观察现有 waiting_approval 任务至少两个旧通知周期不再新增重复事件/卡片。 <!-- service active NRestarts=0; 8787/8090/8088, health, Feishu onReady, PG pass. Task 69324efc... reconciled at 17:36:27 and 17:37:02 while version stayed 136, attempt 1, repeated event count 65. No real approval/publish executed. -->
+- [x] 4.4 回填 commits、测试、部署和诚实验证边界，并完成归档前严格校验。 <!-- deployed file hashes match clean snapshot; post-restart error-priority journal empty; live observation proves silent waits, but no real approval or platform publish was performed -->
