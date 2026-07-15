@@ -478,6 +478,9 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 > - [ ] **全闭环把评论真发出** — dev 工程师大白跑真实排期评论（`ContentScheduler` 心跳命中）：搜索连续命中 `/search_result_ai`、不再 `not_on_search_page`；采卡 → 择优 → 开笔记 → 人审 → 发布走通，飞书出成功回执；日志不再出现该账号搜索大面积失败。
 > - [ ] **happy-path 与自治搜索不回归** — 经典 `/search_result` 页型账号（如 Tmax）与自治浏览搜索（`search_evaluator`/`search.approved`）在真实点击聚焦 + 重试新路径下照常命中、不误伤、不多点不可见按钮。
 
+> **2026-07-15 补登 — `comment-readnote-fastfail`（开笔记失败快速失败 + 诚实归因；cloud master `5529c87` **已部署 dev**，簇 34 归属）**：云端按需评论「开笔记/读正文」步原只监听 `note.detail.arrived`、干等满 28s 单步超时，且超时后把原因误记成「（超时/边端离线）」（边端在线且诚实回过失败）。改为竞速消费三路（`note.detail`=成功 / `action.completed{open_note,ok:false}`=诚实失败带真实 reason / 重报 `page.cards`=目标卡被回收 `target_not_on_page`），任一失败即快速返回、措辞如实。纯云端、不改边缘/协议。剩余真机项：
+> - [ ] **开笔记失败即时且诚实** — dev 制造/遇到开笔记失败（目标卡滚走、弹层不弹等）时：飞书 read_failed 回执/云端日志**即时**出现（不再等约 28s）、原因**真实**（`modal_timeout`/`target_not_on_page` 等，不再是「超时/边端离线」）；happy-path 正常开笔记读正文不回归。
+
 ## 簇 35 — captcha-assist-live-snapshot 真机验收（验证码远程协助改「近实时活体帧 + 选点期冻结」，登记于 2026-07-10；cloud master `210183a` 已 land + **已部署 dev（旗标默认关）**、console master `e63568c` 已 land + **已部署 dev**、edge master `e73dd3e` 已 land，edge 需运营机 pull/重建后生效）
 
 **前置（关键）**：本功能 **env 旗标默认关**，零回归。真机验收前须在 dev ECS `.env` 设 `AIDCP_CAPTCHA_ASSIST_LIVE_ENABLED=true`（可选 `AIDCP_CAPTCHA_ASSIST_LIVE_INTERVAL_MS` / `_MAX_DURATION_MS` / `_MAX_FRAMES` 调 hint）+ `systemctl restart aidcp-cloud.service`，并让运营机 edge pull/重建。范围仅**自刷新 / 多步换图的点选类**验证码；滑块/拖拽不在内。
