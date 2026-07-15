@@ -564,7 +564,13 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **首批 feed 后自动补上昵称（不再只靠握手）** — 空昵称 FB 号（含**导入号 / 换语言号**）重建 edge 后启动：即便握手那一下没读到，等**首批 feed 卡片到达**后云端自动武装本人采集、边端就地读顶栏头像 → dev `accounts.nickname` 落非空、控制台显真名。日志见 `[nickname_enricher] 完整启动首批 page.cards … account=<fbid>` + edge `[fb-session] profile.detail direct authorId=<fbid> nickname="…"（就地读、无导航）`。
 - [ ] **采集就地读、绝不导航** — 本人采集全程无 `Page.navigate` 到 `profile.php`/`/me`（edge 日志 `就地读、无导航`）；FB 活标签页不被导航走、采集完不整页重载（`back` 经幂等 `ensureFeed` 空操作）。
 - [ ] **走过等登录门的号也能补上** — 首启需人工扫码（走等登录门）的 FB 号，登录后首批 feed 到达时仍能补读昵称落库（不再因启动首读失败而整段丢昵称）。
-- [ ] **换语言号读法短板确认（非本 change 范围）** — 头像标签仅覆盖中英文；越/泰/印尼语等 UI 的号本轮仍可能就地读空（诚实留空、无回归、不写垃圾），记录为「读法多语言」单独跟进项，不阻本 change 验收。
+- [ ] **换语言号读法短板确认** — 头像标签仅覆盖中英文 + 时间线后缀（见下两条 07-15 补丁）；仍未覆盖的语种 UI（越/泰/印尼语等）的号可能就地读空（诚实留空、无回归、不写垃圾），单独跟进。
+
+**读法两连修（2026-07-15，就着「Nancy Terry」真机号 CDP 取证做出，edge master `776c0e8` + `600b9de`，edge-only；已 build:dist + CDP live 复核 `readFacebookIdentity → ok+"Nancy Terry"`）——运营重启 edge 后云端首批 feed 采集即写库**：
+
+- [ ] **中文界面「的时间线」自链后缀**（change `facebook-nickname-aria-timeline-suffix`，edge `776c0e8`）— 中文号本人主页锚点 aria 是「<名>的时间线」而非「<名>的头像」；`AVATAR_ARIA_SUFFIX_RE` 已补 `的时间线`/`的時間線`/`'s timeline`。验：中文界面 FB 号启动后昵称就地读出真名。
+- [ ] **c_user 权威、feed 他人链接不判冲突**（change `facebook-self-identity-cookie-authoritative`，edge `600b9de`）— 采集时机迁到「首批 feed 卡片」后，feed 上帖子作者/评论者的 `profile.php?id=` 链接曾被误当自我 id 候选 → `candidates conflict` → 读身份失败 → 昵称空（真机 3 次采样稳定复现）。已改 `deriveFacebookIdentity`：c_user 在场即权威自我 id、id 锚定取昵称、忽略他人链接。验：真实 feed（多帖子作者在场）启动后昵称仍就地读出、不再 conflict；无 cookie 多候选仍诚实 conflict。
+- [ ] **闭环写库确认** — 运营机重启 edge 后：空昵称中文 FB 号（如 `61591803599213`）在云端首批 `page.cards` 采集回合内，dev `accounts.nickname` 由空落为「Nancy Terry」、控制台/客户端显真名。
 
 ## 簇 43 — manual-comment-bypass-quota 真机验收（手动 /comment 命令绕节奏/风控配额，登记于 2026-07-10；cloud master `cb0889a` 已 land + **已部署 dev**，纯云端、边缘无改；openspec change manual-comment-bypass-quota 于 main `f6100a8`）
 
