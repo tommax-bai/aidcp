@@ -3,11 +3,14 @@
 > 状态：Baseline<br>
 > 生效日期：2026-07-15<br>
 > 适用范围：`aidcp-edge` Electron 客户端，包括主窗口、环境栏、运行进展、发布结果、今日进展、活动流、设置与账号人设浮层。<br>
-> 配套速查板：[edge-ui-design-system-v1.svg](./edge-ui-design-system-v1.svg)
+> 配套速查板：[edge-ui-design-system-v1.svg](./edge-ui-design-system-v1.svg)<br>
+> 界面结构与交互契约：[AIDCP Edge 界面说明 v1.0](./edge-ui-interface-spec-v1.md)
 
 ## 1. 这份规范解决什么问题
 
 这是一套可复用的设计系统，不是一张固定页面模板。后续设计可以改变信息组合和页面结构，但必须遵守本规范的视觉语义、组件关系、状态诚实性和交互层级。
+
+具体有哪些界面、各界面何时出现、动作后发生什么，由配套的[界面说明](./edge-ui-interface-spec-v1.md)约束。
 
 应用效果图只用于说明一种组合方式，不是唯一答案。规范优先级如下：
 

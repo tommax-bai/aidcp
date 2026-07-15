@@ -78,6 +78,7 @@ cd ../aidcp-cloud && npm install && npm test
 ## 文档索引
 
 - [Edge UI Design System v1.0](docs/design/edge-ui-design-system-v1.md)
+- [Edge 界面说明 v1.0](docs/design/edge-ui-interface-spec-v1.md)
 - [架构与数据流](docs/architecture.md)
 - [边-云 WebSocket 协议](docs/protocol.md)
 - [验收测试用例（全功能矩阵）](docs/acceptance-tests.md)
