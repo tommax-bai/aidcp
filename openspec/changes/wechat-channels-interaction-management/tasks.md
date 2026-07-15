@@ -13,12 +13,14 @@
 
 ## 2. Session 01 - Edge driver and interaction connector
 
-- [ ] 2.1 Extend Edge `PlatformId`, registry, environment configuration and capability declaration for `wechat_channels` without changing existing XHS/Facebook behavior.
-- [ ] 2.2 Implement the separate browser driver and `InteractionConnector`, with account-bound encrypted session storage, identity mismatch fail-closed behavior and browser reopen lifecycle.
-- [ ] 2.3 Implement comment and DM incremental sync with stable external IDs, paging, tombstones, replayable batches and checkpoint advancement only after a matching accepted/duplicate ack.
-- [ ] 2.4 Implement text comment/DM send with persisted idempotency, command expiry, platform verification and honest confirmed/failed/ambiguous results; keep image send disabled.
-- [ ] 2.5 Wire all seven WS types, payload validators and active-command routing atomically; gate them behind negotiated `interaction_inbox_v1`.
-- [ ] 2.6 Add per-capability probes, endpoint/account flags, schema-change circuit breaking and read-only/gated black-box tests that never submit to an unapproved real target.
+- [x] 2.1 Extend Edge `PlatformId`, registry, environment configuration and capability declaration for `wechat_channels` without changing existing XHS/Facebook behavior.
+- [x] 2.2 Implement the separate browser driver and `InteractionConnector`, with account-bound encrypted session storage, identity mismatch fail-closed behavior and browser reopen lifecycle.
+- [x] 2.3 Implement comment and DM incremental sync with stable external IDs, paging, tombstones, replayable batches and checkpoint advancement only after a matching accepted/duplicate ack.
+- [x] 2.4 Implement text comment/DM send with persisted idempotency, command expiry, platform verification and honest confirmed/failed/ambiguous results; keep image send disabled.
+- [x] 2.5 Wire all seven WS types, payload validators and active-command routing atomically; gate them behind negotiated `interaction_inbox_v1`.
+- [x] 2.6 Add per-capability probes, endpoint/account flags, schema-change circuit breaking and read-only/gated black-box tests that never submit to an unapproved real target.
+
+<!-- Session 01 evidence: aidcp-edge branch/worktree `wechat-channels-edge-adapter` at e22c6a2. `npm test` passed 1384/1384, `npm run test:acceptance` passed 20/20, `npm run typecheck` and `npm run build:dist` passed. Frozen Session 00 WS fixtures were accepted by the Edge validators and `check-jsonschema --schemafile ws-v2.schema.json ../fixtures/ws/*.json` passed. Tests used synthetic/mock data only; no real-account read, browser cold-stop, or write was performed, and all write probes remain gated. No Edge installer, Cloud/Console/Electron UI change, deployment, or dev publish was performed; integration and real-account acceptance remain Session 05 work. -->
 
 ## 3. Session 02 - Cloud inbox, workflow and APIs
 
