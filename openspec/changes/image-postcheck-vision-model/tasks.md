@@ -71,3 +71,13 @@
 - dev 备份：`/opt/aidcp/cloud.bak.20260715-120918.textcard-style-fidelity.tar.gz`、`/opt/aidcp/cloud/.env.bak.20260715-120918`；部署内容 checksum 与 `753d66b` 快照一致。
 - dev 健康：`aidcp-cloud.service=active`、`NRestarts=0`、8787 返回预期 426、8090/8088 health 均 `{"ok":true}`、PG `select 1`、飞书 `WSClient onReady`；同机四个 isales 服务保持 running。
 - 尚未代用户再次触发真实洗稿，6.6 保持 pending；下一次同素材测试将验证 v2 反推、来源文字卡令牌与产后审计的真实记录。
+
+### 7.1 Content-semantics follow-up record (2026-07-15 14:07)
+
+- cloud `c77683e`、console `2b58528` 已快进到各自 `origin/master`；OpenSpec 契约提交 `0063f12` 已快进到 `origin/main`。
+- `ImageSetPlanner` 现在读取有界首/中/尾正文并逐槽生成 `contentVisualBrief`；composer 明确正文控制情绪、神态、视线、动作与姿态，参考图只控制画面类型、景别/镜头、构图、光影、色调和材质。人物允许按正文清晰露脸，但必须身份泛化，不得对应来源真人/名人或复制 logo/平台标识。
+- 摄影 specialist cache schema 升为 `visual-reference-v3`，新增表情、视线、头部/身体姿态、手势、姿态能量及效价/唤醒度；v2 缓存自动失效。生成式产后审计新增 `contentAlignment`；已知失败后第二次 `unverified` 必须丢槽。确定性文字卡仍做视觉保真审计，但不为正文一致性 OCR 卡面文字。
+- validation：cloud 全量 `2082/2082`、目标回归首轮 `64/64` 与收口 `38/38`、typecheck、build；console 全量 `123/123`（另 1 skipped）、目标 `20/20`、build；OpenSpec strict 均通过。
+- dev 备份：`/opt/aidcp/cloud.bak.20260715-1405-image-content.tar.gz`、`/opt/aidcp/cloud/.env.bak.20260715-1405-image-content`、`/opt/aidcp/console.bak.20260715-1405-image-content.tar.gz`。部署后 cloud/console 干净提交快照按 checksum 复核无内容漂移。
+- dev 健康：`aidcp-cloud.service=active`、`NRestarts=0`、8787 返回预期 426、8090/8088 health 均 `{"ok":true}`、console HTTP 200、PG 校验 `ok=1`、飞书 `WSClient onReady`；四个 isales 服务均 active/running。四个视觉旗标均为 `true`。
+- 未代用户再次触发真实人物洗稿，因而没有宣称新链路已通过同素材真人视觉验收；6.6 与 7.2 继续 pending，待用户试跑后核对 v3 反推、逐槽 brief、`contentAlignment` 和最终人物神态。
