@@ -113,19 +113,19 @@
 
 ## 7. aidcp-cloud — 失败语义（被抢占 ≠ 失败）
 
-- [ ] 7.1 **发布第四种终局**（`publish-dispatcher.ts:331-343 / :380-409 / :99-142`）：被抢占＝**保持待审、不写失败终态、不计熔断、FB 素材走归还而非隔离、保留授权签名**，由抢占方释放后**事件驱动重投**（不能靠 60s 兜底扫描盲投——会 spin：每 60s 重投一次、每次排队到 200s 受理超时）
-  - `failed` 是**不可逆终态**（`publish-log-store.ts` 无任何 failed→pending 回退路径）——写了就救不回来，人工再批也没用
-  - 「已开始」标志**下移到首条业务命令真正下发之后**（今天在拿到租约瞬间就置真 ⇒ 零副作用失败被判终态失败 + 熔断 +1）
-- [ ] 7.2 **抢占计数 + 退避**：「被抢占不计熔断」拆掉了系统里唯一那道（意外的）刹车，必须补上。达阈值（建议 3）→ 停止自动重投 + 通知运营
-- [ ] 7.3 **边缘硬暂停闸**（`publish-dispatcher.ts:321-344`）：验证码期云端暂停向该 edge 下发一切页面命令，而发布命令**不在豁免名单** → 投递数 0 → 序列器立即 reject → **烧成 failed + 熔断 +1**。下发前加闸；投递数为零按零副作用回待审
-- [ ] 7.4 边缘已回的 `task_lease_mismatch` **云端全仓零处理** → 被当普通业务失败、直接烧稿 + 熔断。接线
-- [ ] 7.5 **活跃租约的中断通道**（`edge-task-lease-client.ts:210-244 / :173-189`）：收到被抢占/让位超时/排队超时的释放 → **立刻中断该任务的执行体**并抛可区分错误；新原因即时拒绝，不再空等自己的计时器
-- [ ] 7.6 评论（`comment-scheduler.ts:1271-1290 / :1523-1525`）：被抢占**不得判「未开始」**；已过提交点按「已提交待确认」处置并写去重账本；被抢占的按需评论＝**放弃本次**（含 90s 人审），不重建、不本轮重试（重建已被真机实证会失败）
-- [ ] 7.7 巡视（`role-dispatcher.ts:569-622`）：租约被撤 → 走既有失败出口收敛（解除软暂停、回 feed）。会话空闲时钟在独占租约期间**停表**
-- [ ] 7.8 🔴 **「被抢占」必须作为原因级短路，插在兜底滚动抑制名单判断之前**（`role-dispatcher.ts:2149-2162`）——该名单按**动作名**匹配，开笔记 / 刷新 / 看主页**不在名单里**，一旦补上诚实回执就会立刻触发一次恢复滚动，**滚到抢占方的页面上**。不补滚、不重试、不清计数、不计互动失败与配额
-- [ ] 7.9 **FB 评论走租约**（`comment-agent/facebook-edge-steps.ts` 三条命令全无任务标识）：不纳入，「覆盖全部独占任务」就是假话。且今天只要有任何租约在跑，云端下发的 FB 评论命令会在边缘被**静默丢弃**、云端干等到超时
-- [ ] 7.10 验证码协助受理超时 20s → **45s**（`captcha-assist.ts:349-368`）：覆盖最长 20s 提交窗口 + 取消停手 + 让位 + 往返。同一验证码事件的多次提交改为**续租而非重复抢占**
-- [ ] 7.11 被抢占原因补进加群的瞬态白名单；人工触发的加群把**档位一路传下去**（今天硬写成自动档 → 严格三档下运营手动敲的加群会被另一条人工任务抢掉）
+> **批 C 落地（cloud，2026-07-15）**：在 cloud worktree `lease-strict-preemption` 上，先 rebase 批 A 到 origin/master（批 A commit 9f0194b→ea7eee5；协议往返断言因与 master 首作引导 AC-PROTO-14 撞名，抢占两条重编号为 **AC-PROTO-15/16**；edge 侧仍 14/15）。假成功修复链 cloud 半边（BLOCKER command-sequencer 分类 + 6.2 消费 + 7.1 + 7.2 + 7.3 + 7.5 + 9.1 + HOLE-13）+ 7.8 + 7.6 + 7.10 + 7.11 全落地并测；新增单一事实源 `src/comm/preemption.ts`（isPreemptionReason + CommandPreemptedError）。cloud full **2162** / acceptance 54 / typecheck 0 全绿。**7.7、7.9 与 7.10b/7.11d 尾巴延后**（见各条登记 + 顶部「批 C 延后清单」）。**co-deploy 未做**：必与 edge `6d87e39` 同批部署（cloud 单独上会把 edge 已在回的 preempted 认下而不烧——安全方向，但 edge 的抢占能力尚未随 cloud 主动接线到位，仍以整批同部署为红线）。
+
+- [x] 7.1 **发布第四种终局**：outcome 新增 `preempted`；被抢占＝保持待审（不写终态）、不计熔断、FB 素材归还、保留授权签名、事件驱动重投（schedulePreemptedRedispatch：重触发 dispatch 在租约队列上等抢占方释放，非 60s 盲投）。`failed` 不可逆已复核（publish-log-store 无 failed→pending）。HOLE-13「已开始」下移到提交点击真正下发前（onFirstSideEffect），此前零副作用意外失败走 !sequenceStarted 回待审 <!-- aidcp-cloud 7c0b7a7 -->
+- [x] 7.2 **抢占计数 + 退避**：独立 consecutivePreemptions（按 recordId），达阈值（默认 3）→ 停自动重投 + 通知运营 preempted_exhausted（仍保持待审、绝不烧稿），与熔断 consecutiveSeqFails 解耦 <!-- aidcp-cloud 7c0b7a7 -->
+- [x] 7.3 **边缘硬暂停闸**：runDispatch 下发前 isEdgePaused(edgeId)（server 接 ws-server pausedEdges）→ 暂停即零副作用回待审、保留授权（瞬态不作废）、不烧 failed+熔断、通知 edge_paused_requeued。**不**把 publish.command 加进 ws-server 下发豁免名单（那会把写命令推给验证码挡住的浏览器＝假成功红线） <!-- aidcp-cloud 7c0b7a7 -->
+- [x] 7.4 `task_lease_mismatch` 接线：handler.ts **无需改**（原样透传 payload）；识别落在三消费点——command-sequencer 分类（result.error）、edge.post（reason）、role-dispatcher 7.8（reason），全经 `isPreemptionReason` 归抢占（命令到达时租约已不在＝提交前，安全归 preempted） <!-- aidcp-cloud 0daf0bb（+7c0b7a7 分类基座） -->
+- [x] 7.5 **活跃租约中断通道**：EdgeTaskLeaseError 新增 window_busy（+windowRemainingMs）/yield_timeout 码；onReleased 补 challenger acquire 拒绝分支（window_busy 精确重排 / yield_timeout 不可恢复）+ 活跃租约被抢占中断回调 onActiveLeasePreempted → command-sequencer.preemptTask 就地 reject 在飞 publish.command（catch 按 CommandPreemptedError 归类、**绝不 unwind executePublishSequence**，防提交后被抢重投双发）。server 接线 <!-- aidcp-cloud 7c0b7a7 -->
+- [x] 7.6 评论 edge.post 升三态（CommentPostResult：confirmed/submitted_unconfirmed/preempted/not_dispatched，修 HOLE-8 重复评论）；去重写入门改「提交已派发（confirmed∪submitted_unconfirmed）」；被抢占＝放弃本轮（不写去重、不重建、不换词重试）；两 outcome union + 两穷举结果卡开关 + 三 live 调用点全迁；isEdgeTaskAcquireFailure 补排除 yield_timeout（控制面故障不归 not_started 空转成环） <!-- aidcp-cloud 0daf0bb -->
+- [ ] 7.7 **延后**（非假成功修复链必需，见顶部延后清单）：巡视租约被撤收敛 + 独占租约期空闲时钟停表。硬门＝共享 EdgeTaskLeaseClient→按账号 RoleDispatcher 的 taskId 路由 + 外来租约授予/释放的向调度器扇出（今天不存在）。缓解已在位：7.8 原因级短路 + 边缘 canExecute 门控使外来租约期裸浏览命令回 task_lease_mismatch 被短路；被抢巡视仍靠既有空闲看门狗（240s nudge / 1h kill）自然收敛。**onActiveLeasePreempted 已提供撤租信号，缺的只是路由**——落地时接此回调
+- [x] 7.8 🔴 **原因级短路**：role-dispatcher action.completed 处理器**顶部**（在 pendingMigration/comment.done/like 重试/noRecoverScroll 名单之前）加 `ok:false && isPreemptionReason(reason)` → 不兜底滚动、不重试、不计失败与配额、不 emit comment.done，直接 return。co-deploy 于 edge §8.1 批 D 之前必落（本条已落，批 D 后即安全） <!-- aidcp-cloud d3221d2 -->
+- [ ] 7.9 **延后**（非假成功修复链必需，见顶部延后清单）：FB 评论走租约。facebook-edge-steps 三命令补 taskId（协议 payload 已带 optional taskId、零协议改动）+ runFacebookTargetedTaskBody 把 search→open→submit 包进 withLease。较大结构改动、且「人审(≤90s)是否在租约内」有未决设计点。**风险性质**：不纳入＝有任何租约在跑时 FB 评论命令被边缘静默丢弃、云端干等超时（诚实失败非假成功，可重试；FB 评论与其它租约并发相对少见）。落地时按 XHS keep-open 同构接线
+- [x] 7.10 验证码协助受理超时 20s→**45s**（具名常量 CAPTCHA_ASSIST_ACQUIRE_TIMEOUT_MS）。**7.10b 续租延后**：同一验证码事件多次提交今天回 task_busy 拒绝（已避免重复抢占，安全），改「续租而非拒绝」属 UX 增强、无 lease.renew 协议消息需设计，见延后清单 <!-- aidcp-cloud fae46d3 -->
+- [x] 7.11 人工触发的加群把档位一路传下去（gear：manual→human/auto→automatic，经 triggerScheduled/joinSpecificGroup→runReal/runShadow/runAssignedJoin 传到四个 group_join acquire）。**7.11d 尾巴部分**：被抢占原因已经由 leaseFailureReason 包成 `lease_unavailable:<code>` 落 isNetworkTransient 白名单（window_busy 短退避重试）；yield_timeout 仍走此瞬态白名单（应排除、控制面故障不该无限退避重试）＝延后清单一条 <!-- aidcp-cloud fae46d3 -->
 
 ## 8. aidcp-edge — 静默丢弃收口
 
@@ -134,19 +134,19 @@
 
 ## 9. 优先级口径（✅ 用户已拍板 2026-07-14：人审通过的发布 = **自动档**）
 
-- [ ] 9.1 **今天的档位是按触发路径分的，不是按任务性质**：同一篇人审通过的稿，走人工入口＝人工档，走 60s 兜底扫描补投＝自动档 → **可抢/不可抢取决于它怎么被触发，且重投时档位反而降级**（教科书式的反 aging）
+- [x] 9.1 **今天的档位是按触发路径分的，不是按任务性质**：publish-dispatcher.ts:187 从 `opts?.humanApproval ? 'human':'automatic'` 硬定 `'automatic'`；humanApproval opt 保留（另驱动熔断解除 confirmHumanApproval，不再据此定档）。原 test「人工批准入口使用 human」改为断言 automatic <!-- aidcp-cloud 7c0b7a7 -->
   - **定案（用户 2026-07-14）**：**一切发布一律自动档**，不论触发路径（人审入口 / 兜底扫描 / 事件驱动重投）。理由：它是异步队列作业，批准完人就走了，没人在等回执
   - **人工档只留「运营在线等回执」的动作**：手动评论（`/comment`）、手动加群、客户端内审批的即时动作
   - **副作用（接受）**：手动评论会抢占发布——**这正是设计意图**，但发布被抢占＝整条序列重跑
   - 顺带消灭「同一篇稿因触发路径不同而档位不同」与「重投降级」两个反 aging 缺陷
   - 落点：发布派发处不再按触发路径给档位，硬定自动档；人工入口的档位提升只保留给上面三类在线动作
 
-## 10. spec delta
+## 10. spec delta（控制仓 aidcp，`openspec validate lease-strict-preemption --strict` 通过）
 
-- [ ] 10.1 现行 spec **明文禁止本次要做的事**（「正在执行且已产生副作用的独占任务 MUST NOT 被强杀；高优先级只影响下一次授予顺序」）→ **必须改写而非新增**，且两条既有回归 Scenario 的语义要重新定义，否则归档时与主 spec 冲突
-- [ ] 10.2 新增四条 requirement：**清场协议 / 有界让位与超时升级 / 被抢占的第四终局 / 通知巡视的窗口保护**
-- [ ] 10.3 首次定义「**安全取消点**」（已在当前 delta 里）
-- [ ] 10.4 写明：让位超时升级为控制面回收 → 通向的是「**请运营重启浏览器客户端**」这个**人工动作**，不是自动恢复。别让人以为系统会自愈
+- [x] 10.1 HOLE-5 修：MODIFIED#1 header「任务优先级严格生效…」与主 spec:62「任务优先级与同级 FIFO 可预测」不匹配（归档期才暴露、validate 掩盖）→ 补 `## RENAMED Requirements`(FROM/TO)，MODIFIED 内容在新名下生效。两条既有回归 Scenario 语义已在 delta 重定义 <!-- aidcp control-repo（见本次 tasks/spec 提交） -->
+- [x] 10.2 四条 requirement：被抢占分档回执（第四终局）+ 被抢占执行流必须真正停止写页面（清场/页面写记账）+ 交接必须有界（有界让位与超时升级）+ **本次补齐**「通知巡视按窗口保护、其不可逆消费段不可被抢占」
+- [x] 10.3 「安全取消点」定义已在 delta（MODIFIED#2 抢占浏览取消陈旧待执行命令而非排空队列）
+- [x] 10.4 **本次补齐**新增 requirement「让位超时升级为控制面回收，且是人工动作而非自愈」——yield_timeout 通向「请运营重启浏览器客户端」，MUST NOT 自动重试/重投/归还额度
 
 ## 11. 测试
 
@@ -155,18 +155,21 @@
 - [ ] 11.2 抢占矩阵：风控抢人工 ✓ / 人工抢系统 ✓ / 同档不抢 ✓ / 低档不抢高档 ✓
 - [ ] 11.3 抢占发布不双写：系统恢复抢占一个正在逐字输入的发布 → 在系统恢复的第一次页面写之前，发布 MUST 已停止向控制端口派发任何输入
 - [ ] 11.4 提交窗口内 MUST NOT 强杀 + MUST 立刻如实告知剩余预算（不让抢占者空等）
-- [ ] 11.5 分档回执：提交前被抢 → 「未提交，已中止」+ 熔断不变；提交后被抢 → 「已提交，结果未知」+ **不自动重试**
-- [ ] 11.6 清场：抢占一个填了正文的发布 → 编辑器被清空 → 重发时**正文不拼接**
-- [ ] 11.7 巡视窗口保护：点分类栏目之后抢占 MUST 被拒（回「窗口占用中、剩余 ≤20s」）
-- [ ] 11.8 参数一致性断言：云端受理预算 > 最长提交窗口 + 取消停手 + 让位 + 往返
-- [x] 11.9 协议往返断言（新原因字符串两端都是裸值，typecheck 抓不到）：AC-PROTO-14/15 两端各一份，edge full 1338 / cloud full 2044 全绿 <!-- aidcp-edge 9bc6c6b / aidcp-cloud 9f0194b 批 A -->
+- [x] 11.5 分档回执（cloud 单元）：AC-PREEMPT-1（submitDispatched→submitted_unconfirmed）/ AC-PREEMPT-4（submitDispatched 压过抢占，提交后被抢仍 submitted_unconfirmed 不重投）/ AC-PREEMPT-2/3（提交前抢占→preempted）+ publish-dispatcher 7.1（preempted 保持待审、保留授权、不计熔断）+ 评论 7.6（submitted→写去重、preempted→不写去重）<!-- aidcp-cloud 7c0b7a7 / 0daf0bb -->
+- [~] 11.6 清场：**edge 侧已覆盖**（批 B 提交窗口/清场协议）；cloud 无关
+- [~] 11.7 巡视窗口保护：**edge 侧已覆盖**（批 B 通知巡视窗口标志）；cloud 侧对应 7.7 延后
+- [~] 11.8 参数一致性：cloud 验证码受理 45s > 最长提交窗口 20s（7.10 具名常量）；cloud acquire 预算 200s > edge quiesce（5.6 边缘侧对齐延后同 7.10 批坐实）
+- [x] 11.9 协议往返断言（新原因字符串两端都是裸值，typecheck 抓不到）：edge AC-PROTO-14/15；**cloud rebase 后与 master 首作引导 AC-PROTO-14 撞名 → 重编号 AC-PROTO-15（原因串+windowRemainingMs）/16（submitDispatched）**。cloud full 2162 全绿 <!-- aidcp-edge 9bc6c6b 批 A / aidcp-cloud ea7eee5 rebase 后 -->
+- [x] 11.CX **批 C 新增单测**：command-sequencer AC-PREEMPT-1..7（三态分档/submitDispatched 压过/preemptTask 就地 reject 不 unwind/零回归/onFirstSideEffect）、publish-dispatcher 7.1/7.2/7.3、role-dispatcher 7.8（四抢占原因不兜底滚动+对照 modal_timeout 零回归）、comment runner/edge-steps（submitted 写去重·preempted 不写去重）、join 7.11（human/automatic 档）<!-- aidcp-cloud 7c0b7a7 / d3221d2 / 0daf0bb / fae46d3 -->
 - [ ] **批 A（协议地基）已落地** — 上述 6.1/6.2/6.3/6.4 + 11.9；inert 未接线，安全独立部署。
 - [x] **批 B-2a/B-2b/B-2c/B-2d（edge 抢占激活 + 加固）已落地** — 5.1 六站提交窗口 + 5.10b 加群拆分 + 6.2 边缘置位（bc3e774，inert）→ 5.2/5.3/5.4/5.5/5.9 main.ts wire writers 激活 + 5.9 收紧 CHECK（b9fdfa5）→ 5.8 删遗留 onPublishCommand（9a9ebda）→ **对抗复核 `wf_1657e89b-85a` 加固**（6d87e39）。edge full 1363 / typecheck 0 / acceptance 21。**动 main.ts 发布 handler 区经用户 2026-07-15 明确批准（与 FB pacing 禁区结构隔离）**。
   - **对抗复核结论（5 视角 + 逐条对抗验证，1359 单测全绿仍揪出）**：2 BLOCKER + 1 MEDIUM 已修（6d87e39）——① FB 发帖双发（submit 全程无取消点，窗口前抢占→点击照发+判 preempted 可重投）：submit 接 TakeoverCtx + enter 前同步 checkpoint + catch rethrowIfTakeover；② 加群点击前 observe 无取消点（30s 不可中断→超 quiesce→浏览冻结）：observeUntilReady 接 checkpoint 每轮检查 + enter 前 checkpoint；③ submitDispatched 时机（press 已发但 CDP 抛错→回执假→双发）：dispatchClick 加 onPressDispatched 回调 + catch 补带 submitDispatched。其余发现全部对抗验证驳回（join 动作名有云端归一表、两 Map 去同步不可达、遗留 handler 已删、窗口预算 ~1s 尾巴 graceful 非双发）。
   - **🔴 co-deploy：edge 激活后会回 `preempted_by_task`，云端 command-sequencer 当前烧成 failed → 绝不单独部署，必与批 C（cloud）同批。假成功修复链 = 5.2+5.3+5.9+6.2+command-sequencer 分类，整批同部署**。剩余：5.6（延后与 cloud 7.10 同批）、批 C（cloud，含 command-sequencer BLOCKER + 7.x）、批 E 收口。
-- [ ] 11.10 `test:acceptance` → 全量 `test` → `typecheck`，edge / cloud 两侧
+- [~] 11.10 `test:acceptance` → 全量 `test` → `typecheck`：**cloud 侧全绿**（acceptance 54 / full 2162 / typecheck 0，2026-07-15）；edge 侧批 B 已跑（full 1363 / acceptance 21 / typecheck 0）。co-deploy 前最终并线再各跑一轮
 
-## 12. 真机验收（dev；登记 `docs/real-machine-acceptance-backlog.md`）
+## 12. 真机验收（dev；**已登记 `docs/real-machine-acceptance-backlog.md` 簇 85**，co-deploy 后跑）
+
+> 12.1–12.8 已归并入 backlog 簇 85（85.1–85.7，B/F 合验、D/E 合验）。硬前置＝edge `6d87e39` + cloud 批 C co-deploy dev。
 
 - [ ] 12.1 **A（10 秒，决定可抢占段是否免费）**：小红书发布页上传一张图后，读预览区缩略图地址前缀。指向本机临时对象＝提交前零副作用；指向平台服务器＝抢占会留孤儿图、**必须写进 spec 显式承认**
 - [ ] 12.2 **B（决定清场协议的形状）**：在已填标题正文的小红书发布页、已填正文并附图的 FB 发帖弹层上直接导航离开 → 是否弹「离开此页 / 保存草稿 / 丢弃帖子」确认框。**若弹且无人接管，页面会被冻住 → 抢占者反而拿到一个锁死的浏览器**
@@ -179,10 +182,18 @@
 
 ## 13. 收口
 
-- [ ] 13.1 `openspec validate lease-strict-preemption --strict`
-- [ ] 13.2 真机项归并入 backlog
-- [ ] 13.3 部署 dev（走 CLAUDE.md §5 安全序列）
-- [ ] 13.4 archive
+- [x] 13.1 `openspec validate lease-strict-preemption --strict` **通过**（含 HOLE-5 RENAMED 修复后）
+- [ ] 13.2 真机项归并入 backlog（本次已把 12.1–12.8 登记进 `docs/real-machine-acceptance-backlog.md` 抢占簇）
+- [ ] 13.3 **co-deploy dev**：cloud 批 C（本 worktree 4 提交，HEAD 待定）**必与 edge `6d87e39` 同批**部署，绝不 cloud/edge 单独上。走 CLAUDE.md §5 安全序列。**cloud 分支 push 需 force**（批 A 已 rebase 到 master，origin/lease-strict-preemption 从 9f0194b→本 HEAD 为非 ff）——按 §6 需先与用户确认
+- [ ] 13.4 archive（co-deploy + dev 真机 F 验收后）
+
+### 🔶 批 C 延后清单（landed 主体之外，非假成功修复链必需；落地时逐条销账）
+
+1. **7.7 巡视租约撤销收敛 + 独占租约期空闲时钟停表**：需共享 lease-client → 按账号 dispatcher 的 taskId 路由 + 外来租约授予/释放向调度器扇出。缓解已在位（7.8 短路 + edge canExecute 门控 + 既有空闲看门狗兜底）。onActiveLeasePreempted 已备撤租信号。
+2. **7.9 FB 评论走租约**：三命令补 taskId + runFacebookTargetedTaskBody 包 withLease；较大结构改动 + 「人审是否在租约内」未决。不做＝租约在跑时 FB 评论命令被静默丢弃、云端干等超时（诚实失败非假成功、可重试）。
+3. **7.10b 同一验证码多次提交改续租**：今天回 task_busy 拒绝（已避免重复抢占，安全）；改续租＝UX 增强，无 lease.renew 协议消息需设计。
+4. **7.11d yield_timeout 排除出加群瞬态重试白名单**：window_busy 已经瞬态短退避重试（对）；yield_timeout（控制面故障）今天也落该白名单会无限退避空转，应排除（同 comment 侧 isEdgeTaskAcquireFailure 已排除的处置）。
+5. **5.6 边缘排队默认 45s vs 云端 200s 对齐**：edge-task-coordinator.ts 边缘侧改，延后与 7.10 同批坐实（两端受理预算一致，避免单改成不一致的表）。
 
 ---
 
