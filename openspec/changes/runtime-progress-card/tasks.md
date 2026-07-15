@@ -43,3 +43,11 @@
   <!-- Four-mode browser preview measured stage starts at 0%, 33.6%, and 67.2%; both connectors stayed 28px with blue/teal/green semantic colors. Focused companion UI 50/50; post-rebase full npm test 1360/1360, typecheck and OpenSpec strict validation passed. -->
 - [x] 8.5 提交并推送 `aidcp-edge` 与 `aidcp` 默认分支；不构建桌面安装包。
   <!-- aidcp-edge bbbf656 on master and origin/master; aidcp recorded in this closeout commit and pushed to main after strict validation. No desktop installer was built. -->
+
+- [x] 9.1 根据新手引导视觉复核补充规格：“开始创作”前的第二条连接器在等待和生成状态均使用橙色创作语义。
+- [x] 9.2 在 `aidcp-edge` 为 `first-post` 第二条连接器设置独立的静态、动态与圆点橙色变量，不改变其他卡片连接线。
+- [x] 9.3 补充 renderer CSS/DOM 回归断言，覆盖首轮搜索与生成两种状态以及窄屏共用颜色映射。
+- [x] 9.4 运行视觉检查、focused tests、Edge 全量测试、typecheck 与 OpenSpec strict validation。
+  <!-- Browser preview verified the second first-post connector is orange in searching (rgba 216,139,34,.58), orange animated with orange spark in generating, and remains orange at the 430px breakpoint. Focused companion UI 55/55; full npm test 1425/1425; typecheck and OpenSpec strict validation passed. -->
+- [x] 9.5 提交并推送 `aidcp-edge` 与 `aidcp` 默认分支；不构建桌面安装包。
+  <!-- aidcp-edge cc2a538 on master and origin/master; aidcp recorded in this closeout commit and pushed to main after strict validation. No desktop installer was built. -->
