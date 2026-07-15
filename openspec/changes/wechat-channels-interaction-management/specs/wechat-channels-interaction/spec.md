@@ -58,7 +58,7 @@ Cookie/session/二维码/浏览器调试地址 MUST NOT 出现在 Cloud DB、WS 
 
 ### Requirement: WS v2 互动扩展必须完整协商并原子接线
 
-系统 SHALL 在 WS v2 新增 `interaction.auth.status`、`interaction.sync.batch`、`interaction.sync.ack`、`interaction.reply.result`、`interaction.sync.request`、`interaction.reply.send`、`interaction.auth.reopen` 七个类型，使目标 `MessageType` 总数为 83。两份 protocol 定义、Cloud handler/mapping、Edge active-command routing、`docs/protocol.md` 与共享 schema/fixtures MUST 同步。新 Edge SHALL 在 `hello.capabilities` 声明 `interaction_inbox_v1`，新 Cloud SHALL 在 `welcome.capabilities` 回显；只有双方确认后才交换新类型。
+系统 SHALL 在 WS v2 完整接线基础 inbox 七个类型，以及 `interaction.reply.result.ack`、`interaction.reply.reconcile`、`interaction.reply.reconcile.result`、`interaction.offboard.command`、`interaction.offboard.result`、`interaction.offboard.ack` 六个恢复/offboard 类型，使目标 `MessageType` 总数为 89。两份 protocol 定义、Cloud handler/mapping、Edge active-command routing、`docs/protocol.md` 与共享 schema/fixtures MUST 同步。基础能力用 `interaction_inbox_v1`，结果恢复用 `interaction_reply_recovery_v1`，offboard 用 `interaction_offboarding_v1`；Cloud 只回显双方支持的能力，扩展能力依赖基础能力。回显 offboard 能力时 welcome MUST 带 account-bound `interactionRecovery.offboardPending`，Edge 只有明确 false 才可恢复 connector。
 
 #### Scenario: 新 Cloud 不向旧 Edge 派 interaction 命令
 - **WHEN** Edge hello 不含 `interaction_inbox_v1`
@@ -71,6 +71,18 @@ Cookie/session/二维码/浏览器调试地址 MUST NOT 出现在 Cloud DB、WS 
 #### Scenario: active-command routing 漏项使验收失败
 - **WHEN** protocol 枚举包含 `interaction.reply.send` 但 Edge 主动命令入口未放行
 - **THEN** 契约/acceptance MUST 失败，MUST NOT 以 typecheck 通过视为接线完成
+
+#### Scenario: 未协商恢复能力不清 durable result
+- **WHEN** 新 Edge 对接只支持基础 inbox 的旧 Cloud
+- **THEN** Edge MAY 发送基础 reply.result，但 MUST 保留 result outbox，直到后续连接协商 recovery 并收到 exact ack
+
+#### Scenario: 未协商 offboard 能力保持撤权待清理
+- **WHEN** Cloud 已撤权但连接的旧 Edge 没有 `interaction_offboarding_v1`
+- **THEN** Cloud 不发送未知 type、不恢复同步/写，offboard 保持 pending 且不得提前 tombstone
+
+#### Scenario: pending 查询失败不短暂恢复 connector
+- **WHEN** Cloud 回显 offboard capability 但 pending 状态读取失败或 welcome 缺少 recovery barrier
+- **THEN** Edge 将其视为 offboardPending=true，保持 connector 停止，MUST NOT 在 command 到达前短暂同步或写
 
 ### Requirement: Edge 同步 checkpoint 必须等 Cloud 显式 ack
 
@@ -95,3 +107,35 @@ Edge SHALL 持久保存 `idempotencyKey` 与已执行结果；重复 `interactio
 #### Scenario: 超时不冒充失败或成功
 - **WHEN** 平台提交请求已发出但响应超时且回查尚无结论
 - **THEN** Edge 返回 `status='ambiguous'`、`verification='not_verified'`，MUST NOT 返回 confirmed 或触发自动重试
+
+### Requirement: Edge 发送结果必须 durable 并由 Cloud exact ack
+
+Edge SHALL 在发送 `interaction.reply.result` 前将完整结果写入 durable outbox，并在启动/重连后补发。Cloud SHALL 在事务持久化 scope-matching attempt/job 后返回同 envelope id 的 ack。Edge MUST 只在 ack status=`accepted|duplicate` 且 jobId/attemptId/idempotencyKey/envKey/accountId/platform 全部逐字匹配时清除 outbox。
+
+#### Scenario: Cloud 持久化后在 ack 前崩溃
+- **WHEN** Edge 未收到 ack 并在重连后重发同一 result
+- **THEN** Cloud 返回 duplicate，job/attempt/RiskController 副作用至多一次，Edge 收 exact ack 后清 outbox
+
+#### Scenario: 错绑或 rejected ack 不清 outbox
+- **WHEN** ack 的 accountId、attemptId 或 idempotencyKey 不匹配，或 status=rejected
+- **THEN** Edge 保留 durable result 并停止本轮 flush，MUST NOT 把结果视为已确认
+
+### Requirement: Attempt reconciliation 禁止 blind resend
+
+Cloud SHALL 在启动和 Edge 重连时针对 `created|dispatched|ambiguous` 原 attempt/idempotency identity 发 `interaction.reply.reconcile`。Edge SHALL 只检查 durable execution/result 或平台历史，不得调用 reply platform write。`created+not_found` MAY 明确 failed；`dispatched|ambiguous+not_found` MUST 保持 ambiguous；`result_replayed` MUST 通过正常 durable result 回传推进。
+
+#### Scenario: Edge 本地没有 dispatched attempt
+- **WHEN** reconcile 请求一个 Cloud 已 dispatched、Edge 状态中不存在的 attempt
+- **THEN** Edge 回 not_found 且平台写调用数为 0，Cloud 保持 ambiguous 并禁止同 job 新 attempt
+
+### Requirement: Edge offboard 必须 durable、scope-bound 且与普通生命周期分离
+
+Edge SHALL durable claim scope-bound `interaction.offboard.command`，先停止新同步/写并 drain 在途任务，再清除 `envKey+accountId+identity+profile` 加密 session、关闭 sidecar、durable 保存 result，并在 exact Cloud ack 前跨重启补发。普通 pause/close/standby/logout MUST NOT 执行 session clear。
+
+#### Scenario: Edge 离线后重连补清理
+- **WHEN** Cloud 已撤权并持久化 offboard，而 Edge 当时离线
+- **THEN** 新 Edge 重连协商 capability 后收到同一 offboardId，按顺序清理并补发结果，期间不得恢复 connector 同步/写
+
+#### Scenario: 清理失败可重试且不误报成功
+- **WHEN** session clear 或 sidecar close 失败
+- **THEN** Edge durable 回 failed，Cloud 保持 pending；重试同 offboardId 可继续清理，MUST NOT tombstone 或显示已完成

@@ -9,9 +9,15 @@
     { "$ref": "#/$defs/SyncBatchEnvelope" },
     { "$ref": "#/$defs/SyncAckEnvelope" },
     { "$ref": "#/$defs/ReplyResultEnvelope" },
+    { "$ref": "#/$defs/ReplyResultAckEnvelope" },
+    { "$ref": "#/$defs/ReplyReconcileEnvelope" },
+    { "$ref": "#/$defs/ReplyReconcileResultEnvelope" },
     { "$ref": "#/$defs/SyncRequestEnvelope" },
     { "$ref": "#/$defs/ReplySendEnvelope" },
-    { "$ref": "#/$defs/AuthReopenEnvelope" }
+    { "$ref": "#/$defs/AuthReopenEnvelope" },
+    { "$ref": "#/$defs/OffboardCommandEnvelope" },
+    { "$ref": "#/$defs/OffboardResultEnvelope" },
+    { "$ref": "#/$defs/OffboardAckEnvelope" }
   ],
   "$defs": {
     "HelloPayload": {
@@ -46,8 +52,27 @@
           "maxItems": 128,
           "items": { "type": "string", "minLength": 1, "maxLength": 128 },
           "uniqueItems": true
+        },
+        "interactionRecovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["offboardPending"],
+          "properties": {
+            "offboardPending": { "type": "boolean" }
+          }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "capabilities": { "contains": { "const": "interaction_offboarding_v1" } }
+            },
+            "required": ["capabilities"]
+          },
+          "then": { "required": ["interactionRecovery"] }
+        }
+      ]
     },
     "EffectiveCapabilities": {
       "type": "object",
@@ -397,6 +422,166 @@
         }
       ]
     },
+    "ReplyResultAckPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jobId", "attemptId", "idempotencyKey", "envKey", "accountId", "platform", "status", "errorCode", "receivedAt"],
+      "properties": {
+        "jobId": { "$ref": "common.schema.json#/$defs/Id" },
+        "attemptId": { "$ref": "common.schema.json#/$defs/Id" },
+        "idempotencyKey": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "status": { "enum": ["accepted", "duplicate", "rejected"] },
+        "errorCode": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/$defs/ErrorCode" },
+            { "type": "null" }
+          ]
+        },
+        "receivedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "enum": ["accepted", "duplicate"] } } },
+          "then": { "properties": { "errorCode": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "rejected" } } },
+          "then": { "properties": { "errorCode": { "$ref": "common.schema.json#/$defs/ErrorCode" } } }
+        }
+      ]
+    },
+    "ReplyReconcileItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cloudStatus", "command"],
+      "properties": {
+        "cloudStatus": { "enum": ["created", "dispatched", "ambiguous"] },
+        "command": { "$ref": "#/$defs/ReplySendPayload" }
+      }
+    },
+    "ReplyReconcilePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reconcileId", "envKey", "accountId", "platform", "attempts", "requestedAt"],
+      "properties": {
+        "reconcileId": { "$ref": "common.schema.json#/$defs/Id" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "attempts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/ReplyReconcileItem" }
+        },
+        "requestedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "ReplyReconcileObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jobId", "attemptId", "idempotencyKey", "state", "observedAt"],
+      "properties": {
+        "jobId": { "$ref": "common.schema.json#/$defs/Id" },
+        "attemptId": { "$ref": "common.schema.json#/$defs/Id" },
+        "idempotencyKey": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "state": { "enum": ["result_replayed", "not_found", "binding_conflict"] },
+        "observedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "ReplyReconcileResultPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reconcileId", "envKey", "accountId", "platform", "attempts", "finishedAt"],
+      "properties": {
+        "reconcileId": { "$ref": "common.schema.json#/$defs/Id" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "attempts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/ReplyReconcileObservation" }
+        },
+        "finishedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "OffboardCommandPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offboardId", "envKey", "accountId", "platform", "reason", "requestedAt", "expiresAt"],
+      "properties": {
+        "offboardId": { "$ref": "common.schema.json#/$defs/Id" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "reason": { "enum": ["environment_unbind", "customer_terminated", "admin_revoked"] },
+        "requestedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "expiresAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "OffboardResultPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offboardId", "envKey", "accountId", "platform", "status", "errorCode", "finishedAt"],
+      "properties": {
+        "offboardId": { "$ref": "common.schema.json#/$defs/Id" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "status": { "enum": ["cleared", "already_cleared", "failed"] },
+        "errorCode": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/$defs/ErrorCode" },
+            { "type": "null" }
+          ]
+        },
+        "finishedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "enum": ["cleared", "already_cleared"] } } },
+          "then": { "properties": { "errorCode": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "failed" } } },
+          "then": { "properties": { "errorCode": { "$ref": "common.schema.json#/$defs/ErrorCode" } } }
+        }
+      ]
+    },
+    "OffboardAckPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offboardId", "envKey", "accountId", "platform", "status", "errorCode", "receivedAt"],
+      "properties": {
+        "offboardId": { "$ref": "common.schema.json#/$defs/Id" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "status": { "enum": ["accepted", "duplicate", "rejected"] },
+        "errorCode": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/$defs/ErrorCode" },
+            { "type": "null" }
+          ]
+        },
+        "receivedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "enum": ["accepted", "duplicate"] } } },
+          "then": { "properties": { "errorCode": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "rejected" } } },
+          "then": { "properties": { "errorCode": { "$ref": "common.schema.json#/$defs/ErrorCode" } } }
+        }
+      ]
+    },
     "AuthReopenPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -446,6 +631,24 @@
         { "properties": { "type": { "const": "interaction.reply.result" }, "payload": { "$ref": "#/$defs/ReplyResultPayload" } } }
       ]
     },
+    "ReplyResultAckEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.reply.result.ack" }, "payload": { "$ref": "#/$defs/ReplyResultAckPayload" } } }
+      ]
+    },
+    "ReplyReconcileEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.reply.reconcile" }, "payload": { "$ref": "#/$defs/ReplyReconcilePayload" } } }
+      ]
+    },
+    "ReplyReconcileResultEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.reply.reconcile.result" }, "payload": { "$ref": "#/$defs/ReplyReconcileResultPayload" } } }
+      ]
+    },
     "SyncRequestEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
@@ -462,6 +665,24 @@
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
         { "properties": { "type": { "const": "interaction.auth.reopen" }, "payload": { "$ref": "#/$defs/AuthReopenPayload" } } }
+      ]
+    },
+    "OffboardCommandEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.offboard.command" }, "payload": { "$ref": "#/$defs/OffboardCommandPayload" } } }
+      ]
+    },
+    "OffboardResultEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.offboard.result" }, "payload": { "$ref": "#/$defs/OffboardResultPayload" } } }
+      ]
+    },
+    "OffboardAckEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.offboard.ack" }, "payload": { "$ref": "#/$defs/OffboardAckPayload" } } }
       ]
     }
   }

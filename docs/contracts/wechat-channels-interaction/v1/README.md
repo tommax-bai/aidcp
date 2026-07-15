@@ -7,7 +7,7 @@
 1. 行为与不变量以 `openspec/changes/wechat-channels-interaction-management/` 为准。
 2. 字段、枚举和 envelope 以 `schemas/*.schema.json` 为准。
 3. 正常/降级样例以 `fixtures/` 为准。
-4. 边云协议总览同步写入 `docs/protocol.md`；实现落地前，两端运行时仍只有 76 个消息类型，不能声称 83 个已上线。
+4. 边云协议总览同步写入 `docs/protocol.md`；基础 inbox 的 7 个类型和本次新增的 6 个恢复/offboard 类型必须在 Edge、Cloud 同步上线，不能只按 schema 数量声称链路可用。
 5. Session 01–04 不得在各自仓库发明字段别名、放宽枚举或改变状态语义。确需改合同，应先回到控制仓新开或更新 OpenSpec change，并重新生成 fixtures 与校验结果。
 
 所有示例均为合成数据；时间统一为 epoch milliseconds；所有 ID 均为 opaque string；合同不得加入 Cookie、二维码、真实私信、真实账号身份或第三方原始错误体。
@@ -18,7 +18,7 @@
 | --- | --- |
 | `schemas/common.schema.json` | 平台、渠道、状态、风险、错误 envelope、公共原子类型 |
 | `schemas/domain.schema.json` | auth、thread、message、reply job、send attempt 与同步对象 |
-| `schemas/ws-v2.schema.json` | 7 个新增 WS 消息及 capability 协商 payload |
+| `schemas/ws-v2.schema.json` | 13 个 Interaction WS 消息及三段 capability 协商 payload |
 | `schemas/customer-auth-api.schema.json` | 客户 InteractionWorkspace API 的请求/响应 |
 | `schemas/internal-api.schema.json` | Console 配置、预览、发布、runtime controls 与审计 API |
 | `schemas/ai-roles.schema.json` | classifier、polisher、risk reviewer 的严格输入/输出 |
@@ -36,7 +36,7 @@
 
 ## WS v2 冻结
 
-现有 `{v,type,id,ts,payload}` envelope 不变；payload 不重复 `type`。目标 MessageType 从 76 增至 83：
+现有 `{v,type,id,ts,payload}` envelope 不变；payload 不重复 `type`。基础 Interaction 合同的 7 个消息加上本次恢复/offboard 的 6 个消息，使目标 MessageType 从 83 增至 89：
 
 | type | 方向 | 关联语义 |
 | --- | --- | --- |
@@ -44,13 +44,23 @@
 | `interaction.sync.batch` | Edge → Cloud | Cloud 用同 envelope `id` 回 ack |
 | `interaction.sync.ack` | Cloud → Edge | 整批 accepted/duplicate/rejected |
 | `interaction.reply.result` | Edge → Cloud | 回填 send 的 envelope `id` |
+| `interaction.reply.result.ack` | Cloud → Edge | 使用 result envelope `id`；仅 exact accepted/duplicate 可清 durable outbox |
+| `interaction.reply.reconcile` | Cloud → Edge | 启动/重连后仅核验既有 attempt，不得触发平台写 |
+| `interaction.reply.reconcile.result` | Edge → Cloud | 回填 reconcile envelope `id`，逐 attempt 报 result_replayed/not_found/binding_conflict |
 | `interaction.sync.request` | Cloud → Edge | 后续 batch 用 payload `requestId` 关联 |
 | `interaction.reply.send` | Cloud → Edge | Edge 回 reply.result |
 | `interaction.auth.reopen` | Cloud → Edge | Edge 后续以 auth.status 报阶段 |
+| `interaction.offboard.command` | Cloud → Edge | scope-bound 撤权清理命令；先停同步/写并 drain，再删密文、关 sidecar |
+| `interaction.offboard.result` | Edge → Cloud | 可跨重启重放的 cleared/already_cleared/failed 结果 |
+| `interaction.offboard.ack` | Cloud → Edge | 使用 result envelope `id`；仅 exact accepted/duplicate 可清 durable outbox |
 
-协商标识固定为 `interaction_inbox_v1`：Edge 在 optional `hello.capabilities` 声明，Cloud 在 optional `welcome.capabilities` 回显。双方确认前，不得发送任何新增 type。旧端忽略 optional capability；未知 type 不得让连接崩溃或造成重试风暴。
+基础协商标识固定为 `interaction_inbox_v1`；结果恢复另用 `interaction_reply_recovery_v1`，offboard 另用 `interaction_offboarding_v1`。Edge 在 optional `hello.capabilities` 声明，Cloud 只在双方支持时于 optional `welcome.capabilities` 回显。Cloud 回显 offboard capability 时必须同时给 account-bound `welcome.interactionRecovery.offboardPending`；Edge 仅在它明确为 false 时恢复 connector，缺失或 true 均 fail closed。恢复/offboard capability 依赖基础 inbox，未回显时不得发送对应扩展 type。旧 Cloud 仍可接收基础 `interaction.reply.result`，但 Edge 不得把 fire-and-forget 当确认并清 outbox；旧 Edge 不支持 offboard 时 Cloud 必须先撤权停写并保留 pending cleanup，等待可用的新 Edge，不能提前 tombstone 或谎报清理完成。
 
 同步是整批事务。只有 Cloud 持久化 batch/thread/message/cursor 成功后才能 ack `accepted`；已持久化批次回 `duplicate`；拒绝或部分失败回 `rejected`。Edge 只有在 `accepted|duplicate` 且 ack `cursorAfter` 与本批一致时推进本地 checkpoint。
+
+回复结果先在 Edge durable outbox 落盘，再发送 `interaction.reply.result`。Cloud 在同一事务完成 attempt/job CAS 后返回 scope、attempt、idempotency identity 全匹配的 ack；Edge 只在 `accepted|duplicate` 且全部绑定字段一致时清除。超时、断线、Cloud 崩溃、rejected 或错绑 ack 均保留并在重连后补发。Cloud 启动和 Edge 重连时对 `created|dispatched|ambiguous` 发 reconcile；Edge 只能检查 durable execution/result 和平台历史，绝不能因本地缺失而重新调用平台写。`created + not_found` 可明确 failed；`dispatched|ambiguous + not_found` 保持 ambiguous；`result_replayed` 由正常 durable result 再推进终态。
+
+offboard 顺序固定为：Cloud 事务撤销 customer scope 与读写能力 → 创建 durable offboard → Edge durable claim → connector stop 并 drain 在途同步/写 → 删除 scope-bound encrypted session → 关闭 sidecar → durable result/outbox → Cloud exact ack → Cloud tombstone → 最迟 requestedAt 后 30 天内 purge。`failed` 结果回到 pending 并重试；Edge 离线不改变顺序。普通 pause/close/standby/logout 不得映射成 offboard 或删除密文。审计只允许 offboardId、envKey、accountId、userId、event、status、timestamp，不得记录消息正文、回复/模板最终文本或凭证。
 
 ## 数据与幂等不变量
 
@@ -62,6 +72,8 @@
 | sync cursor | `UNIQUE(platform, account_id, channel, scope_external_id)`；只随 accepted batch 事务推进 |
 | reply job | `UNIQUE(inbound_message_id)`；CAS version 单调增加 |
 | send attempt | `UNIQUE(idempotency_key)` 与 `UNIQUE(reply_job_id, attempt_no)`；同 job 最多一个 active/ambiguous attempt |
+| result outbox | Edge durable；exact accepted/duplicate ack 前不可删除；reconnect/startup 必须重放 |
+| offboard | 每个 `(platform,envKey)` 最多一个非 purged 任务；结果/ack exact scope，Cloud ack 后才 tombstone |
 | runtime controls | `UNIQUE(platform, account_id)`；与不可变 reply config 分离 |
 | config version | `UNIQUE(platform, account_id, config_version)`；published 后不可变 |
 
@@ -113,7 +125,11 @@ POST /environments/:envKey/interactions/:messageId/ignore
 POST /environments/:envKey/interactions/:messageId/escalate
 POST /environments/:envKey/interactions/sync
 POST /environments/:envKey/interactions/auth/reopen
+DELETE /environments/:envKey
+GET  /offboarding/:offboardId
 ```
+
+`DELETE /environments/:envKey` 仅对 enabled user 的权威 scope 生效，事务内同时验证 interaction account binding；返回 offboard 状态而非“已删除”。客户不得通过 `POST /environments` 自声明归属。`GET /offboarding/:offboardId` 只允许创建该任务的客户查看，响应继续包含 `envKey/accountId/meta.asOf`。
 
 所有 job/message 写入带 `expectedVersion`；send/sync/reopen 还要求 `Idempotency-Key`。HTTP 2xx 只表示动作受理，UI 必须展示读回的 job state。
 
@@ -138,7 +154,7 @@ GET        /api/accounts/:accountId/reply-config/audit
 
 ## AI 与发送门禁
 
-LLM role 只有 `reply_intent_classifier`、`reply_polisher`、`reply_risk_reviewer`；template renderer 是确定性程序。classifier/reviewer 失败都降级 unknown + 人工；polisher 失败回落原模板；改义或引入 claim 禁止自动发送。DM AI 默认 false。
+LLM role 只有 `reply_intent_classifier`、`reply_polisher`、`reply_risk_reviewer`；template renderer 是确定性程序。classifier/reviewer 失败都降级 unknown + 人工；polisher 失败回落原模板。模型自报的 `meaningChanged`、`introducedClaims`、`riskLevel` 不是安全事实源：候选文本必须再过确定性 claim gate，至少硬拦价格、折扣、促销、退款、订单、售后承诺和补偿承诺。短期自动发送仅允许未经过 AI、与确定性模板渲染完全一致且 claim gate 为空的文本；任何 AI 润色都必须人工审批。DM AI 默认 false。
 
 任何发送都必须通过 scope、auth、identity、capability、全局/账号/channel 开关、published config、CAS、无 active/ambiguous attempt、文本/变量、消息类型、账号单飞、限速与 `RiskController.canDo`。评论沿用 `comment` action；私信新增 `dm_reply`，三窗口 fallback quota 均为 0。所有写开关默认 false；`auto_safe` 默认 false。
 

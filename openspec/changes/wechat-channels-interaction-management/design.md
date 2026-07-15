@@ -42,23 +42,29 @@
 
 备选方案是把所有方法继续塞入 `PlatformDriver`。它会迫使视频号伪装 browse/publish 能力，也会让“浏览器关闭但 connector 正常”难以表达，因此拒绝。
 
-### 2. WS 保持 v2 envelope，冻结 7 个新消息类型
+### 2. WS 保持 v2 envelope，冻结 13 个 Interaction 消息类型
 
-目标 `MessageType` 总数从 76 增至 83。payload 不重复携带 `type`，时间字段统一为 epoch milliseconds `number`，不在消息体再建协议版本。精确类型：
+基础 inbox 的 7 个消息已使目标 `MessageType` 从 76 增至 83；result recovery 与 offboarding 再增加 6 个，使当前目标总数为 89。payload 不重复携带 `type`，时间字段统一为 epoch milliseconds `number`，不在消息体再建协议版本。精确类型：
 
 | type | 方向 | 关联 |
 | --- | --- | --- |
 | `interaction.auth.status` | Edge → Cloud | 状态推送 |
 | `interaction.sync.batch` | Edge → Cloud | Cloud 以同 envelope `id` 回 `interaction.sync.ack` |
 | `interaction.sync.ack` | Cloud → Edge | 确认整批持久化/重复/拒绝 |
-| `interaction.reply.result` | Edge → Cloud | 回填 `interaction.reply.send` 的 envelope `id` |
+| `interaction.reply.result` | Edge → Cloud | recovery 协商后 Cloud 以同 envelope `id` 回 ack |
+| `interaction.reply.result.ack` | Cloud → Edge | exact accepted/duplicate 后清 Edge result outbox |
+| `interaction.reply.reconcile` | Cloud → Edge | 仅核验既有 attempt，不得写平台 |
+| `interaction.reply.reconcile.result` | Edge → Cloud | 回填 reconcile envelope `id` |
 | `interaction.sync.request` | Cloud → Edge | 后续 batch 用 payload `requestId` 关联 |
 | `interaction.reply.send` | Cloud → Edge | Edge 回 `interaction.reply.result` |
 | `interaction.auth.reopen` | Cloud → Edge | Edge 后续用 auth.status 报阶段 |
+| `interaction.offboard.command` | Cloud → Edge | 撤权后 scope-bound 清理凭证 |
+| `interaction.offboard.result` | Edge → Cloud | durable 清理结果，可重连补发 |
+| `interaction.offboard.ack` | Cloud → Edge | exact accepted/duplicate 后清 Edge offboard outbox |
 
 工作包的“五类”与候选六个 type 不一致，且没有 ack 就无法诚实推进 checkpoint；因此新增 `interaction.sync.ack` 并冻结七个 type。拒绝复用 `action.completed`，因为它是页面动作回执，没有批次事务和 cursor 语义。
 
-兼容性通过现有握手的 optional 字段完成：新 Edge 在 `hello.capabilities` 声明 `interaction_inbox_v1`；新 Cloud 在 `welcome.capabilities` 回显同标识。双方都确认后 Edge 才上报新类型、Cloud 才下发新类型。新 Cloud 遇旧 Edge 不派 interaction 命令；新 Edge 遇旧 Cloud 不启动批次上报，不因 `unsupported_type` 重试风暴；未知 type 仍按现有策略忽略或返回 `unsupported_type`，连接不得崩溃。
+兼容性通过现有握手的 optional 字段完成：基础能力为 `interaction_inbox_v1`，结果恢复和 offboarding 分别为 `interaction_reply_recovery_v1`、`interaction_offboarding_v1`，且两者依赖基础能力。新 Cloud 只回显双方都声明的 capability；回显 offboarding 时必须事务性/权威读取 account pending 状态并附 `welcome.interactionRecovery.offboardPending`，Edge 只有明确 false 才恢复 connector，缺失或查询失败均 fail closed。旧 Cloud 可继续消费基础 result，但没有 exact ack 时新 Edge 保留 durable outbox；旧 Edge 无 offboard capability 时新 Cloud 先撤权停写并保留 pending cleanup，不提前 tombstone。未知 type 仍按现有策略忽略或返回 `unsupported_type`，连接不得崩溃或重试风暴。
 
 ### 3. 同步采用整批事务 + 显式 ack + Cloud 权威 cursor
 
@@ -85,6 +91,8 @@ Cloud 在单事务中校验 scope、幂等写 batch/thread/message、更新 curs
 | `reply_templates` | 模板逻辑 ID + template version 在账号/channel/config version 内唯一；历史引用不可覆盖 |
 | `reply_rules` | rule ID 在 config version 内唯一；同优先级同条件不同模板禁止发布 |
 | `account_reply_profiles` | `UNIQUE(platform, account_id, channel, config_version)` |
+| `interaction_offboards` | 每个 `(platform,env_key)` 最多一个非 purged 任务；Cloud exact ack 后才 tombstone |
+| `interaction_offboard_audit` | body-free append-only 事件，不含消息、回复、模板文本或凭证 |
 
 幂等键精确为 `sha256(platform | accountId | inboundMessageId | replyJobId | finalTextSha256)`；字段以 UTF-8 原值和字面量 `|` 拼接，`finalTextSha256` 为最终文本 UTF-8 的小写 hex SHA-256。Cloud 和 Edge 都必须持久保存并复用该键。
 
@@ -95,6 +103,8 @@ Job 状态：`new → classifying → draft_ready | approval_required | queued |
 编辑或重新生成从 `approval_required` 回到 `approval_required` 并增加 version、重新执行确定性门禁与 risk reviewer。`approve` 只做 `approval_required → approved`，`send` 只做 `approved → queued`，避免“已批准”和“已进入发送队列”混为一个事实。后续新 inbound message 建新 job；忽略只终止当前 message，不永久关闭 thread。
 
 Attempt 状态：`created → dispatched → confirmed | failed | ambiguous`，`ambiguous → confirmed | failed` 只允许验证器推进。Job 只有 attempt `confirmed` 才写 `sent`。网络超时、连接中断、响应无法解析一律 ambiguous，不能按失败自动重投。
+
+Edge 在平台执行结果返回后先把 result 写入 durable outbox，再发 Cloud；Cloud 事务推进 attempt/job 后回 exact `accepted|duplicate|rejected` ack。Edge 仅在 job/attempt/idempotency/env/account/platform 全匹配且 ack 为 accepted/duplicate 时清 outbox，断线、超时、Cloud 崩溃和 rejected 均跨重启补发。Cloud 启动和 Edge 重连时只发 reconcile：Edge 对已有 durable execution/result 做验证或结果重放，绝不得因本地缺失而新调用平台写。`created+not_found` 可明确失败；`dispatched|ambiguous+not_found` 保持 ambiguous；账号级串行可释放，但同 job ambiguous 仍阻断新 attempt。
 
 ### 6. API 使用新端点统一 envelope、opaque cursor 与 CAS
 
@@ -114,8 +124,12 @@ Customer API 路径：
 - `POST /environments/:envKey/interactions/:messageId/escalate`
 - `POST /environments/:envKey/interactions/sync`
 - `POST /environments/:envKey/interactions/auth/reopen`
+- `DELETE /environments/:envKey`
+- `GET /offboarding/:offboardId`
 
 所有写 body 带 `expectedVersion`（sync/reopen 无 job version），send/sync/reopen 还必须带 `Idempotency-Key` header。send API 的成功只表示进入 `queued|sending|sent` 真态，UI 必须读回 job state，不能把 HTTP 2xx 当平台已发送。
+
+客户不得通过 `POST /environments` 或任何 customer-auth 输入自声明 `envKey` 归属。归属来自内部权威环境注册/管理员授予，并对 active env 全局唯一（明确共享授权模型上线前不共享）。每个 customer interaction endpoint 必须在同一事务锁定 enabled user、权威 env ownership 与 interaction account binding；跨 scope 与不存在统一不可枚举。DELETE 只创建/返回 offboard 真态，不表示凭证或 Cloud 数据已清完；GET 只允许原客户查看自己的任务并回 `envKey/accountId/meta.asOf`。
 
 Internal API 路径冻结为工作包候选路径，另加运行时控制与审计：
 
@@ -148,7 +162,9 @@ Internal API 路径冻结为工作包候选路径，另加运行时控制与审�
 - renderer 失败：不产草稿，返回 `INTERACTION_CONFIG_MISSING|INTERACTION_VALIDATION_FAILED`。
 - polisher 超时/解析失败/越界：使用原 rendered template，绝不空回复。
 - reviewer 失败：risk=`unknown`、自动发送 false，保留人工审核；确定性硬门禁仍不可绕过。
-- `meaningChanged=true` 或 `introducedClaims` 非空：自动发送 false。
+- `meaningChanged=true` 或 `introducedClaims` 非空：自动发送 false；模型自报这些字段不能作为安全事实源。
+- 模型候选文本必须经过独立确定性 claim gate，至少识别并硬拦价格、折扣、促销、退款、订单、售后承诺和补偿承诺。
+- 短期自动发送只允许未经过 AI、与确定性 template renderer 输出逐字相同且 claim gate 为空的文本；任何 AI 润色强制人工审批。
 - 人工修改后必须重跑 reviewer；预览不建 job、不发 WS、不落真实 send attempt。
 
 AI 输入只含当前任务必需的最小上下文。DM 的 AI 开关默认 false，直到业务/合规确认供应商与脱敏要求；关闭时仍可用确定性模板进入人工审核。
@@ -157,13 +173,13 @@ AI 输入只含当前任务必需的最小上下文。DM 的 AI 开关默认 fal
 
 任何发送都必须同时满足：scope/ownership 匹配、auth active、identity match、有效 capability、全局/账号/channel 写开关、published policy、job CAS、无 active/ambiguous attempt、文本非空且长度合法、变量全部解析、非 unknown message、账号单飞、回复限速、Cloud `RiskController.canDo`。评论回复使用既有 `comment` action；私信回复新增 `dm_reply`，三窗口默认 quota 为 0，须显式配置后才可发送。只有 confirmed 才 `record`，失败/ambiguous 不记成功。
 
-自动发送还必须满足 `mode=auto_safe`、账号白名单、rule 明确 allow、channel allow、risk=`low`、无硬风险 tag、AI 未改义/未引入 claim、非人工编辑、登录冷却已过。任一不确定降级 `approval_required`。最终风险态仍只由 Cloud `RiskController` 写；reply rate limiter/kill switch 只能读风险态或做背压，不能改写它。
+自动发送还必须满足 `mode=auto_safe`、账号白名单、rule 明确 allow、channel allow、risk=`low`、无硬风险 tag、未调用 AI、final text 与确定性模板渲染逐字相同、确定性 claim gate 为空、非人工编辑、登录冷却已过。任一不确定降级 `approval_required`。最终风险态仍只由 Cloud `RiskController` 写；reply rate limiter/kill switch 只能读风险态或做背压，不能改写它。
 
 ### 10. 凭证、隐私与保留采用保守默认
 
 Cookie/session/二维码/浏览器调试地址只在所属 Edge 的 OS 安全存储或应用主密钥密文中存在，绑定 `envKey + accountId + finderIdentity + browserProfileId`。切换环境必须切换 cookie jar/timer/in-flight namespace。清除登录信息立即停写、删除本地密文并进入 login_required。
 
-Cloud 默认保留评论正文 180 天、DM 正文 90 天、无正文审计元数据 365 天。解绑/删除/客户终止时立即撤权并停同步，Edge 立即删会话密文，Cloud 在 30 天内完成 scope purge；允许保留到 365 天的审计不得含正文。普通日志只记 ID 摘要、长度、类型和状态。该默认可支持 dev/mock，实现前无需猜；ol/真实客户数据仍需业务/合规确认。
+Cloud 默认保留评论正文 180 天、DM 正文 90 天、无正文审计元数据 365 天。解绑/删除/客户终止使用显式 offboard 状态机，顺序固定：Cloud 在单事务 revoke access + stop sync/write + durable command → Edge durable claim、drain、删除 scope 密文、关闭 sidecar并 durable 回执 → Cloud exact ack 后 tombstone → requestedAt 后 30 天内 purge。Edge 离线或失败时任务保持 pending 并在重连后重试；普通 pause/close/standby/logout 不得删除密文。允许保留到 365 天的审计只含必要 ID/event/status/time，不得含正文、最终回复/模板文本或凭证。该默认可支持 dev/mock；ol/真实客户数据仍需业务/合规确认。
 
 ### 11. Electron 只替换右侧 workspace
 
@@ -172,7 +188,7 @@ Cloud 默认保留评论正文 180 天、DM 正文 90 天、无正文审计元�
 ## Risks / Trade-offs
 
 - [私有接口字段、端点或平台条款变化] → 每能力独立 flag、schema probe、TLS 校验和 `WECHAT_SCHEMA_CHANGED` 熔断；默认关闭写能力。
-- [七个新 MessageType 增加协议漂移面] → 单一 JSON Schema/fixtures、两端枚举/handler/mapping/active-command 原子接线、能力协商与协议计数验收。
+- [13 个 Interaction MessageType 增加协议漂移面] → 单一 JSON Schema/fixtures、两端枚举/handler/mapping/active-command 原子接线、分段能力协商与协议计数验收。
 - [统一新 API envelope 与现有 API 风格不同] → 只约束本能力端点；不批量改造旧 API，Session 03/04 只消费 v1 schema。
 - [配置关系表较多] → 以不可变 config snapshot 换取历史审计和可恢复性；v1 不做跨账号模板复用。
 - [默认 quota=0/写开关关闭导致开箱不能发] → 这是私有接口与真实账号的安全代价；dev 受控账号可显式开启并留下审计。

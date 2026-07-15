@@ -64,6 +64,10 @@ Attempt 状态 SHALL 为 `created|dispatched|confirmed|failed|ambiguous`，ambig
 - **WHEN** Cloud 在 attempt ambiguous 后重启
 - **THEN** 启动恢复读取原 attempt/idempotencyKey 并继续验证，MUST NOT 新建 attempt 或重发
 
+#### Scenario: 账号队列不被旧 ambiguous 永久卡死
+- **WHEN** 旧 job 保持 ambiguous 但同账号后续独立 message 已人工批准
+- **THEN** 旧 job 仍禁止第二 attempt，账号级 active serialization 只覆盖 created/dispatched，后续 job MAY 排队发送且不得重投旧平台写
+
 ### Requirement: API 分页、envelope 与错误码必须稳定
 
 本能力的新 HTTP API SHALL 使用成功 `{data,meta:{requestId,asOf}}` 与错误 `{error:{code,message,requestId,retryable,details?}}` envelope；`asOf` 为 epoch ms。列表 cursor MUST 为 opaque/signed base64url，固定 `asOf` 并按 `lastMessageAt DESC,id DESC` 排序；默认 limit=30、最大 100。第三方原始错误/响应 MUST NOT 出现在 error body。
@@ -86,4 +90,12 @@ Attempt 状态 SHALL 为 `created|dispatched|confirmed|failed|ambiguous`，ambig
 
 #### Scenario: 解绑立即阻断访问与发送
 - **WHEN** 一个环境被客户解绑
-- **THEN** 下次 API 请求即不可访问，发送队列停止，清理在 30 天期限内完成
+- **THEN** 同一事务撤销 scope、停止同步/写并创建 durable offboard；下次 API 请求即不可访问，Cloud 仅在 exact Edge cleared/already_cleared ack 后 tombstone，并在 requestedAt 后 30 天内 purge
+
+#### Scenario: 客户终止覆盖所有权威环境
+- **WHEN** enabled 客户被内部管理员终止
+- **THEN** Cloud 锁定该客户及其全部权威视频号 binding，为每个环境创建 customer_terminated offboard 后再禁用用户；任一缺失 account binding 时事务 fail closed，不得部分终止
+
+#### Scenario: offboard 审计不含正文或凭证
+- **WHEN** access revoke、Edge cleanup failed/cleared、Cloud tombstone 或 purge 被审计
+- **THEN** 事件只包含必要 scope ID、actor/user、event、status、时间，MUST NOT 包含 message content、final/template text、Cookie/session 或第三方原始响应

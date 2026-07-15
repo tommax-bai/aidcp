@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 多角色，`RoleName` 穷举现 43 项，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> 本 change 冻结后的 v2 目标为 **83 个消息类型**（现有 76 个 + 视频号互动管理 7 个），下表按职能分组列全。Session 01/02 完成两端实现前，运行时代码仍为 76 个，不能把合同冻结表述成已经上线。计数与表为人工维护，落地后仍以两端 `protocol.ts` 的 `MessageType` 穷举与已注册 handler/routing 为准。
+> 本 change 冻结后的 v2 目标为 **89 个消息类型**（既有 83 个 + reply recovery/offboarding 6 个），下表按职能分组列全。计数与表为人工维护，仍以两端 `protocol.ts` 的 `MessageType` 穷举、已注册 handler/routing 与 capability 协商为准。
 
 ## 1. 信封（Envelope）
 
@@ -175,19 +175,25 @@
 该字段不是“当前有没有人设”的别名。更新人设、重复请求、解绑后重绑或账号已经建立过首作状态时为
 `false`/缺省；Edge 只有看到明确的 `true` 才展示“人设已成形”后的第一篇作品引导。
 
-### 2.8 视频号入站互动管理（v2 扩展，合同目标）
+### 2.8 视频号入站互动管理（v2 扩展）
 
-> 精确合同见 `docs/contracts/wechat-channels-interaction/v1/`。新增消息只有在 `hello` 与 `welcome` 双方都确认 `interaction_inbox_v1` 后才能使用。
+> 精确合同见 `docs/contracts/wechat-channels-interaction/v1/`。基础消息要求双方确认 `interaction_inbox_v1`；恢复与 offboard 消息还分别要求 `interaction_reply_recovery_v1`、`interaction_offboarding_v1`。
 
 | type | 方向 | 关联响应 | 用途 |
 | --- | --- | --- | --- |
 | `interaction.auth.status` | edge → cloud | — | 上报视频号 auth/browser/capability/identity 真态 |
 | `interaction.sync.batch` | edge → cloud | `interaction.sync.ack` | 按账号、渠道、scope 上报可重放批次 |
 | `interaction.sync.ack` | cloud → edge | — | 确认整批 accepted/duplicate/rejected；只有前两者可推进 checkpoint |
-| `interaction.reply.result` | edge → cloud | — | 回填 reply.send 的 confirmed/failed/ambiguous 真态 |
+| `interaction.reply.result` | edge → cloud | `interaction.reply.result.ack`（协商 recovery 时） | 先 durable 落盘，再回 confirmed/failed/ambiguous 真态 |
+| `interaction.reply.result.ack` | cloud → edge | — | exact accepted/duplicate 后 Edge 才清 result outbox |
+| `interaction.reply.reconcile` | cloud → edge | `interaction.reply.reconcile.result` | 启动/重连后仅核验已有 attempt，不得触发平台写 |
+| `interaction.reply.reconcile.result` | edge → cloud | — | 逐 attempt 回 result_replayed/not_found/binding_conflict |
 | `interaction.sync.request` | cloud → edge | 后续 `interaction.sync.batch` | 触发用户请求、恢复、定时或回查同步 |
 | `interaction.reply.send` | cloud → edge | `interaction.reply.result` | 下发带稳定幂等键的 text 回复指令 |
 | `interaction.auth.reopen` | cloud → edge | 后续 `interaction.auth.status` | 请求在原 Edge 打开所属登录/挑战现场 |
+| `interaction.offboard.command` | cloud → edge | `interaction.offboard.result` | 撤权后停同步/写、drain、清 scope 密文并关 sidecar |
+| `interaction.offboard.result` | edge → cloud | `interaction.offboard.ack` | durable cleared/already_cleared/failed 结果，可重连补发 |
+| `interaction.offboard.ack` | cloud → edge | — | exact accepted/duplicate 后 Edge 才清 offboard outbox |
 
 ## 3. 各消息 payload 定义
 
@@ -199,7 +205,7 @@
   "edgeId": "edge-01",        // string  边缘节点标识
   "platform": "xiaohongshu",  // string? 运行时平台标识；缺省按历史 xhs 兼容，cloud 会与 accounts.platform 校验
   "app": "xhs",               // string? 业务/站点标识
-  "capabilities": ["click", "input", "scroll", "interaction_inbox_v1"], // string[]? 能力声明
+  "capabilities": ["click", "input", "scroll", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1"], // string[]? 能力声明
   "accountId": "acc-01",      // string? 账号标识；多账号运行时要求真实账号，default 已退役
   "accountNickname": "小张测评", // string? 账号可读昵称；仅用于展示补充，不参与身份确立或路由
   "machineLabel": "win-aliyun-3", // string? 人类可读机器标签
@@ -207,14 +213,15 @@
 }
 ```
 
-`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge、Facebook edge 或视频号 edge 跨平台接管账号。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。`interaction_inbox_v1` 是 optional capability：旧端可忽略；新 Edge 只有收到 `welcome.capabilities` 回显后才启用 §2.8 消息。
+`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge、Facebook edge 或视频号 edge 跨平台接管账号。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。三项 interaction capability 都是 optional；两个扩展 capability 依赖 `interaction_inbox_v1`，新 Edge 只有收到相应 `welcome.capabilities` 回显后才启用对应消息。回显 `interaction_offboarding_v1` 时，Cloud 还必须在 welcome 带当前 account 的 `interactionRecovery.offboardPending`；Edge 只有见到明确 false 才恢复 connector，缺失/查询失败/true 都保持停止。
 
 **`welcome`**（cloud → edge）
 ```jsonc
 {
   "sessionId": "sess-1",      // string  云端分配的会话 id
   "serverVersion": "0.1.0",   // string  服务端版本
-  "capabilities": ["interaction_inbox_v1"], // string[]? Cloud 确认支持的协商能力；旧端忽略
+  "capabilities": ["interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1"], // string[]? Cloud 确认双方支持；旧端忽略
+  "interactionRecovery": { "offboardPending": false }, // object? 协商 offboard 时必带；缺失/true=Edge 不恢复 connector
   "pacing": {                 // object?  可选节奏快照（change pacing-floor-config-min-interval）；旧端忽略
     "tempo": 1.0,             //   number  风控档全局节奏乘子（normal=1.0/warned=1.3/restricted=1.6），边缘乘算
     "opFloorsMs": {           //   object  每类操作兜底 floor 默认区间（已含云端读出口 clamp 护栏、非零）；逐字段可缺、边缘逐项回落内置默认
@@ -997,6 +1004,70 @@ first-writer-wins 审批信号。动作成功只表示审批决定已受理：`a
 
 `confirmed` 只允许来自平台 ack 或回查证据；超时、断连、解析失败或落地无法确认必须回 `ambiguous`，不能回 `failed` 触发盲重试。v1 只允许 text，`dmSendImage` 恒 false。
 
+**`interaction.reply.result.ack` / `interaction.reply.reconcile*`**
+
+```jsonc
+// cloud -> edge，envelope id 原样回填 result 的 id
+{
+  "jobId": "job_comment_100", "attemptId": "attempt_comment_100_1",
+  "idempotencyKey": "e0e055e5abfced94f0e808eb5745a36b5f9f7aecc75c2d0377f5b2f692ae2ae9",
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "status": "accepted", "errorCode": null, "receivedAt": 1784044824100
+}
+
+// cloud -> edge，启动或 Edge 重连时仅核验已有 execution
+{
+  "reconcileId": "reconcile-001",
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "attempts": [{
+    "cloudStatus": "dispatched",
+    "command": { /* 原 jobId/attemptId/idempotencyKey/scope/target/content；同 ReplySendPayload */ }
+  }],
+  "requestedAt": 1784044825000
+}
+
+// edge -> cloud，envelope id 原样回填 reconcile 的 id
+{
+  "reconcileId": "reconcile-001",
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "attempts": [{
+    "jobId": "job_comment_100", "attemptId": "attempt_comment_100_1",
+    "idempotencyKey": "e0e055e5abfced94f0e808eb5745a36b5f9f7aecc75c2d0377f5b2f692ae2ae9",
+    "state": "result_replayed", "observedAt": 1784044825050
+  }],
+  "finishedAt": 1784044825100
+}
+```
+
+Edge 必须在发送 result 前写入 durable outbox，只在 ack 为 `accepted|duplicate` 且 job/attempt/idempotency/env/account/platform 全部一致时清除。断线、Cloud 崩溃、超时、`rejected` 或错绑 ack 均保留并在重连后补发。reconcile 只能读取 durable execution/result 或做平台历史核验：本地 `not_found` 绝不能转成新的平台写。Cloud 对 `created + not_found` 可明确失败；对 `dispatched|ambiguous + not_found` 必须保持 `ambiguous`；`result_replayed` 仍由正常 durable result 推进终态。
+
+**`interaction.offboard.command` / `interaction.offboard.result` / `interaction.offboard.ack`**
+
+```jsonc
+// cloud -> edge
+{
+  "offboardId": "offboard-001",
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "reason": "environment_unbind", "requestedAt": 1784044830000, "expiresAt": 1786550430000
+}
+
+// edge -> cloud，先 durable 落盘
+{
+  "offboardId": "offboard-001",
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "status": "cleared", "errorCode": null, "finishedAt": 1784044831000
+}
+
+// cloud -> edge，envelope id 原样回填 result 的 id
+{
+  "offboardId": "offboard-001",
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "status": "accepted", "errorCode": null, "receivedAt": 1784044831100
+}
+```
+
+执行顺序固定为：Cloud 事务撤权/停同步写并创建 durable offboard → Edge durable claim → connector stop + drain → 清 scope-bound encrypted session → 关 sidecar → durable result → Cloud exact ack → Cloud tombstone → `requestedAt + 30 days` 内 purge。`failed` 必须保留任务并重试；Edge 离线时 Cloud 只保留 pending cleanup，不得跳过凭证清理。普通 pause/close/standby/logout 不是 offboard，不得删除密文。Cloud/Edge 审计与日志都不得记录消息正文、模板最终文本或凭证。
+
 **`interaction.auth.reopen`**（cloud → edge）
 
 ```jsonc
@@ -1085,7 +1156,7 @@ cloud（Publish Agent）          edge                         飞书（云端 B
 
 ### 4.4 视频号评论确认与私信待核验
 
-评论完整合同走读见 `docs/contracts/wechat-channels-interaction/v1/fixtures/walkthroughs/comment-confirmed-flow.json`：只有双方协商能力、Cloud 整批落库并 ack、人工批准、Edge 回 `confirmed` 后，job 才能成为 `sent`。
+评论完整合同走读见 `docs/contracts/wechat-channels-interaction/v1/fixtures/walkthroughs/comment-confirmed-flow.json`：只有双方协商能力、Cloud 整批落库并 ack、人工批准、Edge 回 `confirmed` 且 Cloud durable 接收结果后，job 才能成为 `sent`；Edge 收到 exact result ack 后才清 outbox。
 
 私信降级走读见 `docs/contracts/wechat-channels-interaction/v1/fixtures/walkthroughs/dm-ambiguous-flow.json`：Edge 派发后无法取得平台证据时必须回 `ambiguous`，Cloud 保持阻断且不自动重投，客户界面显示“待核验”。两条 fixture 都只证明合同，不代表真实账号执行过写操作。
 
@@ -1096,6 +1167,4 @@ cloud（Publish Agent）          edge                         飞书（云端 B
 - **坏帧**：`parseEnvelope` 返回 null → `error`（code=`bad_envelope`）。
 - **版本演进**：`v` 用于灰度；新增字段应保持向后兼容（旧端忽略未知字段）。v2 对 v1
   的全部消息保持兼容，新增消息类型旧端可安全忽略。
-- **视频号互动能力协商**：Edge 与 Cloud 都确认 `interaction_inbox_v1` 前，双方均不得发送
-  §2.8 的新增消息。新 Cloud 遇旧 Edge 不派 interaction 命令；新 Edge 遇旧 Cloud 不启动
-  batch 上报；未知 type 不得导致连接崩溃或重试风暴。
+- **视频号互动能力协商**：Edge 与 Cloud 都确认 `interaction_inbox_v1` 前不得发送基础 interaction 消息；恢复/offboard 类型还分别要求 `interaction_reply_recovery_v1`、`interaction_offboarding_v1`。新 Cloud 遇旧 Edge 不派扩展命令；新 Edge 遇旧 Cloud 可安全上报基础 result，但保留未获 ack 的 durable outbox。offboard capability 缺失时 Cloud 已撤权并停写，但任务必须保持 pending，不能提前 tombstone。未知 type 不得导致连接崩溃或重试风暴。

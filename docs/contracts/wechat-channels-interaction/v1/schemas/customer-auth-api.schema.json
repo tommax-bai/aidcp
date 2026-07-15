@@ -7,6 +7,7 @@
     { "$ref": "#/$defs/InteractionDetailResponse" },
     { "$ref": "#/$defs/JobResponse" },
     { "$ref": "#/$defs/AcceptedActionResponse" },
+    { "$ref": "#/$defs/OffboardResponse" },
     { "$ref": "#/$defs/DraftUpdateRequest" },
     { "$ref": "#/$defs/JobMutationRequest" },
     { "$ref": "#/$defs/EscalateRequest" },
@@ -187,6 +188,28 @@
             "action": { "enum": ["sync", "auth_reopen"] },
             "actionRequestId": { "$ref": "common.schema.json#/$defs/Id" },
             "status": { "const": "accepted" }
+          }
+        },
+        "meta": { "$ref": "common.schema.json#/$defs/ResponseMeta" }
+      }
+    },
+    "OffboardResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "meta"],
+      "properties": {
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["offboardId", "envKey", "accountId", "state", "reason", "requestedAt", "purgeDueAt"],
+          "properties": {
+            "offboardId": { "$ref": "common.schema.json#/$defs/Id" },
+            "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+            "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+            "state": { "enum": ["pending_edge", "dispatched", "tombstoned", "purged"] },
+            "reason": { "enum": ["environment_unbind", "customer_terminated", "admin_revoked"] },
+            "requestedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+            "purgeDueAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
           }
         },
         "meta": { "$ref": "common.schema.json#/$defs/ResponseMeta" }

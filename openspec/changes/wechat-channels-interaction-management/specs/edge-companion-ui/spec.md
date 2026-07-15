@@ -52,6 +52,18 @@ renderer MUST NOT 持有 JWT/Cookie、访问平台接口、记录完整 DM 或�
 - **WHEN** renderer 尝试传入任意 URL 或非冻结 method/path
 - **THEN** preload/main 拒绝，MUST NOT 代发网络请求或泄漏 token
 
+### Requirement: 环境删除必须显示 offboard 真态
+
+视频号环境的显式删除/解绑 SHALL 先调用 customer-auth `DELETE /environments/:envKey`，再用 `GET /offboarding/:offboardId` 读取 Cloud/Edge 清理真态。`pending_edge|dispatched` MUST 显示“已撤权，等待本机/离线设备清理”，不能把本地 profile 删除、普通 logout、pause/close 或 HTTP 2xx 显示成凭证已删除。只有 `tombstoned|purged` 才可显示 Cloud 已完成对应阶段。
+
+#### Scenario: Edge 离线时环境仍显示待清理
+- **WHEN** 用户解绑环境而所属 Edge 离线
+- **THEN** UI 立即停止该环境互动访问/写，保留 offboardId 与待清理状态，MUST NOT 显示“删除完成”或丢弃恢复入口
+
+#### Scenario: 本地 profile 删除不冒充 offboard 完成
+- **WHEN** 浏览器 profile 本地删除成功但 Cloud offboard 尚未收到 Edge cleared ack
+- **THEN** UI 仍显示待凭证清理，MUST NOT 将本地动作映射为 tombstoned/purged
+
 ### Requirement: 互动 workspace 必须满足基线尺寸与无障碍
 
 在 `820×720` SHALL 可完成列表选择、上下文查看、编辑、批准/发送/转人工；更窄窗口 SHALL 按基线折叠而不遮挡主动作。tabs、列表、编辑器和主要动作 MUST 键盘可达、focus 可见、状态不只靠颜色。

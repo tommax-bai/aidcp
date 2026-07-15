@@ -38,7 +38,7 @@
 
 ### Requirement: AI role schema 与失败回退必须固定
 
-模型 role ID SHALL 仅为 `reply_intent_classifier`、`reply_polisher`、`reply_risk_reviewer`；`reply_template_renderer` SHALL 是确定性程序而非 LLM。所有 role MUST 通过共享 JSON Schema 校验。classifier 失败 SHALL 产生 unknown/人工；polisher 失败 SHALL 回退原 rendered template；reviewer 失败 SHALL risk=unknown、禁止自动发送但保留人工审核。`meaningChanged=true` 或 `introducedClaims` 非空 MUST 禁止自动发送。
+模型 role ID SHALL 仅为 `reply_intent_classifier`、`reply_polisher`、`reply_risk_reviewer`；`reply_template_renderer` SHALL 是确定性程序而非 LLM。所有 role MUST 通过共享 JSON Schema 校验。classifier 失败 SHALL 产生 unknown/人工；polisher 失败 SHALL 回退原 rendered template；reviewer 失败 SHALL risk=unknown、禁止自动发送但保留人工审核。模型自报的 `meaningChanged`、`introducedClaims`、`riskLevel` 不是安全事实源；候选文本 MUST 再通过确定性 claim gate，至少硬拦价格、折扣、促销、退款、订单、售后承诺和补偿承诺。任何 AI 润色 MUST 人工审批。
 
 #### Scenario: Polisher 超时不生成空回复
 - **WHEN** reply_polisher 超时或输出不符合 schema
@@ -46,7 +46,11 @@
 
 #### Scenario: AI 引入价格承诺禁止自动发送
 - **WHEN** polished output 引入模板中不存在的价格/优惠 claim
-- **THEN** introducedClaims 非空且 risk reviewer 禁止 auto，job 进入 approval_required
+- **THEN** 无论模型是否自报 meaningChanged=false、introducedClaims=[]、risk=low，确定性 gate 均标记 claim 并使 job 进入 approval_required
+
+#### Scenario: Deceptive AI 自证安全不可信
+- **WHEN** 模型输出“本周五折，支持无条件退款”且同时自报无改义、无新增 claim、low risk、无需审批
+- **THEN** 确定性 gate 至少命中 promotion/refund，risk 提升并强制人工，MUST NOT 进入自动队列
 
 #### Scenario: DM AI 默认关闭
 - **WHEN** 业务/合规尚未确认 DM 可发送给模型
@@ -70,7 +74,11 @@
 
 ### Requirement: 自动发送必须满足全部硬门禁
 
-自动发送 SHALL 同时要求：有效 published config、runtime/global/account/channel write 开关、账号与 rule 白名单、mode=`auto_safe`、auth active、identity match、effective capability、text message、模板变量完整、job/version 唯一、无 active/ambiguous attempt、账号单飞/限速/登录冷却通过、Cloud RiskController 允许、risk=`low`、AI 未改义/引入 claim。任一条件未知或失败 MUST 降级 `approval_required` 或具名阻断，MUST NOT 自动发送。
+自动发送 SHALL 同时要求：有效 published config、runtime/global/account/channel write 开关、账号与 rule 白名单、mode=`auto_safe`、auth active、identity match、effective capability、text message、模板变量完整、job/version 唯一、无 active/ambiguous attempt、账号单飞/限速/登录冷却通过、Cloud RiskController 允许、risk=`low`、未调用 AI、final text 与确定性模板输出逐字相同、确定性 claim gate 为空。任一条件未知或失败 MUST 降级 `approval_required` 或具名阻断，MUST NOT 自动发送。
+
+#### Scenario: 只有确定性模板允许自动发送
+- **WHEN** low-risk rule 允许 auto_safe 且模板渲染完整，但 polisher 被调用或 final text 与 rendered text 不同
+- **THEN** job 强制 approval_required；只有未调用 AI 且文本逐字一致、claim gate 为空时 MAY 成为 auto candidate
 
 #### Scenario: High-risk 标签强制人工
 - **WHEN** classifier/reviewer 命中订单、退款、价格、促销、库存、发货、个人信息、投诉、法律、医疗、安全或未成年人风险
