@@ -82,21 +82,24 @@
 
 > **推进边界（2026-07-15 更新，fleet 闸已清）**：原「等 `browser-slot-scheduling` 落定再动协调器」的定序**已解除**——实测其协调器/main.ts 改动已全部落进本分支地基、逐字节等同 master、edge 仓无活跃 slot worktree（证据见上「设计评审复核结论」与 `handoff-section-5-preemption-core.md §3`）。**已先行落地**：**5.7**（验证码回放前复检）+ **5.10(a)**（`waitUntil` 迭代帽），见 `aidcp-edge 35d3aec`。**抢占核心可动手**：动手前设计对抗评审（`wf_18b37a11-416`）已完成、结论见上及两份复核产物；**rebase 推迟到最终集成**（本 base ↔ master 在协调器/main.ts/protocol 逐字节相同，评审直接以本 HEAD 35d3aec 为准坐实；冲突面仅 `browse-session.ts`/`facebook-session.ts` 两文件+测试，留最终并线一次解）。按 handoff §6 分批序列开工；**动 main.ts 前先与用户协调**（禁区=用户未提交工作）。
 
-- [ ] 5.1 **提交窗口标志（六处）**：进入不可逆动作**之前**同步置位「已进入提交窗口 + 预算上限」，拿到确认或预算耗尽后清位。协调器只在标志为假时才允许抢占
-  - XHS 发布提交 `publish-command-handlers.ts:725`（窗口 ≈15s）
-  - FB 发布提交 `facebook/publish-executor.ts:435`（≈20s）
-  - XHS 评论提交 `browse-session.ts:2366`（≈4s，最短）
-  - FB 评论回车 `facebook/comment-executor.ts:518`（≈20s，最长 ⇒ **统一上界取它**）
-  - FB 加群点击 `facebook/join-executor.ts:677`（今天 ≈46.5s ⇒ **收窄**：受保护段只到「点击 + 短确认 ≤20s」，其余观察段改为可抢占）
-  - 通知巡视点分类栏目（`browse-session.ts:2862 / :2911`，≈15–20s，**无回滚 ⇒ 窗口内 MUST 拒绝抢占**）
-- [~] 5.2 **页面写者注册表**：把协调器的单一浏览闸泛化成注册表，每个写者提供 `取消 / 有界让位 / 是否在提交窗口` 三个能力（`edge-task-coordinator.ts:8-11`、`main.ts:502-506`）<!-- aidcp-edge 52d2a78 B-1：协调器侧 EdgeTaskPageWriterProbe（inCommitWindow/commitWindowRemainingMs/publishInFlight/cancelPublish 全可选）+ quiesceAllWriters 已落 + 25 单测；**main.ts wire writers 探针待做（属 5.1/5.3）** -->
-- [ ] 5.3 **发布执行流注册为第二个写者**——它今天跑在 `main.ts:737-782` 一个游离执行流里，**完全不在页面写记账内**，协调器的让位对它零感知。在途登记表从「只会发失败回执」升级为**带真取消**（⚠️ 动 `main.ts`，先与用户协调）
-- [~] 5.4 **抢占**（`edge-task-coordinator.ts:288-289 / :254-266 / :300-308`）：入队时若来者档位**严格高于**在跑者 → 触发取消 → 有界等停 → 授予。**同档不抢占**（FIFO，事实源改为「申请到达时刻」）。窗口占用时**立刻回「窗口占用中 + 剩余预算」**，不让抢占者空等 <!-- aidcp-edge 52d2a78 B-1 + 1f67249 加固：drainOrPreempt 三态（preempt/window_busy/unknown）+ **cancel-before-declare**（preemptedPending：被抢占任务 preempted_by_task 可重投终态只在 quiesce 确认写者真停后才发；cancel 抛出→yield_timeout，绝不让云端重投未停发布=双发，对抗复核 wf_3a8e8996 BLOCKER）+ rejectChallengerWindowBusy 携 windowRemainingMs 不进 terminal 可重试；协调器侧已全落+27 单测。**待 5.1 接真 inCommitWindow 探针才生效**（当前 inWindow=undefined → 保守不抢占，休眠） -->
-- [~] 5.5 **等停到期仍未停手 → 判控制面故障并整体升级回收**（不是「诚实的永久失败」，也不是死等）：一个页面写者收到取消后仍不停手，本质就是控制面故障。整队诚实拒绝、退出让位态。**前提是 4.x 全做完**（已完成）——否则等停会天天超时、验证码协助常态性拿不到锁 <!-- aidcp-edge 52d2a78 B-1：quiesce 抛出的终态由旧「一律 expired」按结构判据分流为**两个**：控制面丢失(canAcquire()===false)→cdp_unhealthy（cloud 已识别、良性）、写者收到取消仍不停手→yield_timeout（=请运营重启客户端，§10.4，cloud 7.5 才识别）。窗口豁免＝在窗口时走 window_busy 早返回、绝不进等停钟。**这两处 reason 重映射在 writers 未接线态即生效（非门控），yield_timeout 须与 cloud 7.5 co-deploy；cdp_unhealthy 已被 cloud edge-task-lease-client:212 处理**（B-1 复核 wf_3a8e8996 dormancy 修正） -->
-- [~] 5.9 **（第 4 节登记）浏览恢复的导航必须让位于在途发布写**：钩子卡在 `edge-task-coordinator.ts` 的 `resumeBrowseIfIdle`（**不是** `quiesceForTask`——队列为空时 drain 直接 return、走不到 quiesce）。这是上面那条「已离开发布页 ⇒ 判成功」假成功的根治点，与 5.2/5.3 同批 <!-- aidcp-edge 52d2a78 B-1：resumeBrowseIfIdle/canExecute/blocksBrowse/hasActiveLease 认 publishInFlight 探针并让位 + notifyPublishSettled 收敛后恢复；协调器侧已落+单测。**待 5.3 wire 真 publishInFlight 探针 + 收紧假成功 CHECK（正证据优先）才闭环** -->
+- [x] 5.1 **提交窗口守卫（六处）**：进入不可逆动作**之前** `enter(budgetMs)`、拿到确认或预算耗尽后 `dispose()`。协调器只在窗口关闭时才允许抢占（窗口内回 window_busy + 剩余预算）。叶子模块 `CommitWindowGuard`（时基兜底自动过期 + 世代守卫）<!-- aidcp-edge a062cbd（叶子）/ bc3e774（六站接线）分支 lease-strict-preemption -->
+  - XHS 发布提交 `publish-command-handlers.ts` runSubmit（窗口 15s，pacing/bare 两分支各 enter）
+  - FB 发布提交 `facebook/publish-executor.ts` submit（20s，与 XHS 共用 publishGuard）
+  - XHS 评论提交 `browse-session.ts` executeComment（4s，最短）
+  - FB 评论回车 `facebook/comment-executor.ts` submitComment（20s，最长 ⇒ **统一上界取它**；确认段 try/finally dispose）
+  - FB 加群点击 `facebook/join-executor.ts` joinGroup（**收窄至短确认 18.5s** + 5.10b 可中断尾巴）
+  - 通知巡视分类栏目 `browse-session.ts` browseNotificationComments/viewNotificationCategory（20s，**无回滚 ⇒ 窗口 MUST 覆盖点击**，finally dispose 防 no_target 早退泄漏）
+  - **6.2 同站落地**：submit 回执携 submitDispatched（点击真正发出那一刻置真，center 查找/no_target 保持假）；测试三态 + 5.9 CHECK 串无 URL 判据
+- [x] 5.2 **页面写者注册表**：协调器单一浏览闸泛化成注册表探针，每个写者提供 `取消 / 有界让位 / 是否在提交窗口` 能力 <!-- aidcp-edge 52d2a78 B-1 协调器侧 EdgeTaskPageWriterProbe + 25 单测；b9fdfa5 B-2b main.ts wire writers（combineCommitWindows + publishInFlight + cancelPublish）激活 -->
+- [x] 5.3 **发布执行流注册为第二个写者**——`main.ts` onPublishAtomCommand 的 dispatch 传 per-command TakeoverCtx（AbortController=接管世代令牌，局部不入单例字段）；inFlightPublishCancels 登记 abort+settled；writers.cancelPublish 遍历触发 abort + 有界等收敛、未收敛即抛。**用户 2026-07-15 明确批准动 main.ts 发布 handler 区（与 FB pacing 禁区结构隔离）** <!-- aidcp-edge b9fdfa5 分支 lease-strict-preemption -->
+- [x] 5.3b **notifyPublishSettled 接线**（复核 finding C：此钩此前零调用者）：dispatch 收敛的 finally 调用 → 恢复浏览，否则 publishInFlight 闸让浏览在发布结束后永久冻结 <!-- aidcp-edge b9fdfa5 -->
+- [x] 5.4 **抢占**：入队时若来者档位**严格高于**在跑者 → 触发取消 → 有界等停 → 授予。**同档不抢占**（FIFO，事实源＝申请到达时刻）。窗口占用时**立刻回「窗口占用中 + 剩余预算」**，不让抢占者空等 <!-- aidcp-edge 52d2a78 B-1 + 1f67249 加固：drainOrPreempt 三态 + cancel-before-declare（preemptedPending，对抗复核 wf_3a8e8996 BLOCKER）+ 27 单测；**b9fdfa5 B-2b wire 真 inCommitWindow → 抢占引擎激活**（此前 inWindow=undefined 休眠）。co-deploy 批 C 前不部署 -->
+- [x] 5.5 **等停到期仍未停手 → 判控制面故障并整体升级回收**（不是永久失败，也不是死等）：写者收到取消仍不停手＝控制面故障，整队诚实拒绝、退出让位态、**绝不解除 browseBlocked**（复核 wf_3a8e8996 finding #1）。前提 4.x 已完成 <!-- aidcp-edge 52d2a78 B-1：quiesce 终态按结构判据分流——控制面丢失(canAcquire===false)→cdp_unhealthy（良性，cloud edge-task-lease-client:212 已识别）、写者不停手→yield_timeout（=请运营重启客户端，§10.4，cloud 7.5 才识别）；窗口豁免＝window_busy 早返回不进等停钟。b9fdfa5 B-2b：cancelPublish 有界等收敛、未收敛即抛，激活发布写者侧的这条判据 -->
+- [x] 5.9 **（第 4 节登记）浏览恢复的导航必须让位于在途发布写**：钩子卡在 `resumeBrowseIfIdle`（**不是** `quiesceForTask`——队列空时 drain 直接 return）。「已离开发布页 ⇒ 判成功」假成功的根治点 <!-- aidcp-edge 52d2a78 B-1：resumeBrowseIfIdle/canExecute/blocksBrowse/hasActiveLease 认 publishInFlight + notifyPublishSettled 恢复（协调器侧+单测）；b9fdfa5 B-2b：wire 真 publishInFlight=inFlightPublishes.size>0 + 收紧假成功 CHECK（去 URL 判据、只认成功文案正证据）→ 闭环 -->
 - [~] 5.10 **（第 4 节登记）顺手项**：
   - [x] (a) `facebook/publish-executor.ts` 的 `waitUntil`（第 8 个纯墙钟 `for(;;)`、旧无迭代帽 → 注入恒定 now 即死循环）已补双闸=墙钟 + 迭代帽 `ceil(timeout/interval)+2`，同 `flows/bounded-poll`；护栏语义已由 `bounded-poll.test.ts` 覆盖，按补测克制不重复造桩 <!-- aidcp-edge 35d3aec 分支 lease-strict-preemption -->
-  - [ ] (b) FB 加群接取消点（`comment-handler.ts` 的 `onJoin` 今天不收 checkpoint，整段 ≈78s 不可中断）**⚠️ 设计评审提级：必须与 5.1 的 FB 加群提交窗口同批原子交付，不再是可延后顺手项**。理由：5.1 给 FB 加群设「受保护段≤~18.5s」的前提，正是把点击后 46.5s 的观察轮询拆成「窗口内短确认 + 可中断尾巴」；若本项掉队，真实不可取消区仍是 46.5s > 30s 的 quiesce 预算 → 每次 FB 加群被抢占必然 quiesce timeout → 5.5 每次误报控制面故障、误命令运营重启浏览器（把逃生梯变成常态误触发）。二者不可一个 blocking 一个 deferrable
+  - [x] (b) FB 加群接取消点（与 5.1 加群窗口同批原子交付）：joinGroup 加 `checkpoint?` 参数，点击后 46.5s 观察轮询拆成「短确认窗口 ≤18.5s（协调器不抢占）+ 可中断尾巴」；尾段每轮门控 `if (!commitWindow?.isOpen()) checkpoint?.()`（窗口内世代号未变→no-op）；被接管抛 TaskTakeoverError，joinGroup catch 加 rethrowIfTakeover 防降级成 nav_error → 冒泡到 comment-handler.handle catch 转 preempted_by_task。checkpoint 经 comment-handler.onJoin 接线（comment-only join-handler 路径无 quiesce 追踪、传 undefined 安全） <!-- aidcp-edge bc3e774 分支 lease-strict-preemption -->
+- 附注：6.2 的边缘置位、5.9 收紧 CHECK 已随批 B-2a/B-2b 落地（见 5.1/5.9）。**5.6（边缘 45s 排队默认 vs 云端）延后与 cloud 批 C 7.10 同批坐实**（受理超时口径两端一起定，避免边缘单改成不一致的表）
 - [ ] 5.6 边缘排队默认值与云端不一致（边缘 45s vs 云端 200s，`edge-task-coordinator.ts:58`）：改成同值，或对缺失该字段的申请**诚实拒绝**，别用不一致的表默默摘掉任务
 - [x] 5.7 **验证码落点回放前强制复检**（`browse/captcha-assist.ts`）：回放前重新探阻断类型 + 读当前 URL。阻断已消失 → `not_blocked`（绝不在已无验证码的页面盲点）；阻断类型或 URL 变了 → `stale_snapshot` + 重抓帧让运营在新帧上重标；复检本身失败 → 诚实 `failed`。复用现有回执枚举、**零协议改动**。URL 仅比 origin+pathname（验证码 token 每刷新都变、纳入会误判）。**硬前置**——今天靠「租约拿不到」挡着（安全的失败）；抢占之后会变成「抢到了 → 在发布编辑页上按几分钟前的旧坐标盲点真实鼠标」（**不安全的成功**）。回归：回放前阻断消失 → not_blocked 且**零鼠标派发**；回放前 URL 变 → stale_snapshot + 重抓帧且**零鼠标派发** <!-- aidcp-edge 35d3aec 分支 lease-strict-preemption -->
 - [ ] 5.8 删除遗留的整页发布处理器（`main.ts:579-639`，全程不过租约闸，云端已无发送方）
@@ -157,7 +160,8 @@
 - [ ] 11.7 巡视窗口保护：点分类栏目之后抢占 MUST 被拒（回「窗口占用中、剩余 ≤20s」）
 - [ ] 11.8 参数一致性断言：云端受理预算 > 最长提交窗口 + 取消停手 + 让位 + 往返
 - [x] 11.9 协议往返断言（新原因字符串两端都是裸值，typecheck 抓不到）：AC-PROTO-14/15 两端各一份，edge full 1338 / cloud full 2044 全绿 <!-- aidcp-edge 9bc6c6b / aidcp-cloud 9f0194b 批 A -->
-- [ ] **批 A（协议地基）已落地** — 上述 6.1/6.2/6.3/6.4 + 11.9；inert 未接线，安全独立部署。下一步批 B（edge 抢占，**动 main.ts 前与用户协调禁区**）→ 批 C（cloud，含 command-sequencer BLOCKER）。假成功修复链（5.2+5.3+5.9+6.2 置位+7.1+command-sequencer 分类）必须整批 B/C 同部署
+- [ ] **批 A（协议地基）已落地** — 上述 6.1/6.2/6.3/6.4 + 11.9；inert 未接线，安全独立部署。
+- [x] **批 B-2a/B-2b（edge 抢占激活）已落地** — 5.1 六站提交窗口 + 5.10b 加群拆分 + 6.2 边缘置位（bc3e774，inert）→ 5.2/5.3/5.4/5.5/5.9 main.ts wire writers 激活 + 5.9 收紧 CHECK（b9fdfa5）。edge full 1359 / typecheck 0 / acceptance 21。**动 main.ts 发布 handler 区经用户 2026-07-15 明确批准（与 FB pacing 禁区结构隔离）**。对抗复核 workflow `wf_1657e89b-85a` 进行中。**🔴 co-deploy：b9fdfa5 激活边缘会回 `preempted_by_task`，云端 command-sequencer 当前烧成 failed → 绝不单独部署，必与批 C（cloud）同批。假成功修复链 = 5.2+5.3+5.9+6.2+command-sequencer 分类，整批同部署**。剩余批 B：5.6（延后与 cloud 7.10 同批）、5.8（批 B-2c 清理遗留 onPublishCommand）
 - [ ] 11.10 `test:acceptance` → 全量 `test` → `typecheck`，edge / cloud 两侧
 
 ## 12. 真机验收（dev；登记 `docs/real-machine-acceptance-backlog.md`）
