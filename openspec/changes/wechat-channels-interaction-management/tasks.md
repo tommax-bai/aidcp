@@ -1,0 +1,52 @@
+## 1. Session 00 - Contract and OpenSpec freeze
+
+- [x] 1.1 Freeze `wechat_channels`, account/env ownership, browser sidecar, connector boundary and effective capability semantics.
+- [x] 1.2 Freeze the seven WS v2 message types, capability negotiation, required payload fields, enums, errors and old/new peer compatibility.
+- [x] 1.3 Freeze thread/message/batch/cursor/reply job/send attempt/config tables, unique keys, CAS versions and exact reply idempotency key.
+- [x] 1.4 Freeze reply job/send attempt state machines, deterministic/AI stages, all-send gates, auto-only gates and ambiguous fail-closed behavior.
+- [x] 1.5 Freeze customer-auth/internal API paths, success/error envelopes, pagination, permissions and immutable config publishing.
+- [x] 1.6 Freeze renderer shell/workspace boundaries, credential locality, identity isolation, log redaction, retention defaults and non-destructive acceptance boundary.
+- [x] 1.7 Publish strict JSON schemas and synthetic WS/customer/internal/AI fixtures, including one confirmed comment walkthrough and one ambiguous DM walkthrough.
+- [x] 1.8 Validate the OpenSpec change strictly, validate every fixture against its schema, scan for message-name aliases and review compatibility evidence.
+
+## 2. Session 01 - Edge driver and interaction connector
+
+- [ ] 2.1 Extend Edge `PlatformId`, registry, environment configuration and capability declaration for `wechat_channels` without changing existing XHS/Facebook behavior.
+- [ ] 2.2 Implement the separate browser driver and `InteractionConnector`, with account-bound encrypted session storage, identity mismatch fail-closed behavior and browser reopen lifecycle.
+- [ ] 2.3 Implement comment and DM incremental sync with stable external IDs, paging, tombstones, replayable batches and checkpoint advancement only after a matching accepted/duplicate ack.
+- [ ] 2.4 Implement text comment/DM send with persisted idempotency, command expiry, platform verification and honest confirmed/failed/ambiguous results; keep image send disabled.
+- [ ] 2.5 Wire all seven WS types, payload validators and active-command routing atomically; gate them behind negotiated `interaction_inbox_v1`.
+- [ ] 2.6 Add per-capability probes, endpoint/account flags, schema-change circuit breaking and read-only/gated black-box tests that never submit to an unapproved real target.
+
+## 3. Session 02 - Cloud inbox, workflow and APIs
+
+- [ ] 3.1 Allocate the next migration ID from current Cloud `master`, create the additive interaction/config/audit tables and enforce all frozen unique keys and account/env scope indexes.
+- [ ] 3.2 Implement transactional sync batch ingestion, duplicate ack replay and authoritative cursor advancement without reusing outbound `interaction_feed`.
+- [ ] 3.3 Implement unique reply jobs, monotonic CAS, send attempts, state transitions, ambiguous verification and no automatic ambiguous retry.
+- [ ] 3.4 Implement deterministic rule/template rendering, immutable published config snapshots, the three strict AI roles and their fail-closed fallbacks.
+- [ ] 3.5 Implement all-send/auto-only gates, `dm_reply` fallback quotas of zero, single-account send serialization and confirmed-only `RiskController.record`.
+- [ ] 3.6 Implement customer-auth and internal APIs exactly as frozen, including JWT domains, enabled-user/env scope checks, permissions, opaque pagination, preview and audit.
+- [ ] 3.7 Implement runtime controls, kill switches, retention/purge jobs, redacted logs and metrics with all real write flags defaulting off.
+
+## 4. Session 03 - Console reply settings
+
+- [ ] 4.1 Add `wechat_channels` account recognition and an interaction reply settings workspace that consumes the frozen internal API schema.
+- [ ] 4.2 Implement policy, templates, rules and two-channel profiles with draft/published versions, aggregate CAS and permission-aware loading/error/conflict states.
+- [ ] 4.3 Implement deterministic preview and publish validation views without creating real jobs, WS messages or send attempts.
+- [ ] 4.4 Show hard gates, audit version/actor/time and DM-content permission boundaries honestly; cancel and clear stale state on account switch.
+
+## 5. Session 04 - Electron interaction workspace
+
+- [ ] 5.1 Select the right-side `InteractionWorkspace` for `wechat_channels` while preserving the global title bar, left environment rail and existing XHS/Facebook workspaces.
+- [ ] 5.2 Implement inbox/detail, pagination and local refresh from the frozen customer API; route calls through named preload IPC and the existing client-auth session only.
+- [ ] 5.3 Implement edit/regenerate/ignore/escalate/approve/send with `expectedVersion`, environment response checks and stale-request cancellation.
+- [ ] 5.4 Render active+closed, reauth/challenge, queued/sending/sent/failed/ambiguous states truthfully; accepted or dispatched must never appear as sent.
+- [ ] 5.5 Cover 820x720, keyboard/focus, empty/loading/error/permission/version-conflict and synthetic fixture/screenshot states without invoking a real write.
+
+## 6. Session 05 - Integration and real-account acceptance
+
+- [ ] 6.1 Integrate the control contract, Cloud, Edge connector, Console and Electron branches serially, resolving only contract/integration defects and rerunning the required repo validations.
+- [ ] 6.2 Verify old/new peer capability skew, restart/replay/cursor behavior, account/env isolation, CAS conflicts, kill switches, schema-change circuit breaking and retention/purge behavior with mocks first.
+- [ ] 6.3 On a named dev account, run read-only authentication, identity, comment and DM sync acceptance before enabling any write capability.
+- [ ] 6.4 Run comment/DM real writes only against operator-approved disposable targets, verify confirmed and ambiguous evidence boundaries, and record any gated/manual backlog honestly.
+- [ ] 6.5 Update validation/deployment evidence, preserve unresolved compliance gates, deploy only through the documented dev path and do not archive until all required tasks are actually complete.

@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "common.schema.json",
+  "title": "AIDCP WeChat Channels Interaction Common Types v1",
+  "$ref": "#/$defs/ErrorEnvelope",
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "NullableId": {
+      "oneOf": [
+        { "$ref": "#/$defs/Id" },
+        { "type": "null" }
+      ]
+    },
+    "Timestamp": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "NullableTimestamp": {
+      "oneOf": [
+        { "$ref": "#/$defs/Timestamp" },
+        { "type": "null" }
+      ]
+    },
+    "NullableString": {
+      "oneOf": [
+        { "type": "string", "maxLength": 4096 },
+        { "type": "null" }
+      ]
+    },
+    "Platform": {
+      "const": "wechat_channels"
+    },
+    "Channel": {
+      "enum": ["comment", "dm"]
+    },
+    "Direction": {
+      "enum": ["inbound", "outbound"]
+    },
+    "MessageType": {
+      "enum": ["text", "image", "unknown"]
+    },
+    "MessageLifecycle": {
+      "enum": ["active", "deleted", "hidden"]
+    },
+    "AuthStatus": {
+      "enum": [
+        "login_required",
+        "authenticating",
+        "active",
+        "reauth_required",
+        "challenge_required",
+        "degraded",
+        "disabled"
+      ]
+    },
+    "BrowserState": {
+      "enum": ["closed", "opening", "open", "closing", "unavailable"]
+    },
+    "ReplyJobState": {
+      "enum": [
+        "new",
+        "classifying",
+        "draft_ready",
+        "approval_required",
+        "approved",
+        "queued",
+        "sending",
+        "sent",
+        "failed",
+        "ambiguous",
+        "ignored",
+        "escalated"
+      ]
+    },
+    "RiskLevel": {
+      "enum": ["low", "medium", "high", "unknown"]
+    },
+    "RiskTag": {
+      "enum": [
+        "order",
+        "refund",
+        "after_sales",
+        "pricing",
+        "promotion",
+        "inventory",
+        "shipping",
+        "personal_data",
+        "complaint",
+        "dispute",
+        "legal",
+        "medical",
+        "safety",
+        "abuse",
+        "minor_safety",
+        "meaning_changed",
+        "introduced_claim",
+        "unknown"
+      ]
+    },
+    "ErrorCode": {
+      "enum": [
+        "INTERACTION_AUTH_REQUIRED",
+        "INTERACTION_PERMISSION_DENIED",
+        "INTERACTION_NOT_FOUND",
+        "INTERACTION_SCOPE_MISMATCH",
+        "INTERACTION_VERSION_CONFLICT",
+        "INTERACTION_STATE_CONFLICT",
+        "INTERACTION_VALIDATION_FAILED",
+        "INTERACTION_CONFIG_MISSING",
+        "INTERACTION_APPROVAL_REQUIRED",
+        "INTERACTION_SEND_AMBIGUOUS",
+        "INTERACTION_UNSUPPORTED_MESSAGE_TYPE",
+        "INTERACTION_FEATURE_DISABLED",
+        "INTERACTION_RATE_LIMITED",
+        "INTERACTION_UPSTREAM_UNAVAILABLE",
+        "INTERACTION_INTERNAL_ERROR",
+        "WECHAT_AUTH_REQUIRED",
+        "WECHAT_CHALLENGE_REQUIRED",
+        "WECHAT_IDENTITY_MISMATCH",
+        "WECHAT_RATE_LIMITED",
+        "WECHAT_PERMISSION_DENIED",
+        "WECHAT_SCHEMA_CHANGED"
+      ]
+    },
+    "ValidationIssue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "code", "message"],
+      "properties": {
+        "path": { "type": "string", "maxLength": 512 },
+        "code": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "ErrorDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "currentVersion": { "type": "integer", "minimum": 0 },
+        "currentState": { "$ref": "#/$defs/ReplyJobState" },
+        "retryAfterMs": { "type": "integer", "minimum": 0 },
+        "issues": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/ValidationIssue" }
+        }
+      }
+    },
+    "ErrorEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message", "requestId", "retryable"],
+          "properties": {
+            "code": { "$ref": "#/$defs/ErrorCode" },
+            "message": { "type": "string", "minLength": 1, "maxLength": 512 },
+            "requestId": { "$ref": "#/$defs/Id" },
+            "retryable": { "type": "boolean" },
+            "details": { "$ref": "#/$defs/ErrorDetails" }
+          }
+        }
+      }
+    },
+    "ResponseMeta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "asOf"],
+      "properties": {
+        "requestId": { "$ref": "#/$defs/Id" },
+        "asOf": { "$ref": "#/$defs/Timestamp" }
+      }
+    },
+    "Envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "ts", "payload"],
+      "properties": {
+        "v": { "const": 2 },
+        "type": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "id": { "$ref": "#/$defs/Id" },
+        "ts": { "$ref": "#/$defs/Timestamp" },
+        "payload": { "type": "object" }
+      }
+    }
+  }
+}

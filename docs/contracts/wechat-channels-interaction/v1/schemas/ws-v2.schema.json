@@ -1,0 +1,468 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ws-v2.schema.json",
+  "title": "AIDCP WS v2 WeChat Channels Interaction Extension v1",
+  "oneOf": [
+    { "$ref": "#/$defs/HelloEnvelope" },
+    { "$ref": "#/$defs/WelcomeEnvelope" },
+    { "$ref": "#/$defs/AuthStatusEnvelope" },
+    { "$ref": "#/$defs/SyncBatchEnvelope" },
+    { "$ref": "#/$defs/SyncAckEnvelope" },
+    { "$ref": "#/$defs/ReplyResultEnvelope" },
+    { "$ref": "#/$defs/SyncRequestEnvelope" },
+    { "$ref": "#/$defs/ReplySendEnvelope" },
+    { "$ref": "#/$defs/AuthReopenEnvelope" }
+  ],
+  "$defs": {
+    "HelloPayload": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["edgeId"],
+      "properties": {
+        "edgeId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "app": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "capabilities": {
+          "type": "array",
+          "maxItems": 128,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "uniqueItems": true
+        },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountNickname": { "type": "string", "maxLength": 256 },
+        "machineLabel": { "type": "string", "maxLength": 256 },
+        "remoteAddr": { "type": "string", "maxLength": 512 }
+      }
+    },
+    "WelcomePayload": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["sessionId", "serverVersion"],
+      "properties": {
+        "sessionId": { "$ref": "common.schema.json#/$defs/Id" },
+        "serverVersion": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "capabilities": {
+          "type": "array",
+          "maxItems": 128,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "EffectiveCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commentsRead", "commentsReply", "dmRead", "dmSendText", "dmSendImage"],
+      "properties": {
+        "commentsRead": { "type": "boolean" },
+        "commentsReply": { "type": "boolean" },
+        "dmRead": { "type": "boolean" },
+        "dmSendText": { "type": "boolean" },
+        "dmSendImage": { "const": false }
+      }
+    },
+    "IdentitySummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["externalId", "displayName", "identityHash"],
+      "properties": {
+        "externalId": { "$ref": "common.schema.json#/$defs/Id" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "identityHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "AuthReasonCode": {
+      "oneOf": [
+        {
+          "enum": [
+            "WECHAT_AUTH_REQUIRED",
+            "WECHAT_CHALLENGE_REQUIRED",
+            "WECHAT_IDENTITY_MISMATCH",
+            "WECHAT_RATE_LIMITED",
+            "WECHAT_PERMISSION_DENIED",
+            "WECHAT_SCHEMA_CHANGED",
+            "INTERACTION_FEATURE_DISABLED",
+            "INTERACTION_UPSTREAM_UNAVAILABLE"
+          ]
+        },
+        { "type": "null" }
+      ]
+    },
+    "AuthStatusPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "envKey",
+        "accountId",
+        "platform",
+        "status",
+        "browserState",
+        "capabilities",
+        "identity",
+        "checkedAt",
+        "reasonCode"
+      ],
+      "properties": {
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "status": { "$ref": "common.schema.json#/$defs/AuthStatus" },
+        "browserState": { "$ref": "common.schema.json#/$defs/BrowserState" },
+        "capabilities": { "$ref": "#/$defs/EffectiveCapabilities" },
+        "identity": {
+          "oneOf": [
+            { "$ref": "#/$defs/IdentitySummary" },
+            { "type": "null" }
+          ]
+        },
+        "checkedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "reasonCode": { "$ref": "#/$defs/AuthReasonCode" }
+      }
+    },
+    "SyncBatchPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "batchId",
+        "requestId",
+        "envKey",
+        "accountId",
+        "platform",
+        "channel",
+        "scopeExternalId",
+        "cursorBefore",
+        "cursorAfter",
+        "hasMore",
+        "threads",
+        "messages",
+        "observedAt"
+      ],
+      "properties": {
+        "batchId": { "$ref": "common.schema.json#/$defs/Id" },
+        "requestId": { "$ref": "common.schema.json#/$defs/NullableId" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "channel": { "$ref": "common.schema.json#/$defs/Channel" },
+        "scopeExternalId": { "$ref": "common.schema.json#/$defs/NullableId" },
+        "cursorBefore": { "$ref": "common.schema.json#/$defs/NullableString" },
+        "cursorAfter": { "$ref": "common.schema.json#/$defs/NullableString" },
+        "hasMore": { "type": "boolean" },
+        "threads": {
+          "type": "array",
+          "maxItems": 200,
+          "items": { "$ref": "domain.schema.json#/$defs/SyncThread" }
+        },
+        "messages": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "$ref": "domain.schema.json#/$defs/SyncMessage" }
+        },
+        "observedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "SyncAckPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "batchId",
+        "envKey",
+        "accountId",
+        "platform",
+        "channel",
+        "scopeExternalId",
+        "status",
+        "cursorAfter",
+        "persisted",
+        "errorCode",
+        "receivedAt"
+      ],
+      "properties": {
+        "batchId": { "$ref": "common.schema.json#/$defs/Id" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "channel": { "$ref": "common.schema.json#/$defs/Channel" },
+        "scopeExternalId": { "$ref": "common.schema.json#/$defs/NullableId" },
+        "status": { "enum": ["accepted", "duplicate", "rejected"] },
+        "cursorAfter": { "$ref": "common.schema.json#/$defs/NullableString" },
+        "persisted": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["threads", "messages"],
+          "properties": {
+            "threads": { "type": "integer", "minimum": 0 },
+            "messages": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "errorCode": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/$defs/ErrorCode" },
+            { "type": "null" }
+          ]
+        },
+        "receivedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "enum": ["accepted", "duplicate"] } } },
+          "then": { "properties": { "errorCode": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "rejected" } } },
+          "then": {
+            "properties": {
+              "cursorAfter": { "type": "null" },
+              "errorCode": { "$ref": "common.schema.json#/$defs/ErrorCode" }
+            }
+          }
+        }
+      ]
+    },
+    "SyncRequestPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requestId",
+        "envKey",
+        "accountId",
+        "platform",
+        "channel",
+        "scopeExternalId",
+        "reason",
+        "requestedAt"
+      ],
+      "properties": {
+        "requestId": { "$ref": "common.schema.json#/$defs/Id" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "channel": { "$ref": "common.schema.json#/$defs/Channel" },
+        "scopeExternalId": { "$ref": "common.schema.json#/$defs/NullableId" },
+        "reason": { "enum": ["user_requested", "resume", "scheduled", "recovery"] },
+        "requestedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "ReplyTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["threadExternalId", "inboundMessageExternalId", "parentExternalId"],
+      "properties": {
+        "threadExternalId": { "$ref": "common.schema.json#/$defs/Id" },
+        "inboundMessageExternalId": { "$ref": "common.schema.json#/$defs/Id" },
+        "parentExternalId": { "$ref": "common.schema.json#/$defs/NullableId" }
+      }
+    },
+    "TextContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text"],
+      "properties": {
+        "type": { "const": "text" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 4000 }
+      }
+    },
+    "ReplySendPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jobId",
+        "attemptId",
+        "idempotencyKey",
+        "envKey",
+        "accountId",
+        "platform",
+        "channel",
+        "target",
+        "content",
+        "expiresAt"
+      ],
+      "properties": {
+        "jobId": { "$ref": "common.schema.json#/$defs/Id" },
+        "attemptId": { "$ref": "common.schema.json#/$defs/Id" },
+        "idempotencyKey": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "channel": { "$ref": "common.schema.json#/$defs/Channel" },
+        "target": { "$ref": "#/$defs/ReplyTarget" },
+        "content": { "$ref": "#/$defs/TextContent" },
+        "expiresAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "ErrorCategory": {
+      "oneOf": [
+        {
+          "enum": [
+            "auth_expired",
+            "challenge_required",
+            "identity_mismatch",
+            "rate_limited",
+            "permission_denied",
+            "schema_changed",
+            "transient_network",
+            "unsupported_message_type",
+            "invalid_scope",
+            "invalid_command",
+            "expired_command",
+            "platform_rejected",
+            "verification_failed",
+            "internal_error"
+          ]
+        },
+        { "type": "null" }
+      ]
+    },
+    "ReplyResultPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jobId",
+        "attemptId",
+        "idempotencyKey",
+        "envKey",
+        "accountId",
+        "platform",
+        "channel",
+        "status",
+        "externalMessageId",
+        "errorCategory",
+        "errorCode",
+        "verification",
+        "retryAfterMs",
+        "finishedAt"
+      ],
+      "properties": {
+        "jobId": { "$ref": "common.schema.json#/$defs/Id" },
+        "attemptId": { "$ref": "common.schema.json#/$defs/Id" },
+        "idempotencyKey": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "channel": { "$ref": "common.schema.json#/$defs/Channel" },
+        "status": { "enum": ["confirmed", "failed", "ambiguous"] },
+        "externalMessageId": { "$ref": "common.schema.json#/$defs/NullableId" },
+        "errorCategory": { "$ref": "#/$defs/ErrorCategory" },
+        "errorCode": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/$defs/ErrorCode" },
+            { "type": "null" }
+          ]
+        },
+        "verification": { "enum": ["platform_ack", "history_lookup", "comment_lookup", "not_verified"] },
+        "retryAfterMs": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "null" }
+          ]
+        },
+        "finishedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "confirmed" } } },
+          "then": {
+            "properties": {
+              "errorCategory": { "type": "null" },
+              "errorCode": { "type": "null" },
+              "verification": { "enum": ["platform_ack", "history_lookup", "comment_lookup"] }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["failed", "ambiguous"] } } },
+          "then": {
+            "properties": {
+              "errorCategory": {
+                "enum": [
+                  "auth_expired",
+                  "challenge_required",
+                  "identity_mismatch",
+                  "rate_limited",
+                  "permission_denied",
+                  "schema_changed",
+                  "transient_network",
+                  "unsupported_message_type",
+                  "invalid_scope",
+                  "invalid_command",
+                  "expired_command",
+                  "platform_rejected",
+                  "verification_failed",
+                  "internal_error"
+                ]
+              },
+              "errorCode": { "$ref": "common.schema.json#/$defs/ErrorCode" }
+            }
+          }
+        }
+      ]
+    },
+    "AuthReopenPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "envKey", "accountId", "platform", "reason", "requestedAt"],
+      "properties": {
+        "requestId": { "$ref": "common.schema.json#/$defs/Id" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "reason": { "enum": ["user_requested", "auth_expired", "identity_mismatch", "challenge_required"] },
+        "requestedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "HelloEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "hello" }, "payload": { "$ref": "#/$defs/HelloPayload" } } }
+      ]
+    },
+    "WelcomeEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "welcome" }, "payload": { "$ref": "#/$defs/WelcomePayload" } } }
+      ]
+    },
+    "AuthStatusEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.auth.status" }, "payload": { "$ref": "#/$defs/AuthStatusPayload" } } }
+      ]
+    },
+    "SyncBatchEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.sync.batch" }, "payload": { "$ref": "#/$defs/SyncBatchPayload" } } }
+      ]
+    },
+    "SyncAckEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.sync.ack" }, "payload": { "$ref": "#/$defs/SyncAckPayload" } } }
+      ]
+    },
+    "ReplyResultEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.reply.result" }, "payload": { "$ref": "#/$defs/ReplyResultPayload" } } }
+      ]
+    },
+    "SyncRequestEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.sync.request" }, "payload": { "$ref": "#/$defs/SyncRequestPayload" } } }
+      ]
+    },
+    "ReplySendEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.reply.send" }, "payload": { "$ref": "#/$defs/ReplySendPayload" } } }
+      ]
+    },
+    "AuthReopenEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.auth.reopen" }, "payload": { "$ref": "#/$defs/AuthReopenPayload" } } }
+      ]
+    }
+  }
+}

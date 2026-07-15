@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "customer-auth-api.schema.json",
+  "title": "AIDCP Customer Interaction API v1",
+  "anyOf": [
+    { "$ref": "#/$defs/InteractionListResponse" },
+    { "$ref": "#/$defs/InteractionDetailResponse" },
+    { "$ref": "#/$defs/JobResponse" },
+    { "$ref": "#/$defs/AcceptedActionResponse" },
+    { "$ref": "#/$defs/DraftUpdateRequest" },
+    { "$ref": "#/$defs/JobMutationRequest" },
+    { "$ref": "#/$defs/EscalateRequest" },
+    { "$ref": "#/$defs/SyncActionRequest" },
+    { "$ref": "#/$defs/EmptyRequest" },
+    { "$ref": "common.schema.json#/$defs/ErrorEnvelope" }
+  ],
+  "$defs": {
+    "EffectiveCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commentsRead", "commentsReply", "dmRead", "dmSendText", "dmSendImage"],
+      "properties": {
+        "commentsRead": { "type": "boolean" },
+        "commentsReply": { "type": "boolean" },
+        "dmRead": { "type": "boolean" },
+        "dmSendText": { "type": "boolean" },
+        "dmSendImage": { "const": false }
+      }
+    },
+    "AuthSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "browserState", "reasonCode", "checkedAt", "capabilities"],
+      "properties": {
+        "status": { "$ref": "common.schema.json#/$defs/AuthStatus" },
+        "browserState": { "$ref": "common.schema.json#/$defs/BrowserState" },
+        "reasonCode": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/$defs/ErrorCode" },
+            { "type": "null" }
+          ]
+        },
+        "checkedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "capabilities": { "$ref": "#/$defs/EffectiveCapabilities" }
+      }
+    },
+    "InteractionListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "threadId",
+        "messageId",
+        "channel",
+        "participantName",
+        "participantAvatarUrl",
+        "previewText",
+        "sourceTitle",
+        "lastMessageAt",
+        "unread",
+        "riskLevel",
+        "jobState",
+        "jobVersion"
+      ],
+      "properties": {
+        "threadId": { "$ref": "common.schema.json#/$defs/Id" },
+        "messageId": { "$ref": "common.schema.json#/$defs/Id" },
+        "channel": { "$ref": "common.schema.json#/$defs/Channel" },
+        "participantName": { "$ref": "common.schema.json#/$defs/NullableString" },
+        "participantAvatarUrl": {
+          "oneOf": [
+            { "type": "string", "format": "uri", "maxLength": 2048 },
+            { "type": "null" }
+          ]
+        },
+        "previewText": { "$ref": "common.schema.json#/$defs/NullableString" },
+        "sourceTitle": { "$ref": "common.schema.json#/$defs/NullableString" },
+        "lastMessageAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "unread": { "type": "boolean" },
+        "riskLevel": { "$ref": "common.schema.json#/$defs/RiskLevel" },
+        "jobState": { "$ref": "common.schema.json#/$defs/ReplyJobState" },
+        "jobVersion": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "InteractionListResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "meta"],
+      "properties": {
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["envKey", "accountId", "platform", "auth", "items", "nextCursor"],
+          "properties": {
+            "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+            "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+            "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+            "auth": { "$ref": "#/$defs/AuthSummary" },
+            "items": {
+              "type": "array",
+              "maxItems": 100,
+              "items": { "$ref": "#/$defs/InteractionListItem" }
+            },
+            "nextCursor": { "$ref": "common.schema.json#/$defs/NullableString" }
+          }
+        },
+        "meta": { "$ref": "common.schema.json#/$defs/ResponseMeta" }
+      }
+    },
+    "InteractionDetailResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "meta"],
+      "properties": {
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "envKey",
+            "accountId",
+            "platform",
+            "auth",
+            "thread",
+            "messages",
+            "replyJob",
+            "sendAttempt",
+            "nextCursor"
+          ],
+          "properties": {
+            "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+            "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+            "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+            "auth": { "$ref": "#/$defs/AuthSummary" },
+            "thread": { "$ref": "domain.schema.json#/$defs/ThreadView" },
+            "messages": {
+              "type": "array",
+              "maxItems": 100,
+              "items": { "$ref": "domain.schema.json#/$defs/MessageView" }
+            },
+            "replyJob": {
+              "oneOf": [
+                { "$ref": "domain.schema.json#/$defs/ReplyJobView" },
+                { "type": "null" }
+              ]
+            },
+            "sendAttempt": {
+              "oneOf": [
+                { "$ref": "domain.schema.json#/$defs/SendAttemptView" },
+                { "type": "null" }
+              ]
+            },
+            "nextCursor": { "$ref": "common.schema.json#/$defs/NullableString" }
+          }
+        },
+        "meta": { "$ref": "common.schema.json#/$defs/ResponseMeta" }
+      }
+    },
+    "JobResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "meta"],
+      "properties": {
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["envKey", "accountId", "job"],
+          "properties": {
+            "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+            "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+            "job": { "$ref": "domain.schema.json#/$defs/ReplyJobView" }
+          }
+        },
+        "meta": { "$ref": "common.schema.json#/$defs/ResponseMeta" }
+      }
+    },
+    "AcceptedActionResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "meta"],
+      "properties": {
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["envKey", "accountId", "action", "actionRequestId", "status"],
+          "properties": {
+            "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+            "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+            "action": { "enum": ["sync", "auth_reopen"] },
+            "actionRequestId": { "$ref": "common.schema.json#/$defs/Id" },
+            "status": { "const": "accepted" }
+          }
+        },
+        "meta": { "$ref": "common.schema.json#/$defs/ResponseMeta" }
+      }
+    },
+    "DraftUpdateRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expectedVersion", "finalText"],
+      "properties": {
+        "expectedVersion": { "type": "integer", "minimum": 0 },
+        "finalText": { "type": "string", "minLength": 1, "maxLength": 4000 }
+      }
+    },
+    "JobMutationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expectedVersion"],
+      "properties": {
+        "expectedVersion": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "EscalateRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expectedVersion", "reason"],
+      "properties": {
+        "expectedVersion": { "type": "integer", "minimum": 0 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "SyncActionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "scopeExternalId"],
+      "properties": {
+        "channel": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/$defs/Channel" },
+            { "type": "null" }
+          ]
+        },
+        "scopeExternalId": { "$ref": "common.schema.json#/$defs/NullableId" }
+      }
+    },
+    "EmptyRequest": {
+      "type": "object",
+      "maxProperties": 0
+    }
+  }
+}
