@@ -1,5 +1,8 @@
 # Handoff — FB feed 就地读+赞 真机灰度：跑出 82.1 扫卡缺陷（2026-07-15）
 
+> **⚠️ 本文档诊断已被后续取证推翻（2026-07-15 同日二跑）——保留作过程记录，勿据本文的「扫卡缺陷」结论行动。**
+> 真根因**不是**扫卡/settleCards，而是 `ensureFeed` 的 `&& !dialogOpen` 守卫遇 FB 首页瞬时良性 `[role=dialog]` → **每条 scroll 命令都整页 `Page.navigate` 重载**（＝「一直刷新、下不去」）。**已修**：edge `fb8c5b3`（change `facebook-feed-dialog-and-lazyload-refresh-fix`，去 dialog 守卫 + feed_exhausted 改懒加载感知），真机 CDP 验证达标。点赞仍 0 是**独立**问题（content_curator 相关性粗筛拒了越南语招工帖）。权威结论见 backlog 簇 82「✅ 二跑更正」块 + memory `fb-feed-dialog-guard-reload-churn`。
+
 > 接手先读本文件 + `docs/real-machine-acceptance-backlog.md` 簇 82（含本次「⚠ 首跑真机结论」块）。
 > 本次 session 把 backlog 簇 82 的「FB feed 就地读+赞灰度」在 dev 真机跑了第一轮，**跑出一条确凿的真机缺陷**并根因定位到边缘代码，未落 change。已提交/推送安全。
 
