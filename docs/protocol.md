@@ -163,7 +163,17 @@
 | `persona.generate` | edge → cloud | `persona.generate.result` | 按客户勾选关键词请求云端生成账号 persona 草稿（带 `idempotencyKey` 防重连/重试双计费；云端以握手绑定 `accountId` 为准） |
 | `persona.generate.result` | cloud → edge | — | 返回生成的 soul.yaml + 身份摘要；失败带 `reason`，MUST NOT 返回半成品（fail-closed、宁缺毋假） |
 | `persona.persist` | edge → cloud | `persona.persist.result` | 请求持久化客户确认后的 soul.yaml（复用云端现有校验写入通道，不新造写路径） |
-| `persona.persist.result` | cloud → edge | — | 持久化结果；失败带 `reason`（`unknown_account` / `persona_required` / `persona_invalid`） |
+| `persona.persist.result` | cloud → edge | — | 持久化结果；失败带 `reason`（`unknown_account` / `persona_required` / `persona_invalid`）；本次确实首次建立账号级首作状态时可带 `firstPostOnboarding:true` |
+
+`persona.persist.result` 成功 payload：
+```jsonc
+{
+  "ok": true,
+  "firstPostOnboarding": true // 可选；仅本次原子建立账号终身唯一的首作状态时为 true
+}
+```
+该字段不是“当前有没有人设”的别名。更新人设、重复请求、解绑后重绑或账号已经建立过首作状态时为
+`false`/缺省；Edge 只有看到明确的 `true` 才展示“人设已成形”后的第一篇作品引导。
 
 ## 3. 各消息 payload 定义
 
@@ -228,6 +238,13 @@
     "totals": { "view": 10, "like": 3, "collect": 1, "comment": 0, "follow": 2, "publish": 1 },
     "quotas": { "view": 150, "like": 50, "collect": 25, "comment": 8, "follow": 15, "publish": 1 },
     "saturated": ["publish"], // 向后兼容：以上三项是 day 窗口别名
+    "firstPost": { // 可选；仅账号终身首作状态正在寻找/生成时出现
+      "state": "searching", // searching | generating
+      "viewed": 7,          // 从首作状态 startedAt 起累计的真实 view 数
+      "target": 20,         // 新手首轮展示预期，不是风控配额或成功保证
+      "startedAt": 1730000000000,
+      "sourceId": "note-9" // 可选；generating 时已原子认领的精选源内容
+    },
     "windows": {
       "session": {
         "active": true,
@@ -288,6 +305,10 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 边缘即如实放弃，持久态由下次 hello 快照补齐。
 
 `dailyUsage.totals` / `quotas` / `saturated` 保持为日窗口别名，用于旧边缘兼容；新客户端优先读取 `windows`。
+`dailyUsage.firstPost` 是首作新人首轮的独立投影：只有字段存在时 Edge 才固定显示 `/20`；字段缺失时继续使用
+账号真实的今日或当前窗口计划。`20` 不写入 `quotas`、不停止浏览，也不表示必定筛出灵感；浏览达到或超过
+20 条仍未有真实精选命中时，客户端只能如实表达“继续寻找合适方向”。当第一条非空图文/视频源内容进入
+精选池后，Cloud 将 `state` 切为 `generating` 并复用现有参照创作与发布确认链；评论精选不触发首作生成。
 `windows.minute|hour|day` 由云端按账号聚合风险流水：浏览/点赞/收藏/评论/关注来自 `risk_counters`，发帖来自发布日志；
 分钟 / 小时窗口为滚动窗口；日窗口为 Asia/Shanghai 本地自然日（00:00 至次日 00:00），与风控 `quota:day` 判定同源；
 `quotas` 来自该账号当前风控档位的有效窗口上限，`saturated` 表示对应维度已达到或超过当前窗口上限。
