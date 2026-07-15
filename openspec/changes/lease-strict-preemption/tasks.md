@@ -102,7 +102,7 @@
 - 附注：6.2 的边缘置位、5.9 收紧 CHECK 已随批 B-2a/B-2b 落地（见 5.1/5.9）。**5.6（边缘 45s 排队默认 vs 云端）延后与 cloud 批 C 7.10 同批坐实**（受理超时口径两端一起定，避免边缘单改成不一致的表）
 - [ ] 5.6 边缘排队默认值与云端不一致（边缘 45s vs 云端 200s，`edge-task-coordinator.ts:58`）：改成同值，或对缺失该字段的申请**诚实拒绝**，别用不一致的表默默摘掉任务
 - [x] 5.7 **验证码落点回放前强制复检**（`browse/captcha-assist.ts`）：回放前重新探阻断类型 + 读当前 URL。阻断已消失 → `not_blocked`（绝不在已无验证码的页面盲点）；阻断类型或 URL 变了 → `stale_snapshot` + 重抓帧让运营在新帧上重标；复检本身失败 → 诚实 `failed`。复用现有回执枚举、**零协议改动**。URL 仅比 origin+pathname（验证码 token 每刷新都变、纳入会误判）。**硬前置**——今天靠「租约拿不到」挡着（安全的失败）；抢占之后会变成「抢到了 → 在发布编辑页上按几分钟前的旧坐标盲点真实鼠标」（**不安全的成功**）。回归：回放前阻断消失 → not_blocked 且**零鼠标派发**；回放前 URL 变 → stale_snapshot + 重抓帧且**零鼠标派发** <!-- aidcp-edge 35d3aec 分支 lease-strict-preemption -->
-- [ ] 5.8 删除遗留的整页发布处理器（`main.ts:579-639`，全程不过租约闸，云端已无发送方）
+- [x] 5.8 删除遗留的整页发布处理器 `client.onPublishCommand`（全程不过租约闸，云端已无发送方 publish.request）+ 三个孤立 import（publishPost/PublishResultPayload/buildPublishApprovalRequestId）；publishPost 函数与 edge-client API 保留（测试仍用） <!-- aidcp-edge 9a9ebda 批 B-2c -->
 
 ## 6. 协议（🔴 热点文件，两份逐字同改 + docs/protocol.md）
 
@@ -161,7 +161,9 @@
 - [ ] 11.8 参数一致性断言：云端受理预算 > 最长提交窗口 + 取消停手 + 让位 + 往返
 - [x] 11.9 协议往返断言（新原因字符串两端都是裸值，typecheck 抓不到）：AC-PROTO-14/15 两端各一份，edge full 1338 / cloud full 2044 全绿 <!-- aidcp-edge 9bc6c6b / aidcp-cloud 9f0194b 批 A -->
 - [ ] **批 A（协议地基）已落地** — 上述 6.1/6.2/6.3/6.4 + 11.9；inert 未接线，安全独立部署。
-- [x] **批 B-2a/B-2b（edge 抢占激活）已落地** — 5.1 六站提交窗口 + 5.10b 加群拆分 + 6.2 边缘置位（bc3e774，inert）→ 5.2/5.3/5.4/5.5/5.9 main.ts wire writers 激活 + 5.9 收紧 CHECK（b9fdfa5）。edge full 1359 / typecheck 0 / acceptance 21。**动 main.ts 发布 handler 区经用户 2026-07-15 明确批准（与 FB pacing 禁区结构隔离）**。对抗复核 workflow `wf_1657e89b-85a` 进行中。**🔴 co-deploy：b9fdfa5 激活边缘会回 `preempted_by_task`，云端 command-sequencer 当前烧成 failed → 绝不单独部署，必与批 C（cloud）同批。假成功修复链 = 5.2+5.3+5.9+6.2+command-sequencer 分类，整批同部署**。剩余批 B：5.6（延后与 cloud 7.10 同批）、5.8（批 B-2c 清理遗留 onPublishCommand）
+- [x] **批 B-2a/B-2b/B-2c/B-2d（edge 抢占激活 + 加固）已落地** — 5.1 六站提交窗口 + 5.10b 加群拆分 + 6.2 边缘置位（bc3e774，inert）→ 5.2/5.3/5.4/5.5/5.9 main.ts wire writers 激活 + 5.9 收紧 CHECK（b9fdfa5）→ 5.8 删遗留 onPublishCommand（9a9ebda）→ **对抗复核 `wf_1657e89b-85a` 加固**（6d87e39）。edge full 1363 / typecheck 0 / acceptance 21。**动 main.ts 发布 handler 区经用户 2026-07-15 明确批准（与 FB pacing 禁区结构隔离）**。
+  - **对抗复核结论（5 视角 + 逐条对抗验证，1359 单测全绿仍揪出）**：2 BLOCKER + 1 MEDIUM 已修（6d87e39）——① FB 发帖双发（submit 全程无取消点，窗口前抢占→点击照发+判 preempted 可重投）：submit 接 TakeoverCtx + enter 前同步 checkpoint + catch rethrowIfTakeover；② 加群点击前 observe 无取消点（30s 不可中断→超 quiesce→浏览冻结）：observeUntilReady 接 checkpoint 每轮检查 + enter 前 checkpoint；③ submitDispatched 时机（press 已发但 CDP 抛错→回执假→双发）：dispatchClick 加 onPressDispatched 回调 + catch 补带 submitDispatched。其余发现全部对抗验证驳回（join 动作名有云端归一表、两 Map 去同步不可达、遗留 handler 已删、窗口预算 ~1s 尾巴 graceful 非双发）。
+  - **🔴 co-deploy：edge 激活后会回 `preempted_by_task`，云端 command-sequencer 当前烧成 failed → 绝不单独部署，必与批 C（cloud）同批。假成功修复链 = 5.2+5.3+5.9+6.2+command-sequencer 分类，整批同部署**。剩余：5.6（延后与 cloud 7.10 同批）、批 C（cloud，含 command-sequencer BLOCKER + 7.x）、批 E 收口。
 - [ ] 11.10 `test:acceptance` → 全量 `test` → `typecheck`，edge / cloud 两侧
 
 ## 12. 真机验收（dev；登记 `docs/real-machine-acceptance-backlog.md`）
