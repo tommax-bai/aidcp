@@ -56,7 +56,7 @@
 - [x] 6.8 补齐正文首/中/尾摘录、视觉 brief 解析/兜底、人物 prompt 冲突优先级、人物反推 v3、contentAlignment 及 failed→unverified 丢槽回归测试。 <!-- cloud full 2082/2082; targeted 64/64 + 38/38; console 123/123 + 1 skipped -->
 - [x] 6.9 覆盖八类严格解析、分类兜底/源类型校正、分类 prompt、文字卡首/中/尾语义、分类审计与控制台 null-safe 展示；通过 acceptance、全量测试、typecheck、build 和 OpenSpec strict。
 - [x] 6.10 覆盖原创 1/多图策略、槽位职责兜底、类型路由、内容审计 pass/fail/retry/unavailable、copy not-applicable 和参照路径零回归。
-- [ ] 6.11 cloud/console acceptance、目标测试、全量测试、typecheck/build 与 OpenSpec strict 通过；提交推送、快进默认分支、部署 dev 并回写健康与未完成真实样本边界。
+- [x] 6.11 cloud/console acceptance、目标测试、全量测试、typecheck/build 与 OpenSpec strict 通过；提交推送、快进默认分支、部署 dev 并回写健康与未完成真实样本边界。
 
 ## 7. Change record
 
@@ -102,3 +102,12 @@
 - dev 备份：`/opt/aidcp/cloud.bak.20260715-144625.image-category-brief.tar.gz`、`/opt/aidcp/cloud/.env.bak.20260715-144625.image-category-brief`、`/opt/aidcp/console.bak.20260715-144625.image-category-brief.tar.gz`。cloud/console 均由干净提交归档构建部署，部署后 checksum dry-run 无内容漂移。
 - dev 健康：`aidcp-cloud.service=active/running`、`NRestarts=0`、8787 返回预期 426、8090/8088 health 均 `{"ok":true}`、console 新资产 HTTP 200、PG `ok=1`、飞书 `WSClient onReady`；四个 isales 服务均 active/running。四个视觉旗标均保持 `true`。
 - 未代用户触发新的真实洗稿，也未替用户评价最终图片质量；6.6 与 7.2 继续 pending，待用户试跑后按同素材逐槽核对类型 brief、正文一致性、视觉风格和人物神态。
+
+### 7.1 Autonomous-visual follow-up record (2026-07-15 15:43)
+
+- cloud `c2b3ad1`、console `b9c3bb3` 已快进到各自 `origin/master`；OpenSpec 契约提交已基于同期并行任务的最新 `origin/main` 重放并快进，不覆盖并行记录。
+- 原创稿件现在生成文章级 `visualSetBrief`，逐槽带固定 `slotRole` 和八类判别式 `categoryBrief`；composer 消费整组连续性、槽位职责与类型参数，并按能力诚实标记生成式、确定性文字卡、专用生成和区域引导路由。无来源图时使用独立 `content_alignment` 审计，`copyCheck=not_applicable`，失败仅有界重试一次且未知结果不得覆盖已知失败。
+- validation：cloud acceptance `52/52`、全量 `2113/2113`、原创视觉目标回归 `70/70`、收口审计回归 `9/9`、typecheck、build；console 全量 `125` passed + `1` skipped（`maxWorkers=2`）、发布详情目标 `22/22`、typecheck、build；OpenSpec strict 均通过。console 默认并发曾有一条未改动配额页用例超时，独立复跑 `3/3` 及降并发全量均通过。
+- dev 备份：`/opt/aidcp/cloud.bak.20260715-154018.autonomous-visual.tar.gz`、`/opt/aidcp/cloud/.env.bak.20260715-154018.autonomous-visual`、`/opt/aidcp/console.bak.20260715-154018.autonomous-visual.tar.gz`。cloud/console 均从默认分支干净归档构建部署，部署后 checksum dry-run 无内容漂移。
+- dev 健康：`aidcp-cloud.service=active`、`NRestarts=0`、8787 返回预期 426、8090/8088 health 均 `{"ok":true}`、console 新资产 HTTP 200、PG `select 1`、飞书 `WSClient onReady`；四个 isales 服务均 active/running。原有四个参考视觉旗标保持 `true`，新增 `AIDCP_AUTONOMOUS_VISUAL_AUDIT=true`。
+- 本次未代用户触发真实原创稿件发布或真实图片生成，因而只确认规划、路由、审计与展示链路已通过代码验证，不宣称最终图像质量已经真图验收；洗稿同素材 A/B 的 6.6 与归档 7.2 继续 pending。
