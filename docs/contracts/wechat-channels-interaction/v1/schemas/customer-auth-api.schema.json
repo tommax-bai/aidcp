@@ -31,7 +31,7 @@
     "AuthSummary": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "browserState", "reasonCode", "checkedAt", "capabilities"],
+      "required": ["status", "browserState", "reasonCode", "checkedAt", "capabilities", "identity", "runtimeControls"],
       "properties": {
         "status": { "$ref": "common.schema.json#/$defs/AuthStatus" },
         "browserState": { "$ref": "common.schema.json#/$defs/BrowserState" },
@@ -42,7 +42,50 @@
           ]
         },
         "checkedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
-        "capabilities": { "$ref": "#/$defs/EffectiveCapabilities" }
+        "capabilities": { "$ref": "#/$defs/EffectiveCapabilities" },
+        "identity": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["displayName", "identityHash"],
+              "properties": {
+                "displayName": { "type": "string", "minLength": 1, "maxLength": 256 },
+                "identityHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "runtimeControls": { "$ref": "#/$defs/RuntimeControlsProjection" }
+      }
+    },
+    "RuntimeControlsProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["storedVersion", "edgeAppliedVersion", "applicationStatus", "stored"],
+      "properties": {
+        "storedVersion": { "type": "integer", "minimum": 0 },
+        "edgeAppliedVersion": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "null" }
+          ]
+        },
+        "applicationStatus": { "enum": ["applied", "pending", "stale"] },
+        "stored": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["commentsReadEnabled", "commentsReplyEnabled", "dmReadEnabled", "dmSendTextEnabled", "dmSendImageEnabled", "writePaused"],
+          "properties": {
+            "commentsReadEnabled": { "type": "boolean" },
+            "commentsReplyEnabled": { "type": "boolean" },
+            "dmReadEnabled": { "type": "boolean" },
+            "dmSendTextEnabled": { "type": "boolean" },
+            "dmSendImageEnabled": { "const": false },
+            "writePaused": { "type": "boolean" }
+          }
+        }
       }
     },
     "InteractionListItem": {

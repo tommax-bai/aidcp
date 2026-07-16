@@ -48,7 +48,16 @@
         "dmSendImageEnabled": { "const": false },
         "writePaused": { "type": "boolean" },
         "updatedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
-        "updatedBy": { "$ref": "common.schema.json#/$defs/Id" }
+        "updatedBy": { "$ref": "common.schema.json#/$defs/Id" },
+        "edgeDelivery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "delivered"],
+          "properties": {
+            "status": { "enum": ["enqueued", "deferred"] },
+            "delivered": { "type": "integer", "minimum": 0, "maximum": 1 }
+          }
+        }
       }
     },
     "PolicyChannel": {

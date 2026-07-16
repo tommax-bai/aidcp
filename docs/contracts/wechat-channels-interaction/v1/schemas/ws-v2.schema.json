@@ -5,6 +5,7 @@
   "oneOf": [
     { "$ref": "#/$defs/HelloEnvelope" },
     { "$ref": "#/$defs/WelcomeEnvelope" },
+    { "$ref": "#/$defs/RuntimeControlsEnvelope" },
     { "$ref": "#/$defs/AuthStatusEnvelope" },
     { "$ref": "#/$defs/SyncBatchEnvelope" },
     { "$ref": "#/$defs/SyncAckEnvelope" },
@@ -60,7 +61,8 @@
           "properties": {
             "offboardPending": { "type": "boolean" }
           }
-        }
+        },
+        "interactionRuntime": { "$ref": "#/$defs/RuntimeControlsPayload" }
       },
       "allOf": [
         {
@@ -71,8 +73,32 @@
             "required": ["capabilities"]
           },
           "then": { "required": ["interactionRecovery"] }
+        },
+        {
+          "if": {
+            "properties": {
+              "capabilities": { "contains": { "const": "interaction_runtime_controls_v1" } }
+            },
+            "required": ["capabilities"]
+          },
+          "then": { "required": ["interactionRuntime"] }
         }
       ]
+    },
+    "RuntimeControlsPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accountId", "envKey", "version", "commentsReadEnabled", "commentsReplyEnabled", "dmReadEnabled", "dmSendTextEnabled", "dmSendImageEnabled"],
+      "properties": {
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "version": { "type": "integer", "minimum": 0 },
+        "commentsReadEnabled": { "type": "boolean" },
+        "commentsReplyEnabled": { "type": "boolean" },
+        "dmReadEnabled": { "type": "boolean" },
+        "dmSendTextEnabled": { "type": "boolean" },
+        "dmSendImageEnabled": { "const": false }
+      }
     },
     "EffectiveCapabilities": {
       "type": "object",
@@ -123,6 +149,7 @@
         "status",
         "browserState",
         "capabilities",
+        "runtimeControlsVersion",
         "identity",
         "checkedAt",
         "reasonCode"
@@ -134,6 +161,12 @@
         "status": { "$ref": "common.schema.json#/$defs/AuthStatus" },
         "browserState": { "$ref": "common.schema.json#/$defs/BrowserState" },
         "capabilities": { "$ref": "#/$defs/EffectiveCapabilities" },
+        "runtimeControlsVersion": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "null" }
+          ]
+        },
         "identity": {
           "oneOf": [
             { "$ref": "#/$defs/IdentitySummary" },
@@ -605,6 +638,12 @@
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
         { "properties": { "type": { "const": "welcome" }, "payload": { "$ref": "#/$defs/WelcomePayload" } } }
+      ]
+    },
+    "RuntimeControlsEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.runtime.controls" }, "payload": { "$ref": "#/$defs/RuntimeControlsPayload" } } }
       ]
     },
     "AuthStatusEnvelope": {

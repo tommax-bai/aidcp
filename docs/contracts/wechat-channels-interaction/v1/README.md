@@ -18,7 +18,7 @@
 | --- | --- |
 | `schemas/common.schema.json` | 平台、渠道、状态、风险、错误 envelope、公共原子类型 |
 | `schemas/domain.schema.json` | auth、thread、message、reply job、send attempt 与同步对象 |
-| `schemas/ws-v2.schema.json` | 13 个 Interaction WS 消息及三段 capability 协商 payload |
+| `schemas/ws-v2.schema.json` | 14 个 Interaction WS 消息及四段 capability 协商 payload |
 | `schemas/customer-auth-api.schema.json` | 客户 InteractionWorkspace API 的请求/响应 |
 | `schemas/internal-api.schema.json` | Console 配置、预览、发布、runtime controls 与审计 API |
 | `schemas/ai-roles.schema.json` | classifier、polisher、risk reviewer 的严格输入/输出 |
@@ -36,7 +36,7 @@
 
 ## WS v2 冻结
 
-现有 `{v,type,id,ts,payload}` envelope 不变；payload 不重复 `type`。基础 Interaction 合同的 7 个消息加上本次恢复/offboard 的 6 个消息，使目标 MessageType 从 83 增至 89：
+现有 `{v,type,id,ts,payload}` envelope 不变；payload 不重复 `type`。基础 Interaction 合同的 7 个消息加上恢复/offboard 的 6 个消息和账号 runtime controls 1 个消息，使目标 MessageType 从 83 增至 90：
 
 | type | 方向 | 关联语义 |
 | --- | --- | --- |
@@ -50,11 +50,12 @@
 | `interaction.sync.request` | Cloud → Edge | 后续 batch 用 payload `requestId` 关联 |
 | `interaction.reply.send` | Cloud → Edge | Edge 回 reply.result |
 | `interaction.auth.reopen` | Cloud → Edge | Edge 后续以 auth.status 报阶段 |
+| `interaction.runtime.controls` | Cloud → Edge | 仅向 scope 匹配且已协商能力的 Edge 下发版本化账号开关；enqueue 不等于应用 |
 | `interaction.offboard.command` | Cloud → Edge | scope-bound 撤权清理命令；先停同步/写并 drain，再删密文、关 sidecar |
 | `interaction.offboard.result` | Edge → Cloud | 可跨重启重放的 cleared/already_cleared/failed 结果 |
 | `interaction.offboard.ack` | Cloud → Edge | 使用 result envelope `id`；仅 exact accepted/duplicate 可清 durable outbox |
 
-基础协商标识固定为 `interaction_inbox_v1`；结果恢复另用 `interaction_reply_recovery_v1`，offboard 另用 `interaction_offboarding_v1`。Edge 在 optional `hello.capabilities` 声明，Cloud 只在双方支持时于 optional `welcome.capabilities` 回显。Cloud 回显 offboard capability 时必须同时给 account-bound `welcome.interactionRecovery.offboardPending`；Edge 仅在它明确为 false 时恢复 connector，缺失或 true 均 fail closed。恢复/offboard capability 依赖基础 inbox，未回显时不得发送对应扩展 type。旧 Cloud 仍可接收基础 `interaction.reply.result`，但 Edge 不得把 fire-and-forget 当确认并清 outbox；旧 Edge 不支持 offboard 时 Cloud 必须先撤权停写并保留 pending cleanup，等待可用的新 Edge，不能提前 tombstone 或谎报清理完成。
+基础协商标识固定为 `interaction_inbox_v1`；结果恢复另用 `interaction_reply_recovery_v1`，offboard 另用 `interaction_offboarding_v1`，账号开关另用 `interaction_runtime_controls_v1`。Edge 在 optional `hello.capabilities` 声明，Cloud 只在双方支持时于 optional `welcome.capabilities` 回显。Cloud 回显 offboard capability 时必须同时给 account-bound `welcome.interactionRecovery.offboardPending`；Edge 仅在它明确为 false 时恢复 connector，缺失或 true 均 fail closed。回显 runtime-controls capability 时必须同时给 scope-bound `welcome.interactionRuntime`；缺失、畸形或错误 scope 时 Edge 的互动能力全关。恢复/offboard/runtime-controls capability 依赖基础 inbox，未回显时不得发送对应扩展 type。旧 Cloud 仍可接收基础 `interaction.reply.result`，但 Edge 不得把 fire-and-forget 当确认并清 outbox；旧 Edge 不支持 offboard 时 Cloud 必须先撤权停写并保留 pending cleanup，等待可用的新 Edge，不能提前 tombstone 或谎报清理完成。
 
 同步是整批事务。只有 Cloud 持久化 batch/thread/message/cursor 成功后才能 ack `accepted`；已持久化批次回 `duplicate`；拒绝或部分失败回 `rejected`。Edge 只有在 `accepted|duplicate` 且 ack `cursorAfter` 与本批一致时推进本地 checkpoint。
 
