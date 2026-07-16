@@ -78,5 +78,9 @@
 
 - [x] 7.1 真机项登记 `docs/real-machine-acceptance-backlog.md` 簇 86.23-86.27（含 PG `listAttempts` 只在 memory 实现上跑过单测、须真库验证一项）
 - [x] 7.2 后继 change 登记（**勿静默**）：① `already_running` 类被误判可重试、1 秒热重试 2 秒烧光预算（`executors.ts:133` 死判断 + `publish-scheduler.ts` 形状，须串行）——**本投诉第一放大器**；② `failedAt` 落库抬精度天花板（`publish-log-store` + dispatcher）；③ `approvalCard.error` 从不被读致 `waiting_approval` 静默躺到 deadline；④ **（评审新增）** 起跑前停滞原因（`waiting_ownership` / `scheduler_busy` / `duplicate_target`）只写进 events 表、从不落 attempt 行 → 全程卡在等占用直到到期的任务，卡上仍只有记账（本 change 的覆盖缺口，非回归）；⑤ **（评审新增）** 异常原文未转义即进 lark_md 卡体，可能糊掉卡片排版（低危，卡是内部运维向）
-- [ ] 7.3 与并发 change `facebook-write-action-visibility` 对账（若其落到 `publish-log-store` / dispatcher 则与本变更互补，避免重复造）
-- [ ] 7.4 `openspec validate delegated-terminal-failure-reason --strict` → archive（MODIFY `user-delegated-tasks`，若同期另有 change 同改该 capability，归档须串行）
+- [x] 7.3 与并发 change `facebook-write-action-visibility` 对账 —— 归档时其仍是**空壳**（只有 `.openspec.yaml`、无任何 `.md`），无可对账内容、无重复造风险。其命名指向的「FB 写动作可见性」若日后落到 `publish-log-store` / dispatcher 落库，即本 change 后继项 ②（抬精度天花板），届时由那条认领。
+- [x] 7.4 `openspec validate --strict` 通过 → archive
+      <!-- capability 争用核查：活跃 change 中另有 unify-card-routing-origin-then-team 也带 user-delegated-tasks delta，
+           但本 change 6 条**全是 ADDED**（新需求名），对方是 MODIFIED 一条既有需求「命令触发的委托任务必须捕获来源
+           会话并回投操作员向卡片」——零 header 碰撞、无依赖序，两者可各自独立归档 -->
+      <!-- publish-claim-reject-defer-not-fail 同改该 capability，但仅 proposal（0/14）、本轮不归档 -->
