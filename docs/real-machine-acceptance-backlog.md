@@ -209,7 +209,9 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 
 ## 簇 15 — remote-captcha-assist 真机验收（云端远程处理验证码，登记于 2026-07-08）
 
-代码与部署已就绪并经只读核验：dev 上 `AIDCP_CAPTCHA_ASSIST_ENABLED=true`、就绪门通过（token secret 走 `AIDCP_PANEL_JWT_SECRET` 回退、`AIDCP_CAPTCHA_ASSIST_PUBLIC_BASE_URL=http://aidcp.tommax.cc`）、协助页 `http://aidcp.tommax.cc/captcha-assist/<id>` 外网 200、`/api/captcha-assist/<id>` 无 token 401、启动无「未启用」告警。剩人机在环走查（需运营机 edge + 真/模拟验证码）：
+代码与部署已就绪并经只读核验：dev 上 `AIDCP_CAPTCHA_ASSIST_ENABLED=true`、就绪门通过（token secret 走 `AIDCP_PANEL_JWT_SECRET` 回退）、`/api/captcha-assist/<id>` 无 token 401、启动无「未启用」告警。剩人机在环走查（需运营机 edge + 真/模拟验证码）：
+
+> **⚠️ 2026-07-16 更正（本条原验收证据已失效）**：上面原记「`AIDCP_CAPTCHA_ASSIST_PUBLIC_BASE_URL=http://aidcp.tommax.cc`、协助页 `http://aidcp.tommax.cc/captcha-assist/<id>` 外网 200」——那是 **2026-07-11 域名割接前**的证据（当时域名指 dev）。割接后该域名只回 **OL**，dev 签发的链接把运营送到 OL，实测报 `captcha_assist_unavailable`（503，在鉴权之前）。**已修**：dev `.env` 基址改为 `http://121.89.85.150:8088`（备份 `.env.bak.20260716-212426`，21:25:15 重启后进程环境已实测生效、无「未启用」告警）。**下面各项验收一律用新签发的链接**——飞书卡里的链接是发出时固化的，旧卡改配置也救不回。**验收口径不是「503 消失」**（503 只是最外层门，让开后还有 404 / `edge_offline` 两堵墙），而是运营真点一下、边缘真动了。
 
 - [ ] 运营机 edge 连 dev（`ws://121.89.85.150:8787`），账号刷到点选类验证码浮层、进入阻断态。
 - [ ] 飞书验证码/未知告警卡出现「打开协助处理」按钮；点开进协助页，看到边缘截下的现场图（账号昵称/机器/风控态/URL 上下文齐）。
