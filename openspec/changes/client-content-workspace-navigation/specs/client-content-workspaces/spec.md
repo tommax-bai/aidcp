@@ -1,0 +1,81 @@
+## ADDED Requirements
+
+### Requirement: Content tools use an in-window page stack
+
+Electron 客户端 SHALL 在现有主窗口内以应用页面承载运行首页、灵感库、灵感详情、参考创作确认和稿件审核；页面切换 MUST 保留全局标题栏、当前账号、环境入口与真实运行健康状态，MUST NOT 默认创建新的系统级子窗口。内容页的关闭动作 SHALL 回到运行首页，不得等同于关闭主窗口或退出客户端。
+
+#### Scenario: 从运行首页进入灵感库
+
+- **WHEN** 客户点击当前账号的灵感库入口
+- **THEN** 主内容区切换为该账号的灵感库页面，标题栏、账号环境栏和运行状态仍可见，且没有创建新的系统窗口
+
+#### Scenario: 关闭内容页回到运行首页
+
+- **WHEN** 客户在任一内容页点击关闭
+- **THEN** 页面栈回到运行首页，边缘核心与主窗口生命周期不受影响
+
+### Requirement: Inspiration library is account-scoped and consistently paginated
+
+灵感库 SHALL 只展示当前账号被纳入精选池的内容，提供“可创作”和“全部”筛选以及服务端一致总数的分页。列表 SHALL 区分缺失计数 `null` 与真实零值 `0`，不得把无数据伪装为零。返回列表 SHALL 恢复进入详情前的筛选、页码和滚动位置。
+
+#### Scenario: 分页只显示当前账号内容
+
+- **WHEN** 当前账号 A 打开灵感库并翻页
+- **THEN** 每一页和总数均只来自账号 A，不出现其他账号的标题、正文、作者、计数、链接或图片
+
+#### Scenario: 可创作筛选总数一致
+
+- **WHEN** 客户选择“可创作”
+- **THEN** 服务端只统计并分页返回正文非空的图文内容，当前页、总页数和总条数使用同一筛选条件
+
+#### Scenario: 从详情返回恢复列表位置
+
+- **WHEN** 客户从某一页的某条详情返回
+- **THEN** 客户回到原筛选、原页码与原滚动位置，而不是被重置到首页顶部
+
+### Requirement: Inspiration detail offers explicit reference modes
+
+可创作的图文灵感详情 SHALL 允许客户在提交前明确选择“图文一起参考”或“只参考文字”。当条目没有可用参考图时，客户端 MUST 禁用图文模式并解释原因；视频、评论或空正文条目 MUST NOT 提供参考创作提交入口。
+
+#### Scenario: 有参考图时选择图文模式
+
+- **WHEN** 正文非空的图文灵感含可用参考图，客户选择“图文一起参考”并确认
+- **THEN** 客户端提交该条 id 与 `useReferenceImages=true`，不得由渲染层提交或改写来源正文和图片 URL
+
+#### Scenario: 无参考图时只能参考文字
+
+- **WHEN** 可创作图文灵感没有可用参考图
+- **THEN** “图文一起参考”不可选，客户仍可选择“只参考文字”
+
+#### Scenario: 不可创作条目仅供查看
+
+- **WHEN** 客户查看视频、评论或正文为空的精选条目
+- **THEN** 页面只展示详情与不可创作原因，不显示可提交的参考创作按钮
+
+### Requirement: Reference creation receipt is honest
+
+参考创作提交成功 SHALL 只呈现任务已经创建或排队的事实，包含可识别的任务号；MUST NOT 呈现“稿件已生成”“发布成功”或平台成功。请求在途时 SHALL 禁止重复提交；失败时 SHALL 保留详情与选择并展示真实错误。
+
+#### Scenario: 任务排队成功
+
+- **WHEN** Cloud 返回结构化委派任务为 `queued`
+- **THEN** 客户端展示“已排队创作”和任务号，并说明稿件将在后续审核，不宣称生成或发布完成
+
+#### Scenario: 创建任务失败
+
+- **WHEN** Cloud 因账号归属变化、内容不可创作、会话失效或服务不可用拒绝请求
+- **THEN** 客户端展示对应失败，不关闭详情、不伪造任务、不显示成功措辞
+
+### Requirement: Account switching invalidates stale content context
+
+当前账号切换 SHALL 原子清除旧账号的详情、参考创作确认与稿件审核局部状态，并加载新账号的内容。任何旧账号迟到回包 MUST 被丢弃，MUST NOT 覆盖或短暂显示在新账号页面。
+
+#### Scenario: 列表加载中切换账号
+
+- **WHEN** 账号 A 的灵感列表请求在途时客户切换到账号 B，随后 A 的响应才到达
+- **THEN** A 的响应不渲染，页面只允许展示 B 的加载态或内容
+
+#### Scenario: 稿件审核中切换账号
+
+- **WHEN** 客户正在审核账号 A 的稿件并切换到账号 B
+- **THEN** 稿件审核页关闭、删除确认与提示清除，B 的界面不得残留 A 的成品内容
