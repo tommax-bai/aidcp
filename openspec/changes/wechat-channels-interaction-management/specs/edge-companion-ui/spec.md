@@ -22,7 +22,7 @@ Electron 客户端 SHALL 保持现有全局标题栏与左侧环境栏；当前�
 
 ### Requirement: 视频号 workspace 必须保留当前环境生命周期控制
 
-InteractionWorkspace SHALL 在顶部提供当前视频号环境可见的生命周期按钮。核心为 stopped/warning 时 SHALL 显示“启动”，会话为 paused 时 SHALL 显示“恢复”，其余 starting/running 状态 SHALL 显示“暂停”。动作 MUST 复用既有单环境 lifecycle IPC 并携当前 `envKey`；MUST NOT 调用 fleet 全部启动、把显示浏览器/重新登录冒充启动，或操作其他环境。
+InteractionWorkspace SHALL 在顶部提供当前视频号环境可见的生命周期控件，并与 XHS 使用同一状态矩阵和判定优先级。会话为 paused 时 SHALL 优先同时显示“恢复”和独立的“关闭”；其余核心为 stopped/warning 时 SHALL 只显示“启动”；其余 starting/running 时 SHALL 只显示“暂停”。“暂停” MUST 保留当前浏览器/会话；“关闭” MUST 仅在暂停态可见且可执行，关闭完成后 SHALL 按主进程回传真态回到“启动”。所有动作 MUST 复用既有单环境 lifecycle IPC 并携当前 `envKey`；MUST NOT 调用 fleet 全部启动、把显示浏览器/重新登录冒充启动、操作其他环境、清除登录凭证或触发 offboard。
 
 #### Scenario: 离线视频号环境可以就地启动
 - **WHEN** 用户选中 edge=stopped 的 wechat_channels 环境并点击“启动”
@@ -31,6 +31,22 @@ InteractionWorkspace SHALL 在顶部提供当前视频号环境可见的生命�
 #### Scenario: 生命周期状态切换使用同一入口
 - **WHEN** 当前视频号环境从 running 进入 paused，或从 paused 恢复运行
 - **THEN** 按钮依次显示“暂停”“恢复”“暂停”，每次动作都绑定当前 envKey 且以主进程回传真态刷新
+
+#### Scenario: 暂停后可以显式关闭当前环境
+- **WHEN** 当前视频号环境为 paused
+- **THEN** workspace 同时显示“恢复”和“关闭”；点击“关闭”只调用当前 envKey 的单环境关闭 IPC，完成后显示“启动”，且其他环境、登录凭证和 offboard 状态保持不变
+
+#### Scenario: 非暂停态不暴露关闭入口
+- **WHEN** 当前视频号环境为 starting、running、stopped 或 warning
+- **THEN** “关闭”入口不可见且 handler 拒绝执行，用户必须先暂停当前环境才能显式关闭
+
+### Requirement: 开发者详情必须跨 workspace 保持可见
+
+设置中的“显示开发者详情”开关 SHALL 继续控制共享的当前环境原始日志面板，默认隐藏和持久化语义 SHALL 保持不变。该面板 MUST 位于 XHS/Facebook legacy workspace 与视频号 InteractionWorkspace 的互斥切换之外；开关启用后切换到 `wechat_channels` MUST 继续显示当前选中 `envKey` 的日志，MUST NOT 因 legacy workspace 隐藏而消失或展示其他环境日志。
+
+#### Scenario: 视频号环境显示已启用的开发者详情
+- **WHEN** 用户已启用“显示开发者详情”并从 XHS/Facebook 切换到视频号环境
+- **THEN** InteractionWorkspace 与开发者详情同时可见，日志内容切换到当前视频号 envKey 的分桶；切回其他环境时同一面板继续显示对应环境日志
 
 ### Requirement: 互动 workspace 必须呈现真实队列与发送状态
 

@@ -11,7 +11,8 @@ aidcp 目前没有视频号平台、入站评论/私信收件箱或可恢复的�
 - 冻结 customer-auth 与 internal API 的成功/错误 envelope、路径、分页游标、环境/账号归属、权限、版本冲突与 draft/published 配置语义。
 - 冻结账号级 policy/template/rule/profile、模板变量白名单、AI role 输入/输出以及失败回退；图片私信发送保持未启用。
 - 冻结 Electron 壳约束：左侧环境栏与全局标题栏不变，选择视频号环境时只替换右侧当前环境 workspace，且所有响应必须按 `envKey` 防串号。
-- 视频号右侧 workspace 保留当前环境的显式生命周期入口，按真实状态显示启动、暂停或恢复，并且只操作当前 `envKey`。
+- 视频号右侧 workspace 保留当前环境的显式生命周期入口，按真实状态显示启动、暂停或恢复；暂停态额外显示显式关闭入口，并且所有动作只操作当前 `envKey`。
+- 设置中启用的“开发者详情”属于共享应用壳诊断面，切换到视频号 workspace 后继续展示当前环境原始日志，不被旧 workspace 的显隐状态吞掉。
 - 提供版本化 JSON Schema、comment/dm fixtures、端到端走读与统一 handoff，作为 Session 01–04 的权威消费入口。
 - 本 change 只冻结控制仓契约，不实现 Edge、Cloud、Console 业务代码，不部署，不调用真实视频号写接口。
 
