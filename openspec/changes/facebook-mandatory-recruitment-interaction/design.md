@@ -69,6 +69,12 @@ loader 限制规则数、id 格式/唯一性、文本长度、动作枚举与审
 
 通知口与既有排期评论 `auto_approve` 使用同一“先通知、后授权、失败关闭”范式，由 server 抽成共享闭包后分别注入 scheduler 与浏览 dispatcher。XHS 未配置规则时零变化。
 
+### 6. 同帖强制点赞必须先入队，再开启评论钉页保护
+
+`interaction.completed` 是“互动决策完成”事件，不是 edge 已执行成功回执；同一事件既驱动 like 指令翻译，也驱动后续评论支线。评论角色的订阅早于 dispatcher 指令翻译，因此 mandatory comment 分支 MUST 与普通评论评估分支一样，把 `comment.appraised` 排到微任务：当前同步事件内先让 dispatcher 下发本帖 like，当前同步栈结束后再设置 `commentInflight` 并开始撰写 / 审批。
+
+评论钉页保护仍覆盖后续滚动、换帖与其它互动，且不等待 like 回执才启动；WebSocket 与 edge 串行命令队列保证已先入队的 like 早于后续评论迁移。任何因 `commentInflight` 被抑制的命令 MUST 记录稳定 `reason=comment_inflight`、动作和目标，不能只返回 `false` 静默消失。
+
 ## Risks / Trade-offs
 
 - **[语义误判导致不该互动]** → 只在全文详情阶段确认，规则需稳定 id，未知输出拒绝；全局品牌安全优先级高于 mandatory rule。
@@ -77,6 +83,7 @@ loader 限制规则数、id 格式/唯一性、文本长度、动作枚举与审
 - **[自动评论变成模板垃圾]** → 不提供硬编码文本兜底；保留内容落地、去 AI 味、反照搬和最多一次重试。
 - **[通知与提交语义漂移]** → 通知携账号、目标与终稿；通知成功才授权，通知失败不提交。
 - **[事件上下文在嵌套 emit 中丢失]** → mandatory context 随 typed payload 逐跳透传，不依赖并行共享集合。
+- **[评论钉页先于同帖点赞导致意图被吞]** → mandatory comment 的钉页事件延后一微任务；集成测试必须同时提供真实 noteData 与 `actions=[like,comment]`，并断言 like 已下发后钉页才生效。
 
 ## Migration Plan
 

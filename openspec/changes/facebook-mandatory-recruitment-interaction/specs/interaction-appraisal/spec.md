@@ -17,3 +17,11 @@
 #### Scenario: mandatory context 不依赖同级共享集合
 - **WHEN** `quality.pass` 在同步 EventBus 内触发深读并嵌套推进到 `reading.done`
 - **THEN** 规则上下文随因果 payload 可见于点赞判定，MUST NOT 依赖另一个同级订阅者稍后写入的 Set 而丢失
+
+#### Scenario: 同帖强制点赞先于评论钉页保护入队
+- **WHEN** 一篇全文确认命中的帖子同时要求 `like + comment`，且评论角色比 dispatcher 更早订阅 `interaction.completed`
+- **THEN** mandatory like 指令 MUST 先真实进入 edge 命令队列，随后评论支线才设置 `commentInflight`；钉页保护 MUST NOT 静默吞掉本帖点赞
+
+#### Scenario: 评论钉页抑制具有稳定审计原因
+- **WHEN** `commentInflight` 已生效后，新的滚动、换帖或其它互动命令被钉页保护拒绝
+- **THEN** 云端 MUST 记录 `reason=comment_inflight`、动作及可用目标信息，不得只返回失败而不留日志
