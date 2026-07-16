@@ -78,12 +78,23 @@ TBD - created by archiving change user-delegated-tasks-phase-1. Update Purpose a
 
 ### Requirement: 批量和异步委托必须遵守自动化风险额度并保留人审
 
-单次旧人工命令 MAY 保留既有 manual override；`targetSuccessCount>1`、跨账号或异步委托 MUST 使用自动化额度与风险闸，MUST NOT 为每次 attempt 传 `manualOverride=true`。RiskController SHALL 继续是账号风险状态唯一写者。公开评论和发布默认 SHALL 使用 `review`，除非既有受控配置明确允许其他模式。
+**精确单次操作员命令**（`source=legacy_command` 且 `targetConstraints.manualSingle=true`，含 `/publish` 与 `/comment`）SHALL 以操作员全权执行——越过风控 status / canDo 与配额闸（发帖侧透传 `operatorOverride=true`，评论侧 `manualOverride=true`），但**发布前 / 评论前的人审 MUST 仍强制**（越权只越风控 / 配额，绝不越人审）。`targetSuccessCount>1`、跨账号、自然语言（`source=feishu`）或结构化（`source ∈ {edge,console,api}`）委托 MUST 使用自动化额度与风险闸（`governed`），MUST NOT 置 `operatorOverride` / 为每次 attempt 传 `manualOverride=true`。RiskController SHALL 继续是账号风险状态唯一写者。公开评论和发布默认 SHALL 使用 `review`，除非既有受控配置明确允许其他模式。
 
 #### Scenario: 批量评论不能循环绕额度
 - **WHEN** 用户确认一个 5 条评论的委托任务
 - **THEN** 每次评论尝试按自动化路径检查风险/配额且 `manualOverride=false`
 - **AND** 额度不足时任务 deferred 或诚实部分完成，不得循环伪装成五次单次人工命令
+
+#### Scenario: 精确 /publish 在风控受限账号仍以操作员全权执行
+- **WHEN** 管理群对一个风控非 normal 或当天已达发布配额的账号发送 `/publish <昵称>`（`source=legacy_command`、`manualSingle`）
+- **THEN** 系统越过风控 status/canDo 与配额生成草稿并发出发布人审卡（`operatorOverride=true`）
+- **AND** MUST NOT 因风控/配额把该精确命令 blocked→deferred→静默判失败
+- **AND** 发布前人审 MUST 仍强制，越权 MUST NOT 越过人审
+
+#### Scenario: 自然语言与结构化发帖不得越风控
+- **WHEN** 委托发帖来自自然语言（`source=feishu`）或结构化入口（edge/console/api）
+- **THEN** 系统走 `governed` 路径，风控非 normal / canDo 拒时诚实 blocked
+- **AND** MUST NOT 置 `operatorOverride`，MUST NOT 让结构化发帖跳过风控闸
 
 ### Requirement: 第一批动作必须统一接入并回报真实进度
 
@@ -155,67 +166,59 @@ Phase 1 SHALL 接入：完成 N 条有效评论、发布一篇稿件、参考今
 
 委托层 MUST NOT 为任务的常规状态迁移（`queued`、`executing`、`completed`、`waiting_approval`）主动推送自有的任务进度卡。每个任务的执行结果 SHALL 由其底层动作的**正常业务结果卡**承担：评论由评论链的结果卡回报；发帖成功由发布人审卡自证（成功不重复报绿）；发帖等待人审由发布人审卡本身承担。
 
-唯一例外：**发帖类终态失败**（`failed`，或仍有缺口的 `partially_completed`）没有独立业务结果卡，委托层 MUST 补发一张诚实的失败 / 部分完成结果卡（红线：绝不静默失败）。**评论类终态失败 MUST NOT 由委托层补发**（评论链已发结果卡，避免重复）。
+**终态失败兜底**（红线：绝不静默失败）——没有独立业务结果卡的终态失败，委托层 MUST 补一张诚实卡：
+
+- **发帖类终态失败**（`failed`，或仍有缺口的 `partially_completed`）：MUST 补发失败 / 部分完成结果卡。
+- **评论类「起跑前触发闸失败」**（`failed`、0 成功、终态码 `non_retryable_failure`——人设未绑 / 联系方式缺 / 平台不支持 / 未接线等在异步任务起跑前早退，评论链从未起跑、`postResultCard` 从未发过）：MUST 补发一张诚实失败卡。
+- **评论类起跑后失败**（`max_attempts` / `deadline` 等，评论链已发结果卡）：MUST NOT 由委托层补发（避免与 `postResultCard` 双发）。
 
 精确旧 slash 写命令（`source=legacy_command`）直接排队时 SHALL **静默受理**——只保留已读表情，MUST NOT 发送队列提示卡；结果由该任务自身的业务结果卡回报。自然语言委托仍先展示结构化确认卡（不受影响）；用户主动请求的控制命令（查看 / 暂停 / 取消）与卡片按钮回卡不受影响。
 
-委托任务处于 `waiting_approval` 时保留有界的审批结果对账，但当审批、真实进度、控制意图和终态结果均未变化时，MUST NOT 发送新的用户通知或递增用于卡片控制的 task version；内部 claim/lease MAY 更新，但不得把无变化心跳呈现为新的业务进度。审批通过 / 驳回 / 候选版本变化 / 真实计数变化 / 暂停 / 取消意图变化 / 终态收敛时，按上述通知归属发送对应反馈，MUST NOT 吞掉真实业务变化。
-
-#### Scenario: 评论任务完成不再叠加委托进度卡
-- **WHEN** 一个委托评论任务跑完（成功或失败），评论链已按账号发出正常结果卡
-- **THEN** 委托层 MUST NOT 再叠加一张任务进度卡（`queued` / `failed` / `completed`）
+委托任务处于 `waiting_approval` 时保留有界的审批结果对账，但当审批、真实进度、控制意图和终态结果均未变化时，MUST NOT 发送新的用户通知或递增用于卡片控制的 task version；内部 claim/lease MAY 更新，但不得把无变化心跳呈现为新的业务进度。
 
 #### Scenario: 发帖失败仍诚实通知
 - **WHEN** 一个委托发帖任务达到最大尝试仍 0 成功 → `failed`
 - **THEN** 委托层补发一张红色失败结果卡（含真实完成数 0/N），MUST NOT 静默
 
+#### Scenario: 评论起跑前触发闸失败仍诚实通知
+- **WHEN** 一个委托评论任务在异步任务起跑前因人设未绑 / 联系方式缺 / 平台不支持 / 未接线而以非重试失败终结（`failed`、0 成功、终态码 `non_retryable_failure`）
+- **THEN** 委托层补发一张红色「评论任务未触发」结果卡（含起跑失败的人类可读原因），MUST NOT 静默
+
+#### Scenario: 评论起跑后失败不重复报卡
+- **WHEN** 一个委托评论任务已起跑到终态失败（评论链已按账号发出结果卡），终态码为 `max_attempts` / `deadline`
+- **THEN** 委托层 MUST NOT 再叠加一张失败卡（避免与评论链 `postResultCard` 双发）
+
 #### Scenario: 发帖成功不重复报绿
 - **WHEN** 委托发帖经人审通过并发布 → `completed`
 - **THEN** 委托层 MUST NOT 再发绿色成功卡（成功由发布人审卡自证）
-
-#### Scenario: 精确命令静默排队
-- **WHEN** 管理群发送 `/publish <昵称>` 且昵称唯一可解析
-- **THEN** 命令直接入队且 MUST NOT 回任何队列提示卡（只保留已读表情）
-- **AND** 结果由发帖的正常业务卡（人审卡 / 失败卡）回报
-
-#### Scenario: 等待审批的重复对账不产生新卡
-- **WHEN** 发布候选进入 `waiting_approval`，连续多轮对账都返回仍未审批
-- **THEN** 委托层不发任何等待进度卡，后续静默对账也 MUST NOT 递增 task version、增加 attempt 或发重复飞书卡
-
-#### Scenario: 审批结果变化仍正常通知
-- **WHEN** 静默等待中的候选随后被批准、驳回或修改为影响任务收敛的新版本
-- **THEN** 下一次对账 SHALL 按真实结果更新任务，并按通知归属发送反映该语义变化的反馈（评论链结果卡 / 发帖失败兜底 / 成功由人审卡自证）
-
-#### Scenario: 静默对账不覆盖并发取消
-- **WHEN** worker 持有等待审批 claim 时用户取消尚未执行的剩余部分
-- **THEN** 静默 release MUST NOT 把已经取消的任务改回 `waiting_approval`
-- **AND** 取消后的真实终态与已有计数保持不变
 
 ### Requirement: 自然语言入口先结构化确认；结构化精确入口直接入队
 
 只有**自然语言**委托入口（`source=feishu`）SHALL 先创建 `awaiting_confirmation` 任务并展示结构化确认摘要——账号 / 数量 / 截止 / 尝试均为从散文**推断**、可能解析错，需人过目；只有带 task id 与当前版本的明确确认才能进入 `queued`。**结构化精确入口**（console 行级动作 / Edge 快捷入口 / api / 旧 slash 命令，即 `source ≠ feishu`）参数已在调用处显式给定、无可推断歧义，SHALL 在创建时直接确认入队（`awaiting_confirmation → queued`），MUST NOT 展示结构化确认卡。
 
+**结构化入口的客户端请求体对 `approvalMode` 不可信**：免审（`auto_approve`）只由账号级授权授予，客户端体 MUST NOT 自带、系统 MUST NOT 原样采信。系统 SHALL 在 HTTP 建草稿边界把客户端体的 `approvalMode` 收口——缺省保持未定（交由按动作的默认，如 `generate_candidates → draft_only`）、`draft_only` 放行、其余（含 `auto_approve` 与任何未来模式）夹成 `review`。**服务端自建 intent**（后台洗稿 / 候选控制已显式传 `review`、飞书 parser 已硬编码 `review`）不经此收口、不受影响。
+
 两类入口的人审都不受影响（发布 / 评论仍在下游内容审批处保留人审），昵称重名或找不到仍 fail-closed 拒绝。重复创建（去重命中）MUST 幂等返回当前真态，MUST NOT 重复入队。任务创建时 SHALL 从账号事实源回读平台，调用方自报平台不一致 MUST 拒绝。直接入队 ≠ 已执行：worker 接管前不得有任何一次尝试或平台副作用。
 
-#### Scenario: console 行级动作直接入队、不出确认卡
+#### Scenario: 客户端体自带 auto_approve 被夹成 review
 
-- **WHEN** 管理后台对一条精选图文点「洗稿」或对候选稿点「批准 / 驳回 / 修改」（`source=console`）
-- **THEN** 系统在创建时直接确认入队（状态 `queued`），MUST NOT 展示「请确认用户委托任务」卡
-- **AND** 入队时 `attemptCount=0`、无边端接管 / 生成 / 发布；结果由下游业务结果卡回报
+- **WHEN** 结构化建草稿路由（面板 / 客户端）收到请求体带 `approvalMode:'auto_approve'`
+- **THEN** 系统在创建前把该字段夹成 `review`，任务以必审入队
+- **AND** MUST NOT 让内容以免审绕过下游人审直达平台，即使该账号未开启账号级免审
+
+#### Scenario: 结构化精确入口不出确认卡但保留人审
+
+- **WHEN** 管理后台对一条精选图文点「洗稿」（`source=console`，服务端自建 intent 传 `review`）
+- **THEN** 系统直接确认入队（状态 `queued`），MUST NOT 展示确认卡
+- **AND** 其 `review` 授权不经客户端收口、保持不变，下游人审仍强制
 
 #### Scenario: 自然语言委托仍先结构化确认
 
-- **WHEN** 飞书管理群发送自然语言业务目标（如「让 <昵称> 发布一篇稿件」）
+- **WHEN** 飞书管理群发送自然语言业务目标
 - **THEN** 系统仍先创建 `awaiting_confirmation` 任务并展示结构化确认摘要，明确确认后才 `queued`
 
 #### Scenario: 重复创建幂等、不产生双任务
 
 - **WHEN** 同一结构化精确动作在去重窗口内被重复触发
 - **THEN** 去重命中返回同一 task id 的当前真态，MUST NOT 重复入队或重复执行
-
-#### Scenario: 平台事实不一致时拒绝
-
-- **WHEN** 入口把 Facebook 账号声明为小红书以请求小红书定向评论
-- **THEN** 系统以 accounts 平台事实源拒绝该草稿或入队
-- **AND** MUST NOT 将任务路由到另一平台执行器
 
