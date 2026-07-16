@@ -113,12 +113,13 @@ TBD - created by archiving change comment-interaction. Update Purpose after arch
 - **经统一命令出口生效**：暂停 MUST 由发命令的统一出口（软暂停闸）扣住一切会离开当前待评论帖的浏览 / 互动命令——包括并行互动回执触发的 stale-target 重扫滚屏、idle 看门狗的恢复滚屏、换帖 `open_note`、`refresh`、feed 续滚。MUST NOT 退化为只在单个 idle-nudge 翻译点做门控（该退化会漏掉上述其余出口）。
 - **看门狗按"有意暂停"处理**：暂停期间 idle 计时 MUST 冻结（不因无浏览上报累积 idle 而 nudge / 结束会话）。
 - **窗内不提前结束会话**：暂停期间由动作数 / 时长 / 配额上限触发的 `session.should_end` MUST 推迟到评论支线终局后再评估，MUST NOT 在评论支线在途时结束会话而废掉一条正在人审 / 已授权的评论；但 `session.end` 本身 MUST 仍可达（暂停不得阻塞真正需要的结束）。
-- **终局解除顺序严格**：`comment.approved` / `comment.skipped` 终局 MUST 先解除暂停态并恢复看门狗计时，再下发已授权评论命令或（读评 surface 不等时的）`open_note{purpose:'navigate'}` 迁移命令——否则评论 / 迁移命令会被自己设的暂停态扣住。
+- **终局解除顺序严格（读评 surface 相等时）**：读、评 surface 相等的账号（如小红书，迁移结构性不可达），`comment.approved` / `comment.skipped` 终局 MUST 先解除暂停态并恢复看门狗计时，再下发已授权评论命令——否则评论命令会被自己设的暂停态扣住。
+- **迁移在途持续抑制离页命令（读评 surface 不等时）**：读、评 surface 不等的账号（如 Facebook：读 feed、评论 detail，`comment.approved` 后经 `open_note{purpose:'navigate'}` 两步迁移），离页命令抑制 MUST **覆盖整个迁移在途窗口**（从迁移 navigate 命令下发起，到浏览器落地详情、评论命令下发止），期间 MUST 继续经统一命令出口扣住一切会离页的浏览 / 互动命令（`page.scroll` / 换帖 `open_note` / `refresh` / feed 续滚 / stale-target 重扫）；否则迁移落地前后并发的 scroll 会经边缘 `ensureFeed` 把浏览器整页拽回列表面、迁移拿不到详情、已批准评论被丢。本迁移的 `open_note{purpose:'navigate'}` 命令与落地后的 `comment` 命令 MUST **豁免**该抑制（它们即迁移支线本身），MUST NOT 被自己设的抑制扣住而静默丢弃。该迁移在途抑制窗口 MUST 有界，并在迁移终局（落地回执 / 迁移下发被拦 / 被抢占 / 会话 reset）解除，MUST NOT 悬挂钉死会话。
 
 MUST 设**硬性短超时**（可信停留上限）；超时 / 拒绝 MUST 视为本篇不评、记审计、emit `comment.skipped` 进"是否进主页评估"。
 审批 MUST 复用既有 `/tmp` 先到先得审批信号机制、用**评论专属 requestId 命名空间**（与发帖 `publish-<recordId>` 区分）；**未获授权 MUST NOT 下发评论命令**。
 
-该暂停态跨平台一致：小红书（读评同为详情面）与 Facebook（读 feed、评论 detail，`comment.approved` 后经 `open_note{navigate}` 两步迁移）均适用。
+该暂停态跨平台一致：小红书（读评同为详情面，评论就地直发）与 Facebook（读 feed、评论 detail，`comment.approved` 后经 `open_note{navigate}` 两步迁移、迁移在途窗口持续抑制离页命令）均适用。
 
 #### Scenario: 授权后下发、超时则跳过
 - **WHEN** 飞书人审在超时窗口内写入评论 requestId 的授权信号
@@ -140,9 +141,13 @@ MUST 设**硬性短超时**（可信停留上限）；超时 / 拒绝 MUST 视�
 - **WHEN** 浏览会话处于"评论支线在途"暂停态
 - **THEN** 看门狗 MUST 按"有意暂停"处理、MUST NOT 因 idle 重启或结束会话；该 edge 的其他浏览 / 互动命令 MUST 在暂停期间不下发，`session.end` MUST 仍可达
 
-#### Scenario: 终局先解除暂停再下发评论/迁移命令
-- **WHEN** 评论支线到达终局（`comment.approved` 或 `comment.skipped`）
-- **THEN** 系统 MUST 先解除暂停态并恢复看门狗计时，再下发已授权评论命令或 `open_note{purpose:'navigate'}` 迁移命令；MUST NOT 让评论 / 迁移命令被残留的暂停态扣住而静默丢弃
+#### Scenario: 读评 surface 相等——终局先解除暂停再下发评论
+- **WHEN** 评论支线到达终局（`comment.approved` 或 `comment.skipped`），且该账号读、评 surface 相等（如小红书，迁移不可达）
+- **THEN** 系统 MUST 先解除暂停态并恢复看门狗计时，再下发已授权评论命令；MUST NOT 让评论命令被残留暂停态扣住而静默丢弃
+
+#### Scenario: 读评 surface 不等——迁移在途持续抑制离页命令、放行迁移与评论
+- **WHEN** `comment.approved` 后该账号读、评 surface 不等（如 Facebook），系统经 `open_note{purpose:'navigate'}` 两步迁移，迁移 navigate 尚未落地详情
+- **THEN** 系统 MUST 在整个迁移在途窗口继续经统一命令出口扣住一切会离页的浏览 / 互动命令（`page.scroll` / 换帖 `open_note` / `refresh` / feed 续滚 / stale-target 重扫），使并发 scroll 不会经 `ensureFeed` 把浏览器拽回列表面；同时 MUST 放行本迁移的 `open_note{purpose:'navigate'}` 与落地后的 `comment` 命令；该迁移在途窗口 MUST 有界并在迁移终局解除，MUST NOT 悬挂钉死会话
 
 #### Scenario: 红线反例——未授权或超时仍发评论（禁止）
 - **WHEN** 有实现在无授权信号 / 超时后仍下发评论命令，或为绕开"页面久留"把评论改成无人审自动直发
