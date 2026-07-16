@@ -22,6 +22,12 @@
           "dmSendTextEnabled": true, "dmSendImageEnabled": false, "writePaused": false }
       }
     },
+    "replyConfig": {
+      "status": "draft_only",
+      "currentVersion": 5,
+      "draftVersion": 5,
+      "publishedVersion": null
+    },
     "thread": {
       "id": "thread_dm_200",
       "platform": "wechat_channels",

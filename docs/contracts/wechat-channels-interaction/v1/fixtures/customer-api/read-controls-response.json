@@ -1,0 +1,51 @@
+{
+  "data": {
+    "envKey": "env_wc_demo",
+    "accountId": "acct_wc_demo",
+    "platform": "wechat_channels",
+    "auth": {
+      "status": "active",
+      "browserState": "closed",
+      "reasonCode": null,
+      "checkedAt": 1784044801000,
+      "capabilities": {
+        "commentsRead": false,
+        "commentsReply": false,
+        "dmRead": false,
+        "dmSendText": false,
+        "dmSendImage": false
+      },
+      "identity": {
+        "displayName": "示例视频号",
+        "identityHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "runtimeControls": {
+        "storedVersion": 8,
+        "edgeAppliedVersion": 7,
+        "applicationStatus": "pending",
+        "stored": {
+          "commentsReadEnabled": true,
+          "commentsReplyEnabled": false,
+          "dmReadEnabled": true,
+          "dmSendTextEnabled": false,
+          "dmSendImageEnabled": false,
+          "writePaused": true
+        }
+      }
+    },
+    "replyConfig": {
+      "status": "missing",
+      "currentVersion": null,
+      "draftVersion": null,
+      "publishedVersion": null
+    },
+    "edgeDelivery": {
+      "status": "enqueued",
+      "delivered": 1
+    }
+  },
+  "meta": {
+    "requestId": "customer-read-controls-001",
+    "asOf": 1784044840000
+  }
+}

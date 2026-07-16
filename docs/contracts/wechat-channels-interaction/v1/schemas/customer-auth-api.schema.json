@@ -13,6 +13,8 @@
     { "$ref": "#/$defs/EscalateRequest" },
     { "$ref": "#/$defs/SyncActionRequest" },
     { "$ref": "#/$defs/BrowserControlRequest" },
+    { "$ref": "#/$defs/ReadControlsRequest" },
+    { "$ref": "#/$defs/ReadControlsResponse" },
     { "$ref": "#/$defs/EmptyRequest" },
     { "$ref": "common.schema.json#/$defs/ErrorEnvelope" }
   ],
@@ -89,6 +91,32 @@
         }
       }
     },
+    "ReplyConfigProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "currentVersion", "draftVersion", "publishedVersion"],
+      "properties": {
+        "status": { "enum": ["missing", "draft_only", "published", "unknown"] },
+        "currentVersion": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "null" }
+          ]
+        },
+        "draftVersion": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "null" }
+          ]
+        },
+        "publishedVersion": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
     "InteractionListItem": {
       "type": "object",
       "additionalProperties": false,
@@ -134,12 +162,13 @@
         "data": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["envKey", "accountId", "platform", "auth", "items", "nextCursor"],
+          "required": ["envKey", "accountId", "platform", "auth", "replyConfig", "items", "nextCursor"],
           "properties": {
             "envKey": { "$ref": "common.schema.json#/$defs/Id" },
             "accountId": { "$ref": "common.schema.json#/$defs/Id" },
             "platform": { "$ref": "common.schema.json#/$defs/Platform" },
             "auth": { "$ref": "#/$defs/AuthSummary" },
+            "replyConfig": { "$ref": "#/$defs/ReplyConfigProjection" },
             "items": {
               "type": "array",
               "maxItems": 100,
@@ -164,6 +193,7 @@
             "accountId",
             "platform",
             "auth",
+            "replyConfig",
             "thread",
             "messages",
             "replyJob",
@@ -175,6 +205,7 @@
             "accountId": { "$ref": "common.schema.json#/$defs/Id" },
             "platform": { "$ref": "common.schema.json#/$defs/Platform" },
             "auth": { "$ref": "#/$defs/AuthSummary" },
+            "replyConfig": { "$ref": "#/$defs/ReplyConfigProjection" },
             "thread": { "$ref": "domain.schema.json#/$defs/ThreadView" },
             "messages": {
               "type": "array",
@@ -306,6 +337,45 @@
       "required": ["action"],
       "properties": {
         "action": { "enum": ["open", "close"] }
+      }
+    },
+    "ReadControlsRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expectedVersion", "commentsReadEnabled", "dmReadEnabled"],
+      "properties": {
+        "expectedVersion": { "type": "integer", "minimum": 0 },
+        "commentsReadEnabled": { "type": "boolean" },
+        "dmReadEnabled": { "type": "boolean" }
+      }
+    },
+    "ReadControlsResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "meta"],
+      "properties": {
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["envKey", "accountId", "platform", "auth", "replyConfig", "edgeDelivery"],
+          "properties": {
+            "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+            "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+            "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+            "auth": { "$ref": "#/$defs/AuthSummary" },
+            "replyConfig": { "$ref": "#/$defs/ReplyConfigProjection" },
+            "edgeDelivery": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status", "delivered"],
+              "properties": {
+                "status": { "enum": ["enqueued", "deferred"] },
+                "delivered": { "type": "integer", "minimum": 0, "maximum": 1 }
+              }
+            }
+          }
+        },
+        "meta": { "$ref": "common.schema.json#/$defs/ResponseMeta" }
       }
     },
     "EmptyRequest": {

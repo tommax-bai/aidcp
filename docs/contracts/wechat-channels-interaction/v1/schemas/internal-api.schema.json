@@ -8,6 +8,7 @@
     { "$ref": "#/$defs/TemplateListResponse" },
     { "$ref": "#/$defs/RuleListResponse" },
     { "$ref": "#/$defs/ProfileResponse" },
+    { "$ref": "#/$defs/InitializeResponse" },
     { "$ref": "#/$defs/PublishResponse" },
     { "$ref": "#/$defs/PreviewResponse" },
     { "$ref": "#/$defs/AuditResponse" },
@@ -16,6 +17,7 @@
     { "$ref": "#/$defs/TemplateWrite" },
     { "$ref": "#/$defs/RuleWrite" },
     { "$ref": "#/$defs/ProfileWrite" },
+    { "$ref": "#/$defs/InitializeRequest" },
     { "$ref": "#/$defs/PublishRequest" },
     { "$ref": "#/$defs/PreviewRequest" },
     { "$ref": "common.schema.json#/$defs/ErrorEnvelope" }
@@ -343,6 +345,23 @@
         "meta": { "$ref": "common.schema.json#/$defs/ResponseMeta" }
       }
     },
+    "InitializeResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "meta"],
+      "properties": {
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["head", "initializedVersion"],
+          "properties": {
+            "head": { "$ref": "#/$defs/ConfigHead" },
+            "initializedVersion": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "meta": { "$ref": "common.schema.json#/$defs/ResponseMeta" }
+      }
+    },
     "TemplateListResponse": {
       "type": "object",
       "additionalProperties": false,
@@ -524,7 +543,7 @@
       "properties": {
         "eventId": { "$ref": "common.schema.json#/$defs/Id" },
         "actor": { "$ref": "common.schema.json#/$defs/Id" },
-        "action": { "enum": ["draft_saved", "template_archived", "config_published", "previewed"] },
+        "action": { "enum": ["draft_saved", "template_archived", "config_initialized", "config_published", "previewed"] },
         "configVersion": { "type": "integer", "minimum": 1 },
         "entityType": { "enum": ["policy", "template", "rule", "profile", "config", "preview"] },
         "entityId": { "$ref": "common.schema.json#/$defs/NullableId" },
@@ -615,6 +634,14 @@
           "maxItems": 2,
           "items": { "$ref": "#/$defs/ReplyProfile" }
         }
+      }
+    },
+    "InitializeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expectedVersion"],
+      "properties": {
+        "expectedVersion": { "const": 0 }
       }
     },
     "PublishRequest": {

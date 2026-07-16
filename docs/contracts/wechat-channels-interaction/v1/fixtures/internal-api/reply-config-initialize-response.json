@@ -1,0 +1,18 @@
+{
+  "data": {
+    "head": {
+      "accountId": "acct_wc_demo",
+      "platform": "wechat_channels",
+      "currentVersion": 1,
+      "draftVersion": 1,
+      "publishedVersion": null,
+      "updatedAt": 1784044850000,
+      "updatedBy": "admin_demo"
+    },
+    "initializedVersion": 1
+  },
+  "meta": {
+    "requestId": "internal-reply-config-initialize-001",
+    "asOf": 1784044850000
+  }
+}

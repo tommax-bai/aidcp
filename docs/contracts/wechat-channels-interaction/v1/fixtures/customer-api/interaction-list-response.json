@@ -22,6 +22,12 @@
           "dmSendTextEnabled": true, "dmSendImageEnabled": false, "writePaused": false }
       }
     },
+    "replyConfig": {
+      "status": "published",
+      "currentVersion": 4,
+      "draftVersion": null,
+      "publishedVersion": 4
+    },
     "items": [
       {
         "threadId": "thread_comment_100",
