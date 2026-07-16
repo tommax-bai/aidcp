@@ -67,6 +67,12 @@ Edge 必须在调用 AdsPower `user/create` **之前**取得 intent；intent/pro
 - label/platform 为展示元数据；envKey 做长度、字符与空白校验。代理、Cookie、账号密码、2FA、AdsPower API key 均不进入 Cloud 请求。
 - customer-auth 的每请求 enabled-user 复核保持不变；停用或令牌失效后 intent 不能完成。
 
+### D5. 未首次绑定环境的删除与添加页状态必须闭环
+
+程序化新建的视频号环境会先归属并入册、但不会自动启动，因此在首次登录前不存在 `interaction_auth_state`。既有删除路径把“已归属但无互动绑定”统一视为 `offboard_binding_missing`，会让这类空环境无法删除。Cloud 仅在以下条件同一事务成立时走无绑定终态解绑：active scope 属于当前 enabled 客户、权威注册平台为 `wechat_channels`、存在该客户与 envKey 对应的 completed provisioning intent、`assigned_by` 仍逐字匹配该 intent 的原始 `client-provision:<intentId>` grant、且确实不存在互动绑定。Cloud 写入 `state='tombstoned'` 的 durable offboard 真态与显式审计、撤销 scope；`accountId` 使用该环境约定的 account namespace（envKey），但不创建虚假互动绑定，也不下发 Edge 密文清理命令。tombstone 保留到正常 29 天清理期结束，期间阻止迟到的首次鉴权状态重新落库；`upsertAuthStatus` 与解绑还须对同一 envKey 获取相同 PostgreSQL transaction advisory lock，令“首次绑定”与“判定无绑定”只有一个串行顺序。Edge 仍须读到该终态后才可物理删除本机 profile。缺少原始连续 provisioning grant 的管理员/存量环境若缺绑定继续返回 `offboard_binding_missing`，不得掩盖数据损坏。
+
+主进程自动入册后，renderer 自己持有的 `roster` 仍是创建前快照；仅调用 `refreshEnvs()` 会用旧快照重画添加列表，所以左栏已有环境、添加页却不显示“已加入”。创建成功且 `rosterJoinedByMain=true` 时，renderer 必须先通过既有 `settings:get` 重新读取主进程已落盘的 `settings.environments`，归一化覆盖本地 roster，再刷新环境列表。该同步只消费主进程真态，不把 envKey 回写给 Cloud，也不触发启动或重复持久化。
+
 ## Risks / Trade-offs
 
 - **[本机在建号后、Cloud 完成前崩溃]** → 环境物理存在但未归属；重开后它仍不会对客户显示，管理员可从 AdsPower/后台登记并分配。本期不持久化 proof，避免新增长期 bearer secret；UI 对失败必须显示管理员兜底。
@@ -74,6 +80,9 @@ Edge 必须在调用 AdsPower `user/create` **之前**取得 intent；intent/pro
 - **[Cloud 已提交但响应丢失]** → 同 intent + envKey 重试幂等返回成功；Edge 在入册前仍以 `/my-environments` 回读为准。
 - **[并发客户提交同一 envKey]** → `client_environments` 主键与 active owner 唯一索引使最多一个事务成功，另一个返回冲突。
 - **[批量创建部分失败]** → 每行独立 intent/事务并逐项回报；已成功项保留，失败项不冒充已加入。
+- **[缺绑定其实是存量数据损坏]** → 只有 completed provisioning intent 且 active scope 仍由同一 `client-provision:<intentId>` 原始 grant 产生时才允许无绑定终态解绑；其他环境继续 fail closed。
+- **[首次登录状态与删除并发]** → 两条事务按 envKey 获取同一 advisory lock；若首次绑定先发生则走普通 offboard 清密文，若解绑先发生则 tombstone 阻止迟到状态复活绑定。
+- **[Cloud 已入册但 renderer 仍持旧 roster]** → 创建成功后从主进程 settings 回读，不依赖异步 fleet 广播时序；若回读失败则不伪造“已加入”标记，后续刷新/重开仍从持久化真态恢复。
 
 ## Migration Plan
 

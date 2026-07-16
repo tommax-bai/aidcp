@@ -16,3 +16,9 @@
 - [x] 3.2 分别提交并 fast-forward 集成 cloud/edge 到默认分支并推送；回写 commit SHA、验证与偏离说明，显式路径提交控制仓 OpenSpec 文件且不触碰现有未跟踪文件。 <!-- aidcp-cloud e8b16d6、aidcp-edge 239c44c 已 ff push origin/master；上游迁移占用 0042，故本变更迁移顺延 0043 -->
 - [x] 3.3 运行 `scripts/deploy-target dev --check`，从干净的 cloud 默认分支提交快照备份/部署 `dev`，验证 service、监听端口、customer-auth/public/panel health、Feishu 与 PostgreSQL；失败则按文档回滚，不碰 `isales`。 <!-- dev 已部署 e8b16d6；backup cloud.bak.20260716-180737.tar.gz；active/NRestarts=0，8787/8090/8091、local+public health、PG provisioning 表+3 indexes、Feishu WS onReady、文件 SHA 均通过；未碰 isales -->
 - [x] 3.4 在不做真实 Windows/AdsPower 建号和不构建安装包的前提下，登记真机验收 backlog；运行 `openspec validate client-created-env-auto-assignment --strict`，完成任务证据同步。 <!-- backlog 簇 89 已登记；strict validate 通过；Windows 新包/真机建号因无显式打包授权保持未执行 -->
+
+## 4. 创建后删除与添加页状态回归
+
+- [x] 4.1 Cloud：仅对 completed provisioning intent 可证明来源、仍归属当前客户且无 `interaction_auth_state` 的视频号环境，事务化写入终态 offboard/审计并撤销 scope；普通管理员/存量环境缺绑定继续 `offboard_binding_missing`，补真实 PostgreSQL 回归。 <!-- aidcp-cloud 993960c；原始 client-provision grant + 同 env advisory lock；ephemeral PostgreSQL 3/3，含迟到 auth 状态被 tombstone 拒绝 -->
+- [x] 4.2 Edge：主进程自动入册成功后，renderer 在刷新添加环境列表前从 `settings:get` 同步已落盘花名册，立即显示“已加入”；锁定终态 offboard 仍须 Cloud 回读后才物理删除，补 Electron 契约测试。 <!-- aidcp-edge bcca8cc；targeted Electron contract 11/11 -->
+- [x] 4.3 运行 Cloud acceptance/full/PostgreSQL/typecheck/build、Edge acceptance/full/typecheck 与 OpenSpec strict validation；提交并 fast-forward 集成默认分支、推送，随后从干净 Cloud master 部署 dev 并验证服务/端口/health/Feishu/PostgreSQL，不构建桌面安装包。 <!-- rebase 后 Cloud acceptance 54/54、full 2302 pass + 6 gated skip、typecheck/build；Edge acceptance 22/22、full 1522/1522、typecheck；两仓已 ff push master。dev 从 993960c git archive 部署，backup cloud.bak.20260716-185429.tar.gz；active/NRestarts=0，8787/8090/8091、本机+公网 panel/client health、PG、Feishu onReady、文件 SHA 通过；未构建 installer。现场 k1eoujd8 于部署前已出现 active auth binding，未代用户执行删除 -->

@@ -31,3 +31,15 @@
 #### Scenario: 未配代理不阻止归属但不自动启动
 - **WHEN** 客户未配置代理即成功新建并完成权威归属
 - **THEN** 环境仍被加入花名册并如实提示未配代理，但保持离线，必须由用户显式启动
+
+#### Scenario: 自动入册后添加环境页面显示已加入
+- **WHEN** 主进程已将新环境落盘到运行花名册并返回 `rosterJoinedByMain=true`
+- **THEN** renderer 在刷新添加环境列表前重新读取主进程花名册，该环境行立即显示“已加入”，后续手动刷新或重开页面仍保持一致，且不得因此自动启动
+
+#### Scenario: 从未绑定的视频号新建环境可以安全删除
+- **WHEN** 当前客户删除一个由 completed provisioning intent 创建并归属、平台为视频号、且 Cloud 不存在互动账号绑定的环境
+- **THEN** Cloud 在同一事务撤销 active scope、记录来源受限的终态 offboard 与审计，Edge 只有读到 `tombstoned|purged` 后才物理删除本机环境，不得返回 `offboard_binding_missing` 或假称执行过密文清理
+
+#### Scenario: 非创建意图环境缺绑定仍然失败关闭
+- **WHEN** 管理员分配或存量视频号环境缺失互动账号绑定，且没有对应的 completed provisioning intent 证明其从未绑定
+- **THEN** Cloud 继续返回 `offboard_binding_missing` 并保留 active scope，本地客户端不得物理删除环境
