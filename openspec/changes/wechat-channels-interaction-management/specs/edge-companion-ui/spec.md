@@ -20,6 +20,18 @@ Electron 客户端 SHALL 保持现有全局标题栏与左侧环境栏；当前�
 - **WHEN** 用户快速 A→B 切换且 A 的详情响应后到
 - **THEN** renderer 校验 envKey 后丢弃 A 响应，B 页面不闪现 A 的昵称/私信/动作
 
+### Requirement: 视频号 workspace 必须保留当前环境生命周期控制
+
+InteractionWorkspace SHALL 在顶部提供当前视频号环境可见的生命周期按钮。核心为 stopped/warning 时 SHALL 显示“启动”，会话为 paused 时 SHALL 显示“恢复”，其余 starting/running 状态 SHALL 显示“暂停”。动作 MUST 复用既有单环境 lifecycle IPC 并携当前 `envKey`；MUST NOT 调用 fleet 全部启动、把显示浏览器/重新登录冒充启动，或操作其他环境。
+
+#### Scenario: 离线视频号环境可以就地启动
+- **WHEN** 用户选中 edge=stopped 的 wechat_channels 环境并点击“启动”
+- **THEN** 客户端只向该环境的单环境启动 IPC 传递当前 envKey，其他环境保持原状态
+
+#### Scenario: 生命周期状态切换使用同一入口
+- **WHEN** 当前视频号环境从 running 进入 paused，或从 paused 恢复运行
+- **THEN** 按钮依次显示“暂停”“恢复”“暂停”，每次动作都绑定当前 envKey 且以主进程回传真态刷新
+
 ### Requirement: 互动 workspace 必须呈现真实队列与发送状态
 
 InteractionWorkspace SHALL 提供横向 `待处理/评论/私信/已回复` 视图、分页列表、thread 详情、模板/AI 差异、风险、final text 与 ignore/escalate/regenerate/approve/send 动作。`queued`、`sending`、`ambiguous`、`sent`、`failed` MUST 有不同文案/视觉；只有 sent 可显示平台确认成功，ambiguous 必须显示待核验。

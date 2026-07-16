@@ -185,6 +185,8 @@ Cloud 默认保留评论正文 180 天、DM 正文 90 天、无正文审计元�
 
 `wechat_channels` 环境选择后渲染 InteractionWorkspace；标题栏和左侧环境栏保持既有布局，不新增永久第二侧栏、不显示 browse/like/collect 等零 KPI。renderer 只经具名 preload IPC → Electron main → customer-auth API；无任意 URL fetch、JWT/Cookie 入口。环境切换取消请求并校验响应 `envKey`，旧响应不得覆盖新环境。浏览器 closed 是 active 的正常副状态；reauth/challenge 才禁写。ambiguous 显示“待核验”，HTTP accepted/queued 不显示绿色成功。
 
+右侧 workspace 必须继续提供当前环境的显式生命周期控制，避免替换旧 workspace 时连同唯一的单环境启动入口一起隐藏。按钮复用现有 Electron 生命周期 IPC：核心停止或异常时显示“启动”，会话暂停时显示“恢复”，其余启动中或运行态显示“暂停”；调用始终携当前 `envKey`，返回状态仍走既有 fleet/status 路由。它与“全部启动”、显示浏览器、重新登录是不同动作，不得互相替代。
+
 ## Risks / Trade-offs
 
 - [私有接口字段、端点或平台条款变化] → 每能力独立 flag、schema probe、TLS 校验和 `WECHAT_SCHEMA_CHANGED` 熔断；默认关闭写能力。

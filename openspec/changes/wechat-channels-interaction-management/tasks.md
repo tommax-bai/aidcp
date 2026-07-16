@@ -68,6 +68,9 @@
 - [x] 5.5 Cover 820x720, keyboard/focus, empty/loading/error/permission/version-conflict and synthetic fixture/screenshot states without invoking a real write.
 - [x] 5.6 After 1.10, route explicit environment deletion/unbind through the frozen offboarding path and show pending/offline cleanup truthfully without treating local profile deletion or ordinary logout as a completed credential purge.
 - [x] 5.7 Disable every interaction write control and enforce the same handler gate while Cloud connectivity is offline or cached data is stale; restore writes only after a successful current-environment refresh and cover the transition with a renderer fixture.
+- [x] 5.8 Keep a visible current-environment lifecycle control in the Video Channels workspace, map stopped/warning to start, paused to resume and running/starting to pause, and cover env-scoped routing with renderer tests.
+
+<!-- Session 04 lifecycle follow-up: aidcp-edge commit 0d4d71483880d9739f0404d4f944c02c57d10eca adds a visible current-environment start/pause/resume control to the Video Channels workspace, reuses the existing save-before-start lifecycle path, routes only the selected envKey and keeps fleet start-all separate. Targeted InteractionWorkspace plus renderer lifecycle tests passed 50/50; the full suite passed 1521/1521, acceptance passed 22/22 and typecheck passed. No installer was built, no Cloud/Console deployment was needed, and no real platform read/write/offboard action was performed. -->
 
 ## 6. Session 05 - Integration and real-account acceptance
 
