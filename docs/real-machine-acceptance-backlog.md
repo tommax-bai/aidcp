@@ -1334,3 +1334,16 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 - [ ] 88.2 **诚实结局与卡片** — 命中参与闸时，边缘回执 = `pending_group_approval`（`submitted:false`）、**打字前**不把评论灌进「输入回答」框、确认段**不刷新不重试**；云端出**黄卡**「该群需管理员批准参与后才能评论（评论未上墙，待人工处理）」，**绝不染绿**、不写去重、不记风控、不算委托成功。查 journalctl（cloud dev）关键字 `pending_group_approval` / `参与审批入群闸`。
 - [ ] 88.3 **假绿否决回归（止血核心）** — 构造/等到「静默待审批」形态（本人首条评论只对作者可见、带「待审核」徽章、带真 comment_id 或 ≥2 交互控件）：确认判据 MUST NOT 判「已上墙」（`buildAckVerifyJs`/`buildScopedVerifyJs` 待审徽章否决生效）→ 落 `pending_group_approval` 而非 `verification_ambiguous`（更非成功）。
 - [ ] 88.4 **不误伤合法回复** — 在**开了参与审批但账号已是 participant** 的群、以及**问答型帖子**（回复框 aria-label「输入回答/Answer」但非参与审批对话框）里正常评论：探针 MUST NOT 误触发，评论照常发出并被确认；参与答题框标签仍被当合法评论框（不回归旧假阳）。
+
+## 簇 89
+
+### change `client-created-env-auto-assignment` 客户端本机建号自动归属验收（Cloud `e8b16d6` 已部署 dev；Edge `239c44c` 已 land、未打安装包；登记于 2026-07-16）
+
+客户在已登录桌面客户端内通过官方“创建环境”流程新建 AdsPower 环境后，Cloud 用一次性短时 intent 把**本次新建返回的 envKey**登记到权威环境注册表并唯一分配给当前客户；Electron 主进程重新读取 `/my-environments` 确认后，才把环境加入本地运行花名册。旧 `POST /environments` 任意认领仍固定 403，已登记环境不能借新建 intent 认领，同一 intent 不能换绑第二个 envKey。成功只加入离线行，**不会自动启动**；代理仍可稍后补配。
+
+桩层：Cloud acceptance 54/54、最新 master 全量 2290 通过（5 个显式 gated skip）、一次性 PostgreSQL 真实事务 2/2、typecheck/build 通过；Edge acceptance 22/22、最新 master 全量 1520/1520、typecheck 通过。dev 部署备份 `cloud.bak.20260716-180737.tar.gz`，`8787/8090/8091`、三条 health、PostgreSQL provisioning 表/唯一 owner 索引及飞书长连接均验证正常。**没有运行 `electron:build*`，因此当前已安装的 Windows 客户端仍会显示旧“管理员分配”提示，这是旧包事实，不是新闭环已在真机失败。**
+
+- [ ] 89.1 **Windows 新包载体** — 用户明确授权桌面打包/发布后，从 Edge master（含 `239c44c`）构建 Windows x64 安装包并在 Win11 Intel 真机启动一次；确认 core 能连 dev、AdsPower 调用可达，且无 packaged-only `app.asar`/`spawn ENOTDIR` 回归。未获明确授权前保持本项未执行。
+- [ ] 89.2 **视频号新建自动归属与可见性（本 change 直接目的）** — 在新包中以客户账号登录，选择“视频号”创建一个全新环境：回执应为“已分配到当前账号并加入运行环境；需要启动时请在环境栏操作”，左侧环境列表立即出现该视频号环境的**离线行**；Cloud `/my-environments` 与 PostgreSQL active owner 都只归当前账号。MUST NOT 自动启动浏览器/core。
+- [ ] 89.3 **代理与重启持久化** — 不填代理创建：提示“未配代理，可稍后在环境行「代理」里补配”，环境仍正常归属；关闭并重开客户端后该环境仍在当前账号花名册，平台保持 `wechat_channels`，补配代理只改该环境且不改变归属。
+- [ ] 89.4 **失败诚实性与旧认领红线** — 分别制造 Cloud intent 申请不可达、建号后完成归属失败、权威清单刷新失败和本地 settings 写盘失败：申请失败必须在 AdsPower 建号前停止；其余失败须明确区分“本机已创建 / 已分配 / 未入运行环境”，不得把未确认环境加入花名册。用已登记的另一环境 envKey 与旧 `/environments` 路由尝试认领都必须被拒，且不得改变现有 owner。
