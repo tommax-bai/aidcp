@@ -11,6 +11,7 @@
     "queryKeys": ["_aid", "_pageUrl", "_rid"],
     "contentType": "application/json",
     "bodyShape": {"_log_finder_id": "string", "_log_finder_uin": "string", "pluginSessionId": "null", "rawKeyBuff": "string", "reqScene": "number", "scene": "number", "timestamp": "string"},
+    "observedEmptyStringKeys": ["_log_finder_uin", "rawKeyBuff"],
     "requiredHeaderNames": ["X-WECHAT-UIN", "finger-print-device-id"]
   },
   "requests": {

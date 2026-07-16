@@ -1307,7 +1307,7 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 
 ### change `wechat-channels-interaction-management` dev 真账号与受控写验收（Session 05；登记于 2026-07-15）
 
-**已完成的代码与 dev 基线**：控制仓契约 `a678003`；Cloud 互动闭环 `ae7b4e8`（dev 最终按文件校验匹配干净 master `f654850`，已包含它）；Edge connector + Electron 集成至 master `dc9dac6`；Console `3a477c1` 已部署 dev。协议 schema、44 份归一化双向 fixture、Edge/Cloud acceptance、全量测试、typecheck、mock 工作流和隔离 PostgreSQL 集成均通过；dev Cloud/Console 健康、迁移/索引、日志脱敏与 kill switch 状态已核。**但 dev 数据库当时没有任何视频号授权账号，用户也未提供可写测试评论/私信目标，因此下面所有真账号项都没有被 mock 替代，也没有被写成已通过。**
+**已完成的代码与 dev 基线**：控制仓契约 `a678003` 与真实运行闭环变更；Cloud master `42cd5f8` 已部署 dev 并应用 0042；Edge master `d321042` 完成身份 bootstrap、账号控制下发、真实空评论/DM 请求与 Cloud 可见空批次；Console `3a477c1` 已部署 dev。Edge acceptance 22/22、全量 1520/1520、typecheck 通过；Cloud acceptance 54/54、全量 2279 通过（5 个显式跳过）、typecheck 通过；严格 schema/OpenSpec 与脱敏证据检查通过。命名账号已完成首次授权、浏览器关闭后的 API-only 恢复和 controls 0→1 在线收敛，Cloud 各接受 1 个 comment/DM 空批次并保留各 1 个 cursor，持久化 thread/message 与 send attempt 均为 0；两轮后批次数稳定为各 1，跨 scope 批次为 0，AdsPower 已关闭。**该账号当前没有评论或私信，所以上述结果只证明真实“成功同步 0 条”；非空解析、真实写与 offboarding 仍不得由空结果或 mock 替代。**
 
 **安全前置**：只用用户明确命名的测试账号；写 capability 初始保持 false，账号级 `write_paused` 保持 true；先完成只读项。评论/私信分别需要用户批准的一条可删除目标。自动模式必须等 87.1–87.6 通过后再次获得明确批准。Edge 本次只验证了 master 源码，**没有构建或发布安装包**。
 
@@ -1318,7 +1318,9 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 - [ ] 87.5 **真实失败边界** — 分别验会话失效/错误账号、发送中断网形成 `ambiguous` 后只 verify 不盲重发、Edge/Cloud 重启恢复、AI 超时/越界/高风险 fail closed，以及真实 schema missing 时能力熔断；平台不可见且无确认时不得显示「已发送」。
 - [ ] 87.6 **真实解绑与延期清理** — 验环境解绑、客户终止、Edge 离线后重连三条路径：Cloud 先撤权/停派发，Edge drain 后清加密 session 并关闭 sidecar，重复/重启只确认一次，Cloud 收到 scope-matching ack 后 tombstone，并在配置期限内完成 scope purge；保留审计不得含正文。需保存真实的凭据删除与 purge 证据。
 - [ ] 87.7 **low-risk auto 仍需二次批准** — 只有 87.1–87.6 全部通过且用户再次明确批准，才给该测试账号开启 low-risk auto，用可删除测试消息验一次；否则状态必须写成「已实现、未真机开放验证」，全局开关、账号白名单和账号级暂停继续关闭。
-- [ ] 87.8 **Edge 真机载体边界** — 用包含 `dc9dac6` 的 edge master 源码真机运行，或在用户明确要求后另走桌面打包/发布流程并跑一次 packaged artifact；在此之前不得把本次源码验证称为「Edge 安装包已发布/已验收」。
+- [x] 87.8 **Edge 真机载体边界** — 已用 Edge master `d321042` 源码连接同一 AdsPower 登录态完成只读真机运行；没有构建或发布安装包，因此本项只证明源码载体，不代表桌面安装包已发布/验收。
+
+<!-- 87.1 partial evidence (2026-07-16): named-account auth became active, the browser closed, controls version 1 converged, and Cloud retained one accepted zero-item batch/cursor for each of comment and DM with no send attempts. Keep 87.1 open until a non-empty incremental sample and the real client-side same-account/cursor presentation are observed; 87.2 remains open for multi-page/restart/two-account isolation. -->
 
 ## 簇 88
 
