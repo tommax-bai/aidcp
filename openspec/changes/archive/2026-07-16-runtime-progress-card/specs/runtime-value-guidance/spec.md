@@ -1,3 +1,8 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: 内部浏览步骤按需展开而非常驻占据主视图`
+- TO: `### Requirement: 详细浏览步骤不得与价值进度争夺主视图`
+
 ## MODIFIED Requirements
 
 ### Requirement: 详细浏览步骤不得与价值进度争夺主视图
