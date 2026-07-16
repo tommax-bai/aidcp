@@ -1,0 +1,3 @@
+# Keep noisy command and test output from dominating the model context.
+# Agents should rerun focused slices when more evidence is required.
+tool_output_token_limit = 4000
