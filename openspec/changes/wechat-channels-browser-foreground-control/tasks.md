@@ -24,6 +24,8 @@
 - [x] 5.1 Add focused Cloud, Edge auth/runtime, Electron IPC/workspace, protocol fixture, and lifecycle regression tests.
 - [x] 5.2 Run Cloud and Edge acceptance suites, full tests, typechecks, builds required by the touched paths, and `openspec validate wechat-channels-browser-foreground-control --strict`.
   <!-- Edge: 1540 passed; Cloud: 2305 passed, 6 real-environment gates skipped; both typecheck/build passed; OpenSpec strict validation passed. -->
-- [ ] 5.3 Commit and push Edge/Cloud/control changes, record SHAs and validation evidence here, and do not build an Edge installer.
-- [ ] 5.4 Deploy the clean Cloud default branch to `dev`, verify service/listeners/health/Feishu/PostgreSQL and the acceptance-only control path, and record the honest live-validation boundary.
+- [x] 5.3 Commit and push Edge/Cloud/control changes, record SHAs and validation evidence here, and do not build an Edge installer.
+  <!-- Edge: bac2df5 pushed to master. Cloud: dce8824 pushed to master. Control contracts/change: 315f623 plus closeout/archive commit on main. No Edge installer was built. -->
+- [x] 5.4 Deploy the clean Cloud default branch to `dev`, verify service/listeners/health/Feishu/PostgreSQL and the acceptance-only control path, and record the honest live-validation boundary.
+  <!-- dev: deployed exact Cloud dce8824 from a clean detached worktree. Backups: /opt/aidcp/backups/wechat-browser-control-cloud-20260716-193519.tgz and /opt/aidcp/backups/wechat-browser-control-env-20260716-193519. aidcp-cloud.service active; 8787/8090/8091/5432 listening; panel/client-auth health OK; PostgreSQL SELECT 1 OK; Feishu WS ready. Edge bac2df5 reconnected and interaction_auth_state reported active/closed at 2026-07-16 19:40:48 CST. The live client was restarted with the required customer-auth gate, but its client login had expired and was left at the prefilled login screen; no browser-open command was falsely claimed as executed. -->
 - [ ] 5.5 Archive the completed OpenSpec change, validate all specs strictly, and remove obsolete worktrees/branches.
