@@ -4,7 +4,7 @@
 
 系统 SHALL 让普通评论的 `CommentAppraiser` 仅在笔记过**精品门槛**时才可能评论。精品门槛 MUST 包含一道**可确定性判定的硬门槛**：该门槛的阈值 SHALL **按内容品类 / 账号可配**（可表达为热度绝对下限、或收藏/点赞比例、或百分位），并按品类给出合理默认；MUST NOT 对所有品类 / 账号写死同一组绝对值（例如固定 `likeCount>1000` **且** `collectCount>300`），以免系统性排除「高赞低藏」的情感 / 颜值类正当爆帖。**通用默认地板** SHALL 为：`likeCount > 300` **且**（`collectCount > 100` **或** `likeCount > 10000` 超高热豁免），边界均为严格大于。**无「收藏」概念的平台**（如 Facebook）SHALL **只放宽收藏合取项**、保留主门槛 `likeCount > 300`。普通评论任一不满足门槛 MUST 直接 `comment.skipped`，硬门槛之上继续叠加 LLM 精品判定与飞书人审；实际生效每日上限仍为运营配置与风控安全配额取小。
 
-详情全文确认命中的结构化 `mandatory_interactions` 规则若含 `comment`，则是上述**普通评论策略的唯一显式例外**：`CommentAppraiser` MUST 跳过会话 comments 软预算、每日评论预闸、热度门槛、评论冷却与“要不要评”LLM，直接 emit `comment.appraised` 并携规则上下文。例外只取消普通策略二次否决；评论下发前仍 MUST 经过 `RiskController.canDo('comment')`，真实成功才计数。
+详情全文确认命中的结构化 `mandatory_interactions` 规则若含 `comment`，则是上述**普通评论策略的唯一显式例外**：`CommentAppraiser` MUST 跳过会话 comments 软预算、普通每日策略闸、热度门槛、评论冷却与“要不要评”LLM，但在撰写前 MUST 经过可解释的 `RiskController.explain('comment')` 硬风控预检。预检拒绝时不得撰写、不得发免审通知；预检放行才 emit `comment.appraised` 并携规则上下文。预检不是配额预占，评论下发前仍 MUST 再经过同一硬风控，真实成功才计数。
 
 #### Scenario: 达到每日上限即停止普通评论
 - **WHEN** 某账号当日已评数 ≥ min(运营配置上限, 风控配额)，且本篇未命中结构化强制规则
@@ -24,7 +24,7 @@
 
 #### Scenario: 低热度强制帖子绕过普通门槛与判定
 - **WHEN** 一篇 Facebook 帖 `likeCount = 0` 但全文确认命中 actions 含 comment 的结构化规则
-- **THEN** `CommentAppraiser` 不检查软预算/每日预闸/冷却/热度、不调用评论判定 LLM，直接进入撰写
+- **THEN** `CommentAppraiser` 不检查软预算/普通每日策略闸/冷却/热度、不调用评论判定 LLM，但必须先过硬风控预检，放行后才进入撰写
 
 ### Requirement: 循环内真人审批——暂停态 + 短超时 + 未授权不发
 
@@ -85,3 +85,29 @@ mandatory comment SHALL 继续经过 `CommentComposer`、`CommentDeAiFlavor` 与
 #### Scenario: 两次都无法生成则诚实不发
 - **WHEN** mandatory composer 首次与一次重试均失败、弃权、为空或超长
 - **THEN** 系统 emit 真实 skip 原因，不使用“还招吗/支持一下”等固定模板替代，不报告评论成功
+
+### Requirement: mandatory 免审评论必须区分预授权与真实终态
+
+mandatory comment 在撰写前 MUST 使用带稳定 reason 的硬风控预检。预检被 `state:*` 或 `quota:minute|hour|day` 拒绝时 MUST 在同帖 mandatory like 已有机会入队后诚实跳过，MUST NOT 调 composer、MUST NOT 发免审通知、MUST NOT声称该评论已授权或已发布。预检通过不构成配额预占，下发前最终硬风控 MUST 保留。
+
+免审通知成功时 SHALL 只表述“终稿已预授权、等待平台执行”，使用非绿色中性状态，并携 requestId、账号、目标与终稿。通知之后系统 MUST 以同一 requestId 最多回报一个可见终态：`confirmed`、`pending`、`failed` 或 `unknown`。只有 edge 真实回 `action.completed{action:'comment',ok:true}` 才能回 `confirmed` 并记成功；`pending_group_approval` MUST 回 `pending` 且不计成功；明确风控/页面/下发/edge 失败 MUST 回 `failed`；命令或迁移在途时断线、会话结束或有界超时 MUST 回 `unknown`，明确要求人工核对且不得猜测上墙状态。
+
+#### Scenario: 硬风控预检拒绝不白跑也不发卡
+- **WHEN** mandatory comment 命中，但 `explain('comment')` 返回 `quota:minute`、`quota:hour`、`quota:day`、`state:restricted` 或 `state:frozen`
+- **THEN** 系统不调用 composer、不发送预授权卡，并留下带原始稳定 reason 的审计日志；同帖 mandatory like 的派发顺序不受影响
+
+#### Scenario: 预授权卡不是成功卡
+- **WHEN** mandatory auto-approve 终稿通知成功
+- **THEN** 卡片 MUST 使用中性/黄色语义说明“已预授权、等待平台执行”，MUST NOT 使用绿色“已成功”语义
+
+#### Scenario: 平台确认成功才回成功终态
+- **WHEN** 已预授权评论收到 edge `action.completed{action:'comment',ok:true}`
+- **THEN** 系统以同一 requestId 回一次绿色 `confirmed` 终态；该回执是唯一允许称评论已发布并计成功的依据
+
+#### Scenario: 群审批与明确失败如实分档
+- **WHEN** edge 返回 `pending_group_approval`，或最终风控/迁移/下发/edge 返回明确失败
+- **THEN** 前者回黄色 `pending` 并说明尚未上墙，后者回人话 `failed`；两者均不得计成功或显示机器码
+
+#### Scenario: 断线或超时保持未知
+- **WHEN** 评论命令已下发或评论迁移仍在途，但连接断开、会话结束或超过有界回执时间仍无终态
+- **THEN** 系统以同一 requestId 回黄色 `unknown`，说明是否上墙未知、需人工核对；MUST NOT猜成功、MUST NOT补记配额
