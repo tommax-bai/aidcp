@@ -1310,3 +1310,16 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 - [ ] 87.6 **真实解绑与延期清理** — 验环境解绑、客户终止、Edge 离线后重连三条路径：Cloud 先撤权/停派发，Edge drain 后清加密 session 并关闭 sidecar，重复/重启只确认一次，Cloud 收到 scope-matching ack 后 tombstone，并在配置期限内完成 scope purge；保留审计不得含正文。需保存真实的凭据删除与 purge 证据。
 - [ ] 87.7 **low-risk auto 仍需二次批准** — 只有 87.1–87.6 全部通过且用户再次明确批准，才给该测试账号开启 low-risk auto，用可删除测试消息验一次；否则状态必须写成「已实现、未真机开放验证」，全局开关、账号白名单和账号级暂停继续关闭。
 - [ ] 87.8 **Edge 真机载体边界** — 用包含 `dc9dac6` 的 edge master 源码真机运行，或在用户明确要求后另走桌面打包/发布流程并跑一次 packaged artifact；在此之前不得把本次源码验证称为「Edge 安装包已发布/已验收」。
+
+## 簇 88
+
+### change `facebook-comment-participation-gate` 群参与审批入群闸真机验收（edge master `a6fb282` 已 land、需从 master 起客户端；cloud master `21e44e5` 已 land + **已部署 dev**（backup `cloud.bak.20260716-161340`，healthcheck 绿）；登记于 2026-07-16）
+
+**背景**：Facebook 群「参与者审批 / 参与问题」= 管理员配置的一次性入群闸——账号首次在该群评论时被拦成「申请参与 + 答题 + 同意群规」，提交后待管理员人工批才上墙。桩层已实装：① 止血（确认判据加「待审批徽章」否决，堵住「待批评论误报已发出」假绿）；② 识别（`buildParticipationGateJs` 只认可见 `role=dialog` + 参与审批专属文案，避开侧栏 Join / 问答帖回复框两类旧假阳）→ 新诚实结局 `pending_group_approval`（不上墙、不染绿、不去重、不重试）。**默认不做自动答题**（答了仍等人批 + 暴露自动化痕迹，属另议）。
+
+**前置环境**：tom 分组测试号（工程师大白 / Tmax）+ 一个**开了「参与者审批」的公开 FB 群**（或私密群开「限定成员」）；从 edge master（含 `a6fb282`）起 headful 客户端连 dev（`ws://121.89.85.150:8787`）。**共享环境同簇 82（FB feed / 评论真机批）**，建议同一次真机 session 合验。
+
+- [ ] 88.1 **参与审批闸真机取证** — 用**从未在该群贡献过**的账号，对该群一帖尝试评论；抓弹框 **CDP 截图 + `document.body.innerText` 全量 dump + iframe frameUrls**。核：① URL 停在 `/groups/<id>/...`（**不**跳 `/checkpoint`，据此确认是群作用域入群闸、非账号级反机器人）；② 弹框是不是 `role="dialog"`（决定首版 `buildParticipationGateJs` 只认 dialog 是否够——若为非 dialog 全屏 interstitial，需按取证扩面）；③ 坐实简体中文按钮/徽章原文（`申请参与 / 参与问题 / 同意小组规则 / 待审核`），把 `FB_PARTICIPATION_GATE_RE` / `FB_PENDING_APPROVAL_RE` 从「语义高置信」升到「逐字确认」。
+- [ ] 88.2 **诚实结局与卡片** — 命中参与闸时，边缘回执 = `pending_group_approval`（`submitted:false`）、**打字前**不把评论灌进「输入回答」框、确认段**不刷新不重试**；云端出**黄卡**「该群需管理员批准参与后才能评论（评论未上墙，待人工处理）」，**绝不染绿**、不写去重、不记风控、不算委托成功。查 journalctl（cloud dev）关键字 `pending_group_approval` / `参与审批入群闸`。
+- [ ] 88.3 **假绿否决回归（止血核心）** — 构造/等到「静默待审批」形态（本人首条评论只对作者可见、带「待审核」徽章、带真 comment_id 或 ≥2 交互控件）：确认判据 MUST NOT 判「已上墙」（`buildAckVerifyJs`/`buildScopedVerifyJs` 待审徽章否决生效）→ 落 `pending_group_approval` 而非 `verification_ambiguous`（更非成功）。
+- [ ] 88.4 **不误伤合法回复** — 在**开了参与审批但账号已是 participant** 的群、以及**问答型帖子**（回复框 aria-label「输入回答/Answer」但非参与审批对话框）里正常评论：探针 MUST NOT 误触发，评论照常发出并被确认；参与答题框标签仍被当合法评论框（不回归旧假阳）。
