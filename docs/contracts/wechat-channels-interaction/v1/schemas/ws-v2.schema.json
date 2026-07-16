@@ -16,6 +16,7 @@
     { "$ref": "#/$defs/SyncRequestEnvelope" },
     { "$ref": "#/$defs/ReplySendEnvelope" },
     { "$ref": "#/$defs/AuthReopenEnvelope" },
+    { "$ref": "#/$defs/BrowserControlEnvelope" },
     { "$ref": "#/$defs/OffboardCommandEnvelope" },
     { "$ref": "#/$defs/OffboardResultEnvelope" },
     { "$ref": "#/$defs/OffboardAckEnvelope" }
@@ -628,6 +629,19 @@
         "requestedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
       }
     },
+    "BrowserControlPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "envKey", "accountId", "platform", "action", "requestedAt"],
+      "properties": {
+        "requestId": { "$ref": "common.schema.json#/$defs/Id" },
+        "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+        "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+        "platform": { "$ref": "common.schema.json#/$defs/Platform" },
+        "action": { "enum": ["open", "close"] },
+        "requestedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
     "HelloEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
@@ -704,6 +718,12 @@
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
         { "properties": { "type": { "const": "interaction.auth.reopen" }, "payload": { "$ref": "#/$defs/AuthReopenPayload" } } }
+      ]
+    },
+    "BrowserControlEnvelope": {
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/Envelope" },
+        { "properties": { "type": { "const": "interaction.browser.control" }, "payload": { "$ref": "#/$defs/BrowserControlPayload" } } }
       ]
     },
     "OffboardCommandEnvelope": {

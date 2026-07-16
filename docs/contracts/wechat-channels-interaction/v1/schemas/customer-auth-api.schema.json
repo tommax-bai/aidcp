@@ -12,6 +12,7 @@
     { "$ref": "#/$defs/JobMutationRequest" },
     { "$ref": "#/$defs/EscalateRequest" },
     { "$ref": "#/$defs/SyncActionRequest" },
+    { "$ref": "#/$defs/BrowserControlRequest" },
     { "$ref": "#/$defs/EmptyRequest" },
     { "$ref": "common.schema.json#/$defs/ErrorEnvelope" }
   ],
@@ -228,7 +229,8 @@
           "properties": {
             "envKey": { "$ref": "common.schema.json#/$defs/Id" },
             "accountId": { "$ref": "common.schema.json#/$defs/Id" },
-            "action": { "enum": ["sync", "auth_reopen"] },
+            "action": { "enum": ["sync", "auth_reopen", "browser_control"] },
+            "browserAction": { "enum": ["open", "close"] },
             "actionRequestId": { "$ref": "common.schema.json#/$defs/Id" },
             "status": { "const": "accepted" }
           }
@@ -296,6 +298,14 @@
           ]
         },
         "scopeExternalId": { "$ref": "common.schema.json#/$defs/NullableId" }
+      }
+    },
+    "BrowserControlRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action"],
+      "properties": {
+        "action": { "enum": ["open", "close"] }
       }
     },
     "EmptyRequest": {
