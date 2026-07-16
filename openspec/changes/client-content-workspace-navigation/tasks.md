@@ -31,3 +31,14 @@
   <!-- aidcp-edge: focused 63/63; npm test 1506/1506; acceptance 22/22; npm run typecheck pass; syntax checks pass. No packaging invoked and no baseline failures observed. -->
 - [x] 4.3 Run `openspec validate client-content-workspace-navigation --strict`, update this checklist with repo commit SHAs/validation notes, and push only the isolated feature branches without merging or deploying.
   <!-- Strict validation passed. aidcp-cloud 1daec99 and aidcp-edge 02268ec were pushed to codex/client-content-workspace-navigation. The control-repo commit is recorded by this checklist's own history. No default branch merge, deploy, Electron package, or PR was performed. -->
+
+## 5. Compact titlebar inspiration entry
+
+- [x] 5.1 Add an account-scoped authoritative reference-draft count to the customer curated-list projection without exposing publish rows or internal fields.
+  <!-- aidcp-cloud d2437a8: counts persisted publish_log rows with source_reference for the authorized envKey; queued-only tasks are excluded and an unavailable count is omitted instead of fabricated. -->
+- [x] 5.2 Replace the runtime-home inspiration card with the compact titlebar reserve entry, including honest unknown/zero states, accessible entry labeling, bounded reserve fill, and the approved blue/teal palette.
+  <!-- aidcp-edge 174af20: uses a main-owned fixed summary IPC, 30-item visual saturation, independent draft facts, and per-account stale-response invalidation. The old home card is removed. -->
+- [x] 5.3 Add focused Cloud and Edge tests for count semantics, account isolation, summary refresh, navigation, stale responses, and color/state classes.
+  <!-- Cloud focused 14/14 and typecheck pass; the full Cloud suite also passed 2276 with 5 gated skips. Edge content/security focused 10/10, companion/content regression 66/66, syntax checks, and typecheck pass. -->
+- [x] 5.4 Run proportionate tests and typechecks, validate OpenSpec strictly, commit and push only the isolated feature branches, and do not merge, deploy, or package.
+  <!-- Strict validation passed. Cloud d2437a8 and Edge 174af20 were pushed on codex/client-content-workspace-navigation. The control-repo checklist commit is pushed after this note. No merge, deploy, or package was performed. -->
