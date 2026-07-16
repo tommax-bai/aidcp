@@ -1221,6 +1221,8 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 
 - [ ] 82.10 **FB 自动热帖评论迁移在途"上锁" + 慢详情页探测窗放宽真机核（change `fb-comment-migration-hold`；cloud master `865a788` 已 land + **已部署 dev**、edge master `678bdc6` 已 land**待客户端重打包/本地重跑**，登记于 2026-07-16）** — 修「FB 自动 feed-inline 热帖评论时浏览器闪一下群帖地址又秒回首页、已批准评论被静默丢」。真机现场：dev FB 号 `61591753702668`（`ads-k1ei3dbi`）当日 6 次授权丢 1（`groups/1684192411910736`，14:26:35 `open_failed`）。**两正交根因两处修**：①**云端**（`role-dispatcher` 迁移在途以 `pendingMigration` 为闸抑制一切离页 browse/互动命令、只放行本支线自身的迁移 `open_note{navigate}`+`comment`）——去掉"迁移落地前后并发 scroll 经 `ensureFeed` 把浏览器拽回首页"；②**边缘**（`post-reader` 详情探测窗 `surfaceProbeRounds` 14→22，~12s→~18s）——**这才是当日那次掉评论的直接因**：FB 详情正文水合 7–12s > 旧窗 ~12s 上界，慢一拍即误 `open_failed`。**观测法**：dev journal——迁移在途（`pendingMigration` 置位后）不再穿插 `action=scroll`、`评论迁移 navigate 失败 … open_failed` 显著减少；`edge.log`——评论迁移期间不再出现 `ensureFeed 判非目标→整页导航 … surface=group_post` 的中途拽回。**真机核**：① 热帖评论迁移期间浏览器**不再"闪群帖地址又回首页"**（cloud 那半 dev 已生效、单独即可去掉 mid-migration 拽回）；② **慢水合详情页（>12s）评论能发出、不再误 `open_failed` 丢评论**（**须客户端含 edge `678bdc6` 重打包/本地重跑**才有放宽的探测窗，老包仍 ~12s 窗）；③ 评论支线暂停/看门狗终局正常解除、会话不钉死（`pendingMigration` 已在所有终局清空）；④ **XHS 零回归**（读评 surface 相等、迁移结构性不可达，本闸走不到）。**前置**：dev 云端含 `865a788`（已部署）；客户机以 edge master（含 `678bdc6`）重建客户端；用 tom 分组 FB 号（同 82 前置）。**⚠ 分半生效**：cloud 那半已 dev 独立生效；edge 探测窗放宽须重打包（默认不做、等显式发版）。**回滚**：cloud 恢复 `/opt/aidcp/cloud/src/orchestrator/role-dispatcher.ts.bak.20260716-161751` + restart；edge 改回 `surfaceProbeRounds: 14`。交叉 memory `fb-auto-comment-migration-lease-hole` / `fb-feed-dialog-guard-reload-churn`；与 82.6 人审门槛、82.9 审批回调正交。
 
+- [ ] 82.11 **FB 评论链路详情水合窗补齐 + 开帖步超时放宽真机核（change `fb-comment-open-hydration-window`；edge master `ff6c1e1` 已 land + dist 已重建**待运营重启客户端**；cloud master `f4a831e` 已 land + **已部署 dev**（backup `cloud.bak.20260716-202311`，healthcheck 绿：active/8787/飞书长连接/评论调度器就绪/isales 四服务未受影响），登记于 2026-07-16）** — **这是 82.10 那半修复的补齐**。82.10 的 edge `678bdc6` 自述目标是「让慢水合 permalink 不丢已批准评论」，但**只改了 `post-reader.ts`（浏览链路），而评论链路根本不走 post-reader**——`comment-handler.ts:125 → executor.openPost()` 走的是 `comment-executor.ts` 自己的 `openPost`（`:446` 独立产 `open_failed`），其 `surfaceProbeRounds` 是**另一份常量**、值仍为 4（总预算 ≈4.9s < 真机实测水合 7–12s）。dev 取证：`facebook_comment_audit` id 52（2026-07-16 16:54:05，账号 `61591701813509`，`groups/435744902071070`）= `no_strong_candidate/open_failed`，距租约取得仅 14s；且 `dist/facebook/post-reader.js:19`=22 而 `dist/facebook/comment-executor.js:70`=4，坐实「一边修好一边没修」。**两处修**：①**边缘**新增独立的 `postDetailProbeRounds`（默认 22，对齐 post-reader 同源实测依据）只用于 `openPost` 的 article 等待；搜索候选探测与评论框催拉**仍用 `surfaceProbeRounds:4` 逐字节不变**（它们跑在 `editorScrollRounds=6` 循环内，盲改即 6×22×600ms≈79s 炸步超时）；②**云端**新增 `FACEBOOK_OPEN_STEP_TIMEOUT_MS`=45s 让开帖步脱离固定 28s（边端最坏 ≈30s；不放宽只会把诚实的 `open_failed` 改判成 `timeout`——两者塌进同一 `no_strong_candidate`、运营看到的卡片一模一样）；搜索步仍 28s。**观测法**：dev PG `SELECT outcome, reason, count(*) FROM facebook_comment_audit WHERE created_at > <部署时刻> GROUP BY 1,2;` —— `open_failed` 应显著下降；**且 `timeout` 不得同步上升**（若上升说明 45s 仍不够、需复算边端最坏）。**真机核**：① 慢水合（>5s）的群帖评论能发出、不再误 `open_failed`；② 开帖步未被改判成 `timeout`；③ 评论框催拉预算未外溢（开帖步整体耗时不应逼近 45s——桩层已有回归闸，真机再核一次）；④ **XHS 零回归**（走 `edge-steps.ts` 另一条，本 change 未触及）。**前置**：dev 云端含 `f4a831e`（已部署）；**运营机须重启客户端**（dist 已在本机重建含 `ff6c1e1`；`electron:dev` 不含 build，见 memory `standby-restart-loop-stale-build`）；用 tom 分组 FB 号（同簇 82 前置）。**⚠ 分半生效**：cloud 那半已 dev 生效，但**边缘不重启则详情窗仍是 4 轮**、本项无法验收。**回滚**：cloud 恢复 `cloud.bak.20260716-202311.tar.gz` + restart；edge 把 `postDetailProbeRounds` 改回 4（或 revert `ff6c1e1`）。交叉 memory `fb-auto-comment-migration-lease-hole`；**与 82.10 同一现场、必须合并验收**（82.10 只覆盖浏览链路的窗，本项覆盖评论链路的窗）。
+
 ## 簇 83
 
 ### change `image-postcheck-vision-model` 分阶段真图验收（cloud master `023b5da` + console master `8c27fc2` 已 land + dev 已部署；登记于 2026-07-15）
@@ -1303,6 +1305,14 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 - [ ] 86.21 **B 负向：评论起跑后失败不双发** — 一个已起跑、跑到最大尝试仍未评上的 `/comment`：只有**评论链自己的结果卡**，委托层 MUST NOT 再叠一张「评论任务未触发」卡（避免双发）。
 - [ ] 86.22 **C：结构化 draft 自带 `auto_approve` 被夹成 review** — 用带 `approvalMode:"auto_approve"` 的请求体打后台 `/api/delegated-tasks/draft`（或客户端 `/delegated-tasks/draft`）建发帖/评论草稿：任务以**必审**入队、内容 MUST NOT 免审直发平台，即使该账号未开账号级免审。对照：后台「洗稿」正常入口（服务端传 review）行为不变。
 
+> **补登 `delegated-terminal-failure-reason`（2026-07-16，cloud master `<sha>` 已部署 dev）**：终态失败卡带上真实失败原因（此前只有「已达到最大尝试次数；真实完成 0/1。」这句预算记账，用户实际收到并投诉）。原因一路都在——编排器 `failureReason` → 执行器 → 已持久化到 `delegated_task_attempts.reason` 列——只是 `finishBudget` 从不读它。四支拼接 + humanize 白名单已单测（52 项绿），并已用「真 worker → 真 receipt → 真卡 builder」驱过五支肉眼核对；下列为**真 PG + 真飞书**判据，桩测替代不了。**注意 86.7 是本项的前身**（那时只验「有没有卡」，本批验「卡上说不说得清原因」），可一并跑。
+
+- [ ] 86.23 **失败卡带出真实原因（本投诉的正面验收）** — 构造一次发帖终态失败（最简：让同账号已有一轮发帖编排在跑时再 `/publish <昵称>`；或把账号压到风控非 normal 走自然语言 governed 路径）：红卡正文 MUST 在「已达到最大尝试次数；真实完成 0/1。」之后带出**具体原因**（如「已有一轮发帖编排在运行中」/「账号风控状态为 warned，暂不发帖」），MUST NOT 只有那句记账。
+- [ ] 86.24 **「均未真正开始」措辞不误导（红线）** — 上一项若走的是「全程被让开」路径（`failureCount=0`、`skippedCount=attemptCount`）：文案 MUST 为「N 次均未真正开始：<原因>」，MUST NOT 出现「最后一次未成原因」或任何可被读成「已经在平台上动过手」的措辞。
+- [ ] 86.25 **PG `listAttempts` 真库验证（本地测不到）** — 本 change 新增的 `listAttempts` **只在 memory 实现上跑过单测**（PG 需真库）。dev 上任一委托任务走到预算终态后，确认卡上真的带出了原因 → 即证 PG 侧 `SELECT … ORDER BY ordinal` 与 `mapAttempt` 正常；若卡上恒无原因尾巴（而 cloud 日志无 `读取 attempt 原因失败`），说明 PG 查询返回空、须回查。
+- [ ] 86.26 **平台名出现在失败卡上** — 失败卡 MUST 多一行「**平台**：Facebook / 小红书」（取自 registry displayName，非裸 id）。
+- [ ] 86.27 **无原因可取时不补推测（负向）** — 若某次终态确实取不到任何带原因的 attempt：卡文案 MUST 与本 change 前逐字一致（只有记账），MUST NOT 出现「原因未知 / 可能是…」之类推测。
+
 ## 簇 87
 
 ### change `wechat-channels-interaction-management` dev 真账号与受控写验收（Session 05；登记于 2026-07-15）
@@ -1347,3 +1357,22 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 - [ ] 89.2 **视频号新建自动归属与可见性（本 change 直接目的）** — 在新包中以客户账号登录，选择“视频号”创建一个全新环境：回执应为“已分配到当前账号并加入运行环境；需要启动时请在环境栏操作”，左侧环境列表立即出现该视频号环境的**离线行**；Cloud `/my-environments` 与 PostgreSQL active owner 都只归当前账号。MUST NOT 自动启动浏览器/core。
 - [ ] 89.3 **代理与重启持久化** — 不填代理创建：提示“未配代理，可稍后在环境行「代理」里补配”，环境仍正常归属；关闭并重开客户端后该环境仍在当前账号花名册，平台保持 `wechat_channels`，补配代理只改该环境且不改变归属。
 - [ ] 89.4 **失败诚实性与旧认领红线** — 分别制造 Cloud intent 申请不可达、建号后完成归属失败、权威清单刷新失败和本地 settings 写盘失败：申请失败必须在 AdsPower 建号前停止；其余失败须明确区分“本机已创建 / 已分配 / 未入运行环境”，不得把未确认环境加入花名册。用已登记的另一环境 envKey 与旧 `/environments` 路由尝试认领都必须被拒，且不得改变现有 owner。
+
+## 簇 90
+
+### change `facebook-write-action-visibility` FB 写动作客户端可见性验收（edge master `40aa902` 已 land + 已同步主 checkout；**未打安装包**；登记于 2026-07-16）
+
+**背景**：运营报「触发了多次评论，但客户端记录里一条都没有」。坐实：FB 环境的活动流此前只可能出现 5 类条目（账号就位 / 已连云 / 开始浏览 / 读 / 赞）——评论、加群、搜索**一条不产**。根因是三个独立卡点叠加：① 评论/加群/定向搜索/按链接开帖由会话**委托**给独立处理器，处理器自己回执云端后返回，**走不到**唯一的叙述出口；② 叙述器类型联合封闭 4 值且已用满；③ 壳侧中文兜底表 21/22 条规则是**小红书专属**（`autoBrowse` 按构造排除 FB），唯一命中 FB 的那条还把「就地读」叙述成「顺路去作者主页看看」。**危害不止少显示**：运营分不清「没做」和「做了但没显示」——卡在群参与审批（评论已提交、等管理员批）与评论框没找到的，此前同样隐形。
+
+本批同时修一个**既有 `edge-fleet-console` 规格违反**：FB 验证码/阻断**从不点亮**客户端「需要处理」态（检测行不含兜底正则要的「弹窗」「暂停操作」；清除侧 FB 干脆什么都不打），且该标志会被**任何一次成功互动顺带清掉**——一次正常点赞就把卡在验证码上的机器抹回绿色。已改为两侧走结构化事件 + 清除只认显式解除。
+
+**桩层**：`test:acceptance` 22/22、`npm test` 1559/1559、`typecheck` 干净。新覆盖**压在发射器侧**（既有解析器测试只测解析器、从不执行发射器，改一句措辞照样全绿而条目静默消失）。
+
+**前置环境**：tom 分组测试号（工程师大白 / Tmax）+ 越南招工类 FB 群；从 edge master（含 `40aa902`）起 headful 客户端连 dev（`ws://121.89.85.150:8787`）。**共享环境同簇 82 / 88（FB feed / 评论真机批）**，建议同一次真机 session 合验。
+
+- [ ] 90.1 **计数是否重复（首个要核的点）** — 一条真评论会同时 bump 本地兜底 `comments` 与云端经 `interaction.occurred` 的计数。预期云端 ~60s `dailyUsage` 快照**覆盖**本地兜底（与既有 like / view 同构、非新引入模式）。核：真机跑若干条评论后，客户端「今日进展」的评论数**不虚高**、与 console/云端权威计数一致。若虚高 → 说明覆盖没生效，需查 ui.snapshot 推送。
+- [ ] 90.2 **待批准是否为常态（预期反应管理）** — 若群参与审批频繁命中，活动流会出现大量「评论待管理员批准，还没显示出来」。**这是修复在起作用**（把一直存在的现实翻出来），**不是回归**。核：该文案 MUST NOT 计数、MUST NOT 读成已发布；并向运营讲清「现在看着全是待批」≠「现在全失败」——此前它们是静默的假绿。
+- [ ] 90.3 **群名读取（越南语真机）** — 加群条目的群名取自现读页面标题，需剥「(3) 」通知计数前缀与「| Facebook」后缀，按 18 字有界截断。核：越南语群名可读、截断不截错、**读不到时回落「一个小组」而非露 URL / group id**。（桩层已覆盖前缀剥除与截断，真机核多语言与通知前缀的真实形状。）
+- [ ] 90.4 **FB 验证码点亮与不被顺带清除** — 制造 FB 验证码/阻断：核 ① 该环境客户端「需要处理」**点亮并浮到环境栏最上**（此前从不点亮）；② 其后账号若仍有一次正常点赞/阅读，该态 **MUST NOT 被抹绿**（此前会）；③ 人工处理完、边缘复检发出显式解除后才退出该态。**同时核不回归小红书**：XHS 两侧本有显式 popup/popup_cleared，移除 statsDelta 兜底后其阻断态仍能正常置真与清除。
+- [ ] 90.5 **加群成功闸与云端一致** — 加群条目的成功判据镜像云端证据闸（`ok && clicked`）。核：客户端说「加入了小组」时，云端 `interaction.occurred{join_group}` 同时发生；客户端说「申请加入…等待管理员通过」时云端**不**记 join_group。二者 MUST NOT 打架。
+- [ ] 90.6 **搜索条目与在场感** — 定向搜索出「在「<真实群名>」搜「<词>」，找到 N 条」/「没有匹配的帖子」（二者可区分）；浏览侧搜索出「搜索「<词>」，找到 N 条」，且在场感为「正在看「<词>」的搜索结果…」而**非**「正在浏览推荐流…」（后者在搜索结果页上是假话）。
