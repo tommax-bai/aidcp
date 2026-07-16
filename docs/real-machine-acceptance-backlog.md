@@ -1296,6 +1296,13 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 - [ ] 86.17 **自动 / 排期发帖不受影响（回归）** — 自动 / 排期触发的发帖结果卡**仍进账号团队群**（无来源命令会话 → 补集回落既有 per-team 路由），审批卡仍走默认审批群；工程师大白手动命令的改动 MUST NOT 波及自动流量。
 - [ ] 86.18 **后续对齐项（未做，仅登记）** — 手动 `/comment` 终态结果卡目前**仍走账号团队群**（非本 change 范围）；若要与 `/publish` 对齐回来源会话，需另起把 `originChatId` 透传进 `CommentScheduler.postResultCard` 取址。
 
+> **补登 `delegated-executor-operator-authority-parity` + `delegated-approvalmode-clamp`（2026-07-16，cloud master `b78a27f` / `6413a6a` 已部署 dev，backup `cloud.bak.20260716-162510`，healthcheck 绿）**：委托层重新实现命令语义的两处跑偏 + 一处结构化入口免审信任缺口。服务/executor/helper 已单测（operatorOverride 仅精确类透传、评论起跑前失败→红卡 vs 起跑后→null、approvalMode clamp）；下列为真飞书 + 真调度路由判据，桩测替代不了。设计档 `docs/design/delegated-command-two-layer-split.md`（这是分层设计的阶段 1）。
+
+- [ ] 86.19 **A：精确 `/publish` 在风控受限账号仍出草稿 + 人审卡** — 把一个账号压到风控非 normal（或当天已达发布配额），管理群/私聊发 `/publish <昵称>`：系统**越风控生成草稿并出发布人审卡**，MUST NOT 因风控/配额把命令 blocked→静默判失败。人审 MUST 仍强制（越权只越风控、不越人审）。对照：同账号自然语言「让 <昵称> 发一篇」仍受风控闸（governed），受限时诚实 blocked。
+- [ ] 86.20 **B：评论起跑前触发闸失败收诚实红卡（不再静默）** — 对一个**未绑人设**（或联系方式缺 / 非 FB 账号带 `--join`）的账号发 `/comment <昵称>`：运营**收到一张红色「评论任务未触发」卡**，含人类可读原因（如「未绑定人设」），MUST NOT 零反馈静默。（今天此类会静默吞掉）
+- [ ] 86.21 **B 负向：评论起跑后失败不双发** — 一个已起跑、跑到最大尝试仍未评上的 `/comment`：只有**评论链自己的结果卡**，委托层 MUST NOT 再叠一张「评论任务未触发」卡（避免双发）。
+- [ ] 86.22 **C：结构化 draft 自带 `auto_approve` 被夹成 review** — 用带 `approvalMode:"auto_approve"` 的请求体打后台 `/api/delegated-tasks/draft`（或客户端 `/delegated-tasks/draft`）建发帖/评论草稿：任务以**必审**入队、内容 MUST NOT 免审直发平台，即使该账号未开账号级免审。对照：后台「洗稿」正常入口（服务端传 review）行为不变。
+
 ## 簇 87
 
 ### change `wechat-channels-interaction-management` dev 真账号与受控写验收（Session 05；登记于 2026-07-15）

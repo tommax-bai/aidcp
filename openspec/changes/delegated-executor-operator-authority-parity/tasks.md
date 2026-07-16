@@ -18,5 +18,5 @@
 - [x] `npm run typecheck` 通过 <!-- aidcp-cloud b78a27f -->
 - [x] `npm run test:acceptance` 通过（AC-PUB/AC-RISK 红线绿）54/54 <!-- aidcp-cloud b78a27f -->
 - [x] `npm test` 全量通过 2272 pass / 0 fail <!-- aidcp-cloud b78a27f -->
-- [ ] 部署 dev <!-- pending -->
+- [x] 部署 dev <!-- 2026-07-16 deployed (cloud 6413a6a) -->
 - [ ] 真机验收（受限账号 /publish 仍出草稿+人审卡；人设未绑 /comment 收诚实红卡）→ 簇 86

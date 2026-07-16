@@ -12,5 +12,5 @@
 - [x] `npm run typecheck` 通过 <!-- aidcp-cloud 6413a6a -->
 - [x] `npm run test:acceptance` 通过 54/54 <!-- aidcp-cloud 6413a6a -->
 - [x] `npm test` 全量通过 2272 pass / 0 fail <!-- aidcp-cloud 6413a6a -->
-- [ ] 部署 dev <!-- pending -->
+- [x] 部署 dev <!-- 2026-07-16 deployed (cloud 6413a6a) -->
 - [ ] 真机验收（结构化 draft 带 auto_approve → 不写审批信号、无免审直发）→ 簇 86
