@@ -25,7 +25,7 @@
 ## 3. 真机验收（登记 backlog，不阻塞归档）
 
 - [x] 3.1 真机跑一次 AdsPower 视频号环境的 启动 / 恢复 / 暂停 / 关闭 全矩阵，确认界面呈现成功且状态即时刷新（不必等下一次心跳）。建议并入视频号既有真机簇，不新开。
-  <!-- repo=aidcp commit=<pending> validation=已登记 docs/real-machine-acceptance-backlog.md 簇 99（4 项：四动作不谎报 / 状态即时刷新 / 只作用目标环境 / 真失败仍报失败） deploy=n/a deviation=另起簇 99 而非并入既有视频号簇——既有簇 87/98 的前置环境是「已登录且有历史互动的环境」，本簇只需 AdsPower 分身且**必须避开 self 环境**（self 下两标识同值、守卫不误伤 ⇒ 拿 self 验会假绿），前置条件不同故未合并 -->
+  <!-- repo=aidcp commit=23157ce validation=已登记 docs/real-machine-acceptance-backlog.md 簇 99（4 项：四动作不谎报 / 状态即时刷新 / 只作用目标环境 / 真失败仍报失败） deploy=n/a deviation=另起簇 99 而非并入既有视频号簇——既有簇 87/98 的前置环境是「已登录且有历史互动的环境」，本簇只需 AdsPower 分身且**必须避开 self 环境**（self 下两标识同值、守卫不误伤 ⇒ 拿 self 验会假绿），前置条件不同故未合并 -->
 
 ## 备注：与其他 change 的关系（不阻塞本 change）
 
