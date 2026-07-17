@@ -44,6 +44,18 @@ Cookie/session/二维码/浏览器调试地址 MUST NOT 出现在 Cloud DB、WS 
 - **WHEN** 用户对当前环境执行清除登录信息
 - **THEN** Edge 停止新发送、删除本地密文并进入 login required，Cloud 只保留业务队列而不把任务标记成功
 
+### Requirement: 已验证的视频号昵称必须回填通用账号展示名
+
+Cloud 在完成连接账号、平台与环境 scope 校验后收到 `interaction.auth.status` 时，只有 payload 同时满足 `status='active'`、identity 非空且 `identity.displayName` 去除首尾空白后非空，才 SHALL 将该展示名写入通用 `accounts.nickname`。该写入只补充展示元数据，MUST NOT 改变 `accountId`、平台、环境归属、身份路由或授权状态；昵称补充失败 MUST NOT 把已经持久化的 auth status 冒充为失败。Console 账号列表 SHALL 继续使用通用 `nickname → label → accountId` 诚实回落链，MUST NOT 增加视频号专用假名分支。
+
+#### Scenario: active 身份状态自动回填后台昵称
+- **WHEN** 已绑定视频号环境上报 scope 匹配的 active auth status，identity displayName 为 `示例视频号`
+- **THEN** Cloud 持久化 auth status 并把对应 `accounts.nickname` 更新为 `示例视频号`，Console 后续读取账号列表时显示该昵称而非 envKey/accountId
+
+#### Scenario: 未验证或空白身份不得覆盖昵称
+- **WHEN** auth status 不是 active、identity 为空，或 displayName 去除首尾空白后为空
+- **THEN** Cloud MAY 持久化真实 auth status，但 MUST NOT 新建、清空或覆盖 `accounts.nickname`
+
 ### Requirement: 私有接口必须由安全 adapter 隔离
 
 所有创作者助手私有端点调用 SHALL 收口在 Edge `WechatChannelsApiClient`，默认启用 TLS 验证、超时、响应大小上限、有限重试和逐端点 schema 校验。未知字段 MAY 容忍，关键字段缺失 MUST 分类为 `schema_changed` 并关闭对应 capability。第三方响应/错误 MUST 经稳定 error category/code 脱敏，MUST NOT 作为官方 API 或原文直接透传。
@@ -139,3 +151,15 @@ Edge SHALL durable claim scope-bound `interaction.offboard.command`，先停止�
 #### Scenario: 清理失败可重试且不误报成功
 - **WHEN** session clear 或 sidecar close 失败
 - **THEN** Edge durable 回 failed，Cloud 保持 pending；重试同 offboardId 可继续清理，MUST NOT tombstone 或显示已完成
+
+### Requirement: 可见客户昵称不得因缺失非展示 ID 而丢弃
+
+Edge SHALL 保留私有接口已返回的非空客户昵称和头像。评论响应的稳定 username 为空但 `commentNickname` 非空时，Edge SHALL 生成仅用于 participant scope 的确定性 opaque surrogate，MUST NOT 用昵称、头像 URL 或消息正文作为明文 ID。DM history 只提供会话与双方 username 时，Edge SHALL 以同批 session IDs 调用已验证的 `get-session-info` 只读端点，并用其 `username/nickname/headImgUrl` 富化 thread participant；昵称富化 MUST NOT 改变 message/thread 去重键、发送方向或 checkpoint ack 规则。
+
+#### Scenario: 评论 username 为空仍展示平台昵称
+- **WHEN** comment item 的 username 为空但 commentNickname 非空
+- **THEN** 同步 batch 的 thread participant 使用确定性 opaque externalId 并保留 nickname/avatar，MUST NOT 把整个 participant 降为 null
+
+#### Scenario: 私信历史通过 session info 富化客户昵称
+- **WHEN** DM history 返回非空 sessionId/fromUsername/toUsername 且 session-info 返回同 sessionId 的 username/nickname/headImgUrl
+- **THEN** Edge 在发布 batch 前把对应 participant 填为真实 nickname/avatar，且不在日志、fixture 或证据中记录真实值

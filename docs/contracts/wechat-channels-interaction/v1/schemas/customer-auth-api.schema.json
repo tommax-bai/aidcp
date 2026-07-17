@@ -12,6 +12,8 @@
     { "$ref": "#/$defs/JobMutationRequest" },
     { "$ref": "#/$defs/EscalateRequest" },
     { "$ref": "#/$defs/SyncActionRequest" },
+    { "$ref": "#/$defs/TestResetRequest" },
+    { "$ref": "#/$defs/TestResetResponse" },
     { "$ref": "#/$defs/BrowserControlRequest" },
     { "$ref": "#/$defs/ReadControlsRequest" },
     { "$ref": "#/$defs/ReadControlsResponse" },
@@ -117,6 +119,34 @@
         }
       }
     },
+    "SyncFreshnessEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observedAt", "receivedAt"],
+      "properties": {
+        "observedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "receivedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "SyncFreshnessProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["comment", "dm"],
+      "properties": {
+        "comment": {
+          "oneOf": [
+            { "$ref": "#/$defs/SyncFreshnessEvidence" },
+            { "type": "null" }
+          ]
+        },
+        "dm": {
+          "oneOf": [
+            { "$ref": "#/$defs/SyncFreshnessEvidence" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
     "InteractionListItem": {
       "type": "object",
       "additionalProperties": false,
@@ -162,13 +192,20 @@
         "data": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["envKey", "accountId", "platform", "auth", "replyConfig", "items", "nextCursor"],
+          "required": ["envKey", "accountId", "platform", "auth", "replyConfig", "testTools", "syncFreshness", "items", "nextCursor"],
           "properties": {
             "envKey": { "$ref": "common.schema.json#/$defs/Id" },
             "accountId": { "$ref": "common.schema.json#/$defs/Id" },
             "platform": { "$ref": "common.schema.json#/$defs/Platform" },
             "auth": { "$ref": "#/$defs/AuthSummary" },
             "replyConfig": { "$ref": "#/$defs/ReplyConfigProjection" },
+            "testTools": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["dataResetEnabled"],
+              "properties": { "dataResetEnabled": { "type": "boolean" } }
+            },
+            "syncFreshness": { "$ref": "#/$defs/SyncFreshnessProjection" },
             "items": {
               "type": "array",
               "maxItems": 100,
@@ -194,6 +231,7 @@
             "platform",
             "auth",
             "replyConfig",
+            "syncFreshness",
             "thread",
             "messages",
             "replyJob",
@@ -206,6 +244,7 @@
             "platform": { "$ref": "common.schema.json#/$defs/Platform" },
             "auth": { "$ref": "#/$defs/AuthSummary" },
             "replyConfig": { "$ref": "#/$defs/ReplyConfigProjection" },
+            "syncFreshness": { "$ref": "#/$defs/SyncFreshnessProjection" },
             "thread": { "$ref": "domain.schema.json#/$defs/ThreadView" },
             "messages": {
               "type": "array",
@@ -329,6 +368,43 @@
           ]
         },
         "scopeExternalId": { "$ref": "common.schema.json#/$defs/NullableId" }
+      }
+    },
+    "TestResetRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel"],
+      "properties": { "channel": { "$ref": "common.schema.json#/$defs/Channel" } }
+    },
+    "TestResetResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "meta"],
+      "properties": {
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["envKey", "accountId", "channel", "action", "actionRequestId", "status", "deleted"],
+          "properties": {
+            "envKey": { "$ref": "common.schema.json#/$defs/Id" },
+            "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+            "channel": { "$ref": "common.schema.json#/$defs/Channel" },
+            "action": { "const": "test_reset" },
+            "actionRequestId": { "$ref": "common.schema.json#/$defs/Id" },
+            "status": { "const": "accepted" },
+            "deleted": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["threads", "syncBatches", "syncCursors"],
+              "properties": {
+                "threads": { "type": "integer", "minimum": 0 },
+                "syncBatches": { "type": "integer", "minimum": 0 },
+                "syncCursors": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        },
+        "meta": { "$ref": "common.schema.json#/$defs/ResponseMeta" }
       }
     },
     "BrowserControlRequest": {

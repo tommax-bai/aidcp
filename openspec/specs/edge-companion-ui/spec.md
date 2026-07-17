@@ -1058,3 +1058,110 @@ renderer SHALL 将通用可写门禁与 channel send capability 分离。保存�
 - **WHEN** 用户从 A 切到 B 后 A 的互动列表响应才返回
 - **THEN** B 的列表、角标和系统通知均不使用 A 的数据
 
+### Requirement: 慢启动状态与开关在今日进展卡内如实呈现
+
+客户端 SHALL 在「今日进展」摘要卡内以**常驻脚注行**呈现当前选中环境所属账号的慢启动状态与开关。该行 MUST NOT 位于任何默认收起的折叠区内，MUST NOT 位于会因窗口无数据而整块隐藏的容器内——慢启动正是「启动新号之前」要设置的，在其唯一被需要的时刻不存在即为失败。
+
+该行 MUST NOT 置于自定义标题栏内。标题栏跟随选中环境而慢启动是账号级属性，且标题栏无窄窗降级、其平台标识不可收缩，新增不可收缩元素会使昵称在最小窗宽下被压至不可读。
+
+`ui.snapshot` 的慢启动字段 SHALL 为三态语义，与 `personaBound` 同族：`state` 明确取值时为权威，**字段整体缺省 = 未知（云端还没说）**。客户端 MUST NOT 把未知渲染为「未开启」：任何计时器、宽限窗或超时 MUST NOT 把未知提升为已确认的关闭态。
+
+客户端 MUST NOT 在任何文案中把该账号称为「新账号」或表述其平台年龄——系统只知道该账号连上本云端多少天，不知道它在平台上存在多久。
+
+客户端 MUST NOT 暗示慢启动会使动作变慢、更像真人或改变节奏。慢启动只改每日额度上限，不进节奏系数。
+
+#### Scenario: 字段未到时不渲染而非默认关闭
+
+- **WHEN** 客户端已连接云端但尚未收到慢启动字段
+- **THEN** 该脚注行整行隐藏，MUST NOT 渲染为未勾选的开关，无论经过多久
+
+#### Scenario: 开启中显示天数与总天数
+
+- **WHEN** 云端投影 `state=active`、`day=3`、`binding=true`
+- **THEN** 客户端显示「慢启动 · 第 3/7 天」且开关为勾选态
+
+#### Scenario: 曲线不比档位更严时如实说明
+
+- **WHEN** 云端投影 `state=active`、`day=5`、`binding=false`
+- **THEN** 客户端 MUST 在徽章上如实标注当前档位已更严、慢启动不额外限制
+- **AND** MUST NOT 表述为「正在压低配额」
+
+#### Scenario: 毕业态显式告知而非静默消失
+
+- **WHEN** 云端投影 `state=graduated`
+- **THEN** 客户端 MUST 显示已完成态并给出上限放开的日期，开关 MUST 仍如实反映库内为开启
+- **AND** 徽章 MUST NOT 静默消失——上限放开的那一刻正是最应被告知的时刻
+- **AND** 客户端 MUST NOT 把库内为开启的账号显示为未勾选
+
+#### Scenario: 不适用时禁用并说明原因
+
+- **WHEN** 云端投影 `eligible=false`
+- **THEN** 开关禁用，且客户端按 `ineligibleReason` 如实说明原因（平台不支持 / 无法确认该账号平台 / 本构建未启用客户接口 / 本云端已全局停用）
+- **AND** MUST NOT 静默禁用而不给原因
+
+#### Scenario: 断连时降级而非清空
+
+- **WHEN** 云端连接断开，客户端保留着上一次收到的慢启动状态
+- **THEN** 客户端 MUST 按既有连接态降级呈现（标注状态可能已过期）并禁用开关
+- **AND** MUST NOT 把「停止更新」渲染成「已关闭」或「未知」
+
+#### Scenario: 开关点击不触发今日进展折叠
+
+- **WHEN** 用户点击该脚注行内的开关（滑块或其文字标签任一位置）
+- **THEN** 「今日进展」的展开 / 收起状态 MUST 保持不变
+- **AND** 开关 MUST 恰好切换一次，MUST NOT 因事件冒泡在不同点击位置产生不同的切换次数
+
+#### Scenario: 规则说明常驻可读且说清优先关系
+
+- **WHEN** 该脚注行可见
+- **THEN** 规则说明以常驻小字呈现，MUST 说明每日额度按曲线逐日放开、第 7 天自动恢复，且上限取慢启动曲线与账号档位中更严的一个
+- **AND** MUST NOT 依赖悬浮提示、图标或任何需要额外交互才能看到的载体
+
+### Requirement: Cloud MUST NOT supply usage caps for actions the platform cannot perform
+
+The cloud MUST NOT supply a client-facing usage cap for an action that the connected account's platform structurally cannot perform. Supplying such a cap presents the account with a daily plan the system can never carry out, which the client then renders as a cap, a percentage, and a progress bar that can never advance — the fabrication this capability already forbids the client from inventing on its own.
+
+This rule is about the cap, not about the surface that carries it: it MUST hold for every cap the cloud supplies toward the client, whatever window it describes and whichever configuration it was read from. A cap that names an action the platform cannot perform is fabricated whether it arrives in the daily projection, in a per-window projection, or in the receipt of some unrelated write.
+
+The determination MUST come from the platform's own support declarations. Because an unsupported action may be declared in either the note-scoped action matrix or the orchestration capability matrix, the projection MUST consult both; consulting only one is a defect, not a scoping choice. Support MUST NOT be encoded numerically — a cap configured to zero MUST NOT be used to mean "unsupported", and the quota configuration MUST NOT be given a platform dimension.
+
+The projection MUST fail open. If the account's platform cannot be resolved, or any support lookup throws, the cloud MUST supply caps exactly as it did before this rule existed. Withholding a cap MUST be caused only by an explicit unsupported declaration, never by a failure to look one up.
+
+Withholding a cap MUST NOT withhold the corresponding total: the client's action rows continue to render every supplied total, and only the cap, its percentage, and its plan-completed state are absent. This requirement changes which caps the cloud supplies; it does not change how many action rows the client renders.
+
+#### Scenario: Facebook is not offered caps for collect or follow
+
+- **WHEN** the cloud projects usage caps for a Facebook account, whose platform declares collect unsupported in the note-scoped action matrix and follow unsupported in the orchestration capability matrix
+- **THEN** the supplied caps omit both collect and follow
+- **AND** every other supplied cap is unchanged
+- **AND** the supplied totals are unchanged, including the collect and follow totals
+
+#### Scenario: Every cap-bearing surface is covered, not just the daily one
+
+- **WHEN** the cloud supplies caps for a Facebook account across more than one surface — the daily projection, the per-window projections including the session window whose caps come from a different, platform-blind configuration, and the receipt returned by an unrelated settings write
+- **THEN** none of them offers a cap for collect or follow
+- **AND** no surface presents a cap that another surface withholds, because two surfaces disagreeing about the same account is itself the fabrication
+
+#### Scenario: A platform that supports the action still receives its cap
+
+- **WHEN** the cloud projects usage caps for an account whose platform declares every projected action supported
+- **THEN** the supplied caps are byte-for-byte the configured quota tier's caps
+
+#### Scenario: Platform resolution fails while projecting caps
+
+- **WHEN** the account's platform cannot be resolved, or a support lookup throws, while the cloud projects usage caps
+- **THEN** the cloud supplies the full configured set of caps
+- **AND** the client is never left without usage information because a lookup failed
+
+#### Scenario: Client renders the withheld cap honestly
+
+- **WHEN** the client receives a daily usage payload whose totals include an action that has no supplied cap
+- **THEN** the client renders that action's total with no cap, no percentage, and no progress bar
+- **AND** the client does not treat that action as a plan that can complete
+
+#### Scenario: Withheld caps do not block the day-completed state
+
+- **WHEN** every action that has a supplied cap has reached it, and an action without a supplied cap has not
+- **THEN** the client presents the daily plan as completed
+- **AND** an action with no supplied cap never prevents the completed state, because an action with no plan cannot be an incomplete plan
+

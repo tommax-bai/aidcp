@@ -1,0 +1,52 @@
+{
+  "manifestVersion": 1,
+  "capturedAt": "2026-07-17T03:41:00.000Z",
+  "source": "authorized_adspower_session",
+  "evidenceBoundary": "observed_read_only_nonempty",
+  "writesDispatched": false,
+  "rawHarPersisted": false,
+  "secretValuesPersisted": false,
+  "commentList": {
+    "path": "/micro/interaction/cgi-bin/mmfinderassistant-bin/comment/comment_list",
+    "businessBodyKeys": ["commentSelection", "exportId", "forMcn", "lastBuff"],
+    "responseDataKeys": ["comment", "commentCount", "downContinueFlag", "lastBuff"],
+    "commentFieldNames": ["commentContent", "commentCreatetime", "commentHeadurl", "commentId", "commentLikeCount", "commentNickname", "levelTwoComment", "username"],
+    "observedRootCount": 3,
+    "observedFlattenedCount": 3,
+    "hasMore": false
+  },
+  "dmHistory": {
+    "path": "/micro/interaction/cgi-bin/mmfinderassistant-bin/private-msg/get-history-msg",
+    "businessBodyKeys": ["cookie"],
+    "responseDataKeys": ["baseResp", "cookie", "isContinue", "msg"],
+    "messageFieldNames": ["fromUsername", "msgType", "sessionId", "svrMsgId", "textMsg", "toUsername", "ts"],
+    "observedSessionCount": 1,
+    "observedMessageCount": 3,
+    "observedDirections": ["inbound", "outbound"],
+    "observedTypes": ["text"],
+    "incrementalCursorPresent": true,
+    "hasMore": false
+  },
+  "cloudPersistence": {
+    "commentThreadCount": 3,
+    "commentMessageCount": 3,
+    "dmThreadCount": 1,
+    "dmMessageCount": 3,
+    "cursorScopeCount": 3,
+    "localCloudLastBatchIdsMatch": true,
+    "sendAttemptCount": 0
+  },
+  "clientPresentation": {
+    "browserClosed": true,
+    "pendingItemCount": 2,
+    "commentListAndDetailVisible": true,
+    "dmListAndDetailVisible": true,
+    "readCapabilities": ["commentsRead", "dmRead"]
+  },
+  "privacyChecks": {
+    "cookiesPersisted": false,
+    "rawMessagePayloadPersisted": false,
+    "imageEncryptionKeysPersisted": false,
+    "messageBodiesIncludedInEvidence": false
+  }
+}

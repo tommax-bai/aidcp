@@ -53,7 +53,7 @@
 | --- | --- | --- | --- |
 | `hello` | edge → cloud | `welcome` | 边缘上线握手，声明平台、账号与能力 |
 | `welcome` | cloud → edge | — | 握手确认，下发 sessionId |
-| `ui.snapshot` | cloud → edge | — | 陪伴界面数据回填（昵称/最近发布/审批状态/账号今日用量；hello 注册完成后全量 + 审批变化时增量） |
+| `ui.snapshot` | cloud → edge | — | 陪伴界面数据回填（昵称/最近发布/审批状态/账号今日用量/账号级慢启动；hello 注册完成后全量 + 审批变化时增量） |
 | `plan.request` | edge → cloud | `plan.response` | 高层目标拆解为步骤 |
 | `plan.response` | cloud → edge | — | 返回有序步骤清单 |
 | `select.request` | edge → cloud | `select.response` | 元素清单 + 目标，请云端选一个 |
@@ -273,6 +273,16 @@
       "target": 20,         // 新手首轮展示预期，不是风控配额或成功保证
       "startedAt": 1730000000000,
       "sourceId": "note-9" // 可选；generating 时已原子认领的精选源内容
+    },
+    "slowStart": { // 可选（change account-level-slow-start）；账号级慢启动（逐日配额爬坡）投影
+      // **字段整体缺省 = 未知（云端还没说）→ 边缘整行不渲染**，照 personaBound 三态判例：MUST NOT 把「未知」当「关」
+      "state": "active",     // off | active | graduated（graduated=已完成，上限已放开但库里开关仍为真，显式告知而非静默消失）
+      "day": 3,              // 仅 active；1..totalDays
+      "totalDays": 7,        // 曲线总天数（恒 7）
+      "since": 1729900800000, // 起点（epoch ms，写入时已对齐上海日起点）；**绝不是 accounts.created_at**
+      "binding": true,       // 仅 active；clamp 是否至少收紧一项。false = 勾了但当前档位已更严、不额外限制
+      "eligible": true,      // false 时边缘禁用开关并按 ineligibleReason 如实说明
+      "ineligibleReason": "platform_unknown" // 可选：platform_unsupported | platform_unknown | globally_disabled
     },
     "windows": {
       "session": {
@@ -1183,6 +1193,12 @@ cloud（Publish Agent）          edge                         飞书（云端 B
 评论完整合同走读见 `docs/contracts/wechat-channels-interaction/v1/fixtures/walkthroughs/comment-confirmed-flow.json`：只有双方协商能力、Cloud 整批落库并 ack、人工批准、Edge 回 `confirmed` 且 Cloud durable 接收结果后，job 才能成为 `sent`；Edge 收到 exact result ack 后才清 outbox。
 
 私信降级走读见 `docs/contracts/wechat-channels-interaction/v1/fixtures/walkthroughs/dm-ambiguous-flow.json`：Edge 派发后无法取得平台证据时必须回 `ambiguous`，Cloud 保持阻断且不自动重投，客户界面显示“待核验”。两条 fixture 都只证明合同，不代表真实账号执行过写操作。
+
+### 4.5 视频号开发测试数据重置
+
+`interaction.sync.request.reason` 在既有 `user_requested | resume | scheduled | recovery` 基础上增加 `test_reset`。该原因只允许 Cloud 在显式 `dev` 测试开关开启、当前账号写入暂停、所选渠道没有任何发送记录，且唯一在线 Edge 同时协商 `interaction_inbox_v1` 与 `interaction_test_data_reset_v1` 后下发。
+
+收到 `test_reset` 后，Edge 必须在该渠道既有同步锁内先清除本地 checkpoint 与 thread-source 缓存，再从空 cursor 执行正常只读同步。Cloud 必须先清除同账号、同环境、同渠道的 inbox 副本、sync batch 与 cursor，否则稳定 batch id 会被当成 duplicate。该流程只重置 aidcp 的测试读取状态，不删除微信平台评论/私信，不触发回复发送，也不复用会清授权与配置的 offboarding。
 
 ## 5. 错误与兼容性
 
