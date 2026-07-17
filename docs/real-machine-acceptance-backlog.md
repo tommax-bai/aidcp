@@ -1333,6 +1333,8 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 - [ ] 87.6 **真实解绑与延期清理** — 验环境解绑、客户终止、Edge 离线后重连三条路径：Cloud 先撤权/停派发，Edge drain 后清加密 session 并关闭 sidecar，重复/重启只确认一次，Cloud 收到 scope-matching ack 后 tombstone，并在配置期限内完成 scope purge；保留审计不得含正文。需保存真实的凭据删除与 purge 证据。
 - [ ] 87.7 **low-risk auto 仍需二次批准** — 只有 87.1–87.6 全部通过且用户再次明确批准，才给该测试账号开启 low-risk auto，用可删除测试消息验一次；否则状态必须写成「已实现、未真机开放验证」，全局开关、账号白名单和账号级暂停继续关闭。
 - [x] 87.8 **Edge 真机载体边界** — 已用 Edge master `d321042` 源码连接同一 AdsPower 登录态完成只读真机运行；没有构建或发布安装包，因此本项只证明源码载体，不代表桌面安装包已发布/验收。
+- [ ] 87.9 **写熔断人工复位与真发送恢复（`wechat-store-and-circuit`）** — 仅用用户明确批准的可删除测试消息：连续制造达到阈值的真实发送失败，确认 Cloud 同时出现 `writePaused=true`、`circuitOpen=true`、失败计数与熔断起始时刻，Console 不得显示「允许写入」；排除故障后由运营把写总闸从暂停切回开启并保存，确认同一 CAS 版本内失败计数归零、熔断时间清空，随后一次受控真发送通过既有门禁并在平台可见。MUST NOT 用 mock `confirmed`、只改库字段或只看 HTTP 200 代替完整闭环。
+- [ ] 87.10 **Edge 永不回执时的 30 天 Cloud 清除兜底（`wechat-store-and-circuit`）** — 用隔离测试环境造 offboard 后让 Edge 永久离线/不回执；到 `purgeDueAt`（可在专用测试环境安全缩短等待）确认 Cloud 仍清除消息正文/附件元、草稿文本、参与者昵称头像与会话标题并推进 `purged`，`cloud_purged` 审计明确为 `purged_edge_unconfirmed`，不得表述成 Edge 已清。Edge 若之后补回执，应只更新 `edge_result_status` 与 after-cloud-purge 审计，不得复活或重复清除 Cloud 内容。
 
 <!-- 87.1 partial evidence (2026-07-16): named-account auth became active, the browser closed, controls version 1 converged, and Cloud retained one accepted zero-item batch/cursor for each of comment and DM with no send attempts. Keep 87.1 open until a non-empty incremental sample and the real client-side same-account/cursor presentation are observed; 87.2 remains open for multi-page/restart/two-account isolation. -->
 
