@@ -119,6 +119,34 @@
         }
       }
     },
+    "SyncFreshnessEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observedAt", "receivedAt"],
+      "properties": {
+        "observedAt": { "$ref": "common.schema.json#/$defs/Timestamp" },
+        "receivedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "SyncFreshnessProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["comment", "dm"],
+      "properties": {
+        "comment": {
+          "oneOf": [
+            { "$ref": "#/$defs/SyncFreshnessEvidence" },
+            { "type": "null" }
+          ]
+        },
+        "dm": {
+          "oneOf": [
+            { "$ref": "#/$defs/SyncFreshnessEvidence" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
     "InteractionListItem": {
       "type": "object",
       "additionalProperties": false,
@@ -164,7 +192,7 @@
         "data": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["envKey", "accountId", "platform", "auth", "replyConfig", "testTools", "items", "nextCursor"],
+          "required": ["envKey", "accountId", "platform", "auth", "replyConfig", "testTools", "syncFreshness", "items", "nextCursor"],
           "properties": {
             "envKey": { "$ref": "common.schema.json#/$defs/Id" },
             "accountId": { "$ref": "common.schema.json#/$defs/Id" },
@@ -177,6 +205,7 @@
               "required": ["dataResetEnabled"],
               "properties": { "dataResetEnabled": { "type": "boolean" } }
             },
+            "syncFreshness": { "$ref": "#/$defs/SyncFreshnessProjection" },
             "items": {
               "type": "array",
               "maxItems": 100,
@@ -202,6 +231,7 @@
             "platform",
             "auth",
             "replyConfig",
+            "syncFreshness",
             "thread",
             "messages",
             "replyJob",
@@ -214,6 +244,7 @@
             "platform": { "$ref": "common.schema.json#/$defs/Platform" },
             "auth": { "$ref": "#/$defs/AuthSummary" },
             "replyConfig": { "$ref": "#/$defs/ReplyConfigProjection" },
+            "syncFreshness": { "$ref": "#/$defs/SyncFreshnessProjection" },
             "thread": { "$ref": "domain.schema.json#/$defs/ThreadView" },
             "messages": {
               "type": "array",
