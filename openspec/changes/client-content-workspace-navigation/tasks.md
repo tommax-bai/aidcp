@@ -116,3 +116,10 @@
       把本分支对 `interaction-workspace.js` 的改动还原后行为一致。该改动是同步的 class 切换，
       不可能产生 76s 用例。判定为**既有的负载相关 flaky**，与本 change 无因果；登记在此备查。
   <!-- 若后续 CI 复现，从「全量并发下这两个用例被饿死」方向查，勿从本 change 找 -->
+
+## 8. Titlebar right alignment refinement
+
+- [x] 8.1 Move the compact inspiration entry into the right-side control group, immediately before the environment-name chip, without changing its data, color, or click behavior.
+  <!-- Edge DOM order is account identity → flex spacer → inspiration entry → cloud environment chip → health. No CSS, data, or click-handler change. -->
+- [x] 8.2 Update the DOM-order regression test, run focused Edge validation and strict OpenSpec validation, then commit and push only the existing feature branch without packaging or deployment.
+  <!-- aidcp-edge fa4b8a4 pushed on codex/client-content-workspace-navigation; focused content/security tests 16/16 and typecheck pass. Strict OpenSpec validation passed. No package or deployment. -->
