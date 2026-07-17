@@ -72,5 +72,13 @@
 
 ## Capabilities
 
-- `interaction-cooldown` — MODIFIED ×3 + ADDED ×1
+- `interaction-cooldown` — MODIFIED ×5 + ADDED ×3
 - `comment-interaction` — MODIFIED ×1（仅例外的理由句同源化）
+
+> **计数于实装期校正**（原写 MODIFIED ×3 + ADDED ×1）：propose 阶段漏了两条仍带旧值 / 旧语义的要求
+> （「冷却时间戳在真实成功时落」的场景写死「后续 2 分钟内」；「冷却闸只拦四类互动」称冷却为「节奏闸」＝被本 change 改判掉的旧定位），
+> 且把两条**新**要求误置于 MODIFIED 之下（MODIFIED 是整条替换，其中一条还因此丢了 mandatory 例外段）。
+> ADDED 第三条「兜底不变量 MUST 由算术保证」为实装期新增——初版实装把夹 cap 误作用于**全部**风控动作，
+> 踩了 design §8 警告的同一个「对称性」陷阱，只是在**动作轴**而非窗口轴（`MINUTE_BURST_CAP.dm_reply = 0` 是占位、
+> 夹了它＝把视频号入站回复的旋钮焊死）。详见 tasks 2.4。
+> ⚠️ `openspec validate --strict` 对以上问题**全部绿灯放行**。
