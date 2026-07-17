@@ -68,26 +68,25 @@
 
 ## 7. aidcp-cloud — panel 层
 
-- [ ] 7.1 `src/panel/panel-server.ts`：`/click` 分支 body 解构 += `text, submit`（**不新增 verb**）
-- [ ] 7.2 `src/panel/panel-server.ts`：**授权闸** —— `text` 非空 && actor 是 incident 级 scoped token ⇒ **403 `{error:'forbidden', reason:'requires_panel_login'}`**；飞书链接的纯点击流**逐字不变**
-- [ ] 7.3 `src/panel/panel-server.ts`：`captchaAssistStatus` 从 if 链 + default 改成 **`Record<reason, number>` 穷举表**（reason union 一加成员 typecheck 立刻红）；定码 `invalid_text`/`invalid_points`→400、`edge_lacks_text_capability`→409、`not_found`→404
-- [ ] 7.4 `src/panel/types.ts`：`submitClick` 签名 += `text?` / `submit?`；移除 remoteAddr
-- [ ] 7.5 单测：**panel 把 `text`/`submit` 透传到 `submitClick`**（HTTP 边界手写解构的守卫——漏字段 = 静默丢弃 + typecheck 全绿）
-- [ ] 7.6 单测：`actor='captcha-assist-token'` + text ⇒ 403；**纯点击 ⇒ 200（零回归）**；未声明能力 ⇒ 409 且**命令未下发**；畸形 text ⇒ 整单拒绝、未下发
-- [ ] 7.7 `npm test` + `npm run test:acceptance` + `npm run typecheck` 全绿
+- [ ] 7.1 `src/panel/panel-server.ts`：`/click` 分支 body 解构 += `text, submit`（**不新增 verb、不新增身份闸** —— 键入与点击共用同一授权面，见 design D9）
+- [ ] 7.2 `src/panel/panel-server.ts`：`captchaAssistStatus` 从 if 链 + default 改成 **`Record<reason, number>` 穷举表**（reason union 一加成员 typecheck 立刻红）；定码 `invalid_text`/`invalid_points`→400、`edge_lacks_text_capability`→409、`not_found`→404
+- [ ] 7.3 `src/panel/types.ts`：`submitClick` 签名 += `text?` / `submit?`；移除 remoteAddr
+- [ ] 7.4 单测：**panel 把 `text`/`submit` 透传到 `submitClick`**（HTTP 边界手写解构的守卫——漏字段 = 静默丢弃 + typecheck 全绿）
+- [ ] 7.5 单测：`actor='captcha-assist-token'` + text ⇒ **200 且命令已下发**（飞书链接可直接键入，MUST NOT 因缺 console 登录而拒）；**纯点击 ⇒ 200（零回归）**；未声明能力 ⇒ 409 且**命令未下发**；畸形 text ⇒ 整单拒绝、未下发
+- [ ] 7.6 `npm test` + `npm run test:acceptance` + `npm run typecheck` 全绿
 
 ## 8. aidcp-console — 协助页
 
 - [ ] 8.1 `src/types/api.ts`：`lastResult.status` union += `no_target`；+= `inputMode?` / `typeReport?`；**移除 `remoteAddr`**（手抄镜像，不在 `/api/version` 指纹对拍内 ⇒ 登记为已知缺口）
 - [ ] 8.2 `src/pages/CaptchaAssistPage.tsx`：**删「远程桌面」按钮**及 `remoteAddr` 相关渲染
-- [ ] 8.3 `src/pages/CaptchaAssistPage.tsx`：导入 AntD `Input`；**登录态感知** `hasPanelAuth = Boolean(getToken())`；有 token 时提交额外挂 `authorization: Bearer`
-- [ ] 8.4 `src/pages/CaptchaAssistPage.tsx`：**不变量长在控件上** —— 答案框 disabled 直到 `points.length === 1`（label「先在截图上点中输入框，再在此键入答案」）；无 panel token ⇒ disabled + 「远程输入需先登录控制台」；`text` 非空时不让放第 2 个点
+- [ ] 8.3 `src/pages/CaptchaAssistPage.tsx`：导入 AntD `Input`（**不做登录态感知、不挂 Bearer** —— 键入与点击共用同一 scoped token 授权面，见 design D9）
+- [ ] 8.4 `src/pages/CaptchaAssistPage.tsx`：**不变量长在控件上** —— 答案框 disabled 直到 `points.length === 1`（label「先在截图上点中输入框，再在此键入答案」）；`text` 非空时不让放第 2 个点
 - [ ] 8.5 `src/pages/CaptchaAssistPage.tsx`：「回车提交」Checkbox 默认开；**不提供「点第 2 个点提交」**（聚焦滚动会让旧坐标失效且 `sameLocation` 检测不到）
 - [ ] 8.6 `src/pages/CaptchaAssistPage.tsx`：**pin 触发扩到首次键入** —— `frozen = (points.length > 0 || text.length > 0) && pinned != null`，使「画面已更新」Alert 在打字期照常生效
 - [ ] 8.7 `src/pages/CaptchaAssistPage.tsx`：提交 body += `text?` / `submit?`（空则整字段省略，与 trajectory 同「全有或全无」纪律）；**提交成功与 adoptLatest 后立即清空 text state**；答案绝不进 URL / localStorage
 - [ ] 8.8 `src/pages/CaptchaAssistPage.tsx`：建 **`Record<lastResult['status'], string>` 穷举表**（现为裸打英文枚举、无表 ⇒ 新增的 `no_target` 本会从这个洞溜走）
 - [ ] 8.9 `src/pages/CaptchaAssistPage.tsx`：`typeReport` 渲染成三句人话（**用户价值兑现点**）——「字打进去了，但答案不对」/「焦点在跨源/不可读元素内，无法证明字符已落入；请对照新画面确认」/「那一点没点到输入框」；`edge_lacks_text_capability` ⇒ 「该机器客户端版本过旧，不支持远程输入」（不裸打英文 reason）
-- [ ] 8.10 `src/pages/CaptchaAssistPage.test.tsx`：无落点 ⇒ 输入框 disabled；无 panel token ⇒ disabled；打字触发 pin ⇒ 「画面已更新」Alert；答案不出现在任何 fetch URL；**纯点击提交体与今天逐字节一致**
+- [ ] 8.10 `src/pages/CaptchaAssistPage.test.tsx`：无落点 ⇒ 输入框 disabled；打字触发 pin ⇒ 「画面已更新」Alert；答案不出现在任何 fetch URL；**纯点击提交体与今天逐字节一致**
 - [ ] 8.11 `npm test` + `npm run typecheck` 全绿
 
 ## 9. aidcp（中控）— 文档
@@ -112,7 +111,7 @@
 - [ ] 11.4 登记：打字期挑战换图 ⇒ pin + 「画面已更新」
 - [ ] 11.5 登记：**Enter 提交导航后不被误报 failed**
 - [ ] 11.6 登记：未换装新包的运营机 ⇒ 409 + 人话文案（**需一次 edge 出包 + 逐台换装才能验**）
-- [ ] 11.7 登记：飞书链接未登录 ⇒ 输入框 disabled；登录控制台后 ⇒ 可打字
+- [ ] 11.7 登记：**从飞书卡链接直接点开协助页（未登录控制台）即可键入并解开验证码**（授权面不变的真机钉）
 - [ ] 11.8 登记：焦点假阳性取证 —— `focusTag` 是否足以事后判别「打进了错误的框」
 - [ ] 11.9 登记：确认协助页与飞书卡**已无远程桌面入口**
 
@@ -121,4 +120,5 @@
 - [ ] 12.1 登记独立 change：**cleared 断连不可达** —— overlay-report-gate 无论 send 成没成都消费掉 `reportedKind`，断连时解决掉的验证码永不到云端、账号一直暗着（要改 gate 的「已投递 vs 已尝试」记账）
 - [ ] 12.2 登记：incident TTL 30min 只在 `onDetected` 刷新、无续期入口
 - [ ] 12.3 登记：console 三处手抄 union 不在 `/api/version` 指纹对拍内（cloud 改了 console 零提示）
+- [ ] 12.5 登记：**「卡的可见范围 = 操作范围」** —— 协助页在登录门外凭 scoped token 授权、飞书群路由无内外部标记，看得见卡的人就能操作。**既有性质**（今天已完整适用于协助点击与其它审批卡），本 change 不引入、不扩大、不解决；归属是路由层的内外部标记
 - [ ] 12.4 登记（条件）：classifier 词表零条输入类文案 —— 本次报障形态已能被检出故非准入；若后续发现同类漏检，扩词表 MUST 用**真实文案**（裸词误命中已付过代价），不能凭猜

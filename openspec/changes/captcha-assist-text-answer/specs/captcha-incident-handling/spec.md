@@ -130,15 +130,17 @@ edge 派发提交键后 SHALL 用**有界重试**重新探测阻断态。文本�
 - **WHEN** 云端收到超长或含表外字符的 `text`
 - **THEN** MUST 拒绝整个提交，MUST NOT 降级为「只执行点击」
 
-### Requirement: 协助键入必须要求控制台身份
+### Requirement: 协助键入与协助点击共用同一授权面
 
-含 `text` 的协助提交 MUST NOT 仅凭 incident 级 scoped token 放行；cloud SHALL 要求控制台登录身份，否则拒绝并回可辨识的原因（如 `requires_panel_login`）。协助**点击**的授权面不变，Feishu 链接的纯点击流 MUST 零回归。
+含 `text` 的协助提交 SHALL 与纯点击走**完全相同**的授权路径（incident 级 scoped token）。系统 MUST NOT 为键入新增身份闸——协助页刻意置于控制台登录门之外、凭 URL 上的 scoped token 授权，正是为了让运营收到 Feishu 卡后能立即处置；验证码是有时效的现场，且远程桌面处置通道并不存在（见 REMOVED «远程桌面处置文案»），本链是唯一的远程处置路径。
 
-理由 MUST 成文：Feishu 群路由无内部 / 外部标记，卡片可被路由到外部客户群，**卡的可见范围不是授权范围**，系统内无闸可拦。把「点两个像素」升级为「向生产浏览器键入任意 ASCII 并回车」需要一道显式身份闸。协助页 MUST 在无控制台身份时禁用输入控件并给出提示，MUST NOT 让运营键入完整答案后才被拒。
+键入相对既有点击面的**边际暴露接近零**：点击已可作用于页面任意坐标，而键入只能进入已聚焦元素（焦点由一次已授权的点击建立）、字符集与长度受限、无修饰键与功能键、且只在阻断遮罩确认仍在的窗口内成立。
 
-#### Scenario: Feishu scoped token 不能键入
+「卡的可见范围即操作范围」是本链的**既有性质**（Feishu 群路由无内部 / 外部标记），MUST 如实记录为已知暴露面，MUST NOT 被表述为已由本能力解决；它的归属是路由层的内外部标记，不在本能力范围内。
+
+#### Scenario: Feishu 链接可直接键入
 - **WHEN** 持 incident 级 scoped token 的请求提交含 `text` 的协助命令
-- **THEN** cloud MUST 拒绝并回 `requires_panel_login`，MUST NOT 下发命令
+- **THEN** cloud MUST 照常校验并下发，MUST NOT 因缺少控制台登录身份而拒绝
 
 #### Scenario: 点击流零回归
 - **WHEN** 持 incident 级 scoped token 的请求提交纯点击（无 `text`）

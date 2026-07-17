@@ -12,7 +12,7 @@
 
 - **验证码答案键入**：在既有 `captcha.assist.click` 载荷上做 additive optional 扩展（`text?` + `submit?:'enter'`），运营在协助页先点中输入框（1 个落点）再键入答案，边缘用**真实键盘事件**逐字拟人输入并回车提交。**不新增 MessageType**（沿用 `captcha-assist-trajectory-replay` 的 additive 先例）⇒ 边缘主动命令白名单、云端暂停穿透白名单、`docs/protocol.md` 计数三处**全不动**。
 - **诚实取证回执**：新增 `no_target` status + `inputMode?` + `typeReport?`（焦点分级 / 清空三态 / 实际派发字符数 / 回读三态 / 是否提交）。运营 MUST 能区分「答案打错了」与「字根本没打进去」。
-- **协助键入需 panel 身份**：含 `text` 的提交拒绝 incident 级 scoped token（403 `requires_panel_login`）；飞书链接的**纯点击流零回归**。理由：群路由无内外部标记，卡的可见范围不是授权范围。
+- **授权面不变**：键入与点击共用**同一条**授权路径（incident 级 scoped token），**不新增身份闸**。协助页从飞书卡点开即可键入——那正是这条链的设计意图，而键入受的约束比点击更紧（只进已聚焦元素 / 仅 24 个 ASCII 可见字符 / 无修饰键与功能键 / 仅在遮罩确认仍在的窗口内）。
 - **BREAKING（内部契约）：移除「远程桌面」入口**。删 console 按钮、飞书卡「远程地址」行、edge 两处 env 读取、两份 `protocol.ts` 的 `EdgeHelloPayload.remoteAddr` 及云端 session / incident / panel types 的连带字段。**无外部消费方**（该字段从未被填过），风险为零。
 - **准入前置：先修点击链路的 4 个既存诚实缺陷**（可独立合并验证）。
 - **反检测红线**：MUST NOT 复用现有逐字输入函数——它内部是逐字符文本插入、**零 keydown/keyup**，「键事件数与字符数不匹配」是厂商成熟判据，而验证码正是其主战场；且它是 FB 发帖 / XHS 搜索 / FB 评论四处的热点依赖。新建 captcha 专用键盘原语。
@@ -31,8 +31,8 @@
 ## Impact
 
 - **aidcp-edge**：新建 `src/browse/captcha-type.ts`（ASCII 键位表 / 真 keyDown+keyUp 逐字派发 / 焦点三态探针 / 强制清空 / 机会性回读）；`src/browse/captcha-assist.ts`（task 0 四修 + 键入接线 + 中途复检 ×2 + 有界重试判据）；新建 `src/client/build-capabilities.ts`（构建能力位收进 `EdgeClient` 构造函数，两条装配路径都拿不掉）；`src/comm/protocol.ts` 字段 + 移除 `remoteAddr`；`src/main.ts` 透传 taskId 构造 checkpoint、移除 env 读取；`src/wechat-channels/runtime.ts` 移除 env 读取。
-- **aidcp-cloud**：`src/comm/protocol.ts` 逐字一致；`src/comm/captcha-assist.ts`（文本校验 / v1 形状闸 / 能力 fail-closed 闸 / 版本偏斜检测 / 答案明文边界 / 移除 remoteAddr）；`src/comm/captcha-coordinator.ts`（删飞书卡「远程地址」行）；`src/panel/panel-server.ts`（透传 + panel 身份闸 + 错误码穷举表）；`src/panel/types.ts`；`src/comm/ws-server.ts` / `handler.ts` 的 session.remoteAddr 连带清理。
-- **aidcp-console**：`src/pages/CaptchaAssistPage.tsx`（答案输入框 + 登录态感知 + Bearer 挂载 + pin 触发扩到键入 + `lastResult` Record 表 + 三句人话展示 + **删「远程桌面」按钮**）；`src/types/api.ts` 手抄镜像同步。
+- **aidcp-cloud**：`src/comm/protocol.ts` 逐字一致；`src/comm/captcha-assist.ts`（文本校验 / v1 形状闸 / 能力 fail-closed 闸 / 版本偏斜检测 / 答案明文边界 / 移除 remoteAddr）；`src/comm/captcha-coordinator.ts`（删飞书卡「远程地址」行）；`src/panel/panel-server.ts`（透传 + 错误码穷举表）；`src/panel/types.ts`；`src/comm/ws-server.ts` / `handler.ts` 的 session.remoteAddr 连带清理。
+- **aidcp-console**：`src/pages/CaptchaAssistPage.tsx`（答案输入框 + pin 触发扩到键入 + `lastResult` Record 表 + 三句人话展示 + **删「远程桌面」按钮**）；`src/types/api.ts` 手抄镜像同步。
 - **aidcp（中控）**：`docs/protocol.md` 两段 jsonc（顺手修 `:757` click 样例漏 `taskId`）；spec delta。顺手修 `spec.md:18` 已腐烂的「消息数断言均为 44」（实测 91）。
 - **协议**：动 **3 处**（两份 `protocol.ts` + `docs/protocol.md` 语义段）。**MessageType 总数 91 不变** ⇒ 两份 `protocol-contract.test.ts` 的穷举与计数断言不动；边缘主动命令白名单（`edge-client.ts:679`）与云端暂停穿透白名单（`ws-server.ts:217`）**均已放行 `captcha.assist.click`，不动**。`command-bridge` 与 `action.completed` 动作名**不适用**（assist 直接推 envelope、不发 action.completed）。
 - **热点文件单写者**：两份 `protocol.ts`、cloud `src/comm/captcha-assist.ts`、`CaptchaAssistPage.tsx` —— 与活跃 change `captcha-assist-base-url-self-proof`（0/37，未 land）语义正交但同碰文件，**必须串行**。
