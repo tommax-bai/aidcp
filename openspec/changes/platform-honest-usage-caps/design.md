@@ -70,6 +70,19 @@ const quotas = cleanOptionalCounts(input.quotas);   // :1611 只抄存在的键�
 
 **实装形态**：过滤规则只摘**显式声明为不支持**的动作。视频号因全 false 会被摘到只剩发布——这与「整行不渲染」不冲突（整行不渲染由那个 change 决定，优先级更高），但**本 change 的验收 MUST NOT 依赖视频号的载荷形状**，且 Non-Goals 须写清不为其负责。
 
+### D8（实装期新增，2026-07-17）：客户端上限面是 **4 个不是 3 个**，规则对每一个都生效
+
+proposal/tasks 只枚举了 minute / hour / day 三份 `quotas`。实装前的代码普查（6 路并行）坐实**还有两个客户端上限面**，都在 proposal 写作之后由 `account-level-slow-start` 引入或被其放大：
+
+1. **「本轮计划」session 窗口**（`server.ts` 的 `sessionQuotas` → `windows.session.quotas`）。其数据源是 `sessionConfigStore.sessionBudget()`，来自**全局单例表** `session_config_global`（`collects: 5` / `follows: 3` 默认值），**零平台维度**、且与 `quota_config` 是两套配置。客户端把它渲染成 `收藏 0/5` + 进度条，且它是窗口列表里的**第一条**。不摘 = FB 的 KPI 格显示诚实的「收藏 0」、正下方窗口条同屏显示「收藏 0/5」，同源同谎、自己打自己。
+2. **慢启动开关回执**（`server.ts` 的 `slowStart.setForEnv` → `PUT /environments/:envKey/slow-start` 的 200 body `dayQuotas`）。这**不是**死字段：`aidcp-edge/src/electron/renderer/renderer.js:1923-1934` 现读它并**直接覆盖** `dailyUsage.quotas` 与 `windows.day.quotas`。不摘 = FB 用户一勾慢启动，「收藏 0/25」当场闪回，直到 ≤60s 后的下一次 `ui.snapshot` 才被纠回。（一轮对抗评审在此处推翻了普查 agent 的「edge 从不读 dayQuotas」结论——以 `grep -rn dayQuotas` 的实际命中为准。）
+
+**判据是 spec 的原文而不是 proposal 的枚举**：`edge-companion-ui` 的新要求写的是「MUST NOT supply **a client-facing usage cap**」——面无关。两者都是客户端上限面，故都在法条辖内；**漏掉它们才是违规**。
+
+**`capabilities` 侧的 console 面板不在辖内**（`src/panel/panel-server.ts` 的 `/api/dashboard/summary`）：那是内部运维面板、不是客户信任边界内的陪伴客户端，且本 change 明确 Non-Goal「不改 console」。（附带记：它的 `saturated` 用裸 `>=` 无 `typeof` 守卫，只是碰巧 fail-open，非本 change 负责。）
+
+**D3 的「try 块内」在 session 面上不适用、也不需要适用**：`sessionQuotas` 的组装点在那个 try 之外。D3 立「try 块内」的**唯一理由是 fail-open**，而 D4 已把该保证收进函数自身（自兜 try/catch、永不抛），平台读取也只是 `Map.get`（`platformFor`，契约「同步、零 IO、永不抛」）⇒ 该调用点零 fail-closed 风险。**D3 的实质（fail-open）满足，字面（物理 try 位置）不必**，这正是 D4 存在的目的。
+
 ## Risks / Trade-offs
 
 - **[平台错标不可纠错 —— 本 change 的天花板]** `account-store.ts:238` `ON CONFLICT DO NOTHING RETURNING platform` 使既有行 platform 永不被覆盖；平台缓存全仓无 `delete`/`clear`；`normalizePlatformId`（`registry.ts:345-351`）对缺失值静默回落小红书（`raw ?? 'xiaohongshu'`）。AdsPower remark 缺 `plat` 的 FB 环境**首次登记即永久是小红书** → **拿不到摘除，症状（收藏 0/25）与病灶一模一样、无信号可辨**。→ **缓解**：本 change 不治，如实登记；`account-level-slow-start` 已在冷启动曲线侧治同一个根（「平台未知 MUST NOT 静默回落小红书曲线」），建议参照其 fail-honest 形态另立 change（最小治法：载荷回带「云端按哪个平台做的投影」作**诊断字段、不作决策依据**，客户端发现与本地环境平台不符即旁白告警——把静默错标变成可见事故）。
@@ -80,7 +93,9 @@ const quotas = cleanOptionalCounts(input.quotas);   // :1611 只抄存在的键�
 
 ## Migration Plan
 
-1. cloud 实装 D4 的纯函数 + D3 的接入点（try 块内、`effectiveQuotas()` 之后、`pickDailyUsageCounts` 之前）。
+1. cloud 实装 D4 的纯函数 + D3 的接入点（`effectiveQuotas()` 之后、`pickDailyUsageCounts` **之后**）。
+
+   > **实装期更正（2026-07-17）**：本条与 proposal Impact / tasks 2.2 原写「`pickDailyUsageCounts` **之前**」，**是错的、且是会造成事故的错**——`pickDailyUsageCounts`（`server.ts:337`）把六键**无条件物化**（缺失 → `0`），先摘再 pick 会把摘掉的键补回 `0`，而 `quotaSaturation`（`:362`）算出 `totals(0) >= cap(0)` ⇒ 把该动作标成 saturated ⇒ 客户端渲染「收藏 0/0 今日计划已完成」——正是本 change 要除掉的那个谎，早一行原样重新引入，且 typecheck 全绿（两侧入参都是宽松 `Partial<Record<string, number>>`）。D3 正文「**最后一步**」才是对的口径。已按 D3 实装并在 `surface.ts` 的函数注释与调用点各留一条在码内的警告。
 2. 单测：小红书逐位不变 / FB 恰好少 `collect` 与 `follow` / 查询抛异常时六项齐全（fail-open）。
 3. `npm run test:acceptance` → `npm test` → `npm run typecheck`（顺序照 CLAUDE.md §4；本 change 不碰协议，`AC-PROTO-*` 应无变化——若变化即说明改错了地方）。
 4. 部署 dev（安全序列照 §5：`scripts/deploy-target dev --check` → 备份 → rsync → restart → healthcheck）。**无需出安装包**、无需运营侧动作。

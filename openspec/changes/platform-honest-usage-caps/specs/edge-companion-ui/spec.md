@@ -4,6 +4,8 @@
 
 The cloud MUST NOT supply a client-facing usage cap for an action that the connected account's platform structurally cannot perform. Supplying such a cap presents the account with a daily plan the system can never carry out, which the client then renders as a cap, a percentage, and a progress bar that can never advance — the fabrication this capability already forbids the client from inventing on its own.
 
+This rule is about the cap, not about the surface that carries it: it MUST hold for every cap the cloud supplies toward the client, whatever window it describes and whichever configuration it was read from. A cap that names an action the platform cannot perform is fabricated whether it arrives in the daily projection, in a per-window projection, or in the receipt of some unrelated write.
+
 The determination MUST come from the platform's own support declarations. Because an unsupported action may be declared in either the note-scoped action matrix or the orchestration capability matrix, the projection MUST consult both; consulting only one is a defect, not a scoping choice. Support MUST NOT be encoded numerically — a cap configured to zero MUST NOT be used to mean "unsupported", and the quota configuration MUST NOT be given a platform dimension.
 
 The projection MUST fail open. If the account's platform cannot be resolved, or any support lookup throws, the cloud MUST supply caps exactly as it did before this rule existed. Withholding a cap MUST be caused only by an explicit unsupported declaration, never by a failure to look one up.
@@ -16,6 +18,12 @@ Withholding a cap MUST NOT withhold the corresponding total: the client's action
 - **THEN** the supplied caps omit both collect and follow
 - **AND** every other supplied cap is unchanged
 - **AND** the supplied totals are unchanged, including the collect and follow totals
+
+#### Scenario: Every cap-bearing surface is covered, not just the daily one
+
+- **WHEN** the cloud supplies caps for a Facebook account across more than one surface — the daily projection, the per-window projections including the session window whose caps come from a different, platform-blind configuration, and the receipt returned by an unrelated settings write
+- **THEN** none of them offers a cap for collect or follow
+- **AND** no surface presents a cap that another surface withholds, because two surfaces disagreeing about the same account is itself the fabrication
 
 #### Scenario: A platform that supports the action still receives its cap
 
