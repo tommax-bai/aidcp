@@ -139,3 +139,15 @@ Edge SHALL durable claim scope-bound `interaction.offboard.command`，先停止�
 #### Scenario: 清理失败可重试且不误报成功
 - **WHEN** session clear 或 sidecar close 失败
 - **THEN** Edge durable 回 failed，Cloud 保持 pending；重试同 offboardId 可继续清理，MUST NOT tombstone 或显示已完成
+
+### Requirement: 可见客户昵称不得因缺失非展示 ID 而丢弃
+
+Edge SHALL 保留私有接口已返回的非空客户昵称和头像。评论响应的稳定 username 为空但 `commentNickname` 非空时，Edge SHALL 生成仅用于 participant scope 的确定性 opaque surrogate，MUST NOT 用昵称、头像 URL 或消息正文作为明文 ID。DM history 只提供会话与双方 username 时，Edge SHALL 以同批 session IDs 调用已验证的 `get-session-info` 只读端点，并用其 `username/nickname/headImgUrl` 富化 thread participant；昵称富化 MUST NOT 改变 message/thread 去重键、发送方向或 checkpoint ack 规则。
+
+#### Scenario: 评论 username 为空仍展示平台昵称
+- **WHEN** comment item 的 username 为空但 commentNickname 非空
+- **THEN** 同步 batch 的 thread participant 使用确定性 opaque externalId 并保留 nickname/avatar，MUST NOT 把整个 participant 降为 null
+
+#### Scenario: 私信历史通过 session info 富化客户昵称
+- **WHEN** DM history 返回非空 sessionId/fromUsername/toUsername 且 session-info 返回同 sessionId 的 username/nickname/headImgUrl
+- **THEN** Edge 在发布 batch 前把对应 participant 填为真实 nickname/avatar，且不在日志、fixture 或证据中记录真实值

@@ -1,0 +1,30 @@
+{
+  "manifestVersion": 1,
+  "capturedAt": "2026-07-17T05:27:23Z",
+  "source": "authorized_encrypted_edge_session",
+  "evidenceBoundary": "observed_read_only_structure_only",
+  "writesDispatched": false,
+  "rawPayloadPersisted": false,
+  "secretValuesPersisted": false,
+  "dmSessionInfo": {
+    "path": "/micro/interaction/cgi-bin/mmfinderassistant-bin/private-msg/get-session-info",
+    "businessBodyKeys": ["sessionId"],
+    "responseDataKeys": ["baseResp", "sessionInfo"],
+    "observedSessionCount": 1,
+    "sessionInfoFieldNames": ["extInfo", "fromUserType", "headImgUrl", "nickname", "rejectMsg", "sessionId", "sessionType", "username"],
+    "participantFields": {
+      "sessionId": "non_empty_string",
+      "username": "non_empty_string",
+      "nickname": "non_empty_string",
+      "headImgUrl": "non_empty_string"
+    }
+  },
+  "privacyChecks": {
+    "sessionIdPersisted": false,
+    "usernamePersisted": false,
+    "nicknamePersisted": false,
+    "avatarUrlPersisted": false,
+    "cookiesPersisted": false,
+    "messageBodiesPersisted": false
+  }
+}
