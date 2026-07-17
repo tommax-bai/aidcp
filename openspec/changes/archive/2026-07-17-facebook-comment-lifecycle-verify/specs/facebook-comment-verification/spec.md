@@ -34,26 +34,6 @@ The system MUST NOT use **visual styling** (opacity, colour, background) to dist
 - **WHEN** the own+text comment node's opacity or colour differs from, or matches, a live comment row
 - **THEN** that styling does not by itself confirm, veto, or classify the comment state
 
-### Requirement: In-place watch is the sole confirmation path; the edge MUST NOT reload to verify
-
-After submitting, the edge SHALL confirm **only by watching the current page in place**, polling within a bounded window for the ack-gated signals, and MUST NOT reload the page as part of verification.
-
-Real-machine evidence (2026-07-17) retired the previous reload fallback on three independent grounds: (a) the reload verify produced a **false negative** — it reported the just-posted comment absent while both probe comments were in fact live (CDP re-check plus direct human observation); (b) its scoped verify confirmed on own-identity + text alone, without any ack-gated signal, so it would confirm a **platform-rejected** comment as success; (c) reloading **destroys evidence** — the pending-approval badge and the participation-approval dialog are cleared by the reload, blinding the very recognizers that classify a non-live comment.
-
-The in-place window SHALL absorb the budget previously spent on the reload leg, so the **total post-submit budget is unchanged**. The total post-submit budget MUST remain within the cloud comment step timeout, which covers humanized typing plus confirmation in a single allowance: exceeding it makes the cloud record a bare `timeout`, which does not mark de-duplication and therefore re-posts the same target next round as a platform-visible duplicate comment.
-
-#### Scenario: Confirmation never reloads
-- **WHEN** the edge is verifying a submitted comment, whether or not the ack-gated signals have appeared
-- **THEN** the edge does not reload the page at any point during verification
-
-#### Scenario: In-place window absorbs the retired reload budget
-- **WHEN** the post-submit confirmation window is sized
-- **THEN** it takes over the budget formerly spent on the reload leg, leaving the total post-submit budget unchanged and within the cloud step timeout
-
-#### Scenario: Evidence survives for the non-live recognizers
-- **WHEN** a submitted comment is held by a participation-approval gate or rendered with a pending-approval badge
-- **THEN** the badge and dialog are still present for the recognizers to read, because no reload has cleared them
-
 ### Requirement: Unconfirmable submission is honestly ambiguous and de-duplicated
 
 When the in-place watch cannot confirm the own+text comment within its bounded window, the edge SHALL report `verification_ambiguous` (submitted, not server-confirmed) rather than claim success or claim a clean hard failure. This outcome MUST continue to mark the target as de-duplicated so the same comment is not re-posted on a later run.
@@ -70,7 +50,37 @@ Exception 2: when the edge recognizes a **platform rejection indicator** on the 
 - **WHEN** the own+text comment row carries a platform rejection indicator
 - **THEN** the edge reports the rejected outcome, not `verification_ambiguous`, and the target is not de-duplicated as posted
 
+## REMOVED Requirements
+
+### Requirement: In-place watch is the fast primary and bounded reload verify is the authoritative fallback
+
+**Reason**: Real-machine evidence (2026-07-17) retired the reload fallback on three independent grounds. (a) It produced a **false negative** on-probe — the reload verify reported the just-posted comment absent while both probe comments were in fact live (CDP re-check plus direct human observation); this is the origin of the operator-facing 「提交后无法确认评论已上墙」 card that motivated the investigation. (b) Its scoped verify confirmed on own-identity + text alone, without any ack-gated signal, so it would confirm a **platform-rejected** comment as success. (c) Reloading **destroys evidence** — it clears the pending-approval badge and the participation-approval dialog, blinding the very recognizers that classify a non-live comment. The requirement's stated purpose (defeating slow-render false negatives) is fully served by the bounded in-place poll, which now absorbs the reload leg's budget.
+
+**Migration**: Replaced by "In-place watch is the sole confirmation path; the edge MUST NOT reload to verify". The in-place window takes over the reload leg's budget so the **total post-submit budget is unchanged** and stays within the cloud comment step timeout; no timeout constant changes. Behaviour that previously reached success only via the reload leg now reaches it via the longer in-place poll; behaviour that previously false-greened a rejected comment via the reload leg now reports the dedicated rejected outcome.
+
 ## ADDED Requirements
+
+### Requirement: In-place watch is the sole confirmation path; the edge MUST NOT reload to verify
+
+After submitting, the edge SHALL confirm **only by watching the current page in place**, polling within a bounded window for the ack-gated signals, and MUST NOT reload the page as part of verification.
+
+The in-place window SHALL absorb the budget previously spent on the retired reload leg, so the **total post-submit budget is unchanged**. The total post-submit budget MUST remain within the cloud comment step timeout, which covers humanized typing plus confirmation in a single allowance: exceeding it makes the cloud record a bare `timeout`, which does not mark de-duplication and therefore re-posts the same target next round as a platform-visible duplicate comment.
+
+#### Scenario: Confirmation never reloads
+- **WHEN** the edge is verifying a submitted comment, whether or not the ack-gated signals have appeared
+- **THEN** the edge does not reload the page at any point during verification
+
+#### Scenario: Slow render is absorbed by the in-place poll
+- **WHEN** the ack-gated signals have not yet appeared early in the window
+- **THEN** the edge keeps polling in place until they appear or the window expires, rather than reloading to re-check
+
+#### Scenario: In-place window absorbs the retired reload budget
+- **WHEN** the post-submit confirmation window is sized
+- **THEN** it takes over the budget formerly spent on the reload leg, leaving the total post-submit budget unchanged and within the cloud step timeout
+
+#### Scenario: Evidence survives for the non-live recognizers
+- **WHEN** a submitted comment is held by a participation-approval gate or rendered with a pending-approval badge
+- **THEN** the badge and dialog are still present for the recognizers to read, because no reload has cleared them
 
 ### Requirement: Platform-rejected comments are an honest terminal outcome
 
