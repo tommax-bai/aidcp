@@ -78,12 +78,23 @@ TBD - created by archiving change user-delegated-tasks-phase-1. Update Purpose a
 
 ### Requirement: 批量和异步委托必须遵守自动化风险额度并保留人审
 
-单次旧人工命令 MAY 保留既有 manual override；`targetSuccessCount>1`、跨账号或异步委托 MUST 使用自动化额度与风险闸，MUST NOT 为每次 attempt 传 `manualOverride=true`。RiskController SHALL 继续是账号风险状态唯一写者。公开评论和发布默认 SHALL 使用 `review`，除非既有受控配置明确允许其他模式。
+**精确单次操作员命令**（`source=legacy_command` 且 `targetConstraints.manualSingle=true`，含 `/publish` 与 `/comment`）SHALL 以操作员全权执行——越过风控 status / canDo 与配额闸（发帖侧透传 `operatorOverride=true`，评论侧 `manualOverride=true`），但**发布前 / 评论前的人审 MUST 仍强制**（越权只越风控 / 配额，绝不越人审）。`targetSuccessCount>1`、跨账号、自然语言（`source=feishu`）或结构化（`source ∈ {edge,console,api}`）委托 MUST 使用自动化额度与风险闸（`governed`），MUST NOT 置 `operatorOverride` / 为每次 attempt 传 `manualOverride=true`。RiskController SHALL 继续是账号风险状态唯一写者。公开评论和发布默认 SHALL 使用 `review`，除非既有受控配置明确允许其他模式。
 
 #### Scenario: 批量评论不能循环绕额度
 - **WHEN** 用户确认一个 5 条评论的委托任务
 - **THEN** 每次评论尝试按自动化路径检查风险/配额且 `manualOverride=false`
 - **AND** 额度不足时任务 deferred 或诚实部分完成，不得循环伪装成五次单次人工命令
+
+#### Scenario: 精确 /publish 在风控受限账号仍以操作员全权执行
+- **WHEN** 管理群对一个风控非 normal 或当天已达发布配额的账号发送 `/publish <昵称>`（`source=legacy_command`、`manualSingle`）
+- **THEN** 系统越过风控 status/canDo 与配额生成草稿并发出发布人审卡（`operatorOverride=true`）
+- **AND** MUST NOT 因风控/配额把该精确命令 blocked→deferred→静默判失败
+- **AND** 发布前人审 MUST 仍强制，越权 MUST NOT 越过人审
+
+#### Scenario: 自然语言与结构化发帖不得越风控
+- **WHEN** 委托发帖来自自然语言（`source=feishu`）或结构化入口（edge/console/api）
+- **THEN** 系统走 `governed` 路径，风控非 normal / canDo 拒时诚实 blocked
+- **AND** MUST NOT 置 `operatorOverride`，MUST NOT 让结构化发帖跳过风控闸
 
 ### Requirement: 第一批动作必须统一接入并回报真实进度
 
@@ -120,9 +131,13 @@ Phase 1 SHALL 接入：完成 N 条有效评论、发布一篇稿件、参考今
 
 ### Requirement: 命令触发的委托任务必须捕获来源会话并回投操作员向卡片
 
-当一个委托任务由飞书**命令事件**创建（该事件带真实来源会话 `chatId`）时，系统 SHALL 把该来源会话作为该任务的一等字段持久化（与偏向 `messageId`、参与去重键的 `sourceRef` 解耦），并在该任务产出**操作员向卡片**时把来源会话作为投递目标。操作员向卡片当前包含：内容审批卡、发帖终态失败 / 部分完成结果卡。
+当一个委托任务由飞书**命令事件**创建（该事件带真实来源会话 `chatId`）时，系统 SHALL 把该来源会话作为该任务的一等字段持久化（与偏向 `messageId`、参与去重键的 `sourceRef` 解耦），并在该任务产出**操作员向卡片**时把来源会话作为投递目标。
 
-无来源会话的委托任务（console / api / edge 等非飞书入口，或事件未带 `chatId`）SHALL 回落既有默认 / 团队路由，行为逐字不变。该字段的持久化 MUST 覆盖异步执行与进程重启——终态卡可能在命令之后很久、甚至重启之后才发出。
+操作员向卡片 SHALL 覆盖该任务产出的**全部**面向操作员的卡片，与动作族无关，具体包含：发帖内容审批卡、发帖终态失败 / 部分完成结果卡、**评论审批卡（「待审核评论」）**、**评论终态结果卡**。任何**一个**动作族的操作员向卡片漏接来源会话 MUST 视为本要求未满足——同一条命令的多张卡分投不同会话，与「配错了」在运营视角不可区分。
+
+来源会话 SHALL 由**类型层面**贯穿到每个卡片目标解析点：承接委托触发的各调度器端口 MUST 声明该 chat 目标字段，MUST NOT 依赖调用点各自记得透传一个可选参数——缺字段时漏传是合法编译、静默回落，类型检查抓不到。
+
+无来源会话的委托任务（console / api / edge 等非飞书入口，或事件未带 `chatId`）SHALL 回落 `feishu-notification-routing` 定义的共享解析（账号团队群 → 默认群）。该字段的持久化 MUST 覆盖异步执行与进程重启——终态卡可能在命令之后很久、甚至重启之后才发出。
 
 系统 MUST NOT 因来源会话不可达而谎报投递成功：投递失败 SHALL 记日志并保持诚实态（审批卡失败保持诚实待审），MUST NOT 当成功。
 
@@ -138,12 +153,18 @@ Phase 1 SHALL 接入：完成 N 条有效评论、发布一篇稿件、参考今
 - **WHEN** 飞书某群里 `/publish <昵称>` 创建委托发帖任务，事件带 `chatId=G`
 - **THEN** 其内容审批卡与终态失败结果卡 SHALL 投递到 `G`
 
-#### Scenario: 无来源会话的委托任务回落既有路由
+#### Scenario: 私聊命令触发的委托评论，审批卡与终态卡都回私聊
+
+- **WHEN** 飞书私聊里 `/comment <昵称>`（含 `--join` / `--contact` / `--force` 等任意开关）创建委托评论任务，事件带 `chatId=P`
+- **THEN** 其「待审核评论」审批卡 SHALL 投递到 `P`
+- **AND** 其评论终态结果卡 SHALL 投递到 `P`
+- **AND** 两张卡 MUST NOT 分投不同会话，MUST NOT 投递到默认管理群或账号团队群
+
+#### Scenario: 无来源会话的委托任务回落共享解析
 
 - **WHEN** 一个委托任务由 console / api / edge 等无飞书来源会话的入口创建（`originChatId` 为空）
-- **THEN** 其审批卡 SHALL 走既有默认审批群解析
-- **AND** 其账号维度业务结果卡 SHALL 走既有账号→团队群路由
-- **AND** 行为与本变更前逐字一致
+- **THEN** 其审批卡与业务结果卡 SHALL 走 `feishu-notification-routing` 的共享解析（账号团队群 → 默认群）
+- **AND** MUST NOT 因缺来源会话而被硬绑默认群
 
 #### Scenario: 来源会话投递失败保持诚实
 
@@ -155,57 +176,55 @@ Phase 1 SHALL 接入：完成 N 条有效评论、发布一篇稿件、参考今
 
 委托层 MUST NOT 为任务的常规状态迁移（`queued`、`executing`、`completed`、`waiting_approval`）主动推送自有的任务进度卡。每个任务的执行结果 SHALL 由其底层动作的**正常业务结果卡**承担：评论由评论链的结果卡回报；发帖成功由发布人审卡自证（成功不重复报绿）；发帖等待人审由发布人审卡本身承担。
 
-唯一例外：**发帖类终态失败**（`failed`，或仍有缺口的 `partially_completed`）没有独立业务结果卡，委托层 MUST 补发一张诚实的失败 / 部分完成结果卡（红线：绝不静默失败）。**评论类终态失败 MUST NOT 由委托层补发**（评论链已发结果卡，避免重复）。
+**终态失败兜底**（红线：绝不静默失败）——没有独立业务结果卡的终态失败，委托层 MUST 补一张诚实卡：
+
+- **发帖类终态失败**（`failed`，或仍有缺口的 `partially_completed`）：MUST 补发失败 / 部分完成结果卡。
+- **评论类「起跑前触发闸失败」**（`failed`、0 成功、终态码 `non_retryable_failure`——人设未绑 / 联系方式缺 / 平台不支持 / 未接线等在异步任务起跑前早退，评论链从未起跑、`postResultCard` 从未发过）：MUST 补发一张诚实失败卡。
+- **评论类起跑后失败**（`max_attempts` / `deadline` 等，评论链已发结果卡）：MUST NOT 由委托层补发（避免与 `postResultCard` 双发）。
 
 精确旧 slash 写命令（`source=legacy_command`）直接排队时 SHALL **静默受理**——只保留已读表情，MUST NOT 发送队列提示卡；结果由该任务自身的业务结果卡回报。自然语言委托仍先展示结构化确认卡（不受影响）；用户主动请求的控制命令（查看 / 暂停 / 取消）与卡片按钮回卡不受影响。
 
-委托任务处于 `waiting_approval` 时保留有界的审批结果对账，但当审批、真实进度、控制意图和终态结果均未变化时，MUST NOT 发送新的用户通知或递增用于卡片控制的 task version；内部 claim/lease MAY 更新，但不得把无变化心跳呈现为新的业务进度。审批通过 / 驳回 / 候选版本变化 / 真实计数变化 / 暂停 / 取消意图变化 / 终态收敛时，按上述通知归属发送对应反馈，MUST NOT 吞掉真实业务变化。
-
-#### Scenario: 评论任务完成不再叠加委托进度卡
-- **WHEN** 一个委托评论任务跑完（成功或失败），评论链已按账号发出正常结果卡
-- **THEN** 委托层 MUST NOT 再叠加一张任务进度卡（`queued` / `failed` / `completed`）
+委托任务处于 `waiting_approval` 时保留有界的审批结果对账，但当审批、真实进度、控制意图和终态结果均未变化时，MUST NOT 发送新的用户通知或递增用于卡片控制的 task version；内部 claim/lease MAY 更新，但不得把无变化心跳呈现为新的业务进度。
 
 #### Scenario: 发帖失败仍诚实通知
 - **WHEN** 一个委托发帖任务达到最大尝试仍 0 成功 → `failed`
 - **THEN** 委托层补发一张红色失败结果卡（含真实完成数 0/N），MUST NOT 静默
 
+#### Scenario: 评论起跑前触发闸失败仍诚实通知
+- **WHEN** 一个委托评论任务在异步任务起跑前因人设未绑 / 联系方式缺 / 平台不支持 / 未接线而以非重试失败终结（`failed`、0 成功、终态码 `non_retryable_failure`）
+- **THEN** 委托层补发一张红色「评论任务未触发」结果卡（含起跑失败的人类可读原因），MUST NOT 静默
+
+#### Scenario: 评论起跑后失败不重复报卡
+- **WHEN** 一个委托评论任务已起跑到终态失败（评论链已按账号发出结果卡），终态码为 `max_attempts` / `deadline`
+- **THEN** 委托层 MUST NOT 再叠加一张失败卡（避免与评论链 `postResultCard` 双发）
+
 #### Scenario: 发帖成功不重复报绿
 - **WHEN** 委托发帖经人审通过并发布 → `completed`
 - **THEN** 委托层 MUST NOT 再发绿色成功卡（成功由发布人审卡自证）
-
-#### Scenario: 精确命令静默排队
-- **WHEN** 管理群发送 `/publish <昵称>` 且昵称唯一可解析
-- **THEN** 命令直接入队且 MUST NOT 回任何队列提示卡（只保留已读表情）
-- **AND** 结果由发帖的正常业务卡（人审卡 / 失败卡）回报
-
-#### Scenario: 等待审批的重复对账不产生新卡
-- **WHEN** 发布候选进入 `waiting_approval`，连续多轮对账都返回仍未审批
-- **THEN** 委托层不发任何等待进度卡，后续静默对账也 MUST NOT 递增 task version、增加 attempt 或发重复飞书卡
-
-#### Scenario: 审批结果变化仍正常通知
-- **WHEN** 静默等待中的候选随后被批准、驳回或修改为影响任务收敛的新版本
-- **THEN** 下一次对账 SHALL 按真实结果更新任务，并按通知归属发送反映该语义变化的反馈（评论链结果卡 / 发帖失败兜底 / 成功由人审卡自证）
-
-#### Scenario: 静默对账不覆盖并发取消
-- **WHEN** worker 持有等待审批 claim 时用户取消尚未执行的剩余部分
-- **THEN** 静默 release MUST NOT 把已经取消的任务改回 `waiting_approval`
-- **AND** 取消后的真实终态与已有计数保持不变
 
 ### Requirement: 自然语言入口先结构化确认；结构化精确入口直接入队
 
 只有**自然语言**委托入口（`source=feishu`）SHALL 先创建 `awaiting_confirmation` 任务并展示结构化确认摘要——账号 / 数量 / 截止 / 尝试均为从散文**推断**、可能解析错，需人过目；只有带 task id 与当前版本的明确确认才能进入 `queued`。**结构化精确入口**（console 行级动作 / Edge 快捷入口 / api / 旧 slash 命令，即 `source ≠ feishu`）参数已在调用处显式给定、无可推断歧义，SHALL 在创建时直接确认入队（`awaiting_confirmation → queued`），MUST NOT 展示结构化确认卡。
 
+**结构化入口的客户端请求体对 `approvalMode` 不可信**：免审（`auto_approve`）只由账号级授权授予，客户端体 MUST NOT 自带、系统 MUST NOT 原样采信。系统 SHALL 在 HTTP 建草稿边界把客户端体的 `approvalMode` 收口——缺省保持未定（交由按动作的默认，如 `generate_candidates → draft_only`）、`draft_only` 放行、其余（含 `auto_approve` 与任何未来模式）夹成 `review`。**服务端自建 intent**（后台洗稿 / 候选控制已显式传 `review`、飞书 parser 已硬编码 `review`）不经此收口、不受影响。
+
 两类入口的人审都不受影响（发布 / 评论仍在下游内容审批处保留人审），昵称重名或找不到仍 fail-closed 拒绝。重复创建（去重命中）MUST 幂等返回当前真态，MUST NOT 重复入队。任务创建时 SHALL 从账号事实源回读平台，调用方自报平台不一致 MUST 拒绝。直接入队 ≠ 已执行：worker 接管前不得有任何一次尝试或平台副作用。
 
-#### Scenario: console 行级动作直接入队、不出确认卡
+#### Scenario: 客户端体自带 auto_approve 被夹成 review
 
-- **WHEN** 管理后台对一条精选图文点「洗稿」或对候选稿点「批准 / 驳回 / 修改」（`source=console`）
-- **THEN** 系统在创建时直接确认入队（状态 `queued`），MUST NOT 展示「请确认用户委托任务」卡
-- **AND** 入队时 `attemptCount=0`、无边端接管 / 生成 / 发布；结果由下游业务结果卡回报
+- **WHEN** 结构化建草稿路由（面板 / 客户端）收到请求体带 `approvalMode:'auto_approve'`
+- **THEN** 系统在创建前把该字段夹成 `review`，任务以必审入队
+- **AND** MUST NOT 让内容以免审绕过下游人审直达平台，即使该账号未开启账号级免审
+
+#### Scenario: 结构化精确入口不出确认卡但保留人审
+
+- **WHEN** 管理后台对一条精选图文点「洗稿」（`source=console`，服务端自建 intent 传 `review`）
+- **THEN** 系统直接确认入队（状态 `queued`），MUST NOT 展示确认卡
+- **AND** 其 `review` 授权不经客户端收口、保持不变，下游人审仍强制
 
 #### Scenario: 自然语言委托仍先结构化确认
 
-- **WHEN** 飞书管理群发送自然语言业务目标（如「让 <昵称> 发布一篇稿件」）
+- **WHEN** 飞书管理群发送自然语言业务目标
 - **THEN** 系统仍先创建 `awaiting_confirmation` 任务并展示结构化确认摘要，明确确认后才 `queued`
 
 #### Scenario: 重复创建幂等、不产生双任务
@@ -213,9 +232,113 @@ Phase 1 SHALL 接入：完成 N 条有效评论、发布一篇稿件、参考今
 - **WHEN** 同一结构化精确动作在去重窗口内被重复触发
 - **THEN** 去重命中返回同一 task id 的当前真态，MUST NOT 重复入队或重复执行
 
-#### Scenario: 平台事实不一致时拒绝
+### Requirement: 预算耗尽的零成功终态必须携带真实失败原因
 
-- **WHEN** 入口把 Facebook 账号声明为小红书以请求小红书定向评论
-- **THEN** 系统以 accounts 平台事实源拒绝该草稿或入队
-- **AND** MUST NOT 将任务路由到另一平台执行器
+预算耗尽（`max_attempts` / `deadline`）而零成功的终态，其 `terminalOutcome.message` MUST 在既有预算记账之后追加**真实失败原因**，取自该任务已 settle 且 `reason` 非空的最后一条 attempt。
+
+「已达到最大尝试次数」「已到截止时间」是**为什么停**的记账，不是**为什么没成**的原因。只给记账等同于静默失败——卡发出来了，但运营无法判断该重试、该改配置、还是该等。原因在 attempt settle 时即已持久化，终态 MUST 读它，MUST NOT 凭空另拼一句只含记账的模板。
+
+既有前缀 SHALL 原样保留（追加而非替换），既有的诚实部分完成语义不受影响。
+
+#### Scenario: 尝试后失败的终态带上最后一次原因
+
+- **WHEN** 一个委托发帖任务耗尽 `maxAttempts`，其最后一条 settle 的 attempt 状态为 `failed`、`reason` 非空
+- **THEN** `terminalOutcome.message` SHALL 保留 `已达到最大尝试次数；真实完成 0/1。` 前缀
+- **AND** SHALL 追加该 attempt 的原因（经人话化）
+- **AND** 该原因 SHALL 出现在飞书终态失败卡正文中
+
+#### Scenario: 无原因可取时保持现状而非编造
+
+- **WHEN** 预算耗尽终态下，该任务不存在任何 settle 且 `reason` 非空的 attempt
+- **THEN** `terminalOutcome.message` SHALL 与本变更前逐字一致
+- **AND** MUST NOT 补一句「原因未知，可能是……」之类的推测
+
+#### Scenario: 到期终态同样带原因
+
+- **WHEN** 一个委托任务因 `deadlineAt` 到期而零成功终结，且存在带原因的已 settle attempt
+- **THEN** `terminalOutcome.message` SHALL 在 `已到截止时间；真实完成 N/M。` 之后追加该原因
+
+### Requirement: 终态必须区分「尝试后失败」与「从未真正开始」
+
+预算耗尽的零成功终态 MUST 区分两种截然不同的局面，MUST NOT 让二者产出同一句话：
+
+- **从未真正开始**：SHALL 明说 N 次均未真正开始及其原因，MUST NOT 使用任何可被读成「已经发过 / 已经动过手」的措辞。
+- **其余一切局面**：SHALL 表述为最后一次未成的原因。
+
+此区分为红线「绝不静默假成功」在终态回执上的落点：让开同样消耗尝试预算，若与真实失败同文表述，运营会误以为系统已在平台上动过手。
+
+**但「从未真正开始」本身是一个关于「平台没被碰过」的断言，故 MUST 由证据支撑、MUST NOT 由计数器推断**：尝试的「跳过」状态同时覆盖两种截然不同的经过——① 动作真正开始前就被让开（执行器根本没跑）；② 执行器跑了、驱动了浏览器（搜词、开页），最终判定不写入。二者的跳过计数完全相同。因此系统 MUST 在「让开」发生时留下**可区分的验证证据**，并且**仅当每一条已了结的尝试都带有该证据时**才作此断言；证据不全时 SHALL 回落到「最后一次未成原因」的中性表述。否则即为红线「绝不编造」所禁的、拿不出证据的断言。
+
+#### Scenario: 全程被让开而耗尽预算
+
+- **WHEN** 一个委托发帖任务的 2 次 attempt 全部因执行前闸（风控状态、并发占用等）被让开，每条都留下了「未真正开始」的验证证据
+- **THEN** `terminalOutcome.message` SHALL 表述为「2 次均未真正开始」并带上原因
+- **AND** MUST NOT 表述为「最后一次未成原因」或任何暗示已发生平台写入的措辞
+
+#### Scenario: 执行器跑过但判定不写，绝不宣称没开始
+
+- **WHEN** 一个委托评论任务的每次 attempt 都真正驱动了浏览器（搜词、开页），最终判定无强候选而不评、settle 为跳过——其跳过计数与「全程被让开」完全相同
+- **THEN** `terminalOutcome.message` MUST NOT 出现「均未真正开始」
+- **AND** SHALL 回落为「最后一次未成原因」的中性表述
+
+#### Scenario: 混合局面只报最后一次并标注总次数
+
+- **WHEN** 一个任务的多次 attempt 中既有真实失败也有让开，原因各异
+- **THEN** `terminalOutcome.message` SHALL 报最后一次未成的原因并标注总尝试次数
+- **AND** MUST NOT 做原因聚类统计（超出本变更范围）
+
+### Requirement: 原因人话化必须只翻译已知码、未知码原样透传
+
+原因字符串在同一字段内混装三种语域（机器码 snake_case、中文人话句、上游抛出的英文异常文本），无判别字段。人话化 SHALL 按白名单把已知机器码翻成中文；**未命中白名单的 MUST 原样透传**，MUST NOT 猜测其含义、MUST NOT 美化成听着像诊断而实际是编造的句子。超长文本 SHALL 裁剪并保留可辨识的原文片段。
+
+#### Scenario: 已知码翻成人话
+
+- **WHEN** 最后一条 attempt 的 `reason` 为白名单内的机器码（如风控状态类、人设未配置类）
+- **THEN** 终态 message 中 SHALL 出现对应中文表述
+
+#### Scenario: 未知码原样出现在卡上
+
+- **WHEN** 最后一条 attempt 的 `reason` 是白名单未覆盖的字符串
+- **THEN** 该字符串 SHALL 原样出现在终态 message 中
+- **AND** MUST NOT 被替换成任何未经证据支持的表述
+
+#### Scenario: 非重试终态同样说人话
+
+- **WHEN** 一个任务因不可重试的配置问题（人设未绑等）在起跑前早退而终结——此类原因**只走**非重试终态、从不经预算终态
+- **THEN** 其终态 message SHALL 同样经过人话化
+- **AND** MUST NOT 把机器码原样甩给运营（除非该码不在白名单内，此时按上一条原样透传）
+
+### Requirement: 到期终态必须与其他终态一样触发通知
+
+任务因**到达截止时间**而终结时，MUST 与耗尽尝试的终态走同一条通知路径。到期是任务失败最常见的收场之一（全程等不到安全空档、执行器从未成功领到任务等），若它是唯一一条不发卡的终态，红线「绝不静默失败」就在最常见处被绕过——终态原因被写进库却永远无人看见。
+
+#### Scenario: 到期失败必须发出结果卡
+
+- **WHEN** 一个委托发帖任务未达成功目标即到达截止时间而终结
+- **THEN** 系统 SHALL 触发与耗尽尝试终态相同的通知路径，使其终态失败卡照常投递
+- **AND** 该卡 SHALL 携带按本 spec 其余要求组装的真实原因
+- **AND** MUST NOT 只写库而不通知
+
+### Requirement: 结果未知的在途派发绝不可被终结为干净失败
+
+任务到期时若仍有**已派发、未了结**的尝试（如租约失效或进程重启导致终态回执永远未达），该命令**可能已在平台上写入**。此时 MUST 以「已提交、结果未知」终结并标记未知，MUST NOT 判为干净失败，更 MUST NOT 拿更早那次尝试的原因充当本次结局——那是反向的假确定性：把一个可能已生效的动作报成确定没生效。
+
+#### Scenario: 到期时派发仍在途
+
+- **WHEN** 一个任务到达截止时间，且它有一条尝试仍停在已派发未了结状态，同时更早的尝试留有良性原因
+- **THEN** 终态 SHALL 标记为「已提交、结果未知」
+- **AND** MUST NOT 把更早那次尝试的原因渲染为本次结局
+- **AND** MUST NOT 自动重试（防重复写入）
+
+### Requirement: 失败原因的精度不得超过已落库的证据
+
+终态回执的原因精度 SHALL 以**已持久化的证据**为上限。发布派发阶段的分步失败细节（定位失败、内容超长、配图全失败等）当前未落库，仅塌成一个状态枚举——因此该类失败的终态回执 SHALL 表述到「稿件在发布派发阶段失败」这一层并携带可追证据引用，**MUST NOT** 渲染成具体的边缘失败原因。
+
+抬高该精度天花板（把分步失败落库）属独立变更，MUST NOT 在本变更中以推测填补。
+
+#### Scenario: 派发期失败只说到阶段
+
+- **WHEN** 一个委托发帖任务的 attempt 因发布派发阶段失败而 settle，DB 中仅有状态枚举、无分步细节
+- **THEN** 终态 message SHALL 说明失败发生在发布派发阶段并带上稿件记录引用
+- **AND** MUST NOT 声称具体是哪一步、哪个控件或哪条平台文案导致失败
 

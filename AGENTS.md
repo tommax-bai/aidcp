@@ -1,119 +1,78 @@
 # AGENTS.md
 
-This file is the Codex-facing mapping of `CLAUDE.md`. Keep `CLAUDE.md` as the legacy Claude reference; use this file as the active Codex development guide.
+Active Codex guide for the `aidcp*` family. Keep this file at or below 8 KiB because Codex loads it into every task; move details to task-specific references. `CLAUDE.md` is legacy background and is not a default prerequisite.
 
-## 0. Repo Role
+## 1. Repo role and task admission
 
-- `aidcp` is the control repo for the `aidcp*` family. It owns contracts, architecture docs, product design, OpenSpec changes, and test/deploy orchestration.
-- This repo carries docs and contracts only: `docs/`, `openspec/`, `README.md`, and helper scripts. Business code lives in sibling repos.
-- Do not treat this repo as a buildable app repo. Root `npm test`, `npm run build`, or `npm run lint` are not the normal validation path here.
-- Control-repo validation is OpenSpec-centric: `openspec list`, `openspec list --specs`, and `openspec validate <change> --strict`.
+- `aidcp` is the control repo for contracts, architecture, OpenSpec, product docs, and orchestration helpers. Business code lives in sibling repos: `../aidcp-edge`, `../aidcp-cloud`, and `../aidcp-console` (default branches `master`; control repo default is `main`). Confirm a sibling exists before using it.
+- Do not run root `npm test`, `npm run build`, or `npm run lint`; this is not an app checkout. Validate control changes with OpenSpec.
+- Before opening a task, creating/reusing a worktree, or using task helpers, run `scripts/task-preflight`. A failure blocks admission; do not switch branches, stash, clean, remove worktrees, or override it automatically.
+- Canonical checkouts stay on their default branches. Feature work uses `../<repo>.wt/<change-name>` and `codex/<change-name>` branches. Never put `main` in an `aidcp.wt` worktree or switch the canonical control checkout to a feature branch.
+- Preserve unrelated dirty/untracked files. Use isolated worktrees and explicit pathspecs.
 
-## 1. Path Preflight
+Read on demand:
 
-- Sibling repo layout:
-  - `.`: `aidcp`, control repo, default branch `main`
-  - `../aidcp-edge`: edge runtime, default branch `master`
-  - `../aidcp-cloud`: cloud runtime, default branch `master`
-  - `../aidcp-console`: admin console frontend, default branch `master`
-- Before touching edge/cloud/console code, tests, or deployment, confirm the sibling repo exists on this machine. Do not blindly reuse stale paths from older docs.
-- Before any SSH or `rsync` to ECS, name the deployment target and verify it with `scripts/deploy-target <dev|ol> --check`.
-  - `dev`: `121.89.85.150`, key `~/codes/isales-4.pem`
-  - `ol`: `123.56.253.183`, key `/Users/baitianxing/Downloads/ol.pem`
-  If the target is unclear or the key check fails, stop and report it.
-- Default deployment target is `dev`: when a production-facing code/artifact change is complete and no target is specified, resolve the target to `dev`, state it, run the target check, and deploy `dev` after validation.
-- `ol` is opt-in only: deploy `ol` only when the user explicitly requests `ol`/online deployment.
+- Architecture/protocol/risk work: `docs/architecture.md`, `docs/protocol.md`, `docs/risk-control.md`.
+- Worktree/integration work: `docs/parallel-dev-worktrees.md`.
+- Any SSH, `rsync`, or deployment: `docs/deployment-environments.md`.
+- Edge Electron process launch or packaging: the active `aidcp-edge` checkout's `CLAUDE.md` packaging section and `docs/release-desktop.md`.
+- An assigned OpenSpec change: its `proposal.md`, `design.md` when present, `tasks.md`, spec deltas, and `openspec instructions apply --change <name> --json` when useful.
+- Read root `CLAUDE.md` only when this guide and the references above do not resolve a material legacy detail.
 
-## 2. Architecture Invariants
+## 2. Architecture invariants
 
-- Decide first whether a change belongs in edge, cloud, console, or the control repo. Use `docs/architecture.md`, `docs/protocol.md`, and `docs/risk-control.md` as the main architecture references.
-- Edge stays light: atomic browser actions such as click, input, and scroll belong on edge. Planning, element selection strategy, orchestration, risk control, and persistence belong in cloud.
-- Account risk state has a single writer: cloud `RiskController`. Other systems may emit events or read projections, but must not directly mutate final risk state.
-- Red-line invariant: never silently fake success. Missing targets return honest failures such as `no_target`; measured movement/counts must be reported truthfully; bad pages and missing data must not be swallowed as success.
-- DOM-first locating has three gates: post-action validation, bounded retry with escalation, and anti-pollution cache promotion only after repeated success. Do not weaken these gates.
-- Protocol v2 changes must be synchronized across edge/cloud protocol definitions, cloud command mapping, `docs/protocol.md`, and edge active-command routing. Typecheck catches some drift, but not all routing omissions.
-- Treat protocol message counts and role counts in docs as manually maintained hints. Code enumerations and registered runtime behavior are authoritative.
-- Cloud is event-driven multi-agent orchestration, not the old monolithic planner path. Prefer the current v2 event-driven browse loop; avoid reviving deprecated browse/card-filter paths or deleted legacy files.
-- Command pacing belongs primarily in cloud. Cloud computes central `thinkMs`/`dwellMs`; edge may apply jitter, enforce dwell, and handle disconnect fallbacks.
+- Decide first whether work belongs in edge, cloud, console, or control docs/contracts.
+- Edge stays light: browser actions belong on edge; planning, selection strategy, orchestration, persistence, and primary pacing belong in cloud.
+- Cloud `RiskController` is the single writer of final account risk state.
+- Never fake success. Missing targets, bad pages, missing data, movement, and counts must be reported honestly.
+- DOM-first locating keeps post-action validation, bounded retry/escalation, and cache promotion only after repeated success.
+- Protocol v2 changes stay synchronized across cloud/edge types, cloud command mapping, edge active-command routing, and `docs/protocol.md`.
+- Prefer the current event-driven v2 browse loop; do not revive deleted legacy planner/card-filter paths.
 
-## 3. OpenSpec Workflow
+## 3. OpenSpec workflow
 
-- Default rule: functionality, behavior contracts, cross-repo/cross-module work, protocol, risk, publish, deployment-flow, or user-facing behavior changes go through OpenSpec first.
-- Current Windows environment has OpenSpec CLI on PATH; verified `openspec --version` is `1.3.1`.
-- Start by running `openspec list`; run `openspec list --specs` when you need baseline specs.
-- Do not edit `openspec/specs/` directly for new behavior. Create or update `openspec/changes/<change-name>/` with proposal, tasks, optional design, and spec deltas.
-- For complex or extensible features, first ground the current implementation with file/line evidence, compare mature design patterns, propose a pragmatic design, and review it adversarially before implementation.
-- Before implementation, read the active change tasks and use OpenSpec CLI context such as `openspec status --change <name>` or `openspec instructions apply --change <name> --json` when useful.
-- During implementation, code lands in the relevant sibling repo; progress, commits, and deviations are recorded back in this repo's change `tasks.md`.
-- Mark completed tasks with `[x]` and include concise HTML comments with repo, commit SHA, and any deviation/deployment note.
-- Finish by running `openspec validate <change-name> --strict`; archive only after tasks and required validation are complete.
-- Trivial typo, formatting, or comment-only changes that do not affect behavior contracts may skip creating a change, but still confirm they do not alter product, protocol, risk, publish, or deployment semantics.
+- Behavior contracts, cross-repo/module work, protocol, risk, publish, deployment-flow, and user-facing behavior changes go through OpenSpec first. Start with `openspec list`; use `openspec list --specs` only when baseline discovery is actually needed.
+- Do not edit `openspec/specs/` directly for new behavior. Work in `openspec/changes/<change-name>/`, then implement in the owning sibling repo.
+- Record progress in `tasks.md`; completed items include repo, commit SHA, validation, deployment, and deviations in concise HTML comments.
+- Finish with `openspec validate <change-name> --strict`; archive only after required tasks and validation are complete.
+- Typos, formatting, comments, and development-guide/config-only edits may skip a new change after confirming that product, protocol, risk, publish, and deployment semantics are unchanged.
 
-## 4. Testing
+## 4. Context and command-output budget
 
-- Run tests in the sibling repo that owns the code.
-- Edge: `cd ../aidcp-edge && npm test`, plus `npm run test:acceptance` and `npm run typecheck` when relevant.
-- Cloud: `cd ../aidcp-cloud && npm test`, plus `npm run test:acceptance` and `npm run typecheck` when relevant.
-- For protocol, risk, or publish changes, run acceptance first, then full tests, then typecheck.
-- Safety suites such as protocol drift, unauthorized publish, risk-state honesty, and end-to-end checks must remain green for related changes.
-- Local validation is code-level only for cloud. Production cloud runs on ECS; do not start the production cloud locally as a substitute for deployment checks.
+- Project `.codex/config.toml` caps retained output from an individual tool call at 4,000 tokens. Treat this as a ceiling, not a target.
+- Default requested output budgets: 1,000-2,000 tokens for discovery/status commands and at most 4,000 for tests, builds, deploy checks, or focused failure evidence.
+- Use `rg`/`rg --files`, targeted file ranges, focused tests, and concise reporters. Do not dump entire files, full test suites, build logs, `journalctl`, SSH output, database result sets, or repeated polling output into the task transcript.
+- On success, retain the command, exit status, duration when relevant, and a short pass/count summary. On failure, retain the failing test/check names, primary error block, and at most the final 120 relevant lines; narrow and rerun before expanding.
+- If output is truncated, do not infer success. Check the exit code and inspect smaller slices until the cause and validation result are supported.
+- Run focused tests first. Run full suites only when required by the touched risk area or final integration, and summarize successful full-suite output.
+- For long-running commands, use a background session and report only new state or bounded deltas on each poll.
+- Detailed operating examples and the failure-expansion ladder live in `docs/codex-output-budget.md`; read it when a command may be noisy.
 
-## 5. Deployment
+## 5. Testing and closeout
 
-- Cloud runtime runs only on named ECS targets; local cloud is not the production runtime. See `docs/deployment-environments.md`.
-- `dev` is the default high-frequency development/validation target. After a production-facing change is implemented, validated, committed, and pushed, deploy `dev` automatically through the safe deployment sequence unless the user explicitly pauses deployment or a safety gate fails.
-- `ol` is the stable online target and is never the default. Deploy `ol` only after an explicit user request, and create or use a release branch such as `release/<date>-<scope>` for the deployment. Tags or clean SHAs may seed that release branch, but the deployed ref must be the release branch.
-- `dev` also hosts unrelated `isales` services. Never touch unrelated services, directories, ports, or systemd units.
-- Deployment sequence, when deployment is actually required: sibling-repo tests pass, back up ECS cloud and env, `rsync` excluding secrets/deps/git metadata, restart `aidcp-cloud.service`, then healthcheck service state, port, Feishu connection, and PostgreSQL.
-- On deployment failure, roll back. Do not improvise against production.
-- Deployment must come from a clean eligible checkout: default branch/main checkout for `dev`, release branch checkout for `ol`, never an arbitrary dirty shared worktree or feature worktree.
+- Run tests in the sibling repo that owns the code. Edge/cloud normally use focused tests plus `npm run typecheck`; protocol, risk, or publish changes require acceptance first, then full tests, then typecheck.
+- Keep protocol-drift, unauthorized-publish, risk-honesty, and relevant end-to-end safety suites green.
+- Cloud local validation is code-level only; live cloud verification happens on the named ECS target.
+- Default code finish line: implement, run proportionate tests/typecheck, update OpenSpec, commit, push the default branch, and deploy/publish to `dev` when runtime behavior changes and no gate fails.
+- Documentation/config-only changes are committed and pushed but do not deploy. Do not build an Edge installer unless the user explicitly asks to package/release.
 
-### Edge desktop packaging red-lines (Electron / asar)
+## 6. Deployment boundaries
 
-> This bug class is **invisible to `electron .`, `npm run typecheck`, and unit tests — it only surfaces in the packaged build**, so it tends to reach operator machines before anyone notices. Read before touching any process launch under `aidcp-edge/src/electron/**`; authoritative detail lives in `aidcp-edge/CLAUDE.md`.
+- `dev` is the default development target; `ol` is opt-in only and deploys from an explicit `release/<date>-<scope>` branch.
+- Before SSH or `rsync`, state the target, read `docs/deployment-environments.md`, and run `scripts/deploy-target <dev|ol> --check`. Stop if the target or key is unclear.
+- Deploy only from a clean eligible default/release checkout, never an arbitrary feature worktree. Back up cloud/env, exclude secrets/dependencies/git metadata, restart only the documented AIDCP service, then check service, listener, health, Feishu, and PostgreSQL. Roll back on failure.
+- `dev` hosts unrelated `isales` services; never touch them.
 
-- **A `spawn` `cwd` (or entry path) must never resolve inside `app.asar`.** In a packaged build (electron-builder defaults to `asar:true`), `app.getAppPath()` returns `.../Contents/Resources/app.asar`, which is a FILE, not a directory. Passing it as a `child_process.spawn` cwd makes macOS throw `spawn ENOTDIR`, so the edge core child never starts and the fingerprint browser never launches. Local dev is unaffected because `appRoot` is a real directory — this is a packaged-only regression.
-- **Guard:** the core spawn uses `appRoot.endsWith('.asar') ? path.dirname(appRoot) : appRoot` (`dirname` = `Contents/Resources`, the historically-working value). Any new child-process launch must apply the same guard; sites that pass no `cwd` (inheriting the main-process cwd, never asar) are safe.
-- **Packaging fixes must be forward-ported to `master`.** This fix first landed on branch `codex/edge-macos-developer-id-signing` (`20d3784`) but was never merged to master, so `0.3.5` shipped the regression again (re-fixed on edge master `3f578b9`, version bumped to `0.3.6`). A packaging fix that lives only on a feature branch recurs the moment master ships.
-- **Before releasing, run the packaged artifact once on the build machine** (start the compiled core, confirm it reaches cloud connect / the AdsPower call) instead of discovering cwd/asar regressions on the operator machine. Desktop release flow: `aidcp-edge/docs/release-desktop.md`.
+## 7. Git, parallel work, and communication
 
-## 6. Git, Communication, Security
+- One change session = one named change, one branch, and one worktree; use the matching OpenSpec change when required. Development may be parallel; integration and deployment are serial.
+- Protocol/command mapping, role registration/catalog, and risk-state machine are single-writer hotspots.
+- Before integration, fetch/rebase onto the latest default, resolve conflicts, rerun required validation, then fast-forward merge. Never force-push or use non-fast-forward history without explicit approval.
+- Stop before destructive database work, secret/key changes, production deletion, releasing with failed tests, unclear targets, or actions affecting unrelated services.
+- Default user-facing prose is Chinese; code, comments, commits, PR text, commands, and filenames remain English unless the file establishes otherwise.
+- Explain mechanism first, preserve honest validation boundaries, never record secrets, and close with what changed, impact, and next step.
 
-- Preserve user and other-session changes. Do not revert unrelated dirty files.
-- Default closeout for code changes is automatic: after implementation, run the relevant validation, commit, push to the default branch, and deploy/publish to `dev` when the changed service or artifact is production-facing.
-- Do not build the edge desktop installer by default (standing user authorization, 2026-07-08). `electron:build` / `electron-builder` (incl. `electron:build:mac` / `:win`) invoke remote GitHub services and Apple signing/notarization and are slow; build an installer only on an explicit user request to package/release. Default closeout for edge changes stops at commit/push (plus `dev` deploy and typecheck/tests where applicable) and never produces an installer on its own.
-- Confirm before force-push, non-fast-forward pushes, or pushing to non-default/protected branches.
-- If the working tree has unrelated changes, use explicit pathspecs and/or a clean worktree/archive snapshot for final verification and deployment packaging.
-- Default prose language is Chinese. Code, comments, commit messages, PR text, commands, and file names stay in English unless the surrounding file establishes otherwise.
-- Explain problems by function and mechanism first, not by dumping internal identifiers. Use exact files/lines when they help implementation or review.
-- Never record secrets in docs, commits, or tasks. Record paths, service names, commands, and config-loading methods instead.
-- End user-facing work with a plain-language summary of what changed, system impact, and next step.
+## 8. Codex mapping
 
-## 7. Automatic Closeout
-
-- For code-bearing changes, the default finish line is: implementation complete, tests/typecheck appropriate to the touched repo pass, commit, push, and deploy/publish to `dev` if runtime behavior changes.
-- For OpenSpec-backed work, update the relevant `tasks.md` with commit SHA, validation notes, deployment/publish notes, and any deviation from the proposal.
-- Deploy/publish only through the documented safe path for the affected artifact and target: cloud ECS deployment, console static release, edge desktop/package release, or docs/spec-only no-op. If no target is named for production-facing development work, use `dev`; require an explicit user request before any `ol` deployment.
-- Stop and ask before destructive database changes, secret/key changes, production data deletion, tests failing but user still wants release, unclear publish target, force-push, non-fast-forward push, or any action that may affect unrelated `isales` services.
-- Documentation-only or spec-only changes are still committed and pushed by default, but they do not trigger runtime deployment unless they are part of a release procedure.
-
-## 8. Parallel Development
-
-- **Task admission guard (hard rule):** Before opening any new task, creating or reusing a change worktree, or launching work through the task helpers, run `scripts/task-preflight`. It checks the canonical `aidcp` checkout is on `main` and every available sibling canonical checkout (`aidcp-edge`, `aidcp-cloud`, `aidcp-console`) is on `master`. A non-zero result blocks the task immediately. Do not switch branches, clean files, stash changes, remove worktrees, or override the result automatically; move feature/release work out of the canonical checkout through an explicit maintenance action first. `scripts/new-change` and `scripts/spawn-change` enforce this gate, and direct task launches must follow the same rule.
-- Parallel work convention: one Codex session = one OpenSpec change = one branch = one worktree, all sharing the same change name.
-- Sibling repo worktrees live at `../<repo>.wt/<change-name>`. Control-repo OpenSpec changes are mostly additive and may share the main checkout when safe — but "share the main checkout" always means "write additive change dirs on its default branch (`main`)", never "switch its branch".
-- **Canonical checkout stays on its default branch (hard rule, added 2026-07-11).** The canonical control-repo checkout `/Users/baitianxing/codes/aidcp` must always be on `main`. Never run `git checkout <feature>` or `git checkout -b` in it; use a worktree for branch isolation. `main` must live only in the canonical checkout and must never be occupied by a `.wt/<change>` worktree. Codex change branches must be created via `git worktree add`, never by switching the canonical checkout. Session-start guard: run `git -C /Users/baitianxing/codes/aidcp branch --show-current`; if it is not `main`, stop task admission and do not restore or bypass it inside the task flow. Incident (2026-07-11): the canonical checkout was left on `codex/remote-captcha-assist` (already archived on origin/main) while `main` was squatting in `aidcp.wt/publish-queue-stage-overview`, silently 163 commits behind origin/main with nobody cleaning up — root cause was checking out a feature branch in the canonical dir plus checking `main` out into a worktree. To restore a mislocated canonical checkout: wait for any concurrent session to finish, free the squatted `main` (remove the orphan worktree), then `git checkout main` + `git merge --ff-only origin/main`; never `-f` over another session's WIP.
-- **Three drift guards (added 2026-07-11):** (1) the hard rule above; (2) a version-controlled git `post-checkout` hook (`scripts/git-hooks/post-checkout`) that warns the moment the canonical checkout leaves `main` — tool-agnostic (fires for Codex, Claude, or manual git); (3) a Claude `SessionStart` guard (`.claude/settings.json` + `.claude/hooks/check-canonical-main.sh`, auto-distributed via main) that checks the canonical branch at session start. **The git hook needs one-time activation:** run `scripts/install-git-hooks` once per fresh clone — it copies the tracked hooks into `.git/hooks/` additively and never touches the existing corporate pre-commit scanner (Git does not auto-install hooks on clone, by security design). Worktrees share the hooks dir, so one install covers them all.
-- Prefer manual `git worktree add` or the repo helper scripts over environment-specific worktree switching that only affects the current repo.
-- If assigned an existing change, treat it as owned by this session: read proposal/design/tasks, work in the matching worktree/branch, update tasks, validate, and help archive when complete.
-- First determine where you are with `git worktree list` and `git rev-parse`. Worktree means branch-local implementation and validation; main checkout means integration/deployment coordination.
-- Hotspots are single-writer during parallel work: protocol files and command mapping, role registration/catalog, and risk-state machine. Mark such changes as serial when they must be touched.
-- Development may be parallel; integration is serial. Before merging back to default branch, fetch, rebase onto latest default, resolve conflicts, run required tests/typecheck, and fast-forward merge. On non-fast-forward push, rebase and retry; do not force. Deploy `dev` only from the clean main/default checkout, and deploy `ol` only from the selected release branch.
-- After deployment and validation, archive the change and remove obsolete worktrees/branches. A worktree without a matching active change is an orphan.
-- See `docs/parallel-dev-worktrees.md` and helper scripts such as `scripts/new-change`, `scripts/spawn-change`, and `scripts/land-change` for operational details.
-
-## 9. Codex Mapping Notes
-
-- Claude slash commands in `CLAUDE.md` such as `/opsx:propose`, `/opsx:apply`, `/opsx:archive`, `/impl`, and `/claim` are historical shortcuts. In Codex, perform the same workflow through natural-language intent, OpenSpec CLI, file edits, and repo helper scripts.
-- Do not install an OpenSpec skill just to follow this process. The source of truth is this repo plus the OpenSpec CLI.
-- If this file and `CLAUDE.md` diverge, prefer this file for Codex behavior and inspect `CLAUDE.md` for background/detail before making a risky change.
+- Historical Claude slash commands map to natural-language intent, OpenSpec CLI, and repo helpers. Do not install an OpenSpec skill just to follow this workflow.
+- Prefer this file when it conflicts with `CLAUDE.md`; use the latter only for explicitly needed legacy background.

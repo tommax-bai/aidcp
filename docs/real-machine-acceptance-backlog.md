@@ -209,7 +209,9 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 
 ## 簇 15 — remote-captcha-assist 真机验收（云端远程处理验证码，登记于 2026-07-08）
 
-代码与部署已就绪并经只读核验：dev 上 `AIDCP_CAPTCHA_ASSIST_ENABLED=true`、就绪门通过（token secret 走 `AIDCP_PANEL_JWT_SECRET` 回退、`AIDCP_CAPTCHA_ASSIST_PUBLIC_BASE_URL=http://aidcp.tommax.cc`）、协助页 `http://aidcp.tommax.cc/captcha-assist/<id>` 外网 200、`/api/captcha-assist/<id>` 无 token 401、启动无「未启用」告警。剩人机在环走查（需运营机 edge + 真/模拟验证码）：
+代码与部署已就绪并经只读核验：dev 上 `AIDCP_CAPTCHA_ASSIST_ENABLED=true`、就绪门通过（token secret 走 `AIDCP_PANEL_JWT_SECRET` 回退）、`/api/captcha-assist/<id>` 无 token 401、启动无「未启用」告警。剩人机在环走查（需运营机 edge + 真/模拟验证码）：
+
+> **⚠️ 2026-07-16 更正（本条原验收证据已失效）**：上面原记「`AIDCP_CAPTCHA_ASSIST_PUBLIC_BASE_URL=http://aidcp.tommax.cc`、协助页 `http://aidcp.tommax.cc/captcha-assist/<id>` 外网 200」——那是 **2026-07-11 域名割接前**的证据（当时域名指 dev）。割接后该域名只回 **OL**，dev 签发的链接把运营送到 OL，实测报 `captcha_assist_unavailable`（503，在鉴权之前）。**已修**：dev `.env` 基址改为 `http://121.89.85.150:8088`（备份 `.env.bak.20260716-212426`，21:25:15 重启后进程环境已实测生效、无「未启用」告警）。**下面各项验收一律用新签发的链接**——飞书卡里的链接是发出时固化的，旧卡改配置也救不回。**验收口径不是「503 消失」**（503 只是最外层门，让开后还有 404 / `edge_offline` 两堵墙），而是运营真点一下、边缘真动了。
 
 - [ ] 运营机 edge 连 dev（`ws://121.89.85.150:8787`），账号刷到点选类验证码浮层、进入阻断态。
 - [ ] 飞书验证码/未知告警卡出现「打开协助处理」按钮；点开进协助页，看到边缘截下的现场图（账号昵称/机器/风控态/URL 上下文齐）。
@@ -1219,6 +1221,12 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 
 - [ ] 82.9 **FB 评论审批卡「回调失败」修复真机核（热修 cloud master `f5b6fc9` 已 land + **已部署 dev** 2026-07-15；无独立 openspec change，直接热修）** — 修「FB 评论审批卡（待审核评论）点『同意发布』飞书报回调失败、评论发不出」。根因＝Facebook 的 noteId 是**完整帖子 URL**，评论人审 requestId `comment-<noteId>-<ts>` 把 URL 的 `/` 带进 `/tmp/aidcp-publish-approve-<requestId>.json` 落盘路径 → posix.join 造出不存在的子目录 → `writeFile(wx)` 抛 ENOENT → 回调 handler 抛错回「处理审批回调失败」；读侧撞同路径 → 即便点同意也读不到、评论按 `approval_timeout` 丢（XHS noteId 是短码故只 FB 中招；生产日志指纹 `处理卡片回调失败: ENOENT ... /tmp/aidcp-publish-approve-comment-https:/www.facebook.com/thekdaily/...`）。修法＝新增 `buildCommentApprovalRequestId` 单一出口把 noteId 归一到 `[A-Za-z0-9_-]` 再拼（两生成点 `comment-approval-gate.ts`/`compose-approve.ts`；cloud-only，评论信号云端独写独读、边缘不碰）。dev 已用生产真实 URL 跑通：新号 flat、`writeFile(wx)` 不再 ENOENT。**观测法**：dev journal grep `处理卡片回调失败`/`ENOENT`（部署后**新卡**点同意应不再出现）。**真机核**：① 运营对一张**部署后新弹**的 FB 评论审批卡点「同意发布」→ 飞书回成功 toast、不再回调失败；② 评论真发到该 FB 帖（不再 `approval_timeout` 丢）；③ 拒绝/超时语义不变。**⚠ 关键提醒**：部署前已发出的**老卡**（requestId 已烤入 URL）再点仍失败——老 requestId 改不了，只有部署后**新生成**的卡才带安全 requestId，验收须用新卡。交叉 memory `fb-comment-approval-requestid-url-enoent`；与 82.6 人审门槛正交。
 
+- [ ] 82.10 **FB 自动热帖评论迁移在途"上锁" + 慢详情页探测窗放宽真机核（change `fb-comment-migration-hold`；cloud master `865a788` 已 land + **已部署 dev**、edge master `678bdc6` 已 land**待客户端重打包/本地重跑**，登记于 2026-07-16）** — 修「FB 自动 feed-inline 热帖评论时浏览器闪一下群帖地址又秒回首页、已批准评论被静默丢」。真机现场：dev FB 号 `61591753702668`（`ads-k1ei3dbi`）当日 6 次授权丢 1（`groups/1684192411910736`，14:26:35 `open_failed`）。**两正交根因两处修**：①**云端**（`role-dispatcher` 迁移在途以 `pendingMigration` 为闸抑制一切离页 browse/互动命令、只放行本支线自身的迁移 `open_note{navigate}`+`comment`）——去掉"迁移落地前后并发 scroll 经 `ensureFeed` 把浏览器拽回首页"；②**边缘**（`post-reader` 详情探测窗 `surfaceProbeRounds` 14→22，~12s→~18s）——**这才是当日那次掉评论的直接因**：FB 详情正文水合 7–12s > 旧窗 ~12s 上界，慢一拍即误 `open_failed`。**观测法**：dev journal——迁移在途（`pendingMigration` 置位后）不再穿插 `action=scroll`、`评论迁移 navigate 失败 … open_failed` 显著减少；`edge.log`——评论迁移期间不再出现 `ensureFeed 判非目标→整页导航 … surface=group_post` 的中途拽回。**真机核**：① 热帖评论迁移期间浏览器**不再"闪群帖地址又回首页"**（cloud 那半 dev 已生效、单独即可去掉 mid-migration 拽回）；② **慢水合详情页（>12s）评论能发出、不再误 `open_failed` 丢评论**（**须客户端含 edge `678bdc6` 重打包/本地重跑**才有放宽的探测窗，老包仍 ~12s 窗）；③ 评论支线暂停/看门狗终局正常解除、会话不钉死（`pendingMigration` 已在所有终局清空）；④ **XHS 零回归**（读评 surface 相等、迁移结构性不可达，本闸走不到）。**前置**：dev 云端含 `865a788`（已部署）；客户机以 edge master（含 `678bdc6`）重建客户端；用 tom 分组 FB 号（同 82 前置）。**⚠ 分半生效**：cloud 那半已 dev 独立生效；edge 探测窗放宽须重打包（默认不做、等显式发版）。**回滚**：cloud 恢复 `/opt/aidcp/cloud/src/orchestrator/role-dispatcher.ts.bak.20260716-161751` + restart；edge 改回 `surfaceProbeRounds: 14`。交叉 memory `fb-auto-comment-migration-lease-hole` / `fb-feed-dialog-guard-reload-churn`；与 82.6 人审门槛、82.9 审批回调正交。
+
+- [ ] 82.11 **FB 评论链路详情水合窗补齐 + 开帖步超时放宽真机核（change `fb-comment-open-hydration-window`；edge master `ff6c1e1` 已 land + dist 已重建**待运营重启客户端**；cloud master `f4a831e` 已 land + **已部署 dev**（backup `cloud.bak.20260716-202311`，healthcheck 绿：active/8787/飞书长连接/评论调度器就绪/isales 四服务未受影响），登记于 2026-07-16）** — **这是 82.10 那半修复的补齐**。82.10 的 edge `678bdc6` 自述目标是「让慢水合 permalink 不丢已批准评论」，但**只改了 `post-reader.ts`（浏览链路），而评论链路根本不走 post-reader**——`comment-handler.ts:125 → executor.openPost()` 走的是 `comment-executor.ts` 自己的 `openPost`（`:446` 独立产 `open_failed`），其 `surfaceProbeRounds` 是**另一份常量**、值仍为 4（总预算 ≈4.9s < 真机实测水合 7–12s）。dev 取证：`facebook_comment_audit` id 52（2026-07-16 16:54:05，账号 `61591701813509`，`groups/435744902071070`）= `no_strong_candidate/open_failed`，距租约取得仅 14s；且 `dist/facebook/post-reader.js:19`=22 而 `dist/facebook/comment-executor.js:70`=4，坐实「一边修好一边没修」。**两处修**：①**边缘**新增独立的 `postDetailProbeRounds`（默认 22，对齐 post-reader 同源实测依据）只用于 `openPost` 的 article 等待；搜索候选探测与评论框催拉**仍用 `surfaceProbeRounds:4` 逐字节不变**（它们跑在 `editorScrollRounds=6` 循环内，盲改即 6×22×600ms≈79s 炸步超时）；②**云端**新增 `FACEBOOK_OPEN_STEP_TIMEOUT_MS`=45s 让开帖步脱离固定 28s（边端最坏 ≈30s；不放宽只会把诚实的 `open_failed` 改判成 `timeout`——两者塌进同一 `no_strong_candidate`、运营看到的卡片一模一样）；搜索步仍 28s。**观测法**：dev PG `SELECT outcome, reason, count(*) FROM facebook_comment_audit WHERE created_at > <部署时刻> GROUP BY 1,2;` —— `open_failed` 应显著下降；**且 `timeout` 不得同步上升**（若上升说明 45s 仍不够、需复算边端最坏）。**真机核**：① 慢水合（>5s）的群帖评论能发出、不再误 `open_failed`；② 开帖步未被改判成 `timeout`；③ 评论框催拉预算未外溢（开帖步整体耗时不应逼近 45s——桩层已有回归闸，真机再核一次）；④ **XHS 零回归**（走 `edge-steps.ts` 另一条，本 change 未触及）。**前置**：dev 云端含 `f4a831e`（已部署）；**运营机须重启客户端**（dist 已在本机重建含 `ff6c1e1`；`electron:dev` 不含 build，见 memory `standby-restart-loop-stale-build`）；用 tom 分组 FB 号（同簇 82 前置）。**⚠ 分半生效**：cloud 那半已 dev 生效，但**边缘不重启则详情窗仍是 4 轮**、本项无法验收。**回滚**：cloud 恢复 `cloud.bak.20260716-202311.tar.gz` + restart；edge 把 `postDetailProbeRounds` 改回 4（或 revert `ff6c1e1`）。交叉 memory `fb-auto-comment-migration-lease-hole`；**与 82.10 同一现场、必须合并验收**（82.10 只覆盖浏览链路的窗，本项覆盖评论链路的窗）。
+- [ ] 82.12 **FB 加群 click 腿复用已确立页、消灭同址整页重载真机核（change `fb-group-join-click-leg-reuse`；edge master `2f726ee` 已 land**待运营重启客户端**（dist 未重建；`electron:dev` 不含 build）；cloud/协议/DB 零改动、无需部署，登记于 2026-07-16）** — 修用户 2026-07-16 报的「跑 `/comment <昵称> --join --contact --force` 访问小组时页面跳两次、进群后又刷新一次」。**非正确性 bug**（群照加、评论照发），代价是白等一整轮就绪渲染 + 对同址连开两次的机器行为特征。根因：加群是**两腿**边缘调用（observe → 云端 LLM 预判 → click），云端在两腿间**故意释放租约**（不在等 LLM 时霸占浏览器，`facebook-group-join-scheduler.ts:303`/`:329` 两次 `withLease`）——但边缘 `joinGroup` 的 `Page.navigate` 原**无条件**排在「本次只观察」守卫之前，于是 click 腿把 observe 腿刚加载好、已水合的同一页**整页重载一遍**。修法：click 腿在位即跳过 navigate；**observe 腿永远 navigate**（承重反死锁闸——若两腿都复用，页面卡在目标 URL 的坏状态时 `not_ready` 重试将永远跳过导航、永远观察同一个坏页，死锁到 attempts 撞上限被永久标 `failed`；桩层已有断言守这条）。在位判据**故意不 canonical 化 current URL**（会把 `m.facebook.com` 移动版 DOM 与 `/groups/<id>/about` 误判成在位），只认 origin + 精确群根路径、容尾斜杠、忽略 query/hash；一切存疑方向 = 导航（退回今日行为）。**桩层验不了、必须真机的点**：**FB 真页在 observe 腿导航后是否把地址改写**（如追加 `?ref=`/`?sorting_setting=` 或跳 vanity → 数字 id），若改写形状超出判据容忍范围，复用会**每次静默回落 navigate**——功能无回归但优化完全不生效（**这是本项唯一的真实风险，且不会以任何错误形态暴露**）。**真机核**：① 跑 `/comment <昵称> --join`，肉眼确认群主页**只完整加载一次**（此前两次）——「跳两次」应变成「跳一次」，随后是群内搜索页那一跳（该跳是必要的、不消除）；② 加群结果与此前一致（joined / pending / questionnaire / already_member 语义不变）；③ 观测法：edge 日志/CDP 看 `Page.navigate` 到群根的次数，click 腿应为 **0** 次；若仍为 1 次即说明判据没命中真实 URL 形状（本项主要风险，须记录 FB 实际改写成什么样再收窄/放宽判据）；④ 慢渲染群（加入按钮 >7s 才出）零回归；⑤ **XHS 零回归**（本 change 只动 FB 加群执行器，XHS 结构性不可达）。**前置**：tom 分组 FB 号 + 一个**未加入**的目标群（已是成员走 `already_member` 早返回、验不到本项）；运营机以 edge master（含 `2f726ee`）重建客户端。**回滚**：把在位谓词 `isOnCanonicalGroupPage` 恒返回 false（或 revert `2f726ee`）即逐字退回今日无条件导航。交叉 memory `fb-join-coordinate-click-fails` / `fb-group-join-observe-i18n`；与 82.10/82.11 的详情水合窗正交（那两项治评论开帖，本项治加群导航）。
+
+
 ## 簇 83
 
 ### change `image-postcheck-vision-model` 分阶段真图验收（cloud master `023b5da` + console master `8c27fc2` 已 land + dev 已部署；登记于 2026-07-15）
@@ -1291,14 +1299,29 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 - [ ] 86.14 **私聊 `/publish` 审批卡回私聊** — 工程师大白**私聊** Bot 发 `/publish <昵称>`：随后的**内容审批卡出现在该私聊里**，MUST NOT 落默认管理群、MUST NOT 落账号团队群。
 - [ ] 86.15 **私聊 `/publish` 终态失败卡回私聊** — 构造该私聊触发的发帖终态失败（达最大尝试仍 0 成功）：**红色失败结果卡出现在同一私聊里**，MUST NOT 落账号团队群。（cloud 日志 `发帖终态失败卡 … sink=origin` 佐证）
 - [ ] 86.16 **管理群 `/publish` 回该管理群** — 在**管理群**发 `/publish <昵称>`：审批卡 + 终态卡都回**该群**（来源会话＝群）。
-- [ ] 86.17 **自动 / 排期发帖不受影响（回归）** — 自动 / 排期触发的发帖结果卡**仍进账号团队群**（无来源命令会话 → 补集回落既有 per-team 路由），审批卡仍走默认审批群；工程师大白手动命令的改动 MUST NOT 波及自动流量。
-- [ ] 86.18 **后续对齐项（未做，仅登记）** — 手动 `/comment` 终态结果卡目前**仍走账号团队群**（非本 change 范围）；若要与 `/publish` 对齐回来源会话，需另起把 `originChatId` 透传进 `CommentScheduler.postResultCard` 取址。
+- [ ] 86.17 **自动 / 排期发帖不受影响（回归）** — 自动 / 排期触发的发帖结果卡**仍进账号团队群**（无来源命令会话 → 补集回落既有 per-team 路由）；工程师大白手动命令的改动 MUST NOT 波及自动流量。**⚠️ 本项原文的「审批卡仍走默认审批群」一句已于 2026-07-16 被 `unify-card-routing-origin-then-team` 推翻——自动 / 排期审批卡现在应进账号团队群（见 86.29），按旧口径验收会误判为回归。**
+- [ ] 86.18 **后续对齐项 — 已被 `unify-card-routing-origin-then-team` 取代（见 86.26+，勿重复登记）** — 手动 `/comment` 终态结果卡此前仍走账号团队群；该 change 已把 `originChatId` 透传进 `CommentScheduler.postResultCard` 取址，验收判据见 86.27。
+
+> **补登 `delegated-executor-operator-authority-parity` + `delegated-approvalmode-clamp`（2026-07-16，cloud master `b78a27f` / `6413a6a` 已部署 dev，backup `cloud.bak.20260716-162510`，healthcheck 绿）**：委托层重新实现命令语义的两处跑偏 + 一处结构化入口免审信任缺口。服务/executor/helper 已单测（operatorOverride 仅精确类透传、评论起跑前失败→红卡 vs 起跑后→null、approvalMode clamp）；下列为真飞书 + 真调度路由判据，桩测替代不了。设计档 `docs/design/delegated-command-two-layer-split.md`（这是分层设计的阶段 1）。
+
+- [ ] 86.19 **A：精确 `/publish` 在风控受限账号仍出草稿 + 人审卡** — 把一个账号压到风控非 normal（或当天已达发布配额），管理群/私聊发 `/publish <昵称>`：系统**越风控生成草稿并出发布人审卡**，MUST NOT 因风控/配额把命令 blocked→静默判失败。人审 MUST 仍强制（越权只越风控、不越人审）。对照：同账号自然语言「让 <昵称> 发一篇」仍受风控闸（governed），受限时诚实 blocked。
+- [ ] 86.20 **B：评论起跑前触发闸失败收诚实红卡（不再静默）** — 对一个**未绑人设**（或联系方式缺 / 非 FB 账号带 `--join`）的账号发 `/comment <昵称>`：运营**收到一张红色「评论任务未触发」卡**，含人类可读原因（如「未绑定人设」），MUST NOT 零反馈静默。（今天此类会静默吞掉）
+- [ ] 86.21 **B 负向：评论起跑后失败不双发** — 一个已起跑、跑到最大尝试仍未评上的 `/comment`：只有**评论链自己的结果卡**，委托层 MUST NOT 再叠一张「评论任务未触发」卡（避免双发）。
+- [ ] 86.22 **C：结构化 draft 自带 `auto_approve` 被夹成 review** — 用带 `approvalMode:"auto_approve"` 的请求体打后台 `/api/delegated-tasks/draft`（或客户端 `/delegated-tasks/draft`）建发帖/评论草稿：任务以**必审**入队、内容 MUST NOT 免审直发平台，即使该账号未开账号级免审。对照：后台「洗稿」正常入口（服务端传 review）行为不变。
+
+> **补登 `delegated-terminal-failure-reason`（2026-07-16，cloud master `<sha>` 已部署 dev）**：终态失败卡带上真实失败原因（此前只有「已达到最大尝试次数；真实完成 0/1。」这句预算记账，用户实际收到并投诉）。原因一路都在——编排器 `failureReason` → 执行器 → 已持久化到 `delegated_task_attempts.reason` 列——只是 `finishBudget` 从不读它。四支拼接 + humanize 白名单已单测（52 项绿），并已用「真 worker → 真 receipt → 真卡 builder」驱过五支肉眼核对；下列为**真 PG + 真飞书**判据，桩测替代不了。**注意 86.7 是本项的前身**（那时只验「有没有卡」，本批验「卡上说不说得清原因」），可一并跑。
+
+- [ ] 86.23 **失败卡带出真实原因（本投诉的正面验收）** — 构造一次发帖终态失败（最简：让同账号已有一轮发帖编排在跑时再 `/publish <昵称>`；或把账号压到风控非 normal 走自然语言 governed 路径）：红卡正文 MUST 在「已达到最大尝试次数；真实完成 0/1。」之后带出**具体原因**（如「已有一轮发帖编排在运行中」/「账号风控状态为 warned，暂不发帖」），MUST NOT 只有那句记账。
+- [ ] 86.24 **「均未真正开始」措辞不误导（红线）** — 上一项若走的是「全程被让开」路径（`failureCount=0`、`skippedCount=attemptCount`）：文案 MUST 为「N 次均未真正开始：<原因>」，MUST NOT 出现「最后一次未成原因」或任何可被读成「已经在平台上动过手」的措辞。
+- [ ] 86.25 **PG `listAttempts` 真库验证（本地测不到）** — 本 change 新增的 `listAttempts` **只在 memory 实现上跑过单测**（PG 需真库）。dev 上任一委托任务走到预算终态后，确认卡上真的带出了原因 → 即证 PG 侧 `SELECT … ORDER BY ordinal` 与 `mapAttempt` 正常；若卡上恒无原因尾巴（而 cloud 日志无 `读取 attempt 原因失败`），说明 PG 查询返回空、须回查。
+- [ ] 86.26 **平台名出现在失败卡上** — 失败卡 MUST 多一行「**平台**：Facebook / 小红书」（取自 registry displayName，非裸 id）。
+- [ ] 86.27 **无原因可取时不补推测（负向）** — 若某次终态确实取不到任何带原因的 attempt：卡文案 MUST 与本 change 前逐字一致（只有记账），MUST NOT 出现「原因未知 / 可能是…」之类推测。
 
 ## 簇 87
 
 ### change `wechat-channels-interaction-management` dev 真账号与受控写验收（Session 05；登记于 2026-07-15）
 
-**已完成的代码与 dev 基线**：控制仓契约 `a678003`；Cloud 互动闭环 `ae7b4e8`（dev 最终按文件校验匹配干净 master `f654850`，已包含它）；Edge connector + Electron 集成至 master `dc9dac6`；Console `3a477c1` 已部署 dev。协议 schema、44 份归一化双向 fixture、Edge/Cloud acceptance、全量测试、typecheck、mock 工作流和隔离 PostgreSQL 集成均通过；dev Cloud/Console 健康、迁移/索引、日志脱敏与 kill switch 状态已核。**但 dev 数据库当时没有任何视频号授权账号，用户也未提供可写测试评论/私信目标，因此下面所有真账号项都没有被 mock 替代，也没有被写成已通过。**
+**已完成的代码与 dev 基线**：控制仓契约 `3aa51de`（原记 `a678003`，2026-07-17 校正——那个 sha 只活在 `origin/codex/wechat-channels-interaction-management` 分支、**不在 origin/main 上**；`3aa51de` 是主干上 subject 逐字相同的等价提交。工作没丢，只是台账指向了一个别人 clone 下来找不到的提交） 与真实运行闭环变更；Cloud master `42cd5f8` 已部署 dev 并应用 0042；Edge master `d321042` 完成身份 bootstrap、账号控制下发、真实空评论/DM 请求与 Cloud 可见空批次；Console `3a477c1` 已部署 dev。Edge acceptance 22/22、全量 1520/1520、typecheck 通过；Cloud acceptance 54/54、全量 2279 通过（5 个显式跳过）、typecheck 通过；严格 schema/OpenSpec 与脱敏证据检查通过。命名账号已完成首次授权、浏览器关闭后的 API-only 恢复和 controls 0→1 在线收敛，Cloud 各接受 1 个 comment/DM 空批次并保留各 1 个 cursor，持久化 thread/message 与 send attempt 均为 0；两轮后批次数稳定为各 1，跨 scope 批次为 0，AdsPower 已关闭。**该账号当前没有评论或私信，所以上述结果只证明真实“成功同步 0 条”；非空解析、真实写与 offboarding 仍不得由空结果或 mock 替代。**
 
 **安全前置**：只用用户明确命名的测试账号；写 capability 初始保持 false，账号级 `write_paused` 保持 true；先完成只读项。评论/私信分别需要用户批准的一条可删除目标。自动模式必须等 87.1–87.6 通过后再次获得明确批准。Edge 本次只验证了 master 源码，**没有构建或发布安装包**。
 
@@ -1309,4 +1332,104 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 - [ ] 87.5 **真实失败边界** — 分别验会话失效/错误账号、发送中断网形成 `ambiguous` 后只 verify 不盲重发、Edge/Cloud 重启恢复、AI 超时/越界/高风险 fail closed，以及真实 schema missing 时能力熔断；平台不可见且无确认时不得显示「已发送」。
 - [ ] 87.6 **真实解绑与延期清理** — 验环境解绑、客户终止、Edge 离线后重连三条路径：Cloud 先撤权/停派发，Edge drain 后清加密 session 并关闭 sidecar，重复/重启只确认一次，Cloud 收到 scope-matching ack 后 tombstone，并在配置期限内完成 scope purge；保留审计不得含正文。需保存真实的凭据删除与 purge 证据。
 - [ ] 87.7 **low-risk auto 仍需二次批准** — 只有 87.1–87.6 全部通过且用户再次明确批准，才给该测试账号开启 low-risk auto，用可删除测试消息验一次；否则状态必须写成「已实现、未真机开放验证」，全局开关、账号白名单和账号级暂停继续关闭。
-- [ ] 87.8 **Edge 真机载体边界** — 用包含 `dc9dac6` 的 edge master 源码真机运行，或在用户明确要求后另走桌面打包/发布流程并跑一次 packaged artifact；在此之前不得把本次源码验证称为「Edge 安装包已发布/已验收」。
+- [x] 87.8 **Edge 真机载体边界** — 已用 Edge master `d321042` 源码连接同一 AdsPower 登录态完成只读真机运行；没有构建或发布安装包，因此本项只证明源码载体，不代表桌面安装包已发布/验收。
+
+<!-- 87.1 partial evidence (2026-07-16): named-account auth became active, the browser closed, controls version 1 converged, and Cloud retained one accepted zero-item batch/cursor for each of comment and DM with no send attempts. Keep 87.1 open until a non-empty incremental sample and the real client-side same-account/cursor presentation are observed; 87.2 remains open for multi-page/restart/two-account isolation. -->
+
+## 簇 88
+
+### change `facebook-comment-participation-gate` 群参与审批入群闸真机验收（edge master `a6fb282` 已 land、需从 master 起客户端；cloud master `21e44e5` 已 land + **已部署 dev**（backup `cloud.bak.20260716-161340`，healthcheck 绿）；登记于 2026-07-16）
+
+**背景**：Facebook 群「参与者审批 / 参与问题」= 管理员配置的一次性入群闸——账号首次在该群评论时被拦成「申请参与 + 答题 + 同意群规」，提交后待管理员人工批才上墙。桩层已实装：① 止血（确认判据加「待审批徽章」否决，堵住「待批评论误报已发出」假绿）；② 识别（`buildParticipationGateJs` 只认可见 `role=dialog` + 参与审批专属文案，避开侧栏 Join / 问答帖回复框两类旧假阳）→ 新诚实结局 `pending_group_approval`（不上墙、不染绿、不去重、不重试）。**默认不做自动答题**（答了仍等人批 + 暴露自动化痕迹，属另议）。
+
+**前置环境**：tom 分组测试号（工程师大白 / Tmax）+ 一个**开了「参与者审批」的公开 FB 群**（或私密群开「限定成员」）；从 edge master（含 `a6fb282`）起 headful 客户端连 dev（`ws://121.89.85.150:8787`）。**共享环境同簇 82（FB feed / 评论真机批）**，建议同一次真机 session 合验。
+
+- [ ] 88.1 **参与审批闸真机取证** — 用**从未在该群贡献过**的账号，对该群一帖尝试评论；抓弹框 **CDP 截图 + `document.body.innerText` 全量 dump + iframe frameUrls**。核：① URL 停在 `/groups/<id>/...`（**不**跳 `/checkpoint`，据此确认是群作用域入群闸、非账号级反机器人）；② 弹框是不是 `role="dialog"`（决定首版 `buildParticipationGateJs` 只认 dialog 是否够——若为非 dialog 全屏 interstitial，需按取证扩面）；③ 坐实简体中文按钮/徽章原文（`申请参与 / 参与问题 / 同意小组规则 / 待审核`），把 `FB_PARTICIPATION_GATE_RE` / `FB_PENDING_APPROVAL_RE` 从「语义高置信」升到「逐字确认」。
+- [ ] 88.2 **诚实结局与卡片** — 命中参与闸时，边缘回执 = `pending_group_approval`（`submitted:false`）、**打字前**不把评论灌进「输入回答」框、确认段**不刷新不重试**；云端出**黄卡**「该群需管理员批准参与后才能评论（评论未上墙，待人工处理）」，**绝不染绿**、不写去重、不记风控、不算委托成功。查 journalctl（cloud dev）关键字 `pending_group_approval` / `参与审批入群闸`。
+- [ ] 88.3 **假绿否决回归（止血核心）** — 构造/等到「静默待审批」形态（本人首条评论只对作者可见、带「待审核」徽章、带真 comment_id 或 ≥2 交互控件）：确认判据 MUST NOT 判「已上墙」（`buildAckVerifyJs`/`buildScopedVerifyJs` 待审徽章否决生效）→ 落 `pending_group_approval` 而非 `verification_ambiguous`（更非成功）。
+- [ ] 88.4 **不误伤合法回复** — 在**开了参与审批但账号已是 participant** 的群、以及**问答型帖子**（回复框 aria-label「输入回答/Answer」但非参与审批对话框）里正常评论：探针 MUST NOT 误触发，评论照常发出并被确认；参与答题框标签仍被当合法评论框（不回归旧假阳）。
+
+## 簇 89
+
+### change `client-created-env-auto-assignment` 客户端本机建号自动归属验收（Cloud `e8b16d6` 已部署 dev；Edge `239c44c` 已 land、未打安装包；登记于 2026-07-16）
+
+客户在已登录桌面客户端内通过官方“创建环境”流程新建 AdsPower 环境后，Cloud 用一次性短时 intent 把**本次新建返回的 envKey**登记到权威环境注册表并唯一分配给当前客户；Electron 主进程重新读取 `/my-environments` 确认后，才把环境加入本地运行花名册。旧 `POST /environments` 任意认领仍固定 403，已登记环境不能借新建 intent 认领，同一 intent 不能换绑第二个 envKey。成功只加入离线行，**不会自动启动**；代理仍可稍后补配。
+
+桩层：Cloud acceptance 54/54、最新 master 全量 2290 通过（5 个显式 gated skip）、一次性 PostgreSQL 真实事务 2/2、typecheck/build 通过；Edge acceptance 22/22、最新 master 全量 1520/1520、typecheck 通过。dev 部署备份 `cloud.bak.20260716-180737.tar.gz`，`8787/8090/8091`、三条 health、PostgreSQL provisioning 表/唯一 owner 索引及飞书长连接均验证正常。**没有运行 `electron:build*`，因此当前已安装的 Windows 客户端仍会显示旧“管理员分配”提示，这是旧包事实，不是新闭环已在真机失败。**
+
+- [ ] 89.1 **Windows 新包载体** — 用户明确授权桌面打包/发布后，从 Edge master（含 `239c44c`）构建 Windows x64 安装包并在 Win11 Intel 真机启动一次；确认 core 能连 dev、AdsPower 调用可达，且无 packaged-only `app.asar`/`spawn ENOTDIR` 回归。未获明确授权前保持本项未执行。
+- [ ] 89.2 **视频号新建自动归属与可见性（本 change 直接目的）** — 在新包中以客户账号登录，选择“视频号”创建一个全新环境：回执应为“已分配到当前账号并加入运行环境；需要启动时请在环境栏操作”，左侧环境列表立即出现该视频号环境的**离线行**；Cloud `/my-environments` 与 PostgreSQL active owner 都只归当前账号。MUST NOT 自动启动浏览器/core。
+- [ ] 89.3 **代理与重启持久化** — 不填代理创建：提示“未配代理，可稍后在环境行「代理」里补配”，环境仍正常归属；关闭并重开客户端后该环境仍在当前账号花名册，平台保持 `wechat_channels`，补配代理只改该环境且不改变归属。
+- [ ] 89.4 **失败诚实性与旧认领红线** — 分别制造 Cloud intent 申请不可达、建号后完成归属失败、权威清单刷新失败和本地 settings 写盘失败：申请失败必须在 AdsPower 建号前停止；其余失败须明确区分“本机已创建 / 已分配 / 未入运行环境”，不得把未确认环境加入花名册。用已登记的另一环境 envKey 与旧 `/environments` 路由尝试认领都必须被拒，且不得改变现有 owner。
+
+## 簇 90
+
+### change `facebook-write-action-visibility` FB 写动作客户端可见性验收（edge master `40aa902` 已 land + 已同步主 checkout；**未打安装包**；登记于 2026-07-16）
+
+**背景**：运营报「触发了多次评论，但客户端记录里一条都没有」。坐实：FB 环境的活动流此前只可能出现 5 类条目（账号就位 / 已连云 / 开始浏览 / 读 / 赞）——评论、加群、搜索**一条不产**。根因是三个独立卡点叠加：① 评论/加群/定向搜索/按链接开帖由会话**委托**给独立处理器，处理器自己回执云端后返回，**走不到**唯一的叙述出口；② 叙述器类型联合封闭 4 值且已用满；③ 壳侧中文兜底表 21/22 条规则是**小红书专属**（`autoBrowse` 按构造排除 FB），唯一命中 FB 的那条还把「就地读」叙述成「顺路去作者主页看看」。**危害不止少显示**：运营分不清「没做」和「做了但没显示」——卡在群参与审批（评论已提交、等管理员批）与评论框没找到的，此前同样隐形。
+
+本批同时修一个**既有 `edge-fleet-console` 规格违反**：FB 验证码/阻断**从不点亮**客户端「需要处理」态（检测行不含兜底正则要的「弹窗」「暂停操作」；清除侧 FB 干脆什么都不打），且该标志会被**任何一次成功互动顺带清掉**——一次正常点赞就把卡在验证码上的机器抹回绿色。已改为两侧走结构化事件 + 清除只认显式解除。
+
+**桩层**：`test:acceptance` 22/22、`npm test` 1559/1559、`typecheck` 干净。新覆盖**压在发射器侧**（既有解析器测试只测解析器、从不执行发射器，改一句措辞照样全绿而条目静默消失）。
+
+**前置环境**：tom 分组测试号（工程师大白 / Tmax）+ 越南招工类 FB 群；从 edge master（含 `40aa902`）起 headful 客户端连 dev（`ws://121.89.85.150:8787`）。**共享环境同簇 82 / 88（FB feed / 评论真机批）**，建议同一次真机 session 合验。
+
+- [ ] 90.1 **计数是否重复（首个要核的点）** — 一条真评论会同时 bump 本地兜底 `comments` 与云端经 `interaction.occurred` 的计数。预期云端 ~60s `dailyUsage` 快照**覆盖**本地兜底（与既有 like / view 同构、非新引入模式）。核：真机跑若干条评论后，客户端「今日进展」的评论数**不虚高**、与 console/云端权威计数一致。若虚高 → 说明覆盖没生效，需查 ui.snapshot 推送。
+- [ ] 90.2 **待批准是否为常态（预期反应管理）** — 若群参与审批频繁命中，活动流会出现大量「评论待管理员批准，还没显示出来」。**这是修复在起作用**（把一直存在的现实翻出来），**不是回归**。核：该文案 MUST NOT 计数、MUST NOT 读成已发布；并向运营讲清「现在看着全是待批」≠「现在全失败」——此前它们是静默的假绿。
+- [ ] 90.3 **群名读取（越南语真机）** — 加群条目的群名取自现读页面标题，需剥「(3) 」通知计数前缀与「| Facebook」后缀，按 18 字有界截断。核：越南语群名可读、截断不截错、**读不到时回落「一个小组」而非露 URL / group id**。（桩层已覆盖前缀剥除与截断，真机核多语言与通知前缀的真实形状。）
+- [ ] 90.4 **FB 验证码点亮与不被顺带清除** — 制造 FB 验证码/阻断：核 ① 该环境客户端「需要处理」**点亮并浮到环境栏最上**（此前从不点亮）；② 其后账号若仍有一次正常点赞/阅读，该态 **MUST NOT 被抹绿**（此前会）；③ 人工处理完、边缘复检发出显式解除后才退出该态。**同时核不回归小红书**：XHS 两侧本有显式 popup/popup_cleared，移除 statsDelta 兜底后其阻断态仍能正常置真与清除。
+- [ ] 90.5 **加群成功闸与云端一致** — 加群条目的成功判据镜像云端证据闸（`ok && clicked`）。核：客户端说「加入了小组」时，云端 `interaction.occurred{join_group}` 同时发生；客户端说「申请加入…等待管理员通过」时云端**不**记 join_group。二者 MUST NOT 打架。
+- [ ] 90.6 **搜索条目与在场感** — 定向搜索出「在「<真实群名>」搜「<词>」，找到 N 条」/「没有匹配的帖子」（二者可区分）；浏览侧搜索出「搜索「<词>」，找到 N 条」，且在场感为「正在看「<词>」的搜索结果…」而**非**「正在浏览推荐流…」（后者在搜索结果页上是假话）。
+
+> **补登 `unify-card-routing-origin-then-team`（2026-07-16，cloud master `38e3fde`，部署 dev 见 tasks 6.4）**：**一切**出站卡片 / 告警收敛为一条规则——**来源会话 → 账号团队群 → 默认群**。起因＝工程师大白私聊下评论命令，「待审核评论」卡落默认群「AI运营」；同批账号的自动化审批卡也没进已配好的 tom→Tom.A 路由。根因是**一行**：评论审批卡在全仓只有一个发送口（`server.ts` 的 `CommentApprovalPort.request`）写死默认群解析，手里有 `accountId` 也不用、来源会话根本传不进来。解析器三档 + 执行器三分支透传已单测；**下列为真飞书路由判据，桩测替代不了**。
+>
+> **本批同时推翻了两条既有 spec MUST NOT（运营方 2026-07-16 显式定案）**：审批卡不再硬绑管理群；带账号的运维告警也按账号路由。**已接受的暴露面**：审批回调无任何权限校验（只认 requestId、不校验点按者与来源群）→ **谁看得见卡谁能批准**；`group_route` 无内部 / 外部标记 → 规则对全部已映射团队一视同仁。**若把外部客户群映射成某团队路由，该客户即自动获得批准按钮与运维可见性，系统内无闸可拦**——在引入「路由可信标记」前，映射外部客户群须由人工流程约束。
+>
+> dev 真值参考：默认群 `oc_144e761f…`＝「AI运营」；`tom`→`oc_1c268549…`「Tom.A」；`ninghao`→`oc_144e761f…`（**即默认群本身**，故其账号看不出变化——别拿 ninghao 验收）。
+
+- [ ] 86.26 **私聊 `/comment` 审批卡回私聊（本投诉的正面验收）** — 工程师大白**私聊** Bot 发 `/comment <昵称>`（tom 组账号，如 Dennis Scott）：「待审核评论」卡 MUST 出现在**该私聊里**，MUST NOT 落默认群「AI运营」、MUST NOT 落 Tom.A。
+- [ ] 86.27 **私聊 `/comment` 终态卡与审批卡同投私聊（销 86.18；防「两卡两群」复发）** — 同一条 `/comment` 跑到终态：**结果卡与上面那张审批卡在同一个私聊里**，MUST NOT 一张私聊一张团队群。（此前两卡走两段不同代码、两种兜底，正是分投两群的机制根因）
+- [ ] 86.28 **自动化评论审批卡进团队群（本投诉的第二半）** — tom 组账号由**排期 / 自然浏览闭环 / FB 覆盖模式**产出的「待审核评论」卡（无命令来源会话）：MUST 进 **Tom.A**（`oc_1c268549…`），MUST NOT 落默认群。
+- [ ] 86.29 **自动 / 排期发帖审批卡进团队群（发帖侧镜像缺口）** — tom 组账号的自动 / 排期发帖走到人审：**发布审批卡进 Tom.A**，MUST NOT 落默认群。（cloud 日志 `审批卡已发 source=account_scope chat=oc_1c268549…` 佐证；`source` 标的是解析路径、落点以 `chat=` 为准）
+- [ ] 86.30 **未绑团队账号仍落默认群、绝不丢卡（回落回归 · 最高价值）** — 一个**无 `group_label`** 或团队键未命中 `group_route` 的账号触发评论 / 发帖人审：卡 MUST 仍出现在默认群，MUST NOT 静默消失。cloud 日志应有 config-gap 一行。**这是本 change 回归风险最集中处**——三档全落空时若解析出空串，卡会无声蒸发。
+- [ ] 86.31 **群里下命令回该群（来源会话＝群）** — 在**管理群**发 `/comment <昵称>`：审批卡 + 终态卡都回**该群**，MUST NOT 因账号属 tom 而被改投 Tom.A（来源会话优先于团队路由）。
+- [ ] 86.32 **带账号的运维告警进团队群（策略变更的直接后果，需运营确认可接受）** — tom 组账号触发验证码告警 / 发布下发段离线回待审 / 熔断开启：这些卡现在**进 Tom.A 而非默认群**。请运营确认这是想要的——**这是本次策略变更影响面最广的一项**，管理群将不再是运维告警的汇总位（无账号的握手 config-error 仍落默认群）。
+- [ ] 86.33 **审批可点性（跨会话回调回归）** — 在私聊里点 86.26 那张卡的「通过」：授权 MUST 真生效、评论真发出。（回调只认 requestId、不看会话，理论上零风险；但这是「卡搬家」后唯一会让人审彻底失灵的失败模式，必须实点一次）
+
+## 簇 91
+
+**前置环境**：tom 分组测试号（工程师大白 / Tmax）+ 一个能真实触发 FB 频率限流的场景（连续评论 / 连续发帖直到平台弹限流窗）；从 edge master（含 `26ef2cb`）起 headful 客户端连 dev（`ws://121.89.85.150:8787`，cloud master `8944f75` 已部署）。**共享环境同簇 82 / 88 / 90（FB feed / 评论真机批）**，建议同一次真机 session 合验。
+
+> **`fb-throttle-popup-zh-frequency-copy`（2026-07-17，edge `26ef2cb` + cloud `8944f75`，已部署 dev）**：FB 发帖 / 评论后偶发中文弹窗「为让社群免受垃圾信息打扰，我们限制了你发帖、评论或执行其他操作的频率。你可以稍后再试。」此前**对系统全静默**——账号已被平台限流，云端风控态仍停 `normal` 继续按原节奏发，零告警零 alerts 记录。两处断点已一起修：① 词库只认「封锁 / 不可用」框架、不认「频率」框架；② 证据文本与判据文本不同源（分类读整页 innerText，上报却带遮罩快照某 DOM 元素的 textContent，而 FB 标准限流弹窗必然落空候选筛选 → 证据为空 → 云端「无文案不臆断限流」返否定 → 只降速不刹车）。
+>
+> **词条字面尚未真机坐实（本簇最高价值项）**：用户文案来自**截图转录**，页面实际 `innerText` 的标点形态（全 / 半角）与用词（社群 / 社区）未验。词条已刻意避开这两处方言面（不含标点、不含「社群/社区」、「你/您」两版并列），但**「发帖」二字是否与页面逐字一致仍未验**——若 FB 实际用「发布」/「发文」，`我们限制了你发帖` 两条会空转，届时只剩 `执行其他操作的频率` 一条兜底。
+>
+> **失败方向是安全的**：词条不命中 = 回落到今天的静默行为（现状），不会误伤；**真正要防的是反向**——误报一次即 `restricted`、钉住恢复窗且**不自动回滚**、只能人工恢复。故 91.2 的否定验收与 91.1 同等重要。
+
+- [ ] 91.1 **真弹窗逐字取证 + 词条命中（本簇的钉）** — 真机触发限流弹窗后，用 CDP 抓 `document.body.innerText` **逐字记录原文**（存进本条目），比对三条词条 `我们限制了你发帖` / `我们限制了您发帖` / `执行其他操作的频率` 是否真命中。**若「发帖」与页面用词不符，须按真实原文改词条并两仓同步**（两侧单测各锁一份集合，改一侧另一侧必失败）。
+- [ ] 91.2 **正常页面不误报（否定验收，与 91.1 同等重要）** — 浏览 FB 群规则页 / 隐私设置页 / 通知中心（这些页面遍布「限制」「频率」字样），账号风控态 MUST 维持 `normal`，MUST NOT 出现 `fb_throttle` 告警。**误报代价 = 该号停摆至恢复窗结束且只能人工恢复。**
+- [ ] 91.3 **候选为空假设确认（设计前提验证）** — 限流弹窗弹出时，确认云端收到的 `risk.captcha_detected` 里 `overlay.candidates` 是否真为空、而 `overlay.text` 因回填**非空**。若真机发现候选**并非**为空（弹窗恰好命中某分支），回填降级为无害兜底、change 仍成立，但需在此记录实际命中的分支。
+- [ ] 91.4 **账号真进 restricted 而非仅 warned（本 change 的疗效判据）** — 限流命中后查该账号风控态：MUST 为 `restricted`（互动配额清零只留浏览），MUST NOT 停在 `warned`（×0.7 降速）。**这一项直接验证 GAP #2 是否真修好**——只补词库不修证据洞的话，这里会停在 `warned`。
+- [ ] 91.5 **告警 P0 + 独立类型 + 路由正确** — 飞书告警 MUST 为 **P0**、标题「Facebook 限流阻断」，MUST NOT 是 P1「未知阻断弹窗」；面板 `GET /api/alerts` 里该条 `type` MUST 为 `fb_throttle`（可过滤）。路由按统一口径：tom 组账号 → Tom.A（`oc_1c268549…`）。
+- [ ] 91.6 **冷却不跨类型吞没（真飞书验收）** — 同一 edge 10 分钟内先触发一次验证码告警、再触发限流：限流卡 MUST 照常发出且 `alerts` 表 MUST 落一行。（此前按 edge 不分类型冷却，且落库在冷却闸之后 → 卡与记录一起被吞）
+- [ ] 91.7 **评论回执诚实性未回归（红线双向）** — 限流下的评论回执 MUST 仍是「确认不了」（`verification_ambiguous`），MUST NOT 因发了告警就算成功；**也 MUST NOT** 因看到限流弹窗把已被服务器确认的评论改判失败。
+
+## 簇 92
+
+**前置环境**：真实 AdsPower 桌面客户端（**三条均需自出安装包** —— 按 CLAUDE.md §6 打包默认不做，故三者均已 land 但未到运营机）。三条来源不同、可分头跑，聚在一簇是因为共享「本机跑 Electron 客户端 + 真 AdsPower」这一套环境。登记于 2026-07-17（归档 `use-preprovisioned-adspower-group` / `facebook-mandatory-recruitment-interaction` / `wechat-channels-client-self-service` 时解耦）。
+
+> **`use-preprovisioned-adspower-group`（edge master `c86bd94`，纯 Electron 桌面源码、无云端面、未打包）**：客户端不再自建 AdsPower 分组，改用运营预置的固定分组 `aidcp`；写 allowlist 里的 `group/create` 已移除。**运营前置条件（重要）**：每台运营机必须**已经**预置好名为 `aidcp` 的分组——本 change 有意砍掉了客户端自愈，缺分组的机器会**直接失去建环境能力**直到运营补建。桩测覆盖到 46/46，但「真 AdsPower 上分组落对没落对」桩验不了。
+
+- [ ] 92.1 **真机建环境落进预置分组** — 对真实 AdsPower runtime 建一个环境，确认它落进运营预置的、名字逐字为 `aidcp` 的分组。
+- [ ] 92.2 **缺分组时硬失败且报得动** — 把 `aidcp` 分组改名 / 删除后建环境：MUST 以可执行的错误文案硬失败（告诉运营去预置分组），**MUST NOT** 自建一个兜底分组把问题掩盖过去。
+- [ ] 92.3 **缓存分组 id 失效后只重解析一次** — 分组被删后重建（同名、新 id）：客户端 MUST 重新解析一次拿到新 id，MUST NOT 造一个替代分组、MUST NOT 无界重试。
+
+> **`facebook-mandatory-recruitment-interaction`（cloud `1848506` / `6a609ff` / `dea7cb0`，已部署 dev 三次）**：招工帖强制互动。**本 change 诚实声明：部署后从未触发过一条真实公开评论**（当时账号处于 `user_pause`），即代码路径在真机上一次都没走完过。**共享 FB 真机环境同簇 82 / 88 / 90 / 91**，建议同一次 session 合验。
+
+- [ ] 92.4 **真发出第一条强制互动评论** — 解除账号暂停后跑通一条端到端：招工帖命中 → 强制互动判定 → 评论真的发出且被服务器确认。**这是该 change 迄今零真机证据的唯一补齐路径。**
+- [ ] 92.5 **不误伤非招工帖** — 普通帖 MUST NOT 被强制互动逻辑命中（否定验收）。
+
+> **`wechat-channels-client-self-service`（cloud `47e87c2` / edge `5ce88ae` / console `340d93f`，已部署 dev；Edge 侧未打包）**：视频号客户自助互动配置。Edge 的互动设置卡 / 角标 / 通知全未打安装包；Cloud 下发真态与 Console 初始化未经真账号验收。
+
+- [ ] 92.6 **客户端内互动设置三层真态** — 打包后在客户端内改互动读取开关，确认 Cloud 真收到、真下发，且「未开启」与「确实无消息」两种空态在 UI 上可区分（红线：不得混为一谈）。
+- [ ] 92.7 **回复配置缺失走显式安全初始化** — Console 上呈现「缺配置」而非静默给默认值；经显式初始化后才可用。

@@ -38,6 +38,8 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 ### Requirement: 叙述式活动流取代原始日志作为主信息面
 主界面 SHALL 以叙述式活动流为主信息面：每条为一句人话 + 相对时间戳、最新在上、带「刚刚更新 · N 秒前」新鲜度走字；原始日志 SHALL 收进「开发者详情」折叠区。活动流条目 MUST 源自真实核心事件，MUST NOT 编造或美化未发生的动作。
 
+活动流 SHALL 覆盖**账号在该平台上真实做过的写动作**，MUST NOT 因某类动作由内部委托路径执行而使其对运营不可见。一个动作**做了但不显示**与**没做**在客户端上 MUST 可区分：凡执行器已对该动作作出终局判断（成功 / 待第三方批准 / 结构性失败），活动流 MUST 如实呈现该判断。
+
 #### Scenario: 核心事件映射为人话条目
 - **WHEN** 核心进程产生已映射的动作日志（如点赞成功 / 提取内容 / 评论发布成功）
 - **THEN** 活动流顶部新增一条对应的人话句子并带时间戳，今日计数同步递增
@@ -106,6 +108,8 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 ### Requirement: UI 事件解析结构化优先、字符串兜底且状态形状兼容
 主进程 SHALL 经独立可单测模块解析核心输出为带类型 UI 事件：`[ui-event] {json}` 结构化行优先采用，既有中文日志行经映射表兜底；status 对象 MUST 保持既有字段形状向后兼容（新增 presence / publish 字段不删旧字段），既有计数递增行为不变。
 
+中文日志兜底映射表 SHALL 被视为**小红书浏览会话专属**：其规则措辞只由小红书会话与仅小红书生效的启动块打印，Facebook 会话 MUST NOT 依赖该表产出任何活动条目或在场感。Facebook 打印的日志 MUST NOT 误命中该表中语义不符的规则；当某条 Facebook 日志会命中一条描述小红书专属行为的规则（如把「就地读」误述为「顺路去作者主页看看」）时，该 Facebook 日志措辞 MUST 被改到不再命中，MUST NOT 保留一条会对运营说谎的叙述。
+
 #### Scenario: 结构化事件行直接采用
 - **WHEN** 核心输出带 `[ui-event]` 前缀的合法 JSON 行
 - **THEN** 解析结果直接驱动活动流 / 在场感 / 发布卡，不再走字符串匹配
@@ -128,6 +132,11 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 - **WHEN** a Facebook `note.detail` has a readable author nickname and post body
 - **THEN** its desktop activity and presence text show bounded, whitespace-normalized author and leading-content excerpts
 - **AND** when either field is unavailable, the text MUST degrade to an honest generic description and MUST NOT show a permalink or raw note ID
+
+#### Scenario: Facebook 就地读的日志不得被叙述成跳转作者主页
+- **WHEN** Facebook 执行 `profile.open` 的就地读（不离开当前页）
+- **THEN** 该核心日志 MUST NOT 命中中文兜底表中描述「顺路去作者主页看看」的跳转规则
+- **AND** 客户端 MUST NOT 呈现任何声称已跳转作者主页的在场感文案
 
 ### Requirement: 客户端启动不自动开跑任务
 应用启动后 MUST NOT 自动启动自动运营任务；任务 SHALL 由用户经会话控制按钮手动启动。应用启动时 SHALL 做一次轻量预检：配置缺失则呈现待配置引导，配置齐备则如实呈现「就绪」。
@@ -908,3 +917,144 @@ Electron 主窗口 SHALL 使用一致的表面、边框、圆角、排版和颜�
 #### Scenario: 非成功点赞不生成成功摘要
 - **WHEN** Facebook 点赞处于 shadow、失败、已点赞、未找到目标或后置校验未确认状态
 - **THEN** 客户端 MUST NOT 生成点赞成功活动记录或本地点赞成功增量
+
+### Requirement: Facebook 写动作必须在客户端如实分档呈现
+
+客户端 SHALL 为 Facebook 的**评论、加群、搜索**产出结构化活动条目，且 MUST NOT 因这些动作由委托处理器（而非浏览会话主出口）执行而静默无声。叙述 MUST NOT 新增任何成功判定：客户端 SHALL 只叙述执行器**已经作出、且已回报云端**的判断，判据与回报云端的 `action.completed` 完全一致，客户端与云端 MUST NOT 就「某动作是否发生」给出互相矛盾的结论。
+
+四档 SHALL 互斥且穷尽：
+
+- **成功**——仅当执行器既有后置校验判成（评论经本人身份服务器确认、加群经成员信号或结构确认）。
+- **待第三方批准**——一手 DOM 观察到待审徽章或参与审批弹层。MUST 自成一档、MUST NOT 表述为已发布 / 已加入、MUST NOT 贡献任何计数。
+- **结构性失败**——结构上做不到（评论框没找到 / 没权限 / 没结果）。MUST 呈现人话原因，MUST NOT 直接吐机器码。
+- **未开始**——资源被占、被独占任务抢占、会话关闭中、能力不支持、只观察不点。MUST NOT 产条目，MUST NOT 计为失败。
+
+「未开始」的判定 SHALL 以**拒绝集**（列举不算数的原因）实现，MUST NOT 以白名单（列举算数的原因）实现——后者会使未来新增的失败原因静默消失。
+
+计数 SHALL 只在评论真成功时贡献一次本地兜底 `comments` 增量；加群与搜索 MUST NOT 贡献任何计数（二者在云端权威计数投影中均不存在对应字段）。
+
+活动条目的主语 SHALL 只取自一手数据（打进去的评论文本、现读到的群名、下发的搜索词），MUST NOT 展示 permalink 或原始 note ID；群名读取失败 MUST 回落通用文案，MUST NOT 用 URL 顶替。
+
+#### Scenario: 评论真成功
+- **WHEN** Facebook 评论经本人身份服务器确认落地（执行器回 `ok:true`）
+- **THEN** 活动流新增一条含评论文本有界摘要的「评论了」条目
+- **AND** 该条目贡献且只贡献一次本地 `comments` 兜底增量
+
+#### Scenario: 评论卡在群参与审批
+- **WHEN** 执行器观察到待审徽章或参与审批弹层，回 `ok:false, reason:'pending_group_approval'`
+- **THEN** 活动流新增一条明确表述「评论待管理员批准、还没显示出来」的条目
+- **AND** 该条目 MUST NOT 表述为已发布，MUST NOT 贡献任何计数
+
+#### Scenario: 评论框没找到
+- **WHEN** 执行器回 `ok:false, reason:'editor_not_found'`
+- **THEN** 活动流新增一条含人话原因的「评论没发出去」条目，MUST NOT 直接展示 `editor_not_found` 机器码
+
+#### Scenario: 被占用或被抢占不产条目
+- **WHEN** 命令因 `busy` / `preempted_by_task` / `session_closing` / `browse_disabled` / `capability_unsupported` 回非成功
+- **THEN** 活动流 MUST NOT 新增任何条目，且 MUST NOT 把该情形叙述为一次失败
+
+#### Scenario: 未知失败原因默认可见
+- **WHEN** 执行器回一个拒绝集之外、映射表未覆盖的新失败原因
+- **THEN** 活动流 MUST 仍产出一条回落通用文案的失败条目，MUST NOT 静默吞掉
+
+#### Scenario: 加群成功以云端同一证据闸为准
+- **WHEN** 加群回 `ok:true` 且 `clicked===true`
+- **THEN** 活动流新增一条含现读群名的「加入了小组」条目
+- **AND** 该判据 MUST 与云端 `interaction.occurred` 的加群闸一致
+
+#### Scenario: 加群待批准与需答问卷
+- **WHEN** 加群回 `pending` 或 `questionnaire_required`
+- **THEN** 活动流新增一条表述「等待管理员通过」或「需要回答入群问题、没有自动作答」的条目，MUST NOT 表述为已加入
+
+#### Scenario: 已是成员或只观察不产条目
+- **WHEN** 加群回 `already_member` 或 `observation_only`
+- **THEN** 活动流 MUST NOT 新增条目——二者均未发生一次真实加群动作
+
+#### Scenario: 搜索呈现容器与真实结果数
+- **WHEN** Facebook 定向搜索在某群内成功返回候选
+- **THEN** 活动流新增一条含现读群名、搜索词与真实候选数的条目
+- **AND** 该条目 MUST NOT 贡献任何计数
+
+#### Scenario: 搜索零结果与搜索失败可区分
+- **WHEN** 搜索成功执行但零候选，或搜索因结构性原因失败
+- **THEN** 前者 MUST 表述为「没有匹配的帖子」、后者 MUST 表述为搜索失败并给出人话原因，二者 MUST NOT 混为一谈
+
+### Requirement: 同一条开帖在两条路径上的叙述必须一致
+
+`note.open` 经浏览路径与经评论路径（按 permalink 开帖）SHALL 产出**同一套**「读」叙述与同一次本地浏览兜底增量，MUST NOT 因执行路径不同而一路可见、一路隐形。
+
+当评论路径开帖成功读到内容、但评论框始终催不出来（回非成功以便云端换下一个候选）时，客户端 MUST NOT 产出「读失败」条目——帖子确实打开并读到了，该情形 SHALL 沉默，MUST NOT 把一次成功的阅读叙述成失败。
+
+#### Scenario: 评论路径开帖产出与浏览路径一致的读条目
+- **WHEN** 评论路径按 permalink 开帖并成功上报帖子详情
+- **THEN** 活动流新增一条与浏览路径措辞一致的「读」条目
+- **AND** 贡献且只贡献一次本地浏览兜底增量
+
+#### Scenario: 开帖成功但评论框没找到不叙述为读失败
+- **WHEN** 评论路径开帖成功、读到正文，但评论框未就绪，回 `editor_not_found`
+- **THEN** 活动流 MUST NOT 新增「读失败」条目
+
+### Requirement: 视频号工作区必须提供互动读取设置与三层真态
+
+InteractionWorkspace SHALL 在当前环境顶部提供“收取互动”总开关、评论收取开关和私信收取开关，并分别展示 Cloud stored 意图、Edge application status 与 effective read capability。切换 MUST 通过具名 IPC 调用客户 read-controls API、携 expectedVersion 并在回包 envKey 不匹配时丢弃；pending/冲突/失败期间 MUST 保持诚实 busy 或错误状态，MUST NOT 本地先改成已生效。
+
+#### Scenario: 总开关同时更新两个读取渠道
+- **WHEN** 客户在当前视频号环境打开“收取互动”
+- **THEN** 客户端提交两个 read=true 与当前 storedVersion，收到 Cloud 真态后刷新；写字段没有入口也没有请求字段
+
+#### Scenario: Cloud 已保存但 Edge 尚未应用
+- **WHEN** stored read 已开启而 applicationStatus=pending
+- **THEN** 页面显示“已保存，等待本机应用”，MUST NOT 显示“同步正常”
+
+#### Scenario: Edge 已应用但平台读取能力不可用
+- **WHEN** stored/applied 均就绪但 commentsRead 或 dmRead effective capability=false
+- **THEN** 对应渠道显示“平台能力未就绪”并给出登录/probe 处理提示，另一渠道 MAY 独立正常
+
+### Requirement: 互动空态必须区分未开启与确实无消息
+
+页面 SHALL 只有在对应 read stored=true、applicationStatus=applied、effective capability=true 且存在成功数据时间时显示“当前没有评论互动/私信会话”或“同步正常”。读取关闭、待应用、能力不可用、auth 阻断和 Cloud stale MUST 各自显示原因与可执行入口；局部刷新在读取关闭时 MUST NOT 冒充会带来新数据。
+
+#### Scenario: 两个读取开关都关闭
+- **WHEN** 当前账号 commentsReadEnabled=false 且 dmReadEnabled=false
+- **THEN** 顶部显示“互动收取已关闭”，空态引导开启收取，MUST NOT 显示“评论/私信同步正常”
+
+#### Scenario: 已启用渠道真实空结果
+- **WHEN** 对应渠道三层门禁均通过且最近同步成功但 items 为空
+- **THEN** 页面才显示该渠道当前没有互动，并保留数据时间
+
+### Requirement: 非平台发送动作不得被发送 capability 静默拦截
+
+renderer SHALL 将通用可写门禁与 channel send capability 分离。保存最终文字、重新生成、忽略、转人工和批准 MUST NOT 仅因 commentsReply/dmSendText=false 而被本地拦截；只有“发送回复”按钮 SHALL 在对应发送 capability=false 时禁用。任何禁用动作 MUST 显示可读原因，handler 与按钮状态 MUST 一致，MUST NOT 出现看似可点但点击无反应。
+
+#### Scenario: 只读账号仍可整理收件箱
+- **WHEN** 评论读取可用但 commentsReply=false
+- **THEN** 客户仍可忽略或转人工，并可在有有效 published config 时编辑/重新生成/批准；发送回复明确禁用并解释原因
+
+#### Scenario: auth 或 Cloud stale 继续阻断所有修改
+- **WHEN** auth 非 active 或当前数据为 stale
+- **THEN** 草稿与队列修改仍全部禁用并显示对应阻断原因
+
+### Requirement: 回复配置缺失必须有可达引导
+
+工作区 SHALL 展示 replyConfig 的 missing/draft_only/published 真态。missing 或 draft_only 时 SHALL 保留历史收件箱，显示“回复设置”入口及管理后台准确路径，依赖 published 配置的动作禁用；published 时显示版本。客户端 MUST NOT 自行构造默认模板、发布配置或调用 internal API。
+
+#### Scenario: 配置缺失时从空错误变为可处理引导
+- **WHEN** replyConfig.status=missing
+- **THEN** 页面说明“先在管理后台的账号-回复设置初始化并发布”，提供可达说明入口，收取开关仍可独立使用
+
+### Requirement: 新互动必须有 env-scoped 未读标记与去重通知
+
+客户端 SHALL 使用 customer API 的 `unread` 字段渲染列表未读标记并更新当前环境角标。首次成功加载 SHALL 只建立基线，不为历史项弹通知；后续加载发现新的 unread messageId 时 SHALL 通过具名 IPC 发一次系统通知并按 envKey/messageId 去重。切换环境 MUST NOT 串用 seen 集合或由迟到回包更新另一环境角标。
+
+#### Scenario: 首次打开已有历史未读不刷屏
+- **WHEN** 客户首次进入环境且列表含多条 unread=true 历史项
+- **THEN** 列表与角标显示未读，但不弹系统通知
+
+#### Scenario: 后续收到一条新评论只通知一次
+- **WHEN** 同一环境后续刷新首次出现新的 unread messageId，之后多次返回同一项
+- **THEN** 系统通知恰好一次且环境角标保持真实计数
+
+#### Scenario: 环境 A 的迟到响应不更新环境 B
+- **WHEN** 用户从 A 切到 B 后 A 的互动列表响应才返回
+- **THEN** B 的列表、角标和系统通知均不使用 A 的数据
+

@@ -1,0 +1,45 @@
+## 1. Structured persona rule
+
+- [x] 1.1 Add typed `mandatory_interactions` soul fields plus strict loader validation for bounded rule count, unique ids, action/approval enums, comment requirements, and zero-config compatibility.
+- [x] 1.2 Preserve valid mandatory rules in deterministic soul serialization and add loader/serializer/persona-store tests for valid, invalid, and round-trip cases.
+
+## 2. Match once and propagate causally
+
+- [x] 2.1 Make `ContentEvaluator` prioritize possible mandatory matches and make `ContentCuratorRole` confirm the full-detail match, reject unknown rule ids, and preserve global brand safety.
+- [x] 2.2 Add typed mandatory context to `quality.pass`, reading, interaction, and comment payloads; propagate it end-to-end without shared-set ordering dependencies.
+
+## 3. Deterministic like and comment behavior
+
+- [x] 3.1 Make `InteractionAppraiserRole` deterministically emit mandatory like without ordinary LLM/session-budget filtering; make dispatcher skip cooldown only for the matched action while retaining `RiskController` and receipt-based accounting.
+- [x] 3.2 Make `CommentAppraiser` bypass ordinary comment budget/daily pre-gate/cooldown/popularity/LLM only for matched mandatory comment rules.
+- [x] 3.3 Make `CommentComposer` inject mandatory guidance, retry once on decline/empty/oversize, preserve no-template honesty, and propagate context through de-AI cleanup.
+- [x] 3.4 Add explicit mandatory `auto_approve` handling to `CommentApprovalGate`: send a readable notification first, fail closed on notification failure, and keep ordinary/XHS review behavior unchanged.
+
+## 4. Validation and delivery
+
+- [x] 4.1 Add focused unit/integration tests for low-like forced like+comment, soft-gate bypass, hard-risk preservation, notification-first auto-approval, failure honesty, and no-rule zero regression.
+- [x] 4.2 Run cloud acceptance tests, full tests, and typecheck; run `openspec validate facebook-mandatory-recruitment-interaction --strict`.
+  <!-- Validation 2026-07-15: acceptance 54 passed / 1 gated skip; full 2222 passed / 3 skipped; typecheck passed; OpenSpec strict passed. -->
+- [x] 4.3 Commit and push the cloud branch, land it to clean `aidcp-cloud/master`, re-run proportional validation, then deploy `dev` through the documented backup/restart/health sequence.
+  <!-- Cloud 1848506: pushed feature branch, fast-forward landed origin/master, and the land helper re-ran acceptance/full/typecheck successfully. Deployed the clean committed snapshot to dev after scripts/deploy-target dev --check; backups: /opt/aidcp/cloud.bak.20260715-201622.tar.gz and /opt/aidcp/cloud/.env.bak.20260715-201622. aidcp-cloud active with NRestarts=0, ports 8787/8090 listening, /api/version 200, Feishu WS ready, PostgreSQL select 1 passed; unrelated isales units remained active. -->
+- [x] 4.4 Update Tianxing Bai's dev persona to a structured Vietnam-recruitment `like + comment` auto-approved rule; verify API readback, live prompt visibility, service health, and honest runtime observation (or record pending real-post observation without claiming success).
+  <!-- Dev persona audit 2026-07-15: Facebook account 61591753702668 (nickname Tianxing Bai) reads back mandatory rule vietnam-recruitment with like=true, comment=true, commentApproval=auto_approve. Content evaluator, curator, and interaction-appraiser prompt previews include the structured rule. Account-specific Feishu route resolves to the AI运营 chat and is present in bot membership. Edge logs confirm browse mode=on, but environment ads-k1ei3dbi is currently stopped by user_pause; no post-deploy public comment was triggered or claimed. The rule takes effect when the operator resumes the account. -->
+- [x] 4.5 Defer mandatory `comment.appraised` to a microtask so same-post mandatory like reaches the edge queue before `commentInflight`; add stable `comment_inflight` suppression logging.
+  <!-- Implemented in aidcp-cloud isolated worktree: mandatory comment pinning now enters on the next microtask, after the current interaction event has dispatched like; comment-inflight suppression logs action/note/account with a stable reason. -->
+- [x] 4.6 Add an integrated regression with real note data and `actions=[like,comment]` that fails on the production ordering bug, proves like dispatch precedes the hold, and keeps hard-risk behavior unchanged.
+  <!-- Regression first reproduced 0 like commands on the unpatched implementation, then passed after the fix. Focused mandatory/comment/dispatcher/platform suite: 65 passed; typecheck passed. -->
+  <!-- Cloud 6a609ff: acceptance 54/54 passed; full 2291 passed / 5 environment-gated skips; typecheck passed. Fast-forward landed origin/master and deployed the clean git archive to dev after checksum dry-run showed only the two runtime files plus the regression test. Backup: /opt/aidcp/cloud.bak.20260716-182848.tar.gz and /opt/aidcp/cloud/.env.bak.20260716-182848. Health: active, NRestarts=0, 8787/8090 listening, /api/version 200, PostgreSQL select 1, Feishu WS ready. Tianxing Bai account 61591753702668 was restored through the hot-load API to vietnam-recruitment actions=[like,comment], comment_approval=auto_approve; no real post interaction was manually triggered or claimed. -->
+- [x] 4.7 Update proposal/design/comment-interaction delta for reasoned pre-compose hard-risk preflight, neutral pre-authorization wording, and request-correlated terminal outcomes (`confirmed|pending|failed|unknown`).
+  <!-- 2026-07-16 live evidence: 35 mandatory notices = 23 final-risk blocks + 1 migration failure + 11 edge comment commands; only 10 platform-confirmed interaction_feed rows, with one command losing its receipt on disconnect. Contract updated before code. -->
+- [x] 4.8 Add mandatory comment hard-risk preflight before composer/notice using the controller's explain reason; preserve the final risk gate and same-post like-first ordering.
+  <!-- Implemented with the production RiskController.explain source before composer; the final dispatcher gate remains, and denied comment preflight is deferred so same-post mandatory like dispatches first. -->
+- [x] 4.9 Change the mandatory auto-approve card to neutral pre-authorization semantics and thread its requestId/context through dispatch.
+  <!-- The initial card is now yellow “pre-authorized, awaiting platform execution”; requestId plus readable account/target context travels on comment.approved into delivery tracking. -->
+- [x] 4.10 Wire one deduplicated mandatory terminal outcome port across final-risk rejection, migration/dispatch suppression, navigation failure, edge success/failure/pending, and disconnect/session-end/receipt-timeout unknown.
+  <!-- Terminal states are requestId-deduplicated: only a real edge ok receipt is confirmed; group approval is pending; known blocks/failures are failed; disconnect, session end, ambiguous receipt, preemption, and 120s timeout are unknown. -->
+- [x] 4.11 Add focused regressions for no-compose/no-card preflight rejection, neutral initial card, all terminal buckets, exactly-once notification, and pending comment disconnect/timeout honesty.
+  <!-- Focused suite: 29 passed. Acceptance: 54 passed / 1 gated skip. Full: 2302 passed / 5 environment-gated skips. Typecheck passed. -->
+- [x] 4.12 Run focused, acceptance, full tests and typecheck; commit/push, land to clean `aidcp-cloud/master`, deploy `dev`, restore/read back the audited `like + comment` persona rule, and verify health plus honest counters/logs.
+  <!-- Cloud dea7cb0: focused 29 passed; acceptance 54 passed / 1 gated skip; full 2302 passed / 5 environment-gated skips; typecheck passed. The land helper re-ran acceptance/full/typecheck, fast-forward landed and pushed aidcp-cloud/master. Deployed the clean dea7cb0 git archive to dev after scripts/deploy-target dev --check; checksum manifests matched. Backups: /opt/aidcp/cloud.bak.20260716-184936.tar.gz and /opt/aidcp/cloud/.env.bak.20260716-184936. Health: aidcp-cloud active with NRestarts=0, ports 8787/8090 listening, /api/version healthy, PostgreSQL select 1 passed, Feishu WS ready, and unrelated isales units remained active. Tianxing Bai account 61591753702668 reads back risk=normal/aggressive and vietnam-recruitment actions=[like,comment], comment_approval=auto_approve. No real public comment was manually triggered or claimed; platform-effect validation remains bounded to automated receipt-path regressions and live runtime/config health. -->
+- [x] 4.13 Record cloud/control commits, validation, deploy target/backup/health, persona audit, and any deviation in this file; strictly validate the completed change.
+  <!-- Closeout 2026-07-16: cloud implementation commit dea7cb0; control contract/progress commit b00269d. OpenSpec strict validation passed after all tasks were completed. Deploy target was dev; backup, checksum, service/port/API/DB/Feishu/isales health and the Tianxing Bai persona readback are recorded under 4.12. No contract deviation. Deliberate validation boundary: no live public comment was triggered, so real-post observation is not claimed. -->

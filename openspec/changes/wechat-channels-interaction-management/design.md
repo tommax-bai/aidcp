@@ -185,6 +185,10 @@ Cloud 默认保留评论正文 180 天、DM 正文 90 天、无正文审计元�
 
 `wechat_channels` 环境选择后渲染 InteractionWorkspace；标题栏和左侧环境栏保持既有布局，不新增永久第二侧栏、不显示 browse/like/collect 等零 KPI。renderer 只经具名 preload IPC → Electron main → customer-auth API；无任意 URL fetch、JWT/Cookie 入口。环境切换取消请求并校验响应 `envKey`，旧响应不得覆盖新环境。浏览器 closed 是 active 的正常副状态；reauth/challenge 才禁写。ambiguous 显示“待核验”，HTTP accepted/queued 不显示绿色成功。
 
+右侧 workspace 必须继续提供当前环境的显式生命周期控制，避免替换旧 workspace 时连同唯一的单环境启动入口一起隐藏。控件复用现有 Electron 生命周期 IPC，并与 XHS 当前状态矩阵和判定优先级一致：会话暂停时优先同时显示“恢复”和独立的“关闭”；其余核心停止或异常态只显示“启动”；其余启动中或运行态只显示“暂停”。“暂停”必须保留当前浏览器/会话，“关闭”只允许在暂停态显式执行；关闭完成后以主进程回传真态回到“启动”。所有调用始终携当前 `envKey`，不得触发 fleet 全部启动、其他环境生命周期、重新登录、清除凭证或 offboard。
+
+“开发者详情”不是 XHS 业务内容，而是设置开关控制的共享诊断面。它必须位于 legacy/interaction 两个右侧 workspace 的切换边界之外：默认和开关持久化语义不变；开关启用后，无论当前环境是 XHS、Facebook 还是视频号，都显示当前选中环境的同一份原始日志，环境切换仍按既有日志分桶防串号。
+
 ## Risks / Trade-offs
 
 - [私有接口字段、端点或平台条款变化] → 每能力独立 flag、schema probe、TLS 校验和 `WECHAT_SCHEMA_CHANGED` 熔断；默认关闭写能力。

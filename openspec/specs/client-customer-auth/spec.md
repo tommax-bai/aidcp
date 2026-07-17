@@ -108,12 +108,47 @@ TBD - created by archiving change edge-client-customer-auth. Update Purpose afte
 
 ### Requirement: Auto-attribution of client-created environments
 
-当已登录客户在客户端创建/添加新环境时,系统 SHALL 以该客户令牌把新环境显式归属到该客户;归属后运营 MAY 在后台调整。未在登录态创建的环境 MUST NOT 被自动归属。
+当已登录客户在官方客户端内通过 Electron 主进程的程序化 `user/create` 流程**明确新建**环境时，系统 SHALL 在创建前签发绑定当前客户的短时一次性创建意图；主进程取得 AdsPower 返回的真实 envKey 后，Cloud SHALL 以该意图在同一事务内登记新环境并将其显式唯一归属到当前客户。Cloud 完成归属后，客户端 MUST 重新读取 `/my-environments`；只有该权威读已包含新 envKey，主进程才可把环境加入并落盘运行花名册。加入花名册 MUST NOT 自动启动环境。
 
-#### Scenario: 登录态新建环境自动归属
+该能力只适用于本次程序化新建结果。普通客户请求、renderer、手填分身 ID、“加入已有环境”列表或旧 `POST /environments` MUST NOT 通过提交任意 envKey 创建、替换或恢复 ownership；已登记或已归属环境 MUST NOT 借创建完成端点被认领或转移。未在有效登录态创建的环境 MUST NOT 被自动归属。
 
-- **WHEN** 客户 A 在登录态下新建一个环境
-- **THEN** 该环境被显式登记为归属 A,并立即出现在 A 的 `/my-environments`
+创建意图 SHALL 短时过期、一次性且绑定客户；proof MUST 高熵、只回显一次并只以哈希落库。完成写 SHALL 幂等：同一意图与同一 envKey 重试返回相同归属真态，同一意图用于不同 envKey MUST 被拒绝。任一归属失败或权威回读不含该 envKey 时，客户端 MUST 如实说明“本机已创建但未完成分配”，MUST NOT 乐观加入花名册。
+
+#### Scenario: 登录态程序化新建环境自动归属并入册
+- **WHEN** 客户 A 在有效登录态下通过客户端“新建环境”触发程序化建号，创建意图有效，AdsPower 返回一个尚未登记的 envKey，Cloud 完成事务写且 `/my-environments` 回读包含该 envKey
+- **THEN** 该环境被登记并唯一归属 A，主进程把它加入并落盘运行花名册，环境栏立即出现离线行，且环境不被自动启动
+
+#### Scenario: intent 准备失败时不制造本地孤儿
+- **WHEN** 客户鉴权启用但客户端在调用 AdsPower `user/create` 前无法取得有效创建意图
+- **THEN** 客户端诚实拒绝本次创建并说明云端归属准备失败，MUST NOT 调用本地 `user/create`
+
+#### Scenario: 本地已创建但权威归属未确认时不入册
+- **WHEN** AdsPower 已返回新 envKey，但创建完成请求失败、意图过期、Cloud 拒绝或 `/my-environments` 权威回读不含该 envKey
+- **THEN** 客户端标明环境仅在本机创建、未完成分配并给出管理员兜底，MUST NOT 把它加入运行花名册或显示为可启动环境
+
+#### Scenario: 已有环境和任意 envKey 仍不能自认领
+- **WHEN** 客户通过旧 `POST /environments`、手填 ID、“加入已有环境”或创建完成端点尝试认领一个已登记或已归属环境
+- **THEN** Cloud 拒绝请求且原 owner 不变，客户后续 `/my-environments` 不得因此出现该环境
+
+#### Scenario: 创建完成重试幂等且意图不可换目标
+- **WHEN** 同一客户用同一 intent + proof + envKey 重试创建完成，或把同一 intent 改用于另一个 envKey
+- **THEN** 前者返回同一成功归属真态且不重复插入，后者返回冲突且不得产生第二个 owner
+
+#### Scenario: 未配代理不阻止归属但不自动启动
+- **WHEN** 客户未配置代理即成功新建并完成权威归属
+- **THEN** 环境仍被加入花名册并如实提示未配代理，但保持离线，必须由用户显式启动
+
+#### Scenario: 自动入册后添加环境页面显示已加入
+- **WHEN** 主进程已将新环境落盘到运行花名册并返回 `rosterJoinedByMain=true`
+- **THEN** renderer 在刷新添加环境列表前重新读取主进程花名册，该环境行立即显示“已加入”，后续手动刷新或重开页面仍保持一致，且不得因此自动启动
+
+#### Scenario: 从未绑定的视频号新建环境可以安全删除
+- **WHEN** 当前客户删除一个由 completed provisioning intent 创建并归属、平台为视频号、且 Cloud 不存在互动账号绑定的环境
+- **THEN** Cloud 在同一事务撤销 active scope、记录来源受限的终态 offboard 与审计，Edge 只有读到 `tombstoned|purged` 后才物理删除本机环境，不得返回 `offboard_binding_missing` 或假称执行过密文清理
+
+#### Scenario: 非创建意图环境缺绑定仍然失败关闭
+- **WHEN** 管理员分配或存量视频号环境缺失互动账号绑定，且没有对应的 completed provisioning intent 证明其从未绑定
+- **THEN** Cloud 继续返回 `offboard_binding_missing` 并保留 active scope，本地客户端不得物理删除环境
 
 ### Requirement: Admin environment registry and multi-user assignment
 
@@ -239,4 +274,40 @@ TBD - created by archiving change edge-client-customer-auth. Update Purpose afte
 
 - **WHEN** 通知巡视引导流触发某环境「重检」
 - **THEN** 仍能经独立 IPC 重启该环境的运行内核(用于该环境账号重登后接上),不受设置「重新登录」按钮移除的影响
+
+### Requirement: 客户只能修改当前环境的互动读取开关
+
+customer-auth SHALL 提供 env-scoped `PUT /environments/:envKey/interactions/read-controls`。请求 MUST 只接受 `expectedVersion`、`commentsReadEnabled` 与 `dmReadEnabled`，并在同一 enabled-user、env ownership、account binding 权威范围内以 CAS 更新；账号写总闸、评论回复、私信发送、图片发送、自动发送和风险配置 MUST 保持原值且不可由客户请求体覆盖。成功后 SHALL 复用 runtime-control 下发链通知所属 Edge，并返回 stored/applied/effective 真态，MUST NOT 把 Cloud 保存成功显示成 Edge 已应用。
+
+#### Scenario: 客户开启两个读取渠道但不能开启写
+- **WHEN** 当前环境所有者以正确 expectedVersion 同时开启评论和私信收取
+- **THEN** Cloud 只更新两个 read 字段、递增版本并下发所属 Edge，所有 write 字段逐位保持原值
+
+#### Scenario: 客户请求夹带发送字段被拒绝
+- **WHEN** 客户请求体额外携带 commentsReplyEnabled、dmSendTextEnabled 或 writePaused
+- **THEN** customer-auth 返回校验失败且不修改任何 runtime control
+
+#### Scenario: 旧版本更新不覆盖管理员新配置
+- **WHEN** 管理员已更新 controls 版本而客户仍提交旧 expectedVersion
+- **THEN** customer-auth 返回版本冲突与当前版本，MUST NOT 用旧快照覆盖管理员修改
+
+### Requirement: 客户互动投影必须包含回复配置就绪状态
+
+interaction list/detail 与 read-controls 成功回包 SHALL 为当前 account/env 返回只读 `replyConfig` 投影，至少区分 `missing`、`draft_only`、`published` 并给出 current/draft/published version。该投影 MUST NOT 包含模板正文、规则条件、完整私信或 internal permission；查询失败 MUST 显示 unknown/fail-closed，不能伪造默认 published 配置。
+
+#### Scenario: 无发布配置时客户端得到明确阻断
+- **WHEN** 当前账号没有 config head 或只有未发布 draft
+- **THEN** 客户回包分别返回 missing 或 draft_only，客户端可保持收件箱可读并禁用依赖 published 配置的生成/发送流程
+
+#### Scenario: 已发布配置只暴露版本状态
+- **WHEN** 当前账号存在 immutable published 配置
+- **THEN** 客户回包返回 published 与版本号，不返回模板、规则、profile 或审计正文
+
+### Requirement: 客户读取自助不得打通 internal 配置域
+
+客户 JWT SHALL 继续不能访问 internal reply policy/template/rule/profile/preview/publish/audit 路径。客户侧读取开关 API MUST 使用独立 schema 与具名 renderer IPC，MUST NOT 接受任意 URL、internal token 或代理配置写入。
+
+#### Scenario: 客户 token 调用内部配置发布仍被拒绝
+- **WHEN** 客户使用有效 customer JWT 调用 internal reply-config/publish
+- **THEN** 请求按认证域隔离被拒，已发布版本和 runtime write controls 均不变化
 

@@ -16,7 +16,7 @@
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 多角色，`RoleName` 穷举现 43 项，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> 本 change 冻结后的 v2 目标为 **89 个消息类型**（既有 83 个 + reply recovery/offboarding 6 个），下表按职能分组列全。计数与表为人工维护，仍以两端 `protocol.ts` 的 `MessageType` 穷举、已注册 handler/routing 与 capability 协商为准。
+> 本 change 冻结后的 v2 目标为 **91 个消息类型**（既有 83 个 + reply recovery/offboarding 6 个 + runtime controls 1 个 + browser control 1 个），下表按职能分组列全。计数与表为人工维护，仍以两端 `protocol.ts` 的 `MessageType` 穷举、已注册 handler/routing 与 capability 协商为准。
 
 ## 1. 信封（Envelope）
 
@@ -177,7 +177,7 @@
 
 ### 2.8 视频号入站互动管理（v2 扩展）
 
-> 精确合同见 `docs/contracts/wechat-channels-interaction/v1/`。基础消息要求双方确认 `interaction_inbox_v1`；恢复与 offboard 消息还分别要求 `interaction_reply_recovery_v1`、`interaction_offboarding_v1`。
+> 精确合同见 `docs/contracts/wechat-channels-interaction/v1/`。基础消息要求双方确认 `interaction_inbox_v1`；恢复、offboard、账号开关与浏览器显隐消息还分别要求 `interaction_reply_recovery_v1`、`interaction_offboarding_v1`、`interaction_runtime_controls_v1`、`interaction_browser_control_v1`。
 
 | type | 方向 | 关联响应 | 用途 |
 | --- | --- | --- | --- |
@@ -191,6 +191,8 @@
 | `interaction.sync.request` | cloud → edge | 后续 `interaction.sync.batch` | 触发用户请求、恢复、定时或回查同步 |
 | `interaction.reply.send` | cloud → edge | `interaction.reply.result` | 下发带稳定幂等键的 text 回复指令 |
 | `interaction.auth.reopen` | cloud → edge | 后续 `interaction.auth.status` | 请求在原 Edge 打开所属登录/挑战现场 |
+| `interaction.browser.control` | cloud → edge | 后续 `interaction.auth.status` | active 会话打开可见浏览器或转回 API-only 后台；投递不等于已显隐 |
+| `interaction.runtime.controls` | cloud → edge | 后续 `interaction.auth.status` | 只向匹配账号下发单调版本的有效开关快照；投递不等于应用 |
 | `interaction.offboard.command` | cloud → edge | `interaction.offboard.result` | 撤权后停同步/写、drain、清 scope 密文并关 sidecar |
 | `interaction.offboard.result` | edge → cloud | `interaction.offboard.ack` | durable cleared/already_cleared/failed 结果，可重连补发 |
 | `interaction.offboard.ack` | cloud → edge | — | exact accepted/duplicate 后 Edge 才清 offboard outbox |
@@ -205,7 +207,7 @@
   "edgeId": "edge-01",        // string  边缘节点标识
   "platform": "xiaohongshu",  // string? 运行时平台标识；缺省按历史 xhs 兼容，cloud 会与 accounts.platform 校验
   "app": "xhs",               // string? 业务/站点标识
-  "capabilities": ["click", "input", "scroll", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1"], // string[]? 能力声明
+  "capabilities": ["click", "input", "scroll", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? 能力声明
   "accountId": "acc-01",      // string? 账号标识；多账号运行时要求真实账号，default 已退役
   "accountNickname": "小张测评", // string? 账号可读昵称；仅用于展示补充，不参与身份确立或路由
   "machineLabel": "win-aliyun-3", // string? 人类可读机器标签
@@ -213,15 +215,20 @@
 }
 ```
 
-`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge、Facebook edge 或视频号 edge 跨平台接管账号。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。三项 interaction capability 都是 optional；两个扩展 capability 依赖 `interaction_inbox_v1`，新 Edge 只有收到相应 `welcome.capabilities` 回显后才启用对应消息。回显 `interaction_offboarding_v1` 时，Cloud 还必须在 welcome 带当前 account 的 `interactionRecovery.offboardPending`；Edge 只有见到明确 false 才恢复 connector，缺失/查询失败/true 都保持停止。
+`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge、Facebook edge 或视频号 edge 跨平台接管账号。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。五项 interaction capability 都是 optional；四个扩展 capability 依赖 `interaction_inbox_v1`，新 Edge 只有收到相应 `welcome.capabilities` 回显后才启用对应消息。回显 `interaction_offboarding_v1` 时，Cloud 还必须在 welcome 带当前 account 的 `interactionRecovery.offboardPending`；回显 `interaction_runtime_controls_v1` 时必须带 `interactionRuntime`。任一查询失败都按 all-off/pending 处理，不能沿用别的账号或旧连接的能力。
 
 **`welcome`**（cloud → edge）
 ```jsonc
 {
   "sessionId": "sess-1",      // string  云端分配的会话 id
   "serverVersion": "0.1.0",   // string  服务端版本
-  "capabilities": ["interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1"], // string[]? Cloud 确认双方支持；旧端忽略
+  "capabilities": ["interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? Cloud 确认双方支持；旧端忽略
   "interactionRecovery": { "offboardPending": false }, // object? 协商 offboard 时必带；缺失/true=Edge 不恢复 connector
+  "interactionRuntime": { // object? 协商账号开关时必带；缺失=Edge 全能力关闭
+    "accountId": "acc-01", "envKey": "env-01", "version": 7,
+    "commentsReadEnabled": true, "commentsReplyEnabled": false,
+    "dmReadEnabled": true, "dmSendTextEnabled": false, "dmSendImageEnabled": false
+  },
   "pacing": {                 // object?  可选节奏快照（change pacing-floor-config-min-interval）；旧端忽略
     "tempo": 1.0,             //   number  风控档全局节奏乘子（normal=1.0/warned=1.3/restricted=1.6），边缘乘算
     "opFloorsMs": {           //   object  每类操作兜底 floor 默认区间（已含云端读出口 clamp 护栏、非零）；逐字段可缺、边缘逐项回落内置默认
@@ -929,12 +936,17 @@ first-writer-wins 审批信号。动作成功只表示审批决定已受理：`a
     "commentsRead": true, "commentsReply": false,
     "dmRead": true, "dmSendText": false, "dmSendImage": false
   },
+  "runtimeControlsVersion": 7,
   "identity": { "externalId": "finder-demo-001", "displayName": "示例视频号", "identityHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111" },
   "checkedAt": 1784044801000, "reasonCode": null
 }
 ```
 
-`active + closed` 是合法组合。capability 表示该账号此刻有效可用，不是 build 可能支持；身份错配、挑战、schema 漂移或开关关闭时必须降级且 fail closed。凭证、二维码和调试地址不得进入 payload。
+`active + closed` 是合法组合。capability 表示该账号此刻有效可用，不是 build 可能支持；`runtimeControlsVersion` 是 Edge 已接受的账号开关版本，未收到/未应用时为 `null`。身份错配、挑战、schema 漂移、scope/version 不匹配或开关关闭时必须降级且 fail closed。凭证、二维码和调试地址不得进入 payload。
+
+**`interaction.runtime.controls`**（cloud → edge）
+
+payload 与 `welcome.interactionRuntime` 相同。Cloud 只定向到 `accountId` 匹配且协商 `interaction_runtime_controls_v1` 的在线 Edge；保存成功但无在线目标时内部 API 返回 `edgeDelivery=deferred`，不得声称 Edge 已应用。Edge 断线先清快照，重连只接受 scope 完全匹配且版本不倒退的 welcome/在线更新，并用后续 `interaction.auth.status.runtimeControlsVersion` 回报已应用证据。
 
 **`interaction.sync.batch` / `interaction.sync.ack`**
 
@@ -1080,6 +1092,18 @@ Edge 必须在发送 result 前写入 durable outbox，只在 ack 为 `accepted|
 
 Edge 必须只打开该 env/account 所属 sidecar，并用后续 `interaction.auth.status` 报 `authenticating`、`active` 或挑战真态；不得把“已打开浏览器”当登录成功。
 
+**`interaction.browser.control`**（cloud → edge）
+
+```jsonc
+{
+  "requestId": "browser-control-001",
+  "envKey": "env_wc_demo", "accountId": "acct_wc_demo", "platform": "wechat_channels",
+  "action": "open", "requestedAt": 1784044845000
+}
+```
+
+该控制只服务于已经 `active` 的视频号环境：`open` 启动或保留所属 AdsPower sidecar，并尽力把页面带到前台；`close` 只关闭 sidecar、回到加密会话驱动的 API-only 后台，不删除会话，也不触发客户登出/offboard。Edge 必须校验 env/account/platform 精确匹配，并串行执行重复请求。HTTP/WS 投递成功只表示 accepted；客户端只有读回 `interaction.auth.status.browserState=open|closed` 后才能显示“已打开/已转入后台”。旧 Edge 或未协商 `interaction_browser_control_v1` 时 Cloud 必须 fail closed，不得假装已执行。
+
 ## 4. 典型时序
 
 ### 4.1 浏览会话闭环（v2 主路径：结构化上报 + 角色驱动）
@@ -1167,4 +1191,4 @@ cloud（Publish Agent）          edge                         飞书（云端 B
 - **坏帧**：`parseEnvelope` 返回 null → `error`（code=`bad_envelope`）。
 - **版本演进**：`v` 用于灰度；新增字段应保持向后兼容（旧端忽略未知字段）。v2 对 v1
   的全部消息保持兼容，新增消息类型旧端可安全忽略。
-- **视频号互动能力协商**：Edge 与 Cloud 都确认 `interaction_inbox_v1` 前不得发送基础 interaction 消息；恢复/offboard 类型还分别要求 `interaction_reply_recovery_v1`、`interaction_offboarding_v1`。新 Cloud 遇旧 Edge 不派扩展命令；新 Edge 遇旧 Cloud 可安全上报基础 result，但保留未获 ack 的 durable outbox。offboard capability 缺失时 Cloud 已撤权并停写，但任务必须保持 pending，不能提前 tombstone。未知 type 不得导致连接崩溃或重试风暴。
+- **视频号互动能力协商**：Edge 与 Cloud 都确认 `interaction_inbox_v1` 前不得发送基础 interaction 消息；恢复/offboard/账号开关/浏览器显隐类型还分别要求 `interaction_reply_recovery_v1`、`interaction_offboarding_v1`、`interaction_runtime_controls_v1`、`interaction_browser_control_v1`。旧 Edge 不收账号开关或浏览器控制推送；新 Edge 遇旧 Cloud 或 welcome 缺快照时保持全部互动能力关闭。offboard capability 缺失时 Cloud 已撤权并停写，但任务必须保持 pending，不能提前 tombstone。未知 type 不得导致连接崩溃或重试风暴。
