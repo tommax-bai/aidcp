@@ -70,7 +70,7 @@ Cloud 在完成连接账号、平台与环境 scope 校验后收到 `interaction
 
 ### Requirement: WS v2 互动扩展必须完整协商并原子接线
 
-系统 SHALL 在 WS v2 完整接线基础 inbox 七个类型，以及 `interaction.reply.result.ack`、`interaction.reply.reconcile`、`interaction.reply.reconcile.result`、`interaction.offboard.command`、`interaction.offboard.result`、`interaction.offboard.ack` 六个恢复/offboard 类型，使目标 `MessageType` 总数为 89。两份 protocol 定义、Cloud handler/mapping、Edge active-command routing、`docs/protocol.md` 与共享 schema/fixtures MUST 同步。基础能力用 `interaction_inbox_v1`，结果恢复用 `interaction_reply_recovery_v1`，offboard 用 `interaction_offboarding_v1`；Cloud 只回显双方支持的能力，扩展能力依赖基础能力。回显 offboard 能力时 welcome MUST 带 account-bound `interactionRecovery.offboardPending`，Edge 只有明确 false 才可恢复 connector。
+系统 SHALL 在 WS v2 完整接线基础 inbox 七个类型，以及 `interaction.reply.result.ack`、`interaction.reply.reconcile`、`interaction.reply.reconcile.result`、`interaction.offboard.command`、`interaction.offboard.result`、`interaction.offboard.ack` 六个恢复/offboard 类型，使目标 `MessageType` 总数为 91；该数字为人工维护、可能滞后，权威口径以 Cloud 与 Edge 两端 `protocol.ts` 的联合类型穷举为准。两份 protocol 定义、Cloud handler/mapping、Edge active-command routing、`docs/protocol.md` 与共享 schema/fixtures MUST 同步。基础能力用 `interaction_inbox_v1`，结果恢复用 `interaction_reply_recovery_v1`，offboard 用 `interaction_offboarding_v1`；Cloud 只回显双方支持的能力，扩展能力依赖基础能力。回显 offboard 能力时 welcome MUST 带 account-bound `interactionRecovery.offboardPending`，Edge 只有明确 false 才可恢复 connector。
 
 #### Scenario: 新 Cloud 不向旧 Edge 派 interaction 命令
 - **WHEN** Edge hello 不含 `interaction_inbox_v1`

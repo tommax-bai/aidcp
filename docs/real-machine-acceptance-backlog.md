@@ -1333,6 +1333,13 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 - [ ] 87.6 **真实解绑与延期清理** — 验环境解绑、客户终止、Edge 离线后重连三条路径：Cloud 先撤权/停派发，Edge drain 后清加密 session 并关闭 sidecar，重复/重启只确认一次，Cloud 收到 scope-matching ack 后 tombstone，并在配置期限内完成 scope purge；保留审计不得含正文。需保存真实的凭据删除与 purge 证据。
 - [ ] 87.7 **low-risk auto 仍需二次批准** — 只有 87.1–87.6 全部通过且用户再次明确批准，才给该测试账号开启 low-risk auto，用可删除测试消息验一次；否则状态必须写成「已实现、未真机开放验证」，全局开关、账号白名单和账号级暂停继续关闭。
 - [x] 87.8 **Edge 真机载体边界** — 已用 Edge master `d321042` 源码连接同一 AdsPower 登录态完成只读真机运行；没有构建或发布安装包，因此本项只证明源码载体，不代表桌面安装包已发布/验收。
+- [ ] 87.9 **暂停窗口与失败 job 重投（H6 / H9）** — 在真实验证码暂停窗口内制造排队积压：积压不得被烧成终态，暂停解除后 30 秒内自动重投并真正发出；再让一条回复 job 进入 `failed`，重新生成后必须能创建新 attempt 并真正再次发出，不得因旧幂等键 409 空转。
+- [ ] 87.10 **删除环境按账号撤权（H1 / H12）** — 运营先在后台为一个客户端从未连接过的视频号账号打开互动能力，再由客户删除该环境：后台该账号不得继续显示「允许读取」，登录态必须显示已停用；验收须确认命中真实账号，不能用缺失 `env_key` 时伪造账号或把零行更新当成功。
+- [ ] 87.11 **从未扫码环境的撤销与墓碑兑现（H1 / H12）** — 管理员撤销一个「已授予、从未扫码」环境的归属：撤销必须成功且互动能力当场关闭；随后该环境首次扫码登录时，墓碑须兑现为正式解绑，能力继续保持关闭，不得因迟到登录态重新打开。
+- [ ] 87.12 **定向同步时间与排序（H7）** — dev 打开视频号读取开关，对有历史评论的帖子点「重新同步评论」：收件箱会话必须保持平台原时间与排序位置，不得跳顶成「刚刚」；私信定向同步同样验一次。空私信页可只推进 checkpoint，不得编造线程时间。
+- [ ] 87.13 **存量未来时间污染诊断（H7）** — 用诊断查询列出 `last_message_at` 大于该线程 `max(platform_created_at)` 的可疑视频号线程，由运营对照真机判断是否人工修库。全局同步下平台会话更新时间可能合法领先于当前已翻页消息，禁止一刀切回填。
+- [ ] 87.14 **私信回复限额运营可读（M12）** — 用真实限额数据确认三档 `dm_reply` 行均显示中文「私信回复」，编辑弹窗标题正常且不含 `undefined`；同时用一个未来未知动作值确认原值可见、其余行不受影响。
+- [ ] 87.15 **全局旁路的真实配额放行（M10）** — 在 dev 为视频号账号开启全局旁路后，核对 `comment` 与 `dm_reply` 的真实配额均保持配置值且不为 0；不得把仅环境级 UI 的旁路误报成账号级 slow-start 放行。
 
 <!-- 87.1 partial evidence (2026-07-16): named-account auth became active, the browser closed, controls version 1 converged, and Cloud retained one accepted zero-item batch/cursor for each of comment and DM with no send attempts. Keep 87.1 open until a non-empty incremental sample and the real client-side same-account/cursor presentation are observed; 87.2 remains open for multi-page/restart/two-account isolation. -->
 
