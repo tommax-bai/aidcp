@@ -1475,3 +1475,54 @@ t=2906ms  '… 1 分钟 赞 回复'        按钮=4  opacity=1   ← 上墙（�
 - [ ] 93.7 **首页不再从灵感库底下冒出来** — 开着灵感库 / 稿件审核静置若干个状态心跳周期（非视频号账号）：首页 MUST 始终不可见。这是本次修的高危回归，桩已覆盖但真机需肉眼确认无闪烁。
 - [ ] 93.8 **稿件审核全页迁移无回归** — 主窗口全页审核：发布 / 取消 / 逐张删图 / 版本 CAS / 最后一张不可删 MUST 与旧抽屉一致；关闭 MUST 能回到来源页。
 - [ ] 93.9 **客户回包不含内部诊断（安全否定验收）** — 抓一次真实 create-post 回包：MUST NOT 出现 formGuess / visualAnalysis / 视觉模型名 / 厂商 id / cacheKey。（桩测已 grep 断言，真机再确认一次线上形状。）
+
+---
+
+## 簇 94
+
+**前置环境**（两条都是硬前置，缺一条会把验收引向错误结论）：
+
+- **A · 共库排他核对（最高优先，先做再点）**：dev 与 OL **共读写同一个 PG**（`docs/deployment-environments.md:62`）。
+  「新列默认 NULL 所以零回归」只证到了**部署那一刻**——2026-07-17 部署后已在 dev 真库实查确认：
+  列已自愈建出（`slow_start_since | timestamptz | nullable=YES`）、**17 个账号全为 NULL**。但只要验收账号
+  同时在 OL 跑，**dev 上点一次勾选就会让 OL 生产上的同一个号被夹到 FB D1 `view≤20`**。
+  → 验收账号必须与 OL 在跑账号显式排他，核对完再点。
+- **B · 客户端必须是烘焙包或显式配 `AIDCP_CLIENT_AUTH_URL`**：`main.cjs` 的 customer-auth 入口第一行是
+  `if (!clientAuthEnabled()) return … 503 '当前构建未启用 customer-auth API'`（现有运营装机 / dev 行为与从前完全一致）。
+  **不满足这条时勾选框必然 503**，而那读起来极像「provider 没现读」→ 会去改一个没坏的东西。
+
+**当前状态**：cloud `a80b9da` + `a303157` 已部署 dev（服务 active / 8787 + 8090 在监听 / 飞书长连接已建立 /
+PG 通 / isales 未被触碰）；edge `aeb235f` 已 land **但未出安装包** → **慢启动开关此刻对运营不可见**。
+Phase 0（云端）不依赖 UI，可先用 SQL 造态 + 后台仪表盘验（即 94.1）。登记于 2026-07-17（`account-level-slow-start`）。
+
+> **`account-level-slow-start`**：按账号 opt-in 的 7 天配额慢启动。起点 = 运营勾选那一刻（云端写下、
+> 100% 权威），**绝不用 `accounts.created_at`**（那是「第一次连上本云端库」——cookie 导入的三年老号会被算「第 1 天」）。
+> 桩测已覆盖同源同格 / 单调性 / 热加载现读 / 平台诚实 / 两路径不合成 / 全局停用闸 / 上海日对齐，
+> 且「点勾选框不触发展开」一条**已做变异验证**（移掉 stopPropagation 确实红）。下列几条**桩验不了**、必须真机。
+
+- [ ] 94.1 **不重启即生效（不依赖 UI，可先跑）** — dev 上直接 `UPDATE accounts SET slow_start_since=…`
+      **不重启服务**，看后台仪表盘 `effectiveQuotas().day`。⚠️ **注意**：raw SQL 改库**不刷内存镜像**
+      （镜像只在服务自己写入时更新）→ 这条只有经 PUT 路由或重启后才会变。**若要验 provider 现读真的绕过了
+      controller 缓存（Map 永不驱逐），必须走 94.2 的勾选路径**，不能用 raw SQL 判定。
+- [ ] 94.2 **勾选后仪表盘天数当场变、且不重启** — 经客户端勾选（前置 B 满足）→ `effectiveQuotas().day`
+      MUST 当场变。这是 provider 现读的**正面验证**：做错（构造期读入）时症状是「写库成功、HTTP 回 200、
+      行为纹丝不动到重启、且零日志」。
+- [ ] 94.3 **用 FB 号 + normal/aggressive 档验收** — 那里数字必变（FB D1 `view≤20` vs aggressive 300）。
+      **MUST NOT 用 XHS conservative 号验「数字变没变」**（见 94.4）。
+- [ ] 94.4 **XHS conservative 号另跑一条：验 `binding` 文案而非数字** — 该档位下 view/like/comment/publish
+      **逐位不变是预期、不是 bug**（80/20/3/1 vs 曲线 D5-7 的 120/20/3/1）。⚠️ **实测更正**：此场景
+      `binding` 是 **true** 而非原 tasks 假设的 false——collect 10→5 / follow 5→3 / comment_like 3→2 三项真收紧了。
+      → 真机看的是：徽章 MUST 显示「第 N/7 天」且 **MUST NOT** 宣称「正在压低配额」。
+      `binding=false` 的文案（「当前档位已更严，不额外限制」）需把某档位数字面板编辑得比曲线还严才能造出来。
+- [ ] 94.5 **第 7→8 天跨天 + 午夜对齐** — dev 上把 `since` 改到 7 天前造态：day 递增 MUST 与上海自然日
+      计数清零**同时发生**（起点写入时已对齐上海日起点）；第 8 天 MUST 显式显示「已完成（X 月 X 日起按正常档位执行）」，
+      **MUST NOT 静默消失**——上限是哪天放开的正是最该被告知的那一刻。
+- [ ] 94.6 **Windows @640 窄窗不破版** — 脚注行是块级、不与标题区争空间（风险低，但 jsdom 不做布局、
+      mac 上 winctl-pad=0 永远复现不了 → 必须在真 Windows 窄窗看一眼）。
+- [ ] 94.7 **平台未知造态** — 让某账号 `platformFor` 返 undefined（如新登记未回填）→ MUST `eligible=false`
+      + **不 clamp** + UI 如实说明「账号平台待确认」。**MUST NOT** 静默按小红书曲线跑（那会让 FB 号 D1
+      上限从 20 变成 50，差 2.5 倍、无日志无告警）。
+- [ ] 94.8 **边缘离线时开关禁用且如实说明** — 拔掉边缘连接 → 勾选框 MUST 禁用 + 「云端已断开，状态可能已过期」，
+      **MUST NOT** 显示成「已关闭」（断连时字段不会变缺省，只是停止更新）。PUT 此时 MUST 得到 409「该环境当前未连接」。
+- [ ] 94.9 **全局停用闸真能秒级止血** — 设 `AIDCP_SLOW_START_DISABLED=true` + 重启 → 所有账号级开关 MUST 全部失效、
+      一格不 clamp、UI MUST 显示 `globally_disabled`。这是 raw SQL 改库不刷镜像时的**唯一**秒级回滚手段。
