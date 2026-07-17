@@ -1,3 +1,15 @@
+## RENAMED Requirements
+
+<!-- 「专用分组」→「预置分组」是本 change 的用意本身（分组由运营预置、客户端不再自建），
+     但 openspec 的 MODIFIED 按需求名逐字匹配 ⇒ 不先声明改名，archive 会以
+     「MODIFIED failed for header ... not found」失败（validate --strict 查不出，它只校验 delta 内部结构）。 -->
+
+- FROM: `### Requirement: 幂等与生命周期——以 AdsPower user/list 为账本、专用分组/备注、单飞互斥`
+- TO: `### Requirement: 幂等与生命周期——以 AdsPower user/list 为账本、预置分组/备注、单飞互斥`
+
+- FROM: `### Requirement: 专用分组失效时自动恢复一次`
+- TO: `### Requirement: 预置分组失效时只重新解析一次`
+
 ## MODIFIED Requirements
 
 ### Requirement: 写能力经独立写客户端 + 硬编码 allowlist，绝不触碰浏览器生命周期

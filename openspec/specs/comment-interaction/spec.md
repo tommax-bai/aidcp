@@ -56,102 +56,51 @@ TBD - created by archiving change comment-interaction. Update Purpose after arch
 
 ### Requirement: 精品门槛与每账号每日评论上限（后台可配、与风控配额取小）
 
-系统 SHALL 让 `CommentAppraiser` 仅在笔记过**精品门槛**时才可能评论。精品门槛 MUST 包含一道**可确定性判定的硬门槛**：该门槛的阈值 SHALL **按内容品类 / 账号可配**（可表达为热度绝对下限、或收藏/点赞比例、或百分位），并按品类给出合理默认；MUST NOT 对所有品类 / 账号写死同一组绝对值（例如固定 `likeCount>1000` **且** `collectCount>300`），以免系统性排除「高赞低藏」的情感 / 颜值类正当爆帖。**通用默认地板** SHALL 为：`likeCount > 300` **且**（`collectCount > 100` **或** `likeCount > 10000` 超高热豁免），边界均为严格大于——把中腰部高收藏内容（教程 / 攻略 / 清单类）纳入候选，同时保留超高热爆帖对收藏绝对值的豁免。**无「收藏」概念的平台**（如 Facebook，其平台词汇 profile 的收藏名词为空）SHALL **只放宽收藏合取项**（收藏子句恒真）、**主门槛 `likeCount > 300` 恒保留**，MUST NOT 因该平台收藏数恒为 0 而退化为无门槛或必须万赞爆帖才可评（该退化正是「收藏绝对值未过固定线就必然不达门槛」在无收藏平台上的极端形态）。为控成本，该硬门槛 SHALL 尽量在**最便宜阶段（调 LLM 之前）**确定性判定，MUST NOT 退化为宽松纯 OR 让过多笔记落到昂贵 LLM 判定。任一不满足门槛 MUST 直接 `comment.skipped`、不进入撰写 / 去 AI 味 / 审批。硬门槛之上，现有 LLM 精品判定（高热度 + 高价值）与飞书人审继续叠加（门槛为必要非充分条件）。此外系统保留**按账号、可持久化的每日评论上限配置**（运营在 console 后台读写、经面板 `/api` 下发）；**实际生效每日上限 = min(运营配置上限, 风控安全配额)**，"今日已评数" MUST 复用风控按账号按天计数。数量、门槛与阈值 MUST 在评估阶段就判定：超上限 / 不达门槛 / LLM 判不值得 MUST 直接走"不评论 → 进主页评估"分支，MUST NOT 进入撰写 / 去 AI 味 / 审批。
+系统 SHALL 让普通评论的 `CommentAppraiser` 仅在笔记过**精品门槛**时才可能评论。精品门槛 MUST 包含一道**可确定性判定的硬门槛**：该门槛的阈值 SHALL **按内容品类 / 账号可配**（可表达为热度绝对下限、或收藏/点赞比例、或百分位），并按品类给出合理默认；MUST NOT 对所有品类 / 账号写死同一组绝对值（例如固定 `likeCount>1000` **且** `collectCount>300`），以免系统性排除「高赞低藏」的情感 / 颜值类正当爆帖。**通用默认地板** SHALL 为：`likeCount > 300` **且**（`collectCount > 100` **或** `likeCount > 10000` 超高热豁免），边界均为严格大于。**无「收藏」概念的平台**（如 Facebook）SHALL **只放宽收藏合取项**、保留主门槛 `likeCount > 300`。普通评论任一不满足门槛 MUST 直接 `comment.skipped`，硬门槛之上继续叠加 LLM 精品判定与飞书人审；实际生效每日上限仍为运营配置与风控安全配额取小。
 
-#### Scenario: 达到每日上限即停止评论
+详情全文确认命中的结构化 `mandatory_interactions` 规则若含 `comment`，则是上述**普通评论策略的唯一显式例外**：`CommentAppraiser` MUST 跳过会话 comments 软预算、普通每日策略闸、热度门槛、评论冷却与“要不要评”LLM，但在撰写前 MUST 经过可解释的 `RiskController.explain('comment')` 硬风控预检。预检拒绝时不得撰写、不得发免审通知；预检放行才 emit `comment.appraised` 并携规则上下文。预检不是配额预占，评论下发前仍 MUST 再经过同一硬风控，真实成功才计数。
 
-- **WHEN** 某账号当日已评数 ≥ min(运营配置上限, 风控配额)
-- **THEN** `CommentAppraiser` MUST emit `comment.skipped{reason:'daily_cap_reached'}`，当日不再评论，直接进"是否进主页评估"
+#### Scenario: 达到每日上限即停止普通评论
+- **WHEN** 某账号当日已评数 ≥ min(运营配置上限, 风控配额)，且本篇未命中结构化强制规则
+- **THEN** `CommentAppraiser` MUST emit `comment.skipped{reason:'daily_cap_reached'}`，当日不再发起普通评论
 
 #### Scenario: 运营配置不可越过风控安全线
-
 - **WHEN** 运营把每日上限配成高于风控 `comment` 安全配额
 - **THEN** 生效上限 MUST 取风控安全配额（取小），MUST NOT 因运营配置突破封号安全线
 
-#### Scenario: 未达品类/账号硬门槛不评
+#### Scenario: 未达硬门槛的普通帖子不评
+- **WHEN** 普通帖子未达该品类 / 账号硬门槛且无 mandatory context
+- **THEN** `CommentAppraiser` MUST emit `comment.skipped{reason:'below_comment_threshold'}`，在调 LLM 之前即跳过
 
-- **WHEN** 笔记未达该品类 / 账号解析出的硬门槛（按详情页真实点赞 / 收藏量或其比例；通用默认地板为 赞 > 300 且（藏 > 100 或 赞 > 10000））
-- **THEN** `CommentAppraiser` MUST emit `comment.skipped{reason:'below_comment_threshold'}`，在调 LLM 之前即跳过，不进入撰写
+#### Scenario: 无收藏平台按放宽收藏合取项入普通候选
+- **WHEN** 一篇普通 Facebook 帖 `likeCount = 500`、`collectCount = 0`
+- **THEN** 收藏合取项恒真、主门槛满足，该帖进入普通 LLM 精品判定
 
-#### Scenario: 中腰部高收藏笔记按新默认地板可入候选
-
-- **WHEN** 一篇笔记 `likeCount = 500`、`collectCount = 150`（旧默认地板 1000 赞下必被排除）
-- **THEN** 该笔记通过通用默认地板进入 LLM 精品判定（是否真评论仍由 LLM + 人审决定）
-
-#### Scenario: 无收藏平台按放宽收藏合取项入候选（主门槛仍守）
-
-- **WHEN** 一篇 Facebook 帖 `likeCount = 500`、`collectCount = 0`（该平台无收藏概念、收藏名词为空）
-- **THEN** 收藏合取项恒真、主门槛 `likeCount > 300` 满足 ⇒ 该帖通过硬门槛进入 LLM 精品判定，MUST NOT 因收藏数为 0 就判未达门槛
-
-#### Scenario: 无收藏平台主门槛不退化为无门槛
-
-- **WHEN** 一篇 Facebook 帖 `likeCount = 300`（恰等主门槛边界、`collectCount = 0`）
-- **THEN** MUST 视为未达门槛不评（主门槛为严格大于、等于不算达标）——放宽收藏合取项 ≠ 无门槛
-
-#### Scenario: 高赞低藏爆帖不再被固定绝对值一律排除
-
-- **WHEN** 一篇情感 / 颜值类高赞低藏笔记（如高点赞、收藏绝对值不高）进入评估
-- **THEN** 硬门槛按其品类 / 账号口径判定（比例 / 品类默认 / 超高热豁免），MUST NOT 仅因「收藏绝对值未过固定线」就必然判未达门槛
-
-#### Scenario: 门槛边界严格判定
-
-- **WHEN** 笔记指标恰好等于解析出的阈值边界（如 `likeCount === 300` 或 `collectCount === 100`）
-- **THEN** MUST 视为未达门槛、不评（「超过」语义为严格大于，等于不算达标）
-
-#### Scenario: 达门槛仍需过 LLM 与人审
-
-- **WHEN** 笔记通过品类 / 账号硬门槛
-- **THEN** 该笔记仅**通过硬门槛**进入后续判定，是否真评论仍由 LLM 精品判定 + 飞书人审决定（门槛是必要非充分条件）
+#### Scenario: 低热度强制帖子绕过普通门槛与判定
+- **WHEN** 一篇 Facebook 帖 `likeCount = 0` 但全文确认命中 actions 含 comment 的结构化规则
+- **THEN** `CommentAppraiser` 不检查软预算/普通每日策略闸/冷却/热度、不调用评论判定 LLM，但必须先过硬风控预检，放行后才进入撰写
 
 ### Requirement: 循环内真人审批——暂停态 + 短超时 + 未授权不发
 
-因评论 MUST 在详情页打开时发出，审批 SHALL **循环内等待**：`CommentApprovalGate` 下发评论命令前 MUST 经飞书人审授权。
+普通评论因必须在详情页打开时发出，审批 SHALL **循环内等待**：`CommentApprovalGate` 下发评论命令前 MUST 经飞书人审授权。等待期间系统 MUST 进入可识别的审批暂停态，并设硬性短超时；超时 / 拒绝 MUST 记审计并 `comment.skipped`。审批使用评论专属 requestId，未获授权 MUST NOT 下发评论命令。
 
-评论支线在途期间系统 MUST 进入**被看门狗认得的「评论支线在途」暂停态**（复用按-edge 暂停通道）。该暂停态：
+唯一免逐条审批路径是：本篇携详情确认的结构化 mandatory context，规则 actions 含 comment，且规则显式 `comment_approval: auto_approve`。此时该规则保存本身构成账号级站立授权；`CommentApprovalGate` MUST 在提交前把账号、目标和清洗后的终稿发送到免审通知口，**通知成功后**才 emit `comment.approved`。通知口未接线或发送失败 MUST fail-closed 为 `comment.skipped{reason:'auto_approve_notice_failed'}`，MUST NOT 下发。未配置规则、规则为 `review`、或非规则命中评论继续逐条人审。
 
-- **覆盖范围为评论支线在途全程**：从该笔记进入评论支线（互动完成后开始评估/撰写）起，到该笔记评论支线终局（`comment.done` 或 `comment.skipped`）止；MUST NOT 只覆盖 `comment.cleared` 之后的审批等待段，因为评估 / 撰写 / 去 AI 味阶段（数秒到数十秒）内账号同样 MUST 停在待评论帖上。
-- **经统一命令出口生效**：暂停 MUST 由发命令的统一出口（软暂停闸）扣住一切会离开当前待评论帖的浏览 / 互动命令——包括并行互动回执触发的 stale-target 重扫滚屏、idle 看门狗的恢复滚屏、换帖 `open_note`、`refresh`、feed 续滚。MUST NOT 退化为只在单个 idle-nudge 翻译点做门控（该退化会漏掉上述其余出口）。
-- **看门狗按"有意暂停"处理**：暂停期间 idle 计时 MUST 冻结（不因无浏览上报累积 idle 而 nudge / 结束会话）。
-- **窗内不提前结束会话**：暂停期间由动作数 / 时长 / 配额上限触发的 `session.should_end` MUST 推迟到评论支线终局后再评估，MUST NOT 在评论支线在途时结束会话而废掉一条正在人审 / 已授权的评论；但 `session.end` 本身 MUST 仍可达（暂停不得阻塞真正需要的结束）。
-- **终局解除顺序严格（读评 surface 相等时）**：读、评 surface 相等的账号（如小红书，迁移结构性不可达），`comment.approved` / `comment.skipped` 终局 MUST 先解除暂停态并恢复看门狗计时，再下发已授权评论命令——否则评论命令会被自己设的暂停态扣住。
-- **迁移在途持续抑制离页命令（读评 surface 不等时）**：读、评 surface 不等的账号（如 Facebook：读 feed、评论 detail，`comment.approved` 后经 `open_note{purpose:'navigate'}` 两步迁移），离页命令抑制 MUST **覆盖整个迁移在途窗口**（从迁移 navigate 命令下发起，到浏览器落地详情、评论命令下发止），期间 MUST 继续经统一命令出口扣住一切会离页的浏览 / 互动命令（`page.scroll` / 换帖 `open_note` / `refresh` / feed 续滚 / stale-target 重扫）；否则迁移落地前后并发的 scroll 会经边缘 `ensureFeed` 把浏览器整页拽回列表面、迁移拿不到详情、已批准评论被丢。本迁移的 `open_note{purpose:'navigate'}` 命令与落地后的 `comment` 命令 MUST **豁免**该抑制（它们即迁移支线本身），MUST NOT 被自己设的抑制扣住而静默丢弃。该迁移在途抑制窗口 MUST 有界，并在迁移终局（落地回执 / 迁移下发被拦 / 被抢占 / 会话 reset）解除，MUST NOT 悬挂钉死会话。
+#### Scenario: 普通评论授权后下发、超时则跳过
+- **WHEN** 普通评论的飞书人审在超时窗口内写入授权信号
+- **THEN** gate 下发；若未授权 / 被拒则 skip、退出暂停态
 
-MUST 设**硬性短超时**（可信停留上限）；超时 / 拒绝 MUST 视为本篇不评、记审计、emit `comment.skipped` 进"是否进主页评估"。
-审批 MUST 复用既有 `/tmp` 先到先得审批信号机制、用**评论专属 requestId 命名空间**（与发帖 `publish-<recordId>` 区分）；**未获授权 MUST NOT 下发评论命令**。
+#### Scenario: 强制规则免审先通知后授权
+- **WHEN** mandatory comment 的规则显式 `auto_approve` 且免审通知成功
+- **THEN** gate 不等待逐条点击，直接 emit approved；通知内容必须是即将提交的终稿
 
-该暂停态跨平台一致：小红书（读评同为详情面，评论就地直发）与 Facebook（读 feed、评论 detail，`comment.approved` 后经 `open_note{navigate}` 两步迁移、迁移在途窗口持续抑制离页命令）均适用。
+#### Scenario: 强制规则免审通知失败不裸发
+- **WHEN** 免审通知口未接线或发送失败
+- **THEN** MUST emit `comment.skipped{reason:'auto_approve_notice_failed'}`，不下发 edge 评论
 
-#### Scenario: 授权后下发、超时则跳过
-- **WHEN** 飞书人审在超时窗口内写入评论 requestId 的授权信号
-- **THEN** `CommentApprovalGate` MUST emit `comment.approved` 触发评论命令下发；若窗口内未授权 / 被拒，MUST emit `comment.skipped{reason:'approval_timeout'|'rejected'}`、退出暂停态、进"是否进主页评估"
-
-#### Scenario: 撰写窗内并行互动回 no_target 不得把目标帖滚走
-- **WHEN** 评论支线已进入（评估 / 撰写 / 去 AI 味在途、`comment.cleared` 尚未发出），同一笔记的并行互动（点赞 / 收藏）回执带 `ok:false, reason:'no_target'`
-- **THEN** 系统 MUST NOT 因该回执下发 stale-target 重扫滚屏（或任何离开当前待评论帖的命令）；账号 MUST 停在待评论帖上直到评论支线终局；该互动如实记为失败（不假成功、不重扫）
-
-#### Scenario: 审批窗内 stray 边缘上报不得下发移动命令
-- **WHEN** 浏览会话处于"评论支线在途"暂停态，其间到达任一边缘上报（迟到的 `page.cards` / feed 上报 / 互动回执等）
-- **THEN** 系统 MUST NOT 经统一命令出口下发 `open_note` 换帖 / `scroll` / `refresh` 等会离开当前待评论帖的命令；仅 `session.end` 与暂停通道放行的命令可达
-
-#### Scenario: 审批窗内不因动作数/时长/配额提前结束会话
-- **WHEN** 浏览会话处于"评论支线在途"暂停态，其间一条边缘回执使动作数 / 时长 / 配额触及会话结束阈值
-- **THEN** `session.should_end` MUST 推迟到评论支线终局（`comment.done` / `comment.skipped`）后再评估，MUST NOT 在评论在途时结束会话废掉在审 / 已授权评论
-
-#### Scenario: 等待审批期间不卡死会话、不误判 idle
-- **WHEN** 浏览会话处于"评论支线在途"暂停态
-- **THEN** 看门狗 MUST 按"有意暂停"处理、MUST NOT 因 idle 重启或结束会话；该 edge 的其他浏览 / 互动命令 MUST 在暂停期间不下发，`session.end` MUST 仍可达
-
-#### Scenario: 读评 surface 相等——终局先解除暂停再下发评论
-- **WHEN** 评论支线到达终局（`comment.approved` 或 `comment.skipped`），且该账号读、评 surface 相等（如小红书，迁移不可达）
-- **THEN** 系统 MUST 先解除暂停态并恢复看门狗计时，再下发已授权评论命令；MUST NOT 让评论命令被残留暂停态扣住而静默丢弃
-
-#### Scenario: 读评 surface 不等——迁移在途持续抑制离页命令、放行迁移与评论
-- **WHEN** `comment.approved` 后该账号读、评 surface 不等（如 Facebook），系统经 `open_note{purpose:'navigate'}` 两步迁移，迁移 navigate 尚未落地详情
-- **THEN** 系统 MUST 在整个迁移在途窗口继续经统一命令出口扣住一切会离页的浏览 / 互动命令（`page.scroll` / 换帖 `open_note` / `refresh` / feed 续滚 / stale-target 重扫），使并发 scroll 不会经 `ensureFeed` 把浏览器拽回列表面；同时 MUST 放行本迁移的 `open_note{purpose:'navigate'}` 与落地后的 `comment` 命令；该迁移在途窗口 MUST 有界并在迁移终局解除，MUST NOT 悬挂钉死会话
-
-#### Scenario: 红线反例——未授权或超时仍发评论（禁止）
-- **WHEN** 有实现在无授权信号 / 超时后仍下发评论命令，或为绕开"页面久留"把评论改成无人审自动直发
-- **THEN** MUST 视为违规、不予合入；评论 MUST 在授权信号存在时才下发（AC-PUB），未授权 / 超时一律 `comment.skipped` 不发
+#### Scenario: XHS 与普通 FB 评论仍需逐条审批
+- **WHEN** 评论没有有效的 auto-approved mandatory context
+- **THEN** 它仍走既有人审；MUST NOT 因本功能全局自动直发
 
 ### Requirement: 执行端发评论动作——拟人输入 + 发布后校验、绝不假成功
 
@@ -231,30 +180,26 @@ If composition and cleanup logic is refactored into shared helpers, the helper S
 
 ### Requirement: Facebook comments require human review by default
 
-All Facebook comments — whether or not they carry contact info — SHALL pass the Feishu human-review gate before edge submit when `AIDCP_FB_COMMENT_REVIEW_ALL` is not the literal string `false` (default ON). The gate MUST fail closed: an unwired approval port, a review timeout, or a rejection MUST result in an honest non-submitting outcome (`compose_skipped` / `approval_rejected_or_timeout`) with no edge submit and no dedup mark. Contact comments keep their existing always-reviewed behavior and keep showing the contact line on the card; non-contact comments show only the comment body with no phantom trailing line.
+All Facebook comments — whether or not they carry contact info — SHALL pass the Feishu human-review gate before edge submit by default. The only account-persona exception is a detail-confirmed structured mandatory rule whose actions include comment and whose `comment_approval` is explicitly `auto_approve`; that path MUST send a readable auto-approval notice successfully before submit and MUST fail closed when notification is unavailable. The existing `AIDCP_FB_COMMENT_REVIEW_ALL=false` escape hatch and contact-comment rules remain unchanged for scheduled comments. An unwired approval port, review timeout, rejection, or failed mandatory auto-approval notice MUST produce an honest non-submitting outcome with no success mark.
 
 #### Scenario: Non-contact FB comment waits for review by default
-- **WHEN** a Facebook non-contact comment is composed and passes deterministic validation with `AIDCP_FB_COMMENT_REVIEW_ALL` unset
+- **WHEN** a Facebook comment has no valid auto-approved mandatory context and review is enabled
 - **THEN** it MUST request Feishu approval and MUST NOT submit until approved
 
-#### Scenario: Review rejected or unwired → honest no-submit
-- **WHEN** the approval port is unwired, times out, or returns rejected for a Facebook comment
-- **THEN** the run MUST audit `compose_skipped` with reason `approval_rejected_or_timeout` (or the unwired equivalent), MUST NOT call edge submit, and MUST NOT record the target as commented
+#### Scenario: Structured standing approval notifies then submits
+- **WHEN** full-detail matching confirms an account rule with comment plus `comment_approval:auto_approve`
+- **THEN** the system MUST send the final-comment notification first and MAY submit only after that send succeeds
 
-#### Scenario: Reversible escape hatch restores auto-publish
-- **WHEN** `AIDCP_FB_COMMENT_REVIEW_ALL=false`
-- **THEN** a non-contact Facebook comment MAY submit directly after validation (today's behavior); contact comments still require review
+#### Scenario: Review or auto-approval notification failure is honest no-submit
+- **WHEN** review is unwired/timed out/rejected, or the mandatory auto-approval notice fails
+- **THEN** the run MUST audit a non-success reason, MUST NOT call edge submit, and MUST NOT record the target as commented
 
 #### Scenario: Shadow never reviews or submits
 - **WHEN** Facebook comment shadow/dry-run mode is active
-- **THEN** the run MUST short-circuit to the shadow outcome before requesting any human review and MUST NOT submit
+- **THEN** the run MUST short-circuit before review/notification and MUST NOT submit
 
-#### Scenario: manualOverride bypasses quota but never review
-- **WHEN** a Feishu `/comment` run sets `manualOverride` (operator authority) with review enabled
-- **THEN** it MAY skip quota/risk/daily-cap gates but MUST still require Feishu review before submit — the human review is not bypassable by operator override
-
-#### Scenario: Red-line reversal — non-contact FB comment auto-posts under default (forbidden)
-- **WHEN** an implementation submits a non-contact Facebook comment without review while `AIDCP_FB_COMMENT_REVIEW_ALL` is unset
+#### Scenario: Red-line reversal — implicit auto-post is forbidden
+- **WHEN** an implementation auto-posts because of free-form persona wording, account id, nickname, or a global heuristic rather than a validated structured rule
 - **THEN** it MUST be treated as a violation and not merged
 
 ### Requirement: 评论链人设注入对齐互动评估样板
@@ -303,4 +248,42 @@ All Facebook comments — whether or not they carry contact info — SHALL pass 
 
 - **WHEN** 发布正文走发帖侧去 AI 味
 - **THEN** 发帖侧词表、阈值与行为与本 change 之前一致
+
+### Requirement: 强制评论必须生成贴题终稿并有界失败，禁止模板伪造“一定”
+
+mandatory comment SHALL 继续经过 `CommentComposer`、`CommentDeAiFlavor` 与反照搬护栏。撰写 prompt MUST 注入规则的 `comment_guidance` 并明确本篇必须产出具体评论；模型返回弃权、空或超长时 MAY 有界重试一次。重试仍失败、清洗为空或仍与参考语料近似照搬 MUST 诚实 `comment.skipped`，MUST NOT 回退固定模板或占位话术来伪造“已满足必评”。mandatory context MUST 沿所有 `comment.*` payload 透传到审批终点。
+
+#### Scenario: 强制评论按规则指引生成
+- **WHEN** 越南招工规则命中且评论指引要求用越南语询问岗位细节
+- **THEN** composer prompt 含该指引和必产要求，产出的终稿继续经过去 AI 味与反照搬检查
+
+#### Scenario: 两次都无法生成则诚实不发
+- **WHEN** mandatory composer 首次与一次重试均失败、弃权、为空或超长
+- **THEN** 系统 emit 真实 skip 原因，不使用“还招吗/支持一下”等固定模板替代，不报告评论成功
+
+### Requirement: mandatory 免审评论必须区分预授权与真实终态
+
+mandatory comment 在撰写前 MUST 使用带稳定 reason 的硬风控预检。预检被 `state:*` 或 `quota:minute|hour|day` 拒绝时 MUST 在同帖 mandatory like 已有机会入队后诚实跳过，MUST NOT 调 composer、MUST NOT 发免审通知、MUST NOT声称该评论已授权或已发布。预检通过不构成配额预占，下发前最终硬风控 MUST 保留。
+
+免审通知成功时 SHALL 只表述“终稿已预授权、等待平台执行”，使用非绿色中性状态，并携 requestId、账号、目标与终稿。通知之后系统 MUST 以同一 requestId 最多回报一个可见终态：`confirmed`、`pending`、`failed` 或 `unknown`。只有 edge 真实回 `action.completed{action:'comment',ok:true}` 才能回 `confirmed` 并记成功；`pending_group_approval` MUST 回 `pending` 且不计成功；明确风控/页面/下发/edge 失败 MUST 回 `failed`；命令或迁移在途时断线、会话结束或有界超时 MUST 回 `unknown`，明确要求人工核对且不得猜测上墙状态。
+
+#### Scenario: 硬风控预检拒绝不白跑也不发卡
+- **WHEN** mandatory comment 命中，但 `explain('comment')` 返回 `quota:minute`、`quota:hour`、`quota:day`、`state:restricted` 或 `state:frozen`
+- **THEN** 系统不调用 composer、不发送预授权卡，并留下带原始稳定 reason 的审计日志；同帖 mandatory like 的派发顺序不受影响
+
+#### Scenario: 预授权卡不是成功卡
+- **WHEN** mandatory auto-approve 终稿通知成功
+- **THEN** 卡片 MUST 使用中性/黄色语义说明“已预授权、等待平台执行”，MUST NOT 使用绿色“已成功”语义
+
+#### Scenario: 平台确认成功才回成功终态
+- **WHEN** 已预授权评论收到 edge `action.completed{action:'comment',ok:true}`
+- **THEN** 系统以同一 requestId 回一次绿色 `confirmed` 终态；该回执是唯一允许称评论已发布并计成功的依据
+
+#### Scenario: 群审批与明确失败如实分档
+- **WHEN** edge 返回 `pending_group_approval`，或最终风控/迁移/下发/edge 返回明确失败
+- **THEN** 前者回黄色 `pending` 并说明尚未上墙，后者回人话 `failed`；两者均不得计成功或显示机器码
+
+#### Scenario: 断线或超时保持未知
+- **WHEN** 评论命令已下发或评论迁移仍在途，但连接断开、会话结束或超过有界回执时间仍无终态
+- **THEN** 系统以同一 requestId 回黄色 `unknown`，说明是否上墙未知、需人工核对；MUST NOT猜成功、MUST NOT补记配额
 
