@@ -95,3 +95,24 @@
 - [x] 6.10 回归闸：cloud acceptance 54/54、`npm test` 2277 pass / 0 fail、typecheck 通过；
       edge acceptance 22/22、`npm test` 1515/1515、typecheck 通过、`node --check` 全过。未打任何安装包、未部署、未合默认分支。
   <!-- aidcp-cloud 5b62ca0 + aidcp-edge 901ea91 均已推送到 codex/client-content-workspace-navigation -->
+
+## 7. 合回主干（2026-07-17）
+
+- [x] 7.1 三仓合回各自默认分支。**用 merge 而非 rebase**：分支已推送且共享，rebase 会要求对共享分支 force-push
+      （§6 明确需先确认）；把默认分支 merge 进来后默认分支仍是 fast-forward，两全。
+  <!-- aidcp-cloud c32254e / aidcp-edge ccaaf6f：分别 merge origin/master 解冲突 -->
+- [x] 7.2 冲突解法（通例：两边语义都要，绝不择一）：
+      · cloud `client-auth-server.ts`——主干新增 environment-provisioning intent/complete 两路由，
+        与本分支的灵感库路由插在同一锚点，且**争用同一段 readJsonBody 样板**。解法＝两族路由都留、各自解析 body；
+        import 段同时保留主干的 `clampClientApprovalMode` 与本分支的 curated/JsonValue。
+      · edge `index.html`——主干把共享原始日志块 `#dev-section` 挪到工作区切换之外，与本分支新增的
+        `#content-workspace` 撞同一锚点。解法＝两块都留（内容工作区在前、日志块在后），并核对无重复 element id。
+- [x] 7.3 合并后回归闸（在合并树上重跑，非合并前的结论）：
+      cloud acceptance 54/54、`npm test` 2353 pass / 0 fail / 6 skipped、typecheck 通过；
+      edge acceptance 22/22、`npm test` 1612/1612、typecheck 通过、`node --check` 全过。
+- [x] 7.4 **已知 flaky（不掩盖）**：`test/electron/interaction-workspace.test.ts` 的
+      「环境 A→B 原子切换」与「批准/发送防双击」曾在某一次全量跑里以异常时长（39s / 76s）失败。
+      已排查而非「重跑就当没事」：单文件隔离 19/19 过；带本次改动的全量连跑 4 次均 1612/1612 全过；
+      把本分支对 `interaction-workspace.js` 的改动还原后行为一致。该改动是同步的 class 切换，
+      不可能产生 76s 用例。判定为**既有的负载相关 flaky**，与本 change 无因果；登记在此备查。
+  <!-- 若后续 CI 复现，从「全量并发下这两个用例被饿死」方向查，勿从本 change 找 -->
