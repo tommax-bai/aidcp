@@ -1194,6 +1194,12 @@ cloud（Publish Agent）          edge                         飞书（云端 B
 
 私信降级走读见 `docs/contracts/wechat-channels-interaction/v1/fixtures/walkthroughs/dm-ambiguous-flow.json`：Edge 派发后无法取得平台证据时必须回 `ambiguous`，Cloud 保持阻断且不自动重投，客户界面显示“待核验”。两条 fixture 都只证明合同，不代表真实账号执行过写操作。
 
+### 4.5 视频号开发测试数据重置
+
+`interaction.sync.request.reason` 在既有 `user_requested | resume | scheduled | recovery` 基础上增加 `test_reset`。该原因只允许 Cloud 在显式 `dev` 测试开关开启、当前账号写入暂停、所选渠道没有任何发送记录，且唯一在线 Edge 同时协商 `interaction_inbox_v1` 与 `interaction_test_data_reset_v1` 后下发。
+
+收到 `test_reset` 后，Edge 必须在该渠道既有同步锁内先清除本地 checkpoint 与 thread-source 缓存，再从空 cursor 执行正常只读同步。Cloud 必须先清除同账号、同环境、同渠道的 inbox 副本、sync batch 与 cursor，否则稳定 batch id 会被当成 duplicate。该流程只重置 aidcp 的测试读取状态，不删除微信平台评论/私信，不触发回复发送，也不复用会清授权与配置的 offboarding。
+
 ## 5. 错误与兼容性
 
 - **未知 type**：服务端回 `error`（code=`unsupported_type`）。

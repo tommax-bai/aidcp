@@ -298,7 +298,7 @@
         "platform": { "$ref": "common.schema.json#/$defs/Platform" },
         "channel": { "$ref": "common.schema.json#/$defs/Channel" },
         "scopeExternalId": { "$ref": "common.schema.json#/$defs/NullableId" },
-        "reason": { "enum": ["user_requested", "resume", "scheduled", "recovery"] },
+        "reason": { "enum": ["user_requested", "resume", "scheduled", "recovery", "test_reset"] },
         "requestedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
       }
     },

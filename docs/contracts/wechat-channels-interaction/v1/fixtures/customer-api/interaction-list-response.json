@@ -28,6 +28,7 @@
       "draftVersion": null,
       "publishedVersion": 4
     },
+    "testTools": { "dataResetEnabled": false },
     "items": [
       {
         "threadId": "thread_comment_100",
