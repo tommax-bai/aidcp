@@ -75,3 +75,17 @@
 - [x] 10.2 订正 backlog 90.7 的第 ③ 条：它写着完成态文案应读「4 项今日计划已完成」，本 change 后 FB 的带上限指标变为 5 项（含加群）。 <!-- 2026-07-17 已改写 90.7 第 ③ 条并标注「按原文验收会把正确行为当 bug 报回来」 -->
 - [x] 10.3 登记不治的两项：慢启动 day1-2 把加群上限压到 0 ⇒「加群 0/0 今日计划已完成」（**预先存在**，FB 冷启动曲线的 comment/publish 今天就这样）；平台错标（90.8）现在多一个后果 —— 错标的 FB 环境连加群格也不会出现。 <!-- 2026-07-17 登记为 backlog 90.21 / 90.22 -->
 - [x] 10.4 `openspec validate platform-honest-usage-metrics --strict` → archive。 <!-- 2026-07-17 validate 通过 → archive -->
+
+## 11. 归档后修（真机首跑暴露：加群格根本不出现）
+
+> **归档时全绿是真的，但它证明不了这条链是通的。** 云端投影正确（dev 实测坐实）、两份 protocol.ts 逐字一致、
+> `main.cjs` 与 `renderer.js` 的清单都加好了、typecheck 全绿、cloud 2436 + edge 1680 全过 —— 屏幕上依然只有
+> 4 格、加群怎么也不出现、**全链路零报错**。
+
+- [x] 11.1 根因＝**第四张手写键清单**：`aidcp-edge/src/flows/ui-event-lines.ts:22` 的 `DAILY_USAGE_ACTIONS`（六键），`sanitizeCounts` 拿它**过滤** totals ⇒ `join_group` 在到达 Electron 主进程**之前**就被这道白名单吃掉。收藏/关注的缺席被它正确保留（它只拷贝存在的键），所以症状只表现为「加群不出现」，看起来像投影没生效。<!-- edge 3939049 -->
+- [x] 11.2 设计文档与 tasks 第 1 节数清单时数漏了它：只数了两份 `protocol.ts`、cloud `server.ts`、edge `main.cjs`、`renderer.js` 五张，**没有对边缘仓做全局扫描**。已改为从 `UI_DAILY_USAGE_ACTIONS` 派生，该表不复存在。<!-- edge 3939049 -->
+- [x] 11.3 顺带修同类漏：`src/electron/renderer/ui-logic.js:87` 的 `QUOTA_ACTION_PRIORITY` 也是六键手写 ⇒ 加群的上限对「配额休息 / 计划完成」逻辑完全不可见（加群满了不会被算作在等配额）。本文件是纯 JS、import 不了，只能手工对齐 + 注释。<!-- edge 3939049 -->
+- [x] 11.4 补穿透测试 `test/flows/ui-event-lines.test.ts`：FB 投影后的真实载荷形状穿过 `uiSnapshotToLines` 后 `join_group` 仍在、collect/follow 仍缺席。**已验真**：把手写清单写回去 → 该条恰好红（`undefined !== 2`）。<!-- edge 3939049 -->
+- [x] 11.5 `dist` 必须 `npm run build:dist`：`npm run build`（`tsconfig.json`，`rootDir:"."`）写到 `dist/src/…`，而应用读的是 `dist/flows/…`（来自 `tsconfig.build.json`，`rootDir:"src"`）⇒ `build` 退出码 0 但产物纹丝不动。已对编译产物直接做穿透验证（非只看测试）。<!-- edge 3939049 -->
+
+**教训（值得带走的那条）**：本 change 的设计文档专门用一节讲「同一份键清单在几个地方各手写了一遍、typecheck 一张都抓不到」，并逐张点名 —— 然后还是漏了一张，而漏的那张正是唯一真正破坏功能的。**点名清单靠回忆是不够的，必须对两个仓做一次全局扫描**（`grep -rn "'view'.*'like'.*'collect'"`）。edge 全局扫描现存结果：`daily-usage.cjs`（已含）、`ui-logic.js`（已修）、`ui-event-lines.ts`（已派生）、`protocol.ts`。另发现一处**既有**协议漂移（非本 change 引入、不治）：`RiskCanDoPayload.action` 云端有 `join_group`、边缘没有 —— `risk.canDo` 是 CLAUDE.md §2 明列的「保留通道、边缘尚未接线」，故当前无害。
