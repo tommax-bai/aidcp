@@ -159,9 +159,10 @@
 
 ## 12. 收尾
 
-- [ ] 12.1 本文件按格式回写实装台账：`<!-- <repo> <commit-sha> 备注 -->`（部署后追加 `<!-- <date> deployed -->`）。**sha 必须取自已推送提交**，写入前用 `git merge-base --is-ancestor <sha> origin/<默认分支>` 自证——本 change 的 §9 存在理由就是台账 sha 不可达。**不得编造或填写悬空提交。**
+- [x] 12.1 本文件按格式回写实装台账：`<!-- <repo> <commit-sha> 备注 -->`（部署后追加 `<!-- <date> deployed -->`）。**sha 必须取自已推送提交**，写入前用 `git merge-base --is-ancestor <sha> origin/<默认分支>` 自证——本 change 的 §9 存在理由就是台账 sha 不可达。**不得编造或填写悬空提交。**
 <!-- aidcp-cloud 780f1049c876ca3fe6d4a32f2647f99399e98335 implementation; pushed and reachable from origin/master -->
 <!-- aidcp-edge db98d75ee28ee96c8d4b1f28b16fcbf97b283461 implementation; pushed and reachable from origin/master; no installer built -->
 <!-- aidcp-console 28776f14a126a99fe2427b4ae43d07e0838930e9 implementation; pushed and reachable from origin/master -->
-- [ ] 12.2 `openspec validate wechat-review-residuals --strict` 通过。
+<!-- aidcp 395f177e90508ec2575a5971ca66b4849bb76f95 control ledger/spec/backlog; pushed and reachable from origin/main -->
+- [x] 12.2 `openspec validate wechat-review-residuals --strict` 通过。
 - [ ] 12.3 **归档序**：本 change 必须等 `wechat-channels-interaction-management` **先归档**（`wechat-channels-interaction` 与 `inbound-interaction-management` 两个 capability 目前只活在它的 delta 里，尚未并入 `openspec/specs/`），否则 spec-merge 会找不到基线 capability。
