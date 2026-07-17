@@ -10,7 +10,9 @@ This MUST NOT be conflated with counting on dispatch. **Dispatch is intent; a cl
 
 Counting a reached-platform join against the quota MUST NOT mark that join as successful. Success and quota are separate questions with separate answers: the success ledger continues to recognise only a judgment-confirmed join, and a counted-but-unconfirmed join MUST NOT enter the display interaction ledger, MUST NOT be reported to the operator as a completed join, and MUST NOT satisfy any requirement that depends on membership.
 
-Every gate that spends this quota MUST read the **same numerator**. A scheduling pre-filter and the dispatch-time quota check MUST NOT measure the account's join activity with two different counts against one shared cap.
+A **quota-usage display** is not a membership claim, and the two MUST NOT be conflated. A surface whose subject is budget consumption — how much of an action's daily allowance the account has spent — reports **actions spent**; for joins that means join actions that reached the platform, and showing a pending-approval join there is correct, not an overclaim. The surfaces whose subject is membership — which groups the account actually belongs to — MUST continue to count only judgment-confirmed joins. The same word may therefore denote an action on a budget surface and a membership on a ledger surface; each surface MUST be honest about its own subject rather than forced to the other's meaning.
+
+Any count the system holds of join actions that reached the platform is a **lower bound**, never an exact figure: the recording path re-checks policy before writing and silently discards the receipt of an action that was already performed, so a real click made outside the automatic gate — an operator's manual join, or a click whose account was throttled mid-flight — can reach the platform and leave no trace in that counter. Because of this, a gate MUST NOT be relaxed onto a looser bound than one it already enforces. Where the system holds more than one independent lower bound on the same account's join activity — the recorded-action counter and the confirmed-join ledger are two such bounds — gates MAY enforce each of them against the cap, and doing so MUST be understood as taking the tighter estimate rather than as a defect to be unified away. Unifying them onto the recorded-action counter alone MUST NOT be done while that counter can silently drop a real click, because it would raise the account's true join activity above the cap.
 
 #### Scenario: Join quota denial prevents dispatch
 - **WHEN** the risk gate denies a join for an account that has exhausted its minute, hour, or day join quota
@@ -32,15 +34,21 @@ Every gate that spends this quota MUST read the **same numerator**. A scheduling
 - **THEN** the account's join quota counter does not increase
 - **AND** the quota is never spent on intent that the edge did not confirm as actuated
 
+#### Scenario: A quota-usage display shows actions spent, not memberships
+- **WHEN** an operator views a per-account quota-usage display after the account performed one join click that is awaiting group-admin approval
+- **THEN** the join budget shows one action spent against the cap
+- **AND** the surfaces that report group membership still show zero groups joined and one request awaiting approval
+- **AND** neither surface is required to adopt the other's meaning
+
 #### Scenario: Only verified join counts as a successful join
 - **WHEN** a join attempt returns anything other than a judgment-confirmed join
 - **THEN** no successful join interaction is recorded for that account
 - **AND** the success ledger's count of groups joined today is unchanged
 
-#### Scenario: One numerator serves the shared cap
-- **WHEN** the scheduling pre-filter and the dispatch-time quota check both evaluate the same account's join activity against the daily join cap
-- **THEN** both read the same count of join actions that reached the platform
-- **AND** neither uses the count of confirmed joins as the numerator for that cap
+#### Scenario: A gate is never relaxed onto a looser bound
+- **WHEN** an operator manually joins groups up to the daily cap, bypassing the pre-dispatch quota gate by design, and the recorded-action counter drops some of those receipts because a burst window was already saturated when each receipt arrived
+- **THEN** the gate that reads the confirmed-join ledger still bounds the automatic join loop at the cap
+- **AND** the automatic loop MUST NOT be allowed to resume merely because the recorded-action counter is short
 
 #### Scenario: Restricted state stops joining
 - **WHEN** an account's risk state is restricted or frozen
