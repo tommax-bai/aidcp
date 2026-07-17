@@ -1321,11 +1321,11 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 
 ### change `wechat-channels-interaction-management` dev 真账号与受控写验收（Session 05；登记于 2026-07-15）
 
-**已完成的代码与 dev 基线**：控制仓契约 `3aa51de`（原记 `a678003`，2026-07-17 校正——那个 sha 只活在 `origin/codex/wechat-channels-interaction-management` 分支、**不在 origin/main 上**；`3aa51de` 是主干上 subject 逐字相同的等价提交。工作没丢，只是台账指向了一个别人 clone 下来找不到的提交） 与真实运行闭环变更；Cloud master `42cd5f8` 已部署 dev 并应用 0042；Edge master `d321042` 完成身份 bootstrap、账号控制下发、真实空评论/DM 请求与 Cloud 可见空批次；Console `3a477c1` 已部署 dev。Edge acceptance 22/22、全量 1520/1520、typecheck 通过；Cloud acceptance 54/54、全量 2279 通过（5 个显式跳过）、typecheck 通过；严格 schema/OpenSpec 与脱敏证据检查通过。命名账号已完成首次授权、浏览器关闭后的 API-only 恢复和 controls 0→1 在线收敛，Cloud 各接受 1 个 comment/DM 空批次并保留各 1 个 cursor，持久化 thread/message 与 send attempt 均为 0；两轮后批次数稳定为各 1，跨 scope 批次为 0，AdsPower 已关闭。**该账号当前没有评论或私信，所以上述结果只证明真实“成功同步 0 条”；非空解析、真实写与 offboarding 仍不得由空结果或 mock 替代。**
+**已完成的代码与 dev 基线**：控制仓契约 `3aa51de`（原记 `a678003`，2026-07-17 校正——那个 sha 只活在 `origin/codex/wechat-channels-interaction-management` 分支、**不在 origin/main 上**；`3aa51de` 是主干上 subject 逐字相同的等价提交。工作没丢，只是台账指向了一个别人 clone 下来找不到的提交） 与真实运行闭环变更；Cloud master `42cd5f8` 已部署 dev 并应用 0042；Edge master `4c45e48` 已补齐真实非空评论/DM 读取和客户端详情查询；Console `3a477c1` 已部署 dev。最新 Edge acceptance 22/22、全量 1594/1594、typecheck/build 通过，互动模块 55/55、详情/IPC 22/22 通过。命名账号已完成首次授权、浏览器关闭后的 API-only 恢复和 controls v3 在线收敛；真实只读样本得到 3 条评论与 1 个会话内 3 条 DM，Cloud 持久化 3 个 comment thread/message、1 个 DM thread 与 3 个 DM message，客户端显示 2 条待处理互动且评论/私信列表和详情均可读。Edge/Cloud 3 个 scope 的 last batch 一致，send attempt 仍为 0。真实写与 offboarding 仍不得由本次只读结果替代。
 
 **安全前置**：只用用户明确命名的测试账号；写 capability 初始保持 false，账号级 `write_paused` 保持 true；先完成只读项。评论/私信分别需要用户批准的一条可删除目标。自动模式必须等 87.1–87.6 通过后再次获得明确批准。Edge 本次只验证了 master 源码，**没有构建或发布安装包**。
 
-- [ ] 87.1 **真实登录与持续只读同步** — 在 dev 用命名测试账号扫码登录并核对绑定身份；关闭浏览器后，评论和私信仍继续增量同步；Cloud/客户端显示同一账号、同一 cursor，不能把登录请求发出或拿到页面当成同步成功。
+- [x] 87.1 **真实登录与持续只读同步** — 在 dev 用命名测试账号扫码登录并核对绑定身份；关闭浏览器后，评论和私信仍继续增量同步；Cloud/客户端显示同一账号、同一 cursor，不能把登录请求发出或拿到页面当成同步成功。
 - [ ] 87.2 **分页、重启与账号隔离** — 验评论多页、私信多会话、Edge/Cloud 分别重启后的续传恢复；至少两个账号快速切换，列表、详情、游标、草稿、待发送任务和审计不得串账号。
 - [ ] 87.3 **一次受控评论回复** — 只对用户批准的可删除测试评论人工发送一次；同时取到平台端可见、Cloud `confirmed`、Edge/Cloud 同一 attempt/idempotency 与 body-free audit 证据；重复点击和重复 command 不得产生第二条平台回复。
 - [ ] 87.4 **一次受控私信回复** — 只对用户批准的可删除测试私信人工发送一次；判据同 87.3，并确认私信正文不出现在普通日志/审计中。没有批准目标时必须保持 gated，不能用 mock `confirmed` 代替。
@@ -1335,6 +1335,8 @@ dev 云端上按平台放开 Facebook 自动浏览，并把 FB 的会话 / 阅�
 - [x] 87.8 **Edge 真机载体边界** — 已用 Edge master `d321042` 源码连接同一 AdsPower 登录态完成只读真机运行；没有构建或发布安装包，因此本项只证明源码载体，不代表桌面安装包已发布/验收。
 
 <!-- 87.1 partial evidence (2026-07-16): named-account auth became active, the browser closed, controls version 1 converged, and Cloud retained one accepted zero-item batch/cursor for each of comment and DM with no send attempts. Keep 87.1 open until a non-empty incremental sample and the real client-side same-account/cursor presentation are observed; 87.2 remains open for multi-page/restart/two-account isolation. -->
+
+<!-- 87.1 closure evidence (2026-07-17): Edge master 87ee475 parsed the observed non-empty comment-list and global DM-history shapes; 4c45e48 removed the unsupported detail `limit` query. With the browser closed, the named dev account produced three comment messages and three DM messages across one DM session. Cloud stored three comment threads/messages and one DM thread with three messages; the three local/Cloud cursor scopes had matching last batch IDs, send attempts remained zero, and the client rendered two inbound pending items with working comment and DM details. Edge full 1594/1594, acceptance 22/22, interaction 55/55, detail/IPC 22/22, typecheck and build passed. 87.2 remains open for real multi-page, restart recovery and two-account isolation. No platform write or installer build was performed. -->
 
 ## 簇 88
 
