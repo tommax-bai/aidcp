@@ -60,6 +60,8 @@ TBD - created by archiving change comment-interaction. Update Purpose after arch
 
 详情全文确认命中的结构化 `mandatory_interactions` 规则若含 `comment`，则是上述**普通评论策略的唯一显式例外**：`CommentAppraiser` MUST 跳过会话 comments 软预算、普通每日策略闸、热度门槛、评论冷却与“要不要评”LLM，但在撰写前 MUST 经过可解释的 `RiskController.explain('comment')` 硬风控预检。预检拒绝时不得撰写、不得发免审通知；预检放行才 emit `comment.appraised` 并携规则上下文。预检不是配额预占，评论下发前仍 MUST 再经过同一硬风控，真实成功才计数。
 
+**该例外中「跳过评论冷却」一项的理由 MUST 与 `interaction-cooldown` 同源**：冷却是**兜底**（防意外爆发），其抑制语义是**丢弃而非排队**；mandatory 是运营对指定内容类别的显式授权、且为每帖一次性机会 ⇒ 兜底 MUST NOT destroy 一次已授权的机会。该理由 MUST NOT 表述为「授权动作不该被数量约束挡」——冷却不表达数量策略，数量由 `RiskController` 主闸单独负责，而本例外**不跳过主闸**（预检 ＋ 下发前二次判均保留）。
+
 #### Scenario: 达到每日上限即停止普通评论
 - **WHEN** 某账号当日已评数 ≥ min(运营配置上限, 风控配额)，且本篇未命中结构化强制规则
 - **THEN** `CommentAppraiser` MUST emit `comment.skipped{reason:'daily_cap_reached'}`，当日不再发起普通评论
@@ -79,6 +81,10 @@ TBD - created by archiving change comment-interaction. Update Purpose after arch
 #### Scenario: 低热度强制帖子绕过普通门槛与判定
 - **WHEN** 一篇 Facebook 帖 `likeCount = 0` 但全文确认命中 actions 含 comment 的结构化规则
 - **THEN** `CommentAppraiser` 不检查软预算/普通每日策略闸/冷却/热度、不调用评论判定 LLM，但必须先过硬风控预检，放行后才进入撰写
+
+#### Scenario: 例外的理由不得与兜底定位冲突
+- **WHEN** 有人以「冷却是数量约束、已授权动作不该被数量约束挡」为由解释本例外
+- **THEN** MUST 拒绝该表述——冷却不表达数量策略；本例外的唯一正当理由是「兜底丢弃不排队，MUST NOT destroy 已授权的一次性机会」
 
 ### Requirement: 循环内真人审批——暂停态 + 短超时 + 未授权不发
 

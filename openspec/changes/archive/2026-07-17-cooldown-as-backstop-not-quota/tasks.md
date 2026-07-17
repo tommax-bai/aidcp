@@ -58,7 +58,7 @@
 - [x] 4.3 真机验收项登记 `docs/real-machine-acceptance-backlog.md` —— 新建**簇 97**（前置：dev 需真实浏览车队跑满
       **一整天且跨上海自然日**，因日窗是自然日硬清零、非滑动 24h）。含两条「别误判成冷却没生效」的良性现象（97.4）
       与运营核数项（97.6）
-- [ ] 4.4 **归档时手工填写 `interaction-cooldown` 主 spec 的 Purpose**（自 `engagement-restraint` 归档日起逐字停留在
+- [x] 4.4 <!-- aidcp 2026-07-17 归档提交内填写 --> **归档时手工填写 `interaction-cooldown` 主 spec 的 Purpose**（自 `engagement-restraint` 归档日起逐字停留在
       `TBD - created by archiving change engagement-restraint. Update Purpose after archive.`）。
       **openspec delta 不支持 `## Purpose`**（archive 目录零先例；113 个 spec 中 110 个仍是 TBD），历史上填过的 3 个
       都是在 archive 提交里手工写进主 spec（如 `6235f07`）⇒ 只能在归档步骤做。Purpose 应写兜底定位：
