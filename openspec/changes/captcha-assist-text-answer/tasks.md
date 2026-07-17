@@ -21,14 +21,16 @@
 
 ## 3. aidcp-edge — captcha 专用键盘原语（新模块）
 
-- [ ] 3.1 新建 `src/browse/captcha-type.ts`：`ASCII_KEY_TABLE`（0-9 / a-z / A-Z / 空格 / 常见标点 → `{key, code, windowsVirtualKeyCode, needsShift}`），表外字符诚实拒绝
-- [ ] 3.2 `dispatchTypedChar(cdp, ch, {dwellMs})`：真 `keyDown{key,code,vk,text,unmodifiedText}` → sleep(dwell) → `keyUp`；需 Shift 的用真实 Shift keyDown/keyUp 包裹；**无 options 参数**（词法上插不进取消点）；try/finally 保证 keyUp 与 Shift-up 必发（照抄 `commitLeftClick` 已定案形状）
-- [ ] 3.3 `dispatchHumanTyping(cdp, text, opts): Promise<number>`：复用 `humanize/keyboard-rhythm.ts` 的 `generateKeyStrokes` 取 flight；dwell 独立采样 lognormal(median 75, σ0.3) clamp[30,180]；每字符 sleep → `assertInputSafety(opts)`（**顺序 checkpoint→deadline 不可反**）→ `dispatchTypedChar`；循环边界 = strokes 数组长度（迭代限界）
-- [ ] 3.4 `dispatchHumanTyping` 加 **RTT 补偿**：测量上次 CDP 往返、从下次 sleep 扣除（`sleep(max(0, delay - lastRttMs))`）；`medianMs` 按 `edgeId` 派生偏置（复用 `edgeIdBias`）
-- [ ] 3.5 `probeFocus(cdp)`：evalRaw **只读** `document.activeElement` → `{tier:'editable'|'opaque'|'none', tag}`；探针抛错 → fail-closed（调用方回 `failed` / `focus_probe_failed:<msg>`）
-- [ ] 3.6 `clearFocusedField(cdp, tier)`（**强制、非开关**）：`editable` → JS select + Backspace + 回读三态 ⇒ `cleared:'verified'`；`opaque` → 键盘 select-all（darwin `Meta`=4 / 其余 `Ctrl`=2，**修饰键只活在本原语内部**）+ Backspace ⇒ `cleared:'attempted'`
-- [ ] 3.7 `readFocusedText(cdp)`：仅 `editable`；**读全文**（MUST NOT 前 N 字探针）
-- [ ] 3.8 单测（注入 random / sleep / 桩 cdp，脱浏览器）：键事件数 == 字符数、**零 `Input.insertText` 调用**；Shift 包裹成对；表外字符拒绝；焦点三态分级；清空三态；RTT 补偿后键间隔变异系数保留（**不是**只断言 `typed === len`）
+- [x] 3.1 新建 `src/browse/captcha-type.ts`：ASCII 键位表（0-9 / a-z / A-Z / 空格 / 常见标点 → `{key, code, windowsVirtualKeyCode, needsShift}`），表外字符诚实拒绝 <!-- aidcp-edge 2ee4959 上档字符（'!'→Shift+Digit1）派发真实基键、非凭空造键；另加 validateCaptchaText（长度+字符集，注入前整单校验） -->
+- [x] 3.2 `commitKeyStroke(cdp, spec, dwellMs, sleep)`：真 `keyDown{key,code,vk,text,unmodifiedText}` → sleep(dwell) → `keyUp`；需 Shift 的用真实 Shift keyDown/keyUp 包裹；**无 options 参数**（词法上插不进取消点）；try/finally 保证 keyUp 与 Shift-up 必发（照抄 `commitLeftClick` 已定案形状） <!-- aidcp-edge 2ee4959 命名从 dispatchTypedChar 改为 commitKeyStroke，与 commitLeftClick 同族（commit 前缀 = 原子区、无取消点） -->
+- [x] 3.3 `dispatchHumanTyping(cdp, text, opts): Promise<number>`：复用 `generateKeyStrokes` 取 flight；dwell 独立采样 lognormal(median 75, σ0.3) clamp[30,180]；每字符 sleep → `assertInputSafety(opts)`（**顺序 checkpoint→deadline 不可反**）→ `commitKeyStroke`；循环边界 = strokes 数组长度（迭代限界） <!-- aidcp-edge 2ee4959 顺带导出 cdp-util 的 assertInputSafety（原为私有） -->
+- [x] 3.4 `dispatchHumanTyping` 加 **RTT 补偿**：测量上次 CDP 往返、从下次 sleep 扣除 <!-- aidcp-edge 2ee4959 实测往返里扣掉自己 sleep 的 dwell，剩下才是传输层的账；medianMs 由调用方按 edgeId 派生偏置后传入（§5 接线时给） -->
+- [x] 3.5 `probeFocus(cdp)`：evalRaw **只读** `document.activeElement` → `{tier, tag}`；形状异常一律判 none <!-- aidcp-edge 2ee4959 探针抛错的 fail-closed 在调用方（§5）处理 -->
+- [x] 3.6 `clearFocusedField(cdp, tier)`（**强制、非开关**）：`editable` → JS select + Backspace + 回读 ⇒ `verified`；`opaque` → 键盘 select-all + Backspace ⇒ `attempted` <!-- aidcp-edge 2ee4959 -->
+- [x] 3.7 `readFocusedText(cdp)`：**读全文** <!-- aidcp-edge 2ee4959 -->
+- [x] 3.8 单测 15 例：键事件数 == 字符数、**零 `Input.insertText`**；Shift 包裹成对且必松开；keyDown 抛错也补发 keyUp 且不覆盖原始异常；表外字符拒绝；被抢占/超预算的诚实计数 + 接管优先于死线；焦点三态；清空三态；RTT 补偿；真实随机源下键间隔保留方差 <!-- aidcp-edge 2ee4959 三个关键断言经**先红后绿**变异验证会咬人（RTT 补偿 / Shift 松开 / 键事件数）。**过程中抓到自己一个假绿**：RTT 用例最初按「keyDown 计数==序号」判别 flight/dwell，把 dwell 误记成 flight，而 dwell 恰好撞上 flight-RTT 的值 ⇒ 摘掉补偿照样绿。判别器改按 keyDown/keyUp 配对状态（dwell 必夹在两者之间），不按计数更不按数值 -->
+
+> **§3 已完成（edge `2ee4959`，在分支 `captcha-assist-text-answer` 上，未合 master）**。全量 1702 绿 / acceptance 23 绿 / typecheck 干净。纯新增模块 + 一处导出，零现役路径改动。
 
 ## 4. aidcp-edge — 协议字段 + 构建能力位
 
