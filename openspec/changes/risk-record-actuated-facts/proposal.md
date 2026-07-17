@@ -56,7 +56,18 @@ async record(action: RiskAction): Promise<boolean> {
 - **记账只记既成事实**：`record(action)` **无条件写入**计数与持久化。**「该不该做」是动手之前那道闸的事**——每一条自动下发路径都已经在 `canDo` / `explain` 上预闸过（角色调度 `server.ts:2661`、发布排期 `publish-scheduler:297/351/398`、`gated-auto-comment`、`send-orchestrator:116/178`、加群 `canJoin:3264`）。这道事后重判**买不到任何预闸没给的保护**，它只在预闸**失效的那个缝里**开火——而那正是真相最要紧的时候。
 - **返回值语义逐字不变**：`record` 在被 `canDo` 拒时**仍返回 `false`**。**红线保住**（见下）。改的只是它的**副作用**，不是它的**答案**。
 - **修同一个病的第二处**（`interaction-inbox-service.ts:94-108`）：微信入站回复在 `status === 'confirmed'`（**平台已确认发出**）时调 `record`，被拒则**释放幂等占位 + 记 `denied` 指标** ⇒ 那条已发出的回复对风控**永远隐形**。写入无条件化后，**占位只在真抛错时才释放**（否则重放会重复计数）。
-- **不动**：`canDo` / `explain` / 状态机 / 配额档 / `quota_config` / 协议 / 边缘 / console。
+- **【用户裁决 2026-07-17】把「跳过配额」统一解释为「跳过闸、不跳过账」**——三个动作各错各的，一并治：
+
+  | | 闸（该不该做） | 账（做没做过） | 本 change |
+  | --- | --- | --- | --- |
+  | 加群 | 手动绕、自动过 ✅ | 送进记账了，被记账函数**自己丢掉** | 无条件写入（上条） |
+  | 评论 | 手动绕、自动过 ✅ | 手动的**根本不送进记账** | **摘掉 `skipRiskRecord`** |
+  | 发布 | 手动绕、自动过 ✅ | **谁都不送**（手动自动都没记过） | **补上记账调用** |
+
+  **裁决原文**：「手动动作，评论和发布都应该记账，只是跳过配额限制」。⇒ **「操作员全权」豁免的是那道闸，不是那本账。** 平台照样看见了手动动作，它照样消耗这个号在平台眼里的活动预算。
+- **【BREAKING · 推翻一条明文用户裁决】** `comment-search-command` spec 现文明写：命令评论「**MUST NOT 计入风控按账号按天评论配额**、MUST NOT 因此消耗自治评论预算」，并附**用户决策**取舍说明（「真实评论速率可能超过配置的安全配额…该速率由运营负责」）。**本 change 按新裁决推翻它的「不计账」那一半，保留它的「不被闸拦」与「保留人审」两半。** 后果必须提前讲明：**手动评论从此吃自动评论预算**（正常档一天 8 条）——运营手动评满 8 条，机器当天不再自动评论。**这是裁决的直接意图，不是回归。**
+- **【发布配额与排期对齐 —— 拆一颗已上膛的雷】** 发布日配额是 **1**（保守/正常档；激进 2），**今天是装饰品，正因为从没记过账**。一旦补上记账，它**当场变成硬闸**。而真正在管发布量的是**排期里按账号配的日上限**（允许设到 50；**dev 实测在发的号全是 1**）。⇒ **风控的发布配额 MUST NOT 比排期更紧**：把它提到与排期上限一致（并在代码里**直接引用那个常量、不抄数字**，使「一致」由机械保证、排期上限将来改了自动跟随）。**发布的量由运营在排期里按号设，风控配额只当兜底。** 同时唤醒的还有发布的突发窗（**1/分钟、2/小时**）——它们同样从未生效过；dev 上排期限死 1 条/天故撞不到，但属于「一并活过来」的既成事实，须登记。
+- **不动**：`canDo` / `explain` / 状态机 / **除 publish 外的**配额数值 / `quota_config` 机制 / 协议 / 边缘 / console。
 
 ## Capabilities
 
@@ -64,6 +75,7 @@ async record(action: RiskAction): Promise<boolean> {
 <!-- none -->
 
 ### Modified Capabilities
+- `comment-search-command`: 一处 **MODIFIED**——「命令评论跳过自动硬阈值、**不计入风控配额**，但保留人审」。**本 change 按用户新裁决推翻其中「不计入风控配额 / 不消耗自治评论预算」那一半**（连同其「用户决策」取舍说明），**保留**「不经 `canDo('comment')` 门控阻断」「跳过硬数值阈值」「保留飞书人审闸」「仍记每笔记去重」四半。新口径：**跳过的是闸，不是账。**
 - `interaction-risk-gating`: 三处 **MODIFIED**——
   ① 「速率配额饱和是节奏背压、不是风控状态输入」：`MUST 只返回 false` 这句会被敌意解读成「且什么都别干」（即禁止写入）。**本 change 必须显式改写它、绝不靠解释含混过关**，否则就是拿本仓自己的红线文本去赌一个歧义。改法照该要求**自己立的先例**（`spec:127`：「此要求**强化**既有红线：返 false 不变，只去掉『撞自己配额还自升状态』的自残副作用」）——同一招再进一格：**返 false 不变，只去掉「所以就当没发生过」这个丢证据的副作用。**
   ② 「互动发生后必须按账号持久计数」：补「既成事实回执 MUST NOT 被策略二次否决而丢弃」，与既有的 `MUST NOT 凭下发即记` 构成一对（**下发不算，做完了必须算**）。
@@ -71,7 +83,7 @@ async record(action: RiskAction): Promise<boolean> {
 
 ## Impact
 
-- **aidcp-cloud（唯一动代码的仓）**：`src/risk/risk-controller.ts`（把写入移出 `canDo` 分支）、`src/interactions/interaction-inbox-service.ts`（占位只在抛错时释放）、`src/server.ts:1394` 一带（告警改读 `explain()`，见 design D3）。
+- **aidcp-cloud（唯一动代码的仓）**：`src/risk/risk-controller.ts`（把写入移出 `canDo` 分支）、`src/interactions/interaction-inbox-service.ts`（占位只在抛错时释放）、`src/server.ts:1394` 一带（告警改读 `explain()`，见 D3）、`src/server.ts:1385`（摘 `skipRiskRecord`，见 D6）、`src/publish-agent/`（补发布记账调用，见 D7）、`src/risk/quotas.ts`（**仅 publish 日配额**提到与排期上限一致，见 D7）。
 - **协议 / DB / 边缘 / console**：**全部零改动**、无迁移。
 - **部署**：纯云端单边，dev 当天可部署，无需出安装包。
 - **回滚**：还原上一版本 tar。改动期间多记的计数会残留，**滑动窗一天内自然收敛**，无需数据修复。
@@ -99,14 +111,21 @@ async record(action: RiskAction): Promise<boolean> {
 
 **最强的反证**：`send-orchestrator.ts:25` 自己的接口上**声明了** `record`，却**从不调用**——它的两道闸（`:116` / `:178`）都用 `explain()`。**唯一握着 record 句柄的模块，回答「能不能做」时选的是 `explain()`。**
 
+### `publish` 那个洞的化石证据（**已按裁决并进本 change**）
+
+`record('publish')` 全仓零调用点，而 `record()` 是 `risk_counters` 的**唯一写入者** ⇒ **发布计数器恒为 0、发布日配额是装饰品**。**不是回执被丢，是根本没有回执。**
+
+**后台早就绕开它了**：`panel/types.ts:381` 注释自陈 publish 键用 `publish_log` 真实数**覆盖** `risk_counters` 同名键（`panel-server.ts:661`）。**有人撞见「面板发布数是 0」，从另一张表把显示修好了，把计数器留在死地。** 这个 workaround 就是那个 bug 的化石。本 change 补上记账后，该覆盖**仍应保留**（`publish_log` 是发布的权威账本），但两者从此应当对得上——**对不上就是本 change 出了问题**，是个现成的交叉校验（见 tasks）。
+
 ### 同类洞（本 change **不修**，只登记）
 
-- **`publish` 从不进 `record()`**——全仓零调用点（`record('publish')` grep 无命中，而 `record()` 是 `risk_counters` 的**唯一写入者**）⇒ **发布计数器恒为 0，发布日配额是装饰品**（`canDo('publish')` 的配额分支永不开火，发布只受状态闸约束）。**这比本 change 的病更大**：不是回执被丢，是**根本没有回执**。**佐证**：后台早就绕开它了——`panel/types.ts:381` 注释自陈 publish 键用 `publish_log` 真实数**覆盖** `risk_counters` 同名键。有人撞见「面板发布数是 0」，从另一张表把**显示**修好了，把计数器留在死地。
-- **`view` 在手动 `/comment` 路径上无预闸**：`comment-scheduler` 的读帖不过 `explainView`，而 `skipRiskRecord` 只覆盖 `comment` ⇒ 手动跑一轮多开几篇，view 回执被自己丢掉。**这一处的丢弃是在放松闸**（见 design 的方向性讨论）。
+- **`view` 在手动 `/comment` 路径上无预闸**：`comment-scheduler` 的读帖不过 `explainView` ⇒ 手动跑一轮多开几篇，view 回执被自己丢掉。**这一处的丢弃是在放松闸**（见 design D5 的方向性讨论）。摘掉 `skipRiskRecord`（D6）**不覆盖它**——`skipRiskRecord` 只挡 `comment`，view 走的是另一条路。
 
 ### Non-Goals
 
-- **不改** `canDo` / `explain` / 状态机 / 配额数值 / 三档 / `quota_config`。
+- **不改** `canDo` / `explain` / 状态机 / 三档机制 / `quota_config` 机制。
 - **不改** `record()` 的**返回值语义**（拒时仍返 `false`）。
+- **不改**除 `publish` 外任何动作的配额数值。**publish 也不是「重新评估安全预算」**——只是让它别比排期更紧（D7）。「发布一天几条合适」由运营在**排期**里按号定，不在本 change 讨论。
+- **不修** `view` 手动路径无预闸（见上，只登记）。
 - **不做** join 配额的「统一分子」。上一个 change 已在**独立**理由上把它证伪并反转（两个分子是同量的两个独立下界、两闸 AND = 取较紧）。本 change 只是**解除**了那条禁令的前置条件，使其**变为可做**——**不等于该做**。要做另提。
 - **不修** `publish` 无回执、`view` 手动路径无预闸（见上，只登记）。
