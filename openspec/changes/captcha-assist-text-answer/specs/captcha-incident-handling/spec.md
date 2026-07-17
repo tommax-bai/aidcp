@@ -184,7 +184,9 @@ cloud SHALL 额外做**版本偏斜检测**（下发了 `text` 但回执未标�
 
 edge 执行远程协助点击后 SHALL 等待有界 settle 时间并重新探测阻断遮罩。仅当 fresh probe 确认 captcha/unknown 遮罩已消失时，edge SHALL 发送 `risk.captcha_cleared`，cloud 才 SHALL 解除该 edge 暂停；如果遮罩仍存在，系统 MUST 返回 still_blocked，并允许操作者刷新截图后重试。**实时抓帧循环 MUST NOT 用单次 probe 看不到遮罩就自主发 `risk.captcha_cleared`**：多步验证码在旧挑战消失、新挑战未绘出之间存在瞬时无遮罩窗口，自主判 cleared MUST 经连续 K 次确认 + 最小 settle 才成立。**实时循环的自主 probe 结果 MUST NOT 经 `click_result` 混入 `incident.lastResult`**，以免把非运营发起的探测记成一次复检、污染审计与前端"上次复检"。cloud MUST NOT 因点击命令成功送达、Feishu 链接被打开、协助页按钮被点击或告警被手动解决而恢复 edge。
 
-**`risk.captcha_cleared` 的发出权 MUST 被收归于两条路径：实时循环的连续 K 次确认，与旁路监测体的阻断态翻转闸。任何其它路径 MUST NOT 发出该消息——包括截图请求（手动刷新）处理中的单次 probe。** 截图请求发现当前无阻断时，MUST 只回 `not_blocked` 回执（cloud 据此更新 incident），MUST NOT 借此绕过 K 次确认直接上报清除：手动刷新与实时循环共用同一个瞬时无遮罩窗口，单次 probe 在此处与在实时循环里同样不可信。
+**`risk.captcha_cleared` 的发出权 MUST 限于三条路径**：① 运营发起的注入之后、经有界 settle 与 fresh probe 确认（本要求主句）；② 实时循环的连续 K 次确认；③ 旁路监测体的阻断态翻转闸。
+
+**未经注入的单次 probe MUST NOT 发出该消息**，包括截图请求（手动刷新）与注入前的 stale 复检：它们与实时循环共用同一个「旧挑战已消失、新挑战未绘出」的瞬时无遮罩窗口，却既无 settle 也无连续确认——单次 probe 在这两处与在实时循环里同样不可信，据此上报即提前解 `restricted`（自残）。这两处发现当前无阻断时 MUST 只回 `not_blocked` 回执（cloud 的既有映射已据此更新 incident），恢复交由 ② / ③ 达成：旁路监测体本就在独立轮询，遮罩真的消失时它的翻转闸会发出配对的 `cleared`，故不发不会使该 edge 滞留暂停态。
 
 **`risk.captcha_cleared` 的发送 MUST 排在 `click_result` 之前，且二者 MUST 各自独立容错。** 前者承重（解除生产账号的下发暂停），后者只驱动界面；把承重的那条排在装饰性的那条之后，会让传输异常时"已解决的验证码"永远到不了云端、账号无限期处于暗停状态。
 
@@ -198,7 +200,11 @@ edge 执行远程协助点击后 SHALL 等待有界 settle 时间并重新探测
 
 #### Scenario: 手动刷新截图不得绕过 K 次确认
 - **WHEN** 运营在协助页点「刷新」，edge 的单次 probe 未见遮罩
-- **THEN** edge MUST 只回 `not_blocked` 回执，MUST NOT 发送 `risk.captcha_cleared`
+- **THEN** edge MUST 只回 `not_blocked` 回执，MUST NOT 发送 `risk.captcha_cleared`；恢复由旁路监测体的翻转闸达成
+
+#### Scenario: 注入前复检发现遮罩已消失
+- **WHEN** 运营提交了协助命令，但注入前的 stale 复检的单次 probe 未见遮罩
+- **THEN** edge MUST NOT 注入、MUST 只回 `not_blocked` 回执，MUST NOT 发送 `risk.captcha_cleared`（该 probe 未经 settle 与连续确认）
 
 #### Scenario: 键入进行中不得抓帧
 - **WHEN** 某 incident 正在派发协助键入序列，此时收到截图请求
@@ -215,6 +221,26 @@ edge 执行远程协助点击后 SHALL 等待有界 settle 时间并重新探测
 #### Scenario: 手动解决告警不恢复 edge
 - **WHEN** 操作者在告警列表中手动解决对应 captcha 告警但 edge 尚未发送 `risk.captcha_cleared`
 - **THEN** cloud MUST 只闭合告警日志行，MUST NOT 将 incident 标记 cleared，MUST NOT resume 该 edge
+
+### Requirement: 人工点击必须由原 edge 注入原浏览器并绑定 snapshot
+
+协助页提交点击时，cloud SHALL 将点击序列作为归一化坐标发送给该 incident 绑定的原 edge；edge MUST 校验 incident、snapshot、当前阻断态和坐标边界后，将坐标映射回当前浏览器视口并派发真实输入事件。**当实时抓帧开启时，snapshot 绑定 MUST 放宽为"近期帧集"**：边缘 MUST 为每个 incident 保留最近 N 帧环、云端 MUST 相应保留最近 N 帧集，`submitClick` 的 `snapshot_mismatch` 守卫 MUST 放宽为"提交的 `snapshotId ∈ 近期集"，并用**该被点帧自己的 crop** 缩放坐标——否则运营点的稍旧但"与所见一致"的帧会被云端上游拦死、边缘帧环成死代码、白跑不降反升。cloud MUST NOT 在自身环境执行点击，MUST NOT 将点击命令广播到多个 edge，MUST NOT 用 DOM 状态篡改替代用户输入。
+
+#### Scenario: 有效点击序列派发到原 edge
+- **WHEN** 操作者基于最新 snapshot 提交两个图片点位和一个验证按钮点位
+- **THEN** cloud 只向绑定 edge 发送点击命令，edge 将这些点映射到原浏览器并通过输入事件执行
+
+#### Scenario: 稍旧但在近期集内的帧可提交
+- **WHEN** 实时抓帧已推进 latest，但操作者提交的是被冻结的稍旧帧、其 `snapshotId` 仍在近期 N 帧集内
+- **THEN** cloud MUST 放行该点击，edge MUST 用该被点帧自己的 crop 缩放坐标注入，MUST NOT 因非 latest 而判 `stale_snapshot`
+
+#### Scenario: 超出近期集的 stale snapshot 拒绝点击
+- **WHEN** 操作者基于已被挤出近期集或已过期的 snapshot 提交点击
+- **THEN** cloud 或 edge MUST 拒绝该点击并返回 `stale_snapshot`，MUST NOT 盲目点击当前页面
+
+#### Scenario: edge 当前不在阻断态
+- **WHEN** edge 收到 assist 注入命令但注入前的 fresh probe 显示当前已无 captcha/unknown 阻断
+- **THEN** edge MUST 不执行注入，MUST 回 `not_blocked` 回执，且 MUST NOT 由这一次单次 probe 发出 `risk.captcha_cleared` —— 清除交由旁路监测体的翻转闸这条正常路径达成（见「远程协助后的恢复必须由 edge 复检清除驱动」的三条发出权划分）
 
 ### Requirement: 云端必须接收并解析验证码上报，不得静默丢弃
 

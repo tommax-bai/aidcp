@@ -4,12 +4,13 @@
 
 - [ ] 1.1 `src/browse/captcha-assist.ts`：`clicking` 集合改名 `writing`（防后来者新开 `typing` 集合再把洞开一次），同步 `liveTick` 的互斥判断
 - [ ] 1.2 `src/browse/captcha-assist.ts`：`handleCapture` 首行加 `writing` 互斥闸（与 `liveTick` 同形）——键入期的手动刷新帧会拍到打了一半的框、本就无价值
-- [ ] 1.3 `src/browse/captcha-assist.ts`：`handleCapture` 的 `!kind` 分支**删掉 `sendRiskCleared()`**，只保留 `not_blocked` 回执（cloud `onClickResult` 已把 `not_blocked` → cleared，面板照常更新）。`risk.captcha_cleared` 所有权收归 `liveTick` 的 K=3 与 overlay-report-gate 独占
+- [ ] 1.3 `src/browse/captcha-assist.ts`：**摘掉「未经注入的单次 probe」发 cleared 的两处** —— `handleCapture` 的 `!kind` 分支、`recheckStaleBeforeReplay` 的 (a) 分支；两处只保留 `not_blocked` 回执（cloud `onClickResult` 已把 `not_blocked` → cleared，面板照常更新）。发出权只剩三条：①注入后 settle+fresh probe（`handleClick` 成功路径）②`liveTick` 的 K=3 ③overlay-report-gate 的翻转闸。**安全性已核实**：③ 独立轮询、遮罩真消失时发配对 cleared（`overlay-report-gate.ts:54`），不发不会滞留暂停态
 - [ ] 1.4 `src/browse/captcha-assist.ts`：成功分支的 `sendRiskCleared()` 排到 `sendClickResult()` **之前**，二者**各自 try/catch**（承重的那条不能被装饰性的那条挡住）
 - [ ] 1.5 `src/browse/captcha-assist.ts`：catch 分支 best-effort 重抓帧回带 `snapshot`（失败时框里留着半截答案，运营看不见就无法带 clear 重来）；**重抓帧再失败 MUST NOT 盖掉原始 reason**
 - [ ] 1.6 单测：写入期投递 `captcha.assist.capture`（probe 返回 null）→ 断言 **零** `risk.captcha_cleared` 发送（1.2/1.3 的回归钉）
 - [ ] 1.7 单测：`sendRiskCleared` 先于 `sendClickResult`；后者抛错不影响前者已送达
-- [ ] 1.8 `npm test` + `npm run test:acceptance` + `npm run typecheck` 全绿后提交（本节可独立 land）
+- [ ] 1.8 单测：`recheckStaleBeforeReplay` 的 (a) 分支回 `not_blocked` 且**零** `risk.captcha_cleared`（1.3 第二处的回归钉）
+- [ ] 1.9 `npm test` + `npm run test:acceptance` + `npm run typecheck` 全绿后提交（本节可独立 land）
 
 ## 2. 环境探查（不阻塞，决定是否另开 bugfix change）
 
