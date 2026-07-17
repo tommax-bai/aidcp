@@ -27,6 +27,8 @@
 
 选择隐藏整个行，而不是在小红书上保留禁用开关，因为产品要求是“不展示开关”，且残留说明、徽章或帮助入口仍会暗示小红书支持该能力。
 
+Facebook 环境尚未启动时，fleet 可能还没有该环境的运行态投影；此时 renderer 允许从已保存的 `adsProfileId` / `settings.platform` 建立展示上下文，只展示禁用的未知态入口。该入口不允许写入，也不把未知态显示成关闭；等 `ui.snapshot.dailyUsage.slowStart` 到达后，再回到权威三态渲染。
+
 ### 2. 使用原生可聚焦触发器承载非交互表格
 
 问号用 `button type=button`，通过 CSS 的 `:hover` / `:focus-visible` / `:focus-within` 展开帮助面板。面板是静态 `table`，触发器带 `aria-label`，无需新增状态机、点击监听或依赖；点击问号仍在慢启动行内阻止冒泡，不改变「今日进展」收展状态。
