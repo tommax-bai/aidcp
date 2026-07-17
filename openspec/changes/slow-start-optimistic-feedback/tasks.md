@@ -18,4 +18,4 @@
 ## 4. Closeout
 
 - [x] 4.1 Commit and push the Edge implementation branch; do not package or release an installer without an explicit request. <!-- aidcp-edge 0d38116 ff-pushed origin/master; no installer built -->
-- [x] 4.2 Commit and push the control-repo OpenSpec branch, preserving the dirty canonical checkout and documenting that no cloud deployment is required. <!-- aidcp 13341e3 + closeout follow-up; canonical checkout untouched; renderer-only change, no cloud deploy -->
+- [x] 4.2 Commit and push the control-repo OpenSpec branch, preserving the dirty canonical checkout and documenting that no cloud deployment is required. <!-- rebased on latest origin/main; canonical checkout untouched; renderer-only change, no cloud deploy -->
