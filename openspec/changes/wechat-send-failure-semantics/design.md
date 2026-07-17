@@ -1,6 +1,6 @@
 ## Context
 
-视频号互动链路由 Cloud 创建 attempt 并通过 WS 定向下发，Edge 在本地持久 claim 后调用平台写接口，再以既有 `confirmed | failed | ambiguous` 结果回传。Edge 的 `WechatChannelsError` 已携带 `requestDispatched`，用于表示请求是否可能离开进程；但 `WechatReplySender` 当前只按 `category` 决定终态，因此 `schema_changed` 等错误无论发生在序列化前还是响应解析后都走同一条 ambiguous/回查路径。
+视频号互动链路由 Cloud 创建 attempt 并通过 WS 定向下发，Edge 在本地持久 claim 后调用平台写接口，再以既有 `confirmed | failed | ambiguous` 结果回传。Edge 的 `WechatChannelsError` 已携带 `requestDispatched`，用于表示请求是否可能离开进程；但 `WechatReplySender` 当前只按 `category` 决定终态，且响应 parser 产生的 `schema_changed` 默认带有本地前置错误的 `requestDispatched=false`。因此序列化前与响应解析后的错误证据没有完整分流。
 
 这会混淆两个风险完全不同的事实：序列化前失败可以证明平台没有收到写请求；请求派发后超时、断连或响应不可解析则无法证明平台是否已写入。前者长期占据 ambiguous 会阻断后续人工修复，后者若当作 failed 重试则可能重复回复。
 
@@ -41,11 +41,11 @@ Edge 按以下顺序分类：
 
 ### 3. 只有可能写入平台的结果才做 bounded verify
 
-确定未派发和平台明确拒绝都直接完成 durable result；只有可能写入但结果未知时才执行现有评论/DM 回查。回查仍要求唯一匹配，未命中或回查自身失败保持 `ambiguous`，不得盲重发。
+API client SHALL 在请求/响应两段分别捕获错误：请求构造或序列化失败保留 `requestDispatched=false`；收到平台响应后才发生的 parser 错误必须升级为 `requestDispatched=true`。确定未派发和平台明确拒绝都直接完成 durable result；只有可能写入但结果未知时才执行现有评论/DM 回查。回查仍要求唯一匹配，未命中或回查自身失败保持 `ambiguous`，不得盲重发。
 
 ### 4. 测试承重边界而非只测错误名称
 
-Edge 单测至少覆盖同一 `schema_changed` 类别在 `requestDispatched=false` 与 `true` 下产生不同结果，并断言前者零回查、后者仍回查/ambiguous。保留 timeout/restart/reconcile 不重发测试。Cloud 只运行现有结果消费和协议测试，除非验证发现其状态机不能接受新的诚实 `failed` 路径。
+Edge 单测至少覆盖同一 `schema_changed` 类别在 `requestDispatched=false` 与 `true` 下产生不同结果，断言真实 API client 的响应 parser 错误携已派发证据，并断言前者零回查、后者仍回查/ambiguous。保留 timeout/restart/reconcile 不重发测试。Cloud 只运行现有结果消费和协议测试，除非验证发现其状态机不能接受新的诚实 `failed` 路径。
 
 ## Risks / Trade-offs
 
