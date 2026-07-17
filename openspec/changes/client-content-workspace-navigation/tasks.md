@@ -116,3 +116,18 @@
       把本分支对 `interaction-workspace.js` 的改动还原后行为一致。该改动是同步的 class 切换，
       不可能产生 76s 用例。判定为**既有的负载相关 flaky**，与本 change 无因果；登记在此备查。
   <!-- 若后续 CI 复现，从「全量并发下这两个用例被饿死」方向查，勿从本 change 找 -->
+- [x] 7.5 三仓合回默认分支并推送：aidcp `f538b55` (main) / aidcp-edge `86aecf7` (master) / aidcp-cloud `0857d94` (master)。
+      推送前逐仓核 `merge-base --is-ancestor origin/<默认分支> <默认分支>` 确认是 fast-forward，未 force-push。
+      期间并发 session 两次推新提交到默认分支（edge +3、main/master 各 +1），均先合入再重跑闸后才推。
+- [x] 7.6 cloud 部署 dev（`121.89.85.150`）。按 §5 安全序列：target `--check` → 先探 ECS 真实现状 →
+      备份 `cloud.bak.20260717-114831.tar.gz` + `.env.bak.20260717` → rsync（排除 .env / node_modules / .git）→
+      restart → healthcheck。**从 `git archive master` 的干净快照部署**（§6：并行多 session 场景禁止从共享脏工作树上线；
+      canonical 工作区当时确有他人遗留的未跟踪文件 `1`，快照已隔离）。`package.json` 与线上 md5 一致 → 无依赖变更、免 npm ci。
+      healthcheck：service active、8787 + 面板 8090 均在听、飞书长连接已建立（WSClient onReady）、PG `select 1` = 1、
+      重启后 5 分钟内无 unhandled/uncaught/FATAL；**同机 isales 4 个服务全程未动**（红线）。
+  <!-- aidcp-cloud 0857d94 <!-- 2026-07-17 deployed dev --> -->
+- [x] 7.7 **真库对账验证 6.1 的修复真的生效**（不止「测试绿」）：dev 库上同时跑新旧两个口径——
+      旧口径（不过滤 status）34 条，新口径（排除 failed）28 条 → 修复前有 **6 条从未生成的稿**被当成「已成稿」报给客户。
+      这是本次修复在真实数据上的直接证据。
+- [x] 7.8 真机验收项已解耦登记到 `docs/real-machine-acceptance-backlog.md` **簇 93**（9 项；控制仓 `57de65f`）。
+      Edge 侧 UI 未打安装包 → 尚未到运营机，簇 93 前置即「需自出安装包」。
