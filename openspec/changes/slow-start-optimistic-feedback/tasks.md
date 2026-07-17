@@ -18,4 +18,4 @@
 ## 4. Closeout
 
 - [x] 4.1 Commit and push the Edge implementation branch; do not package or release an installer without an explicit request. <!-- aidcp-edge be579de pushed codex/slow-start-optimistic-feedback; no installer built -->
-- [ ] 4.2 Commit and push the control-repo OpenSpec branch, preserving the dirty canonical checkout and documenting that no cloud deployment is required.
+- [x] 4.2 Commit and push the control-repo OpenSpec branch, preserving the dirty canonical checkout and documenting that no cloud deployment is required. <!-- aidcp 13341e3 + closeout follow-up; canonical checkout untouched; renderer-only change, no cloud deploy -->
