@@ -102,8 +102,12 @@ renderer MUST NOT 持有 JWT/Cookie、访问平台接口、记录完整 DM 或�
 
 ### Requirement: 单列互动布局必须提供主列整体滚动
 
-当左侧环境栏使右侧 InteractionWorkspace 的 container 宽度进入单列布局时，Electron 客户端 SHALL 让右侧主列整体纵向滚动，MUST NOT 继续用宽屏固定高度加 `overflow:hidden` 裁掉列表下方的详情或共享开发者详情。宽屏双列布局 MAY 保留列表/详情各自滚动，但任何布局都必须让当前 thread 详情可达。
+当左侧环境栏使右侧 InteractionWorkspace 的 container 宽度进入单列布局时，Electron 客户端 SHALL 让右侧主列整体纵向滚动，MUST NOT 继续用宽屏固定高度加 `overflow:hidden` 裁掉列表下方的详情或共享开发者详情。是否折叠为单列 MUST 以右侧 workspace 的实际可用宽度为准；支持 container query 的客户端 MUST NOT 再被 viewport-only 断点提前覆盖。宽屏双列布局 MAY 保留列表/详情各自滚动，但任何布局都必须让当前 thread 详情可达。
 
 #### Scenario: 820×720 环境栏展开后详情仍可达
 - **WHEN** 窗口为 820×720、环境栏可见且 workspace container 宽度不超过 640px
 - **THEN** 用户在右侧主列向下滚动可依次到达互动详情和开发者详情，MUST NOT 被只响应 viewport 宽度的断点裁切
+
+#### Scenario: 窄 viewport 但右侧仍够宽时保持双栏
+- **WHEN** viewport 不超过 700px，但 InteractionWorkspace 的实际可用宽度仍大于 640px
+- **THEN** 收件箱保持列表/详情双栏，MUST NOT 因 viewport-only 兜底把消息列表拉成通栏；只有 workspace 自身进入单列阈值后才折叠
