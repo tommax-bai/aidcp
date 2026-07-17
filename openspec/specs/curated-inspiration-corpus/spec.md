@@ -168,6 +168,10 @@ TBD - created by archiving change curated-admission-eval-roles. Update Purpose a
 
 精选语料 SHALL 按账号隔离：每行带账号维度，召回 MUST 按账号过滤。系统 MUST NOT 跨账号取材（不得把一个账号的精选内容用于另一账号的创作）。
 
+**账号维度只有一个键空间**：登录态页面读出的真实平台账号 id——写入方一律以它落行，读取方一律以它过滤。指纹浏览器的环境标识（分身 id）**不是**账号 id，两者是可证不交的两个键空间。任何按账号过滤的查询 MUST 只接受平台账号 id；调用方持有的是环境标识时，MUST 先经权威解析把它翻译为绑定账号，MUST NOT 把环境标识原样传入声明为账号的形参。
+
+一次按账号的召回返回零行 SHALL 只意味着「该账号确实没有语料」。当账号维度无法被确定——键翻译缺失、绑定未知或被争用——系统 MUST 诚实回报无法确定，MUST NOT 返回空结果集：把「不知道该查谁」呈现为「该账号什么都没有」，是把失败伪装成一个和善的事实，与「MUST NOT 静默假成功」红线同质。
+
 #### Scenario: 召回只返回本账号语料
 
 - **WHEN** 为某账号选取创作素材
@@ -177,6 +181,18 @@ TBD - created by archiving change curated-admission-eval-roles. Update Purpose a
 
 - **WHEN** 有实现的召回不按账号过滤、把多账号精选内容混用
 - **THEN** MUST 视为违规、不予合入；召回 MUST 按账号隔离
+
+#### Scenario: 红线反例——拿环境标识当账号 id 查（禁止）
+
+- **WHEN** 有实现把指纹浏览器的环境标识直接传入按 `account_id` 过滤的查询
+- **THEN** MUST 视为违规、不予合入——该查询恒零命中，且零命中会被上层呈现为「这个账号还没有语料」
+- **AND** 正确做法 SHALL 是先把环境标识解析为绑定账号，再以账号查询
+
+#### Scenario: 账号无法确定时不得回落为空
+
+- **WHEN** 调用方只有环境标识、而该环境的绑定账号未知或被争用
+- **THEN** 系统 MUST 诚实回报账号无法确定
+- **AND** MUST NOT 返回空结果集，MUST NOT 让上层把它呈现为「该账号没有语料」
 
 ### Requirement: 有界增长与 PII 姿态
 
