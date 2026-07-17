@@ -13,35 +13,47 @@
 
 ## 1. aidcp-cloud — 记账只记既成事实
 
-- [ ] 1.1 `src/risk/risk-controller.ts:179-191`：`record()` **无条件写入**计数 + 持久化，**返回值语义逐字不变**（被 `canDo` 拒时仍返 `false`）。改的是副作用，不是答案。
-- [ ] 1.2 **求值顺序**：`const allowed = this.canDo(action);` **在写入之前**取，写完返回 `allowed`。加一条专门的测试钉死：**撞顶那一次仍返 `false`，且该次计数已写**（先写后判会让它返 `true`）。
-- [ ] 1.3 **不碰** `canDo` / `explain` / `effectiveQuotas` / 状态机 / 配额数值。改完复核 `explain()` 的返回集**一字未动**。
-- [ ] 1.4 更新 `record()` 上那段注释——它现在说「被拒只返 false（**canDo 已拦住动作**）」，**那个括号里的假设正是本 change 要拆的**（手动绕闸的裁决比这句注释还早）。写清新契约：返回值答「在不在策略内」，计数器答「发生过没有」。
+- [x] 1.1 `src/risk/risk-controller.ts:179-191`：`record()` **无条件写入**计数 + 持久化，**返回值语义逐字不变**（被 `canDo` 拒时仍返 `false`）。改的是副作用，不是答案。
+- [x] 1.2 **求值顺序**：`const allowed = this.canDo(action);` **在写入之前**取，写完返回 `allowed`。加一条专门的测试钉死：**撞顶那一次仍返 `false`，且该次计数已写**（先写后判会让它返 `true`）。
+- [x] 1.3 **不碰** `canDo` / `explain` / `effectiveQuotas` / 状态机 / 配额数值。改完复核 `explain()` 的返回集**一字未动**。
+- [x] 1.4 更新 `record()` 上那段注释——它现在说「被拒只返 false（**canDo 已拦住动作**）」，**那个括号里的假设正是本 change 要拆的**（手动绕闸的裁决比这句注释还早）。写清新契约：返回值答「在不在策略内」，计数器答「发生过没有」。
+
+<!-- aidcp-cloud cloud master `7f5f4a3`（含实装 `7970c87` + 复核修复 `7f5f4a3`） —— record() 先取判定、再无条件写入、返回判定；返回值语义逐字未变（AC-RISK 零改测试全过，坐实设计 D2）。 -->
 
 ## 1b. aidcp-cloud — 手动评论照常记账（摘掉记账豁免，**保留闸豁免**）
 
-- [ ] 1b.1 摘掉 `src/server.ts:1385` 的 `skipRiskRecord`（`evt.action === 'comment' && manualCommentAccounts.has(accountId)`）⇒ 手动评论照常驱动 record。**只摘记账豁免**——手动评论**仍不经 `canDo('comment')` 阻断**（那道豁免在别处、逐字不动）。
-- [ ] 1b.2 **复核 `manualCommentAccounts` 的其余用途**：摘掉这一处后它若失去全部消费者，按「显式登记、不顺手删」处理；若仍有别的消费者，**逐个确认没有一个是靠它来豁免闸的**（豁免闸是对的、要留）。
-- [ ] 1b.3 **`view` 不在覆盖范围**：`skipRiskRecord` 硬绑 `comment`，手动路径的 view 走另一条路（无预闸）⇒ 摘它**不影响** view。别顺手扩。
+- [x] 1b.1 摘掉 `src/server.ts:1385` 的 `skipRiskRecord`（`evt.action === 'comment' && manualCommentAccounts.has(accountId)`）⇒ 手动评论照常驱动 record。**只摘记账豁免**——手动评论**仍不经 `canDo('comment')` 阻断**（那道豁免在别处、逐字不动）。
+- [x] 1b.2 **复核 `manualCommentAccounts` 的其余用途**：摘掉这一处后它若失去全部消费者，按「显式登记、不顺手删」处理；若仍有别的消费者，**逐个确认没有一个是靠它来豁免闸的**（豁免闸是对的、要留）。
+- [x] 1b.3 **`view` 不在覆盖范围**：`skipRiskRecord` 硬绑 `comment`，手动路径的 view 走另一条路（无预闸）⇒ 摘它**不影响** view。别顺手扩。
+
+<!-- 1b.2 结论：manualCommentAccounts 仍有消费者——摘掉记账豁免后它只剩**抑制节奏饱和告警**一个用途（此前手动评论靠「整个跳过 record」顺带获得静默，现改为在告警侧显式排除，行为不变而账变诚实）。闸的豁免在下发侧、一字未动。 -->
+<!-- 复核补记：manualSource 只覆盖 XHS 手动评论（withManualCommitMarker 那条路）；**FB 手动 /comment 从不进该集合** ⇒ 其饱和告警行为与改前一致（已写进注释，不夸大）。 -->
 
 ## 1c. aidcp-cloud — 发布补记账 + 配额与排期对齐（**本 change 最险的一段**）
 
-- [ ] 1c.1 补上 `record('publish')` 调用点——**今天全仓零调用点**，而 record 是 `risk_counters` 唯一写入者 ⇒ 发布计数器恒 0。判据须与其余动作同轴：**发布真发出（既成事实）才记**，MUST NOT 凭下发即记；手动 `/publish`（`operatorOverride`）**照记**（裁决）。落点须与 `publish_log` 的权威口径对齐（见 1c.4）。
-- [ ] 1c.2 **同批把发布日配额提到与排期上限一致**（design D7）。**绝不抄数字**——直接引用排期上限常量（今天 = 50），使「一致」由机械保证、排期上限将来改了自动跟随。**注意分层**：那个常量今天导出自会拉起 pg 的模块，直接 import 进 `src/risk/quotas.ts` 可能带进不该有的依赖 ⇒ 实装时把常量提到共享位置，**不要为了省事抄一个 50**（抄了就又长出第二个没人调的数，正是本 change 在治的病）。
-- [ ] 1c.3 **突发窗一并活过来，须如实登记**：发布的分钟/小时窗是 **1/分钟、2/小时**，**同样从未生效过**。dev 上排期限死 1 条/天故撞不到；若运营把排期设到 3，2/小时会开始真的分散发布节奏——**这是合理的拟人化，不是回归**。**不在本 change 调这两个数。**
-- [ ] 1c.4 **白送的交叉校验**：后台的发布数早已绕开这个死计数器（`panel/types.ts:381` 注释自陈用 `publish_log` 真实数**覆盖** `risk_counters` 同名键，`panel-server.ts:661`）。补记账后**该覆盖仍应保留**（`publish_log` 是权威账本），但**两个数从此应当对得上**。**对不上就是本 change 出了问题**——真机拿它当验收判据（6.6）。
+- [x] 1c.1 补上 `record('publish')` 调用点——**今天全仓零调用点**，而 record 是 `risk_counters` 唯一写入者 ⇒ 发布计数器恒 0。判据须与其余动作同轴：**发布真发出（既成事实）才记**，MUST NOT 凭下发即记；手动 `/publish`（`operatorOverride`）**照记**（裁决）。落点须与 `publish_log` 的权威口径对齐（见 1c.4）。
+- [ ] ~~1c.2 **同批把发布日配额提到与排期上限一致**~~（design D7）。**绝不抄数字**——直接引用排期上限常量（今天 = 50），使「一致」由机械保证、排期上限将来改了自动跟随。**注意分层**：那个常量今天导出自会拉起 pg 的模块，直接 import 进 `src/risk/quotas.ts` 可能带进不该有的依赖 ⇒ 实装时把常量提到共享位置，**不要为了省事抄一个 50**（抄了就又长出第二个没人调的数，正是本 change 在治的病）。
+- [x] 1c.3 **突发窗一并活过来，须如实登记**：发布的分钟/小时窗是 **1/分钟、2/小时**，**同样从未生效过**。dev 上排期限死 1 条/天故撞不到；若运营把排期设到 3，2/小时会开始真的分散发布节奏——**这是合理的拟人化，不是回归**。**不在本 change 调这两个数。**
+- [x] 1c.4 **白送的交叉校验**：后台的发布数早已绕开这个死计数器（`panel/types.ts:381` 注释自陈用 `publish_log` 真实数**覆盖** `risk_counters` 同名键，`panel-server.ts:661`）。补记账后**该覆盖仍应保留**（`publish_log` 是权威账本），但**两个数从此应当对得上**。**对不上就是本 change 出了问题**——真机拿它当验收判据（6.6）。
+
+<!-- 1c.1：aidcp-cloud 7970c87 —— publish-dispatcher 的 published_confirmed 与 submitted_unconfirmed 两个分支挂 recordActuatedPublish（best-effort，记账失败绝不动摇已成功的发布终态）；server.ts 注入 recordPublish。判据与 publish_log 权威口径（status IN ('submitted','published')）逐字同轴。 -->
+<!-- **1c.2 刻意不做（推翻本 change 自己的提案 + 用户裁决的一半，理由如下，已当场上报用户）**：提案称「那个 1 从没被人真正选过」——**这是假的**。`docs/risk-control.md` §3/§6 **特意**选了它并写明理由：「发布是最高风险动作；同一天多篇极易触发营销号判定」，开篇更引运营共识「发得多、看得少的账号会被直接归类为营销号」。而红掉的测试名就叫「三档每日配额**符合 risk-control 第 6 节**」——**文档就是它的规范**。
+     复核数据后「与排期一致」这件事**今天已经成立**：排期实际（dev 全部在发的号）=1、风控正常档=1、发布扳机间隔闸 minHoursBetween 默认=24h、文档=1，四个数全是 1。要「提到 50」才会不一致，而那正好撞穿文档那条安全线。⇒ 只做记账、不动数字：dev 上零行为变化、文档不被推翻、裁决核心（手动也要记账）完整落地。**抬那个数是一个独立的安全决策，待用户单独定。**
+     旁证：抬到 50 时全量恰好红 3 条（三档配额对文档 / 面板 day 上限 / 慢启动 binding「publish 纹丝不动」），撤回后一条不剩——**动数字才动了既有约定，诚实记账那部分零回归**。 -->
+<!-- 1c.3：坐实发布突发窗为 1/分钟、2/小时（minute=max(1,min(MINUTE_BURST_CAP=1,ceil(1/20))) / hour=max(1,min(2,ceil(1/4)))），随本 change 首次真正生效；dev 排期限死 1 条/天故撞不到。未调这两个数。 -->
+<!-- 1c.4：publish_log 的覆盖保留（panel/types.ts:381 → panel-server.ts:661），两数从此应当对得上 ⇒ 真机 6.6 拿它当判据。 -->
 
 ## 2. aidcp-cloud — 同病第二处（**必须与 §1 同批，否则出真实重复计数**）
 
-- [ ] 2.1 `src/interactions/interaction-inbox-service.ts:94-108`：微信入站回复在 `status === 'confirmed'`（**平台已确认发出**）时 `claimRiskRecord` → `record` → 被拒则**释放占位**。§1 之后写入已经发生，占位若仍释放 ⇒ **重放会再写一次 ⇒ 真实重复计数**。改为**只在真抛错时释放**（判据从「返回值是不是 false」改成「有没有抛」）。
-- [ ] 2.2 `interaction_risk_record_total{status:'denied'}` **含义变了**：从「没记下」变成「记下了、但超策略」。显式登记（改注释 / 指标说明），别让读盘的人按旧义读。顺带：`denied` 与 `failed` 今天**收敛成同一种处理**、下游分不出「策略拒绝」与「PG 抛错」；改后 `denied` 分支消失，`failed` 只剩真故障 ⇒ 语义更干净。
-- [ ] 2.3 **微信入站是活路径，必须单独跑测试**。`dm_reply` 三档配额都是 `0` ⇒ `canDo('dm_reply')` **恒 false**（`0 >= 0`）⇒ 今天每条已确认回复都被丢。改后计数器**首次**从 0 累加。坐实：`0` 是**占位而非真上限**（`quota_config` 覆盖是唯一启用路径）⇒ `canDo` 仍恒 false、门不变、**预期无行为变化**（design Open Question 2）。**若发现并非如此，停手上报。**
+- [x] 2.1 `src/interactions/interaction-inbox-service.ts:94-108`：微信入站回复在 `status === 'confirmed'`（**平台已确认发出**）时 `claimRiskRecord` → `record` → 被拒则**释放占位**。§1 之后写入已经发生，占位若仍释放 ⇒ **重放会再写一次 ⇒ 真实重复计数**。改为**只在真抛错时释放**（判据从「返回值是不是 false」改成「有没有抛」）。
+- [x] 2.2 `interaction_risk_record_total{status:'denied'}` **含义变了**：从「没记下」变成「记下了、但超策略」。显式登记（改注释 / 指标说明），别让读盘的人按旧义读。顺带：`denied` 与 `failed` 今天**收敛成同一种处理**、下游分不出「策略拒绝」与「PG 抛错」；改后 `denied` 分支消失，`failed` 只剩真故障 ⇒ 语义更干净。
+- [x] 2.3 **微信入站是活路径，必须单独跑测试**。`dm_reply` 三档配额都是 `0` ⇒ `canDo('dm_reply')` **恒 false**（`0 >= 0`）⇒ 今天每条已确认回复都被丢。改后计数器**首次**从 0 累加。坐实：`0` 是**占位而非真上限**（`quota_config` 覆盖是唯一启用路径）⇒ `canDo` 仍恒 false、门不变、**预期无行为变化**（design Open Question 2）。**若发现并非如此，停手上报。**
 
 ## 3. aidcp-cloud — 节奏告警改读 `explain()`（行为逐位不变）
 
-- [ ] 3.1 `src/server.ts:1394` 一带：告警从 `!recorded` 改挂到**写入前的一次 `explain()`**。spec 那条要求（`spec:146`）**本来就是按 `explain()` 的 reason 措辞的**，且现码 `:1395` 当场就在重算它 ⇒ 行为逐位相同，成本一行。
-- [ ] 3.2 **别把「保住这个告警」抬成设计约束**——它今天已经很脆：`:1395` 是第二次独立求值、窗口在滑，滑走就 `reason=undefined`、**本来就静默不发**；P2、20min 冷却去重、自陈「是提示、不是阻断」。
-- [ ] 3.3 **§1b 会让它对手动评论首次开火**：今天 `skipRiskRecord` 跳过整块 ⇒ 手动评论**从不发**这个告警；摘掉后手动评论会开始触发「节奏过载」。**运营存心手动评论时这是噪声不是信号** ⇒ 实装时判断是否要在告警侧显式排除手动来源（**不是**回到跳过记账——那是两回事）。结论写回 design。
+- [x] 3.1 `src/server.ts:1394` 一带：告警从 `!recorded` 改挂到**写入前的一次 `explain()`**。spec 那条要求（`spec:146`）**本来就是按 `explain()` 的 reason 措辞的**，且现码 `:1395` 当场就在重算它 ⇒ 行为逐位相同，成本一行。
+- [x] 3.2 **别把「保住这个告警」抬成设计约束**——它今天已经很脆：`:1395` 是第二次独立求值、窗口在滑，滑走就 `reason=undefined`、**本来就静默不发**；P2、20min 冷却去重、自陈「是提示、不是阻断」。
+- [x] 3.3 **§1b 会让它对手动评论首次开火**：今天 `skipRiskRecord` 跳过整块 ⇒ 手动评论**从不发**这个告警；摘掉后手动评论会开始触发「节奏过载」。**运营存心手动评论时这是噪声不是信号** ⇒ 实装时判断是否要在告警侧显式排除手动来源（**不是**回到跳过记账——那是两回事）。结论写回 design。
 
 ## 4. 运营预期与安全红线
 
@@ -49,36 +61,54 @@
   ① **手动评论从此吃自动评论预算**（正常档日 8）——运营手动评满 8 条，机器当天不再自动评论。**这是裁决的直接意图，且推翻了一条既有明文裁决。**
   ② **手动加群从此吃自动加群预算**（正常档日 3）。
   ③ **发布**：量仍由排期按号定（风控配额已提到不比排期更紧）；但发布的**突发窗**（1/分钟、2/小时）首次生效——排期日上限 >1 的号会看到发布被分散。
-- [ ] 4.2 `AC-RISK-*` **零改测试全过**（design D2 已用执行证明可行）。**要改测试才能过 = 停手。**
-- [ ] 4.3 复核**方向性**：计数器只增（`sliding-window-counter.ts:26` 只 push）、闸为 `count >= quota → deny` ⇒ 诚实记账**只可能更早拒绝**。**逐个确认没有任何路径因此放行今天会挡住的动作**——`view` 是唯一需要单独想的（见 5.5）。
+- [x] 4.2 `AC-RISK-*` **零改测试全过**（design D2 已用执行证明可行）。**要改测试才能过 = 停手。**
+- [x] 4.3 复核**方向性**：计数器只增（`sliding-window-counter.ts:26` 只 push）、闸为 `count >= quota → deny` ⇒ 诚实记账**只可能更早拒绝**。**逐个确认没有任何路径因此放行今天会挡住的动作**——`view` 是唯一需要单独想的（见 5.5）。
 
 ## 5. 测试
 
-- [ ] 5.1 **撞顶仍返 false，且该次已记**（1.2 的求值顺序）——本 change 最容易写反的一条。
-- [ ] 5.2 **被限（`restricted` / `frozen`）时计数照写**、返回仍 `false`、**状态机纹丝不动**（`status` / `signal_count` / `last_signal_at`）。
-- [ ] 5.3 **紧窗口的拒绝不得污染松窗口的账本**：小时配额 1、日配额 3，真实发生 3 次 ⇒ **日计数 = 3**（今天 = 1）。**这是「预算被打穿」那条的直接断言。**
-- [ ] 5.4 **微信已确认回复被记且占位不释放**（§2）；重放不产生重复计数。
-- [ ] 5.5 **`view` 记账后点赞比例规则真正生效**：`likeRatioAllowsNextLike()` 有 `if (views < minViewsForLikeRatio) return true;` ⇒ **view 被少记会跌破阈值、整条规则被跳过 ⇒ 今天更宽松**。诚实记 view 后该规则应真正开火（仍是收紧方向）。
-- [ ] 5.6 **节奏告警行为不变**（§3）：突发窗饱和仍发、日窗饱和仍静默。
-- [ ] 5.7 **零回归**：正常在额度内的动作，计数与返回值**逐位不变**。
-- [ ] 5.8 **手动评论**：配额耗尽时**仍可发**（闸豁免不变）**且被记下**（账豁免取消）；随后**自治**评论被 `canDo('comment')` 正常拦下。**这一对是 1b 的核心断言**（两半必须一起断，只断一半会把「不拦」和「不记」又缠回去）。
-- [ ] 5.9 **发布**：真发出才记、只下发不记；手动 `/publish` 照记且**不被闸拦**；发布日配额**不比排期上限更紧**（引用同一常量，非硬编码——测试须能在常量改动时跟随）。
+- [x] 5.1 **撞顶仍返 false，且该次已记**（1.2 的求值顺序）——本 change 最容易写反的一条。
+- [x] 5.2 **被限（`restricted` / `frozen`）时计数照写**、返回仍 `false`、**状态机纹丝不动**（`status` / `signal_count` / `last_signal_at`）。
+- [x] 5.3 **紧窗口的拒绝不得污染松窗口的账本**：小时配额 1、日配额 3，真实发生 3 次 ⇒ **日计数 = 3**（今天 = 1）。**这是「预算被打穿」那条的直接断言。**
+- [x] 5.4 **微信已确认回复被记且占位不释放**（§2）；重放不产生重复计数。
+- [x] 5.5 **`view` 记账后点赞比例规则真正生效**：`likeRatioAllowsNextLike()` 有 `if (views < minViewsForLikeRatio) return true;` ⇒ **view 被少记会跌破阈值、整条规则被跳过 ⇒ 今天更宽松**。诚实记 view 后该规则应真正开火（仍是收紧方向）。
+- [x] 5.6 **节奏告警行为不变**（§3）：突发窗饱和仍发、日窗饱和仍静默。
+- [x] 5.7 **零回归**：正常在额度内的动作，计数与返回值**逐位不变**。
+- [x] 5.8 **手动评论**：配额耗尽时**仍可发**（闸豁免不变）**且被记下**（账豁免取消）；随后**自治**评论被 `canDo('comment')` 正常拦下。**这一对是 1b 的核心断言**（两半必须一起断，只断一半会把「不拦」和「不记」又缠回去）。
+- [ ] ~~5.9 **发布**~~：真发出才记、只下发不记；手动 `/publish` 照记且**不被闸拦**；发布日配额**不比排期上限更紧**（引用同一常量，非硬编码——测试须能在常量改动时跟随）。
+
+<!-- 2.1：aidcp-cloud 7970c87 —— 占位只在**真抛错 / 拿不到 controller** 时释放（判据从「返回值」改成「有没有写成」）。 -->
+<!-- 2.2：`denied` 标签消失，改为 `recorded_over_policy`（写下了、但超策略）；`failed` 只剩真故障。**含义变了，读盘者按新义读。** -->
+<!-- 2.3：坐实 dm_reply 三档配额皆 0（占位而非真上限，quota_config 覆盖是唯一启用路径）⇒ canDo 恒 false、门不变、无行为变化；已补假 store 单测四条路径（见 5.4）。 -->
+<!-- §3：告警判据改取**写入前**的一次 explain()（record 现在无条件写，写完再问读到的是含这一笔的新状态）；手动来源改为**在告警侧显式排除**（此前靠整个跳过 record 顺带静默）。行为逐位不变。 -->
+<!-- 4.2：**AC-RISK 55/55 零改测试全过**——这正是 design D2 立的验收条件（要改测试才能过 = 设计走错）。 -->
+<!-- 5.x：新增 test/risk-record-actuated-facts.test.ts（7 条，RiskController 层）+ test/interactions/inbox-risk-record-claim.test.ts（4 条，假 store、无需 PG）。
+     **真实性双重验证**：① 把 record() 改动 stash 掉 → 7 条里 6 条红（第 7 条是零回归绊线，两边绿）；
+     ② 对抗性复核用**突变/注入实验**打假：把点赞比例规则整条删掉，原 5.5 照样绿（分钟窗先拦、比例规则根本没跑到）⇒ 已改为先排空突发窗、断言 `explain('like').reason === 'ratio:like_view'`（布尔谁都能满足，reason 只有该规则给），重新突变后能杀死它；
+     把 2.1 那个 bug 原样注入 → 全量 2443 **全绿**（该处此前零覆盖）⇒ 已补 4 条，重新注入后当场变红。 -->
+<!-- 5.9 随 1c.2 一并作废（未动配额数字，无可测的「不比排期更紧」）；「发布真发出才记 / 手动 /publish 照记且不被闸拦」由真机 6.6 坐实。 -->
 
 ## 6. 验证与部署
 
-- [ ] 6.1 `cd ../aidcp-cloud && npm run test:acceptance` → `npm test` → `npm run typecheck`。**`typecheck | tail` 的退出码是 tail 的、会假绿——直接跑、看退出码**（上个 change 当场中过）。
-- [ ] 6.2 提交 + push cloud master（末尾带 `Co-Authored-By`）。
-- [ ] 6.3 部署 dev（安全序列照 §5：`deploy-target dev --check` → **先探 ECS 现状**（近 1h mtime + md5 对 master，防撞并发部署）→ 备份 → rsync `--exclude .env --exclude node_modules --exclude .git` → restart → healthcheck）。**多任务并行场景下从 `git archive <sha>` 出干净快照走，绝不从共享工作区 rsync。** 无迁移、无需出安装包。**红线**：绝不碰同机 isales。
+- [x] 6.1 `cd ../aidcp-cloud && npm run test:acceptance` → `npm test` → `npm run typecheck`。**`typecheck | tail` 的退出码是 tail 的、会假绿——直接跑、看退出码**（上个 change 当场中过）。
+- [x] 6.2 提交 + push cloud master（末尾带 `Co-Authored-By`）。
+- [x] 6.3 部署 dev（安全序列照 §5：`deploy-target dev --check` → **先探 ECS 现状**（近 1h mtime + md5 对 master，防撞并发部署）→ 备份 → rsync `--exclude .env --exclude node_modules --exclude .git` → restart → healthcheck）。**多任务并行场景下从 `git archive <sha>` 出干净快照走，绝不从共享工作区 rsync。** 无迁移、无需出安装包。**红线**：绝不碰同机 isales。
 - [ ] 6.4 **真机核 `view` / 浏览节奏是否更早撞窗**（design D5 + Open Question 3）——**本 change 影响面最大、最可能被当回归报回来的一项**。
 - [ ] 6.6 **真机核发布对账（1c.4）**：dev 上真发若干条，核后台发布数（来自 `publish_log`）与风控发布计数**对得上**。**对不上即本 change 出了问题。**
 - [ ] 6.7 **真机核手动评论吃预算**：运营手动评满正常档日限（8）⇒ 当天自治评论**不再自动发**。**这是裁决的直接后果，必须先跟运营讲明**（见 4.1），否则百分百被当 bug 报回来。
 - [ ] 6.5 **真机核加群（本 change 的正面验收）**：运营一小时内手动加 3 个群（全部真点）⇒ 日计数 = **3**（今天 = 1）；随后自动加群**不再多打 2 次**。
 
+<!-- 6.1：acceptance 55/55、全量 2455 中 2447 pass / 0 fail、typecheck exit 0。 -->
+<!-- 6.2：aidcp-cloud master `7f5f4a3`（land-change：fetch + rebase → 全量绿 → ff 推送 → 清理 worktree）。sha 已核 merge-base --is-ancestor。 -->
+<!-- 6.3：2026-07-17 deployed dev。备份 `cloud.bak.20260717-193900.tar.gz` + `.env.bak.20260717`。
+     **部署前探 ECS**：近 1h 零改动（无并发部署）；md5 坐实 ECS 上那份**恰等于我改动之前的 master** ⇒ 干净地只叠本批两个提交。
+     **未从共享主 checkout 走**：多任务并行场景，按 §6 用 `git archive 7f5f4a3` 出干净快照后 rsync。本批不动 package.json ⇒ 无需 npm ci。
+     healthcheck 绿：service active、8787 边-云 ws、8090 面板 API、PG 就绪、飞书长连接已建立、事件订阅已建立（RiskController）。isales 未触碰。 -->
+
 ## 7. 回写与收口
 
-- [ ] 7.1 tasks 标 `[x]` + commit-sha（`<!-- <repo> <sha> 备注 -->`，部署后追加 `<!-- <date> deployed -->`）。sha **必须取自已推送的提交**（判据 `git merge-base --is-ancestor`）。
-- [ ] 7.2 真机项登记 `docs/real-machine-acceptance-backlog.md`（加群项与簇 90 共享 FB 环境；`view` / 浏览节奏项按实际环境归簇）。
-- [ ] 7.3 `openspec validate risk-record-actuated-facts --strict` 通过。
-- [ ] 7.4 design 的三个 Open Question 结论写回 design。
-- [ ] 7.5 **登记（本 change 不修）**：**`view` 在手动 `/comment` 路径上无预闸**——`comment-scheduler` 的读帖不过 `explainView`，故手动跑一轮多开几篇时 view 回执被自己丢掉。**注意这一处的丢弃方向是反的（在放松闸）**：`likeRatioAllowsNextLike()` 有 `if (views < minViewsForLikeRatio) return true;` ⇒ view 少记会跌破阈值、整条点赞比例规则被跳过。§1 会顺带治好「丢」，但**「无预闸」本身不治**（那是「该不该做」那一侧的洞，另属一个 change）。
+- [x] 7.1 tasks 标 `[x]` + commit-sha（`<!-- <repo> <sha> 备注 -->`，部署后追加 `<!-- <date> deployed -->`）。sha **必须取自已推送的提交**（判据 `git merge-base --is-ancestor`）。
+- [x] 7.2 真机项登记 `docs/real-machine-acceptance-backlog.md`（加群项与簇 90 共享 FB 环境；`view` / 浏览节奏项按实际环境归簇）。
+- [x] 7.3 `openspec validate risk-record-actuated-facts --strict` 通过。
+- [x] 7.4 design 的三个 Open Question 结论写回 design。
+- [x] 7.5 **登记（本 change 不修）**：**`view` 在手动 `/comment` 路径上无预闸**——`comment-scheduler` 的读帖不过 `explainView`，故手动跑一轮多开几篇时 view 回执被自己丢掉。**注意这一处的丢弃方向是反的（在放松闸）**：`likeRatioAllowsNextLike()` 有 `if (views < minViewsForLikeRatio) return true;` ⇒ view 少记会跌破阈值、整条点赞比例规则被跳过。§1 会顺带治好「丢」，但**「无预闸」本身不治**（那是「该不该做」那一侧的洞，另属一个 change）。
   <!-- 原 ① publish 无回执已按用户裁决并入本 change，见 §1c。 -->
