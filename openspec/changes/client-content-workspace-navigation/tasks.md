@@ -145,4 +145,5 @@
   <!-- aidcp-edge 0dd8ecb; aidcp 6d020d6. The sole control conflict kept origin/main tasks 7.5–7.8 and feature tasks 8–9. -->
 - [x] 9.2 Run the focused Edge content-workspace tests, Edge typecheck, and strict OpenSpec validation on the merged trees.
   <!-- Merged-tree focused tests 16/16; Edge typecheck pass; strict OpenSpec validation pass. -->
-- [ ] 9.3 Fast-forward `aidcp-edge/master` and `aidcp/main`, push both default branches, and do not package or deploy.
+- [x] 9.3 Fast-forward `aidcp-edge/master` and `aidcp/main`, push both default branches, and do not package or deploy.
+  <!-- aidcp-edge/master 0dd8ecb; aidcp/main d667435 plus this checklist commit. Both pushes were verified against origin; no force-push, package, restart, or deployment. -->
