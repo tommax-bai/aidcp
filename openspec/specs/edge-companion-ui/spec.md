@@ -93,7 +93,7 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 
 ### Requirement: 今日计数降级为小结条
 
-浏览 / 点赞 / 收藏 / 评论 / 关注 / 发布计数 SHALL 作为界面收尾的“今日进展”分段面板呈现，不再以互相独立的大号 KPI 卡片作首屏主视觉。六项指标 SHALL 在同一容器中以分隔线成组；汇总标题、数据来源、统计时间与当前环境的启动 / 暂停 / 恢复 / 关闭控制 SHALL 属于同一个摘要上下文。生命周期控制 MUST NOT 以固定悬浮层覆盖活动流。摘要 MUST 使用进展与计划语义，MUST NOT 将正常动作累计描述为受限用量。
+云端为该账号投影出的每一项用量指标 SHALL 作为界面收尾的“今日进展”分段面板呈现，不再以互相独立的大号 KPI 卡片作首屏主视觉。指标集合 SHALL 由云端按平台投影后下发决定，MUST NOT 写死为固定项数；面板布局 MUST NOT 依赖指标数量恒定。各项指标 SHALL 在同一容器中以分隔线成组；汇总标题、数据来源、统计时间与当前环境的启动 / 暂停 / 恢复 / 关闭控制 SHALL 属于同一个摘要上下文。生命周期控制 MUST NOT 以固定悬浮层覆盖活动流。摘要 MUST 使用进展与计划语义，MUST NOT 将正常动作累计描述为受限用量。
 
 #### Scenario: 计数照常累计且在今日进展呈现
 - **WHEN** 会话中发生互动动作
@@ -104,6 +104,11 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 - **WHEN** 当前环境处于就绪、运行或暂停状态
 - **THEN** 对应的启动、暂停、恢复或关闭操作显示在今日进展标题区
 - **AND** 活动流上方或右下角不存在固定悬浮的会话控制层
+
+#### Scenario: 指标数量随平台变化时分隔线与分组不塌
+- **WHEN** 云端为该账号投影出的指标少于或多于另一个平台的指标数
+- **THEN** 分段面板按实际下发的指标成组、分隔线随之对齐
+- **AND** 面板不出现空格位、错位分隔线或残留的占位磁贴
 
 ### Requirement: UI 事件解析结构化优先、字符串兜底且状态形状兼容
 主进程 SHALL 经独立可单测模块解析核心输出为带类型 UI 事件：`[ui-event] {json}` 结构化行优先采用，既有中文日志行经映射表兜底；status 对象 MUST 保持既有字段形状向后兼容（新增 presence / publish 字段不删旧字段），既有计数递增行为不变。
@@ -156,7 +161,8 @@ The Electron companion SHALL prefer cloud-supplied account-scoped daily usage ov
 #### Scenario: Hello snapshot replaces local counters with account today totals
 
 - **WHEN** cloud sends `ui.snapshot.dailyUsage` for the account bound to the edge
-- **THEN** Electron renders the supplied account daily totals for view, like, collect, comment, follow, and publish instead of treating the local process's current-session deltas as authoritative
+- **THEN** Electron renders the supplied account daily totals for exactly the actions the cloud supplied, instead of treating the local process's current-session deltas as authoritative
+- **AND** it renders no metric for an action the cloud did not supply
 
 #### Scenario: Local counters remain a fallback before cloud usage arrives
 
@@ -198,14 +204,14 @@ The Electron companion SHALL show plan progress for each cloud-supplied quota wi
 #### Scenario: Daily card is collapsed by default
 
 - **WHEN** Electron has received account-scoped daily usage with quota windows
-- **THEN** the collapsed card renders the day-window totals for view, like, collect, comment, follow, and publish
+- **THEN** the collapsed card renders the day-window totals for exactly the actions the cloud supplied for that account
 - **AND** it does not render session, minute, or hour action details until the user expands the card
 
 #### Scenario: User expands the daily progress card
 
 - **WHEN** the user clicks the daily progress card or its disclosure control
 - **THEN** Electron renders plan detail for each supplied window: current round, current pace, stage, and today
-- **AND** each window detail lists view, like, collect, comment, follow, and publish as separate action rows when totals are available
+- **AND** each window detail lists as separate action rows exactly those actions for which that window supplies a total or a cap, and no others
 - **AND** each action row shows its supplied total and supplied cap when a cap exists
 
 #### Scenario: Cloud supplies all quota windows
@@ -1117,51 +1123,98 @@ renderer SHALL 将通用可写门禁与 channel send capability 分离。保存�
 - **THEN** 规则说明以常驻小字呈现，MUST 说明每日额度按曲线逐日放开、第 7 天自动恢复，且上限取慢启动曲线与账号档位中更严的一个
 - **AND** MUST NOT 依赖悬浮提示、图标或任何需要额外交互才能看到的载体
 
-### Requirement: Cloud MUST NOT supply usage caps for actions the platform cannot perform
+### Requirement: Cloud MUST NOT supply usage metrics for actions the platform cannot perform
 
-The cloud MUST NOT supply a client-facing usage cap for an action that the connected account's platform structurally cannot perform. Supplying such a cap presents the account with a daily plan the system can never carry out, which the client then renders as a cap, a percentage, and a progress bar that can never advance — the fabrication this capability already forbids the client from inventing on its own.
+The cloud MUST NOT supply a client-facing usage metric — neither a cap nor a total — for an action that the connected account's platform structurally cannot perform. Supplying such a metric presents the account with a plan the system can never carry out and a count that can never move, which the client renders as a cap, a percentage, a progress bar that can never advance, and a zero that will never become anything else — the fabrication this capability already forbids the client from inventing on its own.
 
-This rule is about the cap, not about the surface that carries it: it MUST hold for every cap the cloud supplies toward the client, whatever window it describes and whichever configuration it was read from. A cap that names an action the platform cannot perform is fabricated whether it arrives in the daily projection, in a per-window projection, or in the receipt of some unrelated write.
+Conversely, the cloud MUST supply the usage metric for an action that the platform declares it can perform and whose usage the risk counters already record. An action the account really performs, really spends a daily budget on, and that the operator-facing surfaces already report MUST NOT be invisible on the client-facing one: two surfaces disagreeing about the same account is itself the fabrication.
 
-The determination MUST come from the platform's own support declarations. Because an unsupported action may be declared in either the note-scoped action matrix or the orchestration capability matrix, the projection MUST consult both; consulting only one is a defect, not a scoping choice. Support MUST NOT be encoded numerically — a cap configured to zero MUST NOT be used to mean "unsupported", and the quota configuration MUST NOT be given a platform dimension.
+This rule is about the metric, not about the surface that carries it: it MUST hold for every usage projection the cloud supplies toward the client, whatever window it describes and whichever configuration it was read from — the daily projection, each per-window projection including the session window whose budget comes from a different, platform-blind configuration, and the receipt returned by an unrelated write.
 
-The projection MUST fail open. If the account's platform cannot be resolved, or any support lookup throws, the cloud MUST supply caps exactly as it did before this rule existed. Withholding a cap MUST be caused only by an explicit unsupported declaration, never by a failure to look one up.
+The determination MUST come from the platform's own support declarations. Because support may be declared in either the note-scoped action matrix or the orchestration capability matrix, the projection MUST consult both; consulting only one is a defect, not a scoping choice. The mapping from each client-facing metric to the declaration that governs it MUST be stated exhaustively, so that introducing a further metric forces that mapping to be stated rather than defaulted. Support MUST NOT be encoded numerically — a cap configured to zero MUST NOT be used to mean "unsupported", and the quota configuration MUST NOT be given a platform dimension. The projection MUST NOT consult a second, display-only table of platforms or metrics: a platform's own declarations are the only admissible source.
 
-Withholding a cap MUST NOT withhold the corresponding total: the client's action rows continue to render every supplied total, and only the cap, its percentage, and its plan-completed state are absent. This requirement changes which caps the cloud supplies; it does not change how many action rows the client renders.
+**The projection MUST preserve today's shape whenever it cannot decide.** Only an explicit unsupported declaration may withhold a metric the client renders today; only an explicit supported declaration may introduce a metric the client does not render today. These are one rule, not two: a declaration is the only thing that may change the status quo. If the account's platform cannot be resolved, or any support lookup throws, the cloud MUST supply exactly the projection it supplied before this rule existed — nothing withheld, nothing introduced. A lookup failure MUST NOT be able to remove a supported platform's metric, and MUST NOT be able to conjure a metric for a platform that has no such concept.
 
-#### Scenario: Facebook is not offered caps for collect or follow
+The client SHALL render exactly the actions the cloud supplied, and MUST NOT render an action the cloud withheld — not as a zero, not as an empty row. A supplied total of zero is a real observation and MUST still be rendered. The client MUST NOT reintroduce a withheld action locally: neither a normalisation step that materialises a fixed set of keys, nor an optimistic increment applied on a local event, may put back an action absent from the cloud projection. The client's layout MUST NOT depend on the number of metrics being fixed. Before any cloud usage projection has arrived, the client MAY continue to render its local fallback metrics as it does today.
 
-- **WHEN** the cloud projects usage caps for a Facebook account, whose platform declares collect unsupported in the note-scoped action matrix and follow unsupported in the orchestration capability matrix
+#### Scenario: Facebook is offered neither caps nor totals for collect or follow
+
+- **WHEN** the cloud projects usage for a Facebook account, whose platform declares collect unsupported in the note-scoped action matrix and follow unsupported in the orchestration capability matrix
 - **THEN** the supplied caps omit both collect and follow
-- **AND** every other supplied cap is unchanged
-- **AND** the supplied totals are unchanged, including the collect and follow totals
+- **AND** the supplied totals omit both collect and follow
+- **AND** every other supplied metric is unchanged
+- **AND** the client renders no collect metric and no follow metric at all — not a zero, not an empty row
 
-#### Scenario: Every cap-bearing surface is covered, not just the daily one
+#### Scenario: Facebook is offered the group-join metric
 
-- **WHEN** the cloud supplies caps for a Facebook account across more than one surface — the daily projection, the per-window projections including the session window whose caps come from a different, platform-blind configuration, and the receipt returned by an unrelated settings write
-- **THEN** none of them offers a cap for collect or follow
-- **AND** no surface presents a cap that another surface withholds, because two surfaces disagreeing about the same account is itself the fabrication
+- **WHEN** the cloud projects usage for a Facebook account, whose platform declares group joining supported
+- **THEN** the supplied totals include the group-join count and the supplied caps include its configured cap
+- **AND** the client renders a group-join metric alongside the other supplied metrics
 
-#### Scenario: A platform that supports the action still receives its cap
+#### Scenario: Xiaohongshu is not offered the group-join metric
 
-- **WHEN** the cloud projects usage caps for an account whose platform declares every projected action supported
-- **THEN** the supplied caps are byte-for-byte the configured quota tier's caps
+- **WHEN** the cloud projects usage for a Xiaohongshu account, whose platform declares group joining unsupported
+- **THEN** no supplied surface carries a group-join total or cap, including the session window
+- **AND** every metric Xiaohongshu is supplied today is supplied unchanged
 
-#### Scenario: Platform resolution fails while projecting caps
+#### Scenario: Every metric-bearing surface is covered, not just the daily one
 
-- **WHEN** the account's platform cannot be resolved, or a support lookup throws, while the cloud projects usage caps
-- **THEN** the cloud supplies the full configured set of caps
-- **AND** the client is never left without usage information because a lookup failed
+- **WHEN** the cloud supplies usage for a Facebook account across more than one surface — the daily projection, the per-window projections including the session window whose budget comes from a different, platform-blind configuration, and the receipt returned by an unrelated settings write
+- **THEN** none of them carries a metric for collect or follow
+- **AND** no surface presents a metric that another surface withholds, because two surfaces disagreeing about the same account is itself the fabrication
 
-#### Scenario: Client renders the withheld cap honestly
+#### Scenario: A platform that supports the action still receives its metric
 
-- **WHEN** the client receives a daily usage payload whose totals include an action that has no supplied cap
+- **WHEN** the cloud projects usage for an account whose platform declares every projected action supported
+- **THEN** the supplied caps and totals are byte-for-byte what the configured quota tier and the counters produce
+
+#### Scenario: Platform resolution fails while projecting usage
+
+- **WHEN** the account's platform cannot be resolved, or a support lookup throws, while the cloud projects usage
+- **THEN** the cloud supplies the full set of metrics it supplied before this rule existed
+- **AND** it introduces no metric that the client does not render today
+- **AND** the client is never left without usage information, and never shown a new metric, because a lookup failed
+
+#### Scenario: Withholding is caused by a declaration, never by an ordering mistake
+
+- **WHEN** the projection runs at any point in the assembly of a usage payload
+- **THEN** it runs after the step that materialises the full set of metric keys, never before
+- **AND** a withheld metric is never re-materialised as a zero and then read as a plan of zero that is already complete
+
+#### Scenario: The client does not resurrect a withheld metric locally
+
+- **WHEN** the cloud has withheld an action's metric, and the client then applies a local optimistic increment for some other action, or re-normalises the payload it already holds
+- **THEN** the withheld action MUST NOT reappear
+- **AND** the client MUST NOT briefly render it until the next cloud snapshot corrects it
+
+#### Scenario: Withheld metrics do not block the day-completed state
+
+- **WHEN** every action that has a supplied cap has reached it, and an action has no supplied metric at all
+- **THEN** the client presents the daily plan as completed
+- **AND** the completed-state wording counts only the plans that exist, because an action with no plan cannot be an incomplete plan
+
+#### Scenario: Client renders a supplied total that has no supplied cap honestly
+
+- **WHEN** the client receives a usage payload whose totals include an action that has no supplied cap
 - **THEN** the client renders that action's total with no cap, no percentage, and no progress bar
 - **AND** the client does not treat that action as a plan that can complete
 
-#### Scenario: Withheld caps do not block the day-completed state
+### Requirement: The group-join metric reports attempts against the quota, not confirmed memberships
 
-- **WHEN** every action that has a supplied cap has reached it, and an action without a supplied cap has not
-- **THEN** the client presents the daily plan as completed
-- **AND** an action with no supplied cap never prevents the completed state, because an action with no plan cannot be an incomplete plan
+The client-facing group-join metric SHALL read the same counter and the same cap as the operator-facing usage surface: its numerator is the number of join attempts that reached the platform today — a click that the platform accepted, including one still awaiting an administrator's approval — and its denominator is the configured risk quota for that action. It MUST NOT be sourced from the membership ledger, and it MUST NOT be relabelled to suggest confirmed memberships.
+
+This is the usage face, whose subject is the budget; the membership face, whose subject is which groups the account is actually in, answers a different question and continues to count only confirmed joins. The two faces disagreeing on a number is correct and expected. What is not permitted is the client and the operator surfaces disagreeing about the *same* face.
+
+#### Scenario: A pending join shows on the usage metric
+
+- **WHEN** the account clicks join on a group that requires approval, and the platform accepts the request but the administrator has not approved it
+- **THEN** the client's group-join metric increments
+- **AND** the operator-facing usage surface shows the same number for the same account
+- **AND** the membership face still does not list that group as joined
+
+#### Scenario: The metric is not restated as memberships
+
+- **WHEN** the client renders the group-join metric
+- **THEN** its label and any hover text describe joining activity measured against the daily plan
+- **AND** they do not claim a number of groups the account has joined
 

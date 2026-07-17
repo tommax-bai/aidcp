@@ -74,4 +74,4 @@
 - [x] 10.1 真机验收项登记 `docs/real-machine-acceptance-backlog.md` 簇 90，**分「有新包 / 无新包」两组判据**（无新包时只有窗口明细行那一半可验）。 <!-- 2026-07-17 已登记 backlog 簇 90：A 组 90.14-90.16 无需新包、B 组 90.17-90.20 需含 edge 8976637 的包 -->
 - [x] 10.2 订正 backlog 90.7 的第 ③ 条：它写着完成态文案应读「4 项今日计划已完成」，本 change 后 FB 的带上限指标变为 5 项（含加群）。 <!-- 2026-07-17 已改写 90.7 第 ③ 条并标注「按原文验收会把正确行为当 bug 报回来」 -->
 - [x] 10.3 登记不治的两项：慢启动 day1-2 把加群上限压到 0 ⇒「加群 0/0 今日计划已完成」（**预先存在**，FB 冷启动曲线的 comment/publish 今天就这样）；平台错标（90.8）现在多一个后果 —— 错标的 FB 环境连加群格也不会出现。 <!-- 2026-07-17 登记为 backlog 90.21 / 90.22 -->
-- [ ] 10.4 `openspec validate platform-honest-usage-metrics --strict` → archive。
+- [x] 10.4 `openspec validate platform-honest-usage-metrics --strict` → archive。 <!-- 2026-07-17 validate 通过 → archive -->
