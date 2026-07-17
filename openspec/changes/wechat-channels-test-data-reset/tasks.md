@@ -25,5 +25,7 @@
 
 - [x] 4.1 Run Cloud and Edge focused suites, required acceptance/full suites, typecheck/build, and strict OpenSpec validation; record concise evidence.
   <!-- Cloud focused 10/10, acceptance 55/55, full exit 0, typecheck/build passed; Edge focused 69/69, acceptance 23/23, full exit 0, typecheck/build:dist passed; OpenSpec strict and both JSON schemas passed -->
-- [ ] 4.2 Rebase and fast-forward the validated commits to the latest default branches, push Cloud/Edge/control, and leave unrelated canonical checkout changes untouched.
-- [ ] 4.3 Deploy Cloud to `dev` only after deployment preflight, enable both explicit dev reset gates, and verify health plus non-destructive API exposure without resetting the current real account.
+- [x] 4.2 Rebase and fast-forward the validated commits to the latest default branches, push Cloud/Edge/control, and leave unrelated canonical checkout changes untouched.
+  <!-- pushed aidcp-cloud master=d231be1, aidcp-edge master=22c5be8, aidcp control main=09760e9 plus this evidence-only follow-up; no force push; unrelated canonical aidcp-cloud untracked file preserved -->
+- [x] 4.3 Deploy Cloud to `dev` only after deployment preflight, enable both explicit dev reset gates, and verify health plus non-destructive API exposure without resetting the current real account.
+  <!-- dev preflight passed; backup=/opt/aidcp/cloud.bak.20260717-134410.tar.gz; deployed cloud=d231be1 with AIDCP_DEPLOY_ENV=dev and AIDCP_INTERACTION_TEST_DATA_RESET=true; service active with zero restarts, 8787/8090/8091 listening, three health endpoints 200, PostgreSQL select 1, Feishu ready, unrelated isales services unchanged; runtime gate reported enabled and unauthenticated reset request returned 401; no real reset executed -->
