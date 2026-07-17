@@ -42,3 +42,56 @@
   <!-- Cloud focused 14/14 and typecheck pass; the full Cloud suite also passed 2276 with 5 gated skips. Edge content/security focused 10/10, companion/content regression 66/66, syntax checks, and typecheck pass. -->
 - [x] 5.4 Run proportionate tests and typechecks, validate OpenSpec strictly, commit and push only the isolated feature branches, and do not merge, deploy, or package.
   <!-- Strict validation passed. Cloud d2437a8 and Edge 174af20 were pushed on codex/client-content-workspace-navigation. The control-repo checklist commit is pushed after this note. No merge, deploy, or package was performed. -->
+
+## 6. Adversarial review fixes（2026-07-17，多 agent 对抗式评审后）
+
+评审覆盖租户隔离 / 诚实红线 / 渲染层状态机 / 稿件审批回归 / spec 一致性 / 测试质量六个维度，
+每条发现经三名「默认证伪」的复核 agent 独立复核。下列为存活并已修的项；每条修复都做了**变异验证**
+（把修复改回原样，对应测试必红），确保不是又一条空过的断言。
+
+- [x] 6.1 `countReferenceDraftsForAccount` 把从未生成的稿计成「已成稿」。PublishExecutor 有两条**出生即 failed**
+      却照样写 `source_reference` 的路径（M=0 全部生图失败 / 合规闸否决），客户标题栏据此虚报成稿数（静默假成功红线）。
+      改为排除 `status='failed'`。已知保守偏差（宁可少报绝不虚报，已写进 docstring）：到过待审、后被
+      PublishDispatcher 置 failed 的行也被一并少计——当前 schema 无「是否到过待审」的列，SQL 层无法区分两类 failed。
+  <!-- aidcp-cloud 5b62ca0 on codex/client-content-workspace-navigation -->
+- [x] 6.2 `POST /curated-contents/:id/create-post` 原样回 `createDraft` 结果，把服务端内部视觉诊断泄漏进客户域
+      （`task.sourceConstraints` 里的 `referenceImages[].formGuess.{model,provider}` 与
+      `visualAnalysis.{provider,model,cacheKey,…}`，且 `buildDelegatedTaskConfirmation` 又把它们字符串化进
+      `confirmation.constraints`），与同文件 list/detail DTO 特意剥掉这些字段的约定正面冲突，并可经既有
+      `GET /delegated-tasks` 二次读出。改为显式窄回执 `{triggered, created, task{id,status,version}}`；
+      服务端任务行仍保留完整快照供下游 referenceNote 使用。
+  <!-- aidcp-cloud 5b62ca0 -->
+- [x] 6.3 `listForClient` 在 offset 越过结果集末尾时把 total 谎报为 0（`COUNT(*) OVER()` 无行可读），
+      陈旧页码会让 UI 宣称「精选池还是空的」。零行且 offset>0 改为按同一筛选条件补一次独立 COUNT。
+  <!-- aidcp-cloud 5b62ca0 -->
+- [x] 6.4 每次状态心跳把首页从开着的灵感库 / 稿件审核底下掀出来。`#legacy-workspace` 显隐是两个工作区共享的状态：
+      互动工作区 `setVisible(false)` 无条件归还首页，而 `render()` 对所有非视频号账号每次心跳都会走到它；
+      内容工作区在「账号未变」分支直接早返回、不重新主张自己的可见性。两端同修。
+  <!-- aidcp-edge 901ea91 -->
+- [x] 6.5 `createBusy` 永久泄漏：陈旧响应守卫写在解锁**之前**，请求在途时离开创作页即把锁留死，
+      回到创作页只剩禁用的「正在排队…」。解锁移到守卫之前。
+  <!-- aidcp-edge 901ea91 -->
+- [x] 6.6 同一分钟内重复提交被去重到已在执行 / 已完成的同一任务时，UI 把「非 queued」一律报成失败——
+      对已受理的任务谎报失败，会把操作员推去再点一次、反而制造重复稿件。改为所有已受理状态如实回报，
+      只有 cancelled/failed 与未知状态才算未受理。
+  <!-- aidcp-edge 901ea91 -->
+- [x] 6.7 汇总读失败后标题栏永远宣称「数据加载中」（aria-busy=false、无错误态）——未加载 / 加载中 / 失败
+      三态都塌进同一个空值。补显式失败态。储备条另把「未知」画成 0% 宽度、与真实「0 条」像素级等同，
+      改为 `.is-unknown` 虚底纹以区分。
+  <!-- aidcp-edge 901ea91 -->
+- [x] 6.8 测试质量：IPC 安全测试以源码正则替代行为断言（改等价写法即红、真坏了却可能绿），
+      且边界正则未右锚——`limit > 50` 同样匹配放宽后的 `limit > 5000`，offset 校验根本没断言。
+      收敛为只保留源码层真能证明的静态约束（通道 / 路径 / 方法白名单、envKey/token 只由 main 注入），
+      行为一律移到 jsdom 可执行测试；补 offset 断言与 preload 切片非空守卫（防 doesNotMatch 对空串永真）。
+      另补齐 3.5 的账号切换失效保护——原先 3 个守卫点只覆盖 1 个（变异验证：删掉详情页守卫，旧套件仍全绿）。
+  <!-- aidcp-edge 901ea91；变异验证 5/5：逐条改回原样，对应测试必红 -->
+- [x] 6.9 复核后**未采纳**的报告项（记录以免重复排查）：
+      「渲染层直接联网」不成立（`cleanReferenceUrl` 已有 http/https 白名单，且为既有未改行为）；
+      「preload 切片塌成空串致断言空过」在分支尖端不成立（实测切出 373 字符真实代码，仍加了非空守卫防回归）；
+      「跨仓 edge→cloud 契约错配」经逐字手工执行证伪（契约当前正确，只是零测试覆盖）；
+      「入口计数读错字段永远显示 —」已被 174af20 自身修掉；
+      `openDraft` 在无 envId 状态下静默 no-op 属实但生产不可达（主进程始终注入真实 envId），仅影响测试可信度。
+  <!-- 无代码改动；结论来自复核 agent + 本地实测 -->
+- [x] 6.10 回归闸：cloud acceptance 54/54、`npm test` 2277 pass / 0 fail、typecheck 通过；
+      edge acceptance 22/22、`npm test` 1515/1515、typecheck 通过、`node --check` 全过。未打任何安装包、未部署、未合默认分支。
+  <!-- aidcp-cloud 5b62ca0 + aidcp-edge 901ea91 均已推送到 codex/client-content-workspace-navigation -->
