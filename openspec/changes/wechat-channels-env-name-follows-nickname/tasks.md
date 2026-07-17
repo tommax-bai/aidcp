@@ -12,4 +12,4 @@
 ## 3. 收口
 
 - [x] 3.1 运行 `openspec validate wechat-channels-env-name-follows-nickname --strict`，在本文件记录 Edge commit、验证结果和未做真机/安装包验证的边界。 <!-- Edge commit `71dd3de`; focused 71/71, full Edge exit 0, typecheck pass; OpenSpec strict pass. 未启动“tom白”、未调用真实 AdsPower `user/update`、未构建安装包。 -->
-- [ ] 3.2 将 control 与 Edge 变更分别提交、rebase 后 fast-forward 推送到默认分支；不构建 Edge 安装包、不做真实账号写验证。
+- [x] 3.2 将 control 与 Edge 变更分别提交、rebase 后 fast-forward 推送到默认分支；不构建 Edge 安装包、不做真实账号写验证。 <!-- Edge `master` fast-forward pushed at `71dd3de`; control artifacts rebased and `main` fast-forward pushed at `8d1a34e`, followed by this closeout record. -->
