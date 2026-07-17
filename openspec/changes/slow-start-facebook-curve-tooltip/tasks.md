@@ -11,6 +11,6 @@
 
 ## 3. Validation and closeout
 
-- [x] 3.1 Run the focused slow-start UI logic and renderer smoke tests. <!-- PASS: 155/155 across ui-logic, renderer-smoke, companion-ui -->
-- [x] 3.2 Run `npm run typecheck` in `aidcp-edge` and `openspec validate slow-start-facebook-curve-tooltip --strict` in the control worktree. <!-- PASS: typecheck exit 0; OpenSpec strict valid -->
-- [x] 3.3 Review the diff for protocol/cloud scope creep, record validation and commit evidence, and prepare the completed change for integration. <!-- Scope: renderer HTML/CSS/JS + UI tests only; no protocol/cloud/dependency/package changes. aidcp-edge 3a1ffe4bde4ea05d683d39122cc90984f0f7fd91; installer/deploy not run because no client release was requested. -->
+- [x] 3.1 Run the focused slow-start UI logic and renderer smoke tests. <!-- PASS: 155/155 across ui-logic, renderer-smoke, companion-ui; follow-up help affordance tweak PASS: renderer-smoke 52/52 -->
+- [x] 3.2 Run `npm run typecheck` in `aidcp-edge` and `openspec validate slow-start-facebook-curve-tooltip --strict` in the control worktree. <!-- PASS: typecheck exit 0; OpenSpec strict valid; follow-up help affordance tweak PASS: typecheck exit 0; OpenSpec strict valid -->
+- [x] 3.3 Review the diff for protocol/cloud scope creep, record validation and commit evidence, and prepare the completed change for integration. <!-- Scope: renderer HTML/CSS/JS + UI tests only; no protocol/cloud/dependency/package changes. aidcp-edge 3a1ffe4bde4ea05d683d39122cc90984f0f7fd91 + follow-up 78ffb801c40046fc9416ade929de134cdb853c6b; installer/deploy not run because no client release was requested. -->
