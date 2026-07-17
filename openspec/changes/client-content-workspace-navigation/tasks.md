@@ -123,3 +123,9 @@
   <!-- Edge DOM order is account identity → flex spacer → inspiration entry → cloud environment chip → health. No CSS, data, or click-handler change. -->
 - [x] 8.2 Update the DOM-order regression test, run focused Edge validation and strict OpenSpec validation, then commit and push only the existing feature branch without packaging or deployment.
   <!-- aidcp-edge fa4b8a4 pushed on codex/client-content-workspace-navigation; focused content/security tests 16/16 and typecheck pass. Strict OpenSpec validation passed. No package or deployment. -->
+
+## 9. Land right-alignment refinement on default branches
+
+- [ ] 9.1 Merge the latest `origin/master` / `origin/main` into the already-pushed shared feature branches, preserving both sides and without rebasing or force-pushing.
+- [ ] 9.2 Run the focused Edge content-workspace tests, Edge typecheck, and strict OpenSpec validation on the merged trees.
+- [ ] 9.3 Fast-forward `aidcp-edge/master` and `aidcp/main`, push both default branches, and do not package or deploy.
