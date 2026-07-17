@@ -36,6 +36,8 @@
 
 精确平台 ID 为 `wechat_channels`。每个视频号账号仍对应一个 `envKey + accountId` 环境，`accounts.platform` 与 Edge 环境平台标注必须一致。Edge 新增与 browser-oriented `PlatformDriver` 并列的 `InteractionConnector`；browser driver 只负责打开登录/挑战现场、读取身份和管理 sidecar 生命周期，connector 负责接口探针、增量读取、发送和回查。
 
+视频号身份可能在初次 WS hello 之后才完成本地校验，因此后台账号昵称不依赖首次 hello，也不为展示元数据强制 Edge 重连。Cloud 在现有 `interaction.auth.status` 的 capability、session scope 与环境归属校验之后，仅从 `status=active` 的非空 identity 中提取 `displayName`，复用通用 `accounts.nickname` 写入与 Console 回落链。该昵称始终是 display-only enrichment，不参与账号 ID、路由或授权判定。
+
 能力使用稳定标识：`identity`、`overlay`、`auth.browser_sidecar`、`interaction.comment.read`、`interaction.comment.reply`、`interaction.dm.read`、`interaction.dm.send_text`、`interaction.dm.send_image`。browse/like/collect/follow/publish/patrol 在本版本显式 unsupported。`interaction.auth.status.capabilities` 中的布尔值表达“此账号此刻有效可用”，不是“代码里可能实现”；必须同时满足 build support、feature flag、active auth、identity match 与端点 probe。
 
 所有私有接口能力初始 fail closed；写总开关、账号写开关、评论写和私信写均默认 false。`dmSendImage` 在 v1 恒 false。读取可在受控 dev 账号完成 schema probe 后按账号开启。
