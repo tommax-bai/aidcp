@@ -53,7 +53,7 @@
 | --- | --- | --- | --- |
 | `hello` | edge → cloud | `welcome` | 边缘上线握手，声明平台、账号与能力 |
 | `welcome` | cloud → edge | — | 握手确认，下发 sessionId |
-| `ui.snapshot` | cloud → edge | — | 陪伴界面数据回填（昵称/最近发布/审批状态/账号今日用量/账号级慢启动；hello 注册完成后全量 + 审批变化时增量） |
+| `ui.snapshot` | cloud → edge | — | 陪伴界面数据回填（昵称/最近发布/审批状态/账号今日用量/环境级慢启动；hello 注册完成后全量 + 审批变化时增量） |
 | `plan.request` | edge → cloud | `plan.response` | 高层目标拆解为步骤 |
 | `plan.response` | cloud → edge | — | 返回有序步骤清单 |
 | `select.request` | edge → cloud | `select.response` | 元素清单 + 目标，请云端选一个 |
@@ -273,15 +273,15 @@
       "startedAt": 1730000000000,
       "sourceId": "note-9" // 可选；generating 时已原子认领的精选源内容
     },
-    "slowStart": { // 可选（change account-level-slow-start）；账号级慢启动（逐日配额爬坡）投影
+    "slowStart": { // 可选（change environment-level-slow-start）；当前环境的慢启动配置/生效投影
       // **字段整体缺省 = 未知（云端还没说）→ 边缘整行不渲染**，照 personaBound 三态判例：MUST NOT 把「未知」当「关」
       "state": "active",     // off | active | graduated（graduated=已完成，上限已放开但库里开关仍为真，显式告知而非静默消失）
       "day": 3,              // 仅 active；1..totalDays
       "totalDays": 7,        // 曲线总天数（恒 7）
-      "since": 1729900800000, // 起点（epoch ms，写入时已对齐上海日起点）；**绝不是 accounts.created_at**
-      "binding": true,       // 仅 active；clamp 是否至少收紧一项。false = 勾了但当前档位已更严、不额外限制
-      "eligible": true,      // false 时边缘禁用开关并按 ineligibleReason 如实说明
-      "ineligibleReason": "platform_unknown" // 可选：platform_unsupported | platform_unknown | globally_disabled
+      "since": 1729900800000, // 环境起点（epoch ms，已对齐上海日起点）；不随账号换绑重置
+      "binding": true,       // 仅有唯一当前账号时有意义；clamp 是否至少收紧一项
+      "eligible": true,      // false 表示当前无法作用到唯一账号；binding_unknown/conflict 时环境开关仍可配置
+      "ineligibleReason": "platform_unknown" // 可选：platform_unsupported | platform_unknown | globally_disabled | binding_unknown | binding_conflict
     },
     "windows": {
       "session": {

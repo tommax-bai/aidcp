@@ -1836,6 +1836,18 @@ Phase 0（云端）不依赖 UI，可先用 SQL 造态 + 后台仪表盘验（�
 - [ ] 103.7 **（未绑定环境慢启动读诚实态）** 一个未 hello 过的已归属环境，其慢启动这一行显示 `binding_unknown` 专属文案（「还不知道这个环境上是谁」类），**不编造** state/day/since/totalDays、也不渲染成空。云端 GET 回 `409 binding_unknown`（非 200-空投影）。
 - [ ] 103.8 **（旧函数删除无残留 · 命令定向未回归）** 确认删除 `resolveAccountIdForEdge` 后，定向发布 / 命令下发（走保留的 `resolveEdgeIdForAccount`）在真机上仍正常：多连接时取最早登记者、账号离线时诚实退回，无「命令发不出去」类回归。
 
+> **后续语义更正（2026-07-18）**：change `environment-level-slow-start` 已把慢启动从账号事实改成环境事实。上面 103.6 仍可用于验证离线开关，但 103.7 的「未绑定即 409、不能配置」预期已作废；未绑定环境现在应能保存开/关配置，并返回不含账号身份和配额的环境配置投影。
+
+### change `environment-level-slow-start` 真机验收（cloud `a8bb2e3` 已 land + 推 origin/master + **已部署 dev**；edge `7e80ce2` 已 land + 推 origin/master、**未出安装包**；登记于 2026-07-18）
+
+**改了什么（一句话）**：慢启动的事实源改为 `client_environments`，不再写入或运行时读取 `accounts.slow_start_since`；所以换账号不会把设置带走，环境未绑定账号时也可以先配置。RiskController 仍按当前账号执行配额，但锚点来自该账号当前唯一绑定的环境；重复绑定会拒绝任取一行。
+
+> **dev 已坐实**：加法 DDL 两列就位，22/22 历史环境的一次性初始化完成，1 个原有开启态从账号列兼容复制到环境列，0 个未初始化行、0 个重复账号绑定；重启后 Cloud、客户鉴权、面板健康路由、PostgreSQL 和飞书长连接均正常。下面的换绑过程需要一个明确不会影响 OL/真实运营的独占 FB 测试环境，本次未获该目标，故只登记、不冒充已跑。
+
+- [ ] 103.9 **（本 change 最高价值 · 环境设置跨换绑保持）** 在独占非 OL 的 FB 测试环境先开启慢启动，记录环境 `since`；把环境从测试账号 A 换绑到测试账号 B，过程中不重启 Cloud：环境 GET 仍返回同一 `since`，B 立即按该曲线受限，A 立即释放且不再从该环境取锚点。关闭后再换绑一次，B/A 均不得被旧 `accounts.slow_start_since` 重新夹回慢启动。
+- [ ] 103.10 **（未绑定环境可预配置 · 不泄露账号）** 清空独占测试环境绑定后，在含 edge `7e80ce2` 的 `electron:dev` 或后续安装包中切换慢启动：PUT/GET 均成功保存环境开/关，界面保持可操作并显示环境配置说明，不出现账号昵称、账号 ID、当日配额或「已对账号生效」类表述；重新登录账号后无需再点一次即可生效。
+- [ ] 103.11 **（一对一异常 fail-closed）** 仅在可回滚测试数据上临时构造同一测试账号绑定两个测试环境：两边读写投影均返回 `binding_conflict`、RiskController 不任取一行启用慢启动，日志明确记录冲突；清理测试数据后恢复唯一绑定。
+
 ## 簇 104 — 验证码远程协助可键入答案：字究竟打没打进去
 
 ### change `captcha-assist-text-answer` 真机验收（edge `6a48d86` / cloud `04321be` / console `b6a2b3d` 均已 land + 推 origin/master；cloud+console **已部署 dev**；**edge 未出安装包**；登记于 2026-07-18）
