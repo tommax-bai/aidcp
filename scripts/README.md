@@ -30,6 +30,13 @@ scripts/release-desktop-macos 0.3.19                    # prep：下载+校验+�
 scripts/release-desktop-macos 0.3.19 --yes              # prep 全绿后传包+部署 console+验活+提交
 ```
 
+Windows PowerShell must use the `.ps1` wrapper instead of opening the
+extensionless Bash script directly:
+
+```powershell
+& .\scripts\task-preflight.ps1
+```
+
 **红线**：部署只从主 checkout 的 eligible ref 走、绝不从 worktree；部署前必须明确
 `dev` 或 `ol` 并跑 `scripts/deploy-target <target> --check`。未指定目标的开发完成部署默认走
 `dev`；`ol` 只有用户明确要求线上部署时才走，且必须创建或选定 release 分支并按分支部署。

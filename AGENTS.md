@@ -6,7 +6,7 @@ Active Codex guide for the `aidcp*` family. Keep this file at or below 8 KiB bec
 
 - `aidcp` is the control repo for contracts, architecture, OpenSpec, product docs, and orchestration helpers. Business code lives in sibling repos: `../aidcp-edge`, `../aidcp-cloud`, and `../aidcp-console` (default branches `master`; control repo default is `main`). Confirm a sibling exists before using it.
 - Do not run root `npm test`, `npm run build`, or `npm run lint`; this is not an app checkout. Validate control changes with OpenSpec.
-- Before opening a task, creating/reusing a worktree, or using task helpers, run `scripts/task-preflight`. A failure blocks admission; do not switch branches, stash, clean, remove worktrees, or override it automatically.
+- Before opening a task, creating/reusing a worktree, or using task helpers, run `& ./scripts/task-preflight.ps1` in Windows PowerShell or `./scripts/task-preflight` in Bash. Never invoke the extensionless Bash file directly from PowerShell. A failure blocks admission; do not switch branches, stash, clean, remove worktrees, or override it automatically.
 - Canonical checkouts stay on their default branches. Feature work uses `../<repo>.wt/<change-name>` and `codex/<change-name>` branches. Never put `main` in an `aidcp.wt` worktree or switch the canonical control checkout to a feature branch.
 - Preserve unrelated dirty/untracked files. Use isolated worktrees and explicit pathspecs.
 
