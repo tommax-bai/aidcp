@@ -14,4 +14,5 @@
   <!-- Edge focused Electron tests: 40/40 passed; final static layout rerun: 3/3 passed. -->
 - [x] 3.2 Run focused tests, typecheck, build, and `openspec validate wechat-browser-inspection-copy-and-client-width --strict`.
   <!-- Edge build and typecheck passed before integration. land-change then passed acceptance 24/24, full suite 1779/1779, and typecheck. OpenSpec strict validation passed before implementation and at closeout. -->
-- [ ] 3.3 Commit and push Edge/control changes without building an installer; record validation and SHAs.
+- [x] 3.3 Commit and push Edge/control changes without building an installer; record validation and SHAs.
+  <!-- Edge dafe2c3 was fast-forwarded and pushed to master after land-change validation. Control fc2ef58 was pushed to main. No Edge installer was built. -->
