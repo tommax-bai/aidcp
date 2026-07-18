@@ -19,5 +19,4 @@
 - [x] 4.1 提交 `aidcp-cloud` change 分支并用 `scripts/land-change aidcp-cloud increase-rewrite-draft-capacity --yes` 串行集成、推送默认分支。 <!-- aidcp-cloud a38bcfb on origin/master; land-change acceptance 56/56 + typecheck pass; npm glob limitation covered by prior explicit 275-file run -->
 - [x] 4.2 按安全序列部署 dev，确认服务、监听、健康检查、飞书与 PostgreSQL 正常，并记录部署 SHA。 <!-- dev deployed aidcp-cloud a38bcfb; backup /opt/aidcp/cloud.bak.20260718-162421.tar.gz + env backup; active; 8787+8090; panel health ok; PG select 1; Feishu WS onReady -->
 - [x] 4.3 更新任务证据，运行 `openspec validate increase-rewrite-draft-capacity --strict`。 <!-- strict validation passed after dev deployment evidence was recorded -->
-- [ ] 4.4 使用显式 pathspec 提交并推送控制仓 OpenSpec change。
-- [ ] 4.5 归档 change，复核归档后规格，再提交并推送归档结果。
+- [x] 4.4 使用显式 pathspec 提交并推送控制仓 OpenSpec change。 <!-- aidcp 8cb7c95 on origin/main; unrelated untracked files preserved -->
