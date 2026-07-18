@@ -13,6 +13,7 @@
 - [x] 3.1 Add focused AdsPower, IPC security, and interaction workspace tests.
 - [x] 3.2 Run focused tests and `npm run typecheck` in `aidcp-edge`.
 - [x] 3.3 Run `openspec validate wechat-local-browser-inspection-control --strict`.
-- [ ] 3.4 Commit, integrate, and push `aidcp-edge` master and `aidcp` main; record commit SHAs and validation evidence.
+- [x] 3.4 Commit, integrate, and push `aidcp-edge` master and `aidcp` main; record commit SHAs and validation evidence.
 
-<!-- Validation: aidcp-edge focused interaction/IPC/AdsPower tests 62 passed; renderer smoke tests 61 passed; npm run typecheck passed. OpenSpec strict validation passed. -->
+<!-- Integration: aidcp-edge 55afdd9; aidcp contract commit 3edd433. -->
+<!-- Validation: aidcp-edge focused interaction/IPC/AdsPower tests 62 passed; renderer smoke tests 61 passed; acceptance 24 passed; npm run typecheck passed. Full npm test was attempted: 1757 passed / 1 failed on Windows because customer-auth-security asserts POSIX 0600 but observed 0666; the untouched origin/master canonical checkout reproduces the identical failure. OpenSpec strict validation passed. -->
