@@ -21,8 +21,8 @@
 ## 4. Validation and integration
 
 - [x] 4.1 Run focused cloud and edge slow-start/store/customer-auth tests, then both repositories' acceptance suites, full tests, and typechecks. <!-- cloud focused 93/93, acceptance 56/56, full exit 0, typecheck pass; edge focused 107/107, acceptance 24/24, full exit 0, typecheck pass -->
-- [ ] 4.2 Run `openspec validate environment-level-slow-start --strict`, record repo commit SHAs and validation evidence in this checklist, and commit/push the control, cloud, and edge branches.
-- [ ] 4.3 Rebase and fast-forward integrate clean validated commits into the latest default branches without overwriting unrelated work.
+- [x] 4.2 Run `openspec validate environment-level-slow-start --strict`, record repo commit SHAs and validation evidence in this checklist, and commit/push the control, cloud, and edge branches. <!-- strict pass; cloud a8bb2e3; edge 7e80ce2; control artifacts 8e8d1e0 plus this evidence commit -->
+- [x] 4.3 Rebase and fast-forward integrate clean validated commits into the latest default branches without overwriting unrelated work. <!-- task-preflight pass; cloud a8bb2e3 ff master; edge rebased onto latest master then 7e80ce2 ff master; control 8e8d1e0 plus this evidence commit will ff main -->
 
 ## 5. Dev deployment and honest acceptance
 
