@@ -23,3 +23,4 @@
 - [x] 3.2 Run repository change-risk and diff checks, then commit and push the control and Cloud changes through the default-branch workflow
   <!-- aidcp-cloud 5f11bd0 -> origin/master; aidcp d0910b9 -> origin/main; both ff-only after fetch/rebase, diff checks clean. -->
 - [ ] 3.3 Deploy dev Cloud without database DDL and verify interaction list/read-control APIs recover while outbound controls remain closed
+  <!-- Blocked before SSH: deploy-target dev --check rejected /c/Users/tianx/codes/isales-4.pem mode 644; no deploy, SSH, key change, or database action attempted. -->
