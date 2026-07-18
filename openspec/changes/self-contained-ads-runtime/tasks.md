@@ -1,10 +1,13 @@
 # Tasks — self-contained-ads-runtime
 
+<!-- Task 1.7: aidcp-edge commit 1f36bb4; validated on Windows with Node 24 via build:ads-runtime, 20 focused runtime tests, typecheck, and strict OpenSpec validation. -->
+
 > All code lands in **aidcp-edge**. Anchor by function name (source line numbers drift). Regression discipline: after any change run `npm run typecheck` + `npm test` + the electron contract tests; before packaging run the built-app asar-absence probe and a **translocated** smoke test (from DMG/Downloads, not a local `.app`).
 
 ## 1. aidcp-edge — packaging (edge-desktop-packaging)
 
 - [ ] 1.1 Add `adspower-browser@2.1.0` to **devDependencies** in `package.json`; `npm install --package-lock-only`.
+- [x] 1.7 Windows local development: run npm CLI through the current build-time Node executable (no direct `npm.cmd` spawn), resolve the patched `build/ads-runtime` tree before raw `node_modules`, and cover resolution with a focused test. Windows installer packaging remains deferred.
 - [ ] 1.2 New `scripts/stage-ads-runtime.mjs`: fresh global-prefix install into `build/ads-prefix` with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` + `PLAYWRIGHT_BROWSERS_PATH=0` + `npm_config_ignore_scripts=true`; copy the package dir → `build/ads-runtime/adspower-browser` (POSIX path; leave the single win32 path line as the seam). Ship full all-arch `sqlite/`; do NOT pre-run `ads start`.
 - [ ] 1.3 New `resources/ads-runtime.json` = `{ "adsApiKey": "<baked shared key>", "version": 1 }` (data file; NEVER a `.cjs`; not committed with a real secret if repo is shared — inject at build time or keep in a gitignored local — decide per internal-repo policy).
 - [ ] 1.4 `package.json > build`: top-level `extraResources` for `build/ads-runtime/adspower-browser → adspower-browser` and `resources/ads-runtime.json → ads-runtime.json`. Add `build:ads-runtime` script; prepend it in `electron:build` / `electron:build:mac` / `electron:build:win`.

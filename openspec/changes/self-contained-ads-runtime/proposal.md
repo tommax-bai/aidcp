@@ -11,6 +11,8 @@ The intended self-contained model is now **proven feasible**: AdsPower ships an 
 
 ## What Changes
 
+- **Modified** - Windows local development can stage the patched bundled runtime with the current build-time Node/npm toolchain, and `electron:dev` resolves that staged tree before any raw npm package. Windows installer packaging remains deferred.
+
 - **New** — the installer ships a **read-only template** of the AdsPower CLI runtime (`adspower-browser@2.1.0`: `cli/ + cwd/ + sqlite/ (all-arch prebuilt `node_sqlite3.node`) + nested `node_modules/` incl. `playwright-core`) at `Contents/Resources/adspower-browser` (~31 MB), plus a `Contents/Resources/ads-runtime.json` holding a **baked, rotatable shared internal API key**. Native `.node` forces `extraResources` (a `.node` cannot `dlopen` from inside `app.asar`), which lands exactly at `resolveCliEntry`'s primary candidate.
 - **New** — first-run **staging** of the template to `userData/ads-runtime/adspower-browser` (writable), because under macOS App Translocation a quarantined unsigned `.app`'s `Resources` dir is read-only and the CLI writes into its own `cwd/`.
 - **Modified** — **hard switch**: the runtime-ensure always drives **our** bundled CLI (`ads status` → reuse if already running, else `ads start -k <baked key>`), and the old `mode:'external'` HTTP-adopt and `mode:'none'` "proceed anyway" branches are **removed**. A missing bundled runtime is an honest hard-stop, not a reason to try 50325.
@@ -30,6 +32,8 @@ The intended self-contained model is now **proven feasible**: AdsPower ships an 
 - `edge-desktop-packaging`: the macOS installer SHALL bundle the AdsPower CLI runtime template via `extraResources` (native `.node` outside `app.asar`) and its baked-key config, with a build-time staging step and an asar-absence verification.
 
 ## Impact
+
+- **Windows local development**: staging uses local Node/npm only at build time; runtime execution continues to use Electron's bundled Node through `process.execPath` and `ELECTRON_RUN_AS_NODE=1`.
 
 - **aidcp-edge** (all code): `package.json` (devDependency `adspower-browser@2.1.0` + top-level `extraResources` + staging build step); new `scripts/stage-ads-runtime.mjs` + `scripts/verify-ads-runtime-staged.mjs`; new `resources/ads-runtime.json`; `src/electron/ads-runtime.cjs` (resolveCliEntry +userData candidate; ensure/kernel error taxonomy; keep the sqlite native-module comment — it is correct); `src/electron/main.cjs` (split ensures; base-authority fix in `resolveAdsOpts`; `resolveAdsApiKey`; ensure-gating on create-env/proxy/delete/reconcile/status IPC; whenReady service warm-up; leave-daemon-on-quit; delete dead `openAdsClient`); `src/electron/ads-local-api.cjs` (default base); `src/electron/preload.cjs` + renderer (create-progress line + copy fixes); `test/electron/lifecycle-contract.test.ts` (add a runCli-cwd / CLI-writable-dir contract test alongside the existing asar-cwd guard); `docs/release-desktop.md` (staging + translocated smoke test).
 - **Distribution**: installer grows ~+31 MB (CLI template). Each operator machine downloads the ~735 MB SunBrowser kernel **once** to `~/.adspowerCli` on first browser launch (not in the installer).

@@ -2,6 +2,18 @@
 
 ## ADDED Requirements
 
+### Requirement: Windows local development uses the patched bundled runtime
+
+On a Windows development checkout, `npm run build:ads-runtime` SHALL stage `adspower-browser` without directly spawning `npm.cmd`, and `electron:dev` SHALL resolve the patched staged runtime before any raw npm package. This build-time use of the local Node/npm toolchain MUST NOT change the production runtime host: the AdsPower CLI SHALL still execute with Electron's bundled Node via `process.execPath` and `ELECTRON_RUN_AS_NODE=1`.
+
+#### Scenario: Node 24 stages the runtime on Windows
+- **WHEN** a developer runs `npm run build:ads-runtime` on Windows with Node 24
+- **THEN** the staging script invokes `npm-cli.js` through the current build-time Node executable, completes without `spawnSync npm.cmd EINVAL`, and produces `build/ads-runtime/adspower-browser/cli/index.js`
+
+#### Scenario: Electron development resolves compatibility patches
+- **WHEN** both a patched `build/ads-runtime` tree and a raw `node_modules/adspower-browser` package are present
+- **THEN** the desktop runtime resolves the staged CLI first and executes it with Electron's bundled Node
+
 ### Requirement: 随包内置指纹浏览器运行时，不依赖外部 AdsPower 客户端
 
 edge 桌面客户端 SHALL 在安装包内随包分发 AdsPower CLI 运行时（`adspower-browser`）作为只读模板，并在需要时自行拉起该运行时提供本机 LocalAPI，**MUST NOT** 依赖运营机另行安装或运行 AdsPower 桌面客户端。原生模块（`node_sqlite3.node`）SHALL 置于 `app.asar` 之外（经 `extraResources` 落到 `Contents/Resources/adspower-browser`），因为原生 `.node` 无法从 asar 内 `dlopen`。指纹内核（SunBrowser）**MUST NOT** 打进安装包，SHALL 由运行时在首次启动浏览器时按需下载一次到用户可写目录。

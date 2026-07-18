@@ -55,8 +55,8 @@ Ship the **full all-arch `sqlite/`** (~8 MB; the CLI picks arch at runtime from 
 ### 2.5 Signing
 Native `.node` present, but the app is **unsigned** (`mac.identity=null`) → hardened-runtime library validation is not enforced → native `.node` loads for internal distribution. Real-machine gate: verify on a **quarantined/translocated** build (from DMG/Downloads), not a locally-built `.app`. Signing + `disable-library-validation` entitlement is a future seam, not built now.
 
-### 2.6 Windows seam (deferred)
-Only the one OS-normalize line in the staging script + the userData staging target differ. No Windows work this round.
+### 2.6 Windows local development seam
+Windows installer packaging remains deferred, but local development SHALL use the same patched runtime tree as packaging. `stage-ads-runtime.mjs` invokes `npm-cli.js` through the current build-time Node executable instead of spawning `npm.cmd` directly, which avoids `spawnSync npm.cmd EINVAL` on Node 24. `resolveCliEntry` prefers `build/ads-runtime/adspower-browser/cli/index.js` before a raw `node_modules` package so Electron always runs the compatibility-patched tree. Runtime execution remains unchanged: Electron launches the CLI through its own `process.execPath` with `ELECTRON_RUN_AS_NODE=1`.
 
 ## 3. Runtime lifecycle (hard-switch)
 
