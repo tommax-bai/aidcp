@@ -154,4 +154,5 @@
   <!-- Edge passes selectedEnvPlatform() into ContentWorkspace; non-XHS entry/load/open paths fail closed and an open inspiration page returns home on platform switch. Draft review remains platform-neutral. -->
 - [x] 10.2 Add focused renderer regressions for XHS visibility/loading, non-XHS hiding/no-fetch/no-open, platform-switch closure, and the renderer-to-workspace platform handoff.
   <!-- Focused Edge content/security tests: 18/18 pass. -->
-- [ ] 10.3 Run focused Edge tests and typecheck, validate OpenSpec strictly, commit and push the feature branches, then fast-forward the default branches without packaging or deployment.
+- [x] 10.3 Run focused Edge tests and typecheck, validate OpenSpec strictly, commit and push the feature branches, then fast-forward the default branches without packaging or deployment.
+  <!-- Edge af7b6bb (feature) integrated as ce124a2 on master after merging concurrent e7a0252; merged-tree renderer/fleet/content tests 178/178, typecheck and node --check pass. Control spec 37ee2b4 integrated as c5c1373 after merging concurrent 222284a; strict OpenSpec validation passes. Both default branches were fast-forwarded and pushed. No package, restart, or deployment. -->
