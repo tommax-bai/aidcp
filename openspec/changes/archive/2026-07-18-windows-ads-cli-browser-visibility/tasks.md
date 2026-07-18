@@ -15,4 +15,4 @@
 
 - [x] 3.1 Run focused staging/renderer tests and `npm run typecheck` in the Edge worktree. <!-- 71 focused tests passed; real Ads CLI 2.1.0 staging and hook behavior verified; typecheck passed. -->
 - [x] 3.2 Run full Edge tests and `openspec validate windows-ads-cli-browser-visibility --strict`. <!-- 1782 full tests + 24 acceptance tests passed; strict OpenSpec validation passed. -->
-- [ ] 3.3 Commit, integrate, and push the control and Edge changes; do not package/release an installer without explicit operator request.
+- [x] 3.3 Commit, integrate, and push the control and Edge changes; do not package/release an installer without explicit operator request. <!-- aidcp-edge 183dc47 integrated and pushed to origin/master; control change committed as 1d312d2. -->
