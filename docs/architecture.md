@@ -94,7 +94,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 | **RiskController** | `src/risk/risk-controller.ts` | 风控权威：`explain(action)` 判定 allow/deny；组合状态机 + 分/时突发窗 + 自然日配额 + 比例 |
 | **RiskStateMachine** | `src/risk/risk-state-machine.ts` | 账号状态机 `normal→warned→restricted→frozen`，含恢复窗口（warned 7d / restricted 3d）；信号种类 light/quota_exceeded/confirmed/fatal/recovered/manual_unfreeze |
 | 风控配套 | `src/risk/{sliding-window-counter,quotas,cold-start-planner,time-scheduler,session-budget,interaction-dedup,search-frequency-limiter,pg-risk-store}.ts` | 分钟/小时滑动窗口计数、Asia/Shanghai 自然日配额、三档配额、冷启动养号、作息时间窗、会话预算、互动去重、搜索频控、PG 持久化 |
-| **PublishOrchestrator** | `src/publish-agent/publish-orchestrator.ts` | 发布角色图（多阶段，~22 角色经 `registerRole` 接入，见 `src/server.ts`）：`ContentScout→ContentTypeSelector→ContentCreator→ImagePlanner→ImageGenerator→CoverSelector→ContentCleaner→AiFlavorScorer→QualityScorer→ContentAssembler→TitleCreator→TopicStrategist/MentionStrategist/LocationStrategist/CollectionStrategist→VisibilityDecider/PermissionDecider/PublishModeDecider/ComplianceDecider→MetadataAggregator→ApprovalGatekeeper→PublishExecutor`（配图已由 `ImageDirector` 拆为 `ImagePlanner` 决策 + `ImageGenerator` 执行），`pipeline-context` 串联，`wanxiang-client` 万象生图，`publish-log-store` 落库 |
+| **PublishOrchestrator** | `src/publish-agent/publish-orchestrator.ts` | 发布角色图（多阶段，~22 角色经 `registerRole` 接入，见 `src/server.ts`）：`ContentScout→ContentTypeSelector→ContentCreator→ImagePlanner→ImageGenerator→CoverSelector→ContentCleaner→AiFlavorScorer→QualityScorer→ContentAssembler→TitleCreator→TopicStrategist/MentionStrategist/LocationStrategist/CollectionStrategist→VisibilityDecider/PermissionDecider/PublishModeDecider/ComplianceDecider→MetadataAggregator→ApprovalGatekeeper→PublishExecutor`（配图已由 `ImageDirector` 拆为 `ImagePlanner` 决策 + `ImageGenerator` 执行），`pipeline-context` 串联，`wanxiang-client` 万象生图，`publish-log-store` 落库；`CommandSequencer/PublishDispatcher/ScheduledPublishReconciler` 分别负责原子指令顺序、提交落态和定时稿到期对账 |
 | **feishu Bot** | `src/feishu/{ws-receiver,messenger,commands,cards,bot-chat-events,handler,token}.ts` | 官方 SDK 长连接收事件；`/status /pause /resume /publish-test /bind` 命令路由；审批卡片构建 + 回调写信号文件；进退群自动入库 |
 | **SimplePlanner** | `src/planner/simple-planner.ts` | 规则优先 + LLM 兜底，把"一句话目标"拆成 `PlanStep[]`（定向场景；浏览闭环走角色驱动） |
 | **LLM 文本出口（QwenClient + 厂商注册表）** | `src/llm/{qwen,providers,index}.ts` | 多厂商文本 LLM：`providers.ts` 注册表含 DashScope/通义千问（Qwen）与火山引擎方舟（Volcengine Ark，env `ARK_API_KEY`/`VOLCENGINE_API_KEY`/`ARK_BASE_URL`，外加 `DASHSCOPE_API_KEY`）；均 OpenAI 兼容、仅用全局 `fetch`、不引 SDK（图片走通义万相独立客户端，不在此注册） |
@@ -119,7 +119,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 | **BrowseSession** | `src/browse/browse-session.ts` | 浏览会话编排：分发云端命令、结构化上报、拟人化；`feed-scroller`/`modal-controller`/`note-extractor`/`search-handler`（`card-filter` 已 `@deprecated`，开/跳决策上移至云端 `ContentEvaluator`） |
 | **EdgeTaskCoordinator** | `src/execution/edge-task-coordinator.ts` | 同一 edge/CDP 页面写任务单写：浏览命令边界 quiesce、陈旧队列取消、任务优先级/FIFO、taskId owner 校验、租约到期与队列清空后单次恢复 |
 | **humanize** | `src/humanize/*.ts` | 拟人化：`timing` 对数正态停顿、`mouse-path` 贝塞尔、`keyboard-rhythm`、`scroll-physics`、`reading-time`、`session-rhythm` 疲劳曲线 |
-| **flows** | `src/flows/{anchors,like-post,publish-post}.ts` | 垂直业务流程：业务锚点常量、点赞流程、发布六步（进入→标题→正文→标签→提交→校验） |
+| **flows** | `src/flows/{anchors,like-post,publish-post,publish-command-handlers}.ts` | 垂直业务流程：业务锚点常量、点赞流程、发布原子指令；小红书定时链路在内容/话题/其它选项之后设置并正证据校验定时时间，再精确点击“定时发布” |
 | **publish/approval-gate** | `src/publish/approval-gate.ts` | 发布审批：生成 requestId、构造/校验/轮询信号文件、等待授权 |
 | CdpDomProvider | `src/cdp/dom-provider.ts` | 实现 `DomProvider`：从真实页面取 DOM 快照 |
 | CdpActionExecutor | `src/cdp/action-executor.ts` | 实现 `ActionExecutor`：原子操作落到真实页面 |
@@ -187,10 +187,9 @@ LLM 新解析锚点 ──stage──► 暂存区(staging)
   + 分钟/小时滑窗配额 + Asia/Shanghai 自然日每日配额 + 点赞比例（≤35%）判 allow/deny；成功后 `risk.record` 落账。
   云端角色侧亦受 `RoleDispatcher` 浏览预算约束（likes/collects/follows/searches），由各角色经 `consumeBudget()` 扣减、`SessionMonitorRole` 在 likes/collects/searches 耗尽时判定结束。
   - **现状提示**：边缘 `EdgeClient` 已实现 `canDo`/`requestSessionBudget`/`recordRiskAction`，云端也实现了 `risk.canDo`/`risk.record` 响应。**记账侧已接通**：真实互动成功时 `handler` 在 `action.completed` 分支按账号发射 `interaction.occurred`（`src/comm/handler.ts`），`server.ts` 订阅 → `RiskController.record` 按账号计数。**实时拦截侧仍未接线**：当前事件驱动浏览闭环**未在边缘互动前调用** `risk.canDo`，浏览动作的实时拦截目前主要由上面的 RoleDispatcher 浏览预算承担（`risk.canDo` 协议通道已就绪，待接入浏览闭环）。
-- **发布**：`PublishOrchestrator` 多阶段角色图（~22 角色）产出内容 → 下发 `publish.request` → 边缘发
-  `publish.approval_request` → 云端飞书发审批卡片 → 运营点授权 → 卡片回调写信号文件
-  `/tmp/aidcp-publish-approve-<requestId>.json` → 边缘读到 `approved=true` 执行
-  `flows/publish-post` 六步 → `publish.result` 回传。
+- **发布**：`PublishOrchestrator` 多阶段角色图（~22 角色）产出内容并落 `pending_approval`；运营在控制台或飞书审核，草稿编辑通过 `content_version` CAS 防止旧版本误批。授权后 `CommandSequencer` 持有 edge task lease，按「进入创作页 → 标题/正文/图片/话题及其它选项 → 发布方式 → 提交 → 捕获」下发原子指令。
+  - 立即发布：`submit_publish → capture_postId`；捕获到公开 id/URL 即 `published`，否则保留既有 `submitted` 待确认语义。
+  - 小红书定时发布：`set_schedule` 验证 1 小时至 14 天北京时间窗口及“定时发布”按钮后提交，`capture_scheduled` 只捕获平台内部定时句柄并落 `scheduled`，不当作公开帖子、不计发布次数。`ScheduledPublishReconciler` 在目标时间后复用账号绑定和 edge lease 做有界对账；取得真实公开 id/URL 后以 CAS 转 `published` 并只记一次，未公开则退避，耗尽转 `needs_review`。
 
 ## 4. 关键设计取舍
 

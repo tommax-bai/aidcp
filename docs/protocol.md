@@ -151,7 +151,7 @@
 | `publish.draft_image_remove` | edge → cloud | 客户端稿件预览内删除待审稿件的某张配图，携稿件版本 |
 | `publish.draft_image_remove.result` | cloud → edge | 返回删配图结果（成功回带写后真态 images + 新版本）|
 | `publish.result` | edge → cloud | 发布结果回传（ok / postId / error；v1 整页路径） |
-| `publish.command` | cloud → edge | 下发一条参数化发布原子指令（`taskId` 为当前发布租约；`recordId+seq` 关联键，`kind` ∈ E1-E10） |
+| `publish.command` | cloud → edge | 下发一条参数化发布原子指令（`taskId` 为当前发布租约；`recordId+seq` 关联键；`kind` 复用通用 command 映射，含 `capture_scheduled` / `reconcile_scheduled`，不新增 `MessageType`） |
 | `publish.command.result` | edge → cloud | 单条发布指令执行结果回传（按 `recordId+seq` 关联；`ok/value/error/details`，红线不静默假成功；`submitDispatched`=提交「按下」事件已真正派发——`ok:false` 但该位为真时帖子可能已发出，云端按「已提交待确认」处置、绝不烧 failed、绝不自动重投） |
 
 ### 2.7 Persona 生成（v2 新增，建号关键词驱动，客户自助 onboarding）
@@ -334,8 +334,9 @@
 ```
 发送时机：① 边缘 hello 注册完成后（连接进推送表且 `welcome` 已回发之后，避开「hello 处理中推送
 sent=0」前科）回填全量快照；② 发布审批生命周期变化时增量推送（`pending`=草稿候审、`approved`=授权
-已核、`submitted`=页面已接受提交但同页尚未取得帖子链接、`rejected`=拒绝发布、`failed`=云端终判失败）。
-`published` 不经此通道——边缘仅在同页 `capture_postId` 成功后本地打 `[ui-event]` 行；正常链路不得为确认而
+已核、`scheduled`=平台已接受定时稿、等待公开对账、`submitted`=页面已接受立即提交但同页尚未取得帖子链接、
+`rejected`=拒绝发布、`failed`=云端终判失败）。`published` 不经此通道——立即发布仅在同页
+`capture_postId` 成功后本地打 `[ui-event]` 行；正常链路不得为确认而
 刷新页面。`reminded` 枚举保留但云端当前无再提醒机制、不会出现。`code` 与
 飞书审批卡「编号」字段同源（发布记录 id，如 `#83`），供界面对暗号。边缘核心收到后转成 `[ui-event]`
 结构化行打到 stdout，由 Electron 壳解析驱动标题带与发布卡（解析器 `src/electron/ui-events.cjs`）。
@@ -938,6 +939,13 @@ first-writer-wins 审批信号。动作成功只表示审批决定已受理：`a
 ```jsonc
 { "ok": true, "postId": "p789", "error": null } // postId / error 二选一
 ```
+
+**定时发布原子指令语义（小红书）**
+
+- 编排顺序固定为「标题/正文/图片/话题及其它发布选项 → `set_schedule` → `submit_publish` → `capture_scheduled`」。`set_schedule` 必须验证开关已开启、北京时间值精确一致、提交按钮已切为“定时发布”；任一证据缺失即失败关闭，不得回退为立即发布。
+- 小红书定时时间必须位于当前时刻后 1 小时至 14 天（含边界）。平台不支持定时发布时，云端在下发前拒绝。
+- `capture_scheduled` 成功只表示平台定时列表中存在唯一匹配稿；`value` 可携平台内部定时句柄，但该值不得写入 `platform_post_id`、不得拼接公开 URL，也不要求当场 `capture_postId`。
+- 云端将记录转为 `scheduled`，目标时间前不消耗发布次数。目标时间后由有界 `reconcile_scheduled` 对账；只有取得真实公开 `postId + postUrl` 并以 CAS 将 `scheduled → published` 后才记一次发布。未公开时退避重试，次数耗尽转 `needs_review`，不得伪造链接或自动重投。
 
 ### 3.12 通用
 
