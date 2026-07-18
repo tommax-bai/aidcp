@@ -50,4 +50,3 @@ After local browser opening succeeds, the shell SHALL remember that the selected
 - **AND** the operator later explicitly starts the environment engine
 - **THEN** the shell treats the profile as already running and follows the existing adoption path
 - **AND** the earlier manual-open action is not reclassified as an engine start
-
