@@ -147,3 +147,11 @@
   <!-- Merged-tree focused tests 16/16; Edge typecheck pass; strict OpenSpec validation pass. -->
 - [x] 9.3 Fast-forward `aidcp-edge/master` and `aidcp/main`, push both default branches, and do not package or deploy.
   <!-- aidcp-edge/master 0dd8ecb; aidcp/main d667435 plus this checklist commit. Both pushes were verified against origin; no force-push, package, restart, or deployment. -->
+
+## 10. XHS-only inspiration entry
+
+- [x] 10.1 Pass the selected environment platform into the content workspace, show and load the inspiration entry only for `xiaohongshu`, and close an open inspiration page when switching to Video Channels or Facebook without changing draft-review behavior.
+  <!-- Edge passes selectedEnvPlatform() into ContentWorkspace; non-XHS entry/load/open paths fail closed and an open inspiration page returns home on platform switch. Draft review remains platform-neutral. -->
+- [x] 10.2 Add focused renderer regressions for XHS visibility/loading, non-XHS hiding/no-fetch/no-open, platform-switch closure, and the renderer-to-workspace platform handoff.
+  <!-- Focused Edge content/security tests: 18/18 pass. -->
+- [ ] 10.3 Run focused Edge tests and typecheck, validate OpenSpec strictly, commit and push the feature branches, then fast-forward the default branches without packaging or deployment.
