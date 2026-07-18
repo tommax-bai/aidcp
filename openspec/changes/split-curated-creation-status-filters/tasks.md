@@ -19,4 +19,4 @@
 
 - [x] 4.1 Run focused tests, acceptance tests where defined, full tests, and typecheck in Cloud and Edge. <!-- Cloud acceptance 57/57; full direct Windows-safe glob 2519 total, 2511 pass, 8 gated skip; typecheck pass. Edge acceptance 25/25; full 1801/1801; typecheck pass. -->
 - [x] 4.2 Commit, land, and push both implementations; deploy the runtime behavior to `dev` without building an Edge installer. <!-- Cloud master 1a6d51f; Edge master 0096411. dev backup cloud.bak.20260718-213254.tar.gz; active, 8787/8090/8091, both health endpoints, PG, two indexes, Feishu onReady, no startup errors, isales four services active. Live aggregate partition 344 = 7 created + 337 uncreated. No Edge installer built. -->
-- [ ] 4.3 Record commit/deploy evidence, strictly validate, commit and push control changes, then archive the completed OpenSpec change.
+- [x] 4.3 Record commit/deploy evidence, strictly validate, commit and push control changes, then archive the completed OpenSpec change. <!-- evidence recorded above; strict valid; control proposal commit fb604a0 pushed before archive -->

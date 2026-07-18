@@ -1,8 +1,8 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
-### Requirement: Customer curated content routes recheck environment ownership
+### Requirement: 客户灵感库按持久化洗稿触发记录分类
 
-客户鉴权服务 SHALL 提供当前客户已授权环境的精选内容分页、单条详情和参考创作接口。每个请求 MUST 在客户 JWT、撤销和启用态校验后，从数据库重新读取该客户的环境归属，并只以已归属的 `envKey` 作为账号范围；接口 MUST NOT 接受可绕过归属检查的 `accountId`，MUST NOT 暴露内部面板跨账号能力。精选列表新筛选 MUST 接受 `uncreated`、`created` 或 `all`，并 MUST 在账号约束内通过既有 `delegated_tasks.source_constraints` 真态判断是否曾持久化洗稿触发任务，任务当前或终态不得改变该归类。滚动发布期 SHALL 继续接受旧 `creatable`，且 MUST 精确返回 `uncreated ∪ created` 的原可创作集合；新客户端 MUST NOT 再产生该值。其它未知值 SHALL 以具名无效筛选错误拒绝，不得静默回落。
+客户鉴权服务的精选列表新筛选 MUST 接受 `uncreated`、`created` 或 `all`，并 MUST 在客户 JWT、撤销、启用态与环境归属校验所得的账号范围内，通过既有 `delegated_tasks.source_constraints` 真态判断是否曾持久化洗稿触发任务；请求 MUST NOT 接受可绕过归属检查的 `accountId`，另一账号的任务 MUST NOT 改变当前账号归类，任务当前或终态也不得改变该归类。滚动发布期 SHALL 继续接受旧 `creatable`，且 MUST 精确返回 `uncreated ∪ created` 的原可创作集合；新客户端 MUST NOT 再产生该值。其它未知值 SHALL 以具名无效筛选错误拒绝，不得静默回落。
 
 #### Scenario: 已归属环境可读取三种精选筛选
 
