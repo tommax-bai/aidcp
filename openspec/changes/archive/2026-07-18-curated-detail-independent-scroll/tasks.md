@@ -21,4 +21,4 @@
 
 - [x] 4.1 Rebase the edge worktree onto current `origin/master`, rerun required validation, and fast-forward the change to `master`. <!-- rebased onto b8c9b83; acceptance 24/24, full 1770/1770, typecheck passed -->
 - [x] 4.2 Push the edge default branch and record integration evidence; do not package a desktop installer unless explicitly requested. <!-- origin/master b4c33d1; canonical master fast-forwarded; no installer built -->
-- [ ] 4.3 Update the OpenSpec task evidence, re-run strict validation, commit and push the control-repo change, then archive only when all required work is complete.
+- [x] 4.3 Update the OpenSpec task evidence, re-run strict validation, commit and push the control-repo change, then archive only when all required work is complete. <!-- control a453396 pushed after strict validation; ready for archive -->
