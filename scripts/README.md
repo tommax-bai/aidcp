@@ -30,11 +30,14 @@ scripts/release-desktop-macos 0.3.19                    # prep：下载+校验+�
 scripts/release-desktop-macos 0.3.19 --yes              # prep 全绿后传包+部署 console+验活+提交
 ```
 
-Windows PowerShell must use the `.ps1` wrapper instead of opening the
-extensionless Bash script directly:
+本目录中所有无扩展名入口都是 Bash 脚本。Windows PowerShell 应先定位 Git Bash，
+再统一通过它调用，不能直接打开脚本路径：
 
 ```powershell
-& .\scripts\task-preflight.ps1
+$gitRoot = Split-Path (Split-Path (Get-Command git.exe).Source -Parent) -Parent
+$bash = Join-Path $gitRoot 'bin\bash.exe'
+& $bash ./scripts/task-preflight
+& $bash ./scripts/new-change aidcp-cloud my-change-name
 ```
 
 **红线**：部署只从主 checkout 的 eligible ref 走、绝不从 worktree；部署前必须明确
