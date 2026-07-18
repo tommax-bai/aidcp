@@ -146,7 +146,7 @@
 | --- | --- | --- |
 | `publish.request` | cloud → edge | 请求在浏览器中发布一篇帖子 |
 | `publish.approval_request` | edge → cloud | 请求云端发送发布审批卡片（飞书） |
-| `publish.approval_action` | edge → cloud | 客户端稿件预览内提交发布/取消审批动作，携稿件版本 |
+| `publish.approval_action` | edge → cloud | 客户端稿件审批页提交批准/取消，批准可携立即/定时发布计划与稿件版本 |
 | `publish.approval_action.result` | cloud → edge | 返回审批动作受理结果；不代表已完成发帖 |
 | `publish.draft_image_remove` | edge → cloud | 客户端稿件预览内删除待审稿件的某张配图，携稿件版本 |
 | `publish.draft_image_remove.result` | cloud → edge | 返回删配图结果（成功回带写后真态 images + 新版本）|
@@ -886,13 +886,19 @@ edge 按 `system_recovery > human > automatic` 授予；同级 FIFO。发布从 
 ```jsonc
 {
   "requestId": "publish-89", // string；仅接受 publish-<数字>
-  "approved": true,           // boolean；true=发布，false=取消
-  "contentVersion": 0         // number?；客户端所见版本，云端写信号前复核
+  "approved": true,           // boolean；true=批准，false=取消
+  "contentVersion": 0,        // number?；客户端所见版本，云端写信号前复核
+  "publishMode": "scheduled",// "immediate" | "scheduled"；批准时可选
+  "publishTime": 1784383200000 // number | null；scheduled=北京时间对应 epoch ms，immediate=null
 }
 ```
 云端按连接握手的真实 `accountId` 校验稿件归属，并复用飞书/控制台共用的
 first-writer-wins 审批信号。动作成功只表示审批决定已受理：`approved=true` 后仍由
 发布调度器异步下发，最终结果以 `publish.command.result` / `publish.result` 为准。
+
+- `publishMode` 与 `publishTime` 必须同时出现或同时省略；旧客户端同时省略时保持草稿现有发布计划。
+- `approved=false` 不得携带这两个字段。`immediate` 必须配 `publishTime:null`；`scheduled` 必须配有限 epoch ms，且仍由 Cloud 权威校验平台能力与未来 1 小时至 14 天窗口。
+- 如果批准时的计划不同于草稿现状，Cloud 先用 `contentVersion` 对同一稿件执行 CAS 更新并取得新版本，再让审批信号绑定该新版本。预检、计划校验或 CAS 冲突任一失败都不得写审批信号。
 
 **`publish.approval_action.result`**（cloud → edge）
 ```jsonc
@@ -1213,8 +1219,9 @@ cloud（Publish Agent）          edge                         飞书（云端 B
  │ publish.result {ok,postId}    │ （进入→标题→正文→标签→提交→校验）
  │ ◄─────────────────────────────│                            │
 ```
-客户端稿件预览的“发布 / 取消”按钮走 `publish.approval_action`，与飞书按钮共享同一
-审批信号和 first-writer-wins 规则；预览内的“查看稿件 ↗”只打开本地抽屉，不再跳转飞书。
+客户端稿件审批页的“批准并发布 / 批准并定时发布 / 取消”走 `publish.approval_action`，
+与飞书按钮共享同一审批信号和 first-writer-wins 规则。多条待审批内容先按灵感池式卡片列表
+展示，单条直接进入详情；“查看稿件 ↗”打开客户端主内容区，不再跳转飞书。
 
 ### 4.4 视频号评论确认与私信待核验
 
