@@ -1423,7 +1423,7 @@ InteractionWorkspace 的收件箱 SHALL 呈现为单栏两级结构：**列表�
 
 The video-channel interaction overview SHALL present environment engine connectivity and WeChat Channels authentication as the primary status pair. Browser state SHALL be presented only in a secondary manual-inspection area and an unconfirmed browser state MUST NOT visually replace or obscure the primary engine/authentication state.
 
-The manual "打开浏览器" action SHALL remain visible for a valid selected local WeChat Channels environment regardless of the engine lifecycle state or WeChat authentication state. Its success copy SHALL state that browser visibility is auxiliary and that authentication remains determined by the separate WeChat status.
+The manual "打开浏览器" action SHALL remain visible for a valid selected local WeChat Channels environment regardless of the engine lifecycle state or WeChat authentication state. Its default help copy SHALL be “仅用于人工查看，引擎以上方鉴权状态为准”. The desktop action SHALL occupy a visibly larger proportional width than a content-fit button while the narrow layout SHALL remain responsive. Dynamic success copy SHALL state that browser visibility is auxiliary and that authentication remains determined by the separate WeChat status.
 
 #### Scenario: Engine and authentication are healthy
 
@@ -1442,6 +1442,18 @@ The manual "打开浏览器" action SHALL remain visible for a valid selected lo
 - **WHEN** the selected local WeChat Channels environment's engine is stopped or its authentication is not active
 - **THEN** the primary chips truthfully show those states
 - **AND** "打开浏览器" remains available without enabling or starting the engine
+
+#### Scenario: Manual inspection is idle on desktop
+
+- **WHEN** no browser-open action notice is active and the workspace uses the desktop layout
+- **THEN** the help copy is exactly “仅用于人工查看，引擎以上方鉴权状态为准”
+- **AND** the browser action occupies 18% of the manual-inspection row with a usable minimum width
+
+#### Scenario: Manual inspection is shown in a narrow window
+
+- **WHEN** the workspace width reaches the narrow responsive breakpoint
+- **THEN** the manual-inspection content and browser action stack vertically
+- **AND** the browser action stretches within the available row without horizontal overflow
 
 ### Requirement: 精选详情双栏分别夹紧滚动边界
 
@@ -1543,4 +1555,18 @@ The manual "打开浏览器" action SHALL remain visible for a valid selected lo
 
 - **WHEN** 灵感库列表正文摘要超过两行
 - **THEN** 摘要继续按既有两行规则截断，卡片布局保持不变
+
+### Requirement: Electron client startup windows use a 900px default width
+
+The Electron login window and authenticated main window SHALL each use 900px as their initial default width. Their existing minimum width, default height, minimum height, and native frame behavior SHALL remain unchanged.
+
+#### Scenario: Client starts without a valid customer session
+
+- **WHEN** the Electron client opens the login window
+- **THEN** the login window initial width is 900px
+
+#### Scenario: Client starts or proceeds with a valid customer session
+
+- **WHEN** the Electron client opens the authenticated main window
+- **THEN** the main window initial width is 900px
 
