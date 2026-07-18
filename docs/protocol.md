@@ -207,11 +207,10 @@
   "edgeId": "edge-01",        // string  边缘节点标识
   "platform": "xiaohongshu",  // string? 运行时平台标识；缺省按历史 xhs 兼容，cloud 会与 accounts.platform 校验
   "app": "xhs",               // string? 业务/站点标识
-  "capabilities": ["click", "input", "scroll", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? 能力声明
+  "capabilities": ["click", "input", "scroll", "captcha_assist_text_v1", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? 能力声明（含构建能力位 captcha_assist_text_v1，由 EdgeClient 构造函数统一并入，change captcha-assist-text-answer）
   "accountId": "acc-01",      // string? 账号标识；多账号运行时要求真实账号，default 已退役
   "accountNickname": "小张测评", // string? 账号可读昵称；仅用于展示补充，不参与身份确立或路由
-  "machineLabel": "win-aliyun-3", // string? 人类可读机器标签
-  "remoteAddr": "rdp://..."   // string? 人工处置入口/远程地址说明
+  "machineLabel": "win-aliyun-3" // string? 人类可读机器标签（change captcha-assist-text-answer：已移除背后无能力的 remoteAddr/远程桌面入口，design D13）
 }
 ```
 
@@ -756,6 +755,7 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
 **`captcha.assist.click`**（cloud → edge）：把人工点位派发到原浏览器
 ```jsonc
 {
+  "taskId": "task-recovery-01H...", // string? system_recovery 租约；acquired 后才派发（原样例漏了此字段）
   "incidentId": "cap_01H...",
   "snapshotId": "snap_01H...",
   "points": [
@@ -771,7 +771,9 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
       { "x": 0.35, "y": 0.42, "t": 180 }
     ],
     "clicks": [1]                 // 每个 points[i] 对应的按下样本下标；length===points.length、下标∈[0,samples)
-  }
+  },
+  "text": "3f7k",                 // string? 验证码答案明文（change captcha-assist-text-answer）。带 text ⇒ points 必须恰好 1 个（聚焦那个框）
+  "submit": "enter"              // 'enter'? 键入后提交手势，只 enter（跟随焦点、免疫聚焦滚动，不做「点第 2 个点提交」）
 }
 ```
 > 点位是相对 snapshot 图片的归一化坐标 `[0,1]`。edge 必须校验 incident/snapshot/current overlay
@@ -780,6 +782,13 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
 > 必须补一帧 move 到权威落点**（消 mousedown 无前驱 move 的瞬移伪影）、只裁剪长停顿不等比压缩、叠 dt
 > 抖动+亚像素；`clicks` 长度≠点数 / 样本超限 / 坐标越界等一律判无效→回落合成拟人路径（change
 > captcha-assist-humanize-click），绝不硬回放、绝不谎称用了轨迹。无新增 MessageType。
+> `text` 可选（change captcha-assist-text-answer，扩既有 click 载荷、**不新增 MessageType**）：模糊数字图片类字符识别码
+> 的人工答案。**SENSITIVE——明文答案，MUST NOT 落日志/库/incident/回执/URL**（比照 `image.data` 口径）；只活在
+> `submitClick` 调用栈、装进本信封即发走，审计只留 actor+时刻+字符数、never what。带 `text` 时 `points` 必须恰好 1 个
+> （聚焦那个输入框；聚焦会滚动页面 ⇒ 第 2 个「提交按钮」落点会失效，故只用 Enter 提交）；仅 ASCII 可见字符
+> `[0x20,0x7E]`、长度 1..24，畸形=整单拒绝（与 trajectory「丢装饰保留 points」策略刻意相反）。edge 用**真实键盘事件**
+> 逐字派发（绝不 `Input.insertText`：零键事件是厂商成熟判据），先强制清空焦点字段、再键入、按顺序 type→read→submit。
+> 边缘须先声明构建能力 `captcha_assist_text_v1`，否则云端 fail-closed 拒绝（老客户端会忽略 `text`、只点击=静默假成功）。
 
 **`captcha.assist.click_result`**（edge → cloud）：点击后的 fresh 复检结果
 ```jsonc
@@ -788,17 +797,28 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
   "snapshotId": "snap_01H...",
   "edgeId": "edge-1",
   "accountId": "acc-01",
-  "status": "still_blocked",      // 'cleared'|'still_blocked'|'stale_snapshot'|'not_blocked'|'invalid_target'|'failed'
+  "status": "still_blocked",      // 'cleared'|'still_blocked'|'stale_snapshot'|'not_blocked'|'invalid_target'|'no_target'|'failed'（no_target=点空了，与坐标越界 invalid_target 区分，change captcha-assist-text-answer）
   "reason": "captcha overlay still visible",
   "checkedAt": 1717113608000,
   "snapshot": { /* CaptchaAssistSnapshotPayload，可选，用于刷新仍阻断现场 */ },
-  "replayMode": "synthetic"       // 'trajectory'|'synthetic'（change captcha-assist-trajectory-replay）：本次实际用的输入模式，供度量
+  "replayMode": "synthetic",      // 'trajectory'|'synthetic'（change captcha-assist-trajectory-replay）：本次实际用的输入模式，供度量
+  "inputMode": "click_type",      // 'click'|'click_type'?（change captcha-assist-text-answer）：'click' 纯点击 / 'click_type' 含键入。云端据此测版本偏斜（下发了 text 却回 click=老边缘忽略了 text）
+  "typeReport": {                 // object?（change captcha-assist-text-answer）键入取证，**绝不含答案本身**——运营 MUST 能区分「答案打错了」与「字根本没打进去」
+    "focus": "editable",          // 'editable'|'opaque'|'none'：字符派发时的焦点分级（none=没点到输入框）
+    "focusTag": "INPUT",          // string? 持焦元素 tag，供事后取证，MUST NOT 据此分支
+    "cleared": "verified",        // 'verified'|'attempted'? 键入前强制清空的结果
+    "typed": 4,                   // number 实际派发字符数，如实回报（绝不回退到意图长度）
+    "verified": "match",          // 'match'|'mismatch'|'unverifiable'? 回读判定（opaque 焦点=unverifiable）
+    "submitted": true             // boolean 是否已回车提交
+  }
 }
 ```
 > `status:'cleared'` 只是协助命令结果；恢复下发仍只由 edge 额外发送的 `risk.captcha_cleared`
 > 触发。cloud 不得因为点击命令送达、Feishu 链接打开、协助页按钮点击或告警手动解决而 `resumeEdge`。
-> 运行兜底：未配置远程协助、scoped token 过期、edge 离线或截图失败时，飞书告警仍保留原远程桌面处置路径；
-> 操作员应远程连到原机器处理，随后等待 edge fresh probe 上报 `risk.captcha_cleared`，cloud 不能手动伪造清除。
+> 运行兜底：未配置远程协助、scoped token 过期、edge 离线或截图失败时，飞书告警只发 notify-only 提示、
+> 操作员到原机器处理，随后等待 edge fresh probe 上报 `risk.captcha_cleared`，cloud 不能手动伪造清除。
+> （change captcha-assist-text-answer：**已移除背后无任何能力的「远程桌面」入口**——`remoteAddr`、飞书卡「远程地址」行、
+> console 按钮全删；那从来只是个放第三方工具链接的空位、其真机验收自 2026-06-21 起一直 DEFERRED、从未填过，design D13。）
 
 ### 3.10 Edge 页面写任务租约
 

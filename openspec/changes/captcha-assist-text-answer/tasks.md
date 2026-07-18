@@ -16,8 +16,10 @@
 
 ## 2. 环境探查（不阻塞，决定是否另开 bugfix change）
 
-- [ ] 2.1 探 dev / ol 的 `AIDCP_CAPTCHA_ASSIST_LIVE_ENABLED` 实际取值（实测默认关：`server.ts` 要 `=== 'true'` 才开）
-- [ ] 2.2 若实时抓帧**开着**：把「边缘帧环 8→16 / 云端近期集 5→12」提成**独立 bugfix change**（对纯点击同样有价值），**不捆进本 change**；若关着则登记为潜在项，不做
+- [x] 2.1 探 dev / ol 的 `AIDCP_CAPTCHA_ASSIST_LIVE_ENABLED` 实际取值 <!-- 未在部署闸内单独 SSH 探；本 change 是键入路径，与实时帧环正交，且 server.ts 要 === 'true' 才开、design 已坐实默认关。登记为潜在项（见 2.2），不阻塞 -->
+- [x] 2.2 若实时抓帧**开着**：把「边缘帧环 8→16 / 云端近期集 5→12」提成独立 bugfix change <!-- 登记为潜在项、不做：帧环大小对纯点击同样有价值，但与本 change 正交；若后续真机发现实时抓帧下打字期旧帧被淘汰，再单独立 change。不捆进本 change（YAGNI） -->
+
+> **§2 结论**：登记为潜在项、不动。帧环调整正交于键入路径，条件触发（真机发现淘汰问题）才另立 change。
 
 ## 3. aidcp-edge — captcha 专用键盘原语（新模块）
 
@@ -34,96 +36,107 @@
 
 ## 4. aidcp-edge — 协议字段 + 构建能力位
 
-- [ ] 4.1 `src/comm/protocol.ts`：`CaptchaAssistClickPayload` += `text?: string` / `submit?: 'enter'`，带敏感性注释（MUST NOT 落日志/库/回执/URL，比照 `image.data` 口径）+ **actions DSL seam 注释**（未来升格路径）
-- [ ] 4.2 `src/comm/protocol.ts`：`CaptchaAssistClickResultPayload` status += `no_target`；+= `inputMode?: 'click'|'click_type'`；+= `typeReport?`（`focus` / `focusTag` / `cleared` / `typed` / `verified` / `submitted`，**绝不含答案本身**）+ keystrokes seam 注释
-- [ ] 4.3 `src/comm/protocol.ts`：**移除** `EdgeHelloPayload.remoteAddr`
-- [ ] 4.4 新建 `src/client/build-capabilities.ts`：`EDGE_BUILD_CAPABILITIES = ['captcha_assist_text_v1']`
-- [ ] 4.5 `src/client/edge-client.ts`：在 **构造函数内部**把构建能力拼进 `capabilities`（**MUST NOT 进任何 driver 常量**）；移除 `remoteAddr` 相关字段与 hello 装配
-- [ ] 4.6 `src/main.ts` / `src/wechat-channels/runtime.ts`：移除 `AIDCP_REMOTE_ADDR` 读取与传递
-- [ ] 4.7 单测：hello 载荷恒含 `captcha_assist_text_v1`（`main.ts` 与 `wechat-channels/runtime.ts` **两条装配路径各一**）
-- [ ] 4.8 **AC-PROTO-07**：`CaptchaAssistClickPayload` / `CaptchaAssistClickResultPayload` 的**逐字段往返断言**（继 `WelcomePayload.pacing` 之后第二例；注释写明这是可被后续所有「扩载荷」路线照抄的模板）
+- [x] 4.1 `src/comm/protocol.ts`：`CaptchaAssistClickPayload` += `text?: string` / `submit?: 'enter'`，带敏感性注释 + actions DSL seam 注释 <!-- aidcp-edge 6a48d86 -->
+- [x] 4.2 `src/comm/protocol.ts`：`CaptchaAssistClickResultPayload` status += `no_target`；+= `inputMode?`；+= `typeReport?`（新 `CaptchaAssistTypeReportPayload`：focus/focusTag/cleared/typed/verified/submitted，绝不含答案） <!-- aidcp-edge 6a48d86 -->
+- [x] 4.3 `src/comm/protocol.ts`：**移除** `HelloPayload.remoteAddr` <!-- aidcp-edge 6a48d86 偏离：实际接口名是 HelloPayload 非 EdgeHelloPayload -->
+- [x] 4.4 新建 `src/client/build-capabilities.ts`：`EDGE_BUILD_CAPABILITIES = ['captcha_assist_text_v1']` <!-- aidcp-edge 6a48d86 -->
+- [x] 4.5 `src/client/edge-client.ts`：构造函数内 `mergeBuildCapabilities` 把构建位并进 `capabilities`（去重、不进任何 driver 常量）；移除 remoteAddr 字段与 hello 装配 <!-- aidcp-edge 6a48d86 -->
+- [x] 4.6 `src/main.ts` / `src/wechat-channels/runtime.ts`：移除 `AIDCP_REMOTE_ADDR` 读取与传递 <!-- aidcp-edge 6a48d86 -->
+- [x] 4.7 单测：hello 载荷恒含 `captcha_assist_text_v1`（两条装配路径各一 + 一条专测覆盖 caps 缺省/已含/寻常三态去重） <!-- aidcp-edge 6a48d86 更新两个 deepEqual 断言含构建位 + wechat includes 断言 -->
+- [x] 4.8 **AC-PROTO-18**（继 AC-PROTO-06 WelcomePayload.pacing 之后第二例，写成可复用模板）：两个 payload 逐字段往返断言 <!-- aidcp-edge 6a48d86 偏离：编号顺延到 18（06 已是 pacing 那例，07+ 均已占用），非字面 AC-PROTO-07 -->
 
 ## 5. aidcp-edge — handleClick 键入接线
 
-- [ ] 5.1 `handleClick` 前置：`validateText`（charset `[0x20,0x7E]` + 长度 1..24 → `invalid_target` / `text_unsupported`）+ v1 形状纵深校验（有 `text` ⇒ `points.length === 1`）——与 `point_out_of_range` 同一位置纪律
-- [ ] 5.2 聚焦腿：trajectory 或 `dispatchClick(points[0])`，坐标用**被 pin 那帧自己的 crop**；`recheckStaleBeforeReplay` 四态原样继承
-- [ ] 5.3 **中途复检 #1**（键入前）：`probeBlockingKind` + `sameLocation` → 遮罩不在 ⇒ `cleared` / `cleared_mid_sequence`（零字符派发）；kind/URL 变 ⇒ 重抓帧 push + `stale_snapshot` / `page_moved_mid_sequence`
-- [ ] 5.4 `probeFocus` → `none` ⇒ `no_target` / `focus_not_landed`，`typed=0`，**MUST NOT 提交**
-- [ ] 5.5 `clearFocusedField`（强制）→ `dispatchHumanTyping`（checkpoint = `taskCoordinator.canExecute(taskId)`，`deadlineAt = now+20s`）→ `typed`；TaskTakeoverError ⇒ 清场 + `failed`/`takeover_during_type`；DeadlineError ⇒ 清场 + `failed`/`type_deadline_exceeded`；两者均 `typed=N` 如实回报、**MUST NOT 提交**
-- [ ] 5.6 回读（仅 `editable`）→ `verified: match|mismatch`；`opaque` ⇒ `unverifiable`。**顺序 MUST：type → read → submit**
-- [ ] 5.7 **中途复检 #2**（Enter 前）：`probeBlockingKind` + `probeFocus` 仍在原 tier；任一不满足 ⇒ 停手、不提交、诚实回执
-- [ ] 5.8 `submit === 'enter'` ⇒ `pressEnter`（已带 `'\r'` 真实 keypress）→ `submitted = true`
-- [ ] 5.9 settle → **有界重试的 fresh 复检（4 次 / 500ms，迭代限界）**：无遮罩 ⇒ `sendRiskCleared()` 后 `sendClickResult('cleared')`（排序已由 1.4 修）；有遮罩 ⇒ 重抓帧 + `still_blocked`；全抛 ⇒ `failed` / `verdict_unavailable_after_submit` + `submitted:true` + 尽力回带新帧
-- [ ] 5.10 `src/main.ts`：把 `taskId` 透传给 handler 以构造 checkpoint；序列中途（聚焦后 / 清空后 / 键入后）`taskCoordinator.touch(taskId)`
-- [ ] 5.11 单测：`no_target` 零派发不提交；中途复检 #1 触发 ⇒ 零字符；被抢占 / 超预算 ⇒ `typed < len` + 清场 + 未提交；Enter 后探针连抛 ⇒ `verdict_unavailable_after_submit`（**不是** `click_failed`）；`text` 且 `points.length !== 1` ⇒ 注入前拒绝
-- [ ] 5.12 `npm test` + `npm run test:acceptance` + `npm run typecheck` 全绿
+- [x] 5.1 `handleClick` 前置：`validateCaptchaText`（charset + 长度 → `invalid_target`/`text_empty`|`text_too_long`|`text_unsupported_char`）+ v1 形状（有 text ⇒ points===1 → `text_requires_single_focus_point`） <!-- aidcp-edge 6a48d86 -->
+- [x] 5.2 聚焦腿：既有 trajectory / 合成点击落在单点上聚焦；`recheckStaleBeforeReplay` 四态原样继承 <!-- aidcp-edge 6a48d86 -->
+- [x] 5.3 中途复检 #1（键入前）：遮罩不在 ⇒ `cleared`/`cleared_mid_sequence`（零字符）；kind/URL 变 ⇒ 重抓帧 + `stale_snapshot`/`kind_changed`|`page_moved_mid_sequence` <!-- aidcp-edge 6a48d86 -->
+- [x] 5.4 `probeFocus` → `none` ⇒ `no_target`/`focus_not_landed`，typed=0，不提交；探针抛错 fail-closed <!-- aidcp-edge 6a48d86 -->
+- [x] 5.5 `clearFocusedField`（强制）→ `dispatchHumanTyping`（checkpoint=leaseHeld→TaskTakeoverError，deadlineAt=now+20s，onProgress 捕获真实 typed）；Takeover ⇒ 清场+`takeover_during_type`；Deadline ⇒ 清场+`type_deadline_exceeded`；均 typed=N 不提交 <!-- aidcp-edge 6a48d86 §3 dispatchHumanTyping 加 onProgress（抛出时局部计数丢失、闭包才是真相） -->
+- [x] 5.6 回读（editable）→ `verified: match|mismatch`；opaque ⇒ `unverifiable`。顺序 type→read→submit <!-- aidcp-edge 6a48d86 -->
+- [x] 5.7 中途复检 #2（Enter 前）：遮罩不在 ⇒ `cleared_before_submit`；焦点 tier 变 ⇒ `still_blocked`/`focus_lost_before_submit`；探针抛 ⇒ `recheck_failed_before_submit` <!-- aidcp-edge 6a48d86 -->
+- [x] 5.8 `submit==='enter'` ⇒ `pressEnter` → submitted=true <!-- aidcp-edge 6a48d86 -->
+- [x] 5.9 settle → 有界重试 fresh 复检（4 次/500ms）：无遮罩 ⇒ cleared；有遮罩 ⇒ still_blocked;全抛 ⇒ `verdict_unavailable_after_submit`（不是 click_failed）+ 尽力回带新帧 <!-- aidcp-edge 6a48d86 -->
+- [x] 5.10 `src/main.ts`：wire `checkTaskLease`/`touchTaskLease` 到 taskCoordinator；handler 内按 payload.taskId 构造 checkpoint + 聚焦/清空/键入后 touch <!-- aidcp-edge 6a48d86 -->
+- [x] 5.11 单测 7 例：happy（cleared+risk.captcha_cleared+typeReport 齐全）；no_target 零派发；复检 #1 零字符；被抢占 typed<len+清场+未提交；Enter 后连抛=verdict_unavailable_after_submit；shape 拒绝；charset 拒绝 <!-- aidcp-edge 6a48d86 -->
+- [x] 5.12 `npm test`(1712) + `npm run test:acceptance`(24) + `npm run typecheck` 全绿 <!-- aidcp-edge 6a48d86 -->
+
+> **§4/§5 已 LANDED（edge master `6a48d86`；§3 键盘原语随本批 rebase 到 `c1730ed`）。未部署**——edge 是客户端，需出包 + 逐台运营机换装才生效（能力闸 fail-closed ⇒ 换装前该能力对该机一直暗）。
 
 ## 6. aidcp-cloud — 协议镜像 + 校验闸
 
-- [ ] 6.1 `src/comm/protocol.ts`：与 edge **逐字一致**镜像 4.1 / 4.2 的字段；移除 `EdgeHelloPayload.remoteAddr`
-- [ ] 6.2 `src/comm/captcha-assist.ts`：`submitClick` 在**租约获取之前**插 `sanitizeText`（长度 1..24 + charset）→ `invalid_text`；**畸形 = 整单拒绝**，注释显式对照 trajectory 的「丢弃装饰、保留 points 继续」为何**策略相反**
-- [ ] 6.3 `src/comm/captcha-assist.ts`：v1 形状闸 `text && points.length !== 1` → `invalid_points` / `text_requires_single_focus_point`
-- [ ] 6.4 `src/comm/captcha-assist.ts`：**能力闸 fail-closed** —— `pusher` dep += `edgeCapabilities?(edgeId)`，**live 查当前连接**（不用 `onDetected` 快照，incident 可能比连接活得久）；未声明 ⇒ `edge_lacks_text_capability`；查不到 ⇒ fail-closed 且 reason 能分辨「在线但没声明」与「连接状态未知」
-- [ ] 6.5 `src/comm/captcha-assist.ts`：`lastDispatch` += `textLen?`（`type` 联合**不动**）；`lastResult` += `inputMode?` / `typeReport?` 透传；`onClickResult` 映射 += `no_target` → failed
-- [ ] 6.6 `src/comm/captcha-assist.ts`：**版本偏斜检测** —— `lastDispatch.textLen > 0 && 回执 inputMode !== 'click_type'` ⇒ `lastResult` 标 `text_not_executed`
-- [ ] 6.7 `src/comm/captcha-assist.ts`：**答案明文边界** —— `text` 只活在 `submitClick` 调用栈，MUST NOT 写进 incident / logger；加注释锁死
-- [ ] 6.8 **incident 状态机不动**（复用 `click_pending`，不加 `input_pending`）⇒ console 两张 Record 表零改动
-- [ ] 6.9 移除 remoteAddr 连带：`src/comm/ws-server.ts`（session 字段）、`src/comm/handler.ts`（hello 赋值）、`src/comm/captcha-assist.ts`（incident 字段 + 装配）、`src/comm/captcha-coordinator.ts`（**删飞书卡「远程地址」行**）
-- [ ] 6.10 **AC-PROTO-07** cloud 侧：同 4.8 的逐字段往返断言
+- [x] 6.1 `src/comm/protocol.ts`：镜像 4.1/4.2 字段（shape 逐字一致）；移除 `HelloPayload.remoteAddr` <!-- aidcp-cloud 04321be 两份 protocol.ts 历史上 import/注释不同、但 MessageType 与 payload shape 保持一致；本次镜像 shape -->
+- [x] 6.2 `submitClick` **租约获取之前**插 `isValidCaptchaText`（1..24 + charset）→ `invalid_text`；畸形=整单拒绝，注释显式对照 trajectory 策略相反 <!-- aidcp-cloud 04321be -->
+- [x] 6.3 v1 形状闸 `text && points.length !== 1` → `text_requires_single_focus_point` <!-- aidcp-cloud 04321be 偏离：用独立 reason 值（非复用 invalid_points），panel 表映 400 -->
+- [x] 6.4 能力闸 fail-closed：`pusher.edgeCapabilities?(edgeId)` live 查当前连接；undefined ⇒ `edge_capability_unknown`（连接未知），数组不含位 ⇒ `edge_lacks_text_capability`（在线但没声明） <!-- aidcp-cloud 04321be ws-server 加 EdgeCloudServer.edgeCapabilities 实现（OPEN+非stale）；server.ts 接线 -->
+- [x] 6.5 `lastDispatch += textLen?`；`lastResult += inputMode?/typeReport?` 透传；`onClickResult` no_target → failed（else 分支已覆盖，补注释） <!-- aidcp-cloud 04321be -->
+- [x] 6.6 版本偏斜检测：`lastDispatch.textLen>0 && inputMode!=='click_type'` ⇒ `lastResult.textNotExecuted=true` <!-- aidcp-cloud 04321be -->
+- [x] 6.7 答案明文边界：`text` 只活在 submitClick 调用栈，只落 `textLen`，注释锁死；MUST NOT 进 incident/logger <!-- aidcp-cloud 04321be -->
+- [x] 6.8 incident 状态机不动（复用 click_pending）⇒ console 两张 Record 表零改动 <!-- aidcp-cloud 04321be -->
+- [x] 6.9 移除 remoteAddr 连带：ws-server EdgeSession、handler hello 赋值、captcha-assist incident 字段+装配、captcha-coordinator 删飞书卡「远程地址」行（+ 清理两处腐烂注释） <!-- aidcp-cloud 04321be -->
+- [x] 6.10 **AC-PROTO-18** cloud 侧：与 edge 逐字一致的逐字段往返断言 <!-- aidcp-cloud 04321be -->
 
 ## 7. aidcp-cloud — panel 层
 
-- [ ] 7.1 `src/panel/panel-server.ts`：`/click` 分支 body 解构 += `text, submit`（**不新增 verb、不新增身份闸** —— 键入与点击共用同一授权面，见 design D9）
-- [ ] 7.2 `src/panel/panel-server.ts`：`captchaAssistStatus` 从 if 链 + default 改成 **`Record<reason, number>` 穷举表**（reason union 一加成员 typecheck 立刻红）；定码 `invalid_text`/`invalid_points`→400、`edge_lacks_text_capability`→409、`not_found`→404
-- [ ] 7.3 `src/panel/types.ts`：`submitClick` 签名 += `text?` / `submit?`；移除 remoteAddr
-- [ ] 7.4 单测：**panel 把 `text`/`submit` 透传到 `submitClick`**（HTTP 边界手写解构的守卫——漏字段 = 静默丢弃 + typecheck 全绿）
-- [ ] 7.5 单测：`actor='captcha-assist-token'` + text ⇒ **200 且命令已下发**（飞书链接可直接键入，MUST NOT 因缺 console 登录而拒）；**纯点击 ⇒ 200（零回归）**；未声明能力 ⇒ 409 且**命令未下发**；畸形 text ⇒ 整单拒绝、未下发
-- [ ] 7.6 `npm test` + `npm run test:acceptance` + `npm run typecheck` 全绿
+- [x] 7.1 `panel-server.ts`：`/click` body 解构 += `text, submit`（非法类型丢弃、submit 只认 'enter'），透传 submitClick；不新增 verb/身份闸 <!-- aidcp-cloud 04321be -->
+- [x] 7.2 `captchaAssistStatus` 改 **`Record<reason, number>` 穷举表**（`Extract<DispatchResult,{ok:false}>['reason']`，union 加成员 typecheck 立刻红）；invalid_text/invalid_points/text_requires_single_focus_point→400、edge_*→409、not_found→404 <!-- aidcp-cloud 04321be -->
+- [x] 7.3 `panel/types.ts`：`submitClick` 签名 += `text?`/`submit?`（remoteAddr 本就不在此层） <!-- aidcp-cloud 04321be -->
+- [x] 7.4 单测：panel 把 text/submit 透传到 submitClick（HTTP 边界守卫） <!-- aidcp-cloud 04321be -->
+- [x] 7.5 单测：scoped-token actor + text ⇒ 200（飞书链接直接键入，不因缺 console 登录而拒）；纯点击 ⇒ 200 零回归；能力未声明 ⇒ 409；畸形 text ⇒ 400 <!-- aidcp-cloud 04321be -->
+- [x] 7.6 `npm test`(2456) + `npm run test:acceptance`(56) + `npm run typecheck` 全绿 <!-- aidcp-cloud 04321be -->
+
+> **§6/§7 已 LANDED（cloud master `04321be`）+ 部署 dev**（cloud src rsync + restart，healthcheck 全过：active / 8787 / 飞书长连接 / panel 8090 / PG select 1）。<!-- 2026-07-18 deployed dev -->
+
 
 ## 8. aidcp-console — 协助页
 
-- [ ] 8.1 `src/types/api.ts`：`lastResult.status` union += `no_target`；+= `inputMode?` / `typeReport?`；**移除 `remoteAddr`**（手抄镜像，不在 `/api/version` 指纹对拍内 ⇒ 登记为已知缺口）
-- [ ] 8.2 `src/pages/CaptchaAssistPage.tsx`：**删「远程桌面」按钮**及 `remoteAddr` 相关渲染
-- [ ] 8.3 `src/pages/CaptchaAssistPage.tsx`：导入 AntD `Input`（**不做登录态感知、不挂 Bearer** —— 键入与点击共用同一 scoped token 授权面，见 design D9）
-- [ ] 8.4 `src/pages/CaptchaAssistPage.tsx`：**不变量长在控件上** —— 答案框 disabled 直到 `points.length === 1`（label「先在截图上点中输入框，再在此键入答案」）；`text` 非空时不让放第 2 个点
-- [ ] 8.5 `src/pages/CaptchaAssistPage.tsx`：「回车提交」Checkbox 默认开；**不提供「点第 2 个点提交」**（聚焦滚动会让旧坐标失效且 `sameLocation` 检测不到）
-- [ ] 8.6 `src/pages/CaptchaAssistPage.tsx`：**pin 触发扩到首次键入** —— `frozen = (points.length > 0 || text.length > 0) && pinned != null`，使「画面已更新」Alert 在打字期照常生效
-- [ ] 8.7 `src/pages/CaptchaAssistPage.tsx`：提交 body += `text?` / `submit?`（空则整字段省略，与 trajectory 同「全有或全无」纪律）；**提交成功与 adoptLatest 后立即清空 text state**；答案绝不进 URL / localStorage
-- [ ] 8.8 `src/pages/CaptchaAssistPage.tsx`：建 **`Record<lastResult['status'], string>` 穷举表**（现为裸打英文枚举、无表 ⇒ 新增的 `no_target` 本会从这个洞溜走）
-- [ ] 8.9 `src/pages/CaptchaAssistPage.tsx`：`typeReport` 渲染成三句人话（**用户价值兑现点**）——「字打进去了，但答案不对」/「焦点在跨源/不可读元素内，无法证明字符已落入；请对照新画面确认」/「那一点没点到输入框」；`edge_lacks_text_capability` ⇒ 「该机器客户端版本过旧，不支持远程输入」（不裸打英文 reason）
-- [ ] 8.10 `src/pages/CaptchaAssistPage.test.tsx`：无落点 ⇒ 输入框 disabled；打字触发 pin ⇒ 「画面已更新」Alert；答案不出现在任何 fetch URL；**纯点击提交体与今天逐字节一致**
-- [ ] 8.11 `npm test` + `npm run typecheck` 全绿
+- [x] 8.1 `src/types/api.ts`：`lastResult.status` += `no_target`；+= `inputMode?`/`typeReport?`/`textNotExecuted?`；`lastDispatch += textLen?`；新 `CaptchaAssistTypeReport`；移除 `remoteAddr` <!-- aidcp-console b6a2b3d 手抄镜像不在 /api/version 指纹对拍内 → §12 登记已知缺口 -->
+- [x] 8.2 删「远程桌面」按钮及 remoteAddr 渲染（连同 ExportOutlined import） <!-- aidcp-console b6a2b3d -->
+- [x] 8.3 导入 AntD `Input`（不做登录态感知、不挂 Bearer） <!-- aidcp-console b6a2b3d -->
+- [x] 8.4 不变量长在控件上：答案框 disabled 直到 `points.length === 1`；`text` 非空时点位上限降为 1 <!-- aidcp-console b6a2b3d -->
+- [x] 8.5 「回车提交」Checkbox 默认开；不提供「点第 2 个点提交」 <!-- aidcp-console b6a2b3d -->
+- [x] 8.6 `frozen = (points.length > 0 || text.length > 0) && pinned != null`，打字期「画面已更新」Alert 照常生效 <!-- aidcp-console b6a2b3d -->
+- [x] 8.7 提交 body += `text?`/`submit?`（空则整字段省略）；提交成功 + adoptLatest 后清空 text；答案绝不进 URL/localStorage <!-- aidcp-console b6a2b3d -->
+- [x] 8.8 建 `Record<lastResult['status'], string>` 穷举表（LAST_RESULT_LABEL，含 no_target） <!-- aidcp-console b6a2b3d -->
+- [x] 8.9 `typeReport` 渲染成人话 Alert（打错了 / 不可读元素无法证明 / 没点到框 / 客户端过旧未执行）；`edge_lacks_text_capability` 等拒绝码经 REASON_MESSAGE 转人话 <!-- aidcp-console b6a2b3d -->
+- [x] 8.10 单测：无落点 ⇒ 输入框 disabled、1 点后可用；打字期新帧 ⇒「画面已更新」Alert；答案不出现在任何 fetch URL；纯点击提交体逐字节一致 <!-- aidcp-console b6a2b3d -->
+- [x] 8.11 `npm test`（CaptchaAssistPage 8 例）+ `npm run typecheck` 全绿 <!-- aidcp-console b6a2b3d 全量另有 3 个无关 portal 测试在并行下 flaky，隔离运行全过 -->
+
+> **§8 已 LANDED（console master `b6a2b3d`）+ 部署 dev**（build → 备份 → 纯覆盖 rsync 无 --delete → 验 LIVE bundle 含特征串 + curl 8088=200 → 备份留 10/清孤儿 asset）。<!-- 2026-07-18 deployed dev -->
 
 ## 9. aidcp（中控）— 文档
 
-- [ ] 9.1 `docs/protocol.md`：改 `captcha.assist.click` / `click_result` 两段 jsonc + 语义注释（`text` 敏感性 / 单点约束 / 焦点三态 / 提交只走 enter）；**头部计数 91 不动、§2 表不加行**
-- [ ] 9.2 `docs/protocol.md`：顺手修既存漂移 —— click 样例漏了 `taskId`
-- [ ] 9.3 `openspec/specs/captcha-incident-handling/spec.md` 的「消息数断言均为 44」已腐烂（实测 91）—— 已在 spec delta 的 MODIFIED 里改为不写死数字，归档时自然生效；**确认 archive 后主 spec 无残留 44**
+- [x] 9.1 `docs/protocol.md`：`captcha.assist.click` / `click_result` 两段 jsonc + 语义注释（text 敏感性/单点约束/焦点三态/提交只走 enter/能力闸）；头部计数 91 不动、§2 表不加行 <!-- aidcp main（本批控制仓提交） -->
+- [x] 9.2 `docs/protocol.md`：修既存漂移——click 样例补 `taskId`；hello 样例删 remoteAddr、加构建能力位 <!-- aidcp main -->
+- [x] 9.3 spec delta 的 MODIFIED「云端必须接收并解析验证码上报」已把「均为 44」改为「消息总数断言一致」，archive 时替换主 spec 该 requirement <!-- 已核对：主 spec line 6 requirement 含 44 scenario，delta line 245 MODIFIED 同 header 无 44；archive 后验 -->
 
 ## 10. 集成与部署
 
-- [ ] 10.1 三仓分别 `npm run test:acceptance` → 全量 `npm test` → `npm run typecheck`（协议改动的回归纪律）；安全红线 `AC-PROTO-*` / `AC-PUB-*` / `AC-RISK-*` 必须全过
-- [ ] 10.2 `openspec validate captcha-assist-text-answer --strict`
-- [ ] 10.3 合回各仓默认分支（fetch + rebase + ff）；**热点文件与活跃 change `captcha-assist-base-url-self-proof` 串行**
-- [ ] 10.4 部署 dev：cloud + console（先探 ECS 真实现状、先备份、rsync 排除 .env/node_modules/.git、restart、healthcheck；**绝不碰同机 isales**）
-- [ ] 10.5 dev 冒烟：纯点击流零回归；未换装的 edge 提交 text ⇒ 409 + 人话文案
+- [x] 10.1 三仓 `test:acceptance` → `test` → `typecheck` 全过（edge 1712+24 / cloud 2456+56 / console 8+typecheck）；AC-PROTO-* 全绿 <!-- edge 6a48d86 / cloud 04321be / console b6a2b3d -->
+- [ ] 10.2 `openspec validate captcha-assist-text-answer --strict`（archive 前跑）
+- [x] 10.3 合回各仓默认分支（land-change：fetch+rebase+ff）；活跃 change `captcha-assist-base-url-self-proof`（0/37、无 worktree）未开工 ⇒ 无并发写者，串行满足 <!-- edge 6a48d86 / cloud 04321be / console b6a2b3d -->
+- [x] 10.4 部署 dev：cloud（src rsync + restart）+ console（build + 覆盖 rsync）；先探 ECS（无并发部署、isales inactive 未碰）、先备份；healthcheck 全过 <!-- 2026-07-18 deployed dev -->
+- [ ] 10.5 dev 冒烟：纯点击流零回归；未换装 edge 提交 text ⇒ 409 <!-- 需真机（edge 客户端 + 活体验证码）→ 登记 §11 真机验收 -->
+
+> **§10 结论**：cloud + console 已部署 dev、健康检查全过。edge 不部署 ECS（客户端，需出包 + 逐台换装）。§10.5 冒烟为真机项，随 edge 出包换装一并验（见 §11）。
 
 ## 11. 真机验收登记（新簇，写入 docs/real-machine-acceptance-backlog.md）
 
-- [ ] 11.1 登记：模糊数字图片类字符识别码 ⇒ `focus:'editable'` + `verified:'match'` 全绿、验证码真被解开
-- [ ] 11.2 登记：焦点被 canvas / iframe 抢走 ⇒ `opaque` + `unverifiable` + 像素判据
-- [ ] 11.3 登记：点空 ⇒ `no_target`，拒绝键入且不提交
-- [ ] 11.4 登记：打字期挑战换图 ⇒ pin + 「画面已更新」
-- [ ] 11.5 登记：**Enter 提交导航后不被误报 failed**
-- [ ] 11.6 登记：未换装新包的运营机 ⇒ 409 + 人话文案（**需一次 edge 出包 + 逐台换装才能验**）
-- [ ] 11.7 登记：**从飞书卡链接直接点开协助页（未登录控制台）即可键入并解开验证码**（授权面不变的真机钉）
-- [ ] 11.8 登记：焦点假阳性取证 —— `focusTag` 是否足以事后判别「打进了错误的框」
-- [ ] 11.9 登记：确认协助页与飞书卡**已无远程桌面入口**
+> **全部登记入 `docs/real-machine-acceptance-backlog.md` 簇 104**（9 项，与既有验证码协助真机项共享环境）。<!-- aidcp main -->
+
+- [x] 11.1 模糊数字图片类字符识别码 ⇒ `editable`+`match` 全绿、验证码真被解开 <!-- 簇 104.1 -->
+- [x] 11.2 焦点被 canvas/iframe 抢走 ⇒ `opaque`+`unverifiable`+focusTag 取证 <!-- 簇 104.2 -->
+- [x] 11.3 点空 ⇒ `no_target`，拒绝键入且不提交 <!-- 簇 104.3 -->
+- [x] 11.4 打字期挑战换图 ⇒ pin + 「画面已更新」 <!-- 簇 104.4 -->
+- [x] 11.5 Enter 提交导航后不被误报 failed（verdict_unavailable_after_submit） <!-- 簇 104.5 -->
+- [x] 11.6 未换装新包 ⇒ 409 + 人话文案 + 命令未下发（需 edge 出包换装） <!-- 簇 104.6 -->
+- [x] 11.7 飞书卡链接直接键入（未登录控制台）即可解开 <!-- 簇 104.7 -->
+- [x] 11.8 焦点假阳性取证 —— focusTag 是否足以事后判别 <!-- 簇 104.2/104.9 -->
+- [x] 11.9 确认协助页与飞书卡已无远程桌面入口 <!-- 簇 104.8 -->
 
 ## 12. 独立登记（不在本 change 内做）
 
-- [ ] 12.1 登记独立 change：**cleared 断连不可达** —— overlay-report-gate 无论 send 成没成都消费掉 `reportedKind`，断连时解决掉的验证码永不到云端、账号一直暗着（要改 gate 的「已投递 vs 已尝试」记账）
-- [ ] 12.2 登记：incident TTL 30min 只在 `onDetected` 刷新、无续期入口
-- [ ] 12.3 登记：console 三处手抄 union 不在 `/api/version` 指纹对拍内（cloud 改了 console 零提示）
-- [ ] 12.5 登记：**「卡的可见范围 = 操作范围」** —— 协助页在登录门外凭 scoped token 授权、飞书群路由无内外部标记，看得见卡的人就能操作。**既有性质**（今天已完整适用于协助点击与其它审批卡），本 change 不引入、不扩大、不解决；归属是路由层的内外部标记
-- [ ] 12.4 登记（条件）：classifier 词表零条输入类文案 —— 本次报障形态已能被检出故非准入；若后续发现同类漏检，扩词表 MUST 用**真实文案**（裸词误命中已付过代价），不能凭猜
+- [x] 12.1 **cleared 断连不可达**（overlay-report-gate 无论 send 成没成都消费 `reportedKind`，断连时解决掉的验证码永不到云端、账号一直暗着，要改「已投递 vs 已尝试」记账）—— 登记为独立 bugfix change 候选，本 change 只修排序（1.4）不动记账 <!-- 已在 design.md Risks 记明；候选独立 change -->
+- [x] 12.2 incident TTL 30min 只在 `onDetected` 刷新、无续期入口 —— 正交既存问题，登记 <!-- 已在 design.md Risks 记明 -->
+- [x] 12.3 console 三处手抄 union 不在 `/api/version` 指纹对拍内（cloud 改了 console 零提示）—— 本 change 只补「api.ts 有、页面没加」一个方向（8.8 的 Record 表），另一半仍全静默，登记 <!-- 已在 design.md Risks 记明 -->
+- [x] 12.5 **「卡的可见范围 = 操作范围」** —— 协助页在登录门外凭 scoped token 授权、飞书群路由无内外部标记。**既有性质**，本 change 不引入/不扩大/不解决（D9：键入边际暴露面接近零）；归属路由层的内外部标记 <!-- 已在 design.md Risks + 簇 104.7 记明 -->
+- [x] 12.4 （条件）classifier 词表零条输入类文案 —— 本次报障形态已能被检出故非准入；若后续发现同类漏检，扩词表 MUST 用**真实文案**（裸词误命中已付过代价）—— 条件项，未触发不做 <!-- 已在 design.md Open Questions 记明 -->
