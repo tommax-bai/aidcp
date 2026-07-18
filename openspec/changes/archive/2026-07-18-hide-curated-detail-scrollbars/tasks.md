@@ -15,4 +15,4 @@
 
 - [x] 3.1 Run focused renderer tests, full edge tests, acceptance tests, and typecheck. <!-- focused 76/76; acceptance 24/24; full edge 1770/1770; typecheck passed -->
 - [x] 3.2 Commit the edge implementation, rebase, fast-forward to `master`, and push without packaging an installer. <!-- aidcp-edge 3ad6639 pushed to origin/master; canonical master fast-forwarded; no installer built -->
-- [ ] 3.3 Record evidence, strictly validate, commit and push control changes, then archive the completed OpenSpec change.
+- [x] 3.3 Record evidence, strictly validate, commit and push control changes, then archive the completed OpenSpec change. <!-- control 6ecf5dd pushed after strict validation; ready for archive -->
