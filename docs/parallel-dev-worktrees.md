@@ -95,9 +95,10 @@ scripts/new-change <aidcp-edge|aidcp-cloud|aidcp-console> <change-name>
 ```
 
 任务入口会再次执行门禁，因此不能通过先调用底层 worktree 命令来规避检查。
-`task-preflight` 还会拒绝任何 worktree `node_modules` 符号链接/Junction。每个 worktree
-必须拥有独立依赖目录；npm cache 可以复用下载，但依赖目录本身不得指向 canonical checkout
-或其它 worktree。这样 `npm ci`、`npm prune` 和工作树清理不会跨目录破坏本地环境。
+`task-preflight` 还会拒绝任何 worktree `node_modules` 符号链接/Junction，并检查 canonical
+中已安装的 `typescript`/`tsx` 是否缺少 `.bin` 启动器。每个 worktree 必须拥有独立依赖目录；
+npm cache 可以复用下载，但依赖目录本身不得指向 canonical checkout 或其它 worktree。
+这样 `npm ci`、`npm prune` 和工作树清理不会跨目录破坏本地环境；残缺安装也会在任务起手暴露。
 
 控制仓 aidcp 侧通常无需 worktree：直接在规范主 checkout 的 `main` 上用 openspec 流程建 additive change 目录（`/opsx:propose` 等）。如果需要分支隔离，手动从 `origin/main` 开控制仓 worktree：
 

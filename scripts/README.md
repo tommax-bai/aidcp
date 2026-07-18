@@ -7,7 +7,7 @@
 
 | 脚本 | 作用 | 安全性 |
 | --- | --- | --- |
-| `task-preflight` | 任务准入硬门禁：检查 canonical 默认分支，并拒绝共享 `node_modules` 链接 | 只读；失败即阻止任务，不切分支、不修复状态 |
+| `task-preflight` | 任务准入硬门禁：检查 canonical 默认分支、已安装 CLI shim，并拒绝共享 `node_modules` 链接 | 只读；失败即阻止任务，不切分支、不修复状态 |
 | `fleet-status` | 四仓所有 worktree 一屏:分支 / ahead-behind / dirty / 孤儿标记 | 只读（仅 quiet fetch） |
 | `new-change <repo> <name>` | 开一条流：建 `../<repo>.wt/<name>` 分支 `<name>` | 可逆；不共享依赖，按需在 worktree 内运行 `npm ci --prefer-offline` |
 | `spawn-change <repo> <name> [--launch]` | 多终端模式：确保 worktree（幂等）+ 生成任务简报；`--launch` 直接在中控仓启动 claude | 同 new-change；`--launch` 只是启动 CLI |
@@ -51,6 +51,8 @@ sibling clone 才会跳过。
 每个 worktree 必须拥有自己的物理 `node_modules` 目录。禁止将其符号链接/Junction 到
 canonical checkout 或其它 worktree；否则任一 `npm ci`、`npm prune` 或清理操作都可能
 破坏共享目标。依赖下载由 npm cache 复用，不通过目录链接复用。
+若 canonical 已安装 `typescript`/`tsx` 包却缺少对应 `.bin` 启动器，`task-preflight`
+会把它判定为不完整安装并阻断任务，提示在对应 canonical checkout 运行 `npm ci`。
 
 > 状态：三者均已实战跑通（2026-07-03 dashboard-refresh-clarity 经 new-change 开流、
 > land-change --yes 在 cloud+console 两仓完成 rebase→全量绿→ff 推送→清理）。

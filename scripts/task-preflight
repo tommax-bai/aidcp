@@ -41,6 +41,19 @@ for repo in aidcp aidcp-edge aidcp-cloud aidcp-console; do
 
   echo "OK: ${repo} canonical path is on ${expected_branch}: ${repo_root}" >&2
 
+  # A present package with a missing npm binary shim is an incomplete/corrupted install, not an
+  # intentionally uninstalled dependency tree. Catch it before a build fails with "command not found".
+  for package_binary in "typescript:tsc" "tsx:tsx"; do
+    package_name="${package_binary%%:*}"
+    binary_name="${package_binary##*:}"
+    if [ -f "${repo_root}/node_modules/${package_name}/package.json" ] \
+      && [ ! -e "${repo_root}/node_modules/.bin/${binary_name}" ] \
+      && [ ! -e "${repo_root}/node_modules/.bin/${binary_name}.cmd" ]; then
+      echo "FAIL: ${repo} canonical dependency shim is missing: node_modules/.bin/${binary_name} (package ${package_name} is installed; run npm ci in ${repo_root})" >&2
+      failures=$((failures + 1))
+    fi
+  done
+
   # Worktree dependencies must be physical, isolated directories. A symlink/Junction here is
   # especially dangerous on Windows: npm cleanup in the worktree can mutate the canonical target.
   if [ "$repo" != "aidcp" ]; then
