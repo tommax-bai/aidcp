@@ -24,26 +24,17 @@ git -C "$rp" fetch origin --quiet
 info "创建 worktree: $wt  (branch $name from origin/$def)"
 git -C "$rp" worktree add "$wt" -b "$name" "origin/$def"
 
-# 依赖复用：软链回 canonical checkout 的 node_modules，省掉每条流一次 npm ci（几分钟 + 几百 MB）。
-#
-# 安全前提：软链必须被 .gitignore 忽略。带斜杠的 `node_modules/` 只匹配**目录**——软链在 git 眼里是
-# 符号链接文件、匹配不上，于是一次 `git add -A` 就会把它提交进仓，ff 合回默认分支时顶掉真正的
-# node_modules 目录。三个子仓的 .gitignore 现在都有一条不带斜杠的 `node_modules`；这里再校验一次，
-# 校验不过就不建软链（宁可让这条流自己 npm ci，也绝不留一颗会污染主干的雷）。
-if [ -d "$rp/node_modules" ] && [ ! -e "$wt/node_modules" ]; then
-  if git -C "$wt" check-ignore -q node_modules 2>/dev/null; then
-    ln -s "$rp/node_modules" "$wt/node_modules"
-    info "已软链 node_modules → $rp/node_modules（已确认被 .gitignore 忽略）"
-  else
-    warn "$repo 的 .gitignore 不忽略软链形态的 node_modules —— 不建软链。请在该 worktree 里自行 npm ci，或先给 .gitignore 加一条不带斜杠的 node_modules。"
-  fi
-fi
+# 依赖目录必须按 worktree 隔离。共享 node_modules 的符号链接/Junction 会让任一 worktree
+# 的 npm ci、npm prune 或清理操作直接改写 canonical checkout，破坏并发任务和本地运行环境。
+# npm 自带内容缓存已能复用下载；需要验证时在目标 worktree 内独立安装即可。
+info "依赖保持隔离：未创建 node_modules 共享链接；需要时在该 worktree 运行 npm ci --prefer-offline"
 
 cat <<EOF
 
 ✔ 已开流。下一步：
     cd "${wt}"
+    # 若需测试/构建且依赖尚未安装：npm ci --prefer-offline
     # 在此启动该 session 的开发；提交到分支 ${name} 、message 前缀带 change 名
-    # 提交只显式列文件，绝不 git add -A（worktree 里有软链 node_modules 与他人残渣）
+    # 提交只显式列文件，绝不 git add -A
     # 部署绝不从 worktree 走；集成用：  scripts/land-change ${repo} ${name}
 EOF

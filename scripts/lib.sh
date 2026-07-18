@@ -6,8 +6,17 @@
 set -euo pipefail
 
 # Resolve dirs from this file's location (robust to cwd / relative or abs invocation).
-_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # .../aidcp/scripts
-CONTROL_REPO="$(dirname "$_LIB_DIR")"                       # .../aidcp
+# When scripts run from an aidcp control-repo worktree, the script directory itself is under
+# aidcp.wt/<name>. Git's common dir still points at the canonical aidcp/.git, so use that as
+# the stable anchor for all sibling repositories and worktree roots.
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_SCRIPT_CONTROL_REPO="$(dirname "$_LIB_DIR")"
+_COMMON_GIT_DIR="$(git -C "$_SCRIPT_CONTROL_REPO" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+if [ -n "$_COMMON_GIT_DIR" ]; then
+  CONTROL_REPO="$(dirname "$_COMMON_GIT_DIR")"              # .../aidcp canonical checkout
+else
+  CONTROL_REPO="$_SCRIPT_CONTROL_REPO"
+fi
 CODES_DIR="$(dirname "$CONTROL_REPO")"                      # .../codes
 
 # Repo -> default branch. Control repo (aidcp) = main; sub-repos = master.

@@ -40,6 +40,20 @@ for repo in aidcp aidcp-edge aidcp-cloud aidcp-console; do
   fi
 
   echo "OK: ${repo} canonical path is on ${expected_branch}: ${repo_root}" >&2
+
+  # Worktree dependencies must be physical, isolated directories. A symlink/Junction here is
+  # especially dangerous on Windows: npm cleanup in the worktree can mutate the canonical target.
+  if [ "$repo" != "aidcp" ]; then
+    worktree_root="${CODES_DIR}/${repo}.wt"
+    for dependency_path in "${worktree_root}"/*/node_modules; do
+      if [ ! -L "$dependency_path" ]; then
+        continue
+      fi
+      link_target="$(readlink "$dependency_path" 2>/dev/null || echo unknown)"
+      echo "FAIL: ${repo} worktree has linked node_modules: ${dependency_path} -> ${link_target}" >&2
+      failures=$((failures + 1))
+    done
+  fi
 done
 
 if [ "$checked" -eq 0 ]; then
@@ -49,10 +63,11 @@ fi
 
 if [ "$failures" -gt 0 ]; then
   cat >&2 <<'EOF'
-ERROR: task admission blocked by canonical branch state.
-Resolve the reported canonical checkout(s) first. Move feature/release work
-into a linked worktree; this guard will not switch branches, clean files, or
-override another session.
+ERROR: task admission blocked by canonical/worktree safety state.
+Resolve the reported issue(s) first. Feature/release work belongs in an
+isolated worktree, and every worktree must own its node_modules directory.
+This guard will not switch branches, clean files, remove links, or override
+another session.
 EOF
   exit 1
 fi

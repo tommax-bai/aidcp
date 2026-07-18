@@ -7,9 +7,9 @@
 
 | 脚本 | 作用 | 安全性 |
 | --- | --- | --- |
-| `task-preflight` | 任务准入硬门禁：检查本机存在的 canonical checkout 是否都在默认分支 | 只读；失败即阻止任务，不切分支、不修复状态 |
+| `task-preflight` | 任务准入硬门禁：检查 canonical 默认分支，并拒绝共享 `node_modules` 链接 | 只读；失败即阻止任务，不切分支、不修复状态 |
 | `fleet-status` | 四仓所有 worktree 一屏:分支 / ahead-behind / dirty / 孤儿标记 | 只读（仅 quiet fetch） |
-| `new-change <repo> <name>` | 开一条流：建 `../<repo>.wt/<name>` 分支 `<name>` | 可逆（worktree remove + branch -d） |
+| `new-change <repo> <name>` | 开一条流：建 `../<repo>.wt/<name>` 分支 `<name>` | 可逆；不共享依赖，按需在 worktree 内运行 `npm ci --prefer-offline` |
 | `spawn-change <repo> <name> [--launch]` | 多终端模式：确保 worktree（幂等）+ 生成任务简报；`--launch` 直接在中控仓启动 claude | 同 new-change；`--launch` 只是启动 CLI |
 | `land-change <repo> <name> [--yes]` | 集成：fetch+rebase+测试；`--yes` 才 ff 推送+同步主 checkout+清理 | 默认只 prep 不推；push 撞 non-ff 即中止，**绝不 force** |
 | `deploy-target <dev\|ol> [--check\|--shell]` | 打印/校验 ECS 目标元数据：host、key、runtime 目录、cloud URL | 只读；`--check` 仅查本机 key 是否存在且权限安全 |
@@ -19,6 +19,7 @@
 scripts/fleet-status
 scripts/task-preflight
 scripts/new-change aidcp-cloud my-change-name
+# 首次需要测试/构建时：cd ../aidcp-cloud.wt/my-change-name && npm ci --prefer-offline
 # … 在 ../aidcp-cloud.wt/my-change-name 里开发 …
 scripts/land-change aidcp-cloud my-change-name          # 只 prep + 打印命令
 scripts/land-change aidcp-cloud my-change-name --yes    # prep 通过后自动集成
@@ -46,6 +47,10 @@ $bash = Join-Path $gitRoot 'bin\bash.exe'
 `land-change` 永不 force-push；`new-change` 不会覆盖已存在的分支/worktree。`new-change` 和
 `spawn-change` 会在任何 worktree 操作前执行 `task-preflight`；门禁失败即停止，不能绕过，缺少的
 sibling clone 才会跳过。
+
+每个 worktree 必须拥有自己的物理 `node_modules` 目录。禁止将其符号链接/Junction 到
+canonical checkout 或其它 worktree；否则任一 `npm ci`、`npm prune` 或清理操作都可能
+破坏共享目标。依赖下载由 npm cache 复用，不通过目录链接复用。
 
 > 状态：三者均已实战跑通（2026-07-03 dashboard-refresh-clarity 经 new-change 开流、
 > land-change --yes 在 cloud+console 两仓完成 rebase→全量绿→ff 推送→清理）。

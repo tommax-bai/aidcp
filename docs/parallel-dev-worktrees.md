@@ -90,10 +90,14 @@ scripts/task-preflight
 scripts/new-change <aidcp-edge|aidcp-cloud|aidcp-console> <change-name>
 # 等价于：fetch origin + git worktree add ../<repo>.wt/<name> -b <name> origin/<默认分支>
 # 会拒绝覆盖已存在的分支/worktree；change 名不在控制仓时 WARN 提示（不阻断）
+# 不创建共享 node_modules；首次需要测试/构建时在 worktree 内运行 npm ci --prefer-offline
 # 之后：cd ../<repo>.wt/<name> 里启动该 session 的开发
 ```
 
 任务入口会再次执行门禁，因此不能通过先调用底层 worktree 命令来规避检查。
+`task-preflight` 还会拒绝任何 worktree `node_modules` 符号链接/Junction。每个 worktree
+必须拥有独立依赖目录；npm cache 可以复用下载，但依赖目录本身不得指向 canonical checkout
+或其它 worktree。这样 `npm ci`、`npm prune` 和工作树清理不会跨目录破坏本地环境。
 
 控制仓 aidcp 侧通常无需 worktree：直接在规范主 checkout 的 `main` 上用 openspec 流程建 additive change 目录（`/opsx:propose` 等）。如果需要分支隔离，手动从 `origin/main` 开控制仓 worktree：
 
@@ -135,6 +139,8 @@ cd ~/codes/aidcp && scripts/spawn-change <repo> <change-name> --launch
 
 - 只在**本分支**提交；commit message 前缀带 change 名（如 `<name>: …`），末尾带
   `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。
+- `node_modules` 不存在时，在当前 worktree 运行 `npm ci --prefer-offline`；严禁链接
+  canonical checkout 或其它 worktree 的依赖目录。
 - **在自己 worktree 里跑** `npm test` / `npm run typecheck`（sub-repo 内执行）。
 - **绝不从 worktree 部署**（部署只从主 checkout 的 eligible ref，见 §6 与部署目标文档；dev 用默认分支，ol 只用发布分支）。
 - 勤 `git fetch && git rebase origin/master`，让冲突小而早暴露。
@@ -212,13 +218,13 @@ scripts/fleet-status
 
 四个薄封装已落 `scripts/`（共享 `scripts/lib.sh`），见 `scripts/README.md`：
 
-- `scripts/task-preflight` — `[稳]`（任务准入前的 canonical 默认分支硬门禁；失败即阻止后续任务操作）
-- `scripts/new-change <repo> <name>` — `[稳]`（pilot 跑通：建 worktree/分支、拒绝覆盖、change 缺失 WARN）
+- `scripts/task-preflight` — `[稳]`（canonical 默认分支 + worktree 依赖隔离硬门禁；失败即阻止后续任务操作）
+- `scripts/new-change <repo> <name>` — `[稳]`（建 worktree/分支、拒绝覆盖、change 缺失 WARN、依赖目录不共享）
 - `scripts/fleet-status` — `[稳]`（pilot 跑通：四仓扫描 + ahead/behind + dirty + 孤儿标记，只读）
 - `scripts/land-change <repo> <name> [--yes]` — `[稳]`（2026-07-03 随 dashboard-refresh-clarity
   在 cloud+console 两仓实战跑通全流程；test:acceptance 仅在该仓定义时跑）
 
-**红线**：任务必须先通过 `scripts/task-preflight`；`land-change` 永不 force-push；`new-change` 不覆盖已存在分支/worktree；
+**红线**：任务必须先通过 `scripts/task-preflight`；worktree 不得共享 `node_modules`；`land-change` 永不 force-push；`new-change` 不覆盖已存在分支/worktree；
 部署只从主 checkout（§8）且必须命名 target。
 
 ## 10. 常见故障与兜底
