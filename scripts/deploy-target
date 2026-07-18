@@ -10,7 +10,7 @@ usage: scripts/deploy-target <dev|ol> [--check|--shell]
   dev      ECS 121.89.85.150, key ~/codes/isales-4.pem
   ol       ECS 123.56.253.183, key /Users/baitianxing/Downloads/ol.pem
 
-  --check  verify the key exists and has no group/other permissions
+  --check  verify the key exists and is readable
   --shell  print shell exports for eval/use in scripts
 EOF
 exit 1
@@ -44,23 +44,13 @@ downloads_dir="/opt/aidcp/downloads"
 service="aidcp-cloud.service"
 ssh_user="root"
 
-key_perm() {
-  if stat -f '%Lp' "$1" >/dev/null 2>&1; then
-    stat -f '%Lp' "$1"
-  else
-    stat -c '%a' "$1"
-  fi
-}
-
 check_key() {
   [ -f "$key" ] || {
     echo "ERROR: missing SSH key: $key" >&2
     exit 2
   }
-  perm="$(key_perm "$key")"
-  go="${perm: -2}"
-  [ "$go" = "00" ] || {
-    echo "ERROR: unsafe SSH key permissions for $key: $perm (run chmod 600)" >&2
+  [ -r "$key" ] || {
+    echo "ERROR: unreadable SSH key: $key" >&2
     exit 2
   }
 }

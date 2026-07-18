@@ -14,14 +14,16 @@ Any cloud, console, or edge release operation MUST name the target before touchi
 - **WHEN** an operator requests a deployment to `dev`
 - **THEN** the deployment preflight SHALL verify the target IP is `121.89.85.150`
 - **AND** the SSH key path is `~/codes/isales-4.pem`
-- **AND** the key permissions are safe for SSH
+- **AND** the key is a readable regular file
+- **AND** the preflight SHALL NOT reject the dev key based on POSIX group/other mode bits
 
 #### Scenario: Ol target preflight
 
 - **WHEN** an operator requests a deployment to `ol`
 - **THEN** the deployment preflight SHALL verify the target IP is `123.56.253.183`
 - **AND** the SSH key path is `/Users/baitianxing/Downloads/ol.pem`
-- **AND** the key permissions are safe for SSH
+- **AND** the key is a readable regular file
+- **AND** the preflight SHALL NOT reject the ol key based on POSIX group/other mode bits
 
 #### Scenario: Missing target is rejected
 

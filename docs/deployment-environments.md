@@ -38,7 +38,7 @@
 - Any SSH or `rsync` to ECS MUST name a target: `dev` or `ol`.
 - If a completed production-facing development task needs deployment and the user did not name a target, the target defaults to `dev`.
 - `ol` MUST NOT be deployed by default. It is allowed only after an explicit user request for `ol`/online deployment.
-- Before SSH or `rsync`, run `scripts/deploy-target <target> --check` or manually verify the same facts: host IP, key path, and key permissions.
+- Before SSH or `rsync`, run `scripts/deploy-target <target> --check` or manually verify the same facts: host IP, key path, and that the key is a readable regular file. For both `dev` and `ol`, do not reject the key based on Git Bash's synthesized POSIX mode on Windows.
 - Local cloud is not a production substitute. Run cloud tests locally, but runtime cloud lives on ECS.
 - Deploy only from a clean main checkout/default branch for `dev`, and from a clean release branch checkout for `ol`. A tag or clean SHA may be used to create the release branch, but the deployed ref is the branch.
 - Never deploy from an arbitrary dirty worktree.
@@ -224,4 +224,4 @@ scripts/deploy-target dev --check
 scripts/deploy-target ol --check
 ```
 
-The helper is intentionally read-only. It prints target metadata and fails if the key is missing or has group/other permissions.
+The helper is intentionally read-only. It prints target metadata and fails only when the key is missing or unreadable. Neither target requires a POSIX `600` mode; Windows ACLs remain the workstation's native access control and SSH may still apply its own platform checks.

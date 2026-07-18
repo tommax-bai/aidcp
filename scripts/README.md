@@ -12,7 +12,7 @@
 | `new-change <repo> <name>` | 开一条流：建 `../<repo>.wt/<name>` 分支 `<name>` | 可逆；不共享依赖，按需在 worktree 内运行 `npm ci --prefer-offline` |
 | `spawn-change <repo> <name> [--launch]` | 多终端模式：确保 worktree（幂等）+ 生成任务简报；`--launch` 直接在中控仓启动 claude | 同 new-change；`--launch` 只是启动 CLI |
 | `land-change <repo> <name> [--yes]` | 集成：fetch+rebase+测试；`--yes` 才 ff 推送+同步主 checkout+清理 | 默认只 prep 不推；push 撞 non-ff 即中止，**绝不 force** |
-| `deploy-target <dev\|ol> [--check\|--shell]` | 打印/校验 ECS 目标元数据：host、key、runtime 目录、cloud URL | 只读；`--check` 仅查本机 key 是否存在且权限安全 |
+| `deploy-target <dev\|ol> [--check\|--shell]` | 打印/校验 ECS 目标元数据：host、key、runtime 目录、cloud URL | 只读；`--check` 查 key 存在且可读，dev/ol 都不要求 Git Bash 的 POSIX 600 |
 | `release-desktop-macos <version> [--target dev\|ol] [--expect-env ol] [--yes]` | 桌面签名包**出包后交付**编排：下载 CI prerelease 的 dmg → 静态校验（spctl/codesign/stapler/asar/烘焙环境/运行时）→ 改 console `downloads.ts` → 构建 console；`--yes` 才传包+部署 console+验活+提交 | 默认只做本地只读段（下载+校验+改配置+构建）并打印剩余命令；`--yes` 才做 3 个对外动作。构建/签名/公证仍是 CI 专属、脚本不碰。push 撞 non-ff 软失败不 force |
 
 ```bash
