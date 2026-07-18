@@ -4,9 +4,9 @@
 
 ## What Changes
 
-- 精选详情在宽屏双栏模式下让参考图栏与文字栏联动滚动，并分别夹紧在各自的顶部和底部边界。
-- 任一栏先到达底部后保持在底部，只保留固定的小段尾部留白；另一栏继续滚动直到自身到底。
-- 向上滚动时采用对称规则：先到顶部的栏保持不动，另一栏继续回到顶部。
+- 精选详情在宽屏双栏模式下把参考图栏与文字栏改为两个独立滚动区；指针位于哪一栏，滚轮只控制哪一栏。
+- 任一栏到达底部或顶部后保持在自身边界，只保留固定的小段尾部留白，不带动另一栏改变位置。
+- 灵感详情标题区改为紧凑吸顶态，持续显示详情类型、标题、作者、返回与关闭入口；关闭按钮不得因压缩而隐藏。
 - 窄屏单栏布局继续使用普通页面滚动，不引入并列滚动行为。
 - 保持键盘操作、按钮点击、图片加载及详情返回行为不变。
 
@@ -22,7 +22,7 @@
 
 ## Impact
 
-- `aidcp-edge/src/electron/renderer/content-workspace.js`: 精选详情滚动协调与生命周期清理。
+- `aidcp-edge/src/electron/renderer/content-workspace.js`: 精选详情模式生命周期清理。
 - `aidcp-edge/src/electron/renderer/styles.css`: 双栏可滚动高度、尾部留白与窄屏回退。
-- `aidcp-edge/test/electron/content-workspace.test.ts`: 双栏边界夹紧及单栏回退的回归测试。
+- `aidcp-edge/test/electron/content-workspace.test.ts`: 双栏滚动位置隔离、紧凑吸顶标题及单栏回退的回归测试。
 - 不涉及协议、云端、数据库或管理后台 API 变更。
