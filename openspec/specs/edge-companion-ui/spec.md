@@ -1591,3 +1591,56 @@ The Electron environment rail SHALL interpret a double-click on an environment n
 - **THEN** the companion selects that environment and requests its browser be shown
 - **AND** it emits no park request for that gesture
 
+### Requirement: 客户端稿件审核页完整呈现当前账号待审队列
+
+客户端稿件审核页 SHALL 读取当前环境绑定账号的全部 `pending_approval` 候选稿并以服务端一致总数分页。两条及以上 MUST 使用类似灵感池的卡片列表与详情钻取；单条 MAY 直接进入详情；零条 MUST 显示真实空态。卡片 SHALL 展示封面、标题、正文摘要、更新时间与发布方式，详情 SHALL 展示完整配图、标题、正文、话题、内容版本和发布计划。账号切换 MUST 清空旧列表/详情/已处理集合并丢弃迟到响应。
+
+#### Scenario: 多条待审稿使用卡片列表
+
+- **WHEN** 当前账号有三条待审稿并打开稿件审核页
+- **THEN** 客户端显示三张可进入详情的审核卡片，而不是只展示最新一条或隐藏其余两条
+
+#### Scenario: 单条待审稿直接审核
+
+- **WHEN** 当前账号仅有一条待审稿
+- **THEN** 客户端可直接展示该稿详情与批准/取消操作，不要求客户先经过空洞列表页
+
+#### Scenario: 详情返回保留列表上下文
+
+- **WHEN** 客户从待审列表某页进入稿件详情后返回
+- **THEN** 原页码与滚动位置恢复，未处理稿件仍按原账号展示
+
+#### Scenario: 账号切换丢弃旧稿
+
+- **WHEN** 账号 A 的待审列表或详情请求在途时切换到账号 B
+- **THEN** A 的迟到响应不得渲染，B 页面不得出现 A 的标题、正文、图片、版本或发布计划
+
+#### Scenario: 多稿中处理一条保留其余稿件
+
+- **WHEN** 客户成功批准或取消列表中的一条稿件且仍有其它待审稿
+- **THEN** 已处理稿从本次页面会话移除并回到剩余列表或下一条，不关闭整个审核工作区、不把其余稿件标为已处理
+
+### Requirement: 发布计划在批准位置选择并诚实校验
+
+稿件详情的批准区域 SHALL 回显 Cloud 草稿当前发布方式，并允许小红书稿件选择“立即发布 / 定时发布”。定时模式 MUST 使用北京时间分钟值，并说明当前时刻后至少 1 小时且不超过 14 天；空值或越界值 MUST 禁止批准。取消稿件 MUST NOT 依赖发布计划。提交在途时 MUST 禁止当前稿重复操作；失败 MUST 保留稿件、计划选择与真实拒因。
+
+#### Scenario: 立即发布批准
+
+- **WHEN** 客户选择立即发布并批准当前版本稿件
+- **THEN** 客户端提交 `publishMode=immediate`、`publishTime=null` 与当前内容版本，不宣称平台已发布
+
+#### Scenario: 定时发布批准
+
+- **WHEN** 客户选择定时发布并输入当前北京时间后 2 小时的分钟值
+- **THEN** 客户端提交 `publishMode=scheduled` 与对应 epoch ms，成功只表示该版本已批准并进入下发
+
+#### Scenario: 非法定时时间禁止批准
+
+- **WHEN** 定时输入为空、少于未来 1 小时或超过 14 天
+- **THEN** 批准按钮不可用且不发送审批 IPC，取消按钮仍可用
+
+#### Scenario: 审批失败保留上下文
+
+- **WHEN** Cloud 返回版本冲突、时间失效、账号不可用或其它拒因
+- **THEN** 客户端保留当前稿件与发布时间选择，展示对应失败且不将卡片移出待审列表
+
