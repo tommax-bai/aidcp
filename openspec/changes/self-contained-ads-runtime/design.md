@@ -101,6 +101,21 @@ Every write path awaits `ensureAdsServiceOnce()` first (§3.4), so `adsServiceBa
 ### 3.6 Kernel gating
 Metadata (create-env/proxy/delete) → service only, never kernel. First browser launch → kernel via `ensureKernelOnce` after service-ensure, before `startEdge`, driven by `adsFingerprint.DEFAULT_KERNEL` with the existing determinate progress UI. One kernel serves all profiles.
 
+### 3.7 V2 browser lifecycle and lost-registry reconciliation
+
+The bundled `adspower-browser@2.1.0` CLI exposes browser lifecycle through the V2 profile contract. Both lifecycle owners SHALL use the same contract against the authoritative `adsServiceBase`:
+
+- core provider: `GET /api/v2/browser-profile/active?profile_id=...`, `POST /api/v2/browser-profile/start`, and `POST /api/v2/browser-profile/stop`;
+- Electron inspection/reconciliation: the same per-profile `active` and `start` calls, with reconciliation bounded to the known environment roster rather than the legacy global `/api/v1/browser/local-active` list.
+
+The V2 registry is authoritative for normally managed sessions, but the daemon can restart while a SunBrowser child remains alive. In that state V2 truthfully reports `Inactive` even though CDP is still serving. Before starting a duplicate, both paths inspect only the profile-scoped cache directories under `~/.adspowerCli/source/cache/<profile_id>_*`, read `DevToolsActivePort`, and accept an orphan candidate only when all of these checks pass:
+
+1. the port is a valid loopback TCP port and the second line is a `/devtools/browser/<opaque-id>` path;
+2. `http://127.0.0.1:<port>/json/version` is reachable within a short timeout;
+3. its `webSocketDebuggerUrl` is loopback, uses the same port, and has the exact same browser path.
+
+Candidate discovery is bounded and profile-prefixed; it MUST NOT scan unrelated user directories or trust a port alone. A validated candidate is adopted in place, logged as lost-registry recovery, and no V2 `start` is sent. If no candidate validates, launch proceeds through V2 `start`. Stop always uses V2 `stop` and retains the existing CDP-dark confirmation; an unconfirmed close remains an honest failure.
+
 ## 4. Key config + first-run UX
 
 ### 4.1 Baked rotatable key
@@ -136,7 +151,7 @@ Extend `test/electron/lifecycle-contract.test.ts` (source-assertion pattern) wit
 
 ## 7. Scope (YAGNI)
 
-**IN:** devDependency + nested staging script + top-level extraResources (CLI tree + `ads-runtime.json`) + asar-absence verify; resolveCliEntry userData candidate + first-run staging with version stamp; split ensures + remove external/none branches (hard switch); `adsServiceBase` into `resolveAdsOpts` + ensure-gating on createEnv/proxy/delete/reconcile/status IPC (fast-path read); baked rotatable key + single resolver + 3-call-site unification + copy fixes; static create-status line + honest error remap; seat classification as **core exit-code contract** (no give-up trip); kernel stalled-vs-errored + disk-full + partial-file check; eager service warm-up; leave-daemon-on-quit; delete dead `openAdsClient`; runCli-cwd contract test.
+**IN:** devDependency + nested staging script + top-level extraResources (CLI tree + `ads-runtime.json`) + asar-absence verify; resolveCliEntry userData candidate + first-run staging with version stamp; split ensures + remove external/none branches (hard switch); `adsServiceBase` into `resolveAdsOpts` + ensure-gating on createEnv/proxy/delete/reconcile/status IPC (fast-path read); V2 per-profile browser start/active/stop in the core and Electron paths; bounded, validated lost-registry CDP adoption; baked rotatable key + single resolver + 3-call-site unification + copy fixes; static create-status line + honest error remap; seat classification as **core exit-code contract** (no give-up trip); kernel stalled-vs-errored + disk-full + partial-file check; eager service warm-up; leave-daemon-on-quit; delete dead `openAdsClient`; runCli-cwd contract test.
 
 **DEFERRED:** Windows packaging (seam only); CLI/kernel self-update (pin CLI 2.1.0 + kernel `chrome_148`); per-operator keys; richer seat-quota UX (queueing/backoff); supervisor live-core base re-broadcast; per-arch sqlite trimming; userData rotatable-key tier; signing/notarization + `disable-library-validation`; cancellable kernel download; `ads stop` on quit.
 

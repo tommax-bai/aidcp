@@ -64,3 +64,13 @@
 - [ ] 9.2 Translocated build (from DMG/Downloads): first-run staging to userData works (no read-only-Resources write failure).
 - [ ] 9.3 Machine with a foreign desktop AdsPower on 50325: our CLI takes a fallback port; create/launch hit the bound port (no split-brain, no riding the foreign service).
 - [ ] 9.4 Shared-key concurrency: N operators concurrent — seat-ceiling shows the distinct message and does NOT latch the give-up.
+
+## 10. aidcp-edge — V2 browser lifecycle and lost-registry recovery
+
+<!-- Tasks 10.1-10.5: aidcp-edge commit e67fac4; validated after rebase with 82 focused tests, acceptance 24/24, full Edge 1789/1789, typecheck, live read-only V2 reconciliation, and strict OpenSpec validation. -->
+
+- [x] 10.1 Migrate the core AdsPower provider from V1 `browser/start|stop` to V2 per-profile `active|start|stop`, preserving honest CDP-ready/dark confirmation and adding focused request-contract tests.
+- [x] 10.2 Migrate Electron manual inspection and startup reconciliation from global V1 `browser/local-active`/`browser/start` to V2 per-profile `active|start` over the known environment roster.
+- [x] 10.3 Add bounded profile-cache `DevToolsActivePort` discovery in both lifecycle paths; adopt only when loopback `/json/version` exactly matches the recorded browser websocket path and port.
+- [x] 10.4 Cover normal V2-active adoption, V2-inactive validated orphan adoption, rejected stale/spoofed candidates, V2 start fallback, and V2 stop with focused tests.
+- [x] 10.5 Run focused tests, `npm run typecheck`, full Edge tests where practical, and strict OpenSpec validation.

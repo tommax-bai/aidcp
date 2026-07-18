@@ -46,6 +46,32 @@ LocalAPI 的**元数据类**操作（新建环境 / 代理编辑 / 删除环境�
 - **WHEN** 运营在一台尚未下过内核的机器上新建环境
 - **THEN** 客户端仅在数秒内确保 CLI 服务就绪即调用 `group/create`，**不**在建环境阶段下载 735MB 内核；建环境失败时返回可重试的诚实错误（不再是裸 `fetch failed`）
 
+### Requirement: 浏览器生命周期统一使用 V2 并接管失联浏览器
+
+核心 AdsPower provider 与 Electron 的手动检查、启动巡检 SHALL 统一使用随包 CLI 2.1.0 的 V2 profile 生命周期接口：`/api/v2/browser-profile/active`、`/api/v2/browser-profile/start`、`/api/v2/browser-profile/stop`。旧的 V1 `browser/start`、`browser/stop` 与全局 `browser/local-active` **MUST NOT** 再作为浏览器运行状态权威。Electron 巡检 SHALL 仅查询已知环境 roster 中的 profile id。
+
+当 V2 因 daemon 重启而报告 `Inactive`、但对应 profile 的本地缓存仍记录一个活着的 SunBrowser 时，客户端 SHALL 在发起 V2 `start` 前尝试接管。接管 MUST 同时校验 `DevToolsActivePort` 中的端口和 browser websocket path 与 loopback `/json/version` 返回的 `webSocketDebuggerUrl` 完全一致；只看到端口、页面 target 或任意非 loopback 地址均不足以接管。没有通过校验的候选时 SHALL 回落到 V2 `start`，不得假成功。
+
+#### Scenario: V2 正常报告 profile 活跃
+
+- **WHEN** `/api/v2/browser-profile/active` 对目标 profile 返回 `Active` 和有效 `debug_port`
+- **THEN** 客户端复用该端点，不发送重复的 `start`
+
+#### Scenario: daemon 丢失 registry 但浏览器仍活着
+
+- **WHEN** V2 对目标 profile 返回 `Inactive`，且 `~/.adspowerCli/source/cache/<profile_id>_*/DevToolsActivePort` 的端口与 browser path 都和 loopback `/json/version` 完全匹配
+- **THEN** 客户端把该浏览器接管为正在运行，不启动第二个 SunBrowser，并记录失联接管日志
+
+#### Scenario: 缓存候选过期或不匹配
+
+- **WHEN** `DevToolsActivePort` 不存在、端口不可达、地址非 loopback，或 websocket browser path/端口与 `/json/version` 不一致
+- **THEN** 客户端拒绝该候选并调用 V2 `start`，**MUST NOT** 仅凭一个可连接端口声明成功
+
+#### Scenario: 停止后仍可连接
+
+- **WHEN** 客户端调用 V2 `stop` 后 CDP 仍然可达
+- **THEN** 客户端保持既有的 CDP-dark 确认与补救流程，并在最终无法确认关闭时诚实失败
+
 ### Requirement: 内置密钥可轮换且不硬编码，失败诚实
 
 内置的共享 AdsPower API 密钥 SHALL 存放于随包**数据文件** `ads-runtime.json`，**MUST NOT** 硬编码进任何 `.cjs` 源码、**MUST NOT** 预置进 `settings.json`。密钥解析 SHALL 走单一解析器，优先级为 表单值 > 本机设置 > 环境变量 > 内置默认，并同时喂给主进程取参、核心子进程环境、运行时启动三处。密钥全缺失时 SHALL 诚实报「缺少 api-key」并停手，**MUST NOT** 静默假成功。
