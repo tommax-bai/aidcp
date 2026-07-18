@@ -13,5 +13,5 @@
   <!-- repo=aidcp-edge commit=4e4e3e5 validation=70 pass 0 fail; tsc noEmit pass with existing shared dependency runtime and explicit type roots deviation=worktree node_modules lacked dev CLIs, so no install was performed and moduleResolution Node was used for the typecheck -->
 - [x] 2.2 Run `openspec validate wechat-auth-startup-diagnostics --strict` and record validation evidence.
   <!-- repo=aidcp validation=openspec strict pass deploy=n/a deviation=none -->
-- [ ] 2.3 Rebase, fast-forward integrate and push the Edge and control default branches without force. Do not build an installer or deploy a Cloud runtime.
-  <!-- repo=aidcp-edge commit=4e4e3e5 pushed=origin/master; control pending; installer and Cloud deploy intentionally not run -->
+- [x] 2.3 Rebase, fast-forward integrate and push the Edge and control default branches without force. Do not build an installer or deploy a Cloud runtime.
+  <!-- repos=aidcp-edge,aidcp commits=4e4e3e5,67d4b97 pushed=origin/master,origin/main deploy=n/a deviation=installer and Cloud deploy intentionally not run -->
