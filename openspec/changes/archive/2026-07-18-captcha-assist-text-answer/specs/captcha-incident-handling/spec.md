@@ -132,7 +132,7 @@ edge 派发提交键后 SHALL 用**有界重试**重新探测阻断态。文本�
 
 ### Requirement: 协助键入与协助点击共用同一授权面
 
-含 `text` 的协助提交 SHALL 与纯点击走**完全相同**的授权路径（incident 级 scoped token）。系统 MUST NOT 为键入新增身份闸——协助页刻意置于控制台登录门之外、凭 URL 上的 scoped token 授权，正是为了让运营收到 Feishu 卡后能立即处置；验证码是有时效的现场，且远程桌面处置通道并不存在（见 REMOVED «远程桌面处置文案»），本链是唯一的远程处置路径。
+含 `text` 的协助提交 SHALL 与纯点击走**完全相同**的授权路径（incident 级 scoped token）。系统 MUST NOT 为键入新增身份闸——协助页刻意置于控制台登录门之外、凭 URL 上的 scoped token 授权，正是为了让运营收到 Feishu 卡后能立即处置；验证码是有时效的现场，且远程桌面处置通道并不存在（其入口已随本 change 移除，见下方各 MODIFIED 条），本链是唯一的远程处置路径。
 
 键入相对既有点击面的**边际暴露接近零**：点击已可作用于页面任意坐标，而键入只能进入已聚焦元素（焦点由一次已授权的点击建立）、字符集与长度受限、无修饰键与功能键、且只在阻断遮罩确认仍在的窗口内成立。
 
@@ -170,7 +170,9 @@ cloud SHALL 额外做**版本偏斜检测**（下发了 `text` 但回执未标�
 
 云端收到 `risk.captcha_detected` 后，除既有风控迁移、edge 暂停和 Feishu 告警外，还 SHALL 为该次阻断创建或更新一个远程协助 incident。incident MUST 绑定真实 `edgeId`、`accountId`、`kind`、首次检测 URL、创建时间、过期时间和当前处理状态；若缺少 `edgeId` 或无法定位在线 edge，系统 MUST 诚实标记该 incident 不可远程协助。incident MUST NOT 让 cloud 新开浏览器处理平台验证码。
 
-系统 MUST NOT 声称存在「远程桌面处置」这一后路：本系统不提供任何远程桌面能力，incident 与告警 MUST NOT 展示远程桌面入口或远程地址文案（见 REMOVED «远程桌面处置文案»）。不可远程协助时的诚实表述是**「本次无法远程协助」**，MUST NOT 暗示存在另一条已就绪的处置通道。
+系统 MUST NOT 声称存在「远程桌面处置」这一后路：本系统不提供任何远程桌面能力，incident 与告警 MUST NOT 展示远程桌面入口或远程地址文案。不可远程协助时的诚实表述是**「本次无法远程协助」**，MUST NOT 暗示存在另一条已就绪的处置通道。
+
+> **移除背景（原「远程桌面处置文案」条款）**：远程地址是边缘启动时从环境变量读取的自陈自由文本，全仓仅两行源码读取它，无示例配置、无文档、无界面入口，从未被填写过；控制台把该字符串直接当链接、Feishu 卡把它当一行文字打印。系统**不提供任何远程桌面能力**，其真机验证自 2026-06-21 起一直 DEFERRED。保留一个背后什么都没有的处置入口，会让「协助不了就走远程桌面」成为一条不存在的推诿路径——这与「MUST NOT 静默假成功」同源。故本 change 移除远程桌面入口与远程地址文案（控制台按钮、Feishu 卡片行、边缘环境变量读取、两份 `protocol.ts` 的 hello 载荷 `remoteAddr` 字段、云端 session / incident / panel 类型的连带字段），**无外部消费方、风险为零**。若将来确需远程桌面，前置是先决定运营机上部署何种第三方工具（采购与运维决策），届时另行立项。
 
 #### Scenario: 验证码创建远程协助 incident
 - **WHEN** cloud 收到 `risk.captcha_detected{edgeId:'edge-1', accountId:'acc-1', kind:'captcha'}`
@@ -263,10 +265,59 @@ edge 执行远程协助点击后 SHALL 等待有界 settle 时间并重新探测
 - **WHEN** 一侧的协助命令或回执 payload 新增 / 删改字段而另一侧未同步
 - **THEN** 逐字段往返断言 MUST 失败；panel HTTP 边界未透传新字段时透传断言 MUST 失败
 
-## REMOVED Requirements
+### Requirement: 必须去重冷却后发飞书通知，且失败不得静默
 
-### Requirement: 远程桌面处置文案
+云端收到 `risk.captcha_detected` SHALL 通过既有 `FeishuMessenger` 发一张 notify-only 告警卡（复用 `buildAlertCard`），内容含归属账号、机器定位（`machineLabel` / `edgeId`），便于人工前往处置；该卡 MUST NOT 带审批按钮、MUST NOT 写 `/tmp` 信号文件（与发布审批不同）、MUST NOT 展示远程桌面入口或远程地址文案（该入口已随本 change 移除）。云端 SHALL 对同一 edge 的重复验证码上报施加冷却窗（默认约 10 分钟、可配）以防刷屏。告警发送失败 MUST 被记录，MUST NOT 被静默吞掉。
 
-**Reason**: 该文案所指的后路**从不存在**。远程地址是边缘启动时从环境变量读取的自陈自由文本，全仓仅两行源码读取它，无示例配置、无文档、无界面入口，从未被填写过；控制台把该字符串直接当链接、Feishu 卡把它当一行文字打印。本系统**不提供任何远程桌面能力**，其真机验证自 2026-06-21 起一直 DEFERRED。保留一个背后什么都没有的处置入口，会让「协助不了就走远程桌面」成为一条不存在的推诿路径 —— 这与「MUST NOT 静默假成功」同源：向运营展示一个不可能奏效的出口，就是对能力边界撒谎。
+#### Scenario: 首次验证码发卡
 
-**Migration**: 移除远程桌面入口与远程地址文案（控制台按钮、Feishu 卡片行、边缘环境变量读取、两份 `protocol.ts` 的 hello 载荷字段、云端 session / incident / panel 类型的连带字段）。不可远程协助时的诚实表述改为「本次无法远程协助」，不再暗示存在另一条通道。**无外部消费方**（该字段从未被填过），移除风险为零。若将来确需远程桌面，前置是先决定运营机上部署何种第三方工具（属采购与运维决策），届时另行立项 —— 留白比留一个假入口诚实。
+- **WHEN** 某 edge 首次报 `risk.captcha_detected`
+- **THEN** 云端向飞书群发一张含"账号 / 机器 / Edge"的告警卡
+
+#### Scenario: 冷却窗内不重复刷屏
+
+- **WHEN** 同一 edge 在冷却窗内多次翻进验证码态
+- **THEN** 云端只发一张卡，冷却窗内的重复上报不再发卡
+
+#### Scenario: 发卡失败不静默
+
+- **WHEN** 飞书发送返回非 2xx / `code!=0`
+- **THEN** 云端记录该失败（日志 / 可观测），而非吞掉当作成功
+
+### Requirement: 边缘 hello 必须声明账号与机器定位以供归属
+
+边缘 SHALL 在 `hello` 的 `HelloPayload` 声明 `accountId` 与机器定位（如 `machineLabel`）；云端 `onHello` MUST 将其登记到该连接（`EdgeSession` / 连接表），使验证码事件能确定**归属账号**（不再硬编码 `acc-default`）并在告警卡中给出"去哪台机器处置"。字段缺失时云端 MUST 安全降级（卡片至少给出 `edgeId`），MUST NOT 因缺字段崩溃。`HelloPayload` MUST NOT 再声明 `remoteAddr`（背后无能力的远程桌面入口已随本 change 移除）。
+
+#### Scenario: hello 带身份则卡片可定位
+
+- **WHEN** 边缘 `hello` 声明了 `accountId` 与 `machineLabel`
+- **THEN** 该 edge 报验证码时，云端把状态迁移落到对应 `accountId`，告警卡含机器定位（`machineLabel` / `edgeId`）
+
+#### Scenario: 旧边缘缺身份字段仍可降级
+
+- **WHEN** 早于本 change 的边缘 `hello` 未带 `accountId` / 机器定位
+- **THEN** 云端不崩溃，告警卡至少带 `edgeId`，状态迁移落到默认账号（向后兼容）
+
+### Requirement: Feishu 验证码告警必须提供受保护的云端处理入口
+
+当远程协助 incident 可用时，Feishu 验证码 / 未知阻断告警卡 SHALL 包含一个“去处理”入口，指向该 incident 的云端协助页。入口 MUST 使用正常 console JWT 鉴权或短期签名 token；签名 token MUST 只授权读取、刷新和提交该 incident 的协助动作，MUST NOT 授权账号启停、风控状态写入、发布审批或其它管理操作。Feishu 卡 MUST NOT 直接承载验证码截图或“已解决”按钮，MUST NOT 暗示存在远程桌面兜底（该入口已移除）。
+
+#### Scenario: 告警卡展示去处理入口
+- **WHEN** cloud 为验证码 incident 发送 Feishu 告警卡且 assist 已启用
+- **THEN** 卡片包含指向该 incident 的受保护 action URL，卡片正文不再暗示远程桌面兜底
+
+#### Scenario: token 作用域受限
+- **WHEN** 操作者使用 Feishu action URL 打开协助页
+- **THEN** cloud 只允许该 token 访问对应 incident 的截图、刷新和点击接口，MUST NOT 接受该 token 调用账号风险或调度管理接口
+
+### Requirement: 远程协助必须可审计且短期留存
+
+系统 SHALL 记录远程协助 incident 的关键审计事件，包括创建、截图刷新、点击提交、edge 结果、清除、过期和失败；审计记录 MUST 包含操作者来源、incident id、edge/account 归属、时间和结果，但 MUST NOT 把截图二进制、平台 cookie、验证码答案推断、**运营键入的验证码答案本身**或敏感 token 写入普通日志。截图和签名 token MUST 有短期过期策略。
+
+#### Scenario: 记录点击审计
+- **WHEN** 操作者提交一次远程协助点击
+- **THEN** cloud 记录该 incident 的点击审计事件与结果状态，但不记录截图二进制或签名 token 明文
+
+#### Scenario: incident 过期
+- **WHEN** incident 超过有效期且未清除
+- **THEN** cloud 将其标记 expired，协助页显示需重新触发（不再暗示远程桌面兜底），MUST NOT 继续接受旧 token 的点击请求
