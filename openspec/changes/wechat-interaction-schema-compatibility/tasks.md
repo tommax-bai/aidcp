@@ -20,5 +20,6 @@
 
 - [x] 3.1 Run focused Cloud tests, Cloud typecheck, and strict OpenSpec validation
   <!-- Focused 17/17; acceptance 56/56; all 276 Cloud test files passed in Windows-safe batches; typecheck and openspec strict validation passed. -->
-- [ ] 3.2 Run repository change-risk and diff checks, then commit and push the control and Cloud changes through the default-branch workflow
+- [x] 3.2 Run repository change-risk and diff checks, then commit and push the control and Cloud changes through the default-branch workflow
+  <!-- aidcp-cloud 5f11bd0 -> origin/master; aidcp d0910b9 -> origin/main; both ff-only after fetch/rebase, diff checks clean. -->
 - [ ] 3.3 Deploy dev Cloud without database DDL and verify interaction list/read-control APIs recover while outbound controls remain closed
