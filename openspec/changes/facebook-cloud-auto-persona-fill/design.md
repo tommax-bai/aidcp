@@ -12,7 +12,7 @@ Cloud 已具备四块可复用能力：`client_env_scope` 的客户权威归属�
 - 一次补齐运行覆盖提交时当前客户全部权威归属的 Facebook 环境；已绑定账号立即处理，未绑定环境在后续首次握手后继续处理。
 - 只创建缺失人设，使用数据库原子 create-if-missing 防止生成在途时覆盖人工刚写入的人设。
 - 运行和目标持久化、请求幂等、Cloud 重启可恢复；失败有界且结果状态真实。
-- UI 只增加默认开启的自动补齐开关和整批一次的发言语言选择，不增加弹窗、账号列表、统计或跳转。
+- UI 在批量创建增加默认开启的自动补齐开关，在环境栏筛选为 Facebook 时提供手动补齐入口；两处都只选择一次发言语言，不增加弹窗、账号列表、统计或跳转。
 
 **Non-Goals:**
 
@@ -59,6 +59,12 @@ Cloud 在同一事务内以 JWT `userId` 查询 `client_env_scope(source=admin)`
 
 环境创建/归属成功不等于补齐运行已建立。Edge 对 customer-auth 请求做一次有界重试：接受则回 `personaAutoFillScheduled=true`；失败时环境创建仍保持成功，但回执明确“环境已创建，云端自动补齐未启动”，不染绿自动补齐。部分创建已产生环境时也提交一次运行，使已创建且已归属的目标不被遗留。
 
+### 7. 手动入口跟随 Facebook 环境筛选，复用同一无目标选择器 API
+
+环境栏处于展开态且平台筛选为 Facebook 时，在筛选按钮下方显示一行紧凑工具条：发言语言选择和“补齐未设置人设”按钮。其他平台及“全部”筛选隐藏；Facebook 分类即使当前为空也保留入口，因为 Cloud 以客户权威环境归属为准，客户端列表不是目标事实。
+
+点击后 renderer 只经具名 IPC 提交受支持语言。主进程验证 customer-auth 会话和语言白名单，为本次点击生成新的 Idempotency-Key，并复用 `POST /persona-auto-fill/runs`；不传环境或账号 ID。按钮请求中禁用，完成后在工具条内原地显示“已交由云端处理”或具名失败，不弹窗、不跳转、不展示虚构目标数或完成数。
+
 ## Risks / Trade-offs
 
 - [大量账号同时触发 LLM 成本与压力] → Cloud drain 使用小并发、运行/账号去重和目标尝试上限；API 只排队不等待模型。
@@ -72,7 +78,7 @@ Cloud 在同一事务内以 JWT `userId` 查询 `client_env_scope(source=admin)`
 
 1. Cloud 先加入幂等表、create-if-missing、补齐服务和 customer-auth 端点，运行时未收到新请求即零行为变化。
 2. 部署 Cloud 到 dev，验证 customer-auth 健康、表建立和旧 Edge 兼容。
-3. Edge 增加批量表单开关/语言选择和新端点调用；不构建安装器。
+3. Edge 增加批量表单开关/语言选择、Facebook 环境筛选手动入口和新端点调用；不构建安装器。
 4. 回滚 Edge 可停止新运行创建；Cloud 已建运行继续按当次授权收敛。若需紧急停止，可先回滚 Cloud 服务代码，表与已有 `persona_config` 保留。
 
 ## Open Questions

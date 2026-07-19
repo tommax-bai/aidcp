@@ -2,7 +2,7 @@
 
 ### Requirement: 客户端只提交无账号 ID 的 Facebook 补齐意图
 
-客户在 Facebook 批量创建中启用自动补齐后，Edge SHALL 经 customer-auth 提交一次带平台、版本化自动策略和整批发言语言的补齐意图，MUST NOT 提交账号 ID 列表、客户端人设状态、账号凭据、cookie、2FA 或代理资料。Cloud SHALL 以鉴权令牌中的客户身份确定范围，MUST NOT 接受请求体自报客户或账号选择器。
+客户在 Facebook 批量创建中启用自动补齐，或从环境栏 Facebook 分类手动触发补齐后，Edge SHALL 经 customer-auth 提交一次带平台、版本化自动策略和所选发言语言的补齐意图，MUST NOT 提交账号 ID 列表、客户端人设状态、账号凭据、cookie、2FA 或代理资料。Cloud SHALL 以鉴权令牌中的客户身份确定范围，MUST NOT 接受请求体自报客户或账号选择器。
 
 #### Scenario: 正常创建无账号 ID 的补齐运行
 - **WHEN** 已登录客户完成 Facebook 批量创建并保留自动补齐选项
@@ -11,6 +11,22 @@
 #### Scenario: 绕过界面提交账号选择器
 - **WHEN** 调用方在补齐意图中附带 `accountId`、`accountIds`、`envKeys`、`userId` 或其他未允许字段
 - **THEN** Cloud 以 `bad_request` 拒绝，MUST NOT 创建运行或生成人设
+
+### Requirement: Facebook 环境筛选提供无弹窗手动补齐入口
+
+桌面外壳 SHALL 仅在环境栏平台筛选为 Facebook 时显示一行手动补齐工具条，包含受支持发言语言选择和“补齐未设置人设”按钮。点击后 SHALL 原地提交当前客户范围的 Cloud 补齐运行并反馈受理或失败；MUST NOT 打开弹窗、跳转页面、要求先经过批量创建，或展示客户端推测的可设置、待检测、已设置数量。其他平台及“全部”筛选 MUST 隐藏该工具条。
+
+#### Scenario: 既有 Facebook 环境手动补齐
+- **WHEN** 客户把环境栏筛选切换为 Facebook、选择受支持语言并点击“补齐未设置人设”
+- **THEN** Edge 只提交一次无账号/环境 ID 的补齐意图，请求期间禁用按钮，并在原位置反馈“已交由云端处理”或真实失败
+
+#### Scenario: 非 Facebook 分类不显示入口
+- **WHEN** 环境栏筛选为全部、小红书或视频号
+- **THEN** 手动补齐工具条隐藏且不能从该视图提交补齐运行
+
+#### Scenario: 客户端 Facebook 列表为空
+- **WHEN** Facebook 分类当前没有本地可见环境但客户仍点击手动补齐
+- **THEN** Edge 仍可提交客户范围意图，由 Cloud 权威快照决定是否存在目标，客户端不得用本地空列表冒充云端无目标
 
 ### Requirement: Cloud 快照当前客户 Facebook 环境并延迟解析真实账号
 
