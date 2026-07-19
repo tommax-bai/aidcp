@@ -6,7 +6,7 @@ Feishu currently parses one message as one command, so `/publish Tianxing Bai; /
 
 - Accept a bounded semicolon-separated list of recognized slash commands in one Feishu message, validate and admit each segment independently, and report each segment's true acceptance or rejection.
 - Start admitted child commands independently so cloud-only preparation can overlap; do not serialize them by textual order.
-- Preserve one active browser writer per environment. Equal-priority ready requests execute by Edge receive order (priority, then monotonic FIFO order); later requests remain queued.
+- Preserve one active browser writer per environment. Exact manual publish/comment requests retain `human` priority through approval, and equal-priority ready requests execute by Edge receive order (priority, then monotonic FIFO order); later requests remain queued.
 - Treat resource waiting before any browser/platform command as queueing rather than an attempt: it MUST NOT increment `attempt_count` or `failure_count`, and MUST NOT terminate as `max_attempts` solely because another task held the browser.
 - Carry the complete manual comment switch set through the delegated path, including `--join[=<url>]`, `--contact`, and `--force` together.
 - Keep publish/comment human approval and platform-confirmed completion semantics unchanged. “Accepted/queued” remains distinct from “published/commented”.
@@ -24,7 +24,7 @@ None.
 
 ## Impact
 
-- `aidcp-cloud`: `src/feishu/commands.ts`, Feishu receiver result delivery, delegated-task parser/service/worker/executors/store, and focused tests.
+- `aidcp-cloud`: `src/feishu/commands.ts`, Feishu receiver result delivery, delegated-task parser/service/worker/executors/store, manual publish priority persistence/dispatch, and focused tests.
 - `aidcp-edge`: no protocol or behavior change expected; the existing single-active-lease priority/FIFO coordinator is the ordering authority and receives regression coverage only if needed.
 - OpenSpec: modifies `feishu-command-ingestion` and `user-delegated-tasks`; existing `manual-command-override` and `group-chat-injection` requirements provide the `--join --contact --force` regression contract.
 - Deployment: cloud runtime behavior changes and therefore requires serial landing on `aidcp-cloud/master`, `dev` deployment, and event-driven real-environment validation. No Edge package is required.

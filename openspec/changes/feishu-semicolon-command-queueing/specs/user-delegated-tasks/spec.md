@@ -10,6 +10,13 @@
 - **THEN** Edge SHALL 把先收到的请求授予为唯一 active lease
 - **AND** 后收到的请求 SHALL 留在队列中等待前者释放
 - **AND** 两个任务 MUST NOT 同时发送页面命令
+- **AND** 人工发布 MUST NOT 因等待审批而退化成 `automatic` 后被同批人工评论抢占
+
+#### Scenario: 自动候选的人工审批不改变其原调度档位
+
+- **WHEN** 一个非精确手工 `/publish` 来源的自动候选由运营人工审批
+- **THEN** 该候选 SHALL 保持既有 `automatic` Edge 租约优先级
+- **AND** 系统 MUST NOT 仅凭“审批动作由人完成”把所有自动候选提升为 `human`
 
 #### Scenario: 同毫秒时间不依赖文本顺序裁决
 

@@ -41,6 +41,8 @@ Each child receives a deterministic source reference derived from the Feishu mes
 
 No new cloud mutex is added across publish and comment. When both reach the same Edge environment, the coordinator still permits one active lease. It selects higher priority first and, for equal `human` priority, the lower monotonic receive-order counter. “Same time” therefore means first frame observed by Edge, not wall-clock milliseconds and not original semicolon order. Same-priority tasks queue and never preempt one another.
 
+Exact legacy `/publish` must retain its `human` lease priority across the generation/approval boundary. The delegated executor marks only that trusted single-command shape; the publish pipeline freezes the marker into persisted candidate metadata before sending the approval card, and the dispatcher reconstructs priority from that metadata. An operator approving an otherwise automatic candidate does not promote it. This preserves the existing automatic lane while preventing an exact manual publish from being downgraded after approval and then preempted by its manual comment sibling.
+
 ### D4: A proven pre-start defer is not an attempt
 
 Extend deferred execution results with an explicit machine-readable `attemptStarted:false`. Only executors that can prove zero browser/platform commands were dispatched may set it. For that shape, the worker atomically removes the provisional attempt ledger row and reverses its earlier `attempt_count` increment before releasing the task as `deferred`; `failure_count` and `skipped_count` remain unchanged. The normal task claim-release event preserves queue observability.
@@ -59,7 +61,8 @@ The delegated comment executor passes `injectContact`, `joinGroup` / `groupUrl`,
 - **[Batch replay creates duplicate children]** → Derive stable per-index source refs from the original message id; keep existing delegated dedupe.
 - **[Discarding an attempt after side effects permits duplicates]** → Only the explicit `attemptStarted:false` shape may discard; composite join-comment terminal results stay conservative because joining may already have occurred.
 - **[One child blocks batch result delivery]** → Run children concurrently with per-child settlement; current exact write admission is short and downstream work remains asynchronous.
-- **[Hotspot conflict with publish changes]** → Do not edit `publish-scheduler.ts`; land this change serially on current `master`, rerun all delegated/publish acceptance tests, then deploy dev.
+- **[Manual publish loses priority while waiting for approval]** → Persist the exact-command lease priority in candidate metadata before the card is emitted; dispatcher retries read the same value, while unmarked candidates remain automatic.
+- **[Hotspot conflict with publish changes]** → Treat `publish-scheduler.ts` and dispatch metadata as a serial integration hotspot: rebase onto current `master`, rerun all delegated/publish acceptance tests, then deploy dev.
 
 ## Migration Plan
 
