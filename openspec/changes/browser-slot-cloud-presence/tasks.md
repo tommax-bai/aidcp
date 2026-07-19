@@ -31,8 +31,10 @@
 - [x] 4.1 aidcp-edge 运行聚焦测试、acceptance、全量测试与 typecheck；记录通过数和任何真机未覆盖边界。
 - [x] 4.2 aidcp-cloud 运行聚焦测试、acceptance、全量测试与 typecheck，确认协议/发布/风险安全套件全绿。
 - [x] 4.3 更新 OpenSpec 任务证据并执行 `openspec validate browser-slot-cloud-presence --strict`。
-- [ ] 4.4 分别提交并推送 Edge、Cloud 与 control 变更，按默认分支快进集成且保持 canonical checkout 干净。
-- [ ] 4.5 从干净 Cloud master 部署 dev，核验 service、8787/8090 listener、health、Feishu、PostgreSQL 与 isales 未受影响。
+- [x] 4.4 分别提交并推送 Edge、Cloud 与 control 变更，按默认分支快进集成且保持 canonical checkout 干净。
+- [x] 4.5 从干净 Cloud master 部署 dev，核验 service、8787/8090 listener、health、Feishu、PostgreSQL 与 isales 未受影响。
 - [x] 4.6 不生成 Edge 安装包；将“真实客户端升级后验证 16 环境/5 槽位、槽位外 persona 可见、任务可唤醒”登记为真机验收项。
 
 <!-- Validation evidence (2026-07-19): Edge focused scheduling/lifecycle/console 79/79, acceptance 25/25, full 1855/1855, typecheck pass. Cloud focused bootstrap/capability tests pass, full 2541 pass with 8 explicit gated skips, typecheck pass. Real installed-client validation remains open because no Edge installer was built; recorded as cluster 106 in `docs/real-machine-acceptance-backlog.md`. -->
+
+<!-- Integration/deploy evidence (2026-07-19): aidcp-edge 4e0671e and aidcp-cloud 19cf0eb were rebased on current origin/master, pushed on the feature branch, then fast-forwarded and pushed to master; control 596d7f3 was pushed to main before this evidence-only follow-up. dev preflight selected 121.89.85.150. No dependency or migration changed. Backed up `/opt/aidcp/cloud` (including target-local env, excluding node_modules/git) to `/opt/aidcp/backups/cloud.bak.20260719-165851.tar.gz`, synced only `src/client-auth/client-auth-server.ts`, and restarted only `aidcp-cloud.service`. Post-restart: service active; 8787/8090/8091 listening; panel and client-auth health both `{ok:true}`; PostgreSQL ready; Feishu WS onReady; isales api/engine/scheduler/worker remained active. -->

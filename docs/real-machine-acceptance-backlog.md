@@ -1884,7 +1884,7 @@ Phase 0（云端）不依赖 UI，可先用 SQL 造态 + 后台仪表盘验（�
 
 ## 簇 106 — 云端控制连接与浏览器槽位解耦
 
-### change `browser-slot-cloud-presence` 真机验收（Edge `4e0671e` 源码已验证、**未出安装包**；Cloud `19cf0eb` dev 部署信息待 tasks 4.5 回填；登记于 2026-07-19）
+### change `browser-slot-cloud-presence` 真机验收（Edge `4e0671e` 源码已验证、**未出安装包**；Cloud `19cf0eb` 已部署 dev，备份 `cloud.bak.20260719-165851.tar.gz`；登记于 2026-07-19）
 
 **改了什么（一句话）**：浏览器并发上限现在只限制 AdsPower 浏览器，不再把槽位外环境连 Cloud、拿人设真态和接收任务的控制面一起掐掉；页面任务到来后仍走原有有界 FIFO 槽位唤醒，绝不超开浏览器。
 
