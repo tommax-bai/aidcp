@@ -999,7 +999,9 @@ first-writer-wins 审批信号。动作成功只表示审批决定已受理：`a
 }
 ```
 
-`active + closed` 是合法组合。capability 表示该账号此刻有效可用，不是 build 可能支持；`runtimeControlsVersion` 是 Edge 已接受的账号开关版本，未收到/未应用时为 `null`。身份错配、挑战、schema 漂移、scope/version 不匹配或开关关闭时必须降级且 fail closed。凭证、二维码和调试地址不得进入 payload。
+`active + closed` 是合法组合。已有加密会话通过身份校验和已启用读取探针时，Edge 必须直接进入该 API-only 状态，不得为例行启动打开浏览器。capability 表示该账号此刻有效可用，不是 build 可能支持；`runtimeControlsVersion` 是 Edge 已接受的账号开关版本，未收到/未应用时为 `null`。身份错配、挑战、schema 漂移、scope/version 不匹配或开关关闭时必须降级且 fail closed。凭证、二维码和调试地址不得进入 payload。
+
+若加密会话不能复用、Edge 确需重新授权，且 AdsPower `browser-profile/start` 返回已核实的 profile 占用签名，Edge 必须结束 `authenticating` 并上报 `status=reauth_required`、`browserState=unavailable`、`reasonCode=INTERACTION_BROWSER_PROFILE_IN_USE`。Cloud 按普通文本 reason code 持久化并原样投影；历史读取仍可见，所有写能力保持关闭。原始占用者标识只能以掩码写入本机日志，不得进入 WS、Cloud 存储或客户 API。用户释放占用后可显式触发 `interaction.auth.reopen`；命令受理不代表恢复成功，只有后续 `active` 快照才算恢复。机器样例见 `fixtures/ws/auth-status-profile-in-use.json`。
 
 **`interaction.runtime.controls`**（cloud → edge）
 

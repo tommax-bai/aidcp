@@ -32,6 +32,8 @@
 - v1 不支持 browse/like/collect/follow/publish/patrol；`interaction.dm.send_image` 始终 false。
 - browser driver 只负责登录/挑战现场、身份和 sidecar 生命周期；interaction connector 负责增量读取、发送和回查。
 - 浏览器 `closed` 可以与 auth `active` 同时成立，不得误报下线。
+- 本地加密会话通过身份与已启用读取探针时必须保持 API-only，不得仅为启动环境而打开浏览器；只有会话失效或人工要求时才打开 sidecar。
+- 重新授权启动 AdsPower profile 遇到确切占用签名时，Edge 报 `reauth_required + unavailable + INTERACTION_BROWSER_PROFILE_IN_USE`；合同和客户 API 不得携带原始占用者标识。释放占用后由用户显式重试，accepted 不等于已恢复。
 - capability 必须同时满足 build support、feature flag、auth active、identity match 和 endpoint probe，任一不确定即 false。
 
 ## WS v2 冻结

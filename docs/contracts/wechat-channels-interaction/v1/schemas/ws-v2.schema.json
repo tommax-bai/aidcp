@@ -127,6 +127,7 @@
       "oneOf": [
         {
           "enum": [
+            "INTERACTION_BROWSER_PROFILE_IN_USE",
             "WECHAT_AUTH_REQUIRED",
             "WECHAT_CHALLENGE_REQUIRED",
             "WECHAT_IDENTITY_MISMATCH",
