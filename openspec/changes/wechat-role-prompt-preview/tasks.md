@@ -17,9 +17,12 @@
 - [x] 3.2 Add a catalog-level completeness regression test for all non-browse live model roles.
 - [x] 3.3 Run focused prompt/role tests, relevant interaction and visual-role tests, full cloud tests, and cloud typecheck.
 - [x] 3.4 Make the console render `personaSource:none` as “does not use persona,” clarify the account-selection hint, then run focused role-page tests, build, and typecheck.
+<!-- aidcp-cloud d587cf9: focused 78/78; full 2597 total, 2589 pass, 8 skip, 0 fail; typecheck pass. aidcp-console 07fa1fa: focused 7/7, typecheck and production build pass. Deviation: the pre-existing full console suite was also attempted and timed out in 17 unrelated heavy UI tests (171 pass, 1 skip); no failing file overlaps this change, so delivery is based on the scoped role-page tests plus build/typecheck. -->
 
 ## 4. Delivery
 
-- [ ] 4.1 Update this task list with repo commit SHA, validations, deployment evidence, and deviations; run `openspec validate wechat-role-prompt-preview --strict`.
-- [ ] 4.2 Commit and push the control/cloud/console branches, rebase and fast-forward integrate the validated application changes to `master`, then push without force.
-- [ ] 4.3 Deploy the integrated cloud and console changes to `dev` from eligible clean canonical checkouts after `scripts/deploy-target dev --check`; verify service, listener, health, Feishu, PostgreSQL, and authenticated prompt responses for the repaired roles.
+- [x] 4.1 Update this task list with repo commit SHA, validations, deployment evidence, and deviations; run `openspec validate wechat-role-prompt-preview --strict`.
+- [x] 4.2 Commit and push the control/cloud/console branches, rebase and fast-forward integrate the validated application changes to `master`, then push without force.
+- [x] 4.3 Deploy the integrated cloud and console changes to `dev` from eligible clean canonical checkouts after `scripts/deploy-target dev --check`; verify service, listener, health, Feishu, PostgreSQL, and authenticated prompt responses for the repaired roles.
+<!-- Repos: aidcp OpenSpec commit 8d1894a (feature branch pushed); aidcp-cloud d587cf9 and aidcp-console 07fa1fa fast-forwarded and pushed to master without force. OpenSpec strict validation passed. -->
+<!-- dev 2026-07-19: deploy-target check passed; backups cloud.bak.20260719-185113.role-prompt-preview.tar.gz, cloud/.env.bak.20260719-185113.role-prompt-preview, and console.bak.20260719-185113.role-prompt-preview.tar.gz. aidcp-cloud active with NRestarts=0; 8787/8090 listening; /api/health and console/new asset HTTP 200; PostgreSQL select 1; Feishu Dev.A token probe and WSClient onReady; all nine repaired role prompt endpoints returned authenticated HTTP 200, available=true, and non-empty prompt. isales-api and isales-scheduler remained active. -->
