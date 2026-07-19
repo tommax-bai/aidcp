@@ -239,3 +239,32 @@ Facebook batch creation SHALL assign each planned account an OS family independe
 - **WHEN** 单条或批量任一六字段记录的首字段 UID 与可读取的 Cookie `c_user` 不一致
 - **THEN** 主进程在任何 `user/create` 前按安全行号拒绝，错误、日志与 UI 不包含 UID、密码、Cookie、access token 或邮箱原文
 
+### Requirement: Facebook 单建与批量建环境默认开启环境级慢启动
+
+桌面外壳经官方程序化创建链路新建 Facebook 环境时，单个创建与批量创建 SHALL 都把“开启环境级慢启动”作为权威归属完成意图提交给 Cloud；是否开启 SHALL 只由主进程归一后的 `platform === 'facebook'` 决定，MUST NOT 由 renderer 自报平台能力、账号输入行数或创建模式单独决定。小红书与视频号创建 MUST NOT 提交、显示或宣称慢启动配置。
+
+只有在 Cloud 已原子确认环境归属和慢启动设置后，创建回执才 MAY 声明该环境已开启慢启动。若本地环境已经创建但 Cloud 未确认，回执 MUST 如实区分本地创建、客户归属与慢启动配置，不得假成功，也不得为模拟事务回滚而自动删除环境。慢启动只改变每日额度上限，任何创建说明 MUST NOT 暗示动作速度、拟人程度或账号风险状态被改变。
+
+#### Scenario: Facebook 单个创建默认开启
+
+- **WHEN** 运维选择 Facebook 并以单个创建方式创建环境，无论是否同时导入一条账号资料
+- **THEN** 主进程在归属完成请求中提交 Facebook 慢启动开启意图
+- **AND** Cloud 确认后回执如实标记该环境慢启动已配置
+
+#### Scenario: Facebook 批量创建逐环境默认开启
+
+- **WHEN** 运维批量创建多个 Facebook 环境
+- **THEN** 每个计划项的归属完成请求都提交慢启动开启意图
+- **AND** 每个已确认环境使用各自首次完成时的同一上海自然日起点
+
+#### Scenario: 其它平台没有慢启动概念
+
+- **WHEN** 运维创建小红书或视频号环境
+- **THEN** renderer 与主进程均不提交或显示慢启动创建选项，创建回执也不出现慢启动成功声明
+
+#### Scenario: 归属失败不冒充慢启动成功
+
+- **WHEN** Ads CLI / SunBrowser 环境已创建，但 Cloud 归属完成失败
+- **THEN** 客户端说明该环境尚未完成权威归属且慢启动未确认
+- **AND** 不自动删除已经创建的环境
+
