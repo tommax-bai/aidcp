@@ -1,30 +1,30 @@
 ## Why
 
-Facebook 批量创建环境后，客户端逐账号判断人设状态再提交账号 ID，既增加交互负担，也会把状态未知或陈旧的本地投影误当成云端事实。需要把“补齐当前客户所有未设置人设的 Facebook 账号”收口为一个云端意图，由云端基于客户环境归属、已确认的环境→账号绑定和人设存储自行选择目标。
+Facebook 环境需要一个人工可控的批量人设入口，但“导入后自动生成”和环境栏“一键补齐”都跳过了用户对人设内容的确认，还让 Cloud 为不同账号自行生成内容。正确边界应是：用户在客户端只选择并确认一份人设，Cloud 只从当前客户的权威 Facebook 环境/账号绑定中筛出尚无人设的账号，把这份完全相同的人设原子写入，绝不替用户选方向或调用模型生成。
 
 ## What Changes
 
-- Facebook 批量创建表单增加一个默认开启的简单选项：“创建后由云端自动补齐未设置人设”，并只要求为整批选择一次发言语言；不新增账号选择、统计弹窗或跳转。
-- 环境栏筛选为 Facebook 时增加常驻的手动“补齐未设置人设”入口和一次发言语言选择；它适用于既有及非批量创建环境，原地反馈是否已交由云端处理，不新增弹窗、统计或跳转。
-- 批量创建全部完成并通过现有客户归属确认后，Edge 只向 customer-auth API 提交一次无账号 ID 的补齐意图；Facebook 凭据、cookie、2FA 和代理资料仍不上传云端。
-- Cloud 为该意图快照当前客户权威归属的 Facebook 环境和本批发言语言：已有账号绑定的立即检查，尚未绑定的保留等待，待环境首次登录握手建立绑定后继续处理。
-- Cloud 仅为缺失有效 `persona_config` 的账号生成并持久化人设，已有任何有效人设均跳过且绝不覆盖；跨客户绑定冲突、未知账号和非法平台均 fail-closed。
-- 新增显式 `facebook_auto_v1` 自动生成策略，从受控方向池按账号稳定选取生成种子，并继续使用现有人设生成器的账号差异化、结构校验、有限重试和单写落库通道。
-- 补齐任务持久化、幂等且可在 Cloud 重启后恢复；生成或落库失败保留真实失败状态，不把“已排队”表述为“已设置”。
+- 删除 Facebook 批量创建表单中的“创建后自动补齐”开关、批次语言选择、创建后请求和相关回执；创建环境与设置人设重新解耦。
+- 环境栏筛选为 Facebook 时只显示“批量设置人设”入口，不显示独立语言选择。点击后打开现有账号人设选择浮层的批量模式，语言作为完整人设的一部分在浮层内人工选择。
+- 批量模式根据用户选择的语气、点赞倾向、内容偏好和语言在客户端确定性生成一份可预览 `soulYaml`；不调用 Cloud 人设生成器。用户确认后才提交该完整人设。
+- Edge 只提交 `platform=facebook` 与用户已确认的 `soulYaml`，不提交账号 ID、环境 ID、客户端人设状态、凭据或代理资料。
+- Cloud 校验所选人设，快照当前客户权威归属的 Facebook 环境，现读真实环境→账号绑定与 `persona_config`，仅对缺失人设的账号执行原子 create-if-missing；所有目标使用同一份 `soulYaml`，已有设置绝不覆盖。
+- Cloud 补齐服务移除 `facebook_auto_v1` 方向池和逐账号 PersonaGenerator 调用。历史自动生成运行若缺少已确认模板将 fail-closed，不再恢复模型生成。
+- 运行仍持久、幂等并支持等待当前快照内尚未绑定的环境；受理只表示已安排，不冒充所有账号已设置。
 
 ## Capabilities
 
 ### New Capabilities
 
-- `facebook-auto-persona-fill`: 客户范围内、无客户端账号 ID 的 Facebook 缺失人设快照、延迟绑定补齐、幂等生成与诚实结果状态。
+- `facebook-auto-persona-fill`: 客户端人工确认一份人设后，由 Cloud 无账号 ID 地筛选当前客户缺失人设的 Facebook 账号并原样补齐。
 
 ### Modified Capabilities
 
-- `adspower-environment-provisioning`: Facebook 批量创建可选择在创建成功后提交云端自动补齐意图，同时保持凭据本地内存边界与创建结果真实性。
+- `adspower-environment-provisioning`: Facebook 单个/批量创建只负责环境创建与客户归属，不再展示或触发任何人设补齐能力。
 
 ## Impact
 
-- `aidcp-edge`: Facebook 批量创建表单、环境栏 Facebook 筛选工具条、渲染层 IPC 入参、Electron 主进程 customer-auth 请求和批量创建回执。
-- `aidcp-cloud`: customer-auth API、客户环境归属存储、环境绑定注册钩子、人设自动补齐任务存储与编排。
-- PostgreSQL 新增客户人设补齐运行/目标表；不迁移或覆盖现有 `persona_config`。
-- OpenSpec 更新 `adspower-environment-provisioning`，并新增 `facebook-auto-persona-fill` 能力规格。
+- `aidcp-edge`: 删除批量创建自动补齐控件/请求/回执；环境栏入口改为打开人设浮层批量模式；新增客户端确定性模板构建和所选人设提交 IPC。
+- `aidcp-cloud`: customer-auth 请求契约改为接收已确认 `soulYaml`；运行存储新增模板列；补齐编排从逐账号生成改为同模板 create-if-missing。
+- PostgreSQL 对既有补齐运行表做非破坏性扩展；`persona_config` 不迁移且已有行不覆盖。
+- Cloud 运行时变更部署到 dev；不构建 Edge 安装器。

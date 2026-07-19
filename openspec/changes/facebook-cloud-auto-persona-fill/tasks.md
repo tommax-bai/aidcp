@@ -39,3 +39,16 @@
   <!-- aidcp-edge feature commit aeb1020, rebased and integrated as master 3334fb5: Facebook-filter toolbar, customer-auth-only IPC, shared no-selector request helper, and 57 focused tests pass. -->
 - [x] 5.4 Run focused Edge tests, acceptance/full tests and typecheck proportionately; run strict OpenSpec validation, commit/push and serially integrate `aidcp-edge/master` plus `aidcp/main` without building an Edge installer or redeploying unchanged Cloud code.
   <!-- Validation: focused 57/57, acceptance 25/25, full 1881/1881, typecheck pass, strict OpenSpec validation pass. aidcp-edge/master fast-forwarded to 3334fb5 after rebasing onto concurrent origin/master 65927e8, then focused 57/57 + typecheck passed on the default checkout and master was pushed. aidcp/main was rebased onto concurrent origin/main 169fbb1, fast-forward integrated, strictly validated, and pushed with this completion record. No real-account run, Edge installer, or Cloud deployment performed. -->
+
+## 6. Correct auto-generation into selected-persona apply
+
+- [x] 6.1 Amend the proposal/design/specs to remove import-time and one-click auto-generation semantics, define the existing persona popup's batch-template mode, and require identical selected-persona create-if-missing behavior.
+  <!-- Corrected artifacts strictly validate: batch creation has no persona behavior; the FB-filter entry opens explicit template selection; Cloud only filters and applies one confirmed template. -->
+- [x] 6.2 Extend the Cloud run store with a persisted selected persona template and safe legacy-run handling while preserving idempotency, ownership snapshots, waiting-binding recovery, and atomic no-overwrite writes.
+- [x] 6.3 Replace the Cloud direction-pool/PersonaGenerator path with exact selected-template application; change customer-auth to accept only `platform` + validated `soulYaml` and reject selectors, strategy, or standalone language.
+  <!-- Cloud worktree: selected_persona_v1 persists exact soulYaml; legacy runs fail selected_persona_required; customer-auth validates only platform+soulYaml. Focused 41/41 and typecheck pass. -->
+- [x] 6.4 Remove all Facebook environment-creation auto-fill controls, renderer options, main-process triggers, and mixed creation/persona receipts.
+- [x] 6.5 Change the Facebook-filter entry to open the existing persona popup in batch mode without a rail language selector; build/preview the template deterministically on the client and submit it only after explicit confirmation.
+- [x] 6.6 Add focused Cloud/Edge regressions for identical template writes, legacy fail-closed behavior, no generator calls, strict payloads, removed creation hooks, batch popup flow, and no target/secret disclosure.
+  <!-- Edge worktree: import auto-fill removed; FB-filter opens persona-pop batch mode; trusted main builds deterministic YAML and submits only after confirmation. Focused Edge 57/57 + typecheck pass; generated YAML round-trips through Cloud loadSoulFromYaml. -->
+- [ ] 6.7 Run focused/full/acceptance/typecheck and strict OpenSpec validation, commit/push/integrate all owning repos serially, deploy committed Cloud source to dev with runtime checks, and do not build an Edge installer or trigger a real-account fill.
