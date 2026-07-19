@@ -26,6 +26,7 @@
 
 - [x] 4.1 更新 `docs/protocol.md` 并运行协议漂移、发布/评论安全验收、Edge/Cloud 全量测试与 typecheck
 - [x] 4.2 严格校验 OpenSpec，逐仓提交并记录 commit SHA、验证结果、偏差与真实写入边界
-- [ ] 4.3 串行集成并推送 Edge/Cloud/control 默认分支，从 eligible canonical checkout 部署 dev，检查服务/监听/health/log 且不宣称未执行的真实 Facebook 写入
+- [x] 4.3 串行集成并推送 Edge/Cloud/control 默认分支，从 eligible canonical checkout 部署 dev，检查服务/监听/health/log 且不宣称未执行的真实 Facebook 写入
 
 <!-- Validation: Edge/Cloud protocol.ts byte-identical; Cloud full suite 2571 passed + 8 gated skips, Edge full suite 1864 passed, both typechecks passed, openspec validate --strict passed. Runtime boundary: model/stub and deterministic guard validation only; no real-account post/comment submission was attempted. -->
+<!-- Integration/deploy: aidcp-edge master 4355d42 and aidcp-cloud master 3e9e1be pushed. Cloud deployed from the clean canonical master to dev with backup cloud.bak.20260719-180308.tar.gz plus env backup; service active with NRestarts=0, ports 8787/8090/8091 listening, panel/client/nginx health green, PostgreSQL select 1, Feishu WS onReady, and four unrelated isales services still running. Edge source was not packaged; no real Facebook post/comment write was attempted. -->
