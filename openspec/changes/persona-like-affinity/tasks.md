@@ -30,7 +30,10 @@
 
 - [x] 5.1 Edge 运行定向测试、全量测试与 typecheck；Cloud 先验收/定向，再全量测试与 typecheck
   <!-- Windows note: package `npm test` preserved single quotes and discovered 0 tests, so Cloud full verification used `.\\node_modules\\.bin\\tsx.cmd --test test/**/*.test.ts`; 2546 discovered, 2538 pass, 8 gated skip, 0 fail. -->
-- [ ] 5.2 更新 tasks 证据并再次严格校验 OpenSpec；分别提交隔离 worktree
-- [ ] 5.3 用 `scripts/land-change` 串行 rebase/验证/ff 推送默认分支，保留 canonical 既有本地改动
-- [ ] 5.4 按规范从 Cloud canonical checkout 部署 dev 并完成服务/监听/health/飞书/PostgreSQL 检查；Edge 不构建安装包
+- [x] 5.2 更新 tasks 证据并再次严格校验 OpenSpec；分别提交隔离 worktree
+  <!-- implementation commits before landing: aidcp-edge dd26aaf; aidcp-cloud e4a63b6; aidcp control 96d7016. Strict change validation passed. -->
+- [x] 5.3 用 `scripts/land-change` 串行 rebase/验证/ff 推送默认分支，保留 canonical 既有本地改动
+  <!-- landed default branches: aidcp-edge master 2717c69 (acceptance 25/25, full 1838/1838, typecheck); aidcp-cloud master e4a63b6 (acceptance 59/59, typecheck, actual full 2538 pass / 8 environment-gated skips / 0 fail). Edge canonical had unrelated local work, so the helper safely skipped syncing it; those changes remain untouched. -->
+- [x] 5.4 按规范从 Cloud canonical checkout 部署 dev 并完成服务/监听/health/飞书/PostgreSQL 检查；Edge 不构建安装包
+  <!-- dev deployment 2026-07-19: `scripts/deploy-target dev --check` selected 121.89.85.150. Clean aidcp-cloud master e4a63b6 was backed up at `/opt/aidcp/backups/persona-like-affinity-20260719-132720/{cloud.tgz,cloud.env}` and rsynced from a committed archive snapshot without changing `.env`, `node_modules`, or `.git`; package manifests and migrations were unchanged, so npm ci was not required. The first target-directory typecheck exposed one stale removed test (`test/comm/ws-server-resolve-account.test.ts`), triggered automatic backup restoration, and left the prior service healthy; the clean staged snapshot then passed typecheck, the stale file was moved recoverably under the deployment backup, final target typecheck and eight runtime-file comparisons passed, and only `aidcp-cloud.service` was restarted. Final health: active, NRestarts=0, listeners 8787/8090/8091/8088/5432, panel/public/customer-auth health ok, WebSocket HTTP probe 426 as expected, PostgreSQL select 1, Feishu WSClient onReady, error-priority journal zero, and all four colocated isales services active. No database migration, real Facebook interaction, ol deployment, or Edge installer build was performed. -->
 - [ ] 5.5 记录提交、验证、部署与偏差，归档并推送 OpenSpec change
