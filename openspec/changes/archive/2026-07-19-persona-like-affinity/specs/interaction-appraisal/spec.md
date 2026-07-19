@@ -1,6 +1,6 @@
 ## MODIFIED Requirements
 
-### Requirement: 点赞是按人设倾向分档的选择性互动、收藏是更稀有的选择性互动
+### Requirement: 点赞是选择性互动、收藏是更稀有的选择性互动
 
 互动评估 prompt SHALL 把**点赞（like）框定为仍可跳过的选择性互动**、**收藏（collect）框定为更稀有的选择性互动**，并按账号 `behavior_guidelines.like_affinity` 注入单调分档的软偏好：`normal` 保持当前克制先验（多数普通笔记落 pass）；`like_more` 对兴趣明确相关且带来真实正向感受的内容适度降低点赞阈值；`like_most` 对兴趣相关、安全、非低质内容明显偏向点赞但仍允许 pass。档位越高 SHALL 越倾向输出含 `like` 的普通互动决定，但任何档位 MUST NOT 直接产生动作、跳过 LLM 普通判定、绕过预算/冷却/RiskController，或进入 `mandatory_interactions` 确定性旁路。
 
