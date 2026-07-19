@@ -64,7 +64,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - ECS 上 cloud：`/opt/aidcp/cloud`，由 systemd `aidcp-cloud.service` 托管，对外监听 `8787`；panel API 默认 `127.0.0.1:8090`。数据库边界按 target 配置，ol 正式上线应使用独立 ol PostgreSQL/RDS，不把 dev 共库当最终架构。
 - 部署**默认直接做、不用逐次问**（用户长期授权，2026-06-27）；开发完成后默认 target=`dev`，代码/产物验证、提交、推送完成后自动部署 `dev`。`ol` **不参与默认部署**，只有用户明确提出线上/OL部署时才执行；执行前必须建立或选定 `release/<日期>-<范围>` 这类发布分支，并按该发布分支部署。无论目标是 `dev` 还是 `ol`，都必须严格走安全序列：① 明确 target 并 `scripts/deploy-target <dev|ol> --check` → ② sub-repo 测试通过 → ③ ECS **先备份**（`/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`）→ ④ `rsync`（`--exclude .env --exclude node_modules --exclude .git`）→ ⑤ `systemctl restart aidcp-cloud.service` → ⑥ healthcheck（`active (running)` + 8787 监听 + 飞书长连接已建立/或明确禁用 + PG `select 1`）→ ⑦ 失败即回滚。**红线不变**：绝不碰 dev 同机 isales。
-- SSH：先用 `scripts/deploy-target <dev|ol> --check` 取目标信息。逐条命令、版本台账详见 `docs/deployment-environments.md`、`docs/handoff-2026-06-05.md`（历史台账）与 `aidcp-cloud/docs/deployment-ecs.md`。
+- SSH：先用 `scripts/deploy-target <dev|ol> --check` 取目标信息。当前流程见 `docs/deployment-environments.md` 与 `aidcp-cloud/docs/deployment-ecs.md`；历史 handoff 只用于追溯，不作为部署指令。
 
 ### edge 桌面客户端打包红线（Electron / asar）
 

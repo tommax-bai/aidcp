@@ -3,15 +3,15 @@
 本文给出 AIDCP 的组件划分、组件图与端到端数据流。两层（边缘 / 云端）通过
 WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 
-> **架构演进提示**：云端已从早期"单体 `Planner` → `PlanStep[]` 单线规划"重构为
-> **事件驱动多 Agent 编排**——`RoleDispatcher` 注册约 32 个角色（`BaseRole`，按类别：
-> 核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取；准确口径以 `event-bus/types.ts`
-> 的 `RoleName` 穷举与 `role-dispatcher.ts` 的 `setup()` 注册为准），通过
+> **架构演进提示**：浏览主路径已从早期"单体 `Planner` → `PlanStep[]` 单线规划"演进为
+> **事件驱动多 Agent 编排**——`RoleDispatcher` 按平台 capability 与配置注册浏览闭环、
+> 会话守护、评论、通知、概念和平台专题角色；准确枚举以 `event-bus/types.ts` 的 `RoleName`
+> 与 `role-dispatcher.ts` 的 `setup()` 为准。角色通过
 > 进程内 `EventBus` 协作，角色产出的语义动作经 `command-bridge` 翻译为
 > [协议 v2](protocol.md) 指令下发边缘。同时落地了 `RiskController` 风控状态机、
 > `PublishOrchestrator` 发布角色管道、飞书 Bot（含 `/bind` 与审批卡片）等。
 > 边缘端则新增了 `browse`（浏览执行层）、`humanize`（拟人化）、`flows/publish-post`
-> （发布流程）与 `electron`（桌面打包）。本文已对齐当前代码。
+> （发布流程）与 `electron`（桌面运行时）。本文只维护稳定边界，易变枚举以代码为准。
 
 ## 1. 组件总览
 
@@ -20,7 +20,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 │                              aidcp-cloud (云端 · 重)                              │
 │                                                                                  │
 │   ┌─────────────────── orchestrator / agents / event-bus ──────────────────┐    │
-│   │  RoleDispatcher ── 注册约 32 角色，启动 feed.entered 闭环                 │    │
+│   │  RoleDispatcher ── 按 capability 注册角色，驱动 feed.entered 闭环          │    │
 │   │   ContentEvaluator/FeedScroller/NoteOpener/DeepReader/ContentCurator/    │    │
 │   │   InteractionAppraiser/AuthorEvaluator/ProfileOpener/ProfileBrowser/     │    │
 │   │   FollowAgent/SearchScroller/SearchEvaluator/SearchExecutor/BackToFeed/  │    │
@@ -28,16 +28,16 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 │   └────────────┬──────────────────────────────────┬────────────────────────┘    │
 │                │ 角色事件                           │ 读 Soul 人设 / 调 LLM        │
 │        ┌───────▼─────────┐  ┌──────────┐  ┌────────▼──────┐  ┌──────────────┐    │
-│        │ RiskController  │  │ Planner  │  │  QwenClient   │  │  Soul        │    │
-│        │ 状态机+滑窗+配额  │  │(Simple)  │  │ (DashScope)   │  │  soul.yaml   │    │
+│        │ RiskController  │  │ Planner  │  │ Text LLM      │  │  Soul        │    │
+│        │ 状态机+滑窗+配额  │  │(Simple)  │  │ provider路由  │  │  soul.yaml   │    │
 │        │ +冷启动+时间窗    │  │目标→步骤  │  │  文本 LLM     │  │  人设/兴趣    │    │
 │        └───────┬─────────┘  └────┬─────┘  └───────┬───────┘  └──────────────┘    │
 │   ┌────────────▼─────────┐       │                │      ┌─────────────────────┐ │
 │   │ PublishOrchestrator  │       │                │      │  feishu Bot         │ │
-│   │ ~22 角色图(多阶段)    │       │                │      │  长连接/卡片/命令    │ │
+│   │ 多阶段发布角色图       │       │                │      │  长连接/卡片/命令    │ │
 │   │ scout→creator→       │       │                │      │  /bind/审批信号      │ │
 │   │ 图规划/生图→审批→    │       │                │      └──────────┬──────────┘ │
-│   │ executor+万象配图     │       │                │                 │            │
+│   │ executor+图片provider │       │                │                 │            │
 │   └────────────┬─────────┘       │                │                 │            │
 │                └────────┬────────┴────────┬───────┘                 │            │
 │                         ▼                 ▼                         │            │
@@ -87,22 +87,22 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 
 | 组件 | 文件 | 职责 |
 | --- | --- | --- |
-| **RoleDispatcher** | `src/orchestrator/role-dispatcher.ts` | 事件驱动角色调度器：`setup()` 中注册约 32 角色（无条件注册的浏览闭环/会话守护/评论支线/通知巡视 + 条件注册的 `CommentLikeAppraiser`/`ValuableCommentArchivist`/`ConceptExtractorRole`）、订阅事件、`feed.entered` 启动闭环、把 Edge 上报喂数据层、把角色事件翻译成 `EdgeCommand` 下发 |
-| **约 32 个角色（Agent）** | `src/agents/*.ts` | 继承 `BaseRole`（`src/agents` 下 35 个类继承 `BaseRole`，运行时按开关注册约 32 个），各订阅/发布特定事件，按类别：**核心浏览闭环**——`ContentEvaluator`（卡片价值）/`FeedScroller`/`SearchScroller`（翻页）/`NoteOpener`（开卡）/`DeepReader`（深读多图）/`CommentReviewer`（评论区阅读）/`ContentCuratorRole`（质量关卡）/`InteractionAppraiserRole`（点赞收藏决策）/`AuthorEvaluator`/`ProfileOpener`/`ProfileBrowser`/`FollowAgent`（主页与关注）/`SearchEvaluator`/`SearchExecutor`（搜索）/`BackToFeed`（返回）；**会话守护**——`SessionMonitorRole`（动作数/时长/预算超限即发 `session.should_end` 结束会话；事件驱动、订阅 `action.completed`，不 veto/门控）、`BrowseSuspender`/`ExcursionResumer`（巡视让位/恢复）；**评论支线**——`CommentAppraiser`/`CommentComposer`/`CommentDeAiFlavor`/`CommentApprovalGate`（评估→撰写→去 AI 味→循环内人审），及条件注册的 `CommentLikeAppraiser`/`ValuableCommentArchivist`（`AIDCP_COMMENT_LIKE=true` 时）；**通知巡视（消息查看）12 角色**——`NotificationGatekeeper`/`NotificationHomeOpener`/`NotificationTriage`/`NotificationCommentBrowser`/`NotificationLikeBrowser`/`NotificationFollowBrowser`/`NotificationClassifier`/`NotificationDeduper`/`NotificationNotifier`/`NotificationReturnHome` 等；**概念抽取**——`ConceptExtractorRole`（仅概念池可用时注册）。角色名穷举见 `event-bus/types.ts` 的 `RoleName` |
+| **RoleDispatcher** | `src/orchestrator/role-dispatcher.ts` | 事件驱动角色调度器：按平台 capability、功能开关和依赖可用性注册角色，订阅事件，以 `feed.entered` 启动浏览闭环，把 Edge 上报转换为内部事实并将角色语义动作翻译成 `EdgeCommand` |
+| **角色（Agent）** | `src/agents/*.ts`、`src/event-bus/types.ts` | 角色按浏览与搜索、内容判断、互动、评论、通知、会话守护、身份与平台专题等职责订阅/发布事件。`RoleName` 是角色名枚举，实际注册集合由 `RoleDispatcher.setup()` 和运行配置共同决定；文档不复制易漂移的类名和数量 |
 | **EventBus** | `src/event-bus/index.ts`、`types.ts` | 进程内 typed EventEmitter，`emit` fire-and-forget、`emitAsync` 等待、`onAny` 通配；角色间唯一通信渠道 |
 | **SessionContext** | `src/agents/session-context.ts` | 当前会话态（当前笔记/来源页/已访问/连续滚动计数），取代旧 Blackboard；浏览预算（likes/collects/follows/searches）由 RoleDispatcher 持有 |
 | **RiskController** | `src/risk/risk-controller.ts` | 风控权威：`explain(action)` 判定 allow/deny；组合状态机 + 分/时突发窗 + 自然日配额 + 比例 |
 | **RiskStateMachine** | `src/risk/risk-state-machine.ts` | 账号状态机 `normal→warned→restricted→frozen`，含恢复窗口（warned 7d / restricted 3d）；信号种类 light/quota_exceeded/confirmed/fatal/recovered/manual_unfreeze |
 | 风控配套 | `src/risk/{sliding-window-counter,quotas,cold-start-planner,time-scheduler,session-budget,interaction-dedup,search-frequency-limiter,pg-risk-store}.ts` | 分钟/小时滑动窗口计数、Asia/Shanghai 自然日配额、三档配额、冷启动养号、作息时间窗、会话预算、互动去重、搜索频控、PG 持久化 |
-| **PublishOrchestrator** | `src/publish-agent/publish-orchestrator.ts` | 发布角色图（多阶段，~22 角色经 `registerRole` 接入，见 `src/server.ts`）：`ContentScout→ContentTypeSelector→ContentCreator→ImagePlanner→ImageGenerator→CoverSelector→ContentCleaner→AiFlavorScorer→QualityScorer→ContentAssembler→TitleCreator→TopicStrategist/MentionStrategist/LocationStrategist/CollectionStrategist→VisibilityDecider/PermissionDecider/PublishModeDecider/ComplianceDecider→MetadataAggregator→ApprovalGatekeeper→PublishExecutor`（配图已由 `ImageDirector` 拆为 `ImagePlanner` 决策 + `ImageGenerator` 执行），`pipeline-context` 串联，`wanxiang-client` 万象生图，`publish-log-store` 落库；`CommandSequencer/PublishDispatcher/ScheduledPublishReconciler` 分别负责原子指令顺序、提交落态和定时稿到期对账 |
-| **feishu Bot** | `src/feishu/{ws-receiver,messenger,commands,cards,bot-chat-events,handler,token}.ts` | 官方 SDK 长连接收事件；`/status /pause /resume /publish-test /bind` 命令路由；审批卡片构建 + 回调写信号文件；进退群自动入库 |
+| **PublishOrchestrator** | `src/publish-agent/publish-orchestrator.ts` | 多阶段发布角色图，覆盖选题、创作、视觉规划与生成、清洗与质量判断、元数据、审批和执行；实际注册角色见 `src/server.ts`。`pipeline-context` 串联阶段，发布账本落库；`CommandSequencer` / `PublishDispatcher` / `ScheduledPublishReconciler` 分别负责原子指令顺序、提交落态和定时稿到期对账 |
+| **feishu Bot** | `src/feishu/` | 长连接接收入站事件，处理命令、通知、审批卡片、群与团队路由；准确命令和卡片动作以当前 router/types 为准 |
 | **SimplePlanner** | `src/planner/simple-planner.ts` | 规则优先 + LLM 兜底，把"一句话目标"拆成 `PlanStep[]`（定向场景；浏览闭环走角色驱动） |
-| **LLM 文本出口（QwenClient + 厂商注册表）** | `src/llm/{qwen,providers,index}.ts` | 多厂商文本 LLM：`providers.ts` 注册表含 DashScope/通义千问（Qwen）与火山引擎方舟（Volcengine Ark，env `ARK_API_KEY`/`VOLCENGINE_API_KEY`/`ARK_BASE_URL`，外加 `DASHSCOPE_API_KEY`）；均 OpenAI 兼容、仅用全局 `fetch`、不引 SDK（图片走通义万相独立客户端，不在此注册） |
+| **LLM 文本出口与厂商注册表** | `src/llm/{qwen,providers,index}.ts` | 根据角色配置解析文本模型、provider 和思考模式，通过统一客户端调用；厂商、模型和凭据来源以注册表与运行配置为准。视觉理解和图片生成使用各自的显式 provider 边界 |
 | **Soul** | `src/soul/loader.ts` | 从 `soul.yaml` 装载人设（身份/兴趣/行为准则；Facebook 可带受控 `writing_language`），驱动各角色人格化决策与账号对外文本语言 |
 | **PgAnchorCache / ConceptStore / BotChatStore** | `src/cache/*.ts` | PG 锚点主缓存 + 暂存晋升、概念池、Bot 群绑定 |
 | **AccountStateManager** | `src/account-state.ts` | 账号 active/paused 内存状态（暂停时跳过笔记处理） |
 | **EdgeCloudServer / DefaultMessageHandler / command-bridge** | `src/comm/{ws-server,handler,command-bridge}.ts` | WS 服务端 + 消息路由 + `EdgeCommand→Envelope` 翻译 |
-| protocol | `src/comm/protocol.ts` | 边-云消息类型（`PROTOCOL_VERSION=2`，`MessageType` 穷举 74 个，含 `edge.task.*`、`notification.*`、客户端稿件审批动作与发布指令/回执）+ 信封 + 解析/校验 |
+| protocol | `src/comm/protocol.ts` | 边云消息的 `PROTOCOL_VERSION=2`、`MessageType`、payload、信封与解析/校验；消息枚举由两端协议类型和 acceptance 契约测试共同守护，本文不复制数量 |
 | **Panel API（管理后台后端）** | `src/panel/{panel-server,jwt,auth,panel-ws,panel-store}.ts` | console 前端的进程内后端：HTTP `/api` + JWT 鉴权 + 浏览器 WS；独立端口、与 8787 边-云 ws 物理隔离 |
 
 ### 2.2 边缘端 aidcp-edge
@@ -157,7 +157,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 2. **定位（缓存优先）**：
    - 本地 `AnchorCache` 命中 → `matcher` 在作用域内消歧；唯一且分差达标→拿到元素；
    - 未命中 → 走 LLM 选择（`select.request`）。（协议保留 `anchor.get` 取云端主缓存锚点，当前边缘使用进程内缓存，尚未接入云端 `anchor.get`。）
-3. **LLM 选择（缺口路径）**：把作用域内元素清单 `select.request` 发云端，Qwen 选编号，
+3. **LLM 选择（缺口路径）**：把作用域内元素清单 `select.request` 发云端，由当前配置的文本 LLM 选编号，
    云端校验编号在范围内后回 `select.response`。
 4. **执行层**：`CdpActionExecutor` 把 `op` 落到真实页面（穿插 `humanize` 拟人化节奏）。
 5. **后置校验（第一道闸）**：`PostValidator` 验证业务结果真发生。
@@ -183,18 +183,21 @@ LLM 新解析锚点 ──stage──► 暂存区(staging)
 
 ### 3.4 风控判定与发布审批
 
-- **风控**：边缘互动前可发 `risk.canDo`，`RiskController.explain()` 依据状态机（frozen/restricted）
-  + 分钟/小时滑窗配额 + Asia/Shanghai 自然日每日配额 + 点赞比例（≤35%）判 allow/deny；成功后 `risk.record` 落账。
-  云端角色侧亦受 `RoleDispatcher` 浏览预算约束（likes/collects/follows/searches），由各角色经 `consumeBudget()` 扣减、`SessionMonitorRole` 在 likes/collects/searches 耗尽时判定结束。
-  - **现状提示**：边缘 `EdgeClient` 已实现 `canDo`/`requestSessionBudget`/`recordRiskAction`，云端也实现了 `risk.canDo`/`risk.record` 响应。**记账侧已接通**：真实互动成功时 `handler` 在 `action.completed` 分支按账号发射 `interaction.occurred`（`src/comm/handler.ts`），`server.ts` 订阅 → `RiskController.record` 按账号计数。**实时拦截侧仍未接线**：当前事件驱动浏览闭环**未在边缘互动前调用** `risk.canDo`，浏览动作的实时拦截目前主要由上面的 RoleDispatcher 浏览预算承担（`risk.canDo` 协议通道已就绪，待接入浏览闭环）。
-- **发布**：`PublishOrchestrator` 多阶段角色图（~22 角色）产出内容并落 `pending_approval`；运营在控制台或飞书审核，草稿编辑通过 `content_version` CAS 防止旧版本误批。授权后 `CommandSequencer` 持有 edge task lease，按「进入创作页 → 标题/正文/图片/话题及其它选项 → 发布方式 → 提交 → 捕获」下发原子指令。
+- **风控**：Cloud 在计划或调度真实动作前调用账号对应的 `RiskController.canDo()` / `explain()`，
+  组合最终风险状态、窗口配额、自然日配额、慢启动和动作专题规则；拒绝时不下发动作，也不
+  消耗“已执行”计数。`RoleDispatcher` 还持有会话级预算并在动作完成后推进会话。
+  Edge 回传的真实 `action.completed` 由 Cloud 转成 `interaction.occurred`，再由
+  `RiskController.record()` 记账。协议中的 `risk.canDo` / `risk.record` /
+  `session.budget.request` 目前是兼容保留通道，Edge 主路径不调用；不得据此推断 Edge 自己
+  决定风控放行。
+- **发布**：`PublishOrchestrator` 多阶段角色图产出内容并落 `pending_approval`；运营在控制台或飞书审核，草稿编辑通过 `content_version` CAS 防止旧版本误批。授权后 `CommandSequencer` 持有 edge task lease，按「进入创作页 → 标题/正文/图片/话题及其它选项 → 发布方式 → 提交 → 捕获」下发原子指令。
   - 立即发布：`submit_publish → capture_postId`；捕获到公开 id/URL 即 `published`，否则保留既有 `submitted` 待确认语义。
   - 小红书定时发布：`set_schedule` 验证 1 小时至 14 天北京时间窗口及“定时发布”按钮后提交，`capture_scheduled` 只捕获平台内部定时句柄并落 `scheduled`，不当作公开帖子、不计发布次数。`ScheduledPublishReconciler` 在目标时间后复用账号绑定和 edge lease 做有界对账；取得真实公开 id/URL 后以 CAS 转 `published` 并只记一次，未公开则退避，耗尽转 `needs_review`。
 
 ## 4. 关键设计取舍
 
 - **事件驱动取代单体规划**：浏览不再"先规划一串步骤再执行"，而是边缘**结构化上报**、
-  云端约 32 角色**按事件实时决策**单个动作。好处：贴近真人"看一条想一下"的节奏、易插拔
+  云端多个角色**按事件实时决策**单个动作。好处：贴近真人"看一条想一下"的节奏、易插拔
   新角色（只需 `subscribe` EventBus）、单角色失败不阻塞全局（`emit` fire-and-forget）。
 - **DOM 快照而非 CDP DOM 树**：`CdpDomProvider` 用 `Runtime.evaluate` 取 `outerHTML`
   再交 jsdom 解析，直接复用既有 DOM-first 抽取逻辑（纯函数，一个操作周期内 DOM 稳定即可）。

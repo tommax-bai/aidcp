@@ -13,10 +13,11 @@
 > v2 在保持这条链路向后兼容的同时，新增了三大块：
 > 1. **浏览会话编排**（`note.content`/`browse.*`/`note.open` 等）——云端逐条驱动边缘刷信息流；
 > 2. **角色驱动指令 + 结构化上报**（`page.cards`/`note.detail` 上报，`interaction.like`/`page.scroll` 等下发）——
->    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 多角色，`RoleName` 穷举现 43 项，分核心浏览闭环 / 会话守护 / 评论支线 / 通知巡视 / 概念抽取等类；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
+>    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 多角色，覆盖浏览闭环、会话守护、评论、通知、概念和平台专题等职责；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
-> 本 change 冻结后的 v2 目标为 **91 个消息类型**（既有 83 个 + reply recovery/offboarding 6 个 + runtime controls 1 个 + browser control 1 个），下表按职能分组列全。计数与表为人工维护，仍以两端 `protocol.ts` 的 `MessageType` 穷举、已注册 handler/routing 与 capability 协商为准。
+> 下表按职能整理 v2 消息。准确枚举以两端 `protocol.ts` 的 `MessageType`、协议 acceptance
+> 契约测试、已注册 handler/routing 与 capability 协商为准；本文不复制易漂移的消息总数。
 
 ## 1. 信封（Envelope）
 
@@ -1168,7 +1169,7 @@ Edge 必须只打开该 env/account 所属 sidecar，并用后续 `interaction.a
 ### 4.1 浏览会话闭环（v2 主路径：结构化上报 + 角色驱动）
 
 ```
-edge                                          cloud（RoleDispatcher + 多角色/RoleName 43 + EventBus）
+edge                                          cloud（RoleDispatcher + 多角色 + EventBus）
  │  hello {edgeId}                             │
  │ ───────────────────────────────────────────►│  分配 session
  │  welcome {sessionId}                         │
