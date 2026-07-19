@@ -30,7 +30,8 @@
 
 ## 5. Integration and dev deployment
 
-- [ ] 5.1 Commit and push cloud/control feature branches, rebase onto current default branches, rerun required validation, and fast-forward land serially
+- [x] 5.1 Commit and push cloud/control feature branches, rebase onto current default branches, rerun required validation, and fast-forward land serially
+<!-- repos: aidcp-cloud 8bde267 on master; aidcp 77b8a81 on main; feature branches pushed; validation stayed green -->
 - [ ] 5.2 Run `scripts/deploy-target dev --check`, inspect/backup the live cloud runtime and `.env`, deploy the clean `aidcp-cloud/master` snapshot, and restart only `aidcp-cloud.service`
 - [ ] 5.3 Verify dev service state, listeners, health, Feishu readiness, PostgreSQL, and deployed artifact hashes; roll back on any failed gate
 
