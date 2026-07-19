@@ -1,85 +1,73 @@
 ## ADDED Requirements
 
-### Requirement: 客户端只提交无账号 ID 的 Facebook 补齐意图
+### Requirement: Facebook 筛选入口打开批量人设选择页面
 
-客户在 Facebook 批量创建中启用自动补齐，或从环境栏 Facebook 分类手动触发补齐后，Edge SHALL 经 customer-auth 提交一次带平台、版本化自动策略和所选发言语言的补齐意图，MUST NOT 提交账号 ID 列表、客户端人设状态、账号凭据、cookie、2FA 或代理资料。Cloud SHALL 以鉴权令牌中的客户身份确定范围，MUST NOT 接受请求体自报客户或账号选择器。
+桌面外壳 SHALL 仅在环境栏平台筛选为 Facebook 时显示“批量设置人设”入口。点击后 SHALL 打开现有账号人设浮层的批量模式，让用户在其中选择语气、点赞倾向、内容偏好和发言语言，并预览将用于全部缺失账号的同一份人设。环境栏 MUST NOT 再显示独立语言选择；其他平台及“全部”筛选 MUST 隐藏入口。
 
-#### Scenario: 正常创建无账号 ID 的补齐运行
-- **WHEN** 已登录客户完成 Facebook 批量创建并保留自动补齐选项
-- **THEN** Edge 只提交 `facebook`、受支持策略和发言语言，Cloud 从令牌与权威环境归属建立运行，请求和响应均不含账号 ID 清单或敏感导入资料
+#### Scenario: 人工选择批量人设
+- **WHEN** 客户筛选 Facebook 环境并点击“批量设置人设”
+- **THEN** 客户端打开人设选择页，说明只处理未设置账号且所有目标使用同一份人设，用户未确认前不创建 Cloud 运行
 
-#### Scenario: 绕过界面提交账号选择器
-- **WHEN** 调用方在补齐意图中附带 `accountId`、`accountIds`、`envKeys`、`userId` 或其他未允许字段
-- **THEN** Cloud 以 `bad_request` 拒绝，MUST NOT 创建运行或生成人设
-
-### Requirement: Facebook 环境筛选提供无弹窗手动补齐入口
-
-桌面外壳 SHALL 仅在环境栏平台筛选为 Facebook 时显示一行手动补齐工具条，包含受支持发言语言选择和“补齐未设置人设”按钮。点击后 SHALL 原地提交当前客户范围的 Cloud 补齐运行并反馈受理或失败；MUST NOT 打开弹窗、跳转页面、要求先经过批量创建，或展示客户端推测的可设置、待检测、已设置数量。其他平台及“全部”筛选 MUST 隐藏该工具条。
-
-#### Scenario: 既有 Facebook 环境手动补齐
-- **WHEN** 客户把环境栏筛选切换为 Facebook、选择受支持语言并点击“补齐未设置人设”
-- **THEN** Edge 只提交一次无账号/环境 ID 的补齐意图，请求期间禁用按钮，并在原位置反馈“已交由云端处理”或真实失败
-
-#### Scenario: 非 Facebook 分类不显示入口
+#### Scenario: 其他分类没有入口
 - **WHEN** 环境栏筛选为全部、小红书或视频号
-- **THEN** 手动补齐工具条隐藏且不能从该视图提交补齐运行
+- **THEN** 批量人设入口隐藏且不能从该视图提交运行
 
-#### Scenario: 客户端 Facebook 列表为空
-- **WHEN** Facebook 分类当前没有本地可见环境但客户仍点击手动补齐
-- **THEN** Edge 仍可提交客户范围意图，由 Cloud 权威快照决定是否存在目标，客户端不得用本地空列表冒充云端无目标
+### Requirement: 批量模板由客户端选择确定且不调用 Cloud 生成器
 
-### Requirement: Cloud 快照当前客户 Facebook 环境并延迟解析真实账号
+批量模式 SHALL 根据用户已选择的语气、点赞倾向、内容偏好和 Facebook 发言语言，在客户端确定性构建一份合法 `soulYaml` 并展示预览。相同选择 SHALL 产生相同模板；该路径 MUST NOT 调用 `persona.generate`、PersonaGenerator、方向池或按账号差异化生成。单账号人设生成路径不受本要求影响。
 
-Cloud SHALL 在建立运行时快照该客户当前权威归属的全部 Facebook 环境。已有有效环境→账号绑定的目标 SHALL 立即进入缺失人设检查；尚未绑定的目标 SHALL 保持 `waiting_binding`，并在该环境后续成功握手、Cloud 建立真实绑定后继续。处理时 MUST 复核当前客户归属、Facebook 平台、账号主表存在和跨客户争用，MUST NOT 从环境名、导入文本或客户端投影猜测账号。
+#### Scenario: 生成批量模板预览
+- **WHEN** 用户完成全部必选项并点击生成人设
+- **THEN** 客户端本地构建一份含所选语言与偏好的 `soulYaml`，进入预览确认，不发送模型生成请求
 
-#### Scenario: 已绑定账号立即进入处理
-- **WHEN** 运行快照包含一个当前客户拥有、已绑定有效 Facebook 账号的环境
-- **THEN** Cloud 以服务端绑定得到账号并检查其人设，不要求 Edge 再提供账号 ID
+#### Scenario: 修改选择后重新预览
+- **WHEN** 用户返回修改任一偏好并再次生成
+- **THEN** 客户端以新选择替换草稿；未点击确认批量设置前 Cloud 不筛选或写入账号
 
-#### Scenario: 新环境尚未登录
-- **WHEN** 运行快照包含一个尚无账号绑定的 Facebook 环境
-- **THEN** 目标保持等待且不生成；该环境首次登录握手建立绑定后，Cloud 自动继续同一目标
+### Requirement: 客户端只提交已确认人设且不提交目标 ID
 
-#### Scenario: 归属撤销或绑定冲突
-- **WHEN** 目标处理时环境已不归该客户、平台不符、账号悬空或存在跨客户绑定冲突
-- **THEN** Cloud fail-closed 等待或记录具名失败，MUST NOT 为该账号写人设
+用户确认批量人设后，Edge SHALL 经 customer-auth 提交严格的 `{ platform: "facebook", soulYaml }` 和主进程生成的 Idempotency-Key。MUST NOT 提交账号 ID、环境 ID、客户 ID、客户端人设状态、`strategy`、独立 `writingLanguage`、账号凭据、cookie、2FA 或代理资料。Cloud SHALL 从鉴权令牌确定客户并严格拒绝多余字段、非法模板或缺失 Facebook 发言语言的模板。
 
-### Requirement: 自动补齐只创建缺失人设且绝不覆盖
+#### Scenario: 正常提交所选人设
+- **WHEN** 用户确认批量模板
+- **THEN** Edge 只提交平台与该模板，Cloud 不接收目标列表，响应不泄漏账号明细
 
-Cloud SHALL 在生成前检查目标账号是否已有有效人设，并在写入时使用数据库原子 create-if-missing。已有有效人设 SHALL 记录为 `skipped_existing`；生成在途期间人工新增的人设也 MUST 保留，自动产物 MUST NOT 覆盖。只有真实插入成功才可触发账号已绑投影和运行唤醒。
+#### Scenario: 绕过界面提交选择器或自动策略
+- **WHEN** 请求携带 `accountIds`、`envKeys`、`userId`、`strategy`、独立 `writingLanguage` 或其他未允许字段
+- **THEN** Cloud 拒绝请求且不创建运行、不写人设
 
-#### Scenario: 运行建立前已有人工人设
-- **WHEN** 目标账号已有有效 `persona_config`
-- **THEN** Cloud 跳过该账号，不调用模型、不更新人设内容或审计字段
+### Requirement: Cloud 只筛选缺失账号并原样写入同一人设
 
-#### Scenario: 生成期间人工先完成人设
-- **WHEN** 自动生成已开始但在落库前人工写入同账号人设
-- **THEN** 原子 create-if-missing 返回未创建，Cloud 保留人工人设并把自动目标记录为已跳过
+Cloud SHALL 快照当前客户权威归属的 Facebook 环境，并在处理时复核当前客户归属、真实环境→账号绑定、Facebook 平台、账号存在和跨客户争用。已有有效 `persona_config` 的账号 SHALL 跳过；缺失账号 SHALL 通过原子 create-if-missing 写入运行中已确认的同一份 `soulYaml`。Cloud MUST NOT 在该路径调用模型、改变模板、按账号选择方向或覆盖已有设置。
 
-### Requirement: 自动策略显式、有界且按账号差异化
+#### Scenario: 多个缺失账号
+- **WHEN** 同一运行解析到多个当前客户的缺失 Facebook 账号
+- **THEN** 每个成功目标的 `persona_config.persona` 与用户确认的模板逐字相同
 
-Cloud SHALL 只接受受支持的 `facebook_auto_v1` 策略和 `zh-CN/en/vi` 发言语言。该策略 SHALL 从版本化受控方向池按账号稳定选择非空关键词，并用账号相关差异化种子调用现有 PersonaGenerator；产物 MUST 通过现有 soul 校验。未知策略、非法语言、模型失败或非法产物 MUST fail-closed，不得回落默认/模板人设。
+#### Scenario: 已有人设或并发人工设置
+- **WHEN** 账号在运行前已有人设，或在批量写入前被人工设置
+- **THEN** Cloud 保留既有人设并记录跳过，批量模板不得覆盖
 
-#### Scenario: 两个账号使用同一批设置
-- **WHEN** 同一运行处理两个缺失人设的 Facebook 账号
-- **THEN** 两者共享所选发言语言，但按各自账号种子选择/生成人设，MUST NOT 复制同一份固定 persona 文本
+#### Scenario: 尚未绑定的快照环境
+- **WHEN** 运行快照包含尚无真实账号绑定的 Facebook 环境
+- **THEN** 目标等待绑定；后续握手只对解析出的缺失账号原样写入当次已确认模板，不纳入点击后新增环境
 
-#### Scenario: 非法策略或语言
-- **WHEN** 请求携带未知策略或不受支持的发言语言
-- **THEN** Cloud 在建运行前拒绝，且不调用模型、不写任何人设
+### Requirement: 历史自动生成运行停止模型行为
 
-### Requirement: 补齐运行持久、幂等并诚实记录结果
+Cloud SHALL 不再创建 `facebook_auto_v1` 运行。恢复到没有已确认 `soulYaml` 的历史运行时 SHALL fail-closed，把待处理目标终结为具名失败，MUST NOT 继续调用 PersonaGenerator 或回落默认模板。
 
-Cloud SHALL 持久化运行及每个环境目标，按客户和 Idempotency-Key 去重；重复请求 MUST 返回同一运行而不重复快照或计费。Cloud 重启后 SHALL 恢复未终结运行，陈旧 `running` 目标可回到待处理。目标模型/写入失败 SHALL 有界重试并最终记录失败；API 接受运行只表示已排队，MUST NOT 表述为人设已设置。
+#### Scenario: 部署后恢复历史运行
+- **WHEN** Cloud 恢复一个旧版自动生成运行且没有已确认模板
+- **THEN** 该运行不产生任何模型请求或人设写入，并以 `selected_persona_required` 等具名原因失败收敛
+
+### Requirement: 所选人设运行持久、幂等且结果诚实
+
+Cloud SHALL 持久化已确认模板、运行及每个环境目标，并按客户和 Idempotency-Key 去重；重复请求 MUST 返回同一运行且不重复写入。Cloud 重启后 SHALL 继续未终结的所选模板运行。API 受理只表示已安排，客户端 MUST NOT 表述为所有账号均已设置，也不得显示未经 Cloud 确认的完成数量。
 
 #### Scenario: 网络重试重复提交
-- **WHEN** Edge 以相同客户和 Idempotency-Key 重试创建补齐运行
-- **THEN** Cloud 返回同一运行的幂等接受态，不创建第二组目标、不重复调用模型
+- **WHEN** Edge 以相同客户和 Idempotency-Key 重试同一模板
+- **THEN** Cloud 返回同一运行，不建立第二组目标
 
 #### Scenario: Cloud 在运行中重启
-- **WHEN** Cloud 在目标等待绑定或生成过程中重启
-- **THEN** 启动恢复会继续未终结运行；已成功或已跳过目标不重复写入
-
-#### Scenario: 个别账号生成失败
-- **WHEN** 一个目标超过有界尝试仍无法生成或持久化合法人设
-- **THEN** 该目标保持未设置并记录失败原因，其他目标继续，运行不得把该目标宣称成功
+- **WHEN** Cloud 在目标等待绑定或写入过程中重启
+- **THEN** 启动恢复继续使用持久化的同一模板；已成功或已跳过目标不重复写入
