@@ -19,6 +19,6 @@
 
 ## 4. Delivery
 
-- [ ] 4.1 Commit and push the Cloud, Edge, and control-repository changes with validation evidence in this task file.
-- [ ] 4.2 Rebase and serially fast-forward the sibling changes to their default branches; do not build an Edge installer.
-- [ ] 4.3 Deploy the integrated Cloud default branch to `dev` and verify service, listeners, health, PostgreSQL, Feishu, and unrelated `isales` services.
+- [x] 4.1 Commit and push the Cloud, Edge, and control-repository changes with validation evidence in this task file. <!-- Cloud a3ed002, Edge ae125fb, control 4665f87 plus this closeout commit; feature refs pushed before final rebase, default refs are delivery truth -->
+- [x] 4.2 Rebase and serially fast-forward the sibling changes to their default branches; do not build an Edge installer. <!-- Cloud origin/master a3ed002; Edge origin/master ae125fb; land-change gates reran acceptance/full/typecheck; no installer built -->
+- [x] 4.3 Deploy the integrated Cloud default branch to `dev` and verify service, listeners, health, PostgreSQL, Feishu, and unrelated `isales` services. <!-- dev backup cloud.bak.20260719-184033.tar.gz + .env.bak.20260719-184033; rsync dry-run limited to the expected 3 files; source hashes matched; aidcp-cloud active/running NRestarts=0; 8787/8090/8091/8088 listening; health ok; PG SELECT 1; Feishu Dev.A activateStatus=2 and WSClient onReady; four isales services remained active; no error-priority journal entries -->
