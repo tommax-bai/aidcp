@@ -1,9 +1,9 @@
 ## 1. Contract and preconditions
 
 - [x] 1.1 Revalidate on current default branches that valid stored sessions already bypass the browser, AdsPower occupancy is currently a plain Error, auth remains `authenticating`, and Cloud persists `reasonCode` without an enum-constrained database column.
-  <!-- repo=aidcp+aidcp-edge+aidcp-cloud commit=aidcp:f5a7cda,aidcp-edge:65927e8,aidcp-cloud:d224b17 evidence=auth-session valid stored-session bypass; provider apiV2 plain Error; browser_opening maps authenticating; migration 0039 reason_code TEXT deviation=none -->
+  <!-- repo=aidcp+aidcp-edge+aidcp-cloud commit=aidcp:5d9b9e9,aidcp-edge:65927e8,aidcp-cloud:d224b17 evidence=auth-session valid stored-session bypass; provider apiV2 plain Error; browser_opening maps authenticating; migration 0039 reason_code TEXT deviation=none -->
 - [x] 1.2 Complete proposal, design, capability deltas, and strict OpenSpec validation before business-code implementation.
-  <!-- repo=aidcp commit=f5a7cda validation=openspec validate wechat-browser-profile-occupied-status --strict passed deviation=none -->
+  <!-- repo=aidcp commit=5d9b9e9 validation=openspec validate wechat-browser-profile-occupied-status --strict passed deviation=none -->
 
 ## 2. Edge provider and auth state
 
@@ -33,9 +33,9 @@
 ## 5. Control contract synchronization
 
 - [x] 5.1 Update `docs/protocol.md`, frozen interaction JSON Schemas, README, and fixtures for the new reason code and occupied status semantics.
-  <!-- repo=aidcp commit=f5a7cda evidence=protocol, common/ws schemas, README and occupied fixture synchronized deviation=none -->
+  <!-- repo=aidcp commit=5d9b9e9 evidence=protocol, common/ws schemas, README and occupied fixture synchronized deviation=none -->
 - [x] 5.2 Run contract/schema fixture validation and record any real-machine occupancy validation that remains open without claiming it was executed.
-  <!-- repo=aidcp commit=f5a7cda validation=check-jsonschema metaschema+WS fixtures passed evidence=real-machine backlog cluster 108 deviation=real AdsPower occupancy not executed -->
+  <!-- repo=aidcp commit=5d9b9e9 validation=check-jsonschema metaschema+WS fixtures passed evidence=real-machine backlog cluster 108 deviation=real AdsPower occupancy not executed -->
 
 ## 6. Validation, integration, and dev rollout
 
@@ -48,4 +48,4 @@
 - [x] 6.4 Deploy Cloud to `dev` after `deploy-target dev --check`, then verify service, listener, health route, Feishu path, and PostgreSQL connectivity; do not build an Edge installer.
   <!-- repo=aidcp-cloud commit=d224b17 deployment=dev backup=cloud.bak.20260719-191201.tar.gz validation=active/running,NRestarts=0,8787+8090 listening,api-health ok,PostgreSQL select-1,Feishu onReady deviation=Edge installer not built by design -->
 - [x] 6.5 Record pushed commit SHAs, validation/deployment evidence and deviations in this task file, then run `openspec validate wechat-browser-profile-occupied-status --strict`.
-  <!-- repo=aidcp+aidcp-edge+aidcp-cloud commit=aidcp:f5a7cda,aidcp-edge:65927e8,aidcp-cloud:d224b17 validation=openspec strict + schemas + latest-default full suites/typechecks passed deviation=real AdsPower occupancy remains backlog 108 -->
+  <!-- repo=aidcp+aidcp-edge+aidcp-cloud commit=aidcp:5d9b9e9,aidcp-edge:65927e8,aidcp-cloud:d224b17 validation=openspec strict + schemas + latest-default full suites/typechecks passed deviation=real AdsPower occupancy remains backlog 108 -->
