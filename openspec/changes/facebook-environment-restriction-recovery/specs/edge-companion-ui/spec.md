@@ -6,6 +6,8 @@ The Electron companion SHALL render authoritative risk state in the selected env
 
 For a live environment the displayed state SHALL follow the live Cloud snapshot. For a stopped or disconnected environment the client SHALL obtain a fresh customer-auth environment-scoped risk read; it MUST NOT trust a locally initialized `normal` fallback, merge state across environments, or turn a failed read into a normal display.
 
+When the effective state is `restricted`, that state SHALL override the generic `session=resting` presence fallback. The companion MUST NOT describe a risk-triggered pause as a completed browse round or promise the normal automatic-resume countdown.
+
 #### Scenario: Stopped restricted Facebook environment remains visibly restricted
 - **WHEN** the selected Facebook environment is stopped and its environment-scoped Cloud read returns `restricted`
 - **THEN** the companion shows `账号受限` and the compact recovery row for that environment
@@ -14,6 +16,11 @@ For a live environment the displayed state SHALL follow the live Cloud snapshot.
 #### Scenario: Other states and platforms do not show the action
 - **WHEN** the selected environment is not Facebook or its authoritative state is `normal`, `warned`, `frozen`, or unknown
 - **THEN** the compact recovery row is hidden
+
+#### Scenario: Risk-triggered standby is not presented as completed work
+- **WHEN** the selected environment is `restricted`, its session projection is `resting`, and browse progress is still below quota
+- **THEN** the presence headline says automatic operation is paused because the account is restricted
+- **AND** it does not say the round completed or show the normal auto-resume countdown
 
 #### Scenario: Restricted wording is explicit
 - **WHEN** an environment is `restricted`
