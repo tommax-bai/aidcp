@@ -18,4 +18,4 @@
 ## 4. Integration
 
 - [x] 4.1 Commit the Edge implementation with validation evidence, rebase onto the latest `master`, fast-forward integrate it into the clean canonical checkout, and push `origin/master`. <!-- aidcp-edge b0135ffdd1f86734c314fd6c9215bb5a041244f3 on master; origin/master pushed; post-rebase npm test 1900/1900, typecheck/build PASS; no installer built -->
-- [ ] 4.2 Record repo/commit/validation/deviation evidence in this task file, commit the OpenSpec change, fast-forward integrate it into control `main`, and push `origin/main`; do not package an installer.
+- [ ] 4.2 Record repo/commit/validation/deviation evidence in this task file, commit the OpenSpec change, fast-forward integrate it into control `main`, and push `origin/main`; do not package an installer. <!-- control artifact commit 8813101; strict validation PASS after rebase to latest origin/main; canonical integration/push pending; runtime deployment is not applicable to this local Edge source change, and no installer was packaged -->
