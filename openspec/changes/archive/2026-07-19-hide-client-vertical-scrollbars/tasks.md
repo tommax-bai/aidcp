@@ -13,4 +13,4 @@
 
 - [x] 3.1 Run focused renderer tests and typecheck. <!-- renderer-smoke 63/63; typecheck passed -->
 - [x] 3.2 Commit the edge implementation, rebase, land to `master`, and push without packaging an installer. <!-- aidcp-edge 319ef31 pushed to origin/master; acceptance 25/25; full 1836/1836; typecheck passed; no installer built -->
-- [ ] 3.3 Record evidence, strictly validate, commit and push control changes, then archive the completed OpenSpec change.
+- [x] 3.3 Record evidence, strictly validate, commit and push control changes, then archive the completed OpenSpec change. <!-- active change committed as 83ce338 and pushed after strict validation -->
