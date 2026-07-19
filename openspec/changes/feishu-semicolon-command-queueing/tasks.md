@@ -32,11 +32,16 @@
 
 - [x] 5.1 Commit and push cloud/control feature branches, rebase onto current default branches, rerun required validation, and fast-forward land serially
 <!-- repos: aidcp-cloud 8bde267 on master; aidcp 77b8a81 on main; feature branches pushed; validation stayed green -->
-- [ ] 5.2 Run `scripts/deploy-target dev --check`, inspect/backup the live cloud runtime and `.env`, deploy the clean `aidcp-cloud/master` snapshot, and restart only `aidcp-cloud.service`
-- [ ] 5.3 Verify dev service state, listeners, health, Feishu readiness, PostgreSQL, and deployed artifact hashes; roll back on any failed gate
+- [x] 5.2 Run `scripts/deploy-target dev --check`, inspect/backup the live cloud runtime and `.env`, deploy the clean `aidcp-cloud/master` snapshot, and restart only `aidcp-cloud.service`
+- [x] 5.3 Verify dev service state, listeners, health, Feishu readiness, PostgreSQL, and deployed artifact hashes; roll back on any failed gate
+<!-- dev deploy: cloud master 8bde267; backups: /opt/aidcp/backups/cloud.code.20260719-174127.tar.gz + cloud.env.20260719-174127; service active; 8787/8090 listening; health ok; PG aidcp=1; Feishu WS ready; five changed source hashes match -->
+<!-- deployment deviation: rsync --delete removed 15 in-tree .env.bak.* files; all were immediately restored from the pre-deploy tar, current .env was never touched, and future syncs must exclude .env.bak.* -->
 
 ## 6. Event-driven real-environment acceptance
 
-- [ ] 6.1 Start the `Tianxing Bai` AdsPower environment directly without desktop-client startup or screen control, and attach protocol/event/log observation
+- [x] 6.1 Start the `Tianxing Bai` AdsPower environment directly without desktop-client startup or screen control, and attach protocol/event/log observation
+<!-- real env: AdsPower k1ei3dbi -> dynamic CDP 56893 -> identity 61591753702668 / Tianxing Bai -> dev edge ads-k1ei3dbi; Electron was not started; AIDCP_FB_BROWSE_AUTO=off; profile stopped cleanly after observation -->
 - [ ] 6.2 Submit the requested two-command batch and verify two independent tasks, complete flag propagation, one active Edge lease, equal-priority FIFO queueing, and zero wait-budget consumption
+<!-- partial: production batch created publish task 03a15c6a... and facebook_group_comment 6bf4118d... with stable :command:1/:command:2 refs; comment constraints preserved force/joinGroup/manualSingle/injectContact. Blocker: ol and dev share PG, so ol old runtime claimed both rows; ol log proves publish-145 generation/card and comment recorded old deferred:edge_offline twice, exhausting 2 attempts before the dev Edge could receive it. No one-lease/FIFO/zero-budget live conclusion is claimed. -->
 - [ ] 6.3 Complete normal approvals and verify the queued sibling automatically continues with no duplicate publish/comment; record any irreversible/manual boundary honestly
+<!-- blocked by cross-environment claim ownership. Safety cleanup: publish task cancelled, candidate 145 moved pending_approval -> needs_review, comment task already failed without a platform write; post-run risk write counters for comment/publish/join_group were 0. Completing this needs explicit authority to isolate/pause ol claiming or a separate environment-affinity change. -->
