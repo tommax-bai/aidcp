@@ -14,4 +14,4 @@
 
 - [x] 3.1 运行相关 Edge focused tests 与 `npm run typecheck`，修复回归。 <!-- 194/194 focused Edge tests pass; npm run typecheck pass -->
 - [x] 3.2 运行适用的 Edge 全量测试与 `openspec validate manual-environment-nickname --strict`，记录真实验证边界。 <!-- Edge full `npx tsx --test --test-reporter=dot test/**/*.test.ts` exit 0; OpenSpec strict pass. 未启动真实环境、未调用真实 AdsPower user/update、未构建安装包。 -->
-- [ ] 3.3 将 Edge 与 control 变更提交、rebase 后 fast-forward 推送默认分支；按 dev 部署规范发布运行时代码，不构建桌面安装包。
+- [x] 3.3 将 Edge 与 control 变更提交、rebase 后 fast-forward 推送默认分支；按 dev 部署规范发布运行时代码，不构建桌面安装包。 <!-- Edge `master` fast-forward pushed at `bf547da`; control artifacts commit `b881d27` plus this closeout record. Deployment deviation: change is Edge desktop-only; dev has no Edge service artifact, and publishing it requires an installer build explicitly out of scope, so no server deploy/package was performed. -->
