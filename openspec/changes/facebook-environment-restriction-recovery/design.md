@@ -69,6 +69,8 @@ The button uses the named preload/main IPC boundary and passes only `envKey`. A 
 
 The title health result, risk detail row, and environment rail SHALL say `账号受限` instead of `节奏已调整` / `已调整节奏`. `warned` keeps the existing slowed-pacing language and `frozen` remains a separate stronger state.
 
+The presence headline SHALL also prioritize `restricted` over the generic `session=resting` fallback. A risk-triggered cold standby is not a completed browse round and cannot honestly promise the normal rest-window resume time, so the UI says that automatic operation is paused and points to recovery instead of showing “本轮完成” or an auto-resume countdown.
+
 ## Risks / Trade-offs
 
 - [Generic checkpoint becomes `unknown`, so Cloud escalation is delayed by one confirmation interval] → Local automation still stops immediately; only the Cloud report is delayed, filtering transient navigations without weakening true captcha detection.
