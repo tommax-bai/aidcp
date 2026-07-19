@@ -53,7 +53,7 @@
 | --- | --- | --- | --- |
 | `hello` | edge → cloud | `welcome` | 边缘上线握手，声明平台、账号与能力 |
 | `welcome` | cloud → edge | — | 握手确认，下发 sessionId |
-| `ui.snapshot` | cloud → edge | — | 陪伴界面数据回填（昵称/最近发布/审批状态/账号今日用量/环境级慢启动；hello 注册完成后全量 + 审批变化时增量） |
+| `ui.snapshot` | cloud → edge | — | 陪伴界面数据回填（昵称/人设绑定态与 Facebook 发言语言/最近发布/审批状态/账号今日用量/环境级慢启动；hello 注册完成后全量 + 审批变化时增量） |
 | `plan.request` | edge → cloud | `plan.response` | 高层目标拆解为步骤 |
 | `plan.response` | cloud → edge | — | 返回有序步骤清单 |
 | `select.request` | edge → cloud | `select.response` | 元素清单 + 目标，请云端选一个 |
@@ -160,10 +160,22 @@
 
 | type | 方向 | 关联响应 | 用途 |
 | --- | --- | --- | --- |
-| `persona.generate` | edge → cloud | `persona.generate.result` | 按客户勾选关键词请求云端生成账号 persona 草稿（带 `idempotencyKey` 防重连/重试双计费；云端以握手绑定 `accountId` 为准） |
+| `persona.generate` | edge → cloud | `persona.generate.result` | 按客户勾选关键词请求云端生成账号 persona 草稿（Facebook 另带受控 `writingLanguage`；带 `idempotencyKey` 防重连/重试双计费；云端以握手绑定 `accountId` 与平台为准） |
 | `persona.generate.result` | cloud → edge | — | 返回生成的 soul.yaml + 身份摘要；失败带 `reason`，MUST NOT 返回半成品（fail-closed、宁缺毋假） |
 | `persona.persist` | edge → cloud | `persona.persist.result` | 请求持久化客户确认后的 soul.yaml（复用云端现有校验写入通道，不新造写路径） |
 | `persona.persist.result` | cloud → edge | — | 持久化结果；失败带 `reason`（`unknown_account` / `persona_required` / `persona_invalid`）；本次确实首次建立账号级首作状态时可带 `firstPostOnboarding:true` |
+
+`persona.generate` 请求 payload：
+```jsonc
+{
+  "accountId": "acc-1",
+  "keywordSelections": ["咖啡", "亲切接地气", "like_affinity:normal"],
+  "writingLanguage": "vi", // 仅 Facebook；zh-CN | en | vi。FB 新建/更新必填，非 FB 携带即拒绝
+  "idempotencyKey": "persona-..."
+}
+```
+语言是独立账号配置，不得混入 `keywordSelections`。Cloud 按握手会话的平台校验：Facebook 缺失/非法分别返回
+`writing_language_required` / `writing_language_invalid`，非 Facebook 携带返回 `writing_language_not_supported`。
 
 `persona.persist.result` 成功 payload：
 ```jsonc
@@ -245,7 +257,8 @@
 ```jsonc
 {
   "account": { "id": "acc-1", "nickname": "晚风手作" },   // 可选；昵称空则整个字段不带（宁缺毋假）
-  "personaBound": true,   // 可选（change persona-wizard-onboarding-fixes）；账号是否已绑人设，仅 true 时下发；边缘据此把徽标翻「已设置」并跳过建号人设向导
+  "personaBound": true,   // 可选；true=已绑，false=云端确认未绑，字段缺省=未知；边缘只对 false 打开建号向导
+  "personaWritingLanguage": "vi", // 可选；仅在 personaBound=true 且 Cloud 提供读取口时出现；zh-CN | en | vi，null=存量人设尚未配置
   "lastPublish": { "title": "上一篇", "at": 1730000000000 }, // 可选；最近一次成功发布（at=epoch ms，为草稿入库时间近似）
   "publish": { "state": "submitted", "title": "候审笔记", "code": "#83" }, // 可选；审批/提交状态增量
   "publishPreview": { // 可选；当前待审稿件只读预览，不含原稿标题/作者/正文/链接

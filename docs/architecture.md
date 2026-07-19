@@ -98,7 +98,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 | **feishu Bot** | `src/feishu/{ws-receiver,messenger,commands,cards,bot-chat-events,handler,token}.ts` | 官方 SDK 长连接收事件；`/status /pause /resume /publish-test /bind` 命令路由；审批卡片构建 + 回调写信号文件；进退群自动入库 |
 | **SimplePlanner** | `src/planner/simple-planner.ts` | 规则优先 + LLM 兜底，把"一句话目标"拆成 `PlanStep[]`（定向场景；浏览闭环走角色驱动） |
 | **LLM 文本出口（QwenClient + 厂商注册表）** | `src/llm/{qwen,providers,index}.ts` | 多厂商文本 LLM：`providers.ts` 注册表含 DashScope/通义千问（Qwen）与火山引擎方舟（Volcengine Ark，env `ARK_API_KEY`/`VOLCENGINE_API_KEY`/`ARK_BASE_URL`，外加 `DASHSCOPE_API_KEY`）；均 OpenAI 兼容、仅用全局 `fetch`、不引 SDK（图片走通义万相独立客户端，不在此注册） |
-| **Soul** | `src/soul/loader.ts` | 从 `soul.yaml` 装载人设（身份/兴趣/行为准则/会话上限），驱动各角色人格化决策 |
+| **Soul** | `src/soul/loader.ts` | 从 `soul.yaml` 装载人设（身份/兴趣/行为准则；Facebook 可带受控 `writing_language`），驱动各角色人格化决策与账号对外文本语言 |
 | **PgAnchorCache / ConceptStore / BotChatStore** | `src/cache/*.ts` | PG 锚点主缓存 + 暂存晋升、概念池、Bot 群绑定 |
 | **AccountStateManager** | `src/account-state.ts` | 账号 active/paused 内存状态（暂停时跳过笔记处理） |
 | **EdgeCloudServer / DefaultMessageHandler / command-bridge** | `src/comm/{ws-server,handler,command-bridge}.ts` | WS 服务端 + 消息路由 + `EdgeCommand→Envelope` 翻译 |
