@@ -8,6 +8,7 @@
     { "$ref": "#/$defs/TemplateListResponse" },
     { "$ref": "#/$defs/RuleListResponse" },
     { "$ref": "#/$defs/ProfileResponse" },
+    { "$ref": "#/$defs/PreviewContextsResponse" },
     { "$ref": "#/$defs/InitializeResponse" },
     { "$ref": "#/$defs/PublishResponse" },
     { "$ref": "#/$defs/PreviewResponse" },
@@ -425,6 +426,42 @@
               "minItems": 2,
               "maxItems": 2,
               "items": { "$ref": "#/$defs/ReplyProfile" }
+            }
+          }
+        },
+        "meta": { "$ref": "common.schema.json#/$defs/ResponseMeta" }
+      }
+    },
+    "PreviewContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["threadId", "messageId", "channel", "messageType", "userMessage", "userName", "videoTitle", "receivedAt"],
+      "properties": {
+        "threadId": { "$ref": "common.schema.json#/$defs/Id" },
+        "messageId": { "$ref": "common.schema.json#/$defs/Id" },
+        "channel": { "$ref": "common.schema.json#/$defs/Channel" },
+        "messageType": { "$ref": "common.schema.json#/$defs/MessageType" },
+        "userMessage": { "$ref": "common.schema.json#/$defs/NullableString" },
+        "userName": { "$ref": "common.schema.json#/$defs/NullableString" },
+        "videoTitle": { "$ref": "common.schema.json#/$defs/NullableString" },
+        "receivedAt": { "$ref": "common.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "PreviewContextsResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "meta"],
+      "properties": {
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["accountId", "items"],
+          "properties": {
+            "accountId": { "$ref": "common.schema.json#/$defs/Id" },
+            "items": {
+              "type": "array",
+              "maxItems": 50,
+              "items": { "$ref": "#/$defs/PreviewContext" }
             }
           }
         },

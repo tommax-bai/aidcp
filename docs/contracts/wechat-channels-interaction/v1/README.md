@@ -146,6 +146,7 @@ PUT|DELETE /api/accounts/:accountId/reply-templates/:templateId
 GET|POST   /api/accounts/:accountId/reply-rules
 PUT|DELETE /api/accounts/:accountId/reply-rules/:ruleId
 GET|PUT    /api/accounts/:accountId/reply-profile
+GET        /api/accounts/:accountId/reply-preview-contexts?channel=<comment|dm>&limit=<1..50>
 POST       /api/accounts/:accountId/reply-preview
 POST       /api/accounts/:accountId/reply-config/publish
 GET        /api/accounts/:accountId/reply-config/audit
@@ -153,7 +154,7 @@ GET        /api/accounts/:accountId/reply-config/audit
 
 权限固定为 `interaction.config.view`、`interaction.config.edit`、`interaction.config.publish`、`interaction.config.preview`、`interaction.dm.view_full`、`interaction.audit.view`，缺 grant fail closed。
 
-模板变量只允许 `{{user_name}}`、`{{video_title}}`、`{{account_name}}`、`{{support_channel}}`；只做字面替换。规则排序 `priority ASC, ruleId ASC`。运行 controls 与 draft/published config 分离，published snapshot 不可变。
+模板变量只允许 `{{user_name}}`、`{{video_title}}`、`{{account_name}}`、`{{support_channel}}`；只做字面替换。规则排序 `priority ASC, ruleId ASC`。运行 controls 与 draft/published config 分离，published snapshot 不可变。`reply-preview-contexts` 仅返回账号当前权威环境内最近的入站预览字段，不触发同步、建 job 或发送；DM 正文额外要求 `interaction.dm.view_full`。
 
 ## AI 与发送门禁
 
