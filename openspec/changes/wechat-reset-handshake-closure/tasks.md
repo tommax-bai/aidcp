@@ -30,6 +30,9 @@
 
 ## 5. Remediation validation and delivery
 
-- [ ] 5.1 Run Cloud focused handshake/persona/reconnect tests, required acceptance/full safety suites, typecheck, and `openspec validate wechat-reset-handshake-closure --strict`.
-- [ ] 5.2 Rebase, commit, push, fast-forward Cloud/control defaults, deploy Cloud to `dev`, and verify service/listeners/health/PostgreSQL/Feishu/unrelated-service boundaries.
-- [ ] 5.3 Verify a real unpackaged Video Channels Edge receives a non-empty welcome without persona and remains connected; confirm no platform reset/write was triggered and record honest live evidence.
+- [x] 5.1 Run Cloud focused handshake/persona/reconnect tests, required acceptance/full safety suites, typecheck, and `openspec validate wechat-reset-handshake-closure --strict`.
+  <!-- Rebased Cloud head 5ca6ab8: focused handshake/persona/reconnect/EventBus/startup suites 54/54, acceptance 59/59, full 2557 pass / 0 fail / 8 gated skips, typecheck passed. Strict OpenSpec validation passed before delivery and after evidence update. -->
+- [x] 5.2 Rebase, commit, push, fast-forward Cloud/control defaults, deploy Cloud to `dev`, and verify service/listeners/health/PostgreSQL/Feishu/unrelated-service boundaries.
+  <!-- Cloud master fast-forwarded and pushed at 5ca6ab8. DEV target preflight passed; backup cloud.20260719-175259.tgz plus env copy created; only aidcp-cloud.service restarted. Service is active with 8787/8090/8091/8088 listeners, panel health/version and console HTTP 200, PostgreSQL SELECT 1, Feishu Dev.A activate_status=2 plus WSClient onReady, and all four pre-existing isales services still active. -->
+- [x] 5.3 Verify a real unpackaged Video Channels Edge receives a non-empty welcome without persona and remains connected; confirm no platform reset/write was triggered and record honest live evidence.
+  <!-- Local unpackaged Edge env ads-k1eoujd8 (account k1eoujd8, no persona) received sessionId=sess-1 at 18:04:32. Cloud logged platform=wechat_channels transport-only. After bounded observation the child and TCP remained alive with no WS close/reconnect/no_persona/start failure. No reset or platform write was invoked; only startup auth/readiness probing ran, which separately remained fail-closed at INTERACTION_INTERNAL_ERROR. The previously running ads-k1e0awu5 environment was restored after UI verification and both connections were ESTABLISHED. -->
