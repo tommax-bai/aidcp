@@ -14,7 +14,7 @@
 
 - [x] 3.1 Run focused Cloud and Console tests plus each repository's required typecheck/build validation.
 - [x] 3.2 Run `openspec validate wechat-preview-real-interaction-source --strict` and record implementation evidence.
-- [ ] 3.3 Commit and land Cloud and Console through their isolated worktrees, then deploy the integrated default branches to dev and verify the preview flow without creating jobs or sends.
+- [x] 3.3 Commit and land Cloud and Console through their isolated worktrees, then deploy the integrated default branches to dev and verify the preview flow without creating jobs or sends.
 
 ## Validation evidence
 
@@ -23,3 +23,6 @@
 - Console focused reply settings tests: 33 passed.
 - Console full `npm test -- --run`, `npm run typecheck`, and `npm run build`: passed.
 - `openspec validate wechat-preview-real-interaction-source --strict`: passed.
+- Landed default-branch commits: Cloud `ffab5ea`, Console `41cc4fc`, control contract `ca0e79d`.
+- Deployed to dev `121.89.85.150` after backups stamped `20260719-114836`; Cloud, ports `8787`/`8090`, panel health, PostgreSQL, Feishu, Console `8088`, and same-host isales remained healthy.
+- Live authenticated context read returned `videoTitle=血小板的cos，[偷笑][偷笑]`; reply-job/send-attempt counts were unchanged at `3/3` across the request.
