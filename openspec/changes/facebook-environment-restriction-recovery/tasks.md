@@ -17,6 +17,8 @@
 - [x] 3.3 Add selected-environment risk fetch/cache and recovery rendering logic with Facebook-only visibility, confirmation, pending/error truthfulness, write-after convergence, and environment isolation.
 - [x] 3.4 Replace restricted-state euphemisms with explicit `账号受限` wording in health, detail, rail, and presence projections; ensure restricted overrides the generic completed-round/auto-resume fallback; and add focused UI logic/renderer/IPC contract tests.
   <!-- Edge focused UI/IPC validation: 122/122 passed; overlay classifier/report-gate validation: 22/22 passed; `npm run typecheck` passed. -->
+- [x] 3.5 Replace the native recovery confirmation with a compact application-owned `<dialog>`, including selected-environment copy, honest boundary note, cancel/close/Escape behavior, stale-context protection, responsive styling, and renderer/static tests.
+  <!-- Recovery-confirmation专项 6/6 passed: static visual contract, stopped-environment truth, cancel/close/Escape no-op, write-after pending/success, inline failure, and stale cross-environment protection. A real Electron BrowserWindow visual check at 520×680 confirmed the 410px compact layout, hierarchy, backdrop, boundary note, environment name, and balanced actions. -->
 
 ## 4. Validation, integration, and rollout
 
@@ -28,3 +30,4 @@
   <!-- Deployed Cloud `69dfe1d8aee89f666a59bfeba03a46cc78c5564c` to dev from the clean canonical `master`. Backup: `/opt/aidcp/cloud.bak.20260719-210314.tar.gz`; env backup: `/opt/aidcp/cloud/.env.bak.20260719-210314`. Local/remote SHA-256 matched for the three changed source files. Post-restart: service active, NRestarts=0, listeners 8787/8090/8091 present, panel/client health returned `{ok:true}`, public `/capi/health` passed, both risk routes rejected missing auth with 401, PostgreSQL returned ok=1, Feishu WS reached onReady, and all four pre-existing isales services remained running. -->
 - [x] 4.4 Update this checklist with repository commit SHAs, validation/deployment evidence, deviations, and the explicit boundary that no Edge installer was built or published.
   <!-- No behavior or validation deviations. No real Facebook account was mutated, no restricted-state recovery was triggered against a live account, and no Edge installer was built or published; the Edge change is source-only until a separately authorized desktop release. -->
+- [ ] 4.5 Run focused Edge UI tests, typecheck, and strict OpenSpec validation; commit/push and fast-forward the UI-only refinement to current defaults without building an installer or redeploying Cloud.

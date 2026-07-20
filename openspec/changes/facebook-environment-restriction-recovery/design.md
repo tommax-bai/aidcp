@@ -63,13 +63,24 @@ Electron SHALL add one static row below the existing slow-start row inside “�
 
 The explicit `账号受限` label remains in the selected environment's title health result, risk detail, and environment rail; the recovery row does not duplicate it. The row appears only for the selected Facebook environment whose effective authoritative state is `restricted`. Live connected environments use the live Cloud snapshot. Stopped/disconnected environments use a short-lived env-scoped HTTP read cache; HTTP failure does not overwrite the last honest status or invent `normal`.
 
-The button uses the named preload/main IPC boundary and passes only `envKey`. A native confirmation explains that the customer must first confirm Facebook is usable. While the request is pending, the same button is disabled and changes label; success consumes the Cloud write-after receipt immediately, while failure leaves the restricted state visible with an inline error. The `?` panel explains what triggers restriction, that only the current environment is affected, and that a still-present platform block can stop work again.
+The button uses the named preload/main IPC boundary and passes only `envKey`. A compact application-owned modal explains that the customer must first confirm Facebook is usable. While the request is pending, the same button is disabled and changes label; success consumes the Cloud write-after receipt immediately, while failure leaves the restricted state visible with an inline error. The `?` panel explains what triggers restriction, that only the current environment is affected, and that a still-present platform block can stop work again.
 
 ### 5. Make labels explicit without enlarging the surface
 
 The title health result, risk detail row, and environment rail SHALL say `账号受限` instead of `节奏已调整` / `已调整节奏`. `warned` keeps the existing slowed-pacing language and `frozen` remains a separate stronger state.
 
 The presence headline SHALL also prioritize `restricted` over the generic `session=resting` fallback. A risk-triggered cold standby is not a completed browse round and cannot honestly promise the normal rest-window resume time, so the UI says that automatic operation is paused and points to recovery instead of showing “本轮完成” or an auto-resume countdown.
+
+### 6. Replace the native confirmation with a compact application modal
+
+The recovery confirmation SHALL use the existing HTML `<dialog>` pattern rather than `window.confirm`, whose system-owned typography, spacing, and button order cannot match the companion UI. The modal stays narrow and contains only:
+
+- one restrained warning icon and `Facebook · 当前环境` eyebrow;
+- a concise confirmation title plus the selected environment's display name;
+- one tinted boundary note clarifying that AIDCP resumes automation but does not claim Facebook itself is unblocked;
+- `暂不解除` and one `确认解除` primary action.
+
+The backdrop uses the existing dark translucent layer with a small blur. Cancel, close, and Escape MUST all close without IPC; confirmation MUST re-check that the same environment is still selected and restricted before submitting. A large recovery card, multi-step wizard, generic browser alert, and duplicated `账号受限` heading were rejected because the surrounding surface already communicates the state.
 
 ## Risks / Trade-offs
 

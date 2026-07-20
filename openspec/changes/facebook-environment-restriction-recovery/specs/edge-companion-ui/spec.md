@@ -29,7 +29,7 @@ When the effective state is `restricted`, that state SHALL override the generic 
 
 ### Requirement: Recovery interaction reports Cloud write-after truth
 
-Clicking `解除受限` SHALL first show a confirmation that the customer must verify Facebook is usable and that the action affects only the current environment. After confirmation, the renderer SHALL call a named preload/main IPC with only the selected environment key. While pending, the same button SHALL be disabled; success SHALL consume the Cloud write-after status immediately, while failure SHALL leave `账号受限` visible and show an inline failure message. The renderer MUST NOT locally clear the state before Cloud confirms it and MUST reject a response whose `envKey` does not match the request.
+Clicking `解除受限` SHALL first show a compact application-owned modal, not a native browser/system confirmation. The modal SHALL identify the selected environment, ask the customer to verify Facebook is usable, and state that the action only resumes AIDCP automation rather than proving Facebook's own block is cleared. After confirmation, the renderer SHALL call a named preload/main IPC with only the selected environment key. While pending, the same button SHALL be disabled; success SHALL consume the Cloud write-after status immediately, while failure SHALL leave `账号受限` visible and show an inline failure message. The renderer MUST NOT locally clear the state before Cloud confirms it and MUST reject a response whose `envKey` does not match the request.
 
 The `?` help panel SHALL explain that Facebook security checks, captcha evidence, or explicit throttle signals can pause automation; the customer should first confirm the account works; and a still-present platform block can stop work again. The UI MUST NOT claim that pressing the button solved the Facebook checkpoint or captcha itself.
 
@@ -39,8 +39,13 @@ The `?` help panel SHALL explain that Facebook security checks, captcha evidence
 - **AND** other environments remain unchanged
 
 #### Scenario: Cancel does not call Cloud
-- **WHEN** the customer declines the confirmation
+- **WHEN** the customer clicks `暂不解除`, closes the modal, or presses Escape
 - **THEN** no recovery IPC is sent and the restricted row remains unchanged
+
+#### Scenario: Confirmation stays scoped to the environment shown
+- **WHEN** the selected environment or its authoritative risk state changes while the modal is open
+- **THEN** confirming the stale modal sends no recovery IPC
+- **AND** the UI re-renders from the current environment's truth
 
 #### Scenario: Recovery failure remains honest
 - **WHEN** Cloud rejects the request or cannot be reached
