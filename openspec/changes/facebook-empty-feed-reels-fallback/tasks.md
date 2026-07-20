@@ -30,9 +30,12 @@
 ## 4. Validation and delivery
 
 - [x] 4.1 Run Edge focused tests, required acceptance/full tests, and typecheck; record concise evidence and deviations.
-  <!-- Final focused 71/71; full npm test 1977/1977; npm run typecheck passed. No installer/package built. -->
+  <!-- Final focused 71/71; post-rebase acceptance 26/26 and full npm test 1980/1980; npm run typecheck passed. No installer/package built. -->
 - [x] 4.2 Run Cloud focused integration/protocol/risk tests, required full tests, and typecheck; record concise evidence and confirm RiskController remains the only final risk writer.
-  <!-- Focused fallback/protocol 36/36; full npm test 2656 passed, 8 gated/skipped, 0 failed; typecheck passed. Like receipt still enters existing handler/RiskController path. -->
-- [ ] 4.3 Run strict OpenSpec validation and protocol-drift checks, then commit and push isolated Edge, Cloud, and control changes.
-- [ ] 4.4 Integrate clean default branches serially and deploy Cloud to `dev` after `deploy-target dev --check`; verify service, listener, health, logs, Feishu, and PostgreSQL without touching unrelated services.
-- [ ] 4.5 Backfill task evidence with repo/commit/validation/deployment details and document the So La probe boundary, including the single real Reel like and Edge no-installer boundary.
+  <!-- Focused fallback/protocol 36/36; post-rebase acceptance 60/60; full npm test 2666 total, 2658 passed, 8 gated/skipped, 0 failed; typecheck passed. Like receipt still enters the existing handler/RiskController path. -->
+- [x] 4.3 Run strict OpenSpec validation and protocol-drift checks, then commit and push isolated Edge, Cloud, and control changes.
+  <!-- Strict OpenSpec and the exact PageCards protocol-block drift check passed. Isolated branches were pushed before rebase. Final default commits: aidcp-edge 7644caac00f2426a008248e79864104177906b1f; aidcp-cloud 1951715a6e907e2b2b74f26423376efb443ad8de; control artifact 9ab215c1575e828b93afaddf6fbcec5b7e540a24. -->
+- [x] 4.4 Integrate clean default branches serially and deploy Cloud to `dev` after `deploy-target dev --check`; verify service, listener, health, logs, Feishu, and PostgreSQL without touching unrelated services.
+  <!-- Edge and Cloud were rebased on the latest defaults, revalidated, and fast-forward pushed without force. dev target 121.89.85.150 passed preflight; backups cloud.bak.20260720-153110.tar.gz and cloud.env.bak.20260720-153110 were created; committed Cloud 1951715 was checksum-synced with .env unchanged and no dependency delta, then only aidcp-cloud.service was restarted. Runtime: active, NRestarts=0, deployed SHA matches, 8787/8090/8088 listen, local/public health ok, PostgreSQL select 1, Feishu WSClient onReady, and all four isales services active. ol was not contacted. -->
+- [x] 4.5 Backfill task evidence with repo/commit/validation/deployment details and document the So La probe boundary, including the single real Reel like and Edge no-installer boundary.
+  <!-- So La live probe established the real Reels DOM/route/summary/like/next behavior. It performed one real like on Reel 837962452581083 and confirmed the selected/unlike witness; that like remains. The integrated implementation is covered by automated tests but was not run as a second live write against the account. No Edge installer was built. -->
