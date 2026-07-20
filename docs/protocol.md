@@ -583,7 +583,8 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 // interaction.collect
 { "noteId": "n123", "reason": "值得收藏", "thinkMs": 900 }
 // interaction.follow
-{ "authorId": "u456", "reason": "持续优质", "thinkMs": 900 } // authorId 可选
+{ "authorId": "u456", "reason": "持续优质", "thinkMs": 900 } // 既有主页关注：authorId 可选
+{ "noteId": "https://www.facebook.com/reel/1964804494173822", "reason": "明确关注当前 Reel 作者", "thinkMs": 900 } // Facebook Reels：noteId 必填并绑定当前活动 Reel；不以 DOM 顺序或“当前页”兜底
 // interaction.comment
 { "noteId": "n123", "text": "今天的分享很有启发", "thinkMs": 900, "groupChatCode": "...", "fastReturnToFeed": true } // text 必填；groupChatCode 可选=账号「联系方式」；fastReturnToFeed 仅手工 --feed 置 true：提交后 500ms 直回首页、结果保持未确认
 // 注（change generalize-contact-info）：本字段承载的概念已正名为「联系方式」，内部变量为 contactInfo；wire 字段名保留 groupChatCode 作历史兼容（Method A），物理改名属后续协调步骤。
@@ -603,6 +604,11 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 // direct?: boolean — 云端直驱（change account-real-nickname）：true=直接 navi 到 /user/profile/<authorId>、不抓取当前页；缺省/false 维持点头像进入
 { "authorId": "u456", "reason": "作者值得关注评估", "thinkMs": 800, "direct": false }
 ```
+
+`interaction.follow.noteId` 是向后兼容的可选扩展：非 Reels 调用方仍可只携 `authorId`。Facebook
+Reels 执行器仅在会话确处于 Reels 模式、且 `noteId` 与立即重探的规范活动 Reel 完全一致时才允许定位作者区
+关注按钮；命令延迟后若已滑到下一条则回 `no_target`、零点击。该字段只接通执行能力，不等于云端已经选择了
+自动关注策略；普通 Facebook Feed / 作者主页关注在本 change 中仍为 `capability_unsupported`。
 
 > **深读动作的回报**：`note.browse_images` / `note.scroll_comments` 经 `action.completed` 如实回报——
 > 命中则 `ok:true` 且 `reason` 记实际量（`browsed=N` / `scrolled=N`），未命中目标则 `ok:false, reason:'no_target'`
