@@ -30,6 +30,10 @@ The console SHALL visibly identify both the owning group and visible destination
 - **WHEN** the operator activates a multi-destination group by click or keyboard
 - **THEN** the same floating destination menu opens and its links remain operable
 
+#### Scenario: Operator clicks a group that pointer hover already opened
+- **WHEN** pointer hover has opened a multi-destination group and the operator habitually clicks the same trigger before choosing a destination
+- **THEN** the floating menu remains open until the pointer leaves the trigger/menu hover region or navigation occurs
+
 #### Scenario: Similar route prefixes are present
 - **WHEN** the current path is `/content-schedule`
 - **THEN** Schedule is active and Content is not active
