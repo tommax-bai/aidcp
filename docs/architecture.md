@@ -3,6 +3,17 @@
 本文给出 AIDCP 的组件划分、组件图与端到端数据流。两层（边缘 / 云端）通过
 WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 
+## 客户端交互边界（架构红线）
+
+Electron 应用就是客户端；普通 Edge 子进程是按需自动化引擎，浏览器/CDP 是页面执行器。客户端与 Cloud 有两条语义不同、不得混用的路径：
+
+| 路径 | 模型 | 允许内容 | 禁止内容 |
+|---|---|---|---|
+| customer-auth HTTP 数据面 | 客户端像 Web 网站一样主动拉取/提交；逐请求鉴权与结果 | 人设、配置、稿件、审批、环境管理、内容工作区等 AIDCP 自有数据 | 依赖引擎/浏览器在线；以全局 Cloud 长连接状态准入 |
+| automation WebSocket | 已启用自动化引擎的双向任务通道；Cloud 可定向推送 | 自动化控制、外部平台 API 自动化、浏览器生命周期、页面自动化 | 管理后台向客户端推送普通数据读写或“应用配置”命令 |
+
+判断标准是“谁执行什么”，不是是否需要浏览器：自动读取/修改外部平台仍是自动化，可经引擎推送，但 API-only 操作不得取得浏览器槽位；AIDCP 自有数据即使由后台修改，也应先持久化，再由客户端 HTTP 拉取。若以后需要数据实时提示，应建立独立用户级 notification/invalidation 通道，只通知客户端重新拉取，不直接携带非自动化写命令，也不以某个环境引擎在线代表客户端在线。
+
 > **架构演进提示**：浏览主路径已从早期"单体 `Planner` → `PlanStep[]` 单线规划"演进为
 > **事件驱动多 Agent 编排**——`RoleDispatcher` 按平台 capability 与配置注册浏览闭环、
 > 会话守护、评论、通知、概念和平台专题角色；准确枚举以 `event-bus/types.ts` 的 `RoleName`
@@ -50,7 +61,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 │        │  pushToEdges() 下发；emit 上报事件到 EventBus          │                 │
 │        └───────────────────────┬─────────────────────────────┘                 │
 └────────────────────────────────┼────────────────────────────────────────────────┘
-                                 │  WebSocket（边-云协议 v2，见 protocol.md）
+                                 │  automation WebSocket（边-云协议 v2，见 protocol.md）
                                  │  hello/plan/select/anchor · note.*/browse.* · interaction.*
                                  │  page.cards/note.detail · session.budget/risk.canDo · publish.*
 ┌────────────────────────────────┼────────────────────────────────────────────────┐
@@ -72,7 +83,7 @@ WebSocket 协议解耦，协议本身见 [`protocol.md`](protocol.md)。
 │   │  CdpActionExecutor ── 结构路径→XPath，浏览器侧 click/input/scroll          │  │
 │   │  CdpClient / targets / session / chrome-launcher / stealth-injector       │  │
 │   └─────────────────────────────────┬────────────────────────────────────────┘  │
-│   （Electron 打包：src/electron/ 系统托盘 + Chrome 网关 + 控制面板 UI）            │
+│   （Electron 客户端：客户会话 + HTTP 数据面 + 按需引擎监督 + 控制面板 UI）          │
 └─────────────────────────────────────┼────────────────────────────────────────────┘
                                       │ CDP over WebSocket (:9222)
                                       ▼

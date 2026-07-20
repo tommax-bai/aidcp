@@ -255,11 +255,15 @@
 
 > `pacing` 承载**全局节奏兜底**，供边缘做「操作间**最小间隔** gating」（记上次操作完成时刻，收到下一操作时若距上次已达 floor 则立即执行、**不累加**、吸收云端往返；否则只补差额）与详情页停留兜底。数值后台（console）可配、存云端 PostgreSQL、下次握手/重连热加载。与 `session.budget.pacing`（`PacingDefaultsPayload`，边缘从不消费的**死通道**）区分——本快照走 `welcome` 请求/响应，永不经主动命令白名单。**红线**：配置只能抬高延迟、经三道夹（facade 校验含 `max≥min×1.5` + 云端读出口 `clamp(防呆下限,CAP=15000ms)` + 边缘 `Math.max` 二次夹）永远抬不穿非零下限，绝不零延迟。
 
-### 3.1.1 客户端核心与浏览器执行器边界
+### 3.1.1 客户端数据面与自动化引擎边界
 
-`client_core_browser_executor_v1` 客户端把每个环境投影为四条相互独立的状态轴：`coreState`、`cloudState`、`automationState`、`browserState`。合法组合包括 `online + connected + paused + closed`；浏览器关闭不得被解释成 core 离线或 Cloud 断线。
+新客户端能力位为 `client_data_plane_automation_engine_v1`。Electron 应用是客户端；普通 Edge 子进程是按需自动化引擎；浏览器/CDP 是页面执行器。客户会话有效时，AIDCP 自有数据通过 Electron main 的 customer-auth HTTP 逐请求读写，不存在全局 `cloudState` 准入，也不依赖环境引擎、automation WebSocket 或浏览器在线。
 
-操作必须先进入中心注册表并恰好归入一个类别：`local`、`cloud`、`platform_api`、`browser_lifecycle`、`page_automation`。只有后两类可以申请浏览器槽位、启动 provider、附着 CDP 或获取页面任务租约；未知 Cloud 主动消息按 `operation_unclassified` 拒绝，不能回落成页面命令。
+操作必须先进入中心注册表并恰好归入一个类别：`local`、`cloud_data`、`automation_control`、`platform_api_automation`、`browser_lifecycle`、`page_automation`。`cloud_data` 只允许 customer-auth HTTP，禁止进入 automation WebSocket；`platform_api_automation` 需要已启用引擎但不申请浏览器槽位；`page_automation` 才申请槽位、启动 provider、附着 CDP 并获取页面任务租约。未知 Cloud 主动消息按 `operation_unclassified` 拒绝，不能回落成页面命令。
+
+**出站红线**：Cloud/管理后台不得经 per-environment automation WebSocket 推送人设、配置、稿件、审批、环境管理或其他普通数据命令。后台数据变更应先写权威存储，客户端后续主动 HTTP 拉取。未来若增加独立用户级通知，只能发送 invalidation/refetch 提示，不能夹带非自动化业务写，也不能因为某环境引擎离线就把客户端视为离线。
+
+新客户端公开 `clientSessionState`、`automationState`、`browserState`；`engineLinkState` 只作自动化诊断。`coreState`、`cloudState` 仅为 `client_core_browser_executor_v1` 旧客户端兼容投影，不得被新客户端用作数据管理入口准入。
 
 客户人设、待审稿读取/删图/批准/拒绝使用 customer-auth 的环境级窄接口，客户端只提交 `envKey`，Cloud 在每次请求内复核客户归属并解析权威 `accountId`。对应接口为：
 
@@ -267,11 +271,14 @@
 - `POST /environments/:envKey/publish/draft-image-remove`
 - `POST /environments/:envKey/publish/approval`
 
-旧 Edge WS 的 `persona.*`、`publish.approval_action` 和 `publish.draft_image_remove` 继续保留兼容；两条传输必须复用同一领域方法。批准接口返回 `accepted_pending_execution` 只表示决策已受理、等待浏览器执行器，不表示平台已发布。
+旧 Edge WS 的 `persona.*`、`publish.approval_action` 和 `publish.draft_image_remove` 只为旧能力客户端保留兼容；新能力客户端不得由 Cloud 主动推送这些 `cloud_data` 操作。两条历史传输必须复用同一领域方法。批准接口返回 `accepted_pending_execution` 只表示决策已受理、等待自动化执行，不表示平台已发布。
 
 Cloud 切换通过 Electron→core 的本地 `lifecycle.cloud_rebind` 控制协议逐环境重绑 WS：先在安全边界排空当前页面写，停止旧 Cloud intake，再完成新 hello/welcome。该动作不得启停 provider、CDP、浏览器或变更槽位所有权；实际 Cloud、目标 Cloud 与失败原因分别投影。
 
 **`ui.snapshot`**（cloud → edge，主动推送；change edge-companion-ui 8.1）
+
+> 兼容边界：下列 `personaBound`、`personaWritingLanguage`、`lastPublish`、`publish`、`publishPreview` 只对未协商 `client_data_plane_automation_engine_v1` 的旧客户端下发。新客户端的 `ui.snapshot` 仅保留自动化运行投影（如 `dailyUsage`、`browserStandby`）；人设、稿件和审批真态由客户端 customer-auth HTTP 主动拉取。Cloud 按 capability 过滤，Edge 同时丢弃旧 Cloud 夹带的数据字段，形成双向防线。
+
 ```jsonc
 {
   "account": { "id": "acc-1", "nickname": "晚风手作" },   // 可选；昵称空则整个字段不带（宁缺毋假）
