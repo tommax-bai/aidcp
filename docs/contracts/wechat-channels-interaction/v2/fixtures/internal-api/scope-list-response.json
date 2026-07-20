@@ -1,0 +1,29 @@
+{
+  "data": {
+    "items": [
+      {
+        "scopeId": "scope_default",
+        "platform": "wechat_channels",
+        "source": { "type": "default", "groupLabel": null },
+        "memberCount": 2,
+        "currentVersion": 3,
+        "draftVersion": null,
+        "publishedVersion": 3,
+        "updatedAt": 1784512800000,
+        "updatedBy": "admin"
+      },
+      {
+        "scopeId": null,
+        "platform": "wechat_channels",
+        "source": { "type": "group", "groupLabel": "华东组" },
+        "memberCount": 4,
+        "currentVersion": 0,
+        "draftVersion": null,
+        "publishedVersion": null,
+        "updatedAt": null,
+        "updatedBy": null
+      }
+    ]
+  },
+  "meta": { "requestId": "req_scope_list", "asOf": 1784512800000 }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "customer-auth-api-v2.schema.json",
+  "title": "AIDCP Customer Reply Config Projection v2 Overlay",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "currentVersion", "draftVersion", "publishedVersion", "mode", "source"],
+  "properties": {
+    "status": { "enum": ["missing", "draft_only", "published", "unknown"] },
+    "currentVersion": { "type": ["integer", "null"], "minimum": 0 },
+    "draftVersion": { "type": ["integer", "null"], "minimum": 1 },
+    "publishedVersion": { "type": ["integer", "null"], "minimum": 1 },
+    "mode": { "enum": ["legacy", "shadow", "scoped"] },
+    "source": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["type", "groupLabel"], "properties": { "type": { "const": "default" }, "groupLabel": { "type": "null" } } },
+        { "type": "object", "additionalProperties": false, "required": ["type", "groupLabel"], "properties": { "type": { "const": "group" }, "groupLabel": { "type": "string", "minLength": 1, "maxLength": 64 } } }
+      ]
+    }
+  }
+}
