@@ -84,7 +84,7 @@
 
 | type | 方向 | 用途 |
 | --- | --- | --- |
-| `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll；可选 `dwellMs`：feed 翻页按本次新卡数算的停留兜底，返回未刷新时省略） |
+| `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll；Facebook 首页显式空态时 Cloud 可下发 `empty_feed_reels_fallback` 授权进入 Reels；可选 `dwellMs`） |
 | `feed.refresh` | cloud → edge | 主 feed 浏览深度到阈值后，点右下「刷新」按钮回到顶部换出全新一批（`reason`: feed_refresh；可选 `thinkMs`；边缘诚实回执 `action.completed{action:'refresh'}`，非 feed 页 / 无按钮 / 点后未换新批均如实失败，绝不假成功） |
 | `pacing.update` | cloud → edge | 会话中途风控档位变化推送新 `tempo`（payload `{tempo}`）；边缘刷新兜底节奏（最小间隔 + 停留兜底）、**不重置**操作间隔锚点、不入队/不唤醒会话（change pacing-fallback-hardening） |
 | `interaction.like` | cloud → edge | 点赞指定笔记 |
@@ -107,7 +107,7 @@
 
 | type | 方向 | 用途 |
 | --- | --- | --- |
-| `page.cards` | edge → cloud | 上报当前可见卡片列表（index/title/author/计数） |
+| `page.cards` | edge → cloud | 上报当前可见卡片列表；可选 `listKind`/`listState` 是页面形态与内容状态观察，缺省 `feed/ready`，不扩展 `feed/detail` Surface |
 | `note.detail` | edge → cloud | 上报笔记详情（正文/作者/计数） |
 | `profile.detail` | edge → cloud | 上报作者主页数据（粉丝数/作品数） |
 | `action.completed` | edge → cloud | 确认某个 action 执行完成（可选 `noteId`=从被点 article DOM 派生的规范 postId、MUST NOT 抄命令 payload；可选 `observation`=独立见证包 {surface?/listKey?/author?/textPreviewHead?/reactionText?/articleIndex?}，供云端归账仲裁逐字段比对选中卡；change platform-browse-protocol，均 optional、缺省=今天回落 currentNoteId） |
@@ -565,6 +565,7 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 // page.scroll
 { "reason": "feed_scroll" }                  // feed_scroll | search_scroll
 { "reason": "feed_scroll", "dwellMs": 1350 } // feed 出新卡：翻页前按新卡数看一会（feed-scroll-card-floor）；返回未刷新则省略 dwellMs
+{ "reason": "empty_feed_reels_fallback" }    // 仅 Cloud 收到 Facebook 首页明确 feed/empty 观察后授权一次；Edge 不得自行切列表
 // feed.refresh（feed 浏览深度到阈值改点右下「刷新」回顶换新批，change feed-refresh-on-depth）
 { "reason": "feed_refresh", "thinkMs": 700 } // 边缘点后校验「回顶 + 首卡换新」才回 ok:true 并上报新一批 page.cards
 // interaction.like
@@ -628,9 +629,17 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
       "isVideo": false                            // 可选：卡片是否为视频；供后续 note.detail 推导媒体类型
     }
   ],
-  "startupId": "ads-k1e0ero8:12345:lz7abc"        // 可选：完整 core/browser 启动代号；同一次启动内稳定，完整重启后变化，用于云端限定启动期昵称采集
+  "startupId": "ads-k1e0ero8:12345:lz7abc",       // 可选：完整 core/browser 启动代号；同一次启动内稳定，完整重启后变化，用于云端限定启动期昵称采集
+  "listKind": "feed",                              // 可选：feed / reels；缺省 feed。页面形态观察，不是 feed/detail 控制流 surface
+  "listState": "ready"                             // 可选：ready / empty；缺省 ready。empty 只有 cards=[] 且显式空态稳定确认时有效
 }
 ```
+
+Facebook 首页空态的兼容握手：Edge 必须先确认顶层 Facebook 首页、认证/主区域就绪、无登录/checkpoint/consent/captcha，
+且在同一 URL + `performance.timeOrigin` generation、document age ≥8s、无真卡/loading 时，同一紧凑容器的显式空态
+语义连续命中 3 次并通过最终复检，才可上报 `cards:[], listKind:'feed', listState:'empty'`。仅 Cloud 将该观察翻译为
+`page.scroll{reason:'empty_feed_reels_fallback'}`；普通 0 卡、加载中、未知布局及其它平台不得触发。Reels 卡仍以现有
+`page.cards → note.open{surface:'feed'} → note.detail → interaction.like/page.scroll` 链运行，`feed/detail` Surface union 不新增 `reels`。
 
 **`note.detail`**——上报笔记详情
 ```jsonc
