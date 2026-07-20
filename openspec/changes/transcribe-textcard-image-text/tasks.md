@@ -43,6 +43,8 @@
 
 ## 6. 集成与 dev
 
-- [ ] 6.1 回写 cloud/control commit SHA 与验证证据，rebase 后 fast-forward 合入并 push 默认分支
-- [ ] 6.2 按部署规范从 clean cloud master 部署 dev，备份、重启、service/listener/health/Feishu/PostgreSQL 检查
-- [ ] 6.3 dev 真实文字卡验收：记录顺序、识别文字、缓存命中、逐槽生成对应；未实测项诚实登记 backlog
+- [x] 6.1 回写 cloud/control commit SHA 与验证证据，rebase 后 fast-forward 合入并 push 默认分支
+- [x] 6.2 按部署规范从 clean cloud master 部署 dev，备份、重启、service/listener/health/Feishu/PostgreSQL 检查
+- [x] 6.3 dev 真实文字卡验收：记录顺序、识别文字、缓存命中、逐槽生成对应；未实测项诚实登记 backlog
+
+<!-- Integrated and pushed: aidcp-cloud master 9056a1603eb90ecd786f788b903a2e7d71a173f1; aidcp main 512de6946fcab73684259e4e142043ac9c3b1bd7. Deployed clean cloud master to dev 121.89.85.150 after backup /opt/aidcp/backups/cloud-20260720-182152.tar.gz and .env backups; only aidcp-cloud.service restarted. Service active, 8787/8090 listeners, panel API v6, Feishu WS ready, Edge sessions reconnected, and curated_content.text_card_transcription is jsonb. AIDCP_TEXTCARD_OCR=true enabled on dev. Real acceptance used curated row 459: 9/9 cards transcribed in sourceArrayIndex order 0..8, persisted through CuratedContentStore, DB read-through cache hit with zero repeat vision call, and all nine ordered texts appeared monotonically in buildCardSetPrompt with ordered_transcription mapping. One transient failed OCR result was honestly discarded and one bounded diagnostic retry succeeded. No image rendering, approval, or platform publish was performed; that destructive/end-to-end check remains in docs/real-machine-acceptance-backlog.md. -->

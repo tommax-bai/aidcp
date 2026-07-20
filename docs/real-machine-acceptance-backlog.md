@@ -342,6 +342,12 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 - [ ] **多卡文案失败兜底** — 若某张卡违规/LLM 失败 → 整帖回落生成式（`coverFormAudit.formProfileGate='carousel_copy_failed'`），绝不半套卡+半套图
 - [ ] **零回归：非纯卡帖不受影响** — 普通照片封面帖仍全生成式、卡封面+照片混合帖仍 `card_cover`（单封面卡+AI 内页），与开轮播旗标前一致
 
+### 有序文字卡转写（2026-07-20 部署 dev + 开 `AIDCP_TEXTCARD_OCR`）
+
+**已验边界**：cloud `9056a16` 已在 dev 启用。以精选行 459 的真实 9 张文字卡验收：9/9 按来源数组下标 0→8 批量识别并写入 `text_card_transcription`，数据库读回命中锚点缓存（零重复视觉调用）；真实逐卡文字按相同顺序进入生成提示词，映射档为 `ordered_transcription`。期间一次 OCR 返回失败被诚实丢弃，一次有界诊断重试成功。该验收未触发出图、审批或平台发布。
+
+- [ ] **真实 9 卡成品终验** — 选用已具备完整有序转写的纯文字卡素材发起一次 dev 洗稿，停在审批前检查 9 张渲染成品：第 i 张承接来源第 i 张的信息职责、只采用改写终稿支持的事实且无逐字搬运；核 `coverFormAudit.cardContentMapping='ordered_transcription'`、`cardSourceArrayIndices=[0..8]`、九槽均 `rendered`。是否通过审批并真发需另行明确授权。
+
 ## 簇 24 — edge-multi-environment-fleet 真机验收（一台客户端并行托管 N 个环境 + 舰队控制台，登记于 2026-07-09）
 
 **前置**：edge 本地重建到 master `c6292d8`（含 `fleet.cjs` + `main.cjs` 多环境重写 + 环境栏/引导流 renderer + 配图临时目录按 edgeId 隔离 + `browser/active` 对账）；打新安装包（当前 `../aidcp-edge/dist-electron`，版本仍 0.2.7）；≥2 个已登录目标平台的 AdsPower 分身（内存足够 ~1GB/环境）。云端与 console 本 change **零改动**（edges 已按 edgeId 独立路由）。
