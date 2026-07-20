@@ -90,7 +90,7 @@
 | `interaction.like` | cloud → edge | 点赞指定笔记 |
 | `interaction.collect` | cloud → edge | 收藏指定笔记 |
 | `interaction.follow` | cloud → edge | 关注作者 |
-| `interaction.comment` | cloud → edge | 在当前笔记发评论（`text` 正文；云端已撰写/去AI味/人审通过）。可选 `groupChatCode`=账号「联系方式」，非空则 verbatim 追加到评论末尾（wire 名历史保留，概念=contact info，change generalize-contact-info） |
+| `interaction.comment` | cloud → edge | 在当前笔记发评论（`text` 正文；云端已撰写/去AI味/人审通过）。可选 `groupChatCode`=账号「联系方式」，非空则 verbatim 追加到评论末尾（wire 名历史保留，概念=contact info，change generalize-contact-info）；可选 `fastReturnToFeed=true` 仅承载手工 `/comment --feed`：提交派发后不等平台确认，500ms 后直回平台首页，并诚实回 submitted-unconfirmed / verification_ambiguous（绝不冒充平台确认成功） |
 | `interaction.like_comment` | cloud → edge | 给详情页内某条评论点赞（`commentAnchorId` 稳定锚点定位，绝不按序号） |
 | `group.join` | cloud → edge | Facebook 加群原子指令：导航到群、回传结构化 observation；仅 `click:true` 时点击 Join 一次，必须走 Facebook `join` 能力，绝不复用 `browse` |
 | `navigation.back` | cloud → edge | 返回上一页（feed / search） |
@@ -585,7 +585,7 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 // interaction.follow
 { "authorId": "u456", "reason": "持续优质", "thinkMs": 900 } // authorId 可选
 // interaction.comment
-{ "noteId": "n123", "text": "今天的分享很有启发", "thinkMs": 900, "groupChatCode": "..." } // text 必填；groupChatCode 可选=账号「联系方式」(contact info)，非空则边缘逐字敲完 text 后整段追加「\n+该串」，verbatim 不 trim
+{ "noteId": "n123", "text": "今天的分享很有启发", "thinkMs": 900, "groupChatCode": "...", "fastReturnToFeed": true } // text 必填；groupChatCode 可选=账号「联系方式」；fastReturnToFeed 仅手工 --feed 置 true：提交后 500ms 直回首页、结果保持未确认
 // 注（change generalize-contact-info）：本字段承载的概念已正名为「联系方式」，内部变量为 contactInfo；wire 字段名保留 groupChatCode 作历史兼容（Method A），物理改名属后续协调步骤。
 // group.join（Facebook 加群；click 缺省/false=只观察不点击，true=cloud 已判定可点后才点击一次）
 { "groupUrl": "https://www.facebook.com/groups/123", "click": false, "thinkMs": 900 }
