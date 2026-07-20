@@ -37,7 +37,8 @@
   <!-- Console evidence: focused 38/38; full 193 passed, 1 skipped, 0 failed; typecheck and Vite production build passed. Existing jsdom getComputedStyle and chunk-size warnings remain non-fatal. -->
 - [x] 5.4 Update task evidence and run `openspec validate wechat-reply-safety-simplification --strict`.
   <!-- openspec validate wechat-reply-safety-simplification --strict: passed after implementation and validation. -->
-- [ ] 5.5 Commit each repository with explicit path scope, rebase onto current defaults, serially fast-forward/push Cloud, Edge, Console, and control changes, and preserve unrelated canonical WIP.
+- [x] 5.5 Commit each repository with explicit path scope, rebase onto current defaults, serially fast-forward/push Cloud, Edge, Console, and control changes, and preserve unrelated canonical WIP.
+  <!-- Pushed defaults: Cloud master 54b6f8e, Edge master 2fc75c3, Console master 16ad709, control main ce363ce. All integrations were ff-only after a fresh fetch; canonical control output/ and tmp/ remained untouched. -->
 
 ## 6. Dev rollout and closeout
 
@@ -45,4 +46,5 @@
   <!-- dev preflight resolved 121.89.85.150 and the expected key. Backups: /opt/aidcp/cloud.bak.20260720-112236.tar.gz, /opt/aidcp/console.bak.20260720-112236.tar.gz, and target-local .env backup. Cloud 54b6f8e and Console 16ad709 were rsynced from clean canonical master; package hashes already matched, so npm ci was not rerun. Only aidcp-cloud.service was restarted; isales services remained active. -->
 - [x] 6.2 Verify dev service/listeners/health, Console assets, Feishu, PostgreSQL, and honest video-channel read/write-gate state without claiming a real platform send unless one is actually confirmed.
   <!-- Dev evidence: cloud active since 2026-07-20 11:25:25 CST; 8787/8090/8088/5432 listened; panel /api/health returned {"ok":true}; console returned HTTP 200; PostgreSQL SELECT 1 passed; Feishu WSClient onReady appeared. Local/remote hashes matched for all touched Cloud runtime files plus Console index and referenced JS. Startup truth: schema=legacy_read_only, env=dev, configured/effective global write=true, reply_quantity_gate=interaction_windows. Runtime aggregate: 3 controls rows; comment-read/reply=2/2, DM-read/send=2/2, unpaused=2, circuit-closed=3; auth active/authenticating/disabled=1/1/1. No real platform reply was sent. -->
-- [ ] 6.3 Record commits, validations, deployment evidence, deviations, and any remaining real-machine acceptance item; finish strict validation and archive only when every required task is complete.
+- [x] 6.3 Record commits, validations, deployment evidence, deviations, and any remaining real-machine acceptance item; finish strict validation and archive only when every required task is complete.
+  <!-- All implementation, integration, and dev evidence is recorded above. Real platform send and packaged Edge UI acceptance remain explicitly open as backlog 87.16-87.17; no destructive validation or installer build was claimed. Strict validation passed before archive. -->
