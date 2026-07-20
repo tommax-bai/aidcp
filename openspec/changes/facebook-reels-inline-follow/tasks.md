@@ -22,7 +22,8 @@
 ## 4. Integration and closeout
 
 - [x] 4.1 Run `openspec validate facebook-reels-inline-follow --strict` and record repository commits, validation evidence, and deviations here.
-  <!-- Commits: aidcp-edge 6665b88; aidcp-cloud f6118fc. `openspec validate facebook-reels-inline-follow --strict` passed on 2026-07-20. Deviation: no automatic Reel follow policy was added because no selection/probability rule was requested; this change provides the explicitly commanded actuator. -->
-- [ ] 4.2 Fetch/rebase and fast-forward integrate the isolated Edge, Cloud, and control changes without overwriting the concurrent Reel random-like work; push eligible default branches.
+  <!-- Commits after rebase: aidcp-edge 7b98245; aidcp-cloud 462fcd4. `openspec validate facebook-reels-inline-follow --strict` passed on 2026-07-20. Deviation: no automatic Reel follow policy was added because no selection/probability rule was requested; this change provides the explicitly commanded actuator. -->
+- [x] 4.2 Fetch/rebase and fast-forward integrate the isolated Edge, Cloud, and control changes without overwriting the concurrent Reel random-like work; push eligible default branches.
+  <!-- Integration 2026-07-20: all three feature branches rebased without conflict onto current defaults. Edge 7b98245 and Cloud 462fcd4 were fast-forward pushed to origin/master and canonical checkouts synchronized; control was prepared for the same origin/main fast-forward. Post-rebase acceptance, full tests, and typechecks passed. -->
 - [x] 4.3 Do not build an Edge installer. Record that installed clients remain unchanged until an explicit package/release request; no runtime deployment is required for protocol type/docs-only Cloud changes.
   <!-- Delivery boundary: no Edge installer/package was built, so installed clients are unchanged. Cloud changes are TypeScript protocol types plus an offline contract test only; no runtime deployment is required. -->
