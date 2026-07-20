@@ -55,3 +55,11 @@
   <!-- Landed without force: cloud a5bccff, edge 175987f, console fe709ba, and control bb13210. Each feature branch was rebased onto the then-current default branch; code repositories reran their standard land-change validation before push. -->
 - [x] 6.4 按部署规范从默认分支部署 Cloud 与 Console 到 dev，验证服务、监听、健康、PostgreSQL additive 列、Panel DTO 与飞书连接；不构建桌面安装包。
   <!-- DEV deploy 2026-07-20 12:16 CST from clean defaults: cloud a5bccff, console fe709ba. Backups: /opt/aidcp/cloud.bak.20260720-121517.tar.gz, cloud/.env.bak.20260720-121517, and /opt/aidcp/console.bak.20260720-121517.tar.gz. aidcp-cloud.service is active with zero restarts; 8787/8090/8091 listen; panel/client health and console assets return 200. PostgreSQL has additive operator_alias text; Panel v6 exposes all three unified fields for all 26 accounts. Feishu Dev.A token/info and WSClient onReady pass. No Edge installer was built. Live manualAliasCount remains 0, so Tianxing still honestly resolves from platform_nickname until the upgraded client saves again. -->
+
+## 7. 同值提交防误触
+
+- [x] 7.1 扩展 Edge 契约并在 renderer 提交入口把 trim 后与当前显示昵称相同的输入处理为纯 no-op，保持原来源且不进入 pending/IPC/Cloud。
+  <!-- aidcp-edge: renderer captures the editor's original displayed value and returns before optimistic mutation whenever the trimmed submission is unchanged. -->
+- [x] 7.2 补双击系统昵称原值 Enter、失焦及既有人工昵称原值提交测试，锁定零保存调用和视觉来源不变。
+  <!-- aidcp-edge: fleet-console focused suite 58/58 passes, including Enter/blur system-name no-op and trimmed manual-name no-op coverage. -->
+- [ ] 7.3 运行 Edge focused/full/acceptance/typecheck 与 OpenSpec strict，fetch/rebase 最新 master 后 fast-forward 推送；不构建安装包。
