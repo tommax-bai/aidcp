@@ -12,7 +12,7 @@
 - 分组选择、配置版本和历史任务引用可审计、可回放，不依赖可变标签解释历史。
 - 账号换组或分组发布只影响新任务；已生成任务继续使用原不可变快照。
 - 保持账号级 runtime controls、身份、熔断、风控和计数边界。
-- 提供无破坏的账号级配置盘点、冲突识别、shadow 对比和显式切换。
+- 立即退役账号级策略读取、写入和迁移盘点；清理已确认的测试策略数据。
 
 **Non-Goals:**
 
@@ -33,7 +33,7 @@
 - aggregate version、draft/published head 与审计字段；
 - `UNIQUE(platform, scope_type, group_label)`，并以 partial unique index 保证每个平台只有一个 default。
 
-每个 `(scope_id, config_version)` 版本行以 JSONB 子文档原子保存 policy、templates、rules 和 profiles；发布后整行不可变。这样一次 CAS draft mutation 与一次 publish 都只需要锁定 scope head 并写一个完整快照，避免跨四组表复制产生部分版本。旧账号级规范化表保留为迁移只读源，避免上线 migration 直接重写或删除历史数据。
+每个 `(scope_id, config_version)` 版本行以 JSONB 子文档原子保存 policy、templates、rules 和 profiles；发布后整行不可变。这样一次 CAS draft mutation 与一次 publish 都只需要锁定 scope head 并写一个完整快照，避免跨四组表复制产生部分版本。旧账号级规范化表不再作为读取源；本次只清空其中的策略数据，物理表暂留以避免共享数据库上的 DROP/RENAME。
 
 选择它而不是“发布时复制到每个账号”，因为复制会产生部分成功、账号新增补拷贝和漂移问题；也不使用幽灵账号承载共享配置，避免破坏账号 FK 和下线语义。
 
@@ -50,7 +50,7 @@ Cloud 提供唯一 `resolveEffectiveReplyConfig(accountId)`：
 
 ### 3. 任务冻结 scope + version
 
-`interaction_reply_jobs` 加性增加 `config_scope_id`；生成成功时同时保存 `config_scope_id` 和 `config_version`。审批、编辑、发送校验按这两个字段重载历史快照，不根据账号当前分组重新解析。已有仅带账号 `config_version` 的任务继续走 legacy snapshot 读取，直到自然结束或清理。
+`interaction_reply_jobs` 加性增加 `config_scope_id`；生成成功时同时保存 `config_scope_id` 和 `config_version`。审批、编辑、发送校验按这两个字段重载历史快照，不根据账号当前分组重新解析。已有仅带账号 `config_version` 的历史任务保留审计记录，但不再读取账号旧快照；后续审批/编辑/发送以配置缺失 fail closed。
 
 ### 4. 账号安全门禁与共享策略相交，而非被共享策略替代
 
@@ -68,7 +68,7 @@ Cloud 提供唯一 `resolveEffectiveReplyConfig(accountId)`：
 - `POST .../:scopeId/preview` 必须携带 `accountId`，并校验该账号当前属于该 group，或在 default scope 下确实未分组。
 - `GET /api/accounts/:accountId/effective-reply-config` 返回只读解析状态和非敏感来源。
 
-账号级 `interaction-runtime-controls` 保留。旧账号 reply-config 写路径在迁移期返回显式 deprecated 元数据，scoped cutover 后拒绝新写；不会把账号请求偷偷改写到整个分组。
+账号级 `interaction-runtime-controls` 和预览上下文读取保留。其余旧账号 reply-config 读写、预览、发布与审计路径统一返回已退役状态；不会读取已清理数据，也不会把账号请求偷偷改写到整个分组。
 
 权限继续复用 `interaction.config.view/edit/publish/preview` 与 `interaction.audit.view`。审计事件按 `scope_id` 记录，不为每个成员复制；账号有效来源查询只展示 scope 类型、标签、版本和状态。
 
@@ -76,37 +76,32 @@ Cloud 提供唯一 `resolveEffectiveReplyConfig(accountId)`：
 
 新增“视频号策略”页面，列出默认 scope、账号中出现的 group label 以及已有零成员 scope，展示成员数、草稿/发布版本和缺失状态。策略编辑器以 scope 为上下文；预览真实互动时选择一个合法成员账号。
 
-账号页继续编辑分组和 runtime controls，并展示“来自分组 X / 默认策略 / 缺少配置”。不再从账号行直接编辑共享策略，避免用户误以为只影响当前账号。
+账号页继续编辑分组和 runtime controls，但不再展示账号策略来源或“查看策略”。账号表不再渲染通用“操作”列：运营状态标签承载暂停/恢复，风控标签承载状态操作，档位标签承载档位选择；视频号“运行控制”使用具名列，Facebook 配置入口附着平台标签。这样动作与所修改的事实列保持一一对应。
 
-### 7. 分阶段兼容迁移
+### 7. 立即退役账号旧策略
 
-Cloud 支持 `legacy | shadow | scoped` 三态解析模式：
+Cloud 固定使用 `scoped` 解析，不再接受环境变量切回 `legacy` 或 `shadow`。账号旧策略 API 和 migration inventory 一并退役。一次性清理只删除 `interaction_reply_configs`、`interaction_reply_config_versions`、`reply_templates`、`reply_rules`、`account_reply_profiles` 的账号策略行，以及对应配置实体审计；不删除账号、runtime controls、互动消息、回复任务、发送尝试、风险或 scoped 数据。
 
-- `legacy`：运行时仍使用账号配置；新 scope API 可准备配置；
-- `shadow`：仍执行 legacy，但记录 scoped 解析覆盖率和配置 fingerprint 差异，不记录正文；
-- `scoped`：按 group/default 执行，缺失 fail closed。
-
-默认保持 `legacy`，只有覆盖报告显示所有活跃视频号账号均有确定的目标 scope 且冲突已处理后，才允许切换 scoped。该模式是迁移门禁，不是长期账号 override。
+scope 尚未发布时生成/发送按既有 `group_config_missing` / `default_config_missing` fail closed。管理页先创建并发布需要的默认/分组策略，不从旧账号数据自动复制或选择赢家。
 
 ## Risks / Trade-offs
 
-- [同组现有账号配置不一致] → 迁移工具只输出 fingerprint、版本和差异摘要；不自动选赢家，要求运营显式选择来源或重建策略。
+- [清理后 scope 尚未发布] → 明确 fail closed，并由“视频号策略”页从零创建；不恢复或自动搬运账号旧策略。
 - [账号换组导致策略立即变化] → 账号分组写接口在 scoped 模式返回新 effective source；新任务使用新 scope，历史任务继续冻结旧 scope/version。
 - [自由文本标签出现近似重复] → 沿用当前 trim 后精确匹配；Console 显示成员数和零成员 scope，后续可单独引入 group entity/rename 流程。
-- [单账号下线误删共享配置] → offboarding 只删账号互动数据、legacy 配置和 runtime controls，不删除 scope 配置。
-- [迁移影响 dev/ol 共享数据库] → migration 仅加表/加列，不删旧表；部署前仍必须校验环境数据库边界，任何破坏性清理另行审批。
+- [单账号下线误删共享配置] → offboarding 只删账号互动数据和 runtime controls，不删除 scope 配置。
+- [清理影响 dev/ol 共享数据库] → 用户已确认旧账号策略均为测试数据；执行前仍需备份并核对精确行数，迁移只 DELETE 指定策略实体，不做 DROP/RENAME，不触碰其它数据域。
 - [preview 混淆配置与账号上下文] → API 强制合法代表账号，回包同时标记 scope 与 account，不把预览说成真实发送。
 
 ## Migration Plan
 
-1. 部署加性 schema、scope store/API、Console 管理页和 `legacy` 模式；旧运行时行为不变。
-2. 盘点现有账号级 published 配置，按目标 group/default 计算无正文 fingerprint；一致项可复制到 scope draft，冲突项形成待处理清单。
-3. 运营发布所有需要的 group/default scope；运行 `shadow`，确认活跃账号解析覆盖率、版本和预期来源。
-4. 在命名环境显式切换 `scoped`，验证生成、审批、发送门禁、客户投影、换组和 offboarding。
-5. 观察期后冻结旧账号写 API；旧表和 legacy job 读取保留到数据保留窗结束。删除旧表属于后续独立破坏性 change。
+1. 部署固定 scoped resolver、退役账号策略 API 和 Console 精简交互。
+2. 在共享数据库执行前备份五张旧策略表及相关配置审计，复核行数与账号范围。
+3. 执行一次性 DELETE 清理；验证五张旧策略表为 0，runtime controls、回复任务和 scoped 表数量不变。
+4. 验证 default/group 缺配置明确 fail closed，并通过“视频号策略”页从零创建新配置。
 
-回滚只需把解析模式恢复为 `legacy`；新 scope 数据保留，不需逆向 DDL。已用 scope 生成的任务仍按冻结的 scope/version 完成或人工终止。
+数据回滚不能依赖运行模式开关；若清理错误，只能从部署前备份恢复被删的精确策略行。物理旧表的 DROP 属于后续独立 schema change。
 
 ## Open Questions
 
-- 无。默认策略只覆盖未分组账号、有组缺策略 fail closed、最终无账号级 override，均按本次用户确认实施。
+- 无。默认策略只覆盖未分组账号、有组缺策略 fail closed、无账号级 override、旧策略数据直接清理和账号表取消通用操作列，均按本次用户确认实施。

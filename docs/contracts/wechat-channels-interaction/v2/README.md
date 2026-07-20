@@ -6,7 +6,6 @@ New internal routes:
 
 ```text
 GET|POST /api/interaction-reply-config-scopes
-GET      /api/interaction-reply-config-scopes/migration-inventory
 GET      /api/interaction-reply-config-scopes/:scopeId
 POST     /api/interaction-reply-config-scopes/:scopeId/initialize
 PUT      /api/interaction-reply-config-scopes/:scopeId/policy
@@ -20,6 +19,8 @@ GET      /api/accounts/:accountId/effective-reply-config
 ```
 
 The effective resolution order is exact: non-empty `accounts.group_label` selects only its group scope; null selects only the singleton default scope. A grouped account never falls back to default. Runtime controls and all risk/auth/capability gates stay account-scoped.
+
+Account-scoped reply configuration and migration-inventory routes are retired. The resolver mode is always `scoped`; historical jobs without `configScopeId` fail closed instead of loading legacy account snapshots.
 
 Validate the overlay fixtures from this directory:
 

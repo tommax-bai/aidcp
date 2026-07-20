@@ -10,7 +10,7 @@
     "currentVersion": { "type": ["integer", "null"], "minimum": 0 },
     "draftVersion": { "type": ["integer", "null"], "minimum": 1 },
     "publishedVersion": { "type": ["integer", "null"], "minimum": 1 },
-    "mode": { "enum": ["legacy", "shadow", "scoped"] },
+    "mode": { "const": "scoped" },
     "source": {
       "oneOf": [
         { "type": "object", "additionalProperties": false, "required": ["type", "groupLabel"], "properties": { "type": { "const": "default" }, "groupLabel": { "type": "null" } } },

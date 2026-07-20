@@ -64,26 +64,33 @@ internal panel API SHALL 提供 scope 列表、读取、初始化、policy/templ
 - **THEN** API 以 scope/account mismatch 拒绝，不读取其互动正文也不执行 AI preview
 
 ### Requirement: Console 必须以分组和默认策略作为主入口
-Console SHALL 提供“视频号策略”管理面，列出 default、当前账号分组和已有零成员 scope，展示成员数、draft/published 版本及缺失状态。账号页 SHALL 展示 effective source 并保留账号运行控制，MUST NOT 让共享策略编辑看起来只影响当前账号。
+Console SHALL 提供“视频号策略”管理面，列出 default、当前账号分组和已有零成员 scope，展示成员数、draft/published 版本及缺失状态。账号页 SHALL 移除账号策略来源和“查看策略”，仅保留具名运行控制入口，MUST NOT 让共享策略编辑看起来只影响当前账号。
 
-#### Scenario: 从账号查看生效来源
-- **WHEN** 运营查看一个属于分组 A 的视频号账号
-- **THEN** 页面显示“来自分组 A”及当前 published 版本，并提供跳转分组策略而非账号级策略编辑
+#### Scenario: 账号页只保留运行控制
+- **WHEN** 运营查看一个视频号账号
+- **THEN** 账号行不显示旧策略来源或“查看策略”，只显示独立“运行控制”入口
 
 #### Scenario: 未分组账号显示默认来源
 - **WHEN** 未分组账号命中 default published 策略
 - **THEN** 页面明确显示“来自默认策略”，不显示为账号自有配置
 
-### Requirement: 迁移必须先盘点冲突再切换
-系统 SHALL 保留现有账号级配置作为迁移只读源，并支持 `legacy`、`shadow`、`scoped` 解析阶段。迁移盘点 MUST 以无正文 fingerprint 识别同一目标 scope 内的一致和冲突配置；冲突 MUST 显式处理，MUST NOT 自动选择任一账号为赢家。
+### Requirement: 账号旧策略必须直接退役并精确清理
+系统 SHALL 只使用 scoped 解析，MUST NOT 提供 `legacy`/`shadow` 回退、账号旧策略读写或迁移盘点。一次性清理 MUST 限定于账号策略头、版本、模板、规则、档案及其配置审计，MUST NOT 删除账号 runtime controls、互动消息、回复任务、发送尝试、风险或 scoped 配置数据。
 
-#### Scenario: 同组配置冲突
-- **WHEN** 同一 group 下两个账号的 published 配置 fingerprint 不同
-- **THEN** 迁移报告列出冲突账号和版本摘要，scope 不被自动发布，scoped cutover 门禁保持关闭
+#### Scenario: 清理账号测试策略
+- **WHEN** 管理员执行已确认的账号旧策略清理
+- **THEN** 五类账号策略表归零且账号策略 API 返回已退役；runtime controls、历史回复任务与 scoped 表保持不变
 
-#### Scenario: shadow 不改变真实执行
-- **WHEN** 系统运行于 shadow 阶段
-- **THEN** 回复流程继续执行 legacy 配置，只记录 scoped 覆盖和差异摘要，不记录模板或消息正文
+#### Scenario: 历史账号策略任务继续操作
+- **WHEN** 一个历史任务只有账号 config version 而没有 config scope id
+- **THEN** 审批、编辑或发送以配置缺失 fail closed，MUST NOT 重新读取或恢复账号旧策略
+
+### Requirement: 账号表操作必须归入事实列
+账号表 SHALL 不展示通用“操作”列。运营暂停/恢复、风控状态调整和档位调整 MUST 分别从状态、风控、档位标签进入；视频号运行控制 SHALL 使用具名入口，Facebook 配置 SHALL 归入平台列。
+
+#### Scenario: 点击风控和档位标签
+- **WHEN** 运营点击某账号当前风控或档位标签
+- **THEN** 页面在该标签上下文展示可选操作并在 Cloud 确认后刷新真态，不渲染额外“操作”列
 
 ### Requirement: 单账号下线不得删除共享策略
 账号解绑、客户终止和到期 offboarding SHALL 只清除账号互动数据、账号 runtime controls 与 legacy 账号配置；group/default scope 配置及其审计 MUST 保留，除非管理员通过独立 scope 生命周期操作显式处理。

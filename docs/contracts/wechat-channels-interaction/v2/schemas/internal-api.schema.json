@@ -9,8 +9,7 @@
     { "$ref": "#/$defs/ScopeDetailResponse" },
     { "$ref": "#/$defs/EffectiveResponse" },
     { "$ref": "#/$defs/ScopePreviewRequest" },
-    { "$ref": "#/$defs/ScopePreviewResponse" },
-    { "$ref": "#/$defs/MigrationInventoryResponse" }
+    { "$ref": "#/$defs/ScopePreviewResponse" }
   ],
   "$defs": {
     "Id": { "type": "string", "minLength": 1, "maxLength": 256 },
@@ -108,7 +107,7 @@
           "type": "object", "additionalProperties": false,
           "required": ["accountId", "mode", "status", "reason", "source", "currentVersion", "draftVersion", "publishedVersion"],
           "properties": {
-            "accountId": { "$ref": "#/$defs/Id" }, "mode": { "enum": ["legacy", "shadow", "scoped"] },
+            "accountId": { "$ref": "#/$defs/Id" }, "mode": { "const": "scoped" },
             "status": { "enum": ["missing", "draft_only", "published", "unknown"] },
             "reason": { "enum": ["group_config_missing", "default_config_missing", "account_not_found", null] },
             "source": { "$ref": "#/$defs/Source" }, "currentVersion": { "type": ["integer", "null"], "minimum": 0 },
@@ -135,30 +134,6 @@
           "type": "object", "additionalProperties": true,
           "required": ["scopeId", "source", "accountId", "configVersion", "action"],
           "properties": { "scopeId": { "$ref": "#/$defs/Id" }, "source": { "$ref": "#/$defs/Source" }, "accountId": { "$ref": "#/$defs/Id" }, "configVersion": { "type": "integer", "minimum": 1 }, "action": { "enum": ["draft", "review_required", "would_auto_send", "no_match", "blocked"] } }
-        },
-        "meta": { "$ref": "#/$defs/Meta" }
-      }
-    },
-    "MigrationInventoryResponse": {
-      "type": "object", "additionalProperties": false, "required": ["data", "meta"],
-      "properties": {
-        "data": {
-          "type": "object", "additionalProperties": false, "required": ["mode", "items"],
-          "properties": {
-            "mode": { "enum": ["legacy", "shadow", "scoped"] },
-            "items": { "type": "array", "items": {
-              "type": "object", "additionalProperties": false, "required": ["source", "accounts", "conflict"],
-              "properties": {
-                "source": { "$ref": "#/$defs/Source" }, "conflict": { "type": "boolean" },
-                "accounts": { "type": "array", "items": { "type": "object", "additionalProperties": false,
-                  "required": ["accountId", "legacyVersion", "fingerprint"], "properties": {
-                    "accountId": { "$ref": "#/$defs/Id" }, "legacyVersion": { "type": ["integer", "null"], "minimum": 1 },
-                    "fingerprint": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
-                  } }
-                }
-              }
-            } }
-          }
         },
         "meta": { "$ref": "#/$defs/Meta" }
       }
