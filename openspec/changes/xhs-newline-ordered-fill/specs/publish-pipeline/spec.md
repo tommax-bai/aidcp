@@ -16,6 +16,10 @@
 - **WHEN** 小红书 ProseMirror 在 Enter 后把 selection 恢复到上一段尾字之前
 - **THEN** 边缘检测到光标不在末端并显式归尾，至少连续两次确认末端稳定后才输入下一段，上一段尾字不会被后续文字顶到文末
 
+#### Scenario: 末段段落内 caret 视为编辑器语义末端
+- **WHEN** Enter 已创建新的末段 `<p>`，selection 折叠在该段落内且 caret 之后没有实际文本，但其 Range boundary container 与外层 `.ProseMirror` 不同
+- **THEN** 边缘 MUST 将其判为正文末端；若需归尾 MUST collapse 到末段内部，MUST NOT 因跨容器边界不严格相等而误报 `content_newline_unstable`
+
 #### Scenario: 段落或光标无法稳定则清场失败
 - **WHEN** Enter 被页面吞掉、已写前缀丢失、编辑器消失或 selection 在有界窗口内持续无法稳定到末端
 - **THEN** `fill_field(content)` 清空已写正文并回 `ok:false` 与真实错误，云端停在该步且不下发 `submit_publish`

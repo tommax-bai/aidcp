@@ -4,6 +4,8 @@
 
 当前最终回读能在中文也错序时 fail closed，但它发生在整篇输入完成之后，只能阻止提交，不能避免错误填写；测试 fake 也只同步追加字符串，无法覆盖换行后的 selection 回退。
 
+首轮实现把 `Range.selectNodeContents(el).collapse(false)` 生成的外层编辑器末端，与 ProseMirror 实际 selection 所在的末段 `<p>` 内边界做严格 `compareBoundaryPoints(...) === 0`。两者视觉位置相同但 DOM boundary container 不同，实机记录 #159 因而在第一个换行后误报 `content_newline_unstable`；数字光标 fake 没有段落嵌套，未能暴露该问题。
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -31,6 +33,8 @@
 
 每次 Enter 后进行有界轮询。探针同时读取当前正文、统计顶层段落/`br` 所表达的换行数，并检查 selection 是否折叠在编辑器末端；若光标不在末端则显式把 Range collapse 到末端。只有“段落结构数达到截至当前 Enter 的预期”“已写前缀仍可回读”且“连续两次观察都位于末端”才允许输入下一单元。这样即使页面吞掉 Enter 而光标仍在末端，也不会误判为成功。
 
+“位于末端”是编辑器语义而不是跨容器 Range 边界相等：selection MUST 位于最后一个顶层段落（或无块级子节点时的编辑器自身），且从 caret 到该段落末端不存在实际文本。归尾 Range MUST collapse 到最后段落内部；允许浏览器/ProseMirror 在 `<p>` 内对 `<br>` 前后边界做等价归一。外层 `div` 末端与末段 `<p>` 内末端不得再用严格边界相等互判。
+
 中文正文沿用现有 Hanzi 序列口径确认已写前缀，避免 URL/emoji 的平台自动改写造成假失败；无汉字正文回退归一化全文前缀。整篇完成后仍走既有最终回读与污染阈值，单次 Enter 确认不替代最终验收。
 
 ### 3. 失败沿用现有清场与诚实结果
@@ -40,6 +44,8 @@
 ### 4. 测试模拟真实的 selection 回退
 
 Fake CDP 增加光标位置与 Enter 建段建模：若旧路径把换行与后续文字一起交给 `Input.insertText`，fake 会让光标回退到该块尾部之前，从而复现尾字倒序积累；新路径必须表现为纯文本 insert 与 Enter 事件交替，并在 Enter 后通过段落数/末端校准恢复顺序。测试同时断言连续空行数量、最终文本顺序、Enter 被吞时失败清场和所有 `Input.insertText` 参数不含换行。
+
+另以 JSDOM 构造真实嵌套结构 `<div class="tiptap ProseMirror"><p>第一段</p><p><br></p></div>`：末段 `<p>` 内 caret 必须直接判为语义末端；停在前一段的 caret 必须先判非末端并被归到末段，下一轮再判稳定。该测试专门覆盖数字 fake 无法表达的 boundary-container 差异。
 
 ## Risks / Trade-offs
 
