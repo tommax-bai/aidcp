@@ -40,6 +40,7 @@
 
 - [x] 5.1 Run Cloud acceptance/focused tests, full tests and typecheck; run Console focused tests, serial full suite, typecheck and build.
 <!-- Cloud commit `9e1380d`: focused 22/22, acceptance 59/59 (one gated E2E skipped), full 2608 passed/8 skipped, typecheck passed. Console commit `1bed7cf`: focused legacy editor 34/34 plus scope/API/page 5/5, serial full 193 passed/1 skipped before the final added scope editor test (which passed separately), typecheck and production build passed; only pre-existing jsdom/chunk-size warnings remained. -->
-- [ ] 5.2 Run `openspec validate wechat-group-scoped-reply-config --strict`, record repo commits/validation/deviations in this task file, and push feature branches.
+- [x] 5.2 Run `openspec validate wechat-group-scoped-reply-config --strict`, record repo commits/validation/deviations in this task file, and push feature branches.
+<!-- Feature commits pushed: Cloud `9e1380d`, Console `1bed7cf`, Control artifacts `750d4f5`. Strict OpenSpec and all v2 JSON metaschema/fixture checks passed. Deviation: Console has no tracked lockfile, so its worktree used physical `npm install --prefer-offline` after the required `npm ci` failure. -->
 - [ ] 5.3 Rebase and fast-forward integrate Control, Cloud and Console default branches in dependency order, rerun required validation, and push.
 - [ ] 5.4 Check the named dev deployment boundary; deploy only additive eligible artifacts when the database target is isolated/safe, otherwise record the exact blocker without touching ol.
