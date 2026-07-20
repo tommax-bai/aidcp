@@ -43,4 +43,5 @@
   <!-- Focused handler suite: 64 passed. It covers URL-before-filter projection, NFKC, URL-adjacent Chinese, English/digit loss, exact 90% acceptance, 89% rejection, empty semantic fallback and existing pollution cleanup. -->
 - [x] 6.4 运行聚焦、验收、完整测试、typecheck、OpenSpec strict validation 与差异检查
   <!-- After rebasing onto the latest defaults: focused 64 passed; acceptance 26 passed with real-machine E2E explicitly gated; full 2000 passed, 0 failed; typecheck, strict OpenSpec validation and both diff checks passed. -->
-- [ ] 6.5 提交、同步最新默认分支、fast-forward 集成并重建 canonical Edge `dist`；不打包、不自动重试真实稿件
+- [x] 6.5 提交、同步最新默认分支、fast-forward 集成并重建 canonical Edge `dist`；不打包、不自动重试真实稿件
+  <!-- Edge `5990b1b` was rebased over the latest `origin/master`, feature-pushed, then fast-forwarded/pushed to `master`; control artifact `de61405` plus this ledger commit are fast-forwarded to `main`. Canonical Edge `dist` rebuilt at 2026-07-20 16:17:41 +08:00 contains the named 0.90 threshold and semantic projection. Existing Electron/dist child processes started at 15:52-15:53, before this build, so they were deliberately not interrupted and are not claimed to have loaded it; normal client restart is required. No installer or real draft retry/submit was performed. -->
