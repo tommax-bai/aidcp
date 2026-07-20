@@ -68,7 +68,7 @@ Read on demand:
 - One change session = one named change, one branch, and one worktree; use the matching OpenSpec change when required. Development may be parallel; integration and deployment are serial.
 - Protocol/command mapping, role registration/catalog, and risk-state machine are single-writer hotspots.
 - Before integration, fetch/rebase onto the latest default, resolve conflicts, rerun required validation, then fast-forward merge. Never force-push or use non-fast-forward history without explicit approval.
-- Stop before destructive database work, secret/key changes, production deletion, releasing with failed tests, unclear targets, or actions affecting unrelated services.
+- Within an explicitly requested deployment, database changes may proceed after backup, read-only impact checks, and a rollback plan. Stop when the target or rows are unclear, rollback is uncertain, or scope expands. Still stop before secret/key changes, unrelated production deletion, failed-test releases, or unrelated-service impact.
 - Default user-facing prose is Chinese; code, comments, commits, PR text, commands, and filenames remain English unless the file establishes otherwise.
 - Explain mechanism first, preserve honest validation boundaries, never record secrets, and close with what changed, impact, and next step.
 
