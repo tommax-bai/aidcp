@@ -20,8 +20,9 @@
 - [x] 4.1 Run focused delegated-task tests, required acceptance/full Cloud tests, and `npm run typecheck`; record any bounded reruns or flakes honestly.
   <!-- aidcp-cloud: delegated 88/88; delegated + curated-store focused 123/123; acceptance 64/64; full 2730 passed + 8 gated skips; typecheck passed. The only rerun was a test-regex whitespace mismatch after adding migration consistency coverage; production SQL was unchanged and the corrected assertion passed. -->
 - [x] 4.2 Run `openspec validate scope-delegated-tasks-by-cloud-target --strict` and record Cloud/control commits plus validation evidence in this checklist.
-  <!-- OpenSpec strict validation passed. aidcp-cloud implementation commit: 17f1bf7. The control evidence commit is recorded by the following integration evidence update. -->
-- [ ] 4.3 Rebase onto current defaults, fast-forward integrate and push Cloud `master` plus control `main` without disturbing unrelated work.
+  <!-- OpenSpec strict validation passed. aidcp-cloud implementation commit: 17f1bf7. aidcp control artifact commit: 211ab75. -->
+- [x] 4.3 Rebase onto current defaults, fast-forward integrate and push Cloud `master` plus control `main` without disturbing unrelated work.
+  <!-- 2026-07-21: both feature branches were based on the current fetched origin defaults (0 behind), fast-forwarded into aidcp-cloud master / aidcp main, and pushed. Canonical control output/ and tmp/ remained untouched. -->
 
 ## 5. Coordinated migration and runtime proof
 
