@@ -38,7 +38,9 @@ renderer 的花名册归一/保存保留标记，main/fleet 归一保留标记�
 
 ### 5. 全客户端复用返回 `{ name, source }` 的环境显示名解析器
 
-后续复现发现，`railDisplayName` 只覆盖左栏；标题栏、互动/内容工作区、引导、人设入口及主进程下发的浏览器内人设横幅仍各自直接读取 `status.account.name` 或 `env.name`，导致同一环境在不同位置显示不同名字。把纯逻辑下沉到进程无关的 `environment-display-name.js`，导出 `resolveEnvironmentDisplayName(row)` 并统一返回 `{ name, source }`，来源限定为 `manual` / `platform` / `environment` / `fallback`。renderer 通过 script 使用，main/persona notice 通过 CommonJS 使用；`uiLogic.resolveEnvironmentDisplayName` 与 `railDisplayName` 仅保留为兼容消费入口。
+后续复现发现，`railDisplayName` 只覆盖左栏；标题栏、互动/内容工作区、引导、人设入口及主进程下发的浏览器内人设横幅仍各自直接读取 `status.account.name` 或 `env.name`，导致同一环境在不同位置显示不同名字。把纯逻辑下沉到进程无关的 `environment-display-name.cjs`，导出 `resolveEnvironmentDisplayName(row)` 并统一返回 `{ name, source }`，来源限定为 `manual` / `platform` / `environment` / `fallback`。renderer 通过普通 script 使用，main/persona notice 通过 CommonJS 同步使用；`uiLogic.resolveEnvironmentDisplayName` 与 `railDisplayName` 仅保留为兼容消费入口。
+
+共享文件必须拥有真实、明确的 CommonJS 扩展名。项目根目录声明了 `"type": "module"`，因此 `.js` 即使写成 UMD 或包含 `module.exports`，Electron 31 内置的 Node 20 仍会把它分类为 ESM，`persona-notice.cjs` 的同步 `require()` 会在应用初始化阶段抛出 `ERR_REQUIRE_ESM`。不改根目录模块类型，也不把同步启动链改为动态导入；测试除 `tsx` 单元测试外，还使用项目锁定的 Electron 可执行文件和 `ELECTRON_RUN_AS_NODE=1` 启动一个无 loader 子进程，直接加载主进程依赖，防止 loader 掩盖模块边界回归。
 
 保留来源而不只返回字符串，是为了让标题栏仍能只给真实平台昵称加 `@`，人工环境昵称不得冒充平台身份；当来源仅为尾号兜底但账号 ID 已知时，标题栏仍保留“账号 …尾4位”的原有语义。评论/私信参与者、内容作者等第三方真实昵称不属于环境锚点，继续读取其业务 DTO，避免人工环境别名污染外部身份。
 
@@ -50,6 +52,7 @@ renderer 的花名册归一/保存保留标记，main/fleet 归一保留标记�
 - [双击与单击手势冲突] → 仅昵称文字使用短延迟仲裁，环境行其余区域维持原三态交互。
 - [抽象过宽会把环境别名写成平台身份] → 解析器只服务客户端环境锚点并返回来源；协议、路由、作者/参与者 DTO 和 Cloud 账号字段保持不变。
 - [运行中的 Electron 不热加载新 renderer] → 验证和交付明确记录进程启动时间与代码提交时间；源码合入后必须重启客户端才能观察新行为，不把旧进程测试当成新代码失败。
+- [`tsx` loader 掩盖 Electron 模块边界] → 除现有测试外，使用 Electron 31 内置 Node 20 在无 loader 子进程中同步加载 `persona-notice.cjs`；任何 `ERR_REQUIRE_ESM` 或非零退出都使验证失败。
 
 ## Migration Plan
 
