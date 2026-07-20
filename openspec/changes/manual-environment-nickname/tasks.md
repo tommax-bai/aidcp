@@ -23,3 +23,10 @@
 - [x] 4.3 把标题栏、互动/内容工作区、环境引导、人设浮层、桌面提醒与浏览器内人设横幅统一接到解析器；第三方参与者/作者昵称保持业务 DTO 原语义。 <!-- Edge: all current-environment anchors use the resolver; routeStatus also refuses to overwrite manual names with stale system heartbeats. -->
 - [x] 4.4 增加统一优先级与各消费位置回归测试，运行 focused tests、typecheck、全量 Edge tests与 OpenSpec strict validation。 <!-- Edge focused display/persona suite 109/109 pass; `npm run typecheck` exit 0; full `tsx --test --test-reporter=dot test/**/*.test.ts` exit 0; OpenSpec strict pass. -->
 - [x] 4.5 提交、rebase、快进推送 Edge/control 默认分支；记录当前旧进程需重启和未构建安装包的边界。 <!-- Edge `master` fast-forward pushed at `4b743db`; control artifacts are committed/pushed with this record. The Electron process started before the feature still requires restart; no installer was built and desktop source has no dev server artifact to deploy. -->
+
+## 5. 昵称数据即时更新与失败回滚
+
+- [x] 5.1 增加昵称专用的窄 IPC，使主进程仅在写盘成功后提交内存花名册，失败恢复旧 settings 并返回真实原因。 <!-- Edge: preload exposes only `saveEnvironmentNickname`; main `fleet:setManualNickname` snapshots settings, restores on write failure, and syncs handles only after success. -->
+- [x] 5.2 renderer 在第一次等待前乐观更新昵称并标记 pending；成功确认人工来源，失败恢复原昵称、来源和当前环境身份锚点。 <!-- Edge: env-scoped pending resists stale fleet/status snapshots; rail/title/workspace/persona/guide anchors redraw optimistically and rollback together. -->
+- [x] 5.3 更新回归测试，覆盖 pending、成功收敛、失败回滚、窄 IPC 与本地非 Cloud 边界，并完成 focused、typecheck、全量和 OpenSpec strict 验证。 <!-- Edge focused fleet/IPC/scope suite 69/69 pass; `npm run typecheck` exit 0; full `tsx --test --test-reporter=dot test/**/*.test.ts` exit 0; OpenSpec strict pass. -->
+- [x] 5.4 提交、rebase、快进推送 Edge/control 默认分支；记录源码仍需重启加载且未构建安装包的边界。 <!-- Edge rebased onto `d950e7f`, revalidated, then `master` fast-forward pushed at `ebdacf2`; control artifacts are committed/pushed with this record. Existing Electron processes still require restart to load source; no installer was built and no Cloud deployment applies. -->
