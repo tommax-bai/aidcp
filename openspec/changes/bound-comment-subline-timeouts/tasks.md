@@ -17,11 +17,14 @@
 
 - [x] 3.1 Run `npm run test:acceptance`, full `npm test`, and `npm run typecheck` in the isolated Cloud worktree.
   <!-- PASS: acceptance 60/60 (1 gated E2E skipped); full 2674 passed, 8 gated skips, 0 failed; typecheck passed. -->
-- [ ] 3.2 Update this task record with repo, commit SHA, validations, deployment result, and any deviation; run `openspec validate bound-comment-subline-timeouts --strict`.
+- [x] 3.2 Update this task record with repo, commit SHA, validations, deployment result, and any deviation; run `openspec validate bound-comment-subline-timeouts --strict`.
+  <!-- Strict validation passed before integration and again at closeout. No protocol, Edge, package, schema, or LLM/approval timeout change. -->
 - [x] 3.3 Commit and push the Cloud change, fast-forward it into `origin/master` without force, then commit and push the control-repo OpenSpec artifacts.
   <!-- Cloud b98e358 pushed to the feature branch and fast-forwarded to origin/master; this control commit records the active OpenSpec artifacts. -->
 
 ## 4. Dev deployment and live verification
 
-- [ ] 4.1 Re-check the named `dev` target, back up the Cloud runtime/env, deploy only from the clean canonical Cloud `master`, and restart only `aidcp-cloud.service`.
-- [ ] 4.2 Verify service state, listeners, health endpoints, PostgreSQL and Feishu readiness; inspect bounded post-restart logs without claiming a real timeout occurred unless observed.
+- [x] 4.1 Re-check the named `dev` target, back up the Cloud runtime/env, deploy only from the clean canonical Cloud `master`, and restart only `aidcp-cloud.service`.
+  <!-- DEV 121.89.85.150 deployed from clean aidcp-cloud master b98e358. Backups: /opt/aidcp/cloud.bak.20260720-082506Z.tar.gz and /opt/aidcp/cloud/.env.bak.20260720-082506Z. Only aidcp-cloud.service restarted. -->
+- [x] 4.2 Verify service state, listeners, health endpoints, PostgreSQL and Feishu readiness; inspect bounded post-restart logs without claiming a real timeout occurred unless observed.
+  <!-- PASS: active/running, NRestarts=0; 8787/8090/8091 listening; panel and client-auth health OK; PostgreSQL select 1; Feishu WSClient onReady; deployed source checksums match local master. No real comment timeout was induced or observed. -->
