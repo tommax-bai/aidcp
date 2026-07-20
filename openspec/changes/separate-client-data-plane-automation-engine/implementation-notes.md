@@ -13,6 +13,7 @@
 | settings, environment nickname, notification surface | renderer → named Electron IPC/local | forbidden | `local`; unchanged |
 | persona read/generate/persist | renderer → named IPC → Electron customer-auth HTTP | forbidden | `cloud_data`; no engine/WS gate |
 | publish approval/reject and draft image removal | renderer → named IPC → Electron customer-auth HTTP | forbidden | `cloud_data`; accepted receipt remains distinct from platform success |
+| home daily usage/current publish/last published | renderer → named IPC → Electron customer-auth HTTP | forbidden | `cloud_data`; automation results only invalidate and trigger refetch |
 | interaction workspace reads/config | renderer → named IPC → Electron customer-auth HTTP | forbidden | `cloud_data`; no engine/WS gate |
 | UI snapshot compatibility, pacing, interaction ACK/control, ping/pong | Cloud ↔ Edge WebSocket | forbidden | new clients only receive automation projection; legacy customer-data snapshot fields are compatibility-only |
 | interaction sync/reply/reconcile/offboard | Cloud ↔ Edge WebSocket → local platform API | forbidden except explicit reauth | `platform_api_automation`; only while ordinary automation engine is enabled, except restricted cleanup |
@@ -30,6 +31,8 @@ Electron lifecycle inventory:
 - Restricted offboard cleanup already uses a separate customer-auth bootstrap and must remain the only login-time browserless worker exception.
 
 Implemented lifecycle outcome: ordinary engines now start only from explicit automation intent; pause uses `lifecycle.pause_and_exit`, releases the engine-owned browser/CDP/slot, and does not respawn; resume reacquires resources automatically. Cloud additionally filters `ui.snapshot` for the new capability at both service and transport boundaries so ordinary customer data cannot be pushed through the automation channel.
+
+Implemented home-data outcome: `GET /environments/:envKey/overview` is the single read source for today usage, current in-flight publish and last platform-confirmed publish. New-capability `ui.snapshot` no longer carries `dailyUsage`; `browserStandby` retains its independent automation refresh chain. The renderer caches by environment, refreshes on selection/focus/expand/60-second polling and bounded automation invalidation, preserves the last confirmed snapshot on refresh failure, and renders unknown rather than fake zero/empty history before the first successful response.
 
 ## Capability and compatibility matrix
 

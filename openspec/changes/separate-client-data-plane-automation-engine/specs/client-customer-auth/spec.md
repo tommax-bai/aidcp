@@ -19,6 +19,11 @@
 - **WHEN** 客户请求中的 `envKey` 不属于当前客户，或该环境绑定无法权威解析
 - **THEN** Cloud 以可区分拒因 fail-closed，MUST NOT 使用请求体账号、历史 UI 缓存或浏览器启动来绕过校验
 
+#### Scenario: 环境概览离线于自动化引擎可读
+
+- **WHEN** 客户读取所拥有环境的今日进展与发布摘要，而该环境没有在线 Edge 或浏览器
+- **THEN** Cloud SHALL 逐请求解析环境绑定并返回同一账号的权威用量与发布投影，响应 MUST NOT 泄漏 `accountId` 或要求建立 automation WebSocket
+
 ## REMOVED Requirements
 
 ### Requirement: 客户登录后 SHALL 自动建立可信环境的浏览器无关核心

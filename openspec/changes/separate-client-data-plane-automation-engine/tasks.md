@@ -85,3 +85,19 @@
   <!-- Edge primary controls now use the requested compact labels; the browser button keeps its existing open/close behavior and exposes the current action through aria-label/title. The batch action is `全部启动`. Focused renderer/fleet tests passed 127/127 and Edge typecheck passed. -->
 - [x] 8.2 Remove redundant client/automation prefixes from compact status labels while preserving specific browser/account labels and explanatory failure details; update focused health, fleet and renderer tests.
   <!-- Health and fleet labels now use compact context-aware wording: 已就绪/处理中/连接中/重连中/运行中/已暂停/启动中/暂停中/关闭中/异常. Browser/account/action-required labels and diagnostic details retain their subjects. Focused health/fleet/companion/renderer suites passed 250/250 and Edge typecheck passed. -->
+
+## 9. Client home HTTP single source
+
+- [x] 9.1 Add an environment-scoped customer-auth overview read returning authoritative daily usage, current publish state and last published summary without accepting or exposing `accountId`.
+  <!-- GET /environments/:envKey/overview resolves the customer-owned persistent binding server-side and returns dailyUsage/currentPublishState/lastPublished + meta.asOf without accountId. -->
+- [x] 9.2 Reuse the existing Cloud usage builder and publish stores, add ownership/offline/error tests, and keep submitted distinct from platform-confirmed published.
+  <!-- Overview reuses buildTodayUsageForAccount and PublishLogStore. Tests cover stopped/offline access, ownership fail-closed, aggregation failure, and an in-flight-only query where submitted remains distinct from last confirmed published. -->
+- [x] 9.3 Stop Cloud and Edge from carrying `dailyUsage` over automation `ui.snapshot` for new-capability clients while preserving legacy clients and the independent `browserStandby` wake chain.
+  <!-- Capability-aware service and transport filters now retain only browserStandby for new clients; legacy clients keep the historical payload and the standby refresh chain schedules independently with null dailyUsage. -->
+- [x] 9.4 Add a narrow Electron main/preload overview IPC that uses customer-auth HTTP without child, WS, browser, CDP or slot access.
+  <!-- environment-overview:get resolves local envId to profileId in main and calls a fixed customer-auth endpoint; static security tests prove renderer cannot supply URL/token/accountId or cross into runtime/browser gates. -->
+- [x] 9.5 Refresh the selected environment overview on selection, focus, expand, bounded polling and local automation-result invalidation; keep last confirmed data with freshness and do not fabricate initial zeroes.
+  <!-- Renderer owns a per-environment HTTP cache with selection/focus/expand/60s polling and debounced 5s-minimum invalidation refresh. Initial failure renders unknown markers; refresh failure retains confirmed values with a cache label. -->
+- [x] 9.6 Add focused Cloud/Edge boundary, renderer freshness and offline-engine tests; run required acceptance/full suites and both typechecks.
+  <!-- Focused Cloud boundary/store tests passed 10/10 and Edge registry/IPC/renderer tests passed 10/10. Cloud acceptance 60/60 + full suite passed + typecheck passed; Edge acceptance 26/26 + full 2034/2034 + typecheck passed. One legacy zero-style assertion exposed a regression in the compatibility fallback; the fallback was corrected and both focused/full suites then passed. -->
+- [ ] 9.7 Synchronize protocol/docs, validate OpenSpec strictly, integrate/push clean default branches, deploy Cloud to dev and verify the HTTP endpoint boundary without building an Edge installer.
