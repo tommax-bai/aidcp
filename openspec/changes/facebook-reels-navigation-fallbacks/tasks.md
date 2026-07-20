@@ -21,3 +21,13 @@
   <!-- aidcp-edge 81b520f7eea0a606cf386f1aba34f7b276d5acf2 was rebased onto current origin/master, revalidated, pushed to its feature branch, and fast-forwarded to master. The control change was rebased onto current origin/main and is delivered by this evidence commit using the same non-force flow. -->
 - [x] 3.4 Backfill commit/validation/live-probe evidence and record that no Cloud deployment or Edge installer was required.
   <!-- Final post-rebase validation: acceptance 26/26, full Edge suite 2022/2022, typecheck, diff checks, and strict OpenSpec all passed. This is an Edge-only source/runtime behavior change: no Cloud code or server deployment changed, and no Edge installer was built. -->
+
+## 4. Reels view accounting follow-up
+
+- [x] 4.1 Record one Cloud `view` for every presented non-empty Reels card, suppress a matching later `note.detail` from double-counting, and enforce view quota at the shared scroll exit.
+  <!-- aidcp-cloud handler records the single active Reels card at page.cards ingress; EdgeSession.countedReelViewNoteId suppresses only the matching later detail-side view; RoleDispatcher.sendScrollCommand closes the prior all-skip quota bypass. -->
+- [x] 4.2 Add focused Cloud tests for skipped-Reel view accounting, matching-detail deduplication, normal feed preservation, and empty Reels.
+  <!-- Focused handler/risk suites passed 25/25 with matching detail preservation, feed regression, empty/malformed Reels fail-closed coverage, and all-skip scroll quota sleep; post-change Cloud acceptance/full suite passed 2677 with 8 explicit gated skips and 0 failures; typecheck and diff checks passed. -->
+- [x] 4.3 Record the So La evidence explaining why the run emitted only scroll commands and no likes.
+  <!-- dev 2026-07-20 17:40-17:46, account 61592039187933 / edge ads-k1es0359: Edge proved successive Reel URL movement, Cloud content_evaluator skipped nearly all visible Vietnamese/off-persona cards and sent only scroll; no note.detail/reading.done/interaction_appraiser chain and therefore no interaction.like command. Daily usage remained view=0, like=0 despite available like quota. One first-card valuable decision overlapped startup nickname capture and was not dispatched, but later cards were explicit persona/content skips rather than Edge like failures. -->
+- [ ] 4.4 Run focused/full Cloud validation and strict OpenSpec validation, integrate without force-push, deploy to `dev`, and backfill evidence.

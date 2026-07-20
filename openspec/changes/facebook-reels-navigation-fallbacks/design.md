@@ -12,10 +12,12 @@ Facebook also supports trusted ArrowDown and wheel inputs. These are less couple
 - Stop at the first method that changes the canonical Reel route or active-video identity.
 - Keep every input bounded and fail closed when identity is unchanged or button targeting is ambiguous.
 - Make method selection and failure visible in logs and deterministic in tests.
+- Count each Reel that was actually presented as one view, regardless of whether the content selector chooses it for deeper reading.
+- Avoid double-counting when a selected Reel subsequently produces `note.detail` for quality/interaction appraisal.
 
 **Non-Goals:**
 
-- Changing Cloud scheduling, protocol messages, risk accounting, or card parsing.
+- Changing protocol messages, other-platform accounting, or the rule that likes require content/interaction appraisal.
 - Using DOM `scrollBy`, synthetic page JavaScript events, or unverified success.
 - Adding backward navigation to the current forward-only browse loop.
 - Packaging an Edge installer.
@@ -36,6 +38,12 @@ Facebook also supports trusted ArrowDown and wheel inputs. These are less couple
 
 7. **Keep protocol failure compatibility.** The reader logs `keyboard_unchanged`, `wheel_unchanged`, `button_no_target`, `button_ambiguous`, or `button_unchanged`; the session continues to return the existing protocol-level `scroll/no_target` when all methods fail.
 
+8. **Account a visible Reel at the `page.cards` ingress.** A non-empty `page.cards` payload with `listKind='reels'` means Edge has already resolved and presented the active video. Cloud records one `interaction.occurred{action:'view'}` for that arrival before content selection. This prevents content-language or persona mismatch from turning real watching into `view:0` and an unbounded scroll loop.
+
+9. **Suppress only the matching follow-up detail view.** Cloud remembers the currently visible Reel note id on the connection. If content selection later opens that same Reel and Edge reports `note.detail`, the detail still drives quality and interaction appraisal but does not emit a second view. A normal feed detail, a different note id, or a later feed list keeps the existing detail-based accounting.
+
+10. **Enforce the view gate at the shared scroll exit.** Recording views alone does not stop a run whose content evaluator skips every card: the legacy view check guarded `open_note`, while `content.no_valuable → scroll` bypassed it. `sendScrollCommand` now asks the existing view decision before dispatching any next-page scroll and enters the existing bounded quota sleep when denied. Already-sleeping calls still pass through the suppressed-command logger so the pause remains observable.
+
 ## Risks / Trade-offs
 
 - **Keyboard focus can be captured by an overlay or editor.** → Verify identity; unchanged input falls through to wheel/button without claiming success.
@@ -43,13 +51,17 @@ Facebook also supports trusted ArrowDown and wheel inputs. These are less couple
 - **Localized next labels can drift.** → Combine locale-assisted matching with a tightly scoped structural two-control fallback; unknown single controls remain fail-closed.
 - **Three methods can add latency when the page is stuck.** → Give each method a short bounded verification window and stop immediately on proven movement.
 - **A prior method may move late while a fallback starts.** → Re-probe immediately before every write and stop if the original identity has already changed.
+- **A selected Reel can also produce `note.detail`.** → Track the current Reel view fact on the Edge session and skip only its matching detail-side view emission.
+- **Reel content can be irrelevant to the persona.** → Count the view as an observed fact, but preserve the existing quality/appraisal gates; viewing a Reel does not force a like.
+- **Every Reel can be rejected by the content selector.** → Put the view quota check at the common scroll-command exit so the skip-only path cannot roll forever.
 
 ## Migration Plan
 
 1. Land the Edge-only reader and fixture tests on the latest `master`.
 2. Validate focused Facebook tests, Edge acceptance/full tests, and typecheck.
-3. No Cloud deployment or protocol rollout is required. The source change takes effect for development Edge runs after restart/update; do not build an installer unless explicitly requested.
-4. Roll back by reverting the Edge commit; the prior button-only behavior is restored without data migration.
+3. Deploy the Cloud accounting follow-up to `dev` after its default-branch integration; no protocol rollout or database migration is required.
+4. The Edge source change takes effect for development runs after restart/update; do not build an installer unless explicitly requested.
+5. Roll back by reverting the Edge navigation and Cloud accounting commits; no data migration is required.
 
 ## Open Questions
 

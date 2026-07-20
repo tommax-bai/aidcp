@@ -55,3 +55,33 @@ The button fallback SHALL exclude page-header controls, scope candidates to the 
 #### Scenario: Ambiguous next controls
 - **WHEN** multiple credible next controls remain after semantic and structural scoping
 - **THEN** the driver SHALL perform zero button clicks and SHALL return no next Reel
+
+### Requirement: One view per presented Reel
+Cloud SHALL record one `view` interaction for every single-card Facebook `page.cards` payload whose `listKind` is `reels`, because that single active video has already been presented to the account. This accounting SHALL NOT depend on the content evaluator selecting the Reel for deeper reading or interaction. Empty or malformed multi-card Reels payloads SHALL fail closed without view accounting.
+
+#### Scenario: Reel is skipped by content evaluation
+- **WHEN** Edge reports one active Reel and the content evaluator decides it is irrelevant to the persona
+- **THEN** Cloud SHALL still record exactly one view before continuing to the next Reel
+
+#### Scenario: Selected Reel later reports detail
+- **WHEN** a presented Reel was already counted and its matching `note.detail` later arrives for quality or interaction appraisal
+- **THEN** Cloud SHALL preserve the detail event but SHALL NOT record a second view for that Reel
+
+#### Scenario: Normal feed detail remains unchanged
+- **WHEN** a normal feed card reports `note.detail`, or the detail note id does not match the currently counted Reel
+- **THEN** Cloud SHALL retain the existing detail-based view accounting
+
+#### Scenario: Empty Reels report
+- **WHEN** `listKind` is `reels` but no card is present
+- **THEN** Cloud SHALL record no view
+
+#### Scenario: View quota is reached after skipped Reels
+- **WHEN** presented Reels have consumed the active view quota and content evaluation keeps rejecting them
+- **THEN** the next shared scroll command SHALL enter the existing bounded view-quota sleep and SHALL NOT continue an unbounded Reel loop
+
+### Requirement: Viewing does not force liking
+Reel view accounting SHALL remain separate from like intent and confirmed like accounting. A like SHALL still require the existing content-quality, interaction-appraisal, risk, cooldown, target, and post-condition gates.
+
+#### Scenario: Persona rejects a Reel
+- **WHEN** a Reel is viewed but its content is rejected or skipped by the persona-bound evaluation chain
+- **THEN** Cloud SHALL count the view and SHALL NOT fabricate or force a like
