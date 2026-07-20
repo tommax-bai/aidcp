@@ -1,0 +1,13 @@
+{
+  "data": {
+    "accountId": "acct_wc_001",
+    "mode": "scoped",
+    "status": "published",
+    "reason": null,
+    "source": { "type": "group", "groupLabel": "华东组" },
+    "currentVersion": 4,
+    "draftVersion": null,
+    "publishedVersion": 4
+  },
+  "meta": { "requestId": "req_effective", "asOf": 1784512800000 }
+}

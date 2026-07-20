@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "internal-api-v2.schema.json",
+  "title": "AIDCP Internal Group Reply Configuration API v2 Overlay",
+  "anyOf": [
+    { "$ref": "#/$defs/ScopeListResponse" },
+    { "$ref": "#/$defs/ScopeCreateRequest" },
+    { "$ref": "#/$defs/ScopeCreateResponse" },
+    { "$ref": "#/$defs/ScopeDetailResponse" },
+    { "$ref": "#/$defs/EffectiveResponse" },
+    { "$ref": "#/$defs/ScopePreviewRequest" },
+    { "$ref": "#/$defs/ScopePreviewResponse" },
+    { "$ref": "#/$defs/MigrationInventoryResponse" }
+  ],
+  "$defs": {
+    "Id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "Timestamp": { "type": "integer", "minimum": 0 },
+    "Meta": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requestId", "asOf"],
+      "properties": { "requestId": { "$ref": "#/$defs/Id" }, "asOf": { "$ref": "#/$defs/Timestamp" } }
+    },
+    "Source": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false, "required": ["type", "groupLabel"],
+          "properties": { "type": { "const": "default" }, "groupLabel": { "type": "null" } }
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["type", "groupLabel"],
+          "properties": { "type": { "const": "group" }, "groupLabel": { "type": "string", "minLength": 1, "maxLength": 64 } }
+        }
+      ]
+    },
+    "ScopeHead": {
+      "type": "object", "additionalProperties": false,
+      "required": ["scopeId", "platform", "source", "memberCount", "currentVersion", "draftVersion", "publishedVersion", "updatedAt", "updatedBy"],
+      "properties": {
+        "scopeId": { "$ref": "#/$defs/Id" },
+        "platform": { "const": "wechat_channels" },
+        "source": { "$ref": "#/$defs/Source" },
+        "memberCount": { "type": "integer", "minimum": 0 },
+        "currentVersion": { "type": "integer", "minimum": 0 },
+        "draftVersion": { "type": ["integer", "null"], "minimum": 1 },
+        "publishedVersion": { "type": ["integer", "null"], "minimum": 1 },
+        "updatedAt": { "$ref": "#/$defs/Timestamp" },
+        "updatedBy": { "$ref": "#/$defs/Id" }
+      }
+    },
+    "ScopeSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["scopeId", "platform", "source", "memberCount", "currentVersion", "draftVersion", "publishedVersion", "updatedAt", "updatedBy"],
+      "properties": {
+        "scopeId": { "anyOf": [{ "$ref": "#/$defs/Id" }, { "type": "null" }] },
+        "platform": { "const": "wechat_channels" },
+        "source": { "$ref": "#/$defs/Source" },
+        "memberCount": { "type": "integer", "minimum": 0 },
+        "currentVersion": { "type": "integer", "minimum": 0 },
+        "draftVersion": { "type": ["integer", "null"], "minimum": 1 },
+        "publishedVersion": { "type": ["integer", "null"], "minimum": 1 },
+        "updatedAt": { "anyOf": [{ "$ref": "#/$defs/Timestamp" }, { "type": "null" }] },
+        "updatedBy": { "anyOf": [{ "$ref": "#/$defs/Id" }, { "type": "null" }] }
+      }
+    },
+    "Snapshot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["accountId", "configScopeId", "configSource", "platform", "configVersion", "state", "policy", "templates", "rules", "profiles", "createdAt", "createdBy", "publishedAt", "publishedBy"],
+      "properties": {
+        "accountId": { "type": "string" },
+        "configScopeId": { "$ref": "#/$defs/Id" },
+        "configSource": { "$ref": "#/$defs/Source" },
+        "platform": { "const": "wechat_channels" },
+        "configVersion": { "type": "integer", "minimum": 1 },
+        "state": { "enum": ["draft", "published"] },
+        "policy": { "$ref": "../../v1/schemas/internal-api.schema.json#/$defs/ReplyPolicy" },
+        "templates": { "type": "array", "items": { "$ref": "../../v1/schemas/internal-api.schema.json#/$defs/ReplyTemplate" }, "maxItems": 100 },
+        "rules": { "type": "array", "items": { "$ref": "../../v1/schemas/internal-api.schema.json#/$defs/ReplyRule" }, "maxItems": 100 },
+        "profiles": { "type": "array", "items": { "$ref": "../../v1/schemas/internal-api.schema.json#/$defs/ReplyProfile" }, "minItems": 2, "maxItems": 2 },
+        "createdAt": { "$ref": "#/$defs/Timestamp" },
+        "createdBy": { "$ref": "#/$defs/Id" },
+        "publishedAt": { "type": ["integer", "null"], "minimum": 0 },
+        "publishedBy": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "ScopeCreateRequest": {
+      "type": "object", "additionalProperties": false, "required": ["type", "groupLabel"],
+      "properties": { "type": { "enum": ["group", "default"] }, "groupLabel": { "type": ["string", "null"], "minLength": 1, "maxLength": 64 } }
+    },
+    "ScopeListResponse": {
+      "type": "object", "additionalProperties": false, "required": ["data", "meta"],
+      "properties": {
+        "data": { "type": "object", "additionalProperties": false, "required": ["items"], "properties": { "items": { "type": "array", "items": { "$ref": "#/$defs/ScopeSummary" } } } },
+        "meta": { "$ref": "#/$defs/Meta" }
+      }
+    },
+    "ScopeCreateResponse": {
+      "type": "object", "additionalProperties": false, "required": ["data", "meta"],
+      "properties": { "data": { "type": "object", "additionalProperties": false, "required": ["head"], "properties": { "head": { "$ref": "#/$defs/ScopeHead" } } }, "meta": { "$ref": "#/$defs/Meta" } }
+    },
+    "ScopeDetailResponse": {
+      "type": "object", "additionalProperties": false, "required": ["data", "meta"],
+      "properties": { "data": { "type": "object", "additionalProperties": false, "required": ["head", "snapshot"], "properties": { "head": { "$ref": "#/$defs/ScopeHead" }, "snapshot": { "anyOf": [{ "$ref": "#/$defs/Snapshot" }, { "type": "null" }] } } }, "meta": { "$ref": "#/$defs/Meta" } }
+    },
+    "EffectiveResponse": {
+      "type": "object", "additionalProperties": false, "required": ["data", "meta"],
+      "properties": {
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["accountId", "mode", "status", "reason", "source", "currentVersion", "draftVersion", "publishedVersion"],
+          "properties": {
+            "accountId": { "$ref": "#/$defs/Id" }, "mode": { "enum": ["legacy", "shadow", "scoped"] },
+            "status": { "enum": ["missing", "draft_only", "published", "unknown"] },
+            "reason": { "enum": ["group_config_missing", "default_config_missing", "account_not_found", null] },
+            "source": { "$ref": "#/$defs/Source" }, "currentVersion": { "type": ["integer", "null"], "minimum": 0 },
+            "draftVersion": { "type": ["integer", "null"], "minimum": 1 }, "publishedVersion": { "type": ["integer", "null"], "minimum": 1 }
+          }
+        },
+        "meta": { "$ref": "#/$defs/Meta" }
+      }
+    },
+    "ScopePreviewRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["accountId", "expectedVersion", "use", "channel", "messageType", "userMessage", "videoTitle", "userName"],
+      "properties": {
+        "accountId": { "$ref": "#/$defs/Id" }, "expectedVersion": { "type": "integer", "minimum": 0 },
+        "use": { "enum": ["draft", "published"] }, "channel": { "enum": ["comment", "dm"] },
+        "messageType": { "enum": ["text", "image", "unknown"] }, "userMessage": { "type": ["string", "null"] },
+        "videoTitle": { "type": ["string", "null"] }, "userName": { "type": ["string", "null"] }
+      }
+    },
+    "ScopePreviewResponse": {
+      "type": "object", "additionalProperties": false, "required": ["data", "meta"],
+      "properties": {
+        "data": {
+          "type": "object", "additionalProperties": true,
+          "required": ["scopeId", "source", "accountId", "configVersion", "action"],
+          "properties": { "scopeId": { "$ref": "#/$defs/Id" }, "source": { "$ref": "#/$defs/Source" }, "accountId": { "$ref": "#/$defs/Id" }, "configVersion": { "type": "integer", "minimum": 1 }, "action": { "enum": ["draft", "review_required", "would_auto_send", "no_match", "blocked"] } }
+        },
+        "meta": { "$ref": "#/$defs/Meta" }
+      }
+    },
+    "MigrationInventoryResponse": {
+      "type": "object", "additionalProperties": false, "required": ["data", "meta"],
+      "properties": {
+        "data": {
+          "type": "object", "additionalProperties": false, "required": ["mode", "items"],
+          "properties": {
+            "mode": { "enum": ["legacy", "shadow", "scoped"] },
+            "items": { "type": "array", "items": {
+              "type": "object", "additionalProperties": false, "required": ["source", "accounts", "conflict"],
+              "properties": {
+                "source": { "$ref": "#/$defs/Source" }, "conflict": { "type": "boolean" },
+                "accounts": { "type": "array", "items": { "type": "object", "additionalProperties": false,
+                  "required": ["accountId", "legacyVersion", "fingerprint"], "properties": {
+                    "accountId": { "$ref": "#/$defs/Id" }, "legacyVersion": { "type": ["integer", "null"], "minimum": 1 },
+                    "fingerprint": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+                  } }
+                }
+              }
+            } }
+          }
+        },
+        "meta": { "$ref": "#/$defs/Meta" }
+      }
+    }
+  }
+}

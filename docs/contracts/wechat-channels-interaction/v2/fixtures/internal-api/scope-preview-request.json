@@ -1,0 +1,10 @@
+{
+  "accountId": "acct_wc_001",
+  "expectedVersion": 4,
+  "use": "published",
+  "channel": "comment",
+  "messageType": "text",
+  "userMessage": "怎么联系人工客服？",
+  "videoTitle": "售后说明",
+  "userName": "小王"
+}
