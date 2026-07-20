@@ -23,6 +23,7 @@
 
 - [x] 4.1 Commit the console implementation, rebase and fast-forward it onto the latest `aidcp-console` default branch, and push without force.
   <!-- aidcp-console `b9b5879280f27dd33a6ebb5f24b8ae14c708ea99`; rebased onto `d18337c`, resolved the concurrent grouped-navigation test against the current flyout model, fast-forwarded canonical master, and pushed `master` without force. -->
-- [ ] 4.2 Commit and push the OpenSpec artifacts with console commit, validation, deployment, and deviation evidence.
+- [x] 4.2 Commit and push the OpenSpec artifacts with console commit, validation, deployment, and deviation evidence.
+  <!-- Control artifacts commit `6a34eae49ef855ce6252cd8a801b48a2e23bc10c` was fast-forwarded to canonical main and pushed. This follow-up evidence update records the completed console commit, validation, browser checks, dev backup, deployed assets, and health results. -->
 - [x] 4.3 Deploy rebuilt console assets from the clean default checkout to `dev`, then verify HTTP health and the served publish-queue route/assets.
   <!-- Target `dev` passed `scripts/deploy-target dev --check`. Backup: `/opt/aidcp/console.bak.20260720-150228.tar.gz`. Deployed clean canonical `aidcp-console/master` commit `b9b5879` assets `index-MfdeLsKa.js` + `index-D0qPl7t5.css`; remote JS contains `/publish-queue` and `发布队列`. `aidcp-cloud.service` remained active with `NRestarts=0`; 8787/8088/8090 were listening; panel health returned `{"ok":true}`; `/`, `/content`, `/publish-queue`, and proxied `/api/health` returned HTTP 200. Public dev route and both assets also returned HTTP 200. No service restart or unrelated service change. -->
