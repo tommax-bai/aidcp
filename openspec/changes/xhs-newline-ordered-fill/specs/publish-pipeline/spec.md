@@ -2,7 +2,7 @@
 
 ### Requirement: 边缘指令运行时逐条执行并每条后置校验如实回报
 
-边缘 SHALL 以 `PublishCommandDispatcher` 逐条分发 `publish.command`：每个 `kind` 对应一个参数化处理器，处理器 MUST 复用既有定位/执行原语与后置校验完成「定位 + 原子操作 + 后置校验」，MUST NOT 在发布层另起一套无校验的整页流程。小红书 `fill_field(content)` MUST 把普通文字与换行拆为不同输入原语：`Input.insertText` 的 `text` MUST NOT 含 CR/LF，每个正文换行 MUST 独立派发真实 Enter；Enter 后 MUST 在有界窗口内确认截至当前 Enter 的段落结构数、已写前缀和 selection 均稳定，并使 selection 连续位于正文编辑器末端，随后才可输入下一段。段落或光标无法稳定 MUST 清空字段并回 `ok:false`，MUST NOT 继续到 `submit_publish`。每条指令执行后边缘 MUST 按真实结果回报一条对应 `recordId+seq` 的 `publish.command.result`：成功带 `ok:true` 与 `value`，失败带 `ok:false` 与真实 `error`（如 `no_target` / `post_validate_failed` / `engine_error: content_newline_unstable`），`details` 带可得的 `actionId/outcome/attempts`。
+边缘 SHALL 以 `PublishCommandDispatcher` 逐条分发 `publish.command`：每个 `kind` 对应一个参数化处理器，处理器 MUST 复用既有定位/执行原语与后置校验完成「定位 + 原子操作 + 后置校验」，MUST NOT 在发布层另起一套无校验的整页流程。小红书 `fill_field(content)` MUST 把普通文字与换行拆为不同输入原语：`Input.insertText` 的 `text` MUST NOT 含 CR/LF，每个正文换行 MUST 独立派发真实 Enter；Enter 后 MUST 在有界窗口内确认截至当前 Enter 的段落结构数、已写前缀和 selection 均稳定，并使 selection 连续位于正文编辑器末端，随后才可输入下一段。段落或光标无法稳定 MUST 清空字段并回 `ok:false`，MUST NOT 继续到 `submit_publish`。正文最终回读 MUST 在移除 URL 后只以 Unicode 字母和数字组成的语义文字比较，忽略 DOM 标签、空白/换行、标点与 emoji；按 Unicode code point 计算的 Levenshtein 相似度 MUST `>= 0.90` 才可放行，语义投影为空时 MUST 回退非空的既有精确校验。每条指令执行后边缘 MUST 按真实结果回报一条对应 `recordId+seq` 的 `publish.command.result`：成功带 `ok:true` 与 `value`，失败带 `ok:false` 与真实 `error`（如 `no_target` / `post_validate_failed` / `engine_error: content_newline_unstable`），`details` 带可得的 `actionId/outcome/attempts`。
 
 #### Scenario: 逐条执行逐条回报
 - **WHEN** cloud 依次下发 `navigate_entry`、`fill_field(title)`、`fill_field(content)`
@@ -31,6 +31,18 @@
 #### Scenario: 后置校验失败如实回报
 - **WHEN** `fill_field` 执行后读 DOM 校验不到刚填入的内容（后置校验失败）
 - **THEN** 边缘回报 `publish.command.result {ok:false, error:'post_validate_failed'}` 及可得 details，MUST NOT 回报 `ok:true`
+
+#### Scenario: 富文本附加内容不参与正文比较
+- **WHEN** 小红书将正文中的 URL、emoji、换行或富文本标签改写/移除，但归一化后的中文、英文和数字语义文字保持一致
+- **THEN** 最终正文回读 MUST 视为 100% 语义一致并允许 `fill_field(content)` 成功
+
+#### Scenario: 正文 90% 相似度边界放行
+- **WHEN** 最终回读的归一化语义文字与输入正文的 Levenshtein 相似度恰好为 90%
+- **THEN** `fill_field(content)` MUST 放行；若相似度低于 90% 则 MUST 清场并回 `ok:false`
+
+#### Scenario: 英文和数字仍属于语义文字
+- **WHEN** 正文包含 `SenseNova`、`7B`、`MoT`、`OCR` 等英文或数字且页面吞掉其中超过容差的内容
+- **THEN** 最终回读 MUST 把这些字符计入差异，MUST NOT 因汉字仍完整而误报成功
 
 #### Scenario: 红线反例——谎报成功（禁止）
 - **WHEN** 某指令找不到目标元素、换行后光标未稳定或最终后置校验失败

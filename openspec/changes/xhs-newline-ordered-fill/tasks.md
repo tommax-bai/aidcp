@@ -34,3 +34,13 @@
   <!-- Dev record #159 failed at 2026-07-20 15:18:20 +08:00, seq=4 fill_field, error=`engine_error: content_newline_unstable`; DB stayed `failed` with no platform id/url and no submit. Root boundary was nested last-`p` caret vs outer-editor Range equality. Strict validation and both diff checks passed. Deviation: no automatic real-draft retry or submit probe was performed; real-machine E2E remains operator-gated. -->
 - [x] 5.5 提交、推送并同步最新默认分支后 fast-forward 集成；重建 canonical Edge `dist`，不打包安装程序、不自动重试真实稿件
   <!-- Edge commit `46a5dd5` was pushed to the feature branch and fast-forwarded/pushed to `master`; control artifact commit `133a119` plus this ledger commit are fast-forwarded to `main`. Canonical Edge `dist` rebuilt at 2026-07-20 15:54:08 +08:00 contains the semantic-last-block probe. An operator-started Electron client was already running from pre-build child processes, so it was deliberately not interrupted and is not claimed to have loaded the fix; a normal client restart is required. No installer or real draft retry/submit was performed. -->
+
+## 6. 语义文字与 90% 保底验收
+
+- [x] 6.1 实现正文语义投影：移除 URL，只保留 NFKC 归一后的 Unicode 字母和数字；保持标题与 Enter 后结构确认口径不变
+- [x] 6.2 实现 Unicode code point Levenshtein 相似度和具名 `0.90` 阈值，语义投影为空时安全回退
+- [x] 6.3 增加 URL/emoji/换行忽略、英文数字缺失、90% 放行、低于 90% 拒绝及既有污染回归测试
+  <!-- Focused handler suite: 64 passed. It covers URL-before-filter projection, NFKC, URL-adjacent Chinese, English/digit loss, exact 90% acceptance, 89% rejection, empty semantic fallback and existing pollution cleanup. -->
+- [x] 6.4 运行聚焦、验收、完整测试、typecheck、OpenSpec strict validation 与差异检查
+  <!-- After rebasing onto the latest defaults: focused 64 passed; acceptance 26 passed with real-machine E2E explicitly gated; full 2000 passed, 0 failed; typecheck, strict OpenSpec validation and both diff checks passed. -->
+- [ ] 6.5 提交、同步最新默认分支、fast-forward 集成并重建 canonical Edge `dist`；不打包、不自动重试真实稿件
