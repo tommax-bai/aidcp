@@ -62,4 +62,5 @@
   <!-- aidcp-edge: renderer captures the editor's original displayed value and returns before optimistic mutation whenever the trimmed submission is unchanged. -->
 - [x] 7.2 补双击系统昵称原值 Enter、失焦及既有人工昵称原值提交测试，锁定零保存调用和视觉来源不变。
   <!-- aidcp-edge: fleet-console focused suite 58/58 passes, including Enter/blur system-name no-op and trimmed manual-name no-op coverage. -->
-- [ ] 7.3 运行 Edge focused/full/acceptance/typecheck 与 OpenSpec strict，fetch/rebase 最新 master 后 fast-forward 推送；不构建安装包。
+- [x] 7.3 运行 Edge focused/full/acceptance/typecheck 与 OpenSpec strict，fetch/rebase 最新 master 后 fast-forward 推送；不构建安装包。
+  <!-- Edge focused 58/58, final post-rebase full 1994/1994, acceptance 26/26 and typecheck pass. OpenSpec strict passes; edge b7dfd99 was fast-forward pushed to master after one expected non-ff retry, without force or installer build. -->
