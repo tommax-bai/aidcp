@@ -1,8 +1,5 @@
-# publish-draft-client-edit Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change client-preview-image-delete. Update Purpose after archive.
-## Requirements
 ### Requirement: 客户端待审草稿编辑经账号绑定的边-云请求应答通道、复用同一乐观 CAS 单写方法
 
 客户端对自己环境绑定账号名下待审草稿（`pending_approval`）的编辑 SHALL 由 Electron 主进程经 customer-auth 窄接口完成，renderer MUST NOT 直接访问网络。请求只携带 `envKey` 与最小编辑意图；Cloud MUST 验证当前客户拥有该环境并从权威绑定解析 `accountId`，MUST NOT 采信 renderer 或请求体自报账号。该操作 MUST NOT 要求浏览器、CDP、浏览器槽位或 Edge 活 WS 会话。旧客户端经边→云请求/云→边应答的协议路径 SHALL 在兼容窗口继续可用。
@@ -63,32 +60,7 @@ Cloud 处理 customer-auth 客户端草稿编辑请求 SHALL 按下列闸序逐�
 - **WHEN** 待删 URL 不属于记录当前配图列表
 - **THEN** Cloud 拒绝 `image_not_found`，MUST NOT 删除其他配图或注入该 URL
 
-### Requirement: 客户端 MUST NOT 把待审稿件的配图删空
-
-因图文帖在配图为空（M=0）时会被发布下发段诚实判失败（见 `publish-image-required`：无图时 MUST NOT 继续驱动注定失败的纯文字路径），客户端编辑通道 SHALL 拒绝会使配图归零的删除请求，拒因 `last_image`。
-
-该拦截 MUST 由**云端**执行（服务端为权威），客户端 UI 的「最后一张不给删除入口」只是配套的前置提示，MUST NOT 作为唯一防线。系统 MUST NOT 向客户提供一个「删掉最后一张 → 审批 → 稿件被判失败」的路径，那等同于把「静默假成功 / 自残」外包给用户。
-
-#### Scenario: 删除仅剩的最后一张配图
-
-- **WHEN** 待审草稿当前只有一张配图，而客户端请求删除该张
-- **THEN** 云端 SHALL 拒 `last_image`、配图与版本 MUST 保持不变；客户端 SHALL 呈现「至少保留一张配图」的说明且不提供该张的删除入口
-
-### Requirement: 编辑成功后客户端手上的稿件真态必须立即刷新
-
-删配图必然推进 `content_version`。若客户端持有的版本不同步刷新，其随后的审批动作会撞版本闸被弹回。因此编辑成功后系统 SHALL 以**应答回带的真态为主**刷新客户端所持稿件（新配图列表 + 新版本号），并 SHALL 另行沿用既有的预览重推通道下发一帧新快照作为**辅助**。
-
-预览重推是 best-effort（账号无在线连接或下发未达时会被丢弃且不重试），故 MUST NOT 被当作唯一刷新手段。客户端 SHALL NOT 乐观地本地移除缩略图，SHALL 以服务端回读的真态重绘。
-
-#### Scenario: 删除成功后立即再点发布
-
-- **WHEN** 客户删掉一张配图，随即对同一稿件点「发布」
-- **THEN** 客户端携带的 SHALL 是刷新后的版本号，审批 SHALL NOT 因 `version_stale` 被弹回
-
-#### Scenario: 预览重推落空
-
-- **WHEN** 编辑成功但云端的预览重推因该账号无在线连接而被丢弃
-- **THEN** 客户端 SHALL 仍以应答回带的真态完成刷新，界面 MUST NOT 停留在删除前的旧稿
+## ADDED Requirements
 
 ### Requirement: 客户端审批决定受理 MUST 与后续平台发布分离
 
@@ -108,4 +80,3 @@ Cloud 处理 customer-auth 客户端草稿编辑请求 SHALL 按下列闸序逐�
 
 - **WHEN** 客户驳回一份待审稿且 Cloud 成功记录决定
 - **THEN** 客户端显示已驳回，Cloud MUST NOT 申请浏览器槽位或排入页面发布队列
-

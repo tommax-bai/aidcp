@@ -220,21 +220,21 @@
   "edgeId": "edge-01",        // string  边缘节点标识
   "platform": "xiaohongshu",  // string? 运行时平台标识；缺省按历史 xhs 兼容，cloud 会与 accounts.platform 校验
   "app": "xhs",               // string? 业务/站点标识
-  "capabilities": ["click", "input", "scroll", "captcha_assist_text_v1", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? 能力声明（含构建能力位 captcha_assist_text_v1，由 EdgeClient 构造函数统一并入，change captcha-assist-text-answer）
+  "capabilities": ["click", "input", "scroll", "captcha_assist_text_v1", "client_core_browser_executor_v1", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? 能力声明（构建能力位由 EdgeClient 构造函数统一并入）
   "accountId": "acc-01",      // string? 账号标识；多账号运行时要求真实账号，default 已退役
   "accountNickname": "小张测评", // string? 账号可读昵称；仅用于展示补充，不参与身份确立或路由
   "machineLabel": "win-aliyun-3" // string? 人类可读机器标签（change captcha-assist-text-answer：已移除背后无能力的 remoteAddr/远程桌面入口，design D13）
 }
 ```
 
-`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge、Facebook edge 或视频号 edge 跨平台接管账号。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。五项 interaction capability 都是 optional；四个扩展 capability 依赖 `interaction_inbox_v1`，新 Edge 只有收到相应 `welcome.capabilities` 回显后才启用对应消息。回显 `interaction_offboarding_v1` 时，Cloud 还必须在 welcome 带当前 account 的 `interactionRecovery.offboardPending`；回显 `interaction_runtime_controls_v1` 时必须带 `interactionRuntime`。任一查询失败都按 all-off/pending 处理，不能沿用别的账号或旧连接的能力。
+`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge、Facebook edge 或视频号 edge 跨平台接管账号。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。`client_core_browser_executor_v1` 是可选的结构能力位：双方回显只说明客户端能把 core/Cloud transport 与浏览器执行器分别管理，不改变任何旧消息类型；旧 Cloud 不回显时 Edge 保持旧协议兼容。五项 interaction capability 都是 optional；四个扩展 capability 依赖 `interaction_inbox_v1`，新 Edge 只有收到相应 `welcome.capabilities` 回显后才启用对应消息。回显 `interaction_offboarding_v1` 时，Cloud 还必须在 welcome 带当前 account 的 `interactionRecovery.offboardPending`；回显 `interaction_runtime_controls_v1` 时必须带 `interactionRuntime`。任一查询失败都按 all-off/pending 处理，不能沿用别的账号或旧连接的能力。
 
 **`welcome`**（cloud → edge）
 ```jsonc
 {
   "sessionId": "sess-1",      // string  云端分配的会话 id
   "serverVersion": "0.1.0",   // string  服务端版本
-  "capabilities": ["interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? Cloud 确认双方支持；旧端忽略
+  "capabilities": ["client_core_browser_executor_v1", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? Cloud 确认双方支持；旧端忽略
   "interactionRecovery": { "offboardPending": false }, // object? 协商 offboard 时必带；缺失/true=Edge 不恢复 connector
   "interactionRuntime": { // object? 协商账号开关时必带；缺失=Edge 全能力关闭
     "accountId": "acc-01", "envKey": "env-01", "version": 7,
@@ -252,7 +252,24 @@
   }
 }
 ```
+
 > `pacing` 承载**全局节奏兜底**，供边缘做「操作间**最小间隔** gating」（记上次操作完成时刻，收到下一操作时若距上次已达 floor 则立即执行、**不累加**、吸收云端往返；否则只补差额）与详情页停留兜底。数值后台（console）可配、存云端 PostgreSQL、下次握手/重连热加载。与 `session.budget.pacing`（`PacingDefaultsPayload`，边缘从不消费的**死通道**）区分——本快照走 `welcome` 请求/响应，永不经主动命令白名单。**红线**：配置只能抬高延迟、经三道夹（facade 校验含 `max≥min×1.5` + 云端读出口 `clamp(防呆下限,CAP=15000ms)` + 边缘 `Math.max` 二次夹）永远抬不穿非零下限，绝不零延迟。
+
+### 3.1.1 客户端核心与浏览器执行器边界
+
+`client_core_browser_executor_v1` 客户端把每个环境投影为四条相互独立的状态轴：`coreState`、`cloudState`、`automationState`、`browserState`。合法组合包括 `online + connected + paused + closed`；浏览器关闭不得被解释成 core 离线或 Cloud 断线。
+
+操作必须先进入中心注册表并恰好归入一个类别：`local`、`cloud`、`platform_api`、`browser_lifecycle`、`page_automation`。只有后两类可以申请浏览器槽位、启动 provider、附着 CDP 或获取页面任务租约；未知 Cloud 主动消息按 `operation_unclassified` 拒绝，不能回落成页面命令。
+
+客户人设、待审稿读取/删图/批准/拒绝使用 customer-auth 的环境级窄接口，客户端只提交 `envKey`，Cloud 在每次请求内复核客户归属并解析权威 `accountId`。对应接口为：
+
+- `GET|POST|PUT /environments/:envKey/persona[/draft]`
+- `POST /environments/:envKey/publish/draft-image-remove`
+- `POST /environments/:envKey/publish/approval`
+
+旧 Edge WS 的 `persona.*`、`publish.approval_action` 和 `publish.draft_image_remove` 继续保留兼容；两条传输必须复用同一领域方法。批准接口返回 `accepted_pending_execution` 只表示决策已受理、等待浏览器执行器，不表示平台已发布。
+
+Cloud 切换通过 Electron→core 的本地 `lifecycle.cloud_rebind` 控制协议逐环境重绑 WS：先在安全边界排空当前页面写，停止旧 Cloud intake，再完成新 hello/welcome。该动作不得启停 provider、CDP、浏览器或变更槽位所有权；实际 Cloud、目标 Cloud 与失败原因分别投影。
 
 **`ui.snapshot`**（cloud → edge，主动推送；change edge-companion-ui 8.1）
 ```jsonc
@@ -1138,7 +1155,9 @@ Edge 必须在发送 result 前写入 durable outbox，只在 ack 为 `accepted|
 }
 ```
 
-执行顺序固定为：Cloud 事务撤权/停同步写并创建 durable offboard → Edge durable claim → connector stop + drain → 清 scope-bound encrypted session → 关 sidecar → durable result → Cloud exact ack → Cloud tombstone → `requestedAt + 30 days` 内 purge。`failed` 必须保留任务并重试；Edge 离线时 Cloud 只保留 pending cleanup，不得跳过凭证清理。普通 pause/close/standby/logout 不是 offboard，不得删除密文。Cloud/Edge 审计与日志都不得记录消息正文、模板最终文本或凭证。
+执行顺序固定为：Cloud 事务撤权/停同步写并创建 durable offboard → 为新版客户端签发短期单用途 cleanup grant → 受限 browserless core durable claim → connector stop + drain → 清 scope-bound encrypted session → 关 sidecar → durable result → Cloud exact ack → Cloud tombstone → `requestedAt + 30 days` 内 purge。`failed` 必须保留任务并重试；Edge 离线时 Cloud 只保留 pending cleanup，不得跳过凭证清理。普通 pause/close/standby/logout 不是 offboard，不得删除密文。Cloud/Edge 审计与日志都不得记录消息正文、模板最终文本或凭证。
+
+cleanup grant 由 customer-auth `DELETE /environments/:envKey` 在客户端同时提交稳定 `edgeId` 时签发，绑定 `offboardId/envKey/accountId/edgeId/userId`，默认 10 分钟有效。Electron main 可持久化 bearer，但不得投影给 renderer；恢复时经 `POST /offboarding/:offboardId/cleanup-bootstrap` 原子核验并作废。Cloud 只保存 `jti` 哈希、有效期、使用时间和审计事件。受限 core 只声明 `interaction_inbox_v1 + interaction_offboarding_v1 + browser_absent_v1`，只接受绑定的 `interaction.offboard.command/ack`。过期、复用或任一 scope 不匹配必须转人工，绝不降级到普通 `queueStartEnv` 或打开浏览器。
 
 **`interaction.auth.reopen`**（cloud → edge）
 

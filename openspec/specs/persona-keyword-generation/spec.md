@@ -5,14 +5,14 @@ TBD - created by archiving change edge-persona-keyword-generation. Update Purpos
 ## Requirements
 ### Requirement: 客户端 onboarding 关键词向导经边缘发起的 WS 请求触发云端生成
 
-Electron 客户端 SHALL 在扫码登录、握手完成（账号身份已确立、真实 userid 而非 env-label）后提供人设向导：客户按维度选择关键词——**垂类（枚举快捷选 + 「自定义」自由文本兜底长尾，单选）、兴趣（少量高频标签多选 + 自由文本兜底长尾）、语气（枚举单选）**；并在“语气调性”面板下提供**点赞倾向（正常 / 喜欢 / 更喜欢，单选，默认正常）**。点赞倾向 MUST 有真实输出映射：客户端 SHALL 以受控标记随 `keywordSelections` 发送，云端 SHALL 在生成兴趣关键词前剥离该标记，并把档位写入人设 `behavior_guidelines.like_affinity` 与匹配账号兴趣的 `like_principle`；MUST NOT 把内部标记当作兴趣词或原样写入身份文案。除该有明确映射的点赞倾向外，客户端 MUST NOT 提供对生成产物零影响的互动偏好输入。
+Electron 客户端 SHALL 在客户已登录、环境归属与账号绑定已由 Cloud 权威解析后提供人设向导：客户按维度选择关键词——**垂类（枚举快捷选 + 「自定义」自由文本兜底长尾，单选）、兴趣（少量高频标签多选 + 自由文本兜底长尾）、语气（枚举单选）**；并在“语气调性”面板下提供**点赞倾向（正常 / 喜欢 / 更喜欢，单选，默认正常）**。点赞倾向 MUST 有真实输出映射：客户端 SHALL 以受控标记随 `keywordSelections` 发送，云端 SHALL 在生成兴趣关键词前剥离该标记，并把档位写入人设 `behavior_guidelines.like_affinity` 与匹配账号兴趣的 `like_principle`；MUST NOT 把内部标记当作兴趣词或原样写入身份文案。除该有明确映射的点赞倾向外，客户端 MUST NOT 提供对生成产物零影响的互动偏好输入。
 
-点击生成即由**边缘发起**一条 `persona.generate` WebSocket 请求。请求 MUST 携带握手绑定的 `accountId`（不由请求体自报覆盖）、关键词勾选（含自由文本项与受控点赞倾向标记）、idempotency key，并以 `timeoutMs ≥ 185s` 显式覆盖默认超时。触发 MUST 发生在账号身份已确立之后（`accounts` 行已存在，满足人设落库外键前提）。云端 MUST 对 `keywordSelections` 做轻量输入校验（单项长度上限 + 条数上限），超限诚实拒绝、绝不把超长/超量文本原样喂进生成 prompt（纵深防御：弱注入面在自助模型下影响面仅为该用户自己的人设、且产物经 `loadSoulFromValue` 结构复验）。旧客户端未携带点赞倾向标记时 SHALL 按“正常”生成，保持兼容。
+点击生成 SHALL 由 Electron 主进程经 customer-auth 窄接口发起；请求只携带 `envKey`、关键词勾选（含自由文本项与受控点赞倾向标记）及 idempotency key，Cloud MUST 从客户会话逐请求校验环境归属并解析权威 `accountId`，MUST NOT 采信 renderer 或请求体自报账号。生成 MUST NOT 要求环境浏览器已启动、页面登录态在线、CDP 可用、浏览器槽位可用或 Edge 活 WS 会话存在。云端 MUST 对 `keywordSelections` 做轻量输入校验（单项长度上限 + 条数上限），超限诚实拒绝、绝不把超长/超量文本原样喂进生成 prompt。旧客户端仍经 Edge WS 发起时 SHALL 保持原协议兼容，且两条传输 MUST 复用同一生成领域方法、校验、幂等和记账。
 
-#### Scenario: 握手后触发生成
+#### Scenario: 浏览器关闭时触发生成
 
-- **WHEN** 客户在客户端新建环境扫码登录、握手完成后于向导选定关键词与点赞倾向并点击生成
-- **THEN** 边缘发出 `persona.generate` 请求（携握手绑定 `accountId`、关键词勾选、受控点赞倾向标记、idempotency key、`timeoutMs ≥ 185s`），云端据此生成
+- **WHEN** 客户已登录且环境归属/绑定可信，在浏览器关闭、CDP 缺席或槽位为零时选定关键词与点赞倾向并点击生成
+- **THEN** Electron 主进程经 customer-auth 请求携 `envKey`、关键词、受控标记与 idempotency key，Cloud 解析权威账号后生成，MUST NOT 启动浏览器或等待槽位
 
 #### Scenario: 默认正常并在预览中可核对
 
@@ -26,18 +26,18 @@ Electron 客户端 SHALL 在扫码登录、握手完成（账号身份已确立�
 
 #### Scenario: 旧客户端无标记保持兼容
 
-- **WHEN** `persona.generate` 请求没有点赞倾向标记
+- **WHEN** 旧客户端的 `persona.generate` 请求没有点赞倾向标记
 - **THEN** 云端按 `normal` 处理并生成合法人设，MUST NOT 因字段缺失拒绝请求
 
-#### Scenario: 身份未确立不触发
+#### Scenario: 绑定未确立不触发
 
-- **WHEN** 环境已建但尚未扫码登录 / 未拿到真实 userid / 未握手
-- **THEN** 向导 MUST NOT 发起生成请求（此刻无可落库的 `accountId`），仅可本地暂存关键词与点赞倾向选择
+- **WHEN** 客户未登录、环境不属于该客户或 Cloud 无法权威解析账号绑定
+- **THEN** 向导 MUST NOT 发起可落库的生成请求，仅可本地暂存选择，并 SHALL 显示可区分的客户鉴权/绑定拒因而非引导启动浏览器
 
 #### Scenario: 超长或超量输入被诚实拒绝
 
-- **WHEN** `keywordSelections` 某项超单项长度上限 / 总条数超上限（含经自由文本注入的超量内容）
-- **THEN** 云端诚实拒绝该次生成、MUST NOT 把超长/超量文本原样喂进 prompt，边缘透传失败原因
+- **WHEN** `keywordSelections` 某项超单项长度上限或总条数超上限（含经自由文本注入的超量内容）
+- **THEN** 云端诚实拒绝该次生成、MUST NOT 把超长/超量文本原样喂进 prompt，客户端显示真实失败原因
 
 ### Requirement: 云端生成经 JSON 序列化校验，生成失败硬 fail-closed 绝不回落默认人设
 
@@ -129,45 +129,48 @@ Electron 客户端 SHALL 在扫码登录、握手完成（账号身份已确立�
 
 ### Requirement: 云端下发已绑人设信号，边缘按 onboarding 三态渲染
 
-云端 SHALL 经既有 `ui.snapshot` 下行通道把该账号「是否已绑人设」如实告知边缘：`UiSnapshotPayload` 新增可选 `personaBound?: boolean`，云端在 hello 快照解析 `isPersonaBound(accountId)`（人设存储权威判据，与浏览/发布入口闸同源）后携带下发。为守「宁缺毋假 / 全空不发包」，`personaBound` MUST 仅在为真时下发（缺省=边缘按本地默认渲染）。该字段 MUST NOT 新增 `MessageType`（`ui.snapshot` 为既有消息，穷举计数不变、不碰 command-bridge 与 onMessage 主动命令白名单），但两份 `protocol.ts` MUST 逐字同步该可选字段、AC-PROTO 往返断言两端镜像。
+Cloud SHALL 在客户鉴权环境状态中返回该环境绑定解析状态及账号“是否已绑人设”的权威结果。客户端 SHALL 按“绑定待解析 / 已解析且已绑 / 已解析且未绑”三态渲染；该真态来自客户拥有环境与账号绑定的服务端解析，MUST NOT 依赖浏览器、CDP、页面登录态或 Edge WS hello。为了避免 stale-true 泄漏，环境切换、客户切换或归属刷新时客户端 MUST 先清除上一账号投影，待目标环境的新权威响应重建。
 
-边缘 SHALL 据 `personaBound` × 连接态渲染 onboarding 状态，其中「是否已绑」**仅在已连云（`auth==='logged in' && cloud==='connected'`）时判定为权威**——因为该账号在云端的真实 id 与人设绑定态只有握手连云后才可知：① 已绑（连云后 `personaBound=true` 或本会话确认成功）→ 显示「已设置」、跳过向导；② **未连云 / 未登录（尚不知道该账号是否已绑）→ 徽标 MUST 显示中立态（如「待启动」），MUST NOT 谎称「未设置」（宁缺毋假）**，并引导「先启动、扫码登录」，明确「连上云端后会显示该账号人设状态」；③ 未绑 + 已连云（权威可知未绑）→ 徽标「未设置」、启用向导。
+浏览器无关 core 的 `ui.snapshot.personaBound` MAY 在兼容窗口继续下发，但只能作为同一权威结果的辅助同步，MUST NOT 成为新客户端判断人设绑定的唯一来源。旧客户端仍可按既有 WS 快照语义工作。
 
-边缘 MUST 在换会话时清除上一账号的已绑标记（core 重启清 `ui.snapshot` 派生的已绑态、断连清本会话确认标记），避免切环境 / 换账号后旧账号的「已设置」误染新账号——因云端只在为真时下发 `personaBound`（从不发 false），stale-true 会泄漏，故须本地在换会话时清零，待新会话权威信号重建。
+#### Scenario: 已绑人设且浏览器关闭时显示已设置
 
-#### Scenario: 已绑人设的账号连云后显示已设置
+- **WHEN** 客户登录后获取一个绑定可信且此前已绑人设的环境状态，而该环境浏览器未启动
+- **THEN** 客户鉴权响应返回已解析且 `personaBound=true`，客户端显示“已设置”并跳过向导，MUST NOT 要求启动环境
 
-- **WHEN** 一个此前已绑人设的账号在客户端选环境、启动、扫码登录、握手连云后收到 hello 快照
-- **THEN** 快照带 `personaBound=true`，边缘徽标显示「已设置」并跳过向导三步，MUST NOT 停在本地默认
+#### Scenario: 绑定待解析时中立态不谎称未设置
 
-#### Scenario: 未连云时中立态不谎称未设置
-
-- **WHEN** 在设置页选 / 切换环境但尚未启动 / 未登录 / 未连云（边缘此刻不知该环境对应哪个真实账号、也未连云）
-- **THEN** 徽标 MUST 显示中立态（如「待启动」）而非「未设置」，并引导先启动登录；连云后再据权威 `personaBound` 翻「已设置」/「未设置」
+- **WHEN** 环境属于当前客户但 Cloud 尚未解析出可信账号绑定
+- **THEN** 徽标显示中立“绑定待确认/状态加载中”，MUST NOT 谎称“未设置”，也 MUST NOT 把打开浏览器作为默认解析手段
 
 #### Scenario: 切环境不泄漏旧账号已绑态
 
-- **WHEN** 在一个已绑账号运行后切换到另一个环境 / 账号（core 重启、断连重连）
-- **THEN** 边缘 MUST 先清除上一账号的已绑标记（回中立「待启动」），MUST NOT 因 stale `personaBound=true` 把新账号误显示为「已设置」；新会话连云后据其真实 `personaBound` 重新判定
+- **WHEN** 从一个已绑人设环境切换到另一个环境或客户 roster 发生变化
+- **THEN** 客户端先清除旧 `personaBound` 投影，待目标环境权威响应后显示新状态，MUST NOT 把 stale true 泄漏给新账号
 
-#### Scenario: 未绑人设不下发 personaBound
+#### Scenario: 已解析且未绑时进入向导
 
-- **WHEN** 账号未绑人设，云端组 hello 快照
-- **THEN** 快照 MUST NOT 带 `personaBound`（或带 false 而不因此破坏「全空不发包」）；边缘连云后按「未设置」渲染、进入向导流程
+- **WHEN** Cloud 已验证环境归属和账号绑定并确认该账号未绑人设
+- **THEN** 客户端显示“未设置”并启用向导，浏览器关闭或槽位已满不得改变该判定
 
 ### Requirement: 生成 gate 判据不放宽但引导透明
 
-生成 gate 判据 `auth === 'logged in' && cloud === 'connected'` MUST 保持不变（红线：persona 命令必须经运行中 core 子进程 WS 打到云端、握手后账号才在云端存在；放宽 gate = 点了发不出去 = 静默假成功）。未满足时边缘 MUST NOT 允许发起生成，但 SHALL **分别**如实告知未满足的前置（未登录 / 未连云）并给出指向「启动」的可操作引导，MUST NOT 只给一句无差别的灰置提示。
+新客户端的人设生成 gate SHALL 为“客户会话有效、环境归属通过、账号绑定已权威解析且 Cloud 请求通道可用”；判据 MUST NOT 包含 core 子进程存在、页面 `auth === logged in`、Edge WS 已连接、浏览器已启动、CDP 或槽位。未满足时客户端 MUST 禁止提交并分别显示客户登录、环境归属、绑定解析或 Cloud 可用性的真实前置，MUST NOT 提示“请先启动浏览器”。旧客户端在兼容窗口仍 MAY 使用既有 `auth && cloud` gate。
 
-#### Scenario: 未登录时分态引导
+#### Scenario: 客户未登录时分态引导
 
-- **WHEN** core 未运行或未扫码登录（`auth !== 'logged in'`）
-- **THEN** 生成按钮 disabled，且提示明确指向「请先点启动并在浏览器扫码登录」，而非笼统灰置
+- **WHEN** 客户会话无效
+- **THEN** 生成按钮 disabled，提示客户登录，不得引导打开平台浏览器扫码
 
-#### Scenario: 已登录未连云时分态引导
+#### Scenario: 绑定已解析且 Cloud 可用时不看浏览器状态
 
-- **WHEN** 已登录但云端未连接（`cloud !== 'connected'`）
-- **THEN** 生成按钮 disabled，且提示明确指向「等待云端连接」，与「未登录」态区分
+- **WHEN** 客户会话有效、环境归属和绑定可信且 Cloud 请求通道可用，但浏览器关闭、CDP 缺席或 Edge WS 重连中
+- **THEN** 生成按钮可用，提交不进入浏览器调度链
+
+#### Scenario: Cloud 请求不可用时诚实失败
+
+- **WHEN** 客户鉴权有效但 Cloud 人设接口不可达
+- **THEN** 客户端显示 Cloud 请求失败/可重试状态，MUST NOT 把失败改写为“浏览器未启动”
 
 ### Requirement: 人设向导使用吉祥物功能色并保留多平台身份
 
