@@ -83,3 +83,5 @@
 
 - [x] 8.1 Simplify the visible lifecycle controls to `浏览器` and `启动`/`暂停`/`恢复`/`关闭`, retain truthful browser open/close accessibility hints, and update focused renderer tests.
   <!-- Edge primary controls now use the requested compact labels; the browser button keeps its existing open/close behavior and exposes the current action through aria-label/title. The batch action is `全部启动`. Focused renderer/fleet tests passed 127/127 and Edge typecheck passed. -->
+- [x] 8.2 Remove redundant client/automation prefixes from compact status labels while preserving specific browser/account labels and explanatory failure details; update focused health, fleet and renderer tests.
+  <!-- Health and fleet labels now use compact context-aware wording: 已就绪/处理中/连接中/重连中/运行中/已暂停/启动中/暂停中/关闭中/异常. Browser/account/action-required labels and diagnostic details retain their subjects. Focused health/fleet/companion/renderer suites passed 250/250 and Edge typecheck passed. -->

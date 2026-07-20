@@ -49,7 +49,7 @@
 #### Scenario: 自动化未启动时只显示数据目标
 
 - **WHEN** 客户端使用 dev HTTP API 且环境自动化未启动
-- **THEN** 设置显示数据目标 dev，环境显示自动化未启动，MUST NOT 显示“Cloud 离线”
+- **THEN** 设置显示数据目标 dev，环境状态短标签显示“已就绪”、自动化明细显示“未启动”，MUST NOT 显示“Cloud 离线”
 
 #### Scenario: 数据与自动化目标暂时不同
 
