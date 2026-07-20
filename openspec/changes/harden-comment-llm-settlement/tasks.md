@@ -22,7 +22,8 @@
   <!-- PASS (aidcp-cloud): acceptance 62/62 with 1 gated E2E skipped; full 2705 passed, 8 gated skips, 0 failed; final typecheck passed. -->
 - [x] 4.2 Update this task record with repo, commit SHA, validation results, deployment result, and deviations; run `openspec validate harden-comment-llm-settlement --strict`.
   <!-- PASS: aidcp-cloud commit `892a9a32f5448ed183e6d76be9ed53d750da3ab6`; focused 72/72, acceptance 62/62 with 1 gated E2E skip, full 2705 passed with 8 gated skips and 0 failures, final typecheck passed. OpenSpec strict validation passed. No protocol, schema, Edge, model-selection, or global 180s timeout changes; no deviations from the design. -->
-- [ ] 4.3 Commit and push the Cloud feature branch, rebase/fast-forward it into `origin/master` without force, then commit and push the control-repo OpenSpec artifacts.
+- [x] 4.3 Commit and push the Cloud feature branch, rebase/fast-forward it into `origin/master` without force, then commit and push the control-repo OpenSpec artifacts.
+  <!-- PASS: aidcp-cloud feature `codex/harden-comment-llm-settlement` pushed at `892a9a3` and fast-forwarded to `origin/master`; control artifacts committed at `6157206`, feature branch pushed, and this completion-record commit is fast-forwarded to `origin/main`. No force push. -->
 
 ## 5. Dev deployment and live verification
 
