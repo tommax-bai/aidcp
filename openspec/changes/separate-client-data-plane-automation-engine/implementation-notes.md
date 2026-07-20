@@ -50,3 +50,10 @@ Protocol migration rules:
 - Cloud domain methods remain single writer; HTTP and legacy WS adapters share idempotency/CAS and audit gates.
 - Unknown active command classification remains `operation_unclassified` fail-closed.
 - New renderer consumes `automationState`, `browserState` and diagnostic `engineLinkState`; `coreState`/`cloudState` remain compatibility-only until a later removal change.
+
+## Home HTTP follow-up delivery
+
+- Integrated and pushed `aidcp-cloud` master `50052fe` and `aidcp-edge` master `7c6730d` after rebasing onto concurrent XHS schedule and Facebook view work; conflict resolution retained both upstream capabilities and the overview path.
+- Focused ownership/offline/error/transport/cache tests, both acceptance suites, both full suites and both typechecks passed after the final rebase. Strict OpenSpec validation passed.
+- Deployed Cloud `50052fe` to dev after target check and backup `cloud.bak.20260720-181421.tar.gz` plus `.env.bak.20260720-181421`. Source hashes matched; only `aidcp-cloud.service` restarted. Service, 8787/8090/8091/5432, panel health, PostgreSQL, Feishu WS and all four running isales services were healthy.
+- The Nginx customer-auth overview boundary returned `401 unauthorized / missing_token` without credentials. Authenticated stopped-engine content behavior is covered by customer-auth and renderer integration tests; no live customer credential was used. No Edge installer was built.
