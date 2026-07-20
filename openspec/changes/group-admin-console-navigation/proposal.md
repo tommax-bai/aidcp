@@ -4,9 +4,9 @@ The admin console now exposes fourteen top-level destinations in one horizontal 
 
 ## What Changes
 
-- Replace the flat top-level destination strip with six stable business groups and a persistent second-level destination row.
+- Replace the flat top-level destination strip with six stable business groups and compact floating destination menus that do not add a second header row.
 - Group the existing destinations as Overview, Accounts, Content, Interaction, AI Configuration, and System without changing any route URL.
-- Keep the current group and destination visibly active for direct links and nested routes.
+- Keep the current group visibly active in the header and the current destination visibly active inside its floating menu for direct links and nested routes.
 - Provide a labelled grouped navigation menu at narrow widths instead of hiding every destination label.
 - Keep download, settings, and user actions independent on the right side of the header.
 - Continue deriving routes and both navigation levels from one route metadata source.

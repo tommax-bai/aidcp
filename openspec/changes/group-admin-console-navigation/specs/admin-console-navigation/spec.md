@@ -8,19 +8,27 @@ The admin console SHALL present the existing visible destinations under six orde
 - **THEN** the first header row presents the six labelled groups instead of fourteen flat destination buttons
 
 #### Scenario: Operator selects a group
-- **WHEN** the operator opens or navigates to a destination in a group
-- **THEN** the second header row presents every labelled destination in that group
+- **WHEN** the operator hovers over or activates a multi-destination group
+- **THEN** a compact floating menu presents every labelled destination in that group without changing the header height or moving page content
+
+#### Scenario: Operator uses the single-destination Overview group
+- **WHEN** the operator activates Overview
+- **THEN** the console navigates directly to Data without opening a redundant one-item menu
 
 ### Requirement: Navigation context SHALL follow the current route
 The console SHALL visibly identify both the owning group and visible destination for exact and nested routes, using path-boundary matching so similar prefixes do not activate multiple destinations.
 
 #### Scenario: Direct destination URL loads
 - **WHEN** the operator opens an existing destination URL directly
-- **THEN** its owning primary group and its secondary destination are active
+- **THEN** its owning primary group is active and the destination is selected when that group's floating menu opens
 
 #### Scenario: Nested destination URL loads
 - **WHEN** the operator opens a nested path below a visible destination
-- **THEN** the owning group and destination remain active
+- **THEN** the owning group remains active and the destination remains selected in that group's floating menu
+
+#### Scenario: Operator cannot or does not use hover
+- **WHEN** the operator activates a multi-destination group by click or keyboard
+- **THEN** the same floating destination menu opens and its links remain operable
 
 #### Scenario: Similar route prefixes are present
 - **WHEN** the current path is `/content-schedule`
@@ -31,11 +39,11 @@ The console SHALL visibly identify both the owning group and visible destination
 - **THEN** the independent Settings action is active and the System group remains the navigation context
 
 ### Requirement: Narrow navigation SHALL keep every destination readable and reachable
-Below the narrow layout breakpoint, the console SHALL replace the desktop group and destination rows with a labelled grouped navigation trigger. The opened menu MUST expose every visible destination with text under its owning group; it MUST NOT rely on an icon-only strip.
+Below the narrow layout breakpoint, the console SHALL replace the desktop group strip with a labelled grouped navigation trigger. The opened menu MUST expose every visible destination with text under its owning group; it MUST NOT rely on an icon-only strip.
 
 #### Scenario: Header enters narrow layout
 - **WHEN** the available width crosses below the narrow breakpoint
-- **THEN** the desktop navigation rows are hidden and a labelled current-location trigger is visible
+- **THEN** the desktop group navigation is hidden and a labelled current-location trigger is visible
 
 #### Scenario: Operator opens the narrow menu
 - **WHEN** the operator activates the narrow navigation trigger
