@@ -15,3 +15,11 @@
 - [x] 3.1 运行相关 Edge focused tests 与 `npm run typecheck`，修复回归。 <!-- 194/194 focused Edge tests pass; npm run typecheck pass -->
 - [x] 3.2 运行适用的 Edge 全量测试与 `openspec validate manual-environment-nickname --strict`，记录真实验证边界。 <!-- Edge full `npx tsx --test --test-reporter=dot test/**/*.test.ts` exit 0; OpenSpec strict pass. 未启动真实环境、未调用真实 AdsPower user/update、未构建安装包。 -->
 - [x] 3.3 将 Edge 与 control 变更提交、rebase 后 fast-forward 推送默认分支；按 dev 部署规范发布运行时代码，不构建桌面安装包。 <!-- Edge `master` fast-forward pushed at `bf547da`; control artifacts commit `b881d27` plus this closeout record. Deployment deviation: change is Edge desktop-only; dev has no Edge service artifact, and publishing it requires an installer build explicitly out of scope, so no server deploy/package was performed. -->
+
+## 4. 统一昵称解析与复现修复
+
+- [x] 4.1 核对真实运行进程与本地设置，确认 `Tianxing Bai1` 未落盘的原因。 <!-- Electron dev process started 2026-07-19 21:21:53 +0800, before Edge commit `bf547da` at 21:42:07; settings still contained `k1ei3dbi -> Tianxing Bai` with no manual source. -->
+- [x] 4.2 将左栏文字函数抽象为主进程与 renderer 共用、返回显示名与来源的统一环境昵称解析器，并保留兼容包装。 <!-- Edge: added process-neutral `renderer/environment-display-name.js`; uiLogic and main persona notice share it. -->
+- [x] 4.3 把标题栏、互动/内容工作区、环境引导、人设浮层、桌面提醒与浏览器内人设横幅统一接到解析器；第三方参与者/作者昵称保持业务 DTO 原语义。 <!-- Edge: all current-environment anchors use the resolver; routeStatus also refuses to overwrite manual names with stale system heartbeats. -->
+- [x] 4.4 增加统一优先级与各消费位置回归测试，运行 focused tests、typecheck、全量 Edge tests与 OpenSpec strict validation。 <!-- Edge focused display/persona suite 109/109 pass; `npm run typecheck` exit 0; full `tsx --test --test-reporter=dot test/**/*.test.ts` exit 0; OpenSpec strict pass. -->
+- [x] 4.5 提交、rebase、快进推送 Edge/control 默认分支；记录当前旧进程需重启和未构建安装包的边界。 <!-- Edge `master` fast-forward pushed at `4b743db`; control artifacts are committed/pushed with this record. The Electron process started before the feature still requires restart; no installer was built and desktop source has no dev server artifact to deploy. -->

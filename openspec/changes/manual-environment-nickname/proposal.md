@@ -8,6 +8,7 @@
 - 环境花名册持久化人工昵称来源；显示优先级调整为人工昵称 → 平台真实昵称 → AdsPower 环境名 → 尾号兜底。
 - 人工昵称存在时，平台身份事件自动改名与 AdsPower 列表实时名回填均不得覆盖该昵称。
 - 人工昵称在左栏使用轻微不同的颜色与可理解提示，便于识别但不改变环境状态、平台色或选中态。
+- 客户端所有“当前环境 / 当前账号”身份锚点统一通过一个主进程与 renderer 共用、返回名字与来源的解析器取显示名，避免标题栏、内容工作区或浏览器内提示绕过人工优先级。
 - 保存失败时如实提示，保留本次内存显示但不得声称已经持久化。
 
 ## Capabilities
@@ -18,13 +19,13 @@ _None._
 
 ### Modified Capabilities
 
-- `edge-fleet-console`: 左栏昵称增加双击就地编辑、人工来源视觉区分，并将人工昵称置于显示优先级最高位。
+- `edge-fleet-console`: 左栏昵称增加双击就地编辑、人工来源视觉区分，并将人工昵称置于全客户端环境显示名优先级最高位。
 - `adspower-desktop-env-picker`: 环境列表实时名回填增加人工昵称保护，不再无条件覆盖所有花名册名称。
 - `adspower-environment-provisioning`: 登录后自动跟随平台昵称的改名链增加人工昵称保护。
 
 ## Impact
 
-- `aidcp-edge` Electron renderer：环境花名册归一、保存、刷新回填、左栏渲染与交互样式。
+- `aidcp-edge` Electron shared/renderer：环境显示名纯解析器、花名册归一、保存、刷新回填、左栏渲染与交互样式。
 - `aidcp-edge` Electron main/fleet：环境设置归一、句柄快照和自动 AdsPower 改名闸。
 - 本地 `settings.json` 中每个环境成员新增可选的人工昵称来源标记；旧设置保持兼容。
 - 不改 Cloud 协议、账号主键、平台昵称采集、风险逻辑或安装包发布流程。
