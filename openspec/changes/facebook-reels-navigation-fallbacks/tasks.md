@@ -17,5 +17,7 @@
   <!-- 2026-07-20: focused Reels/session 58/58; Edge acceptance 26/26; Edge full suite 2002/2002; npm run typecheck and git diff --check passed. -->
 - [x] 3.2 Run strict OpenSpec validation and a bounded So La navigation probe, without likes/comments/publishing.
   <!-- Strict validation passed. So La profile k1es0359: a temporary foreground Reel tab showed trusted ArrowDown starting the vertical transition; follow-up sampling proved the same video element's rect drifts during animation, which informed the stable element identity fix. No like/comment/publish input was sent. The profile closed before an end-to-end rerun of the final patched reader, so final fallback ordering is automated-test validated. -->
-- [ ] 3.3 Commit, push, rebase, and fast-forward integrate the isolated Edge and control changes without force-pushing.
-- [ ] 3.4 Backfill commit/validation/live-probe evidence and record that no Cloud deployment or Edge installer was required.
+- [x] 3.3 Commit, push, rebase, and fast-forward integrate the isolated Edge and control changes without force-pushing.
+  <!-- aidcp-edge 81b520f7eea0a606cf386f1aba34f7b276d5acf2 was rebased onto current origin/master, revalidated, pushed to its feature branch, and fast-forwarded to master. The control change was rebased onto current origin/main and is delivered by this evidence commit using the same non-force flow. -->
+- [x] 3.4 Backfill commit/validation/live-probe evidence and record that no Cloud deployment or Edge installer was required.
+  <!-- Final post-rebase validation: acceptance 26/26, full Edge suite 2022/2022, typecheck, diff checks, and strict OpenSpec all passed. This is an Edge-only source/runtime behavior change: no Cloud code or server deployment changed, and no Edge installer was built. -->
