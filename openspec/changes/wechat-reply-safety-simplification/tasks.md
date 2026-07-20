@@ -12,7 +12,7 @@
 - [x] 2.3 Apply the new-login cooldown only to auto sends and remove platform-auth admission from Cloud-only generate, edit, and approve operations.
 - [x] 2.4 Update confirmed-send risk accounting labels so generic quota membership is not presented as the video-channel interaction policy result.
 - [x] 2.5 Add focused Cloud regression tests for defaults, manual/auto cooldown, quota-vs-state admission, offline draft actions, and confirmed accounting.
-  <!-- Cloud rebased commit c373430: focused interaction tests 27/27 and latest group-scope regression tests 22/22 passed after rebase; full test invocation before rebase completed successfully (2604 passed, 8 skipped, 0 failed); post-rebase typecheck passed. -->
+  <!-- Cloud rebased commits c373430 + 54b6f8e: focused interaction tests 27/27 and latest group-scope regression tests 22/22 passed after rebase; full test invocation before rebase completed successfully (2604 passed, 8 skipped, 0 failed); post-rebase typecheck passed. The follow-up removes a stale dev_quota_bypass startup label and reports reply_quantity_gate=interaction_windows. -->
 
 ## 3. Edge combined review and send
 
@@ -41,6 +41,8 @@
 
 ## 6. Dev rollout and closeout
 
-- [ ] 6.1 Read the deployment guide, run `scripts/deploy-target dev --check`, deploy Cloud and Console only from clean canonical default branches, and avoid unrelated `isales` services.
-- [ ] 6.2 Verify dev service/listeners/health, Console assets, Feishu, PostgreSQL, and honest video-channel read/write-gate state without claiming a real platform send unless one is actually confirmed.
+- [x] 6.1 Read the deployment guide, run `scripts/deploy-target dev --check`, deploy Cloud and Console only from clean canonical default branches, and avoid unrelated `isales` services.
+  <!-- dev preflight resolved 121.89.85.150 and the expected key. Backups: /opt/aidcp/cloud.bak.20260720-112236.tar.gz, /opt/aidcp/console.bak.20260720-112236.tar.gz, and target-local .env backup. Cloud 54b6f8e and Console 16ad709 were rsynced from clean canonical master; package hashes already matched, so npm ci was not rerun. Only aidcp-cloud.service was restarted; isales services remained active. -->
+- [x] 6.2 Verify dev service/listeners/health, Console assets, Feishu, PostgreSQL, and honest video-channel read/write-gate state without claiming a real platform send unless one is actually confirmed.
+  <!-- Dev evidence: cloud active since 2026-07-20 11:25:25 CST; 8787/8090/8088/5432 listened; panel /api/health returned {"ok":true}; console returned HTTP 200; PostgreSQL SELECT 1 passed; Feishu WSClient onReady appeared. Local/remote hashes matched for all touched Cloud runtime files plus Console index and referenced JS. Startup truth: schema=legacy_read_only, env=dev, configured/effective global write=true, reply_quantity_gate=interaction_windows. Runtime aggregate: 3 controls rows; comment-read/reply=2/2, DM-read/send=2/2, unpaused=2, circuit-closed=3; auth active/authenticating/disabled=1/1/1. No real platform reply was sent. -->
 - [ ] 6.3 Record commits, validations, deployment evidence, deviations, and any remaining real-machine acceptance item; finish strict validation and archive only when every required task is complete.
