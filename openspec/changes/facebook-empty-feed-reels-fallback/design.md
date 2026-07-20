@@ -31,7 +31,9 @@ Edge 探针先确认顶层 `facebook.com` 首页 URL、认证态、可用主区�
 
 ### 2. 使用现有消息传递观察和授权
 
-`page.cards` 增加可选 `listKind: 'feed' | 'reels'` 与 `listState: 'ready' | 'empty'`。缺省等价于当前 `feed/ready`。Edge 对首页明确空态上报一次 `cards: [] + feed/empty`；Cloud handler 将其翻译为内部 `feed.empty.confirmed`，RoleDispatcher 仅在 Facebook 活跃会话发送现有 `page.scroll{reason:'empty_feed_reels_fallback'}`。Edge 只有收到该原因才进入 Reels。
+`page.cards` 增加可选 `listKind: 'feed' | 'reels'` 与 `listState: 'ready' | 'empty'`。缺省等价于当前 `feed/ready`。Edge 对首页明确空态上报一次 `cards: [] + feed/empty`；Cloud handler 将其翻译为内部 `feed.empty.confirmed`。当 Facebook 活跃会话收到该事件，或收到 Edge 在浏览过真实卡片后返回的 `action.completed{action:'scroll',ok:false,reason:'feed_exhausted'}` 时，RoleDispatcher 都发送现有 `page.scroll{reason:'empty_feed_reels_fallback'}`，且每场至多授权一次。Edge 只有收到该原因才进入 Reels。
+
+`empty_feed_reels_fallback` 是已部署的兼容握手名；它现在表达“Facebook Feed 已无可继续浏览内容”，既包括从一开始明确为空，也包括非空列表确认到底。沿用该 reason 可让新 Cloud 直接驱动现有 Edge，避免新增 reason 导致未升级客户端把命令误当普通 Feed 滚动。其他平台的 `feed_exhausted` 继续走原有 `refresh` 自愈。
 
 不新增协议消息或命令，也不把 `reels` 加入 `feed/detail` surface。后者继续只表达读取是否离开列表；Reels 仍是 feed-surface 就地读取。旧 Cloud 忽略可选字段，旧 Edge 不产生空态观察，混合版本不会自动切换。
 
@@ -49,11 +51,12 @@ Reels 的 `page.scroll` 不使用页面 wheel（该页面 `scrollY` 不变）；
 
 ### 5. 模式生命周期
 
-会话初始和普通首页/搜索导航将列表模式重置为 feed；只有 Cloud 空态授权可进入 reels。Reels 内 `note.open`、`interaction.like`、`page.scroll` 就地工作。返回、重连或非 Reels URL 会重新探测并收敛，绝不凭陈旧内存对错误页面执行 Reels 动作。
+会话初始和普通首页/搜索导航将列表模式重置为 feed；只有 Cloud 对明确空态或确认到底的授权可进入 reels。Reels 内 `note.open`、`interaction.like`、`page.scroll` 就地工作。返回、重连或非 Reels URL 会重新探测并收敛，绝不凭陈旧内存对错误页面执行 Reels 动作。
 
 ## Risks / Trade-offs
 
 - [Facebook DOM/翻译变化导致空态文案未命中] → 只是不触发 fallback，保留 `feed_unknown` 诊断；不得扩大到任意 0 卡。
+- [重复/延迟的 `feed_exhausted` 回执导致多次切换] → Cloud 复用会话级 Reels fallback 幂等闸；一旦授权便吞掉重复到底回执，不再刷新普通 Feed。
 - [预加载视频导致读错卡] → 路由身份、视口交集和动作前后身份三重绑定。
 - [结构相似按钮导致误赞/误翻页] → 限定活动视频相对区域、唯一候选和后验状态；歧义即失败。
 - [新 Cloud 与旧 Edge / 新 Edge 与旧 Cloud 混跑] → 全部新增字段可选，fallback 由特定现有命令 reason 双向握手。
