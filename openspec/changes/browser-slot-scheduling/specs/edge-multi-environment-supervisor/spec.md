@@ -88,7 +88,7 @@
 
 #### Scenario: 执行满时进入有界启动队列
 - **WHEN** 一个开浏览器请求到来而浏览器并发已满、启动排队尚有容量
-- **THEN** 请求 SHALL 进入启动等待队列并如实显示排队位次，MUST NOT 踢掉正在执行的环境
+- **THEN** 请求 SHALL 进入启动等待队列，客户端主状态与环境栏 SHALL 统一显示「排队中」并如实呈现排队位次，MUST NOT 使用含糊的「等待浏览器资源」，MUST NOT 踢掉正在执行的环境
 
 #### Scenario: 停泊释放的槽位可被他人取用
 - **WHEN** an environment enters cold standby and releases its browser
