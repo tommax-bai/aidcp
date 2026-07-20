@@ -78,3 +78,8 @@
   <!-- Target dev=121.89.85.150 passed deploy-target --check. Remote backup timestamp 20260720-153740; the first rsync lacked the key and failed before restart, then explicit keyed rsync succeeded and source guards were verified. Only aidcp-cloud.service was restarted. Final deploy marker da7df17; service active, 8787/8090/5432 listening, /api/health ok, PostgreSQL accepting, and Feishu WS ready. No isales service/path was touched. -->
 - [x] 7.4 Verify dev behavior for data management with engine/browser absent and source-level desktop lifecycle tests; do not build or publish a desktop installer unless separately requested.
   <!-- Dev public health returned ok. A no-token request to /capi/environments/no-such-env/persona returned HTTP 401 missing_token directly from the customer HTTP boundary, not an engine/browser prerequisite. Authenticated offline behavior is covered by Cloud customer-auth integration tests; no live customer credential was used. Edge lifecycle/renderer suites cover stopped/paused engine and closed-browser HTTP access. No desktop installer was built or published. -->
+
+## 8. Client lifecycle wording follow-up
+
+- [x] 8.1 Simplify the visible lifecycle controls to `浏览器` and `启动`/`暂停`/`恢复`/`关闭`, retain truthful browser open/close accessibility hints, and update focused renderer tests.
+  <!-- Edge primary controls now use the requested compact labels; the browser button keeps its existing open/close behavior and exposes the current action through aria-label/title. The batch action is `全部启动`. Focused renderer/fleet tests passed 127/127 and Edge typecheck passed. -->
