@@ -22,5 +22,6 @@
 ## 4. Integration
 
 - [x] 4.1 Commit the Edge and control-repo changes with explicit pathspecs and record commit SHAs, validation, and the no-package/no-runtime-deploy boundary in this checklist.
-  <!-- aidcp-edge commit=3df3cee7f5bc04812ce2686433c9eef8ad3b7c85 pushed to origin/master; aidcp initial artifacts/docs commit=d7a9ffd41b6713597a83ae381ad5547d2ccf2a4a. Source validation only: no desktop installer/package, installed-client acceptance, Cloud deploy, or real platform action. -->
-- [ ] 4.2 Rebase/integrate serially onto the latest eligible default branches, rerun required gates, and push without force.
+  <!-- aidcp-edge commit=3df3cee7f5bc04812ce2686433c9eef8ad3b7c85 pushed to origin/master; aidcp initial artifacts/docs commit=a4f18360c85dd69945df95fc16cc8f0a4bfad292. Source validation only: no desktop installer/package, installed-client acceptance, Cloud deploy, or real platform action. -->
+- [x] 4.2 Rebase/integrate serially onto the latest eligible default branches, rerun required gates, and push without force.
+  <!-- aidcp-edge rebased onto 5990b1b, revalidated (acceptance 26/26, full 2013/2013, typecheck), fast-forward pushed origin/master at 3df3cee and synced canonical master. aidcp rebased onto fa6e4c8 after one safe non-fast-forward rejection, strict validation passed, fast-forward pushed origin/main at 2089fe5 and synced canonical main; this final checklist update records completion. -->
