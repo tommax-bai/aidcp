@@ -101,6 +101,8 @@ HTTP 没有 `connecting/connected/reconnecting` 生命周期。每个请求独�
 
 旧客户端在兼容窗口内继续接收 `ui.snapshot.dailyUsage`。对 `client_data_plane_automation_engine_v1`，Cloud 不再构建/推送 `dailyUsage`，Edge 也丢弃旧 Cloud 混入的新客户端 `dailyUsage`；`browserStandby` 仍属于自动化控制投影并保留独立续跳，不能因拆除用量推送而破坏浏览器待机唤醒。
 
+overview 的 `currentPublishState` 是发布卡摘要，不携带完整正文、配图或 `publishPreview`。发布卡的审批入口因此 MUST 由“当前摘要仍为 pending/reminded + 客户端具备待审列表/详情 HTTP RPC”决定，而不是继续以 WS 内联 `publishPreview` 是否存在作为唯一判据。用户点击入口后才打开内容工作区并拉取 `/publish-drafts`；只有 legacy 客户端才回落既有内联预览。这样既保持待审操作可达，也不把完整稿件重新塞回 automation WebSocket 或 overview。
+
 ## Risks / Trade-offs
 
 - [停止登录后常驻引擎会让 API-only 自动同步停止] → 明确其属于自动化；只有自动化启用时运行。若未来需要“暂停自动化但继续收件”，另建独立 background-sync 产品能力，不偷用客户端数据面。
@@ -109,6 +111,7 @@ HTTP 没有 `connecting/connected/reconnecting` 生命周期。每个请求独�
 - [结构化 Cloud 目标迁移破坏旧设置] → 旧单一 WS 设置只作为 automation URL 兼容读取，内置 dev/ol 补齐 HTTP base；无法安全推导的自定义目标要求用户补充，不静默猜测。
 - [暂停后浏览器仍占槽位] → 当前实现随引擎暂停退出立即释放，恢复自动重开；若未来要保留热浏览器，必须先引入独立且可观测的 shell-owned 租约，不能隐式占槽。
 - [旧 UI 字段残留造成冲突] → 新能力下 renderer 只以自动化状态为主事实，兼容字段进入开发者详情并用协议漂移测试限制消费点。
+- [overview 摘要清空 publishPreview 导致审批入口消失] → 入口按 pending 摘要与具名 HTTP RPC 能力显示，点击后按环境拉取待审列表/详情；聚焦测试覆盖无内联预览的重启/刷新形状。
 
 ## Migration Plan
 
