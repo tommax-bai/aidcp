@@ -46,6 +46,8 @@ The single header row contains the brand, six primary groups, and existing actio
 
 The current group remains visibly active when its menu is closed, and the current destination is selected inside the menu. Pointer movement between the trigger and menu has a short close grace period. Click/keyboard activation remains available so access does not depend on hover, and navigation closes the menu. A permanent second row was rejected after visual acceptance because it consumed height and read as a competing top bar. A generic overflow "More" menu was rejected because it hides the information architecture and makes destination placement unpredictable.
 
+Operator visual review found the first floating treatment too close to a mobile card: its 204px centered panel, 42px rows, broad selected slab, and heavy shadow overwhelmed the compact header trigger. The desktop flyout therefore uses a fixed 176px panel aligned to the trigger's left edge, a 6px visual gap and panel inset, 38px rows with 2px separation, 10px outer and 7px row radii, and a lighter border/shadow. Hover and selected fills remain distinct but subtle; the selected destination keeps one small check instead of adding another elevated surface. The trigger chevron rotates while its menu is open, and opening a non-current group uses only a light transient background so interaction state does not masquerade as route state.
+
 ### Replace icon-only collapse with a grouped narrow menu
 
 Below the narrow breakpoint, the desktop group strip is replaced by one labelled trigger that names the current group and destination. Its menu presents all destinations under their six group headings. Brand and independent header actions remain available.
