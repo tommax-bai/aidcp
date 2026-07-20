@@ -90,6 +90,10 @@
 - **WHEN** 一个开浏览器请求到来而浏览器并发已满、启动排队尚有容量
 - **THEN** 请求 SHALL 进入启动等待队列，客户端主状态与环境栏 SHALL 统一显示「排队中」并如实呈现排队位次，MUST NOT 使用含糊的「等待浏览器资源」，MUST NOT 踢掉正在执行的环境
 
+#### Scenario: 首次账号绑定未知时仍保持排队
+- **WHEN** 一个尚未建立持久账号绑定的环境请求启动、浏览器并发已满，且无浏览器引擎引导返回 `binding_unknown`
+- **THEN** 该环境 SHALL 保留启动排队资格，客户端主状态与环境栏 SHALL 显示「排队中」，引擎连接 SHALL 如实显示未连接；MUST NOT 将 `binding_unknown` 写成自动化异常，MUST NOT 因无法无浏览器启动引擎而退出等槽位队列
+
 #### Scenario: 停泊释放的槽位可被他人取用
 - **WHEN** an environment enters cold standby and releases its browser
 - **THEN** its slot returns to the pool and the next queued browser-opening action may take it
