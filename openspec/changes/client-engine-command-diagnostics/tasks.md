@@ -15,12 +15,12 @@
 - [x] 3.1 Add EdgeClient tests for active command families, rejection paths, stage honesty, unknown fields, and sensitive payload non-disclosure.
 - [x] 3.2 Add Electron parser/renderer tests for validation, bounded retention, stage upsert, environment switching, null-safe legacy status, and raw-log redaction.
 - [x] 3.3 Run focused Edge tests, the full Edge test suite, and Edge typecheck; record exact results.
-  <!-- aidcp-edge: focused command/client/electron/renderer 129/129; acceptance 26/26 with real-machine E2E gated by AIDCP_E2E=1; full suite 2001/2001; npm run typecheck passed. No real platform action or packaged-client validation was performed. -->
+  <!-- aidcp-edge: focused command/client/electron/renderer 129/129; post-rebase acceptance 26/26 with real-machine E2E gated by AIDCP_E2E=1; post-rebase full suite 2013/2013; post-rebase npm run typecheck passed. No real platform action or packaged-client validation was performed. -->
 - [x] 3.4 Update the Edge interface description and run strict OpenSpec validation.
   <!-- aidcp: docs/design/edge-ui-interface-spec-v1.md updated; openspec validate client-engine-command-diagnostics --strict passed. -->
 
 ## 4. Integration
 
 - [x] 4.1 Commit the Edge and control-repo changes with explicit pathspecs and record commit SHAs, validation, and the no-package/no-runtime-deploy boundary in this checklist.
-  <!-- aidcp-edge commit=5938be7; control artifacts/docs are committed with this task update. Source validation only: no desktop installer/package, installed-client acceptance, Cloud deploy, or real platform action. -->
+  <!-- aidcp-edge commit=3df3cee7f5bc04812ce2686433c9eef8ad3b7c85 pushed to origin/master; aidcp initial artifacts/docs commit=d7a9ffd41b6713597a83ae381ad5547d2ccf2a4a. Source validation only: no desktop installer/package, installed-client acceptance, Cloud deploy, or real platform action. -->
 - [ ] 4.2 Rebase/integrate serially onto the latest eligible default branches, rerun required gates, and push without force.
