@@ -11,5 +11,5 @@
 
 ## 3. 集成收口
 
-- [ ] 3.1 提交并推送 Edge 与控制仓同名分支，串行快进/挑选精确提交集成到各自默认分支并复验。
-- [ ] 3.2 在本文件记录仓库、commit SHA、验证结果及“未构建客户端安装包”的交付边界。
+- [x] 3.1 提交并推送 Edge 与控制仓同名分支，串行快进/挑选精确提交集成到各自默认分支并复验。 <!-- feature: edge fb8ee0d, control 45b58bf; integrated: edge master a0ecff9, control main 91df893; both feature branches pushed, edge master pushed -->
+- [x] 3.2 在本文件记录仓库、commit SHA、验证结果及“未构建客户端安装包”的交付边界。 <!-- edge canonical verification: ui-logic 53/53, companion-ui 69/69, npm run typecheck passed; OpenSpec strict valid; source-only delivery, no Electron installer/package build or release -->
