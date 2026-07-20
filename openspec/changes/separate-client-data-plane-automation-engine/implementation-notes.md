@@ -13,6 +13,7 @@
 | settings, environment nickname, notification surface | renderer → named Electron IPC/local | forbidden | `local`; unchanged |
 | persona read/generate/persist | renderer → named IPC → Electron customer-auth HTTP | forbidden | `cloud_data`; no engine/WS gate |
 | publish approval/reject and draft image removal | renderer → named IPC → Electron customer-auth HTTP | forbidden | `cloud_data`; accepted receipt remains distinct from platform success |
+| home daily usage/current publish/last published | renderer → named IPC → Electron customer-auth HTTP | forbidden | `cloud_data`; automation results only invalidate and trigger refetch |
 | interaction workspace reads/config | renderer → named IPC → Electron customer-auth HTTP | forbidden | `cloud_data`; no engine/WS gate |
 | UI snapshot compatibility, pacing, interaction ACK/control, ping/pong | Cloud ↔ Edge WebSocket | forbidden | new clients only receive automation projection; legacy customer-data snapshot fields are compatibility-only |
 | interaction sync/reply/reconcile/offboard | Cloud ↔ Edge WebSocket → local platform API | forbidden except explicit reauth | `platform_api_automation`; only while ordinary automation engine is enabled, except restricted cleanup |
@@ -31,6 +32,8 @@ Electron lifecycle inventory:
 
 Implemented lifecycle outcome: ordinary engines now start only from explicit automation intent; pause uses `lifecycle.pause_and_exit`, releases the engine-owned browser/CDP/slot, and does not respawn; resume reacquires resources automatically. Cloud additionally filters `ui.snapshot` for the new capability at both service and transport boundaries so ordinary customer data cannot be pushed through the automation channel.
 
+Implemented home-data outcome: `GET /environments/:envKey/overview` is the single read source for today usage, current in-flight publish and last platform-confirmed publish. New-capability `ui.snapshot` no longer carries `dailyUsage`; `browserStandby` retains its independent automation refresh chain. The renderer caches by environment, refreshes on selection/focus/expand/60-second polling and bounded automation invalidation, preserves the last confirmed snapshot on refresh failure, and renders unknown rather than fake zero/empty history before the first successful response.
+
 ## Capability and compatibility matrix
 
 | Edge hello | Cloud welcome | Behavior |
@@ -47,3 +50,10 @@ Protocol migration rules:
 - Cloud domain methods remain single writer; HTTP and legacy WS adapters share idempotency/CAS and audit gates.
 - Unknown active command classification remains `operation_unclassified` fail-closed.
 - New renderer consumes `automationState`, `browserState` and diagnostic `engineLinkState`; `coreState`/`cloudState` remain compatibility-only until a later removal change.
+
+## Home HTTP follow-up delivery
+
+- Integrated and pushed `aidcp-cloud` master `50052fe` and `aidcp-edge` master `7c6730d` after rebasing onto concurrent XHS schedule and Facebook view work; conflict resolution retained both upstream capabilities and the overview path.
+- Focused ownership/offline/error/transport/cache tests, both acceptance suites, both full suites and both typechecks passed after the final rebase. Strict OpenSpec validation passed.
+- Deployed Cloud `50052fe` to dev after target check and backup `cloud.bak.20260720-181421.tar.gz` plus `.env.bak.20260720-181421`. Source hashes matched; only `aidcp-cloud.service` restarted. Service, 8787/8090/8091/5432, panel health, PostgreSQL, Feishu WS and all four running isales services were healthy.
+- The Nginx customer-auth overview boundary returned `401 unauthorized / missing_token` without credentials. Authenticated stopped-engine content behavior is covered by customer-auth and renderer integration tests; no live customer credential was used. No Edge installer was built.

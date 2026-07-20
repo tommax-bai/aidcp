@@ -54,7 +54,7 @@
 | --- | --- | --- | --- |
 | `hello` | edge → cloud | `welcome` | 边缘上线握手，声明平台、账号与能力 |
 | `welcome` | cloud → edge | — | 握手确认，下发 sessionId |
-| `ui.snapshot` | cloud → edge | — | 陪伴界面数据回填（昵称/人设绑定态与 Facebook 发言语言/最近发布/审批状态/账号今日用量/环境级慢启动；hello 注册完成后全量 + 审批变化时增量） |
+| `ui.snapshot` | cloud → edge | — | 自动化控制投影；新能力客户端仅接收 `browserStandby` 等控制提示，旧客户端兼容接收昵称/发布/今日用量等历史字段 |
 | `plan.request` | edge → cloud | `plan.response` | 高层目标拆解为步骤 |
 | `plan.response` | cloud → edge | — | 返回有序步骤清单 |
 | `select.request` | edge → cloud | `select.response` | 元素清单 + 目标，请云端选一个 |
@@ -268,16 +268,19 @@
 客户人设、待审稿读取/删图/批准/拒绝使用 customer-auth 的环境级窄接口，客户端只提交 `envKey`，Cloud 在每次请求内复核客户归属并解析权威 `accountId`。对应接口为：
 
 - `GET|POST|PUT /environments/:envKey/persona[/draft]`
+- `GET /environments/:envKey/overview`
 - `POST /environments/:envKey/publish/draft-image-remove`
 - `POST /environments/:envKey/publish/approval`
 
 旧 Edge WS 的 `persona.*`、`publish.approval_action` 和 `publish.draft_image_remove` 只为旧能力客户端保留兼容；新能力客户端不得由 Cloud 主动推送这些 `cloud_data` 操作。两条历史传输必须复用同一领域方法。批准接口返回 `accepted_pending_execution` 只表示决策已受理、等待自动化执行，不表示平台已发布。
 
+`GET /environments/:envKey/overview` 是客户端首页业务数据的单一读源，返回 `dailyUsage`、`currentPublishState`、`lastPublished` 与 `meta.asOf`。它不接收也不返回 `accountId`，不检查引擎、automation WebSocket、浏览器/CDP 或槽位；Cloud 从客户环境归属与持久绑定解析账号，再复用既有风控计数和发布日志。自动化结果只允许使该 HTTP 缓存失效并触发重拉，不得直接覆盖已确认概览。首次失败不得物化 0 或“从未发布”，刷新失败时保留上次确认缓存并标明陈旧。
+
 Cloud 切换通过 Electron→core 的本地 `lifecycle.cloud_rebind` 控制协议逐环境重绑 WS：先在安全边界排空当前页面写，停止旧 Cloud intake，再完成新 hello/welcome。该动作不得启停 provider、CDP、浏览器或变更槽位所有权；实际 Cloud、目标 Cloud 与失败原因分别投影。
 
 **`ui.snapshot`**（cloud → edge，主动推送；change edge-companion-ui 8.1）
 
-> 兼容边界：下列 `personaBound`、`personaWritingLanguage`、`lastPublish`、`publish`、`publishPreview` 只对未协商 `client_data_plane_automation_engine_v1` 的旧客户端下发。新客户端的 `ui.snapshot` 仅保留自动化运行投影（如 `dailyUsage`、`browserStandby`）；人设、稿件和审批真态由客户端 customer-auth HTTP 主动拉取。Cloud 按 capability 过滤，Edge 同时丢弃旧 Cloud 夹带的数据字段，形成双向防线。
+> 兼容边界：下列 `personaBound`、`personaWritingLanguage`、`lastPublish`、`publish`、`publishPreview`、`dailyUsage` 只对未协商 `client_data_plane_automation_engine_v1` 的旧客户端下发。新客户端的 `ui.snapshot` 仅保留 `browserStandby` 等自动化控制投影；今日进展、最近发布、人设、稿件和审批真态由客户端 customer-auth HTTP 主动拉取。Cloud 按 capability 过滤，Edge 同时丢弃旧 Cloud 夹带的数据字段，形成双向防线。
 
 ```jsonc
 {
@@ -381,7 +384,7 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 已拒草稿在 hello 快照不回放（拒绝时刻已实时推过，重启不翻旧账）。推送为 best-effort：账号无在线
 边缘即如实放弃，持久态由下次 hello 快照补齐。
 
-`dailyUsage.totals` / `quotas` / `saturated` 保持为日窗口别名，用于旧边缘兼容；新客户端优先读取 `windows`。
+`dailyUsage.totals` / `quotas` / `saturated` 保持为日窗口别名，用于旧边缘兼容；新客户端从 HTTP `overview.dailyUsage` 读取同一数据结构。
 `dailyUsage.firstPost` 是首作新人首轮的独立投影：只有字段存在时 Edge 才固定显示 `/20`；字段缺失时继续使用
 账号真实的今日或当前窗口计划。`20` 不写入 `quotas`、不停止浏览，也不表示必定筛出灵感；浏览达到或超过
 20 条仍未有真实精选命中时，客户端只能如实表达“继续寻找合适方向”。当第一条非空图文/视频源内容进入

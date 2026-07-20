@@ -40,6 +40,26 @@ Cloud、管理后台或编排器 MUST NOT 通过环境 automation WebSocket 向�
 - **WHEN** 未来独立用户级通知通道告知客户端某项 Cloud 数据已变化
 - **THEN** 客户端按自身客户会话重新发起窄 HTTP 读取；通知载荷不得直接执行数据写入、启动自动化引擎或打开浏览器
 
+#### Scenario: 客户端首页数据始终通过 HTTP 读取
+
+- **WHEN** 客户端展示所选环境的今日进展、配额节奏和最近发布摘要，无论该环境自动化引擎为 stopped、paused、connected 或 running
+- **THEN** Electron main SHALL 通过具名 customer-auth HTTP 请求逐次读取权威概览；automation WebSocket MUST NOT 直接提供或覆盖这些数据
+
+#### Scenario: 自动化结果只触发概览重拉
+
+- **WHEN** 已连接引擎回报浏览、互动或发布执行结果
+- **THEN** 客户端 MAY 立即失效该环境概览缓存并重新发起 HTTP 读取，但 MUST NOT 把引擎事件中的本地增量直接冒充 Cloud 已确认计数或发布历史
+
+#### Scenario: 概览读取失败不制造真实零值
+
+- **WHEN** HTTP 概览读取失败或仍在首次加载
+- **THEN** 客户端 SHALL 保留并标记上次成功快照及其时间，或显示获取中/暂时无法获取；MUST NOT 用默认 `0` 冒充 Cloud 已确认的今日数据
+
+#### Scenario: 新能力客户端不接收用量数据推送
+
+- **WHEN** Cloud 向支持 `client_data_plane_automation_engine_v1` 的自动化引擎发送 UI 控制投影
+- **THEN** 载荷 MAY 保留 `browserStandby` 等自动化控制提示，但 MUST NOT 包含 `dailyUsage`、最近发布或发布历史；旧客户端 MAY 在兼容窗口继续接收旧快照
+
 ### Requirement: 自动化引擎连接 MUST 只表示自动化可用性
 
 普通 Edge 子进程 SHALL 作为按需自动化引擎，仅在用户启动或恢复自动化后建立 automation WebSocket。连接成功 SHALL 投影为自动化 `ready`，只有实际任务执行期间才 SHALL 投影为 `running`。登录和 roster 刷新 MUST NOT 自动启动普通引擎。

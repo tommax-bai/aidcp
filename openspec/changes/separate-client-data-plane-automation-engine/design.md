@@ -93,6 +93,14 @@ HTTP 没有 `connecting/connected/reconnecting` 生命周期。每个请求独�
 
 新增可选 `client_data_plane_automation_engine_v1`。Cloud additive-first：新 HTTP 端点先上线，hello/welcome 仅在双方支持时协商新能力。新客户端发送新分类和引擎状态；旧客户端继续 `client_core_browser_executor_v1` 语义。Cloud 领域层保持单一写入口和幂等/CAS，HTTP/旧 WS 只是传输适配器。
 
+### 9. 客户端首页采用 HTTP 单一读源，引擎事件只触发失效重拉
+
+“今日进展”、配额/节奏和最近发布摘要属于 Cloud 持久化数据投影。Cloud 提供环境级 customer-auth 概览读取，逐请求把当前客户的 `envKey` 解析为权威账号，再复用既有今日用量构建器和发布记录存储。renderer 只能调用 Electron main 的具名 IPC，不得提交 `accountId`、URL 或令牌。
+
+新能力客户端无论自动化引擎是否连接都使用同一 HTTP 读源。选择环境、窗口重新聚焦、展开进展区、定时刷新及本地自动化结果事件都可触发有界去抖重拉；引擎事件不得携带或直接覆盖今日计数、最近发布或发布历史。HTTP 失败时保留上次成功快照并标记陈旧/失败；首次读取未完成或失败且无缓存时不得把初始零值显示成已确认真态。
+
+旧客户端在兼容窗口内继续接收 `ui.snapshot.dailyUsage`。对 `client_data_plane_automation_engine_v1`，Cloud 不再构建/推送 `dailyUsage`，Edge 也丢弃旧 Cloud 混入的新客户端 `dailyUsage`；`browserStandby` 仍属于自动化控制投影并保留独立续跳，不能因拆除用量推送而破坏浏览器待机唤醒。
+
 ## Risks / Trade-offs
 
 - [停止登录后常驻引擎会让 API-only 自动同步停止] → 明确其属于自动化；只有自动化启用时运行。若未来需要“暂停自动化但继续收件”，另建独立 background-sync 产品能力，不偷用客户端数据面。
