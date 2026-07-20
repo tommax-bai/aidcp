@@ -51,5 +51,6 @@
   <!-- Cloud: focused 96/96 after final notification-priority audit, final full 2637 pass + 8 skipped, acceptance 59/59, typecheck/build pass. Edge: focused nickname 60/60 and fleet/native-Electron 94/94, final full 1937/1937, acceptance 25/25, typecheck pass. Console: focused 45/45, final post-rebase full 207 pass + 1 skipped, typecheck/build pass; the earlier three-suite parallel run was discarded after an isolated green rerun. -->
 - [x] 6.2 运行 `openspec validate unified-account-display-name --strict`，核对 Cloud 优先部署、Console 后部署、Edge 重启和未构建安装包边界。
   <!-- Strict validation passes. Runtime order is Cloud then Console; Edge behavior requires a restarted source runtime/new release, and this change deliberately does not build an installer. -->
-- [ ] 6.3 各仓提交后 fetch/rebase 最新默认分支，复验并 fast-forward 推送 Edge/Cloud/Console/control 默认分支。
+- [x] 6.3 各仓提交后 fetch/rebase 最新默认分支，复验并 fast-forward 推送 Edge/Cloud/Console/control 默认分支。
+  <!-- Landed without force: cloud a5bccff, edge 175987f, console fe709ba, and control bb13210. Each feature branch was rebased onto the then-current default branch; code repositories reran their standard land-change validation before push. -->
 - [ ] 6.4 按部署规范从默认分支部署 Cloud 与 Console 到 dev，验证服务、监听、健康、PostgreSQL additive 列、Panel DTO 与飞书连接；不构建桌面安装包。
