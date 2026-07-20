@@ -10,7 +10,7 @@ The page split must not turn approval into a queue-side mutation or imply that a
 
 - Make publish operations a first-class destination under the Content group.
 - Let an operator answer three questions immediately: how many drafts are active, how many are waiting for a human, and how many tasks have not started.
-- Preserve the Cloud lifecycle projection, eight-stage evidence, active/recent separation, legacy fallback, and raw diagnostics.
+- Preserve the Cloud lifecycle projection, eight-stage evidence, active/recent separation, and legacy fallback without exposing raw snapshots in the operator UI.
 - Keep the Content page focused on candidate approval and published history.
 - Keep the layout useful from desktop through narrow widths.
 
@@ -49,9 +49,15 @@ When the selected lifecycle item is waiting for human approval, the queue page e
 
 The first implementation may use the status-only link if the lifecycle payload lacks a reliable candidate identifier. Inventing a candidate mapping from record order or title was rejected as dishonest.
 
-### Preserve compatibility and diagnostic depth
+### Group active work by account before task detail
 
-The page prefers `lifecycle` when present, retains the existing `runs`/`snapshot` fallback for older Cloud deployments, and keeps raw snapshot fields behind a collapsed disclosure. No summary count may be inferred from raw field presence when explicit lifecycle data exists.
+Replace the task-level Select with a horizontal account strip. Each selector item displays only the resolved account name; it does not mix titles or lifecycle status into account navigation. The strip uses native horizontal overflow so desktop trackpads, mouse-wheel shift scrolling, and mobile touch swipes can reach accounts beyond the viewport.
+
+The content region below renders every active journey owned by the selected account, in lifecycle order, rather than hiding sibling tasks behind another selector. The queued-task panel remains a separate single region and MUST NOT be repeated once per active journey.
+
+### Preserve compatibility while removing raw disclosure
+
+The page prefers `lifecycle` when present and retains the existing `runs`/`snapshot` fallback for older Cloud deployments. Raw snapshot fields are implementation diagnostics and are no longer rendered in either path. No summary count may be inferred from raw field presence when explicit lifecycle data exists.
 
 ## Risks / Trade-offs
 
@@ -59,6 +65,7 @@ The page prefers `lifecycle` when present, retains the existing `runs`/`snapshot
 - [Risk] Operators may expect approval inline on the queue page. → Use clear “去内容页审批” handoff copy and keep authorization in one place.
 - [Risk] Queue and Content queries refresh independently after navigation. → Both use existing React Query keys; candidate mutations already invalidate content and queue truth.
 - [Risk] Older Cloud responses cannot provide exact waiting-human counts. → Display evidence available from the legacy surface without fabricating lifecycle counts.
+- [Risk] One account can have many simultaneous journeys, producing a tall detail region. → Keep each journey visually bounded and stack them directly; do not add a second hidden task selector that would make concurrent work easy to miss.
 
 ## Migration Plan
 

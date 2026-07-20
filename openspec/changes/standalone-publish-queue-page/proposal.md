@@ -8,7 +8,8 @@ The admin Content page currently mixes the editorial ledger with a large operati
 - Move the existing truthful lifecycle view and queued publish-task list from `/content` to the dedicated page without changing their Cloud data sources or status semantics.
 - Give the standalone page an operational summary for active drafts, human-waiting drafts, and queued tasks, followed by separate active-work and queued-work regions.
 - Keep draft editing, approval, rejection, and published history on `/content`; queue items waiting for human approval link operators back to the corresponding content record instead of duplicating approval behavior.
-- Preserve active/recent/terminal separation, the eight-stage lifecycle evidence, legacy queue fallback, and raw diagnostic fields.
+- Preserve active/recent/terminal separation, the eight-stage lifecycle evidence, and legacy queue fallback while removing the operator-facing raw-field disclosure.
+- Group active journeys by account: show accounts in a horizontally scrollable selector and render every active task for the selected account in the detail area below.
 
 ## Capabilities
 
