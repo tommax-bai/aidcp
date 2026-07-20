@@ -18,5 +18,6 @@
 
 ## 4. 集成与 dev 收口
 
-- [ ] 4.1 提交并推送控制仓与 Edge 变更，记录仓库、SHA、验证和偏差
+- [x] 4.1 提交并推送控制仓与 Edge 变更，记录仓库、SHA、验证和偏差
+  <!-- Edge: `aa77762` (feature + `master` pushed). Control artifacts: initially pushed as `8fe8487`, then rebased onto current `origin/main` as `b5651d5`; this ledger commit records final integration status. Validation: focused 56/56, acceptance 25/25, full 1964/1964, typecheck, strict OpenSpec and both diff checks passed. Deviation: real-machine write E2E stayed gated because no disposable publish target was authorized; dev validation was source-process/load evidence only and no installer was built. -->
 - [ ] 4.2 同步最新默认分支后以 fast-forward 集成并推送 `main`/`master`；确认 dev 源码客户端加载新 Edge 构建，不打包安装程序
