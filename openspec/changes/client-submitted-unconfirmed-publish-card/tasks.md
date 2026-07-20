@@ -24,5 +24,5 @@
 ## 5. 补充验证与交付
 
 - [x] 5.1 运行 Cloud/Edge 聚焦测试、相关 acceptance/full suite 与两仓 `npm run typecheck`。 <!-- focused cloud 86/86, edge 202/202; acceptance cloud 60/60, edge 26/26; both full suites exit 0; both typechecks passed -->
-- [ ] 5.2 运行 `openspec validate client-submitted-unconfirmed-publish-card --strict`，提交并推送三仓同名分支，串行集成到最新默认分支。
-- [ ] 5.3 确认依赖的 Cloud overview 已部署到 dev，验证服务、HTTP 鉴权边界与目标账号数据；不构建 Edge 安装包。
+- [x] 5.2 运行 `openspec validate client-submitted-unconfirmed-publish-card --strict`，提交并推送三仓同名分支，串行集成到最新默认分支。 <!-- strict valid; feature branches pushed: Edge a7a0607, control 84d14bf tip, Cloud 9056a16 tip; exact new commits integrated: Edge master f3197ad and control main e7ccc49; Edge master pushed; control ledger follows in a separate closeout commit -->
+- [x] 5.3 确认依赖的 Cloud overview 已部署到 dev，验证服务、HTTP 鉴权边界与目标账号数据；不构建 Edge 安装包。 <!-- dependency deploy: Cloud 50052fe on dev, previously backed up and deployed by separate-client-data-plane-automation-engine; rechecked target dev, service active, 8787/8090/8091/5432 listening, panel health ok, overview unauthenticated boundary 401 missing_token, source route present. DB truth: Tmax latest #160 submitted title 4090跑122B大模型实测对比🆚; last confirmed #88 Claude被封 企业AI稳才是核心. No live customer token was used in this recheck; authenticated DTO behavior is covered by integration tests. No Edge installer built. -->
