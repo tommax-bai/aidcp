@@ -16,5 +16,5 @@
   <!-- Edge focused renderer / lifecycle / slot / bootstrap coverage: 107/107 passed after the final stopped-intent correction. -->
 - [x] 3.2 Run the Edge acceptance suite, full tests, typecheck, and OpenSpec strict validation.
   <!-- Edge acceptance 27/27 passed (real-machine E2E remained gated), full suite 2056/2056 passed, `npm run typecheck` passed, and `openspec validate client-environment-browser-controls --strict` passed. No installer was built. -->
-- [ ] 3.3 Record validation evidence and commits in this checklist, commit / push control and Edge branches, then integrate the eligible default branches without building an installer.
-  <!-- Edge commit 4a0adc6 was pushed on `codex/client-environment-browser-controls`, fast-forwarded to `origin/master`, and synced to the clean canonical checkout. Control artifacts remain to commit and integrate. -->
+- [x] 3.3 Record validation evidence and commits in this checklist, commit / push control and Edge branches, then integrate the eligible default branches without building an installer.
+  <!-- Edge commit 4a0adc6 was pushed on `codex/client-environment-browser-controls`, fast-forwarded to `origin/master`, and synced to the clean canonical checkout. Control artifact commit fa93a6b was pushed on the matching branch, fast-forwarded to `origin/main`, and synced without touching unrelated canonical `output/` or `tmp/` files. This checklist completion is the final control-only follow-up. No installer was built or published. -->
