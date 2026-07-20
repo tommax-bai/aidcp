@@ -60,6 +60,14 @@ Cloud、管理后台或编排器 MUST NOT 通过环境 automation WebSocket 向�
 - **WHEN** Cloud 向支持 `client_data_plane_automation_engine_v1` 的自动化引擎发送 UI 控制投影
 - **THEN** 载荷 MAY 保留 `browserStandby` 等自动化控制提示，但 MUST NOT 包含 `dailyUsage`、最近发布或发布历史；旧客户端 MAY 在兼容窗口继续接收旧快照
 
+#### Scenario: 待审摘要保持 HTTP 审批入口可达
+
+- **GIVEN** 新能力客户端的环境 overview 返回当前发布为 `pending` 或 `reminded`，且自动化 WebSocket 没有内联 `publishPreview`
+- **WHEN** 客户端渲染发布卡
+- **THEN** 发布卡 SHALL 显示可操作的“查看稿件”入口，而不是只显示“等你确认”却无审批路径
+- **AND** 用户打开入口后，Electron main SHALL 通过该环境的具名 customer-auth HTTP 待审列表与详情请求拉取完整稿件
+- **AND** renderer MUST NOT 获得令牌、`accountId` 或通用 URL，Cloud/Edge MUST NOT 为恢复该入口重新经 automation WebSocket 推送完整稿件
+
 ### Requirement: 自动化引擎连接 MUST 只表示自动化可用性
 
 普通 Edge 子进程 SHALL 作为按需自动化引擎，仅在用户启动或恢复自动化后建立 automation WebSocket。连接成功 SHALL 投影为自动化 `ready`，只有实际任务执行期间才 SHALL 投影为 `running`。登录和 roster 刷新 MUST NOT 自动启动普通引擎。
