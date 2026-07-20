@@ -25,7 +25,7 @@
 ## 5. Validation and delivery
 
 - [x] 5.1 Run focused Cloud and Edge tests, both repositories' full tests and typechecks, and `openspec validate xhs-approval-peak-time-shortcuts --strict`.
-  <!-- Cloud: focused 55, acceptance 60, full 2677 passed / 8 gated skips, typecheck passed. Edge: focused 86, acceptance 26, full 2031 passed, typecheck passed. OpenSpec strict passed. -->
+  <!-- Cloud: focused 55, acceptance 60, full 2677 passed / 8 gated skips, typecheck passed. Edge after latest-default rebase: focused 86, acceptance 26, full 2032 passed, typecheck passed. OpenSpec strict passed after rebase. -->
 - [x] 5.2 Record repo SHAs, validation, deviations, and deployment status in this checklist; commit the control/Cloud/Edge changes.
-  <!-- aidcp 88c2b03: proposal/design/spec/tasks, strict validation passed. aidcp-cloud 1347891: occupied scheduled-hour store/API + focused/acceptance/full/typecheck pass. aidcp-edge 4e0a9a8: single/multi approval shortcuts + focused/acceptance/full/typecheck pass. Deviations: none. Deployment pending task 5.3. -->
+  <!-- aidcp 9561c86: proposal/design/spec/tasks after latest-main rebase, strict validation passed. aidcp-cloud 1347891: occupied scheduled-hour store/API + focused/acceptance/full/typecheck pass. aidcp-edge 93c3017: single/multi approval shortcuts after latest-master rebase + acceptance/full/typecheck pass. Deviations: none. Deployment pending task 5.3. -->
 - [ ] 5.3 Rebase/integrate through clean default checkouts, push current default branches, and deploy the runtime Cloud change to `dev` after target precheck and documented health checks; do not package an Edge installer.
