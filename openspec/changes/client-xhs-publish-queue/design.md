@@ -19,7 +19,7 @@ Electron 当前的 `pub-card` 只投影一条 `publish` 与一条 `lastPublish`�
 - 不取消已经进入待审、平台下发、定时或已提交平台的生命周期记录。
 - 不增加队列优先级调整、拖拽排序、精确队列名次或批量取消。
 - 不改变内部 Console 队列、发布编排顺序、发布状态落库或平台确认逻辑。
-- 不增加数据库迁移、协议 v2 命令、部署、默认分支合并或桌面安装包。
+- 不增加数据库迁移、协议 v2 命令、`ol` 部署或桌面安装包；默认分支集成和 Cloud `dev` 部署由客户在初始隔离交付后另行授权。
 
 ## Decisions
 
@@ -85,7 +85,7 @@ Renderer 调用 `publishQueueGet(envId)` 与 `publishQueueCancel({envId, taskId,
 1. 在 feature worktree 中先增加 Cloud 加性接口与测试；旧 Edge 不调用，不影响现有客户接口。
 2. 增加 Edge main/preload IPC、renderer 页面与测试；Cloud 不可用时呈现明确失败，不回落内部面板。
 3. 运行 Cloud/Edge 聚焦测试、typecheck 和 OpenSpec strict validation，在各自 feature 分支提交但不合并默认分支。
-4. 后续获准集成时，先合 Cloud 并部署 dev，再交付 Edge；回滚 Edge 可恢复旧单卡，回滚 Cloud 时新版 Edge显示队列不可用，不影响自动化主链。
+4. 获准集成后，先合 Cloud 并部署 dev，再交付 Edge 默认分支源码；回滚 Edge 可恢复旧单卡，回滚 Cloud 时新版 Edge 显示队列不可用，不影响自动化主链。桌面安装包仍需独立的显式发布请求。
 
 ## Open Questions
 
