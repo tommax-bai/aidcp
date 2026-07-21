@@ -72,21 +72,21 @@ worker 不再单独接收可漂移的 target；它只使用已绑定 target 的 
 - [旧任务全部归 dev 的决定不可从数据自行证明] → 按用户明确授权执行；部署前记录旧行总数和各状态，迁移后断言全部为 dev、业务计数不变。
 - [只隔离领取但控制 API 仍跨 target] → 把 store 全部任务读写入口一起 target-scope，并用 SQL 形状测试覆盖。
 - [已有活跃任务在部署瞬间被重启恢复] → 沿既有备份与串行部署流程；迁移不改状态/claim，dev worker只恢复回填为 dev 的历史任务，符合用户确认归属。
-- [只发布 dev 时旧 ol worker 仍会忽略 target 并领取 dev 任务] → 禁止 dev-only 运行迁移；发布前必须获得 ol 授权并协调停止旧 worker、升级两个目标。
-- [第一个新进程收紧 `NOT NULL` 后，尚未升级的旧进程无法创建任务] → 两个旧 worker 都停止后再迁移和升级，不把新旧版本并行运行当作支持的滚动发布路径。
+- [dev 先发布到 ol 升级完成之间，旧 ol worker 仍会忽略 target] → 用户明确指定 dev-first；只读基线发现 10 条可领取任务，因此双端备份后在 dev 重启迁移前停止旧 ol Cloud，dev 验证后立即拉 release 分支升级并恢复 ol。
+- [dev 启动收紧 `NOT NULL` 后，尚未升级的旧 ol 进程无法创建任务] → 不在间隔内触发 ol 委托任务；dev 验证后立即从同一 Cloud SHA 拉 release 分支升级 ol，不把该间隔声明为受支持的长期混跑状态。
 
 ## Migration Plan
 
 1. 在发布前分别执行 dev/ol 目标检查，确认 `.env` 中 `AIDCP_DEPLOY_ENV=dev|ol`，并只读统计共享库的任务总数、状态分布、活跃 claim 与 `execution_target` 列状态。
-2. 获得明确 ol 发布授权；未获授权时停在代码交付门，不执行数据库迁移或 dev-only 发布。
+2. 获得明确 ol 发布授权；用户于 2026-07-21 指定先部署 dev，再拉 release 分支部署 ol Cloud，不构建 OL 客户端包。
 3. 备份两端 Cloud/env 与共享数据库中的委托任务相关表，记录可验证的回滚点。
-4. 协调停止两个目标的旧 `aidcp-cloud.service`，避免旧 worker 在迁移后继续跨目标领取或写入缺少 target 的任务。
-5. 执行幂等 schema 迁移，将全部历史任务回填为 dev；断言行数、状态/attempt/event 计数不变且无 NULL/非法 target。
-6. 用户已确认 ol 没有历史委托任务；从各自合规分支先升级/启动 ol，再升级/启动 dev，并分别验证服务、监听、健康、PostgreSQL、Feishu，以及 `AIDCP_DEPLOY_ENV` 装配日志。
-7. 用 SQL/日志及新建任务证明 dev/ol 分别只写入和领取自身 target；确认 ol worker 不读取历史 dev 任务。
+4. 基线确认无活跃 claim、但存在 10 条会被持续轮询的待执行任务；因此在 dev 重启迁移的最后一刻停止旧 ol `aidcp-cloud.service`，随后从干净 Cloud `master` 部署并启动 dev。执行幂等 schema 迁移，将全部历史任务回填为 dev，并断言行数、状态/attempt 计数不变且无 NULL/非法 target；事件增量按真实轮询记录单独对账。
+5. dev 健康验证通过后，从已部署 Cloud SHA 创建并推送 `release/<yyyymmdd>-<scope>`，立即只部署 ol Cloud（不构建、不上传 OL 客户端安装包）。
+6. 在 dev-first 间隔前后核对 claim/event 增量，确认旧 ol worker 没有领取 dev 任务；若出现异常，先停止 ol worker再处置，禁止继续扩大影响。
+7. 分别验证服务、监听、健康、PostgreSQL、Feishu 和 `AIDCP_DEPLOY_ENV` 装配日志，并用 SQL/日志证明 dev/ol 只写入和领取自身 target。
 
 回滚代码前必须先评估：旧代码忽略新列后仍会恢复跨环境领取，因此不能把“代码回滚但继续双 worker”当安全状态。紧急回滚应先停止非目标 worker 的委托消费或恢复单环境消费，再回退代码；新增列与数据可保留，避免破坏审计。
 
 ## Open Questions
 
-运行迁移前仍需用户明确授权 ol 协调发布。历史任务归属已由用户明确指定为 dev；同 target 多副本不在当前部署模型内。
+无。ol Cloud 发布授权和 dev-first 顺序已由用户明确指定；历史任务全部归 dev，同 target 多副本不在当前部署模型内。
