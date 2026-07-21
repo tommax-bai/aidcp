@@ -666,7 +666,8 @@ Facebook 首页空态的兼容握手：Edge 必须先确认顶层 Facebook 首�
   "likeCount": 1234, "collectCount": 200,
   "publishedAtText": "3小时前",                 // 可选（change feed-hot-lead-group-comment）：发布相对时刻原始文本
                                                // （刚刚/X小时前/昨天/07-05）。边缘只从正文列底部日期容器抽原始串、不解析、不污染正文；
-                                               // 云端解析成距今小时数并算「每小时点赞」热度速率（判引流线索）。缺则诚实置空、绝不臆造。
+                                               // 云端以 note.detail.arrived 事件时刻为锚做统一标准化，再派生帖龄/热度并供精选池复用。
+                                               // 缺失或不可解析时保留诚实未知语义，绝不以首次发现/记录更新时间代替。
   "authorFollowed": true,                      // 可选：作者区关注按钮当下真实态（已关注/互关→true）。
                                                // 边缘在 note.open 探测、只读取上报；云端据此在评估进主页前短路已关注作者。缺省→回退原流程。
   "url": "https://www.xiaohongshu.com/explore/n123?xsec_token=…",
@@ -680,6 +681,11 @@ Facebook 首页空态的兼容握手：Edge 必须先确认顶层 Facebook 首�
                                                // 云端 MUST NOT 计为新的 view，也不触发普通详情决策链。
 }
 ```
+
+`publishedAtText` 的线上协议仍只有这一个 Edge 原始字段；标准时间属于 Cloud 派生事实，不回写协议。Cloud 标准化结果
+同时保留原文、事件观测锚、`parsed|unparseable` 状态、可选 epoch 时间与 `minute|hour|day` 精度。日精度只表示来源
+自然日，展示不得补造时分；精选池保存这组证据时，本次没有新原文不得擦除旧值，历史行也不得用 `first_seen_at`、
+`updated_at` 或 `counts_captured_at` 猜测回填。
 
 **`profile.detail`**——上报作者主页数据
 ```jsonc
