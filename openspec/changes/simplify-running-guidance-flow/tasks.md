@@ -25,8 +25,16 @@
 
 ## 5. 流光区域纠正
 
-- [x] 5.1 撤销错误的 presence 文案映射，保留“返回推荐流，继续逛…”，并只在该实时事件下把流光 class 从顶部状态迁移到“正在缩小创作方向。”标题。
-- [x] 5.2 补充纯逻辑与 Electron DOM/CSS 回归，覆盖两处文字不变、流光区域迁移、真实更新时间、其他动作流光不退化和吉祥物隔离。
+- [x] 5.1 撤销错误的 presence 文案映射，保留“返回推荐流，继续逛…”，并只在该实时事件下把流光 class 从顶部状态迁移到“正在缩小创作方向。”标题；按文字匹配的限制经用户再次纠正，由 6.1 改为纯区域规则。
+- [x] 5.2 补充纯逻辑与 Electron DOM/CSS 回归，覆盖两处文字不变、流光区域迁移、真实更新时间、其他动作流光不退化和吉祥物隔离；其中“其他动作仍在顶部流光”的旧预期由 6.2 纠正。
   <!-- Correction validation: focused renderer suite 214/214; npm run typecheck; git diff --check; OpenSpec strict validation. The exact return-feed event keeps its presence text while `shimmer` moves to `#runtime-guidance-title`; stale events clear both shimmer targets. -->
 - [x] 5.3 运行聚焦测试、typecheck、OpenSpec strict 校验，并按 ff-only 规范集成和推送；不部署 ECS、不构建安装包。
   <!-- Delivered as aidcp-edge 7116f99 to origin/master by ff-only push after rebasing onto the latest default branch. Validation: focused renderer suite 214/214; acceptance 28/28; full suite 2156/2156; npm run typecheck; git diff --check; OpenSpec strict validation. Edge source-only correction: no ECS deployment and no desktop installer build. -->
+
+## 6. 流光区域最终收口
+
+- [x] 6.1 删除所有按 presence 文案匹配流光目标的逻辑，顶部状态区域永不展示文字流光；普通运行卡标题区域统一承接实时流光。
+- [x] 6.2 补充 Electron DOM/CSS 回归，覆盖不同顶部动作文字、顶部无流光能力、下方标题统一流光、事件过期停止和吉祥物隔离。
+  <!-- Final area-rule validation: focused renderer suite 214/214; npm run typecheck; git diff --check; OpenSpec strict validation. Both ordinary live actions and return-feed actions keep plain presence text while the running-card title owns shimmer; CSS no longer defines `#presence-text.shimmer`. -->
+- [x] 6.3 运行聚焦测试、typecheck、OpenSpec strict 校验，并按 ff-only 规范集成和推送；不部署 ECS、不构建安装包。
+  <!-- Delivered as aidcp-edge 8de0000 to origin/master by ff-only push after rebasing onto the latest default branch. Validation: focused renderer suite 214/214 before rebase and 215/215 after rebase; acceptance 29/29 after rebase; npm run typecheck; git diff --check; OpenSpec strict validation. The default-concurrency full suite first passed 2158/2159 with one unrelated renderer-smoke timing failure (`riskReads` 2 vs 1); that exact test passed 1/1 in isolation, and the decisive single-concurrency full suite passed 2159/2159 before the final rebase. Edge source-only change: no ECS deployment and no desktop installer build. -->
