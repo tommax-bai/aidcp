@@ -37,4 +37,5 @@
   <!-- Regression coverage includes numeric `Thích`, a separate numeric reaction summary, zh/en/es/vi action variants, and summary-only ambiguity. -->
 - [x] 4.3 Run focused Facebook tests, acceptance/full Edge tests, typecheck, and a bounded read-only Mi Xu probe from the isolated Edge source.
   <!-- Rebased validation: focused Facebook tests 74/74; acceptance 28/28; full suite 2141/2141; `npm run typecheck` exit 0. The bounded source probe launched exact AdsPower profile `k1es035u`, recovered the visible Sang Vlog video by round 4 with stable watch identity, author, caption, reaction count, and `isVideo=true`, performed no interaction, then returned the profile to `Inactive`. -->
-- [ ] 4.4 Integrate and push the Edge fix and control evidence serially, preserving the no-installer boundary.
+- [x] 4.4 Integrate and push the Edge fix and control evidence serially, preserving the no-installer boundary.
+  <!-- Pushed Edge 94e93ad to origin/master first, then pushed control contract/evidence bc66491 to origin/main. No Edge installer was built or installed. -->
