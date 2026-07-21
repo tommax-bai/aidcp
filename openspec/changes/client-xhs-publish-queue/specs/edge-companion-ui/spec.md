@@ -14,6 +14,27 @@ Electron 陪伴界面 SHALL 在明确的小红书环境中把原单记录发布�
 - **WHEN** 当前环境只有 queued、generating 或 submitted 内容且无需客户操作
 - **THEN** 首页显示紧凑数量摘要和“查看全部”，不为每条内容占据运行首页空间
 
+### Requirement: Expanded publish summary SHALL support restrained item switching
+
+Electron 展开态发布摘要 SHALL 在当前环境可展示项超过一条时，提供位于卡片最左和最右的上一条、下一条按钮，并显示当前位置与总数。按钮 SHALL 默认使用弱化颜色，在 hover 与 `focus-visible` 时轻度加深；按钮 SHALL 是原生键盘可达控件并以目标内容标题提供可访问名称。单条、加载、错误与收起态 MUST 隐藏并禁用切换控件。
+
+切换序列 SHALL 先展示待确认 active，再展示其它 active 与尚未开跑 tasks；无进行中内容时 MAY 在 recent 内切换。左右边界 SHALL 循环。HTTP 刷新后若当前稳定身份仍存在 SHALL 保持当前项，消失时 SHALL 回到新的首项；切换环境或平台 MUST 清除选择。切换 MUST NOT 发送写请求、改变任务顺序、跨环境复用索引，或把展示位置描述成精确队列名次。
+
+#### Scenario: 鼠标或键盘切换到下一稿件
+
+- **WHEN** 客户点击右侧按钮，或在该原生按钮上按 Enter / Space
+- **THEN** 卡片更新为下一条内容，位置提示与按钮可访问名称同步更新，完整队列和 Cloud 状态保持不变
+
+#### Scenario: 当前稿件在刷新后仍存在
+
+- **WHEN** 客户正在查看第二条内容且 HTTP 刷新仍返回同一稳定身份，即使列表位置改变
+- **THEN** 卡片继续展示该内容，不因刷新跳回首项；若该身份消失才回到新的首项
+
+#### Scenario: 切换环境或只剩一条内容
+
+- **WHEN** 客户切换账号、平台，或刷新后当前环境只剩一条可展示内容
+- **THEN** 客户端清除旧选择，隐藏且禁用左右按钮，不保留可聚焦的不可见控件
+
 ### Requirement: Publish queue SHALL reuse the in-app content workspace safely
 
 Electron SHALL 在现有主窗口内容工作区页面栈内展示发布队列，不创建新的系统窗口。关闭 SHALL 返回运行首页；打开稿件审核后返回 SHALL 回到队列。环境切换 SHALL 清除取消确认、忙态和旧内容；旧环境迟到回包 MUST NOT 重新打开或覆盖新环境页面。
