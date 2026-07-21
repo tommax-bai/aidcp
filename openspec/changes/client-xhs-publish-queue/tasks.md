@@ -88,4 +88,5 @@
   <!-- aidcp-edge 706c1fd: the complete daily-summary block now precedes pub-card in source/DOM order; both semantic sections and all existing ids remain intact, with the activity stream after both. -->
 - [x] 9.2 Add DOM-order regression coverage, complete focused/full Edge gates, and visually verify desktop plus narrow layouts with both cards visible.
   <!-- Post-rebase aidcp-edge 706c1fd: focused companion 77/77, full 2156/2156, acceptance 28/28, four Electron syntax checks, typecheck, and diff check passed. Browser checks at 900x800 and 420x900 verified daily-summary -> pub-card -> activity order, 14px card spacing, preserved responsive layout, and no horizontal overflow. -->
-- [ ] 9.3 Rebase onto latest defaults, fast-forward merge and push aidcp-edge plus control refs, record final evidence, and do not package Edge or touch Cloud/ol.
+- [x] 9.3 Rebase onto latest defaults, fast-forward merge and push aidcp-edge plus control refs, record final evidence, and do not package Edge or touch Cloud/ol.
+  <!-- origin/master aidcp-edge 706c1fd and origin/main control behavior artifacts through 5b5a95f were integrated by ff-only after current-default rebases and deciding reruns. This checklist closeout follows as a second ff-only control commit. No Edge installer was built; Cloud, dev runtime, and ol were not touched. -->
