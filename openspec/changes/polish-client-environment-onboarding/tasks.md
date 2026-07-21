@@ -53,3 +53,9 @@
 - [x] 7.3 用自适应间距与非语义化低对比环境光收口大窗口底部留白，并补充减弱动态、矮窗和窄窗样式
 - [x] 7.4 补充老用户无空态闪烁、零环境加载收敛、失败重试和视觉布局测试
 <!-- Runtime source-only delivery: no ECS deployment and no desktop installer build. Actual-page QA covered loading, confirmed-empty, and first-start states; the empty-state ambient treatment carries large-window whitespace without fake environment rows, metrics, or progress semantics. -->
+
+## 8. 同机历史环境下的首次交接修复
+
+- [x] 8.1 首次创建候选仅以当前账号权威 fleet 零环境为准，本机其他账号或历史 settings roster 不得阻断自动关窗与启动引导
+- [x] 8.2 补充同机历史环境回归测试，完成聚焦测试、typecheck、OpenSpec strict 校验、ff-only 集成与默认分支推送；不部署 ECS、不构建安装包
+<!-- Delivered as aidcp-edge cafc771 to origin/master by ff-only merge and push. Validation: the regression failed before the fix and passed after it; fleet-console 82/82; renderer smoke + fleet + companion-ui + ui-logic passed; acceptance 32/32; full suite 2177/2177; npm run typecheck; node --check; git diff --check; OpenSpec strict validation. Source-only Edge delivery: no ECS deployment and no desktop installer build. -->
