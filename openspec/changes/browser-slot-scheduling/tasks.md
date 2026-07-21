@@ -92,4 +92,4 @@
 - [x] 6.3 视频号启动与重新鉴权接入临时通道：全部环境顺序初始化；会话有效不打开浏览器；会话失效才开 sidecar，确认关闭后释放；补结构化 API/Cloud 运行证据与状态投影。<!-- aidcp-edge 3fd5320: leased sidecar, stored-session browser skip, current-process API/Cloud ACK proof -->
 - [x] 6.4 视频号声明 `personaApplicable=false`：不应用 personaBound、不显示入口、不运行 gate/自动弹窗；过期 IPC 调用返回不适用并补回归测试。<!-- aidcp-edge 3fd5320: platform capability, renderer gating, not_applicable IPC -->
 - [x] 6.5 运行 Edge focused/acceptance/full/typecheck 与 Electron 生命周期回归；记录通过数和真实边界，安装包仍按用户明确授权门禁。<!-- aidcp-edge 3fd5320: post-rebase focused 162/162, acceptance 28/28, typecheck, build:dist and syntax checks passed. Pre-rebase full 2166/2166 passed; post-rebase full 2167/2169 under shared-machine load had two unrelated UI timing flakes, and both exact tests passed isolated 1/1. AIDCP_E2E remained gated; no installer built. -->
-- [ ] 6.6 提交 aidcp-edge 与中控 OpenSpec 证据，rebase/fast-forward 合入默认分支并推送；`openspec validate browser-slot-scheduling --strict` 通过。
+- [x] 6.6 提交 aidcp-edge 与中控 OpenSpec 证据，rebase/fast-forward 合入默认分支并推送；`openspec validate browser-slot-scheduling --strict` 通过。<!-- aidcp-edge master 3fd5320; aidcp contract 3428c56; both rebased and fast-forward pushed. -->
