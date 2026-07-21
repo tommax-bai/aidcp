@@ -84,7 +84,7 @@
 
 | type | 方向 | 用途 |
 | --- | --- | --- |
-| `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll；Facebook 首页显式空态时 Cloud 可下发 `empty_feed_reels_fallback` 授权进入 Reels；可选 `dwellMs`） |
+| `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll；Facebook 首页显式空态或有界续滚后仍有物理卡但不可可靠上报时，Cloud 可下发 `empty_feed_reels_fallback` 单次授权进入 Reels；可选 `dwellMs`） |
 | `feed.refresh` | cloud → edge | 主 feed 浏览深度到阈值后，点右下「刷新」按钮回到顶部换出全新一批（`reason`: feed_refresh；可选 `thinkMs`；边缘诚实回执 `action.completed{action:'refresh'}`，非 feed 页 / 无按钮 / 点后未换新批均如实失败，绝不假成功） |
 | `pacing.update` | cloud → edge | 会话中途风控档位变化推送新 `tempo`（payload `{tempo}`）；边缘刷新兜底节奏（最小间隔 + 停留兜底）、**不重置**操作间隔锚点、不入队/不唤醒会话（change pacing-fallback-hardening） |
 | `interaction.like` | cloud → edge | 点赞指定笔记 |
@@ -575,7 +575,7 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 // page.scroll
 { "reason": "feed_scroll" }                  // feed_scroll | search_scroll
 { "reason": "feed_scroll", "dwellMs": 1350 } // feed 出新卡：翻页前按新卡数看一会（feed-scroll-card-floor）；返回未刷新则省略 dwellMs
-{ "reason": "empty_feed_reels_fallback" }    // 仅 Cloud 收到 Facebook 首页明确 feed/empty 观察后授权一次；Edge 不得自行切列表
+{ "reason": "empty_feed_reels_fallback" }    // 仅 Cloud 收到 Facebook 首页 feed/empty 或 feed/present_unreportable 观察后授权一次；Edge 不得自行切列表
 // feed.refresh（feed 浏览深度到阈值改点右下「刷新」回顶换新批，change feed-refresh-on-depth）
 { "reason": "feed_refresh", "thinkMs": 700 } // 边缘点后校验「回顶 + 首卡换新」才回 ok:true 并上报新一批 page.cards
 // interaction.like
@@ -646,8 +646,9 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
     }
   ],
   "startupId": "ads-k1e0ero8:12345:lz7abc",       // 可选：完整 core/browser 启动代号；同一次启动内稳定，完整重启后变化，用于云端限定启动期昵称采集
+  "documentGeneration": "1784628123456",          // 可选：当前 performance.timeOrigin；用于同一启动内空态/不可上报态去重，不是帖子身份
   "listKind": "feed",                              // 可选：feed / reels；缺省 feed。页面形态观察，不是 feed/detail 控制流 surface
-  "listState": "ready"                             // 可选：ready / empty；缺省 ready。empty 只有 cards=[] 且显式空态稳定确认时有效
+  "listState": "ready"                             // 可选：ready / empty / present_unreportable；缺省 ready。后两者只允许 cards=[]
 }
 ```
 
@@ -656,6 +657,12 @@ Facebook 首页空态的兼容握手：Edge 必须先确认顶层 Facebook 首�
 语义连续命中 3 次并通过最终复检，才可上报 `cards:[], listKind:'feed', listState:'empty'`。仅 Cloud 将该观察翻译为
 `page.scroll{reason:'empty_feed_reels_fallback'}`；普通 0 卡、加载中、未知布局及其它平台不得触发。Reels 卡仍以现有
 `page.cards → note.open{surface:'feed'} → note.detail → interaction.like/page.scroll` 链运行，`feed/detail` Surface union 不新增 `reels`。
+
+Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有规则连续滚动最多 8 轮；仍无可信卡片身份时，必须重新
+读取同一完整页面样本。仅在 canonical 首页、主壳就绪、无登录/checkpoint/consent/captcha/loading，且可见物理 Feed
+卡仍在场时，才可上报 `cards:[], listKind:'feed', listState:'present_unreportable'`（可携带 `startupId` 与
+`documentGeneration`）。Cloud 不把它送入内容评估，也不把它冒充空 Feed；仅复用同一
+`page.scroll{reason:'empty_feed_reels_fallback'}` 做本场单次 Reels 授权。页面仍在加载、未知或受阻时失败关闭。
 
 **`note.detail`**——上报笔记详情
 ```jsonc
