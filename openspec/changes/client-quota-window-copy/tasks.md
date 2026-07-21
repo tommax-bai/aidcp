@@ -22,17 +22,17 @@
 
 ## 5. Completion Visual Hierarchy
 
-- [x] 5.1 Make browsing completion the only condition that applies completion styling to an entire quota-window card and its completed row. <!-- aidcp-edge df64de4 -->
-- [x] 5.2 Keep completed non-browsing rows neutral while showing the completion-colored `完成 N 项` state for every completed action. <!-- aidcp-edge df64de4 -->
-- [x] 5.3 Derive near-limit card tone only from incomplete capped actions so a completed supporting action does not create a false near-limit state. <!-- aidcp-edge df64de4 -->
+- [x] 5.1 Make browsing completion the only condition that applies completion styling to an entire quota-window card and its completed row. <!-- aidcp-edge 86091a2 -->
+- [x] 5.2 Keep completed non-browsing rows neutral while showing the completion-colored `完成 N 项` state for every completed action. <!-- aidcp-edge 86091a2 -->
+- [x] 5.3 Derive near-limit card tone only from incomplete capped actions so a completed supporting action does not create a false near-limit state. <!-- aidcp-edge 86091a2 -->
 
 ## 6. Follow-up Validation
 
-- [x] 6.1 Add focused DOM and CSS coverage for non-browsing completion, browsing completion, and the completion state text. <!-- aidcp-edge df64de4 -->
+- [x] 6.1 Add focused DOM and CSS coverage for non-browsing completion, browsing completion, and the completion state text. <!-- aidcp-edge 86091a2 -->
 - [x] 6.2 Run the focused Electron companion UI test and Edge typecheck. <!-- focused 76/76 pass; edge typecheck pass -->
 - [x] 6.3 Run `openspec validate client-quota-window-copy --strict` in the isolated control worktree. <!-- strict validation pass -->
 
 ## 7. Follow-up Delivery
 
-- [ ] 7.1 Commit the Edge implementation and control artifacts with repo SHAs and validation evidence recorded in this task file.
+- [x] 7.1 Commit the Edge implementation and control artifacts with repo SHAs and validation evidence recorded in this task file. <!-- aidcp-edge 86091a2; aidcp ce14d43; focused 76/76; edge typecheck pass; openspec strict pass -->
 - [ ] 7.2 Refresh against latest defaults, rerun required validation, fast-forward integrate, and push Edge `master` plus control `main` without packaging an installer.
