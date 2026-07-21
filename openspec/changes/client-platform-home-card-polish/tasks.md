@@ -15,4 +15,6 @@
 ## 3. Delivery
 
 - [x] 3.1 Record Edge commit and validation evidence, then pass strict OpenSpec validation.
-- [ ] 3.2 Rebase or replay onto the latest default branches, rerun deciding checks, fast-forward merge and push Edge and control repositories.
+- [x] 3.2 Rebase or replay onto the latest default branches, rerun deciding checks, fast-forward merge and push Edge and control repositories.
+
+<!-- Delivery: aidcp-edge ed48824 fast-forwarded and pushed to master; aidcp control commits 80fbc09 and fd48962 fast-forwarded and pushed to main. No Cloud deploy or desktop package was required because this is an Electron renderer-only change. -->
