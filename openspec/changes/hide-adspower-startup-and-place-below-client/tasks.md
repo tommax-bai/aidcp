@@ -31,4 +31,5 @@
   <!-- 2026-07-21 screenshot evidence showed the browser exposed at the client's lower-right edge while Z-order was otherwise correct. -->
 - [x] 4.2 Derive display-aware client-centered bounds in Electron, pass them through the correlated show command, and apply the validated override in core without changing guide/recovery behavior.
   <!-- Electron now reads mainWindow bounds and its matching display per avatar gesture; core validates and applies only that correlated bounds override. -->
-- [ ] 4.3 Add regression coverage, run focused/full Edge validation plus strict OpenSpec validation, record the real-machine screenshot finding, and safely integrate the correction.
+- [x] 4.3 Add regression coverage, run focused/full Edge validation plus strict OpenSpec validation, record the real-machine screenshot finding, and safely integrate the correction.
+  <!-- Edge 227a6f0 integrated to master after rebasing 13 concurrent commits. Client-alignment/core override regressions, acceptance 28/28, full Edge suite, typecheck, diff check, and strict OpenSpec validation passed. The supplied screenshot confirms the pre-fix lower-right offset; post-fix visual acceptance remains pending a rebuilt client. -->
