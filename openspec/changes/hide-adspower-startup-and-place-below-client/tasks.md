@@ -22,4 +22,5 @@
   <!-- 2026-07-21: 149 focused tests passed; git diff --check passed. -->
 - [x] 3.2 Run Edge acceptance, full tests, and typecheck; record real-machine startup/focus acceptance as completed or explicitly outstanding.
   <!-- 2026-07-21: acceptance 28 passed / 1 gated skip; full Edge suite exited 0; typecheck passed. Real-machine AdsPower flash/focus observation remains outstanding because no installer was built or target profile launched. -->
-- [ ] 3.3 Update this checklist with commits/validation evidence, run strict OpenSpec validation, and commit/push the isolated Edge and control branches without building an installer.
+- [x] 3.3 Update this checklist with commits/validation evidence, run strict OpenSpec validation, and commit/push the isolated Edge and control branches without building an installer.
+  <!-- Edge 85b59ee; control bb912f4 plus this evidence commit. Both isolated branches pushed. Strict OpenSpec validation passed; no installer was built. -->
