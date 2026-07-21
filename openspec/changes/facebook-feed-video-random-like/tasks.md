@@ -28,3 +28,13 @@
   <!-- Dev target check passed; backed up `/opt/aidcp/cloud` and `.env`, synced clean origin/master bf4fb93, restarted only `aidcp-cloud.service`, and verified active/NRestarts=0, listeners 8787/8090/8091, direct and Nginx health, PostgreSQL, source hashes, and unchanged isales services. Feishu WS was explicitly unset, so no Feishu ready/send probe applied. -->
 - [x] 3.6 Re-run bounded live probes on Mi Xu and Tianxing Bai when the installed Edge/runtime boundary permits, and report any installer or session limitation honestly.
   <!-- Pre-implementation bounded probes confirmed the two observed real Feed-video layouts and exact neutral-to-liked controls. A post-implementation source probe was not started: the active installed client is 0.3.22 while source is 0.3.24, it owns AdsPower port 50325, and starting a second source client would risk two controllers sharing the same environments. No installer was built or installed because packaging was outside this change's authorized scope. -->
+
+## 4. Live localized action/count regression
+
+- [x] 4.1 Replace duplicated numeric guards with one shared localized reaction-control classifier used by strict card identity and exact like location/verification.
+  <!-- aidcp-edge commit 94e93ad centralizes exact localized labels, same-action-bar comment proof, summary-toolbar exclusion, and fail-closed ambiguity handling for scan, action, and verification. -->
+- [x] 4.2 Add regression fixtures for an exact neutral action containing numeric text, a distinct reaction-summary toolbar, supported locale variants, and structurally ambiguous failure.
+  <!-- Regression coverage includes numeric `Thích`, a separate numeric reaction summary, zh/en/es/vi action variants, and summary-only ambiguity. -->
+- [x] 4.3 Run focused Facebook tests, acceptance/full Edge tests, typecheck, and a bounded read-only Mi Xu probe from the isolated Edge source.
+  <!-- Rebased validation: focused Facebook tests 74/74; acceptance 28/28; full suite 2141/2141; `npm run typecheck` exit 0. The bounded source probe launched exact AdsPower profile `k1es035u`, recovered the visible Sang Vlog video by round 4 with stable watch identity, author, caption, reaction count, and `isVideo=true`, performed no interaction, then returned the profile to `Inactive`. -->
+- [ ] 4.4 Integrate and push the Edge fix and control evidence serially, preserving the no-installer boundary.

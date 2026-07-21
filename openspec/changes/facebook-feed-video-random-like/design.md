@@ -62,9 +62,11 @@ The Feed policy marks the normalized identity handled before drawing. An injecta
 
 The ordinary interaction appraiser keeps its mandatory branch before the external-handled skip. Thus a later confirmed mandatory rule can still force its required action after a random miss, while the random policy remains the sole ordinary like decision. This matches the deployed Reels ordering.
 
-### 5. Vietnamese compatibility is bounded to verified post-level controls
+### 5. Localized controls share one structural classifier
 
-The CTA normalization adds exact verified forms: neutral `Thích`, selected/unlike `Gỡ Thích` and `Bỏ thích`, comment `Viết bình luận`, and reacted word `Thích`. Numeric reaction summaries such as `Thích: 27K người` remain excluded from toggle targeting and may be parsed as counts.
+The CTA normalization retains exact verified forms: neutral `Thích`, selected/unlike `Gỡ Thích` and `Bỏ thích`, comment `Viết bình luận`, and reacted word `Thích`. The shared classifier MUST combine these locale labels with post-action structure: a neutral/selected control belongs to the post action boundary only when it shares the bounded action-bar region with exactly one supported post-level comment control and is outside a reaction-summary toolbar. An exact neutral label remains an action candidate even when Facebook renders a numeric count inside the same button; numeric text alone MUST NOT demote it.
+
+Numeric reaction summaries such as `Thích: 27K người`, or exact reaction-word buttons inside a summary toolbar, remain excluded from toggle targeting and may be parsed as counts. If action and summary structure cannot be distinguished uniquely, the classifier returns the null/ambiguous sentinel. Scan identity, action location, and post-action verification MUST consume the same classifier rather than reimplementing their own digit guards.
 
 This is a bounded compatibility fallback for existing localized sessions, not a generalized N-language selector system; the en-US environment pin remains the normative provisioning behavior.
 
@@ -80,6 +82,7 @@ A view record, probability miss, safety abstention, blocked hit, already-liked r
 - [A random hit can be blocked or fail verification] → Define 25% as intent selection; only the existing confirmed `ok:true` receipt counts as a like.
 - [A mandatory rule is discovered after the early draw] → Mandatory appraisal stays ahead of the handled skip and can still force required actions; already-liked remains an honest no-op.
 - [Existing imported accounts remain localized] → Cover only exact probed Vietnamese labels and retain fail-closed numeric/action disambiguation.
+- [Facebook renders the count inside the real localized toggle] → Treat numeric text as presentation only after structural action-bar/summary-toolbar classification; never use a standalone digit guard to discard an exact action label.
 
 ## Migration Plan
 
