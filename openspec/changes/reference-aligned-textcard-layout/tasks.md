@@ -19,5 +19,7 @@
 
 - [x] 4.1 Run focused tests, publish/text-card acceptance tests, the full Cloud suite, and Cloud typecheck.
   <!-- aidcp-cloud e6b9289; focused 91/91, acceptance included, full 2759 passed + 8 skipped, npm run typecheck passed. -->
-- [ ] 4.2 Run strict OpenSpec validation and record implementation commits, validations, deployment, and deviations in this task list.
-- [ ] 4.3 Integrate and push the control and Cloud changes, deploy Cloud to dev, and verify service health plus a non-publishing Xiaomao generation smoke test.
+- [x] 4.2 Run strict OpenSpec validation and record implementation commits, validations, deployment, and deviations in this task list.
+  <!-- control 1ca6916; aidcp-cloud e6b9289; openspec validate reference-aligned-textcard-layout --strict passed; no protocol, schema, dependency, or environment changes. -->
+- [x] 4.3 Integrate and push the control and Cloud changes, deploy Cloud to dev, and verify service health plus a non-publishing Xiaomao generation smoke test.
+  <!-- Both default branches were fast-forward pushed. Dev backup=/opt/aidcp/cloud.bak.20260721-152231.tar.gz env=/opt/aidcp/cloud.env.bak.20260721-152231; only aidcp-cloud.service restarted; active/NRestarts=0, 8787+8090 listening, panel health+version HTTP 200, PostgreSQL select 1, Feishu ready, no error journal entries, and pre-existing isales services remained active. ECS Xiaomao article-page smoke rendered 1728x2304/245847 bytes at occupancy 0.8368 with truncated=false and sanitized=false; no platform publish was performed. -->
