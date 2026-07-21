@@ -78,6 +78,12 @@ Electron 主进程已经分别投影 `coreState`、`engineLinkState`、`automati
 
 `slots_full` 且已经保留启动资格的环境进入权威 `slotWaiters()` FIFO，显示 `排队中` 与可证明的 `#N`。`start_queue_full` 表示本次没有取得排队资格；环境可先连接 browser-absent 控制面并按 60/120/300 秒有界退避重新申请，但状态保持 `待机中`，日志必须写明“本次未入队、稍后重试”，不得复用“仍在队列中，浏览器继续起”的文案。
 
+### 8. 全量快照与增量状态共用完整投影
+
+`statusOf(handle)` 是单环境对渲染层的唯一权威状态投影，负责合并原始核心状态、四条生命周期轴以及当前调度器可证明的队列阶段和位次。`fleetSnapshot()` 与每次 `status:update` 增量推送都必须使用这份完整投影，不能由增量出口直接展开 `handle.status`。
+
+渲染层按 `envId` 用最新状态对象替换旧对象，因此主进程推送必须是完整快照而不是局部 patch。这样，`start_queue_full` 后保持浏览器关闭的环境在后续心跳中仍是 `待机中`，真实槽位 FIFO 成员也会持续保留 `waiting_resource` 与 `#N`，不会被原始 `edge/session` 兼容字段重新解释为 `运行中` 或 `启动中`。旧主进程版本缺少结构化轴时，渲染层仍可使用兼容投影；当前主进程不得依赖该降级路径。
+
 ## Risks / Trade-offs
 
 - [普通状态组增多，长列表标题更多] → 空组不展示，收起态仍只显示头像与状态点；不增加横向宽度。
@@ -93,8 +99,9 @@ Electron 主进程已经分别投影 `coreState`、`engineLinkState`、`automati
 2. 再更新纯状态投影、分组和 CSS；旧主进程没有位次字段时仅不显示 `#N`。
 3. 更新批量启动进度判据并补充纯函数、DOM 与调度队列测试。
 4. 为关闭/暂停/重新启动增加每环境操作代，取消尚未开始的旧队列项，并补充完整的快速关闭再启动回归。
-5. 通过 focused、acceptance、full test 与 typecheck 后快进集成到 `aidcp-edge/master`；控制仓 OpenSpec 独立提交并严格校验。
-6. 回滚时可整体回退 Edge 提交；新增句柄字段只存在于内存，不需要数据迁移。
+5. 将 `fleetSnapshot()` 与 `status:update` 收敛到同一 `statusOf(handle)` 完整投影，并覆盖增量心跳不改变待机/排队真态的回归。
+6. 通过 focused、acceptance、full test 与 typecheck 后快进集成到 `aidcp-edge/master`；控制仓 OpenSpec 独立提交并严格校验。
+7. 回滚时可整体回退 Edge 提交；新增句柄字段只存在于内存，不需要数据迁移。
 
 ## Open Questions
 

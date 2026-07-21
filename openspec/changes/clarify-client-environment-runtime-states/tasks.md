@@ -31,3 +31,11 @@
 - [x] 5.6 Run Edge focused tests, acceptance tests, full tests and typecheck <!-- acceptance: 28/28; full: 2149/2149; typecheck: pass -->
 - [x] 5.7 Record follow-up implementation commits and validation evidence <!-- implementation: aidcp-edge 61ce7fc; focused: 206/206; acceptance: 28/28; full: 2149/2149; typecheck: pass -->
 - [x] 5.8 Run `openspec validate clarify-client-environment-runtime-states --strict` <!-- pass -->
+
+## 6. Incremental status projection follow-up
+
+- [x] 6.1 Make every `status:update` use the same complete `statusOf(handle)` projection as fleet snapshots
+- [x] 6.2 Add main-process source and renderer regressions proving heartbeats preserve standby and queued truth <!-- focused scheduler/renderer: 102/102 pass -->
+- [x] 6.3 Run Edge focused tests, acceptance tests, full tests and typecheck <!-- focused: 182/182; acceptance: 28/28 with real-machine E2E gate skipped; full: 2151/2151; typecheck: pass -->
+- [x] 6.4 Record follow-up implementation commit and validation evidence <!-- implementation: aidcp-edge e4eb749; focused: 182/182; acceptance: 28/28; full: 2151/2151; typecheck: pass -->
+- [x] 6.5 Run `openspec validate clarify-client-environment-runtime-states --strict` <!-- pass -->

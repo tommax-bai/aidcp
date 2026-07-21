@@ -158,3 +158,19 @@
 - **WHEN** 一个待机环境因 `start_queue_full` 没有取得启动排队资格
 - **THEN** 环境 SHALL 显示 `待机中`且不显示 `#N`
 - **AND** 日志 SHALL 说明“本次未入队、稍后重试”，MUST NOT 声称“仍在队列中，浏览器继续起”
+
+### Requirement: 增量状态推送 SHALL 保留完整生命周期投影
+
+主进程向渲染层发送的全量 fleet 快照与 `status:update` 增量状态 SHALL 来自同一份完整生命周期投影，并 SHALL 同时包含当前可推导的核心、Cloud、自动化、浏览器状态以及权威队列阶段和位次。增量推送 MUST NOT 只发送原始核心状态后依赖渲染层兼容推断，因为渲染层按环境替换状态对象时会丢失快照中的调度真态。
+
+#### Scenario: 待机状态不被后续心跳覆盖
+- **GIVEN** 全量快照把一个 `start_queue_full` 后未入队、浏览器关闭且控制面在线的环境投影为 `待机中`
+- **WHEN** 该环境随后产生一次普通状态心跳
+- **THEN** 增量状态 SHALL 继续携带 `automationState=ready`、`engineLinkState=connected` 与 `browserState=closed`
+- **AND** 环境 MUST 保持 `待机中`，不得被原始 `edge=running` 或 `session=resting` 覆盖为 `运行中`
+
+#### Scenario: 排队位次不被后续心跳覆盖
+- **GIVEN** 一个环境是权威槽位 FIFO 的成员并显示 `排队中 #N`
+- **WHEN** 该环境随后产生一次普通状态心跳
+- **THEN** 增量状态 SHALL 继续携带 `automationState=waiting_resource` 与当前可证明的 `queuePosition`
+- **AND** 环境 MUST 保持 `排队中 #N`，不得退化为 `启动中` 或丢失位次
