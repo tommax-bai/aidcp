@@ -1,16 +1,16 @@
 ## 1. Edge proxy password data path
 
-- [x] 1.1 Update AdsPower profile normalization so an API-returned `proxy_password` is exposed only as the in-memory `proxyConfig.proxyPassword` field while summaries remain non-sensitive.
-- [x] 1.2 Update the existing-environment proxy editor to display the returned password and keep it in the form payload unless the operator changes or clears it.
+- [x] 1.1 Keep the all-profile projection non-sensitive and reuse the exact-profile proxy reader for password-bearing configuration.
+- [x] 1.2 Add a customer-scoped exact proxy-read IPC and update the existing-environment editor to load, display, and preserve the returned password for the selected target only.
 
 ## 2. Regression coverage and security boundaries
 
-- [x] 2.1 Update normalization tests for returned and absent proxy passwords, including proof that the environment summary remains non-sensitive.
-- [x] 2.2 Add renderer coverage proving the existing password is visibly prefilled and is submitted unchanged when another proxy field is edited.
-- [x] 2.3 Run focused Electron proxy/renderer tests and Edge typecheck; confirm write-body allowlisting and redaction tests remain green. <!-- aidcp-edge worktree commit 32bacbd; `npx tsx --test --test-reporter=dot test/electron/ads-local-api.test.ts test/electron/ads-proxy-config.test.ts test/electron/ads-write-api.test.ts test/electron/renderer-smoke.test.ts` PASS (126); `npm run typecheck` PASS. Read-only local AdsPower probe: 30 profiles, 13 password fields, 12 non-empty; no values emitted. -->
+- [x] 2.1 Update normalization and IPC-scope tests for exact returned/absent passwords, including proof that the all-profile projection and environment summary remain non-sensitive.
+- [x] 2.2 Add renderer coverage proving the target password is loaded on demand, visibly prefilled, and submitted unchanged when another proxy field is edited.
+- [x] 2.3 Run focused Electron proxy/renderer tests and Edge typecheck; confirm write-body allowlisting, customer scope, and redaction tests remain green. <!-- aidcp-edge d725385 on top of b7c6dda + version 0063e4c; after physical `npm ci`, seven focused Electron files PASS including proxy preflight, customer scope, renderer and lifecycle; `npm run typecheck` PASS. Read-only local AdsPower probe: 30 profiles, 13 password fields, 12 non-empty; no values emitted. -->
 
 ## 3. Closeout
 
-- [x] 3.1 Run `openspec validate preserve-client-proxy-password --strict` and record Edge commit and validation evidence in this task list. <!-- Strict validation PASS; Edge source/test worktree commit 32bacbd. -->
+- [x] 3.1 Run `openspec validate preserve-client-proxy-password --strict` and record Edge commit and validation evidence in this task list. <!-- Strict validation PASS after exact-target design update; Edge commits b7c6dda, 0063e4c, d725385. -->
 - [ ] 3.2 Integrate the validated control and Edge commits onto their default branches and push; do not package or deploy a desktop installer unless separately requested.
 - [ ] 3.3 Build signed and notarized macOS `0.3.24` installers from merged Edge `master` with `dev` defaults, publish only to the dev downloads directory, and verify packaged code, baked target, hashes, sizes, and HTTP availability.

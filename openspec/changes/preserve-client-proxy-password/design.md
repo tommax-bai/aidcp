@@ -1,6 +1,6 @@
 ## Context
 
-Edge 目前经主进程调用 AdsPower `user/list`，再由 `normalizeProfile()` 把代理配置投影给渲染层。该投影主动删除 `proxy_password`，代理编辑浮层也强制把密码框置空；保存时 `normalizeProxyInput()` 重建完整 `user_proxy_config`，空密码不会进入请求。因此，对已有鉴权代理只修改其他字段时，旧密码不会随 `user/update` 提交。
+Edge 经主进程调用 AdsPower `user/list`，再由 `normalizeProfile()` 把非敏感代理摘要投影给渲染层；该全量列表必须继续删除 `proxy_password`。最新主干已经增加按精确 `profileId` 读取单个环境完整代理配置的主进程能力，用于 Facebook 启动前预检，但尚未向渲染层提供受限编辑读取。当前代理编辑浮层仍只使用全量列表投影，因此密码框为空；保存时 `normalizeProxyInput()` 重建完整 `user_proxy_config`，对已有鉴权代理只修改其他字段时，旧密码不会随 `user/update` 提交。
 
 用户已明确允许客户端在本地代理编辑界面回显密码。约束仍是：凭据只在 AdsPower 响应、Electron IPC、渲染层当前内存和写请求中短暂存在，不进入 `settings.json`、花名册、日志、诊断或代理摘要。
 
@@ -21,16 +21,18 @@ Edge 目前经主进程调用 AdsPower `user/list`，再由 `normalizeProfile()`
 
 ## Decisions
 
-1. `structuredProxy()` 直接把 `user_proxy_config.proxy_password` 投影为 `proxyPassword`。这样密码只沿现有、已按客户环境范围过滤的 `ads:listProfiles` IPC 链路到达渲染层，不引入第二个读取接口或额外持久化面。备选的独立“读取密码”IPC 会增加授权与竞态面，且仍依赖同一个 `user/list` 数据源，因此不采用。
-2. 打开代理浮层时把 `proxyPassword` 写入密码输入框，并把输入类型改为普通文本以满足“直接回显”。保存继续复用现有 `readProxyForm()` → `ads:updateEnvProxy` → `normalizeProxyInput()` 链，因此未改密码时自然原样提交，修改或清空时也按当前表单值提交。
-3. 不把 profile 或密码写入 settings。`lastProfiles` 仍只是渲染进程内存态；环境花名册持久化只提取 `profileId/name/platform`。代理摘要继续只含类型、host、IP 和国家信息。
-4. AdsPower 未返回 `proxy_password` 时，表单显示空值，客户端不声称已保留未知密码。该边界保持数据诚实；本变更只修复“API 已返回但客户端主动丢弃”的路径。
+1. 全量 `ads:listProfiles` 投影继续剥离 `proxy_password`。运营点击某一行“代理”时，新增具名 IPC 只接收该行 `userId`，主进程在客户鉴权开启时先校验有效会话和 `allowedProfileIds`，再复用最新主干的 `getProfileProxyConfig()` 精确读取该环境。这样不会把其他环境密码批量送进渲染层，也不会引入任意 URL 或原始响应能力。
+2. 精确读取成功后才打开代理浮层，把返回的 `proxyPassword` 写入输入框，并把输入类型改为普通文本以满足“直接回显”。读取失败保持浮层关闭并显示真实原因；陈旧响应在目标环境已不在当前列表时丢弃。
+3. 保存继续复用现有 `readProxyForm()` → `ads:updateEnvProxy` → `normalizeProxyInput()` 链，因此未改密码时自然原样提交，修改或清空时也按当前表单值提交。
+4. 不把 profile 或密码写入 settings。环境花名册持久化只提取 `profileId/name/platform`，代理摘要继续只含类型、host、IP 和国家信息。
+5. AdsPower 精确读取未返回 `proxy_password` 时，表单显示空值，客户端不声称已保留未知密码。该边界保持数据诚实；本变更只修复“API 已返回但编辑链未使用”的路径。
 
 ## Risks / Trade-offs
 
 - [本地肩窥或渲染层脚本可看到明文代理密码] → 这是用户明确选择的本地运维体验；仍限制在已归属环境、当前本地页面内存中，不落盘、不进日志，并保持 Electron 上下文隔离边界。
 - [AdsPower 某版本不返回密码] → 不伪造成功或缓存旧值；表单如实为空，用户需重新填写后再保存。
-- [对象传播扩大意外日志泄露面] → 保持现有代码无 profile 整体日志，回归检查摘要、设置和写客户端脱敏逻辑不包含密码。
+- [敏感读取 IPC 被越权调用] → IPC 只接受精确 `userId`，客户模式必须通过有效会话与 `allowedProfileIds`，本地 API 返回也必须匹配同一 `profileId`；全量列表继续不含密码。
+- [对象传播扩大意外日志泄露面] → 精确响应只挑代理字段，保持现有代码无 profile 整体日志，回归检查摘要、设置和写客户端脱敏逻辑不包含密码。
 - [清空密码会移除鉴权] → 表单当前值即提交意图；用户主动清空后保存会下发不含 `proxy_password` 的完整代理配置。
 
 ## Migration Plan
