@@ -14,6 +14,15 @@ Electron 陪伴界面 SHALL 在明确的小红书环境中把原单记录发布�
 - **WHEN** 当前环境只有 queued、generating 或 submitted 内容且无需客户操作
 - **THEN** 首页显示紧凑数量摘要和“查看全部”，不为每条内容占据运行首页空间
 
+### Requirement: Home status surfaces SHALL prioritize today progress before publish content
+
+Electron 运行首页 SHALL 在 DOM 与视觉顺序中将完整“今日进展”卡放在内容发布卡之前。实现 MUST 保持今日进展的环境控制、展开状态与指标节点完整，保持发布卡的折叠、轮播、审核和队列入口完整，并且 MUST NOT 通过仅改变 CSS 视觉顺序造成辅助技术或键盘顺序不一致。
+
+#### Scenario: 今日进展与待发布卡同时出现
+
+- **WHEN** 当前环境同时展示今日进展和展开或收起的内容发布卡
+- **THEN** 用户先阅读和操作今日进展，再到内容发布卡；“今天做了这些”活动流继续位于两张卡之后
+
 ### Requirement: Expanded publish summary SHALL support restrained item switching
 
 Electron 展开态发布摘要 SHALL 在当前环境可展示项超过一条时，提供位于卡片最左和最右的上一条、下一条按钮，并显示当前位置与总数。按钮 SHALL 默认使用弱化颜色，在 hover 与 `focus-visible` 时轻度加深；按钮 SHALL 是原生键盘可达控件并以目标内容标题提供可访问名称。单条、加载、错误与收起态 MUST 隐藏并禁用切换控件。
