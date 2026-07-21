@@ -11,7 +11,7 @@ The environment rail's show phase uses `browser.show`; the core moves the window
 - Start parked headful browsers at a best-effort coordinate to the right of every known display, before CDP is available.
 - Avoid the conflicting maximized launch state when a staging coordinate is present, while keeping the fixed desktop size and post-attach viewport proof.
 - Keep the operator-selected parking bounds independent from the startup staging coordinate.
-- For the environment-avatar show gesture, establish the browser immediately below the AIDCP client in window order and only advance the UI phase after the placement completes.
+- For the environment-avatar show gesture, center the browser on the AIDCP client's current outer bounds, establish it immediately below the client in window order, and only advance the UI phase after the placement completes.
 - Preserve browser-foreground behavior for guided login and explicit recovery controls.
 
 **Non-Goals:**
@@ -34,13 +34,19 @@ AdsPower and self Chrome omit `--start-maximized` when `BrowserLaunchOptions.win
 
 Removing the fixed desktop size was rejected because responsive Facebook/XHS layouts depend on it. Removing post-attach correction was rejected because launch hints remain best-effort and window managers may clamp them.
 
-### 3. Use a correlated show completion before restoring AIDCP foreground
+### 3. Center the avatar-shown browser on the live AIDCP window frame
 
-The rail-avatar path sends `browser.show` with a correlation id and a client-foreground policy. The core performs the existing visible-bounds move and browser raise, then emits a structured completion line carrying that id. Electron waits for that bounded completion, raises/focuses its own `mainWindow`, and only then returns success to the renderer. This ordering places the driven browser immediately below AIDCP rather than racing two independent focus calls.
+Electron reads `mainWindow.getBounds()` at the moment of the avatar gesture and selects the matching display. It preserves the fixed browser desktop size, centers that browser rectangle on the AIDCP outer window rectangle, and clamps only to the matching display work area when the client is itself near an edge. The resulting bounds travel in the correlated `browser.show` payload and replace the static primary-screen inspection bounds for this avatar-only path.
+
+Using the startup-time `visibleBounds` was rejected because it is centered on the primary display and may also carry a per-environment cascade offset. That creates the observed lower-right exposure when AIDCP is large or has moved. Resizing the browser to exactly match AIDCP was rejected because it could cross the fixed desktop viewport boundary and trigger responsive platform layouts.
+
+### 4. Use a correlated show completion before restoring AIDCP foreground
+
+The rail-avatar path sends `browser.show` with a correlation id, the client-centered target bounds, and a client-foreground policy. The core performs the requested bounds move and browser raise, then emits a structured completion line carrying that id. Electron waits for that bounded completion, raises/focuses its own `mainWindow`, and only then returns success to the renderer. This ordering places the driven browser immediately below AIDCP rather than racing two independent focus calls.
 
 Uncorrelated `browser.show` calls from guided login, tray, and explicit recovery keep the current browser-foreground behavior. A simple fixed delay was rejected because AdsPower/CDP timing varies by machine and could still let a late `Page.bringToFront` cover AIDCP. Skipping `Page.bringToFront` was rejected because the browser could remain behind unrelated windows instead of directly below AIDCP.
 
-### 4. Completion remains honest and bounded
+### 5. Completion remains honest and bounded
 
 Electron stores only short-lived correlation ids. A core error, child loss, or completion timeout returns `{ok:false}` and the rail does not enter the shown phase. Successful completion proves the core finished the requested move and Electron issued its own foreground call; it still does not claim the OS can guarantee focus indefinitely against later user/system actions.
 
@@ -50,6 +56,7 @@ Electron stores only short-lived correlation ids. A core error, child loss, or c
 - [A transient off-screen page reports hidden] → No automation starts before final parking and the existing post-placement visibility probe passes; hidden final state still fails/degrades honestly.
 - [Foreground acknowledgement is lost in stdout processing] → Use a narrow structured prefix, bounded timeout, and focused parsing tests; never advance the rail phase on timeout.
 - [AIDCP focus call itself is denied by the OS] → Do not claim permanent topmost status; preserve visible bounds and honest failure for missing windows/cores.
+- [AIDCP is partly outside the work area or on another display] → Derive geometry from the matching display and clamp the browser rectangle to that work area while keeping its fixed size.
 
 ## Migration Plan
 
@@ -62,4 +69,3 @@ Rollback removes the separate staging coordinate and correlated client-foregroun
 ## Open Questions
 
 - Real-machine acceptance must establish how often macOS clamps the initial off-screen coordinate and whether any visible focus flash remains after maximization is omitted.
-

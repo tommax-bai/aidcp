@@ -6,7 +6,7 @@ AdsPower cold starts can briefly paint a maximized browser on the operator's pri
 
 - Give every parked-browser cold start a machine-local right-side staging position and stop passing `--start-maximized` when that position is available, while retaining the fixed desktop size and authoritative CDP correction.
 - Keep the staging position separate from the operator-selected final parking position, so the browser can start out of view and then settle into `primary-screen`, `parking-display`, `edge-strip`, or `offscreen` after attach and verification.
-- Change the environment-avatar show action to move the driven browser to its visible inspection bounds, then restore the AIDCP client as the foreground window instead of leaving the browser above it.
+- Change the environment-avatar show action to center the driven browser on the AIDCP client's current window frame, then restore the AIDCP client as the foreground window instead of leaving the browser above it or offset at the primary-screen inspection position.
 - Preserve honest failure behavior: unsupported/clamped staging remains best-effort, failed show/park commands do not advance the rail phase, and page visibility/desktop viewport verification still gates automation.
 
 ## Capabilities
@@ -25,5 +25,5 @@ AdsPower cold starts can briefly paint a maximized browser on the operator's pri
 
 - `aidcp-edge/src/electron/browser-parking.cjs` and Electron spawn wiring: compute and inject separate startup staging and final parking bounds.
 - `aidcp-edge/src/cdp/browser-provider.ts` and browser-window control: remove parked-launch maximization and accept explicit show bounds.
-- `aidcp-edge/src/electron/main.cjs`: send the current visible target and restore the AIDCP main window to foreground after the browser show request.
+- `aidcp-edge/src/electron/main.cjs`: derive a browser target centered on the current AIDCP window frame, send it with the show request, and restore the AIDCP main window to foreground after completion.
 - Focused provider, parking, Electron main/renderer, and acceptance coverage; no cloud protocol, database, dependency, installer, or deployment change.
