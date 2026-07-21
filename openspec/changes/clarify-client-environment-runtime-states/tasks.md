@@ -20,3 +20,14 @@
 
 - [x] 4.1 Record implementation commits and validation evidence in this checklist <!-- implementation: aidcp-edge 47bf3c0ab6a3 -->
 - [x] 4.2 Run `openspec validate clarify-client-environment-runtime-states --strict` <!-- pass -->
+
+## 5. Rapid close/start regression follow-up
+
+- [x] 5.1 Add per-environment lifecycle generations and cancel or invalidate stale preparation, launch, wake and retry work
+- [x] 5.2 Serialize a new start request behind an in-flight user close without reusing the closing core
+- [x] 5.3 Bind execution-stage truth to the current lifecycle generation and clear it at structured idle/standby/close boundaries
+- [x] 5.4 Distinguish authoritative FIFO membership from `start_queue_full` retry state in status and logs
+- [x] 5.5 Add focused queue, lifecycle-generation, rapid close/start and rail truth regressions <!-- focused queue/lifecycle/rail/log truth: 206/206 pass -->
+- [x] 5.6 Run Edge focused tests, acceptance tests, full tests and typecheck <!-- acceptance: 28/28; full: 2149/2149; typecheck: pass -->
+- [x] 5.7 Record follow-up implementation commits and validation evidence <!-- implementation: aidcp-edge 61ce7fc; focused: 206/206; acceptance: 28/28; full: 2149/2149; typecheck: pass -->
+- [x] 5.8 Run `openspec validate clarify-client-environment-runtime-states --strict` <!-- pass -->
