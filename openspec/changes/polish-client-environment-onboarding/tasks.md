@@ -59,3 +59,9 @@
 - [x] 8.1 首次创建候选仅以当前账号权威 fleet 零环境为准，本机其他账号或历史 settings roster 不得阻断自动关窗与启动引导
 - [x] 8.2 补充同机历史环境回归测试，完成聚焦测试、typecheck、OpenSpec strict 校验、ff-only 集成与默认分支推送；不部署 ECS、不构建安装包
 <!-- Delivered as aidcp-edge cafc771 to origin/master by ff-only merge and push. Validation: the regression failed before the fix and passed after it; fleet-console 82/82; renderer smoke + fleet + companion-ui + ui-logic passed; acceptance 32/32; full suite 2177/2177; npm run typecheck; node --check; git diff --check; OpenSpec strict validation. Source-only Edge delivery: no ECS deployment and no desktop installer build. -->
+
+## 9. 登录后的账号环境原子加载
+
+- [x] 9.1 将 settings、当前账号环境同步和最终 fleet 读取串行为一个 loading 阶段，登录初期空快照不得提前触发新用户空态
+- [x] 9.2 补充老用户登录同步延迟回归测试，完成聚焦测试、验收、全量测试、typecheck、OpenSpec strict 校验、ff-only 集成与默认分支推送；不部署 ECS、不构建安装包
+<!-- Delivered as aidcp-edge 13b4025 to origin/master by ff-only merge and push. Validation: the delayed account-roster regression failed before the fix and passed after it; unresolved account sync plus empty fleet stays retryable instead of entering onboarding; fleet-console 84/84; renderer smoke + fleet + companion-ui + ui-logic 302/302; acceptance 29 passed with the gated real-machine E2E skipped; final committed tree full suite exited 0; npm run typecheck; node --check; git diff --check. Source-only Edge delivery: no ECS deployment and no desktop installer build. -->
