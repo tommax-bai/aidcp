@@ -30,12 +30,12 @@
 
 ### Requirement: Customer progress SHALL use truthful four-stage semantics
 
-客户端 SHALL 以“开始创作、正文与配图、你来确认、发布结果”四阶段展示客户进度，但每一阶段状态 MUST 只由 Cloud 显式生命周期投影映射。当前阶段有可证实数量时 SHALL 展示，例如配图 `2/4`；缺少状态证据时 SHALL 显示未知或未开始，不得根据等待时长、字段存在或页面顺序推断完成。
+客户端 SHALL 以“开始创作、正文与配图、发布确认、发布结果”四阶段展示客户进度，但每一阶段状态 MUST 只由 Cloud 显式生命周期投影映射。当前阶段有可证实数量时 SHALL 展示，例如配图 `2/4`；“发布确认”处于 `waiting_human` 时 SHALL 显示“待你确认”，完成时 SHALL 显示“已确认”；“发布结果”尚未开始时 SHALL 显示“等待发布”。缺少状态证据时 SHALL 显示未知或未开始，不得根据等待时长、字段存在或页面顺序推断完成。
 
 #### Scenario: 等待人工确认
 
 - **WHEN** lifecycle 明确显示审批阶段为 `waiting_human` 且下发阶段为 `pending`
-- **THEN** 客户端显示“你来确认”为当前阶段、“发布结果”为未开始，并提供现有稿件审核入口
+- **THEN** 客户端显示“发布确认”为当前阶段及“待你确认”，显示“发布结果”为“等待发布”，并提供现有稿件审核入口
 
 ### Requirement: Queued publish tasks SHALL be individually cancellable
 

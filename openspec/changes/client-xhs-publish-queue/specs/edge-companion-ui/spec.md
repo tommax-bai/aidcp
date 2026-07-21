@@ -36,3 +36,17 @@ Renderer SHALL 只通过 preload 暴露的发布队列读取与取消方法操�
 
 - **WHEN** 客户确认取消当前队列中的任务
 - **THEN** renderer 只向 preload 提交当前 envId、任务 id 与整数 version，main 将其绑定到该环境的固定客户取消路径
+
+### Requirement: Publish progress rail SHALL read as one connected, non-interactive sequence
+
+发布队列的四阶段步骤条 SHALL 在宽屏将节点和文案按同一四列对齐，并只在相邻圆点外缘之间绘制连接线。第一节点之前与最后节点之后 MUST NOT 出现线段，连接线 MUST NOT 穿过圆点或阶段文案。窄屏 SHALL 改为等价的纵向连接，保持阶段顺序与状态文字可读。步骤项只表达状态，MUST NOT 使用 hover、手型光标或点击反馈暗示可操作性。
+
+#### Scenario: 已确认稿件等待发布
+
+- **WHEN** 前三阶段完成而发布结果尚未开始
+- **THEN** 第三个圆点与第四个圆点之间显示已推进连接，第四个圆点保持待处理样式，轨道首尾无悬空短线且文字不遮挡线段
+
+#### Scenario: 窄屏查看四阶段
+
+- **WHEN** 客户在窄屏窗口查看同一任务
+- **THEN** 四阶段按从上到下排列，连接线只连接相邻圆点，完整标签与状态文字换行可读且页面无横向溢出

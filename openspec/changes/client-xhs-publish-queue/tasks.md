@@ -48,3 +48,13 @@
   <!-- dev 121.89.85.150: backups /opt/aidcp/backups/cloud-20260721-041827Z.tgz and cloud-env-20260721-041827Z.bak; local/remote hashes matched; AIDCP_DEPLOY_ENV=dev; service active with NRestarts=0; 8787/8090/8091 listening; internal and public health passed; queue unauth probe 401; PostgreSQL select 1, Feishu WS ready, and both isales services remained active. -->
 - [x] 5.4 Record final refs and deployment evidence, validate OpenSpec strictly, then fast-forward merge and push the control change to `main`; do not build an Edge installer or deploy `ol`.
   <!-- Control artifacts and rollout evidence were rebased onto current origin/main, strict validation passed, and ff-only integration was pushed through 912f255; this final checklist closeout is appended on the same branch. No Edge installer was built and ol was not touched. -->
+
+## 6. Customer-facing stage polish
+
+- [x] 6.1 Rename the customer approval stage to `发布确认` and add truthful stage-specific wording for waiting, completed, and not-yet-dispatched states.
+  <!-- aidcp-cloud fbfc67d: approval maps to 发布确认 with 待你确认 / 已确认; pending dispatch maps to 等待发布 without changing lifecycle evidence. -->
+- [x] 6.2 Rebuild the desktop and narrow-screen progress rail so connectors run only between adjacent node edges, never through labels, with no leading/trailing fragment or false click affordance.
+  <!-- aidcp-edge 84013d0: centered desktop nodes with edge-to-edge outgoing segments, vertical narrow-screen segments, no leading/trailing pseudo-element, no hover/cursor affordance, and role/listitem accessibility. -->
+- [x] 6.3 Add focused Cloud projection and Edge renderer/static-style regressions, then run the proportionate full, acceptance, syntax, and typecheck gates serially.
+  <!-- Cloud focused 2/2, acceptance 64/64, full 2758 total (2750 passed, 8 skipped), typecheck passed. Edge focused queue/IPC 23/23 plus companion 73/73, acceptance 28/28, full 2127/2127, four Electron syntax checks and typecheck passed. Browser-rendered data URL was blocked by the browser security policy, so no visual-browser result is claimed; DOM/accessibility and exact CSS connector geometry regressions passed. -->
+- [ ] 6.4 Rebase onto current defaults, fast-forward merge and push all three repositories, deploy the committed Cloud source to `dev` with backup and runtime checks, and record final evidence without packaging Edge or touching `ol`.
