@@ -15,14 +15,15 @@
 - [x] 3.2 Run focused tests, Edge typecheck, desktop build-input verification, and `openspec validate facebook-proxy-selection-preflight --strict`; record commits and validation evidence.
 
 <!--
-Implementation evidence (not merged or deployed):
-- aidcp-edge commit fe4d374 (codex/facebook-proxy-selection-preflight)
-- focused proxy/API/runtime tests: 38 passed
-- lifecycle/slot/control-plane/fleet/renderer regression selection: 241 passed
-- post-queue-refactor proxy + cold-standby + slot selection: 43 passed
+Implementation evidence:
+- aidcp-edge commit 7d03770, fast-forward merged and pushed to origin/master
+- focused proxy/API/runtime/lifecycle/slot/control-plane selection: 84 passed
+- full Edge test suite: 2078 passed
 - npm run typecheck: passed
 - npm run verify:desktop-build-input: passed
 - live one-shot module probe: all six supplied proxies reached Facebook when configured as HTTP; the currently stored HTTPS type for proxy 1 failed as expected
 - npm audit --omit=dev: one pre-existing high finding in jsdom -> form-data@4.0.5; new proxy agents are not in the finding path
-- no installer build, deployment, archive, or default-branch integration performed
+- scripts/deploy-target dev --check: passed
+- deployment boundary: Edge desktop source only; no cloud/console ECS artifact changed, and no installer was built without explicit packaging/release authorization
+- OpenSpec change remains unarchived
 -->
