@@ -37,3 +37,19 @@
 <!-- Session validation: fleet-console 75/75; npm run typecheck; node --check; git diff --check. Actual index.html/styles.css were checked at 1280x720 and 820x720: the card starts 74px below the content origin, the false progress decoration is absent, the 820px page has no horizontal overflow, the final step stays on one line, and the CTA opens the existing create tab. -->
 - [x] 5.3 在独立 worktree 完成聚焦测试、验收、完整测试、typecheck、OpenSpec strict 校验及 ff-only 集成；不部署 ECS、不构建安装包
 <!-- Delivered as aidcp-edge 989122e to origin/master by ff-only push. Validation: fleet-console 75/75; acceptance 28/28; serial full suite 2149/2149; npm run typecheck; node --check; git diff --check; OpenSpec strict validation. Edge source-only change: no ECS deployment and no desktop installer build. -->
+
+## 6. 首次创建后的主界面接续引导
+
+- [x] 6.1 为从零花名册创建的首个单环境增加双重权威确认，确认进入设置花名册与 fleet 后关闭环境管理并选中主界面
+- [x] 6.2 在主界面启动按钮旁增加绑定精确环境的一次性提示、有限光环、主动关闭和减弱动态效果支持
+- [x] 6.3 补充首次/后续/批量/失败/快照延迟、提示显示与清除的回归测试，并完成实际窗口交互检查
+- [x] 6.4 在独立 worktree 完成聚焦测试、验收、完整测试、typecheck、OpenSpec strict 校验及 ff-only 集成；不部署 ECS、不构建安装包
+<!-- Delivered as aidcp-edge a03b9a2 to origin/master after rebasing onto concurrent renderer changes. Validation: fleet-console 81/81; smoke + fleet 160/160; post-rebase fleet/smoke/companion-ui/ui-logic focused suites passed; acceptance 28/28; serial full suite 2158/2158; npm run typecheck; node --check; git diff --check. Visual and interaction QA passed at 1280x720 and 820x720: the guide stayed inside the summary layout, pointed to the exact start action, did not overflow, did not steal focus, and closed on click. -->
+
+## 7. 启动加载态与大窗口视觉收口
+
+- [x] 7.1 增加 fleet roster `loading / ready / error` 三阶段，HTML 首帧先展示中性加载骨架，权威快照后再进入零环境或日常态
+- [x] 7.2 增加读取失败重试且禁止失败冒充零环境；保留不支持 fleet API 的旧主进程兼容路径
+- [x] 7.3 用自适应间距与非语义化低对比环境光收口大窗口底部留白，并补充减弱动态、矮窗和窄窗样式
+- [x] 7.4 补充老用户无空态闪烁、零环境加载收敛、失败重试和视觉布局测试
+<!-- Runtime source-only delivery: no ECS deployment and no desktop installer build. Actual-page QA covered loading, confirmed-empty, and first-start states; the empty-state ambient treatment carries large-window whitespace without fake environment rows, metrics, or progress semantics. -->
