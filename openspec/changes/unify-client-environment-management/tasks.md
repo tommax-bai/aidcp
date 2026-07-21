@@ -30,3 +30,10 @@
   <!-- Edge integration: rebased onto the moving `origin/master`, preserved the concurrent scoped password-retention change with a masked password input, reran all gates, fast-forwarded and pushed `c484ed9`, synchronized the canonical checkout, and removed the feature worktree. Unrelated control-repo paths remained untouched. Control strict validation is rerun before its final commit. -->
 - [x] 4.4 Push both default branches, run the dev deployment precheck, deliver every applicable runtime artifact, and record health evidence or an explicit non-applicable boundary.
   <!-- Delivery: Edge `master` was pushed at `c484ed9`; `scripts/deploy-target dev --check` passed for host `121.89.85.150` with readable key and configured Cloud/Console paths. This change has no Cloud/Console/server runtime artifact, and an Edge installer was not requested, so SSH/rsync/service health and installer publication are not applicable. The control `main` push is completed after this evidence commit. -->
+
+## 5. Follow-up batch clarity and progress
+
+- [x] 5.1 Replace the ambiguous reuse-round copy and add a request-scoped named progress event that advances only after each confirmed proxy write, with a compact `completed/total` label and progress bar.
+  <!-- Edge worktree: preview now says `其中 N 个环境复用代理`; executor progress advances only after successful writes, main emits request-scoped count-only events, and renderer filters stale/non-monotonic events while retaining terminal partial progress. -->
+- [x] 5.2 Add focused executor, preload/main contract, renderer, and failure-state tests; rerun proportionate gates, strict OpenSpec validation, and the documented integration/push workflow.
+  <!-- Validation and integration: focused proxy/renderer suites passed 160/160, acceptance passed 28/28 (real-machine suite remained gated), the land gate passed the full Edge suite at 2117/2117 plus `npm run typecheck`, and commit `3327b66` fast-forwarded to and was pushed on `aidcp-edge/master`. The canonical Edge checkout was synchronized and the feature worktree/branch removed. This desktop-source follow-up has no ECS runtime artifact, and no installer was requested. -->
