@@ -44,7 +44,7 @@ Read on demand:
 - Use `rg`/`rg --files`, targeted file ranges, focused tests, and concise reporters. Do not dump entire files, full test suites, build logs, `journalctl`, SSH output, database result sets, or repeated polling output into the task transcript.
 - On success, retain the command, exit status, duration when relevant, and a short pass/count summary. On failure, retain the failing test/check names, primary error block, and at most the final 120 relevant lines; narrow and rerun before expanding.
 - If output is truncated, do not infer success. Check the exit code and inspect smaller slices until the cause and validation result are supported.
-- Run focused tests first. Run full suites only when required by the touched risk area or final integration, and summarize successful full-suite output.
+- Run independent repo tests/builds in parallel; serialize only failed retries likely caused by resource contention. Full suites remain risk/final-integration only.
 - For long-running commands, use a background session and report only new state or bounded deltas on each poll.
 - Detailed operating examples and the failure-expansion ladder live in `docs/codex-output-budget.md`; read it when a command may be noisy.
 
