@@ -16,4 +16,5 @@
   <!-- Edge validation before integration: focused Facebook/session/renderer tests 128 passed; formatter boundary tests 3 passed; full suite 2159 passed, 0 failed/skipped; npm run typecheck passed. -->
 - [x] 3.2 Run `openspec validate facebook-reels-read-activity --strict` and record validation plus Edge commit evidence here.
   <!-- Edge commit after final rebase: aidcp-edge ab470ec. Post-final-rebase focused tests: 129 passed; npm run typecheck passed. OpenSpec strict validation passed after rebasing onto origin/main. -->
-- [ ] 3.3 Fetch/rebase, rerun required validation, fast-forward push Edge and control default branches, and record that no installer was built.
+- [x] 3.3 Fetch/rebase, rerun required validation, fast-forward push Edge and control default branches, and record that no installer was built.
+  <!-- Fast-forward delivery: aidcp-edge master -> ab470ec; aidcp main -> a9bbab4. No Edge installer was built or released; installed clients remain unchanged until a separately requested release. -->
