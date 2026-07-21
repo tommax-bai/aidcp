@@ -32,5 +32,5 @@
 <!-- Live like evidence on k1eu5amn: video 7661993431920676116, before=unliked, exactly one click dispatched, after=liked, result=ui_confirmed, confirmation=ui_only. No server-persistence claim. -->
 - [x] 5.3 只向唯一评论编辑器输入无敏感测试文本，回读匹配后保持未发送状态和浏览器打开，记录文本长度而不记录全文。
 <!-- Live draft evidence on k1eu5amn: video 7663490008363420948, textLength=42, matched=true, status=filled_not_submitted, submitted=false. Read-only screenshot inspection confirmed the text remained in the editor and the send arrow was untouched; the temporary screenshot was not retained as a deliverable. Browser remained open. -->
-- [ ] 5.4 将真机结论、未证明边界、Edge/控制仓提交 SHA 与验证结果回写本任务清单，并推送两个 feature 分支；不部署、不归档。
-<!-- Edge implementation commit: aidcp-edge c5e0fa0, pushed to origin/codex/tiktok-cdp-interaction-probes. Control OpenSpec commit will be recorded after the first control commit exists. -->
+- [x] 5.4 将真机结论、未证明边界、Edge/控制仓提交 SHA 与验证结果回写本任务清单，并推送两个 feature 分支；不部署、不归档。
+<!-- Commits: aidcp-edge c5e0fa0 (pushed), aidcp control OpenSpec 9695885 (followed by this ledger-only closeout commit). Final validation: TikTok focused tests 16/16 PASS, Edge typecheck PASS, whitespace/diff checks PASS, OpenSpec strict PASS. Boundaries: probe-only, like confirmation is UI-only, comment remains an unsent local draft, no production registration, no deployment, no archive. -->
