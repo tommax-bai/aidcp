@@ -18,7 +18,9 @@
 
 - [x] 3.1 Run Cloud focused tests, publish safety acceptance suites, the full test suite, and typecheck; resolve only failures attributable to this change.
 - [x] 3.2 Record Cloud commits and validation evidence in this task list, then run `openspec validate bind-auto-publish-to-connected-environment --strict`.
-- [ ] 3.3 Rebase and fast-forward integrate the control and Cloud branches into their latest defaults, push both defaults, and keep canonical checkouts clean.
-- [ ] 3.4 Back up and deploy Cloud to dev, then verify the service, listener, health, PostgreSQL, deployment-target handling, and unchanged unrelated services; record the deployment evidence and any scope deviation.
+- [x] 3.3 Rebase and fast-forward integrate the control and Cloud branches into their latest defaults, push both defaults, and keep canonical checkouts clean.
+- [x] 3.4 Back up and deploy Cloud to dev, then verify the service, listener, health, PostgreSQL, deployment-target handling, and unchanged unrelated services; record the deployment evidence and any scope deviation.
 
 <!-- Validation on Cloud eb7b8b8: focused 151/151; acceptance 65/65; full 2778 passed, 0 failed, 8 gated skips; npm run typecheck passed. OpenSpec strict validation passed. -->
+<!-- Integration: aidcp-cloud/master eb7b8b8 and aidcp/main 59bc77b were fast-forwarded and pushed; the control checkout's pre-existing untracked output/ and tmp/ were left untouched. -->
+<!-- Dev deployment 2026-07-21: backup /opt/aidcp/backups/cloud-20260721-pre-eb7b8b8.tar.gz; deployed from clean aidcp-cloud/master eb7b8b8. aidcp-cloud.service active since 19:43:39 CST; listeners 0.0.0.0:8787 and 127.0.0.1:8090; /api/health returned {ok:true}; source hashes matched. AIDCP_DEPLOY_ENV=dev and ContentScheduler startup were logged; content_schedule_hour_claims plus execution_target exist. Transactional claim probe returned first=1, second=0, residue=0. Feishu WS reached ready and bot info returned Dev.A. isales-api/engine/scheduler/worker remained active/running. No package lock change, so remote npm ci was not required. OL was intentionally not deployed. -->
