@@ -29,3 +29,11 @@
 <!-- Session validation: fleet-console 75/75; npm run typecheck; node --check; git diff --check. Actual index.html/styles.css were checked at 1440x900 and 820x720: no horizontal overflow, CTA opened the existing create tab, and all three environment-scoped workspaces were hidden while Cloud/settings stayed reachable. -->
 - [x] 4.5 在独立 worktree 完成聚焦测试、验收、完整测试、typecheck、OpenSpec strict 校验及 ff-only 集成；不部署 ECS、不构建安装包
 <!-- Delivered as aidcp-edge 057ff4e to origin/master by ff-only push. Validation: fleet-console 75/75; acceptance 28/28; serial full suite 2141/2141; npm run typecheck; node --check; git diff --check. Visual QA passed at 1440x900 and 820x720 with no horizontal overflow, all environment-scoped workspaces suppressed, Cloud/settings reachable, and the CTA opening the create tab. Edge source-only change: no ECS deployment and no desktop installer build. -->
+
+## 5. 首次引导视觉收口
+
+- [x] 5.1 将右侧引导改为靠上定位，移除伪进度装饰，降低左侧占位卡强调度，并缩短第三步说明
+- [x] 5.2 补充视觉层级和文案回归断言，在宽屏与窄屏实际窗口复核留白、换行、横向溢出和 CTA 路由
+<!-- Session validation: fleet-console 75/75; npm run typecheck; node --check; git diff --check. Actual index.html/styles.css were checked at 1280x720 and 820x720: the card starts 74px below the content origin, the false progress decoration is absent, the 820px page has no horizontal overflow, the final step stays on one line, and the CTA opens the existing create tab. -->
+- [x] 5.3 在独立 worktree 完成聚焦测试、验收、完整测试、typecheck、OpenSpec strict 校验及 ff-only 集成；不部署 ECS、不构建安装包
+<!-- Delivered as aidcp-edge 989122e to origin/master by ff-only push. Validation: fleet-console 75/75; acceptance 28/28; serial full suite 2149/2149; npm run typecheck; node --check; git diff --check; OpenSpec strict validation. Edge source-only change: no ECS deployment and no desktop installer build. -->
