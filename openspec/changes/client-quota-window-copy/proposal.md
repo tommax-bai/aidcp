@@ -7,6 +7,7 @@ The expanded “今日进展” card currently exposes cloud window keys as vagu
 - Rename the expanded window groups to “本轮计划”, “近 1 分钟”, “近 1 小时”, and “今日计划”.
 - For an active session with trustworthy timing metadata, show the current round's remaining time and exact start/end range; retain honest inactive or missing-time fallbacks.
 - Present capped action rows as “已完成数量 + 最多 N” instead of a bare `N/N` fraction, while uncapped actions show only the confirmed count.
+- Reserve whole-card completion color for browsing completion; when another action completes, keep the card and action row neutral while coloring only the “完成 N 项” state text.
 - Keep the expanded groups in a readable 2×2 layout at the normal companion width and fall back to one column at narrow widths.
 - Preserve all cloud counts, caps, saturation decisions, action projection, collapsed daily totals, and risk behavior unchanged.
 

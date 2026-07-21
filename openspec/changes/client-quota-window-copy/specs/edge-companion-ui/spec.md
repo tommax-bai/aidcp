@@ -34,8 +34,10 @@ The Electron companion SHALL show plan progress for each cloud-supplied quota wi
 #### Scenario: Any window completes its plan
 
 - **WHEN** any supplied window's `saturated` list is non-empty, or any supplied action total is greater than or equal to that window's supplied cap
-- **THEN** Electron's aggregate progress status identifies completed action plans
-- **AND** the affected action rows use green completion styling without changing global risk, captcha, or engine health states
+- **THEN** Electron's aggregate progress status shows `完成 N 项`, counting every completed supplied action plan
+- **AND** the `完成 N 项` state text uses the completion color
+- **AND** the whole window card and completed row use completion styling only when browsing is complete
+- **AND** when browsing is incomplete, a completed like, favorite, comment, follow, or publish action keeps the card and its action row in the normal visual style without changing global risk, captcha, or engine health states
 - **AND** an available future `releaseAt` is described as the time the action will continue, not as quota release
 
 #### Scenario: Session plan is not active

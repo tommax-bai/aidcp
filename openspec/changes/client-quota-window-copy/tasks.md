@@ -19,3 +19,20 @@
 
 - [x] 4.1 Commit the Edge implementation and control artifacts with repo SHAs and validation evidence recorded in this task file. <!-- aidcp-edge 92e77a8; aidcp 3abf828; focused 74/74; edge typecheck pass; openspec strict pass -->
 - [x] 4.2 Rebase/refresh against latest defaults, rerun required validation, fast-forward integrate, and push Edge `master` plus control `main` without packaging an installer. <!-- aidcp-edge master 92e77a8 pushed; aidcp main 744d889 pushed; no installer built per packaging boundary -->
+
+## 5. Completion Visual Hierarchy
+
+- [x] 5.1 Make browsing completion the only condition that applies completion styling to an entire quota-window card and its completed row. <!-- aidcp-edge df64de4 -->
+- [x] 5.2 Keep completed non-browsing rows neutral while showing the completion-colored `完成 N 项` state for every completed action. <!-- aidcp-edge df64de4 -->
+- [x] 5.3 Derive near-limit card tone only from incomplete capped actions so a completed supporting action does not create a false near-limit state. <!-- aidcp-edge df64de4 -->
+
+## 6. Follow-up Validation
+
+- [x] 6.1 Add focused DOM and CSS coverage for non-browsing completion, browsing completion, and the completion state text. <!-- aidcp-edge df64de4 -->
+- [x] 6.2 Run the focused Electron companion UI test and Edge typecheck. <!-- focused 76/76 pass; edge typecheck pass -->
+- [x] 6.3 Run `openspec validate client-quota-window-copy --strict` in the isolated control worktree. <!-- strict validation pass -->
+
+## 7. Follow-up Delivery
+
+- [ ] 7.1 Commit the Edge implementation and control artifacts with repo SHAs and validation evidence recorded in this task file.
+- [ ] 7.2 Refresh against latest defaults, rerun required validation, fast-forward integrate, and push Edge `master` plus control `main` without packaging an installer.

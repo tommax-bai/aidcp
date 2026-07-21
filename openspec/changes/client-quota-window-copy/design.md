@@ -11,6 +11,7 @@ The session is not a rolling “last N minutes” window. Its actual duration is
 - Make every expanded group reveal its real time scope in user language.
 - Keep the short title “本轮计划” while using the existing status and metadata lines for remaining time and the actual range.
 - Make a supplied cap read as “最多 N”, not as a target the user is expected to fill.
+- Make browsing completion the visual milestone for a completed card, while letting other completed actions contribute only to a concise completion count.
 - Give six action rows enough horizontal room through a 2×2 normal-width layout and a one-column narrow layout.
 - Preserve stale-window, inactive-session, completion, and release fallbacks honestly.
 
@@ -46,9 +47,18 @@ The expanded detail grid uses two equal columns at the normal companion width, o
 
 Alternative considered: keep four columns. Rejected because status text, `最多 N`, and six progress rows become cramped in the companion's maximum-width shell.
 
+### 5. Treat browsing completion as the card-level milestone
+
+Every completed action contributes to the state text `完成 N 项`, and that text uses the completion color. The whole card and a completed row use the green completion surface only when the completed action is `浏览`. A completed like, favorite, comment, follow, or publish row stays in the normal visual style, so a supporting action cannot make the whole time window look finished.
+
+The near-limit card tone is derived only from incomplete capped actions. This prevents a completed non-browsing action at 100% from turning the otherwise neutral card into a near-limit state.
+
+Alternative considered: keep every completed action row green while limiting only the card background. Rejected because the user's primary signal is browsing progress; multiple green rows would still overstate completion and compete with the single `完成 N 项` summary.
+
 ## Risks / Trade-offs
 
 - [Client clock differs from cloud] → Use client time only to format cloud-supplied timestamps and stop showing a countdown once `expiresAt <= now`; never infer a new end time locally.
 - [Old snapshots omit timing] → Preserve the current state and metric fallback instead of fabricating a session range.
 - [Long translated or large-number text wraps] → Allocate two columns, use secondary compact cap text, and retain the existing ellipsis/min-width protections.
+- [A supporting action completion overstates the window result] → Keep the card and non-browsing rows neutral, and reserve the completion surface for browsing completion.
 - [Copy-only change accidentally alters enforcement] → Keep protocol, cloud, counters, quotas, and saturation calculations untouched; cover the renderer transformation with focused DOM tests.
