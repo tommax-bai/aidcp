@@ -70,3 +70,43 @@ TikTok CDP 探针 SHALL 要求调用方明确提供 AdsPower profile id，并 SH
 #### Scenario: 生成真机探针报告
 - **WHEN** 浏览、点赞或评论输入阶段完成或失败
 - **THEN** 报告包含足以区分 executed、shadow、blocked 和 ambiguous 的最小证据，且不包含受限敏感字段
+
+### Requirement: 发布探针必须先只读发现上传入口与编排器
+发布探针 SHALL 先通过语义属性唯一识别 TikTok 上传入口，并在进入上传页面后重新执行登录、挑战和页面阻断分类。探针 SHALL 只报告页面 host/path、唯一文件输入的接受类型以及编排器字段种类，不得读取或输出 cookie、token、网络正文或账号身份。
+
+#### Scenario: 上传入口与文件输入唯一
+- **WHEN** 已登录环境中可唯一识别上传入口，且目标页面存在唯一可用文件输入
+- **THEN** 探针报告上传路由、输入接受类型和可见编排字段，不选择任何文件
+
+#### Scenario: 页面阻断或文件输入不唯一
+- **WHEN** 上传页面出现登录、验证、挑战，或不存在唯一可用文件输入
+- **THEN** 探针诚实报告阻断或歧义并停止，不向任意输入设置文件
+
+### Requirement: 合成素材暂存必须绑定精确输入并验证页面状态
+只有调用方显式提供现存的无敏感测试素材路径时，发布探针 MAY 将该精确路径设置到已唯一确认的文件输入。探针 SHALL 等待页面给出上传已确认或编排器可编辑的有界证据；超时、错误或页面移动时 MUST 报告失败，不得假定上传成功。
+
+#### Scenario: 合成视频进入编排器
+- **WHEN** 唯一文件输入接受调用方提供的合成视频，且页面在有界时间内显示上传确认或可编辑编排器
+- **THEN** 探针报告 `upload_acknowledged`，并明确该证据不等于公开发布
+
+#### Scenario: 上传结果不明确
+- **WHEN** 设置文件后页面出现错误、移动到非预期页面或无法确认上传状态
+- **THEN** 探针报告 `ambiguous` 或明确错误，不重试其他输入且不继续填写
+
+### Requirement: 发布编排器探针只能填写而不能提交
+发布探针 MAY 在上传已确认后定位唯一可见文案编辑器、填入无敏感测试文案并回读。实现 MUST NOT 查询或点击最终发布控件、MUST NOT 派发 Enter、Ctrl+Enter 或 Meta+Enter、MUST NOT 调用表单提交，且 MUST NOT 暴露启用最终发布的运行开关。
+
+#### Scenario: 编排器文案成功写入
+- **WHEN** 上传已确认且唯一可见文案编辑器可编辑
+- **THEN** 探针写入并回读文案，只报告长度和匹配结果，状态为 `composer_ready_not_submitted`
+
+#### Scenario: 到达可发布前状态
+- **WHEN** 文件上传和文案回读均已确认
+- **THEN** 探针保持浏览器打开，不查找、不点击最终发布控件，也不得报告 `published`
+
+### Requirement: 发布探针必须区分文件选择、上传确认和公开发布
+发布证据 SHALL 分别记录文件是否被选择、平台页面是否确认上传、编排器是否就绪以及最终提交是否执行。`submitted` SHALL 永远为 `false`；探针不得把本地文件选择、传输完成、平台草稿或按钮可用性描述为公开发布成功。
+
+#### Scenario: 生成发布探针报告
+- **WHEN** 发布探针完成或失败
+- **THEN** 报告以脱敏状态区分 `file_selected`、`upload_acknowledged` 和 `composer_ready_not_submitted`，并明确 `submitted=false`

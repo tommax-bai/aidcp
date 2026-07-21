@@ -34,3 +34,18 @@
 <!-- Live draft evidence on k1eu5amn: video 7663490008363420948, textLength=42, matched=true, status=filled_not_submitted, submitted=false. Read-only screenshot inspection confirmed the text remained in the editor and the send arrow was untouched; the temporary screenshot was not retained as a deliverable. Browser remained open. -->
 - [x] 5.4 将真机结论、未证明边界、Edge/控制仓提交 SHA 与验证结果回写本任务清单，并推送两个 feature 分支；不部署、不归档。
 <!-- Commits: aidcp-edge c5e0fa0 (pushed), aidcp control OpenSpec 9695885 (followed by this ledger-only closeout commit). Final validation: TikTok focused tests 16/16 PASS, Edge typecheck PASS, whitespace/diff checks PASS, OpenSpec strict PASS. Boundaries: probe-only, like confirmation is UI-only, comment remains an unsent local draft, no production registration, no deployment, no archive. -->
+
+## 6. TikTok 发布机制探针（不提交）
+
+- [x] 6.1 在 `k1eu5amn` 只读识别 TikTok 上传入口、实际路由、页面阻断状态、唯一文件输入接受类型和编排字段，不选择文件。
+<!-- 2026-07-21 live read-only evidence: the current video page exposed one visible `a[data-e2e="nav-upload"]` to `/tiktokstudio/upload?from=webapp&tab=video`. TikTok Studio settled at `/tiktokstudio/upload` with blockReason=none, one enabled `input[type=file][accept="video/*"]`, `multiple=false`, and semantic nodes `select_video_container` / `select_video_button`. No file was selected; no composer fields exist before upload. -->
+- [x] 6.2 参考 Facebook/XHS 探针，在 `src/tiktok/probes/` 实现独立且可单测的发布编排器探针；复用现有 CDP/AdsPower 原语，不注册生产平台、协议或命令路由。
+- [x] 6.3 新增手动运行器，以显式 profile 和可选合成素材路径为输入；代码路径不查询或点击最终发布控件，不派发提交快捷键，不调用 form submit。
+- [x] 6.4 增加聚焦测试，覆盖入口/文件输入唯一性、阻断、上传确认、文案回读、报告脱敏和静态 no-submit 边界。
+<!-- Edge implementation: `src/tiktok/probes/publish-composer-probe.ts`, export, `scripts/tiktok-publish-composer-probe.ts`, and focused fixture/behavior/source-boundary tests. The probe reuses CDP file-input setting but contains no final-control lookup or final-submit path. -->
+- [x] 6.5 运行 TikTok 聚焦测试、Edge typecheck、diff 检查与 OpenSpec strict validation。
+<!-- Initial validation after implementation: `npx tsx --test test/tiktok/*.test.ts` PASS 24/24; `npm run typecheck` PASS; Edge/control `git diff --check` PASS; `openspec validate tiktok-cdp-interaction-probes --strict` PASS. Final validation is rerun after live calibration. -->
+<!-- Final validation after live calibration: TikTok focused tests PASS 25/25; Edge typecheck PASS; Edge/control diff checks PASS; OpenSpec strict validation PASS. -->
+- [x] 6.6 用临时生成的无敏感合成视频在 `k1eu5amn` 验证文件选择、平台上传确认与文案填写，停在 `composer_ready_not_submitted` 并保持浏览器打开；若页面或目标不明确则诚实停止。
+<!-- Live evidence on k1eu5amn: a 2-second 720x1280 solid-color MP4 was set on the unique video input. The input then disappeared and TikTok Studio exposed a blob thumbnail plus canvas preview, one `contenteditable=true role=combobox` caption seeded with the 20-character filename, and a separate Vietnamese location search input. A first-use editing tutorial was acknowledged only by an exact `role=alertdialog` + `Đã hiểu` match. The caption was replaced with a 38-character probe marker and read back exactly: status=composer_ready_not_submitted, uploadAcknowledged=true, matched=true, submitted=false. Read-only settings evidence included publish-now/schedule radios, audience=`Mọi người`, location, high-quality upload, music copyright check, and quick content check. The browser remains open on the composer; no final publish control was queried or activated. -->
+- [ ] 6.7 回写真机结论、未证明边界、提交 SHA 与验证结果，提交并推送 Edge/控制仓 feature 分支；不部署、不归档。
