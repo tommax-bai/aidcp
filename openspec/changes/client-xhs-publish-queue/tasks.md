@@ -70,3 +70,13 @@
   <!-- aidcp-edge 38cfeec: focused companion 75/75, acceptance 28/28, full 2139/2139, four Electron syntax checks, typecheck, and diff check passed. Native button semantics cover Enter/Space without custom double-activation handlers. -->
 - [x] 7.4 Rebase onto the latest defaults, fast-forward merge and push aidcp-edge plus control OpenSpec refs, record final evidence, and do not build an installer or touch Cloud/ol.
   <!-- origin/master aidcp-edge 38cfeec and origin/main control behavior artifacts through 756d170 were integrated by ff-only after fresh fetch/rebase and validation. This checklist closeout follows as a second ff-only control commit. No Edge installer was built; Cloud, dev runtime, and ol were not touched. -->
+
+## 8. Home pending-publish card visual redesign
+
+- [x] 8.1 Replace the enlarged legacy single-post composition with an XHS-only summary shell and queue-style current-item card; remove the unproven decorative thumbnail while preserving loading/error/empty and non-XHS fallbacks.
+  <!-- aidcp-edge 25ef6f5: XHS-only queue-surface shell and nested current-item card remove the decorative thumbnail; legacy snapshot, empty, and non-XHS paths explicitly clear the new surface. -->
+- [x] 8.2 Add queue-style status badges, per-stage state text, native primary/secondary actions, selected-item-only review visibility, restrained pager/count hierarchy, and responsive no-overflow layouts without changing carousel or queue truth.
+  <!-- aidcp-edge 25ef6f5: selected-item heading and state chip, truthful stage summaries, native scoped action buttons, selected waiting-only review entry, quiet edge controls, and 430px vertical stage layout. -->
+- [x] 8.3 Add focused renderer/static regressions for hierarchy, stage truth, selected-item actions, native-button semantics, fallback isolation, responsive behavior, and existing carousel flows; complete browser visual checks plus required Edge gates.
+  <!-- Post-rebase aidcp-edge evidence: focused companion 77/77, full 2156/2156, acceptance 28/28, four Electron syntax checks, typecheck, and diff check passed. Browser checks at 900x650 and 420x700 verified queue-card hierarchy, no decorative thumbnail, native button equality, bidirectional carousel selection, selected-only review visibility, vertical narrow stages, and no horizontal overflow. -->
+- [ ] 8.4 Rebase onto latest defaults, fast-forward merge and push aidcp-edge plus control refs, record final evidence, and do not package Edge or touch Cloud/ol.

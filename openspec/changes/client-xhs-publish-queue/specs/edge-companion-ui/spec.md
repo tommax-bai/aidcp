@@ -35,6 +35,27 @@ Electron 展开态发布摘要 SHALL 在当前环境可展示项超过一条时�
 - **WHEN** 客户切换账号、平台，或刷新后当前环境只剩一条可展示内容
 - **THEN** 客户端清除旧选择，隐藏且禁用左右按钮，不保留可聚焦的不可见控件
 
+### Requirement: Expanded publish summary SHALL reuse the full queue visual hierarchy
+
+Electron 的 XHS 展开态发布摘要 SHALL 使用与完整发布队列一致的状态徽标、白底细边任务卡、紧凑四阶段轨道和主次按钮层级。摘要 MUST NOT 使用没有真实稿件图片证据的装饰封面。每个有 Cloud 阶段证据的步骤 SHALL 同时显示阶段标签与客户状态文字；尚未开跑的 task SHALL 显示未开始，不得伪造阶段进度。
+
+“查看全部进度” SHALL 是次级原生按钮。“审核稿件” SHALL 是主按钮，且只在当前轮播项自身为 waiting approval 并且审核能力可用时展示。说明文字与操作按钮 SHALL 分区布局。左右切换控件 MUST 留在外层边缘并且不遮挡标题、步骤或操作；窄窗口 SHALL 使用纵向阶段轨道且无横向溢出。非 XHS 与旧单稿回退 MUST NOT 继承 XHS 队列摘要样式。
+
+#### Scenario: 当前轮播项是待确认稿
+
+- **WHEN** 当前 XHS 展开态摘要选中 waiting approval journey
+- **THEN** 内层任务卡显示等待确认徽标、稿件标题、四阶段标签与状态，操作区显示次级“查看全部进度”和主按钮“审核稿件”，且不显示装饰封面
+
+#### Scenario: 切换到创作中或排队任务
+
+- **WHEN** 客户从待确认稿切换到 generating journey 或 queued task
+- **THEN** 标题、状态徽标与阶段文字同步切换；审核主按钮隐藏，完整队列次级入口保留，queued task 的四阶段均显示未开始
+
+#### Scenario: 窄窗口查看重构后的摘要
+
+- **WHEN** XHS 发布摘要在 430px 或更窄的可用宽度展开
+- **THEN** 当前任务信息、纵向四阶段状态、说明与操作按钮完整可读，左右切换不遮挡内容且页面无横向溢出
+
 ### Requirement: Publish queue SHALL reuse the in-app content workspace safely
 
 Electron SHALL 在现有主窗口内容工作区页面栈内展示发布队列，不创建新的系统窗口。关闭 SHALL 返回运行首页；打开稿件审核后返回 SHALL 回到队列。环境切换 SHALL 清除取消确认、忙态和旧内容；旧环境迟到回包 MUST NOT 重新打开或覆盖新环境页面。
