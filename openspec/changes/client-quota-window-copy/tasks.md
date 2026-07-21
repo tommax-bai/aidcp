@@ -34,5 +34,5 @@
 
 ## 7. Follow-up Delivery
 
-- [x] 7.1 Commit the Edge implementation and control artifacts with repo SHAs and validation evidence recorded in this task file. <!-- aidcp-edge 86091a2; aidcp ce14d43; focused 76/76; edge typecheck pass; openspec strict pass -->
+- [x] 7.1 Commit the Edge implementation and control artifacts with repo SHAs and validation evidence recorded in this task file. <!-- aidcp-edge 86091a2; aidcp 7bb9751, 5d3b62b; focused 76/76; edge typecheck pass; openspec strict pass -->
 - [ ] 7.2 Refresh against latest defaults, rerun required validation, fast-forward integrate, and push Edge `master` plus control `main` without packaging an installer.
