@@ -39,3 +39,12 @@
   <!-- Rebased validation: focused Facebook tests 74/74; acceptance 28/28; full suite 2141/2141; `npm run typecheck` exit 0. The bounded source probe launched exact AdsPower profile `k1es035u`, recovered the visible Sang Vlog video by round 4 with stable watch identity, author, caption, reaction count, and `isVideo=true`, performed no interaction, then returned the profile to `Inactive`. -->
 - [x] 4.4 Integrate and push the Edge fix and control evidence serially, preserving the no-installer boundary.
   <!-- Pushed Edge 94e93ad to origin/master first, then pushed control contract/evidence bc66491 to origin/main. No Edge installer was built or installed. -->
+
+## 5. Present-but-unreportable Feed fallback and locale convergence
+
+- [ ] 5.1 Extend the shared Facebook locale vocabulary and structural classifier for the verified Re Su verbose Vietnamese like/comment accessibility labels while preserving same-card uniqueness, summary exclusion, and fail-closed ambiguity.
+- [ ] 5.2 Add a protocol-level present-but-unreportable Feed list state after eight unsuccessful continuation rounds, gated by a fresh confirmed-home, physical-card, loading, login, consent, and checkpoint probe; do not reuse `empty`, `no_feed`, or `feed_exhausted` dishonestly.
+- [ ] 5.3 Make Cloud deduplicate that observation per startup/document generation and authorize exactly one Reels transition through the existing Edge command boundary; keep early reportable-card recovery and explicit-empty behavior unchanged.
+- [ ] 5.4 Reuse normalized supported-locale vocabulary in the dedicated Reels reader while retaining separate active `noteId + videoKey`, geometry, exact-target, and post-action verification rules.
+- [ ] 5.5 Add Edge protocol/session/Feed/Reels fixtures and Cloud handler/dispatcher/integration tests for Re Su labels, eight-round fallback, blockers, early recovery, repeated observations, and exact transition identity.
+- [ ] 5.6 Run focused tests, acceptance/full suites, and typechecks in isolated Edge and Cloud worktrees; update protocol documentation, validate OpenSpec strictly, and perform a bounded read-only Re Su acceptance before serial integration. Do not build an installer unless separately requested.

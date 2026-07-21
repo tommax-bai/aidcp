@@ -1,10 +1,10 @@
 ## Context
 
-The existing Facebook Feed scanner keys reportable cards from own-level canonical anchors. Real Feed probes on Mi Xu and Tianxing Bai showed a second layout: a lightweight video card can expose one `data-video-id`, one `<video>`, publisher, caption, reaction summary, and post-level like/comment controls while lacking `[role="article"]` or an explicit post permalink. Mi Xu exposed only hashtag links; Tianxing Bai exposed both `data-video-id` and a matching `/watch/?v=` link. Both could be liked safely only after locating the action inside the same strict card root and verifying `Gỡ Thích` / `移除赞` afterward.
+The existing Facebook Feed scanner keys reportable cards from own-level canonical anchors. Real Feed probes on Mi Xu, Tianxing Bai, and Re Su showed a second layout: a lightweight video card can expose one `data-video-id`, one `<video>`, publisher, caption, reaction summary, and post-level like/comment controls while lacking `[role="article"]` or an explicit post permalink. Mi Xu exposed only hashtag links; Tianxing Bai exposed both `data-video-id` and a matching `/watch/?v=` link. Re Su exposed verbose Vietnamese accessibility labels such as `Bày tỏ cảm xúc Thích về bài viết của <author>` and `Bình luận về bài viết của <author>` while the visible action text remained `Thích` / `Bình luận`. These cards can be acted on safely only after locating the action inside the same strict card root and verifying the selected state afterward.
 
 The same probes also showed an embedded Reels rail with three mounted `<video>` elements at one viewport position, no `data-video-id`, and no local post action boundary. An unconstrained ancestor search incorrectly associated that rail with a preceding ordinary post. Therefore video presence alone is not identity evidence, and the scan, read, action, and verification paths must share one strict card/identity primitive.
 
-Cloud already receives `listKind`, `isVideo`, `noteId`, author, and title in `page.cards`. The existing Reels policy already provides an injectable 25% draw, session-local idempotency, ordinary-appraiser bypass, note-scoped dispatch, and confirmed-receipt accounting. No wire shape is needed.
+Cloud already receives `listKind`, `listState`, `isVideo`, `noteId`, author, and title in `page.cards`. The existing Reels policy already provides an injectable 25% draw, session-local idempotency, ordinary-appraiser bypass, note-scoped dispatch, and confirmed-receipt accounting. The follow-up adds one `listState` value for present-but-unreportable Feed evidence; interaction command and receipt shapes remain unchanged.
 
 ## Goals / Non-Goals
 
@@ -14,6 +14,8 @@ Cloud already receives `listKind`, `isVideo`, `noteId`, author, and title in `pa
 - Count each actually presented Feed video once and make one fixed 25% ordinary-like decision while the target is still current.
 - Preserve mandatory interaction precedence and all existing risk, quota, cooldown, duplicate, retry, and receipt invariants.
 - Support the exact Vietnamese Facebook controls observed on extant accounts.
+- Turn an eight-round present-but-unreportable Feed outcome into a truthful Cloud-authorized Reels transition instead of collapsing it into `no_feed` and silently waiting.
+- Share supported locale vocabulary across Feed and Reels without sharing unsafe surface selectors or DOM-order fallbacks.
 - Keep ordinary non-video Feed behavior and existing Reels behavior unchanged.
 
 **Non-Goals:**
@@ -21,7 +23,7 @@ Cloud already receives `listKind`, `isVideo`, `noteId`, author, and title in `pa
 - Video-frame, audio, OCR, or multimodal content understanding.
 - A Console probability setting, per-account tuning, or database migration.
 - Liking a video with missing/ambiguous identity, missing caption safety evidence, or no same-card verification witness.
-- Applying this policy to embedded Reels rails, the dedicated Reels tab, search results, or another platform.
+- Applying the ordinary-Feed 25% policy to embedded Reels rails, the dedicated Reels tab, search results, or another platform.
 - Packaging or releasing an Edge installer.
 
 ## Decisions
@@ -72,7 +74,17 @@ This is a bounded compatibility fallback for existing localized sessions, not a 
 
 ### 6. Browsing continues after every terminal decision
 
-A view record, probability miss, safety abstention, blocked hit, already-liked result, or failed like receipt does not terminate the Feed loop. Once the card is reportable it follows the existing `page.cards → selection/read/scroll` chain; truly ambiguous/unreportable cards retain the existing bounded continuation behavior.
+A view record, probability miss, safety abstention, blocked hit, already-liked result, or failed like receipt does not terminate the Feed loop. Once the card is reportable it follows the existing `page.cards → selection/read/scroll` chain; truly ambiguous/unreportable cards first use the existing bounded continuation behavior.
+
+### 7. Eight unreportable rounds become a truthful Cloud-authorized Reels fallback
+
+The eight-round limit remains a per-batch safety and command-time budget, not evidence that the Feed is empty or truly exhausted. When all eight rounds complete without one reportable card, Edge SHALL re-probe the active page before deciding what to report. Only a confirmed Facebook home surface that is not loading, login, consent, or checkpoint blocked and still contains physical Feed-card evidence may produce a present-but-unreportable list observation. `page.cards.listState` will add a value for this state; Edge MUST NOT emit an uncommanded `action.completed` receipt and MUST NOT mislabel the observation as `empty` or `feed_exhausted`.
+
+Cloud will deduplicate that observation for the active startup/document generation and authorize the existing Reels transition once. Edge enters Reels only after that Cloud command and revalidates the target surface before navigating. If any round finds a reportable Feed card, normal Feed reporting wins and no fallback is requested. An explicit empty Feed keeps the existing empty-state path; a loading, unknown, login, consent, checkpoint, non-home, or identity-ambiguous page fails closed without switching surfaces.
+
+### 8. Locale vocabulary is shared; surface proof remains separate
+
+The supported Facebook locale vocabulary will cover both short visible controls and verified bounded accessibility-label templates, including Vietnamese `Bày tỏ cảm xúc Thích về bài viết của <author>` and `Bình luận về bài viết của <author>`. Feed scan, action location, and verification continue to use the same-card action-bar classifier. The dedicated Reels reader may reuse normalized like/unlike vocabulary, but it MUST retain active Reel `noteId + videoKey`, viewport geometry, and post-click state proof; it MUST NOT reuse a Feed card root or DOM-order fallback. This removes vocabulary drift without pretending the two surfaces share a DOM layout.
 
 ## Risks / Trade-offs
 
@@ -83,6 +95,8 @@ A view record, probability miss, safety abstention, blocked hit, already-liked r
 - [A mandatory rule is discovered after the early draw] → Mandatory appraisal stays ahead of the handled skip and can still force required actions; already-liked remains an honest no-op.
 - [Existing imported accounts remain localized] → Cover only exact probed Vietnamese labels and retain fail-closed numeric/action disambiguation.
 - [Facebook renders the count inside the real localized toggle] → Treat numeric text as presentation only after structural action-bar/summary-toolbar classification; never use a standalone digit guard to discard an exact action label.
+- [Every visible Feed card is unreportable for many screens] → Keep each scan batch bounded, report a distinct present-but-unreportable observation after eight rounds, and let Cloud authorize one Reels transition rather than spin indefinitely or lie about emptiness.
+- [A broad translated phrase matches caption or reaction summaries] → Normalize only verified action-label templates or exact visible action words, then require the existing Feed action-bar or Reels active-video structural proof.
 
 ## Migration Plan
 
@@ -91,6 +105,7 @@ A view record, probability miss, safety abstention, blocked hit, already-liked r
 3. Run Edge and Cloud focused tests, acceptance suites, full suites, and typechecks; validate this OpenSpec change strictly.
 4. Integrate each repository serially to its latest default branch and push. Deploy only the Cloud runtime delta to `dev` from the clean canonical checkout; Edge source changes require a restarted development client but no installer.
 5. Re-run a bounded Mi Xu / Tianxing Bai probe to verify one view, one decision log, exact-target receipt, and continued scrolling. Roll back the respective default-branch commits if validation fails.
+6. Add the present-but-unreportable protocol state, Cloud authorization path, verbose Vietnamese fixtures, and shared Reels vocabulary coverage; validate with a bounded Re Su probe before integration.
 
 ## Open Questions
 

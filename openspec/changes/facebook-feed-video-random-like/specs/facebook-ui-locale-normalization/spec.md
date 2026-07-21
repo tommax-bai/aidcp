@@ -28,6 +28,14 @@ While en-US remains the normative interface locale for provisioned Facebook envi
 - **WHEN** a lightweight video card contains `Viết bình luận` beside its like control
 - **THEN** Edge may use it as the same-card action-boundary witness without interpreting caption text as a control
 
+#### Scenario: Verbose Vietnamese accessibility labels recover the strict Feed card root
+- **WHEN** a lightweight video card exposes visible `Thích` / `Bình luận` actions with accessibility labels `Bày tỏ cảm xúc Thích về bài viết của <author>` and `Bình luận về bài viết của <author>`
+- **THEN** the shared classifier recognizes exactly one same-bar like/comment pair, permits the strict card root and video identity, and does not match the caption or reaction summary
+
+#### Scenario: Reels reuses vocabulary but retains active-video proof
+- **WHEN** a supported localized like or unlike word appears on the dedicated Reels surface
+- **THEN** the Reels reader may reuse the normalized locale vocabulary but still requires the active Reel identity, constrained action geometry, and post-action selected-state proof rather than a Feed card selector
+
 #### Scenario: Unknown localized state fails closed
 - **WHEN** a localized card lacks every supported neutral/selected/comment witness or exposes multiple matching controls
 - **THEN** Edge returns no target or ambiguous target and does not click by DOM order

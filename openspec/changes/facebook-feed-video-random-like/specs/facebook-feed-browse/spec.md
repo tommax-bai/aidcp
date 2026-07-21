@@ -23,3 +23,23 @@ The Facebook Feed scanner SHALL merge semantic top-level posts with lightweight 
 #### Scenario: Ambiguous lightweight card continues browsing
 - **WHEN** a candidate contains multiple ids/videos, lacks publisher/caption/action witnesses, or has mismatched explicit and data-derived identities
 - **THEN** Edge reports no synthetic card for it, performs no action on it, and retains the existing bounded continuation behavior
+
+### Requirement: Bounded present-but-unreportable Feed transitions to Reels through Cloud authorization
+
+When a confirmed Facebook home Feed contains physical card evidence but eight bounded continuation rounds yield no reportable card, Edge SHALL report a distinct present-but-unreportable Feed list state. Edge MUST NOT report that observation as an empty Feed, MUST NOT claim `feed_exhausted`, and MUST NOT emit an uncommanded action receipt. Cloud SHALL deduplicate the observation for the active startup/document generation and authorize one Reels transition. Edge SHALL enter Reels only after that authorization and a fresh surface/blocker check. Loading, login, consent, checkpoint, unknown, non-home, or physically cardless pages MUST NOT use this fallback.
+
+#### Scenario: Eight unreportable rounds request one Reels transition
+- **WHEN** the active Facebook home page still contains physical Feed cards but all eight continuation rounds yield no trustworthy card identity
+- **THEN** Edge reports the present-but-unreportable list state, Cloud sends one Reels-fallback authorization, and Edge transitions to the dedicated Reels surface
+
+#### Scenario: A reportable card before round eight keeps the Feed active
+- **WHEN** any continuation round produces a trustworthy Feed card
+- **THEN** Edge reports that card through the normal Feed path and does not request the unreportable Reels fallback
+
+#### Scenario: Loading or blocked pages never use the unreportable fallback
+- **WHEN** the final probe is loading, login-like, consent-blocked, checkpoint-like, unknown, non-home, or lacks physical card evidence
+- **THEN** Edge fails closed with the truthful existing state and neither Edge nor Cloud transitions to Reels from the unreportable path
+
+#### Scenario: Repeated observation is idempotent
+- **WHEN** the same startup/document generation repeats the present-but-unreportable observation
+- **THEN** Cloud emits at most one Reels-fallback authorization for that generation
