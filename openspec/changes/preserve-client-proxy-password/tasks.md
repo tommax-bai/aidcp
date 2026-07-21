@@ -12,4 +12,4 @@
 ## 3. Closeout
 
 - [x] 3.1 Run `openspec validate preserve-client-proxy-password --strict` and record Edge commit and validation evidence in this task list. <!-- Strict validation PASS; Edge source/test commit e2267e6. -->
-- [ ] 3.2 Integrate the validated control and Edge commits onto their default branches and push; do not package or deploy a desktop installer unless separately requested.
+- [x] 3.2 Integrate the validated control and Edge commits onto their default branches and push; do not package or deploy a desktop installer unless separately requested. <!-- aidcp-edge master e2267e6 pushed; aidcp main fast-forwarded through d4738ae and this closeout record. No package or deployment performed. -->
