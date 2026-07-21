@@ -12,6 +12,6 @@
 ## 3. Delivery
 
 - [x] 3.1 Record Edge commit and validation evidence, then pass strict OpenSpec validation.
-- [ ] 3.2 Replay onto the latest default branches, rerun deciding checks, fast-forward merge and push Edge and control repositories; record that no Cloud deployment or desktop package applies.
+- [x] 3.2 Replay onto the latest default branches, rerun deciding checks, fast-forward merge and push Edge and control repositories; record that no Cloud deployment or desktop package applies.
 
-<!-- aidcp-edge commit 2fa334c; focused UI/DOM 139/139, renderer syntax checks, full Edge suite 2180/2180 and typecheck passed. OpenSpec strict validation passed. -->
+<!-- aidcp-edge pre-replay commit 2fa334c; final commit 0b3c6ae fast-forwarded and pushed to master after replay onto cafc771. Pre-replay focused UI/DOM 139/139, renderer syntax checks, full Edge suite 2180/2180 and typecheck passed. Post-replay UI/DOM/fleet 221/221, acceptance 29/29, renderer syntax checks and typecheck passed. OpenSpec strict validation passed. No Cloud deployment applies because no server code changed; no desktop package was built because this was not a requested client release. -->
