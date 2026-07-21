@@ -19,3 +19,13 @@
 <!-- OpenSpec strict validation passed after recording the implementation and validation evidence above. -->
 - [x] 3.4 安全 fast-forward 集成并推送 `aidcp-edge/master`；记录本变更不部署 ECS、不构建安装包
 <!-- Delivered as aidcp-edge a0973be to origin/master with the project land-change ff-only workflow. Edge source-only change: no ECS deployment and no desktop installer build. -->
+
+## 4. 完整零环境引导态
+
+- [x] 4.1 在 shell 中增加右侧首次引导结构，并用同一权威 `rosterEmpty` 原子切换标题栏、环境工作区和引导面板
+- [x] 4.2 设计“创建环境 → 登录账号 → 开始运行”三步价值路径、唯一创建主按钮、键盘焦点和减弱动态效果样式
+- [x] 4.3 隐藏零环境时的旧环境身份、平台、代理、生命周期操作、零值工作区和内部原因码；第一个真实环境进入花名册后完整恢复
+- [x] 4.4 补充进入/退出零环境、CTA 直达创建、内部错误不泄漏、键盘语义和视觉布局回归测试，并完成实际窗口视觉检查
+<!-- Session validation: fleet-console 75/75; npm run typecheck; node --check; git diff --check. Actual index.html/styles.css were checked at 1440x900 and 820x720: no horizontal overflow, CTA opened the existing create tab, and all three environment-scoped workspaces were hidden while Cloud/settings stayed reachable. -->
+- [x] 4.5 在独立 worktree 完成聚焦测试、验收、完整测试、typecheck、OpenSpec strict 校验及 ff-only 集成；不部署 ECS、不构建安装包
+<!-- Delivered as aidcp-edge 057ff4e to origin/master by ff-only push. Validation: fleet-console 75/75; acceptance 28/28; serial full suite 2141/2141; npm run typecheck; node --check; git diff --check. Visual QA passed at 1440x900 and 820x720 with no horizontal overflow, all environment-scoped workspaces suppressed, Cloud/settings reachable, and the CTA opening the create tab. Edge source-only change: no ECS deployment and no desktop installer build. -->

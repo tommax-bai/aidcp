@@ -9,6 +9,8 @@
 - 点击首次占位卡直达环境管理的“新建环境”页；已有环境点击“管理”仍默认进入“环境”列表。
 - 把环境管理的全宽按钮式页签改成紧凑文字页签，把新建表单改为平台选择、浏览器系统、按需展开的可选代理、底部唯一主操作的纵向层级。
 - 创建期间提供不可重复提交的明确反馈；成功后新环境自动加入环境栏并如实显示为离线，失败时保留输入和可理解的错误。
+- 当权威运行花名册为零时，右侧工作区同步进入完整首次引导态：隐藏环境身份、平台、代理、发布、今日进展、浏览器与启动操作，展示“创建环境 → 登录账号 → 开始运行”的价值路径和唯一创建主按钮。
+- 首次引导不得展示 `environment_not_owned` 等内部原因码，也不得用旧环境名、平台徽标、零值进展或可点击生命周期按钮暗示已有环境；第一个真实环境进入花名册后原位恢复正常工作区。
 - 保持 Facebook 单个/批量创建、代理校验、客户归属、AdsPower 写入、花名册即时落盘和生命周期状态判定不变。
 
 ## Capabilities
@@ -19,12 +21,12 @@
 
 ### Modified Capabilities
 
-- `edge-fleet-console`: 增加已确认零环境时的专用环境栏空态、控件隐藏和直达创建行为。
+- `edge-fleet-console`: 增加已确认零环境时的专用环境栏与主工作区空态、环境级控件隐藏、直达创建和建成后恢复行为。
 - `adspower-desktop-env-picker`: 调整环境管理导航、新建环境信息层级和创建中/成功/失败反馈契约。
 
 ## Impact
 
 - Edge Electron renderer：`src/electron/renderer/index.html`、`styles.css`、`renderer.js`。
-- Edge Electron 测试：`test/electron/fleet-console.test.ts` 及相关渲染测试。
+- Edge Electron 测试：`test/electron/fleet-console.test.ts`、工作区渲染测试及首次引导视觉断言。
 - 控制仓只新增本 OpenSpec 变更；不改协议、Cloud、Console、数据库、AdsPower API schema 或敏感信息存储。
 - 属于桌面客户端源码交付；不构建安装包、不部署 ECS。
