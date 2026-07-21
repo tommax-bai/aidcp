@@ -12,5 +12,5 @@
 ## 3. Closeout
 
 - [x] 3.1 Run `openspec validate preserve-client-proxy-password --strict` and record Edge commit and validation evidence in this task list. <!-- Strict validation PASS after exact-target design update; Edge commits b7c6dda, 0063e4c, d725385. -->
-- [ ] 3.2 Integrate the validated control and Edge commits onto their default branches and push; do not package or deploy a desktop installer unless separately requested.
+- [x] 3.2 Integrate the validated control and Edge commits onto their default branches and push; do not package or deploy a desktop installer unless separately requested. <!-- User separately authorized merge and deployment on 2026-07-21. Edge `master` fast-forwarded and pushed at d725385; control `main` fast-forwarded through 4468dac before this evidence update. -->
 - [ ] 3.3 Build signed and notarized macOS `0.3.24` installers from merged Edge `master` with `dev` defaults, publish only to the dev downloads directory, and verify packaged code, baked target, hashes, sizes, and HTTP availability.
