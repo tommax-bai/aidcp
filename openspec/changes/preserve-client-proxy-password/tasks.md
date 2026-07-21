@@ -13,3 +13,4 @@
 
 - [x] 3.1 Run `openspec validate preserve-client-proxy-password --strict` and record Edge commit and validation evidence in this task list. <!-- Strict validation PASS; Edge source/test worktree commit 32bacbd. -->
 - [ ] 3.2 Integrate the validated control and Edge commits onto their default branches and push; do not package or deploy a desktop installer unless separately requested.
+- [ ] 3.3 Build signed and notarized macOS `0.3.24` installers from merged Edge `master` with `dev` defaults, publish only to the dev downloads directory, and verify packaged code, baked target, hashes, sizes, and HTTP availability.

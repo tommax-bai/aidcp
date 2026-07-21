@@ -36,7 +36,7 @@ Edge 目前经主进程调用 AdsPower `user/list`，再由 `normalizeProfile()`
 ## Migration Plan
 
 1. 先合入 Edge 源码和回归测试，不需要数据迁移。
-2. 后续正常客户端发布后生效；本次不自动打包或发布安装包。
+2. 用户已在实现完成后明确授权合并与部署；本次升版为 `0.3.24`，从合并后的 Edge `master` 构建签名、公证且烘焙 `dev` 连接的 macOS 安装包，只发布到 dev 下载目录，不触碰 `ol`。
 3. 回滚可恢复旧的非密投影和空密码表单，不影响 AdsPower 中已保存的代理配置。
 
 ## Open Questions
