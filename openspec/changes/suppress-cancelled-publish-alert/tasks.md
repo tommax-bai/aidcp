@@ -20,10 +20,10 @@
 
 - [x] 4.1 Run focused delegated publish/store/notification tests.
 - [x] 4.2 Run Cloud publish acceptance tests, full test suite, and typecheck.
-- [x] 4.3 Record commits and validation evidence, then run strict OpenSpec validation without merging or deploying.
+- [x] 4.3 Record commits, integration, validation, and deployment evidence, then run strict OpenSpec validation.
 
 <!--
-Implementation: aidcp-cloud commit 150017ccae44573ca5a39699efd64ae6ba8ffe37.
-Validation: focused delegated/store/notification tests 53 passed; npm run test:acceptance 64 passed with the deployment-gated E2E case skipped; full Cloud test suite passed; npm run typecheck passed; git diff --check passed; openspec validate suppress-cancelled-publish-alert --strict passed.
-Deployment: not run per user instruction. Integration: not merged to master per user instruction.
+Implementation: aidcp-cloud commit 150017ccae44573ca5a39699efd64ae6ba8ffe37; fast-forwarded and pushed to master. OpenSpec artifacts fast-forwarded and pushed to aidcp main at c7f8f44bb96d9f12733b46b9106b38a30cab013a.
+Validation: after rebasing to the latest defaults, focused delegated/store/notification tests 53 passed; npm run test:acceptance 64 passed with the deployment-gated E2E case skipped; full Cloud test suite passed; npm run typecheck passed; git diff --check passed; openspec validate suppress-cancelled-publish-alert --strict passed.
+Deployment: deployed aidcp-cloud master 150017ccae44573ca5a39699efd64ae6ba8ffe37 to dev only on 2026-07-21. Backup: /opt/aidcp/backups/cloud-before-150017c-20260721T040637Z.tar.gz. The six changed runtime files matched local SHA-256 before restart. aidcp-cloud.service became active at 2026-07-21 12:07:38 CST; ports 8787 and 8090 listened; local and nginx /api/health returned {"ok":true}; PostgreSQL select 1 passed; no service error-priority logs were present. Dev AIDCP_FEISHU_WS_ENABLED=false, so no Feishu connection was expected. Runtime module smoke returned cancelled_publish_alert=none. No migration, console deploy, OL deploy, or unrelated service operation was performed.
 -->
