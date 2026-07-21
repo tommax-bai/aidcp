@@ -84,3 +84,12 @@
 - [ ] 5.6 **待机被拒不得把健康环境打成 paused**（`core-lifecycle.ts` 的 `enterStandby()` 返回 false → `currentState='paused'` + `onCloseFailed()` → 外壳写 `coreParked/session:'paused'` → 一个只是「此刻不能待机」的环境变成永久占 700MB 的砖，且从此被排除出等槽位队列）。AdsPower 的 close 无 OS 级杀，这条路生产可达。
 - [ ] 5.7 **冷待机期间收到浏览命令 → 今天静默丢弃、零回执**（`src/main.ts` 三处），云端角色干等到看门狗。应回诚实的 `action.completed{ok:false}`，动作名须走那张 21 条映射表归一（CLAUDE.md §2 第 5 处）。
 - [ ] 5.8 **明确不做：需求驱动的「让位 / 槽位借调」**（请一个 resting 账号提前进冷待机腾槽位）。四位独立评审判它致命且**全部在代码里坐实**：① `session==='resting'` 标签来自 stdout 正则、滞后且粘滞，而核心的进入待机路径**没有「浏览循环是否在跑」的闸**——会真的把正在跑的会话停掉（**踩「绝不驱逐 running」红线**）；② 冷待机中的环境自己就被标成 `resting`，选中它 = 零槽位释放，调度器却以为让了位（幻影供体）；③ 让位直接调进入待机、**绕过唯一那道安全闸**（暂停 / 验证码浮层 / 稿件待审 / 未登录的 skip 链），能把运营手指底下正在过验证码的浏览器杀掉；④ 合格供体占空比仅约 3%（休息中位 60s，而设计要求剩余 ≥45s），6 持有者下「此刻有合格供体」约 15% —— 为一个 85% 时间是 no-op 的机制付一整套新的槽位所有权语义。**方向也错**：真正长期占死槽位的是 5.1 的 idle 与 5.5 的 paused，释放它们根本不涉及驱逐。
+
+## 6. 视频号临时浏览器通道
+
+- [x] 6.1 补齐 OpenSpec：公共执行槽位与容量 1/FIFO 的机器级临时浏览器通道分池；视频号 API-only 运行态与人设不适用写入契约。
+- [x] 6.2 Edge 外壳实现通用临时通道租约、结构化排队位次、代际取消与退出兜底；公共槽位计数排除临时/API-only 环境，资源分池不放宽既有提供方限频约束。<!-- aidcp-edge 3fd5320: machine-level capacity-1 FIFO, generation guards, exit/timeout fallback, split capacity projection -->
+- [x] 6.3 视频号启动与重新鉴权接入临时通道：全部环境顺序初始化；会话有效不打开浏览器；会话失效才开 sidecar，确认关闭后释放；补结构化 API/Cloud 运行证据与状态投影。<!-- aidcp-edge 3fd5320: leased sidecar, stored-session browser skip, current-process API/Cloud ACK proof -->
+- [x] 6.4 视频号声明 `personaApplicable=false`：不应用 personaBound、不显示入口、不运行 gate/自动弹窗；过期 IPC 调用返回不适用并补回归测试。<!-- aidcp-edge 3fd5320: platform capability, renderer gating, not_applicable IPC -->
+- [x] 6.5 运行 Edge focused/acceptance/full/typecheck 与 Electron 生命周期回归；记录通过数和真实边界，安装包仍按用户明确授权门禁。<!-- aidcp-edge 3fd5320: post-rebase focused 162/162, acceptance 28/28, typecheck, build:dist and syntax checks passed. Pre-rebase full 2166/2166 passed; post-rebase full 2167/2169 under shared-machine load had two unrelated UI timing flakes, and both exact tests passed isolated 1/1. AIDCP_E2E remained gated; no installer built. -->
+- [ ] 6.6 提交 aidcp-edge 与中控 OpenSpec 证据，rebase/fast-forward 合入默认分支并推送；`openspec validate browser-slot-scheduling --strict` 通过。

@@ -43,6 +43,13 @@
 - 任务受理超时要容得下一次冷启（今天默认 45s，短于 30–90s 的冷启）；按请求覆盖的口子已存在。
 - **排期任务失败不再烧掉这小时的名额**：`lastFired` 改到执行之后记；唤醒失败 / 仍在唤醒中的，这一小时内每分钟可再试。
 
+**五、短时浏览器工作流使用独立临时通道**
+
+- 外壳新增机器级**临时浏览器通道**，容量固定为 1、严格 FIFO。它服务需要短时打开浏览器、完成后立即关闭的能力；与长期占用浏览器的公共执行槽位分池，普通浏览自动化不得借此绕过公共并发上限。
+- 视频号环境启动全部经过该通道串行核验：已保存会话有效时不打开浏览器，启动 API connector 后立即释放通道；会话缺失、过期或遇到挑战时，才在持有通道期间打开鉴权浏览器，登录确认、保存会话并确认浏览器关闭后释放。
+- 视频号鉴权完成后的 API-only 数据交互 SHALL 显示为「运行中」，但浏览器状态保持「已关闭」，且不占公共槽位或临时通道。该运行态必须来自结构化的鉴权、身份、connector/Cloud 往返证据，不能只凭历史登录成功。
+- 视频号不适用账号人设：不检测、不展示行内人设入口、不触发人设弹窗；过期调用也必须返回「不适用」，不得把它变成启动阻塞项。
+
 ## Capabilities
 
 ### New Capabilities
@@ -55,10 +62,12 @@
 - `edge-task-execution-coordination`：新增「浏览器缺席」这一可唤醒态，与 `cdp_unhealthy` 分离；释放与在跑租约互斥。
 - `edge-multi-environment-supervisor`：错峰串行升级为**有界串行启动队列**（起完一个再起下一个）；浏览器并发按 Edge 启动时内存快照自动推算一次，后续任务不重算。
 - `content-schedule`：触发失败不消耗小时格；停泊账号经唤醒路径派发而非直接判失败。
+- `wechat-channels-interaction`：视频号启动、鉴权浏览器与 API-only 运行态接入独立临时通道并提供结构化运行证据。
+- `edge-fleet-console`：分开展示公共浏览器与临时通道占用；视频号不适用人设且 API-only 运行态不冒充浏览器打开。
 
 ## Impact
 
-- `aidcp-edge`：`src/main.ts`（浏览器闸、待机释放、唤醒重建接线）、`src/client/core-lifecycle.ts`（新增原地重建意图）、`src/execution/edge-task-coordinator.ts`（缺席态）、`src/electron/main.cjs`（槽位池 + 串行启动队列 + 唤醒不再 stopAndRestart）、`src/electron/fleet.cjs`（准入闸提升为队列级）、`src/electron/browser-cold-standby.cjs`。
+- `aidcp-edge`：`src/main.ts`（浏览器闸、待机释放、唤醒重建接线）、`src/client/core-lifecycle.ts`（新增原地重建意图）、`src/execution/edge-task-coordinator.ts`（缺席态）、`src/electron/main.cjs`（公共槽位池 + 临时通道 + 串行启动队列 + 生命周期投影）、`src/electron/fleet.cjs`（准入闸与通道队列）、`src/electron/browser-cold-standby.cjs`、`src/wechat-channels/*`（短时鉴权与 API-only 运行证据）、渲染层（视频号人设不适用）。
 - `aidcp-cloud`：`src/orchestrator/connection-runtime.ts`（就绪态）、`src/orchestrator/content-scheduler.ts`（名额不烧）、`src/comm/edge-task-lease-client.ts`（唤醒容差超时）、`src/comm/browser-standby.ts`。
 - 协议：**不新增消息类型**（唤醒复用既有快照通道；缺席态是既有回执的新原因值）。`AC-PROTO-02` 的 74 不动。
 - 地基（已 landed，不重做）：`2026-07-14-cold-standby-reconnect-stability`（待机不退化成重启重登循环）、`persona-bound-tristate-and-standby-drain` 的「关浏览器前先排空浏览循环」。
