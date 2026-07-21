@@ -10,7 +10,7 @@
 - [x] 2.2 Run focused publish/home UI tests, the required Edge full/acceptance gates, syntax checks and typecheck.
 - [x] 2.3 Validate Facebook and XHS desktop/narrow variants visually, including hover, focus, hidden controls and horizontal overflow.
 
-<!-- aidcp-edge commit 5a75211; focused platform tests 4/4, acceptance 28/28, full suite 2159/2159, typecheck and renderer syntax checks passed. Browser visual QA passed at 760px and 430px with no horizontal overflow; hover/focus and XHS regression were inspected. -->
+<!-- aidcp-edge commit ed48824 after replay onto master 8de0000; pre-replay full suite 2159/2159 passed. Post-replay focused UI suite 136/136, acceptance 29/29, typecheck and renderer syntax checks passed. Browser visual QA passed at 760px and 430px with no horizontal overflow; hover/focus and XHS regression were inspected. -->
 
 ## 3. Delivery
 
