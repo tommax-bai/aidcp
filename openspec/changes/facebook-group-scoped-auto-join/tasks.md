@@ -32,5 +32,6 @@
 
 - [x] 4.1 Run focused and full required Cloud tests plus typecheck; run focused Console tests plus typecheck/build and record exact results.
   <!-- Cloud: acceptance 65/65; focused 96 core + 2 panel; full single-concurrency 2,835 pass / 0 fail / 8 skip; typecheck pass. Console: focused 31/31; full single-worker 245 pass / 0 fail / 1 skip; typecheck/build pass (existing >500 KiB chunk warning only). -->
-- [ ] 4.2 Run `openspec validate facebook-group-scoped-auto-join --strict`, integrate isolated branches serially, and record repo commit SHAs and deviations.
+- [x] 4.2 Run `openspec validate facebook-group-scoped-auto-join --strict`, integrate isolated branches serially, and record repo commit SHAs and deviations.
+  <!-- Strict validation passed. Integrated serially: aidcp-cloud master 1ef8549d1f513a645a073470762b631abef37a0d, then aidcp-console master dec70481373f7702240cc41bc3830996b7e45f5e. Deviation: Console validation initially left same-worktree vitest workers; exact cwd was verified before terminating only those workers, then the full suite was rerun single-worker and passed. -->
 - [ ] 4.3 Deploy clean integrated Cloud and Console revisions to dev only, verify schema/health/static assets/read projections, then perform a bounded default-off/scoped dry validation without bulk-mapping existing business targets.
