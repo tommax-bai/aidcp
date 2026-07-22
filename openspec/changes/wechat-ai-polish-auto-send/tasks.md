@@ -35,7 +35,8 @@
 
 - [x] 5.1 从 Cloud 生成准入和派发复核中删除隐藏账号 allowlist 及其降级路径。
 - [x] 5.2 增加 Cloud 测试，证明公开配置与硬门禁通过时不需要任何隐藏账号白名单，并更新 OpenSpec 契约。
-- [ ] 5.3 运行 Cloud 聚焦测试、全量测试、typecheck 与 OpenSpec strict validation，提交、推送并部署 dev。
-- [ ] 5.4 核验 dev 文件哈希、服务/监听/健康、PostgreSQL、Feishu、日志与 isales；不主动开启 runtime controls 或触发真实发送。
+- [x] 5.3 运行 Cloud 聚焦测试、全量测试、typecheck 与 OpenSpec strict validation，提交、推送并部署 dev。
+- [x] 5.4 核验 dev 文件哈希、服务/监听/健康、PostgreSQL、Feishu、日志与 isales；不主动开启 runtime controls 或触发真实发送。
 
 <!-- Follow-up validation 2026-07-22: Cloud send-orchestrator focused 15/15, focused interaction 58/58, acceptance 68/68, full suite 2880 passed/8 skipped/0 failed, and typecheck passed. OpenSpec strict validation passed. Cloud implementation commit after rebase/integration: 64e2bb6. -->
+<!-- Follow-up delivery 2026-07-22: pushed Cloud master 64e2bb6 and Control main ef9cefc, then deployed Cloud-only to dev from the clean canonical checkout. Backup stamp 20260722-205237 created cloud.bak and cloud.env artifacts. The stale hidden allowlist line was removed from dev .env after backup; local/remote send-orchestrator hash matched a62f8fda. aidcp-cloud.service was active with NRestarts=0; 5432/8088/8090/8091/8787 listened; PostgreSQL SELECT 1 passed; Feishu bot was Dev.A and WSClient reached onReady; the error-priority journal had no entries; isales api/engine/scheduler/worker remained active. Reply jobs/send attempts for the target account were 4/0, and runtime controls remained writePaused=true, commentsReplyEnabled=false, dmSendTextEnabled=false, so deployment neither enabled nor triggered a real reply. -->
