@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 三仓为**同级目录**：本仓即 `.`（cwd = 仓库根），sub-repo 用相对写法 `../aidcp-edge`、`../aidcp-cloud`（文档里历史遗留的 `ai-dcp`、`/Users/bears/codes/…` 均为换机前旧值，正文已统一，勿再产出）。
 
 - **edge / cloud 两个 sub-repo 可能未在当前机器 clone**（中控仓只承载文档与契约）。涉及 edge/cloud 代码、测试或 ECS 部署前，**先 `ls -d ../aidcp-edge ../aidcp-cloud` 确认是否存在**；缺失则停手，向用户确认实际位置或先 clone，**绝不盲目照搬路径执行命令**。
-- **ECS 操作必须先命名 target**。执行任何 `ssh` / `rsync` 到 ECS 前，先在中控仓运行 `scripts/deploy-target <dev|ol> --check`：`dev=121.89.85.150`（key `~/codes/isales-4.pem`），`ol=123.56.253.183`（key `/Users/baitianxing/Downloads/ol.pem`）。未指定部署目标时，开发完成后的默认部署目标是 `dev`；`ol` 只有用户明确要求线上/OL部署时才执行。target 不清或 key 检查失败则停手告知用户。
+- **ECS 操作必须先命名 target**。执行任何 `ssh` / `rsync` 到 ECS 前，先在中控仓运行 `scripts/deploy-target <dev|ol> --check`：`dev=121.89.85.150`（key `~/codes/dev-0722.pem`），`ol=123.56.253.183`（key `~/codes/ol-0722.pem`）。未指定部署目标时，开发完成后的默认部署目标是 `dev`；`ol` 只有用户明确要求线上/OL部署时才执行。target 不清或 key 检查失败则停手告知用户。
 
 ## 1. 四仓关系（原三仓 + 管理后台前端 aidcp-console）
 

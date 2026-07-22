@@ -5,7 +5,7 @@ TBD - created by archiving change split-dev-ol-deploy-targets. Update Purpose af
 ## Requirements
 ### Requirement: Deployment targets must be explicit
 
-The project SHALL define explicit deployment targets for aidcp runtime operations. `dev` SHALL refer to ECS `121.89.85.150` with SSH key `~/codes/isales-4.pem` and SHALL be the default target for completed production-facing development deployment, mainline development deployment, and real-machine validation. `ol` SHALL refer to ECS `123.56.253.183` with SSH key `/Users/baitianxing/Downloads/ol.pem` and SHALL be used only when the user explicitly requests stable online deployment.
+The project SHALL define explicit deployment targets for aidcp runtime operations. `dev` SHALL refer to ECS `121.89.85.150` with SSH key `~/codes/dev-0722.pem` and SHALL be the default target for completed production-facing development deployment, mainline development deployment, and real-machine validation. `ol` SHALL refer to ECS `123.56.253.183` with SSH key `~/codes/ol-0722.pem` and SHALL be used only when the user explicitly requests stable online deployment.
 
 Any cloud, console, or edge release operation MUST name the target before touching remote state. Deployment tools and docs MUST NOT rely on the legacy assumption that there is only one ECS target.
 
@@ -13,7 +13,7 @@ Any cloud, console, or edge release operation MUST name the target before touchi
 
 - **WHEN** an operator requests a deployment to `dev`
 - **THEN** the deployment preflight SHALL verify the target IP is `121.89.85.150`
-- **AND** the SSH key path is `~/codes/isales-4.pem`
+- **AND** the SSH key path is `~/codes/dev-0722.pem`
 - **AND** the key is a readable regular file
 - **AND** the preflight SHALL NOT reject the dev key based on POSIX group/other mode bits
 
@@ -21,7 +21,7 @@ Any cloud, console, or edge release operation MUST name the target before touchi
 
 - **WHEN** an operator requests a deployment to `ol`
 - **THEN** the deployment preflight SHALL verify the target IP is `123.56.253.183`
-- **AND** the SSH key path is `/Users/baitianxing/Downloads/ol.pem`
+- **AND** the SSH key path is `~/codes/ol-0722.pem`
 - **AND** the key is a readable regular file
 - **AND** the preflight SHALL NOT reject the ol key based on POSIX group/other mode bits
 
@@ -281,4 +281,3 @@ The one exception is a **release-artifact pointer** — a value whose meaning is
 - **WHEN** an `ol` release is cut and later hotfixed
 - **THEN** every hotfix on that branch is present on trunk before the next release is cut from trunk
 - **AND** cutting the next release from trunk therefore cannot reintroduce a bug that was already fixed for `ol`
-

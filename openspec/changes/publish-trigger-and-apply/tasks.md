@@ -84,7 +84,7 @@
 
 ## 11. 部署（ECS 安全序列 + edge 本地；执行前先做 §0 前置检查）
 
-- [ ] 11.1 §0 前置检查：`ls -d ../aidcp-edge ../aidcp-cloud` 确认 sub-repo 存在 + 私钥 `~/codes/isales-4.pem` 存在且 `chmod 600`；缺失即停手告知用户 <!-- 部署按用户指示延后（A 全阶段统一部署） -->
+- [ ] 11.1 §0 前置检查：`ls -d ../aidcp-edge ../aidcp-cloud` 确认 sub-repo 存在 + 私钥 `~/codes/dev-0722.pem` 存在且 `chmod 600`；缺失即停手告知用户 <!-- 部署按用户指示延后（A 全阶段统一部署） -->
 - [ ] 11.2 ECS 先备份（`/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`）→ `rsync`（`--exclude .env --exclude node_modules --exclude .git`）→ DB 迁移（`publish_log` 加 `publish_metadata` / `ai_enforced` 列 + `liked_notes` 建表，DDL `IF NOT EXISTS` 幂等）→ `systemctl restart aidcp-cloud.service`
 - [ ] 11.3 healthcheck：`active (running)` + 8787 监听 + 飞书长连接已建立 + PG `select 1`；失败即回滚。**任何 ECS 操作绝不碰同机 `isales`**
 - [ ] 11.4 edge 本地跑、连 `ws://121.89.85.150:8787`，验证飞书 `/publish` → 指令驱动 → 人审 → 配图/元数据应用 → 真实落库 + 血缘端到端（`AIDCP_REAL_PUBLISH` 缺省即挂人审；受控放行用 `AIDCP_REAL_PUBLISH=false`）

@@ -7,8 +7,8 @@ usage() {
 cat >&2 <<'EOF'
 usage: scripts/deploy-target <dev|ol> [--check|--shell]
 
-  dev      ECS 121.89.85.150, key ~/codes/isales-4.pem
-  ol       ECS 123.56.253.183, key /Users/baitianxing/Downloads/ol.pem
+  dev      ECS 121.89.85.150, key ~/codes/dev-0722.pem
+  ol       ECS 123.56.253.183, key ~/codes/ol-0722.pem
 
   --check  verify the key exists and is readable
   --shell  print shell exports for eval/use in scripts
@@ -23,13 +23,13 @@ mode="${2:-}"
 case "$target" in
   dev)
     host="121.89.85.150"
-    key="$HOME/codes/isales-4.pem"
+    key="$HOME/codes/dev-0722.pem"
     purpose="mainline development and high-frequency validation"
     cloud_url="ws://121.89.85.150:8787"
     ;;
   ol)
     host="123.56.253.183"
-    key="/Users/baitianxing/Downloads/ol.pem"
+    key="$HOME/codes/ol-0722.pem"
     purpose="stable online release deployment"
     cloud_url="ws://123.56.253.183:8787"
     ;;
