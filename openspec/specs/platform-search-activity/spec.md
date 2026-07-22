@@ -103,3 +103,41 @@ Edge build SHALL 声明 `search_activity_receipt_v1`，Cloud SHALL 仅对声明�
 
 - **WHEN** 账号处于将主动行为清零的 restricted 或 frozen 状态
 - **THEN** search 生效配额为 0，而 view 保持既有只读浏览语义
+
+### Requirement: 已确认搜索进入支持平台的客户端今日进展
+
+Cloud SHALL 将已按 `actuated=true` 一次性记入账号 `search` 风险事实的搜索，投影到该账号环境级客户鉴权 HTTP 今日进展，并 MAY 同步出现在兼容 `ui.snapshot.dailyUsage` 中。投影 SHALL 包含 day alias 以及 session、minute、hour、day 窗口中真实可得的搜索次数、有效上限、饱和状态和恢复时间；MUST NOT 使用命令下发次数、关键词尝试账或旧 Edge 的未确认搜索补造计数。
+
+#### Scenario: Facebook 今日搜索显示真实次数与上限
+
+- **WHEN** Facebook 账号今日已有 2 次已确认搜索且当前有效 day 上限为 10
+- **THEN** 客户 HTTP 今日进展的 totals 与 day window 均包含 `search=2`，day quota 包含 `search=10`
+
+#### Scenario: 离线查看仍读取 Cloud 已确认搜索
+
+- **WHEN** 账号已有已确认搜索，但对应浏览器、自动化引擎或 Edge 当前离线
+- **THEN** 客户端仍可通过环境级客户鉴权 HTTP 读取最近的 Cloud 已确认 search 今日进展
+
+#### Scenario: 未确认搜索不进入客户端用量
+
+- **WHEN** Cloud 只下发过搜索命令，或旧 Edge 未提供可消费的 `actuated=true` 终态
+- **THEN** 系统不因该下发或未知状态增加客户端 search 次数
+
+### Requirement: 搜索进度按平台显式供给且四窗口同口径
+
+Cloud SHALL 仅为平台注册明确支持搜索的账号供给客户端 `search` 指标。Facebook 与小红书 SHALL 供给，视频号与未知平台 SHALL 保持字段缺席；MUST NOT 用 `search=0` 代替结构性不支持或未知。minute、hour、day SHALL 来自账号风险计数窗口，session SHALL 来自当前连接运行时的 `searches` 单场统计并映射为客户端键 `search`。
+
+#### Scenario: 小红书与 Facebook 均供给搜索
+
+- **WHEN** Cloud 构造已知小红书或 Facebook 账号的今日进展
+- **THEN** daily alias 和适用窗口保留 search 次数及配额，即使真实次数为 0
+
+#### Scenario: 视频号与未知平台不出现搜索格
+
+- **WHEN** Cloud 构造视频号账号或平台归属未知账号的今日进展
+- **THEN** totals、quotas、saturated 与各窗口均不包含 search
+
+#### Scenario: 单场搜索使用运行时复数键映射
+
+- **WHEN** 当前会话统计为 `searches=1` 且单场搜索上限为 3
+- **THEN** session window 投影为 `totals.search=1` 与 `quotas.search=3`，不读取 day 累计代替
