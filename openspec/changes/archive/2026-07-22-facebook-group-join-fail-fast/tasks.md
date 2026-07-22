@@ -15,8 +15,9 @@
 
 - [x] 3.1 Run focused Cloud tests, acceptance, full tests, typecheck, and diff checks; record exact results.
   <!-- Cloud: focused 138/138; acceptance 68/68; full 2,879 passed, 8 skipped, 0 failed (2,887 total); typecheck and git diff --check passed. Post-rebase focused 138/138 and typecheck also passed. -->
-- [ ] 3.2 Run `openspec validate facebook-group-join-fail-fast --strict`, integrate clean branches serially, and record commit SHAs.
-  <!-- Cloud integrated and pushed to master at 3586c8b; OpenSpec proposal is control commit d031107. Final control integration SHA is recorded after this delivery-evidence commit lands. -->
+- [x] 3.2 Run `openspec validate facebook-group-join-fail-fast --strict`, integrate clean branches serially, and record commit SHAs.
+  <!-- Cloud integrated and pushed to master at 3586c8b. Control proposal 718999e and delivery evidence b6d72ee were integrated and pushed to main. Change strict validation and all-spec strict validation passed (242/242). -->
 - [x] 3.3 Deploy the clean Cloud master revision to dev only and verify service health plus database/read-model evidence that execution failures no longer create future cooldown assignments.
   <!-- DEV only: deployed Cloud master 3586c8b from the clean canonical checkout. Backup: /opt/aidcp/backups/deploy-20260722-204435-facebook-group-join-fail-fast. aidcp-cloud active since 2026-07-22 20:44:44 CST; 8787/8090/8091 listening; panel health ok; console HTTP 200; PostgreSQL SELECT 1 passed; source hashes matched; future unfinished page/network-failure cooldown rows=0; isales services remained active. OL untouched. -->
-- [ ] 3.4 Archive the completed OpenSpec change after verified dev delivery.
+- [x] 3.4 Archive the completed OpenSpec change after verified dev delivery.
+  <!-- Artifact graph complete; task checklist complete; delta sync assessed against both baseline specs. Archive command follows in the same closeout. -->
