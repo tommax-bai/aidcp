@@ -30,6 +30,7 @@
 
 ## 4. Validation and delivery
 
-- [ ] 4.1 Run focused and full required Cloud tests plus typecheck; run focused Console tests plus typecheck/build and record exact results.
+- [x] 4.1 Run focused and full required Cloud tests plus typecheck; run focused Console tests plus typecheck/build and record exact results.
+  <!-- Cloud: acceptance 65/65; focused 96 core + 2 panel; full single-concurrency 2,835 pass / 0 fail / 8 skip; typecheck pass. Console: focused 31/31; full single-worker 245 pass / 0 fail / 1 skip; typecheck/build pass (existing >500 KiB chunk warning only). -->
 - [ ] 4.2 Run `openspec validate facebook-group-scoped-auto-join --strict`, integrate isolated branches serially, and record repo commit SHAs and deviations.
 - [ ] 4.3 Deploy clean integrated Cloud and Console revisions to dev only, verify schema/health/static assets/read projections, then perform a bounded default-off/scoped dry validation without bulk-mapping existing business targets.
