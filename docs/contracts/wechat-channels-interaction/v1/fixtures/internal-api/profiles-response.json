@@ -13,6 +13,7 @@
         "allowLinks": false,
         "blockedPhrases": ["绝对有效"],
         "disallowedClaims": ["未验证的效果承诺"],
+        "knowledgeDocument": "## 账号说明\n- 这个账号主要分享日常效率方法。\n- 课程资料会在每周五统一更新。",
         "requiredDisclaimer": null,
         "variableFallbacks": {
           "user_name": "朋友",
@@ -31,6 +32,7 @@
         "allowLinks": false,
         "blockedPhrases": ["保证退款"],
         "disallowedClaims": ["代替人工完成订单决策"],
+        "knowledgeDocument": null,
         "requiredDisclaimer": "如需处理账户或订单，请转人工核验。",
         "variableFallbacks": {
           "user_name": "朋友",

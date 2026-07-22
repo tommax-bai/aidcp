@@ -17,6 +17,7 @@
     "allowEmoji": true,
     "allowLinks": false,
     "blockedPhrases": ["绝对有效"],
+    "knowledgeDocument": "## 账号说明\n- 这个账号主要分享日常效率方法。\n- 课程资料会在每周五统一更新。",
     "requiredDisclaimer": null
   }
 }

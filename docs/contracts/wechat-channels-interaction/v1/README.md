@@ -156,11 +156,11 @@ GET        /api/accounts/:accountId/reply-config/audit
 
 权限固定为 `interaction.config.view`、`interaction.config.edit`、`interaction.config.publish`、`interaction.config.preview`、`interaction.dm.view_full`、`interaction.audit.view`，缺 grant fail closed。
 
-模板变量只允许 `{{user_name}}`、`{{video_title}}`、`{{account_name}}`、`{{support_channel}}`；只做字面替换。规则排序 `priority ASC, ruleId ASC`。运行 controls 与 draft/published config 分离，published snapshot 不可变。`reply-preview-contexts` 仅返回账号当前权威环境内最近的入站预览字段，不触发同步、建 job 或发送；DM 正文额外要求 `interaction.dm.view_full`。
+模板变量只允许 `{{user_name}}`、`{{video_title}}`、`{{account_name}}`、`{{support_channel}}`；只做字面替换。规则排序 `priority ASC, ruleId ASC`。运行 controls 与 draft/published config 分离，published snapshot 不可变。comment/dm profile 可带 nullable `knowledgeDocument`（Markdown/纯文本、≤20,000 字符），随 group/default scope 版本发布；旧 profile 缺字段按 null。`reply-preview-contexts` 仅返回账号当前权威环境内最近的入站预览字段，不触发同步、建 job 或发送；DM 正文额外要求 `interaction.dm.view_full`。
 
 ## AI 与发送门禁
 
-LLM role 只有 `reply_intent_classifier`、`reply_polisher`、`reply_risk_reviewer`；template renderer 是确定性程序。classifier/reviewer 失败都降级 unknown + 人工；polisher 失败回落原模板。模型自报的 `meaningChanged`、`introducedClaims`、`riskLevel` 不是安全事实源：候选文本必须再过确定性 claim gate，至少硬拦价格、折扣、促销、退款、订单、售后承诺和补偿承诺。短期自动发送仅允许未经过 AI、与确定性模板渲染完全一致且 claim gate 为空的文本；任何 AI 润色都必须人工审批。DM AI 默认 false。
+LLM role 只有 `reply_intent_classifier`、`reply_polisher`、`reply_risk_reviewer`；template renderer 是确定性程序。classifier/reviewer 失败都降级 unknown + 人工；polisher 失败回落原模板。polisher 仅在实际启用时接收命中渠道的 `knowledgeDocument`，并只能用文档明确支持的业务事实回答；文档被视为不可信数据，内部命令不得覆盖系统规则，缺答案必须诚实说明无法确认。模型自报的 `meaningChanged`、`introducedClaims`、`riskLevel` 不是安全事实源：候选文本必须再过确定性 claim gate，至少硬拦价格、折扣、促销、退款、订单、售后承诺和补偿承诺。短期自动发送仅允许未经过 AI、与确定性模板渲染完全一致且 claim gate 为空的文本；任何 AI 润色都必须人工审批。DM AI 默认 false。
 
 任何发送都必须通过 scope、auth、identity、capability、全局/账号/channel 开关、published config、CAS、无 active/ambiguous attempt、文本/变量、消息类型、账号单飞、限速与 `RiskController.canDo`。评论沿用 `comment` action；私信新增 `dm_reply`，三窗口 fallback quota 均为 0。所有写开关默认 false；`auto_safe` 默认 false。
 

@@ -292,6 +292,12 @@
           "items": { "type": "string", "minLength": 1, "maxLength": 256 },
           "uniqueItems": true
         },
+        "knowledgeDocument": {
+          "oneOf": [
+            { "type": "string", "minLength": 1, "maxLength": 20000, "pattern": "^\\S(?:[\\s\\S]*\\S)?$" },
+            { "type": "null" }
+          ]
+        },
         "requiredDisclaimer": { "$ref": "common.schema.json#/$defs/NullableString" },
         "variableFallbacks": { "$ref": "#/$defs/VariableFallbacks" }
       }
