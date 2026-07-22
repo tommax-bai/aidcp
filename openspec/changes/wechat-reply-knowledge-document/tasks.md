@@ -21,5 +21,7 @@
 
 ## 5. Delivery
 
-- [ ] 5.1 Commit, rebase, integrate, and push the control, Cloud, and Console default branches with validation evidence.
-- [ ] 5.2 Deploy Cloud then Console from clean default checkouts to `dev`; verify hashes, services, health, logs, PostgreSQL, Feishu, unchanged reply/contact counts, and no real platform write.
+- [x] 5.1 Commit, rebase, integrate, and push the control, Cloud, and Console default branches with validation evidence.
+  <!-- Delivery: control main 80d4800, Cloud master 7d02d1f, and Console master 65b9df0 were fast-forward integrated and pushed after validation; no Edge protocol or installer change. -->
+- [x] 5.2 Deploy Cloud then Console from clean default checkouts to `dev`; verify hashes, services, health, logs, PostgreSQL, Feishu, unchanged reply/contact counts, and no real platform write.
+  <!-- Dev 2026-07-22: Cloud deployed from clean current master 833b160 (contains feature 7d02d1f), then Console 65b9df0. Backups: cloud.bak.20260722-145823.tar.gz, cloud.env.20260722-145823.bak, console.bak.20260722-145944.tar.gz. Local/remote feature-file and static-asset hashes matched; aidcp-cloud active with NRestarts=0; 8787/8090/8088/5432 listened; panel/public health returned ok; PostgreSQL SELECT 1 passed; Feishu bot Dev.A and WSClient onReady verified; recent error count was zero; isales-api/isales-scheduler remained active. Reply jobs/send attempts/contact comment attempts stayed 4/0/63 before and after, so no real platform write occurred. No migration or Edge package was involved. -->
