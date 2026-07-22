@@ -52,7 +52,7 @@
 - [x] 5.3 Implement approved comment and comment-like commands with target binding, fill/readback/submit validation, and no implicit publish.
   <!-- aidcp-edge 317cd47: comment routes require exact note/comment binding, verify editor readback, and do not expose a generic submit surface; full Edge tests passed. -->
 - [x] 5.4 Add crash, disconnect, timeout, cancellation, and duplicate-command tests proving `not_started`, `dispatched`, `confirmed`, and `ambiguous` are never upgraded to false success.
-  <!-- aidcp-edge 317cd47: effect, fake-CDP, process-protocol, and TypeScript supervisor tests cover these boundaries; Rust 40, focused 33, and full Edge 2224 tests passed. -->
+  <!-- aidcp-edge 317cd47: effect, fake-CDP, process-protocol, and TypeScript supervisor tests cover these boundaries; Rust 40, focused 33, and rebased full Edge 2235 tests passed. -->
 
 ## 6. Publish commands and safety invariants
 
@@ -101,7 +101,7 @@
 
 - [ ] 9.1 Run Rust formatting, unit/integration/acceptance tests, clippy, and release builds for every locally supported target; record unsupported cross-target checks truthfully.
 - [x] 9.2 Run physical Edge dependency installation, focused tests, required safety acceptance suites, full tests, typecheck, and production build.
-  <!-- aidcp-edge 317cd47: physical npm tree; focused 33/33, acceptance 29/29, full 2224/2224, typecheck, build:dist, Rust 40/40, rustfmt, and clippy -D warnings passed. No live or packaged-app validation. -->
+  <!-- aidcp-edge 317cd47: physical npm tree; focused 33/33, acceptance 29/29, rebased full 2235/2235, typecheck, build:dist, Rust 40/40, rustfmt, and clippy -D warnings passed. No live or packaged-app validation. -->
 - [ ] 9.3 Run package-input graph checks, packaged smoke tests, signature verification, and leakage scans for locally produced artifacts; record Windows and alternate-architecture CI evidence separately.
 - [ ] 9.4 Run the authorized read-only live Xiaohongshu matrix across home/explore/search/note/profile/notification/error/login-observable states and record exact post-conditions.
 - [ ] 9.5 Run live write/action validation only under separate target-specific authorization, covering interaction and publish ambiguity without broadening the authorized action scope.
