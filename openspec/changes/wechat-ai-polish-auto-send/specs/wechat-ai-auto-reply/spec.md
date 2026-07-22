@@ -64,7 +64,12 @@
 
 ### Requirement: 无人审批 AI job 必须在派发前再次复核
 
-Cloud SHALL 在生成准入和真实派发前分别复核无人审批 AI job。派发复核 MUST 使用 job 固定的配置版本查找命中规则、渠道 profile 和策略，并重新验证规则授权、风险等级、流程标签组合、知识依据条件、最终文本和确定性 claim gate；原有账号 allowlist、runtime controls、active identity、capability、登录冷却、RiskController、专用限速、CAS、幂等与结果核验 MUST 保持生效。
+Cloud SHALL 在生成准入和真实派发前分别复核无人审批 AI job。派发复核 MUST 使用 job 固定的配置版本查找命中规则、渠道 profile 和策略，并重新验证规则授权、风险等级、流程标签组合、知识依据条件、最终文本和确定性 claim gate；runtime controls、active identity、capability、登录冷却、RiskController、专用限速、CAS、幂等与结果核验 MUST 保持生效。Cloud MUST NOT 读取隐藏账号 allowlist 来额外否决后台已经明确授权的自动回复。
+
+#### Scenario: 不依赖隐藏账号白名单
+
+- **WHEN** 已发布账号策略、渠道、规则、runtime controls 与全部硬门禁均允许自动发送
+- **THEN** Cloud MUST 允许 job 进入队列并通过派发复核，不得要求账号同时出现在环境变量或其它后台不可见灰度名单中
 
 #### Scenario: 生成后运行门禁关闭
 

@@ -2,7 +2,7 @@
 
 回复规则已经有冻结字段 `actions.polish` 和 `actions.allowAutoSend`，账号/渠道也已有 `auto_safe`、`sendReplies` 和 `allowAutoSend`。但 Console 在启用 AI 时强制把规则字段写回 false；Cloud 的预览判定和发送编排又只允许“未运行 AI、最终文本等于模板、没有任何风险标签”的候选，因此 AI 规则没有真实自动发送路径。
 
-真实发送仍经过 Cloud 的 queued job、运行控制、账号 allowlist、平台身份与 capability、登录冷却、RiskController、专用限速、幂等和结果核验。本变更只开放一条受约束的 AI 候选准入，不新增发送旁路，也不改变 Edge 协议。
+真实发送仍经过 Cloud 的 queued job、后台可见的账号/渠道/规则授权、运行控制、平台身份与 capability、登录冷却、RiskController、专用限速、幂等和结果核验。隐藏的账号 allowlist 不属于产品授权模型，不能在后台显示允许时静默否决发送。本变更只开放一条受约束的 AI 候选准入，不新增发送旁路，也不改变 Edge 协议。
 
 ## Goals / Non-Goals
 
@@ -15,7 +15,7 @@
 
 **Non-Goals:**
 
-- 不自动修改或发布现有规则，不为任何账号开启账号级自动模式、渠道自动范围、runtime controls 或运维 allowlist。
+- 不自动修改或发布现有规则，不为任何账号开启账号级自动模式、渠道自动范围或 runtime controls。
 - 不允许订单、退款、价格、促销、库存、时效、售后、投诉争议、个人数据、医疗、法律、安全、辱骂或未成年人安全内容自动发送。
 - 不新增模型、数据库字段、API DTO、WS v2 命令或 Edge 行为；不开放 v1 私信 AI。
 - 不用真实平台发送作为开发或部署验收。
@@ -44,7 +44,9 @@
 
 Cloud 把自动内容资格收敛为共享的纯函数/等价判定，输入只包括已发布配置、命中规则、渠道 profile 和候选的结构化字段。生成阶段额外要求 classifier、polisher、reviewer 均无 fallback、候选未被拒、reviewer 返回 low 且建议允许自动发送。满足后，system actor 才把 job 从 classifying 直接转 queued。
 
-派发阶段从 job 固定的 `configVersion/configScopeId` 读取同一版本规则和 profile，重新检查规则授权、风险等级、流程标签组合、知识文档条件、最终文本和确定性 claim gate。运行控制、平台能力、登录冷却、allowlist、RiskController、限速、CAS、幂等和核验继续按原顺序执行。任一复核失败不得创建 send attempt。
+派发阶段从 job 固定的 `configVersion/configScopeId` 读取同一版本规则和 profile，重新检查规则授权、风险等级、流程标签组合、知识文档条件、最终文本和确定性 claim gate。运行控制、平台能力、登录冷却、RiskController、限速、CAS、幂等和核验继续按原顺序执行。任一复核失败不得创建 send attempt。
+
+账号级隐藏 allowlist 从生成准入和派发复核同时删除。自动发送授权只来自已发布账号策略、渠道范围、规则发送方式和后台可见的 runtime controls；Cloud 仍保留全局紧急停写及不可绕过的身份、能力、风险与限速门禁，但不得再要求运维在环境变量中重复登记账号。
 
 不在 job 新增 AI fallback 字段：只有生成阶段完整成功的 job 才能进入无人审批 queued；派发阶段以 queued 状态加固定版本配置和持久化风险证据复核，避免数据库迁移。
 
@@ -61,7 +63,7 @@ reviewer prompt 明确：普通低风险内容应返回 `riskLevel=low` 且 `all
 - [知识文档事实无法用字符串比较证明语义完全一致] → 只开放普通问答、要求文档非空和 introducedClaims 审计、全 AI 成功、reviewer low、确定性 claim gate 为空；实质类别和未知继续强制人工。
 - [生成准入与派发条件漂移] → 抽取共享资格判定，并用测试同时覆盖 preview/job 两种输入；派发继续 fail closed。
 - [旧规则启用 AI 但 allowAutoSend=false] → 不迁移、不改发布版本，仍保持人工；只有管理员主动选择并发布才扩权。
-- [客户端显示自动但运维 allowlist 或运行门禁关闭] → UI 说明该选择只是规则授权，预览与发送记录如实展示最终降级，不能宣称已发送。
+- [隐藏开关导致后台与运行态相悖] → 删除账号 allowlist；发送授权只使用后台可见配置，运行控制与硬门禁仍如实降级且不能宣称已发送。
 - [模型低风险误判] → reviewer 不是唯一事实源；确定性 intent/claim/text/profile/硬标签检查和两阶段门禁继续独立生效。
 
 ## Migration Plan
@@ -73,4 +75,4 @@ reviewer prompt 明确：普通低风险内容应返回 `riskLevel=low` 且 `all
 
 ## Open Questions
 
-无。运维 allowlist 的账号纳入仍按现有上线流程处理，不由本次 UI 自动开启。
+无。

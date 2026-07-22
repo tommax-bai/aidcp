@@ -9,6 +9,7 @@
 - AI 调用失败、候选被拒、风险未知、实质高风险、规则指定强制人工，或任何现有运行时/身份/能力/限速门禁不满足时，继续降级为人工审核。
 - `meaning_changed` 与 `introduced_claim` 保留为可审计流程标签；只有可机械证明的安全 AI 路径才能携带这些标签自动发送，不能借此绕过订单、价格、退款、承诺、个人数据等实质风险。
 - 修正规则 `forceHumanTags` 的命中语义：只有最终实际出现了管理员选定的标签才强制人工，不因配置列表非空就无条件阻断。
+- 删除 `AIDCP_INTERACTION_AUTO_ACCOUNT_ALLOWLIST` 隐藏账号白名单；后台已发布的账号、渠道和规则配置不得再被不可见灰度名单静默否决。
 - 预览和规则列表显示最终发送方式与降级原因；部署和验证期间不改变已有规则，也不执行真实平台发送。
 
 ## Capabilities
@@ -23,6 +24,6 @@
 
 ## Impact
 
-- Cloud：`reply-workflow` 的审批判定、`send-orchestrator` 的生成准入与派发复核、规则强制人工标签判定及相关测试。
+- Cloud：`reply-workflow` 的审批判定、`send-orchestrator` 的生成准入与派发复核、隐藏账号白名单删除、规则强制人工标签判定及相关测试。
 - Console：视频号回复规则编辑器、规则列表/发布摘要及组件测试。
 - Control：OpenSpec 变更和视频号互动契约说明；冻结 DTO、数据库、Edge 与 WS v2 协议不变。
