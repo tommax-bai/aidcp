@@ -1,0 +1,29 @@
+## 1. Cloud group scope data model
+
+- [ ] 1.1 Add additive target-scope schema, types, normalization, and target-store transaction methods for list/filter/bulk replace.
+- [ ] 1.2 Extend group import with optional request-level account-group scopes while preserving mappings when the field is absent.
+- [ ] 1.3 Make pooled candidate claim resolve the account's current Facebook group label and retain the global one-group-one-account atomic lock.
+- [ ] 1.4 Revalidate unfinished scoped assignments before actuation, release mismatches safely, and preserve terminal/joined membership facts.
+- [ ] 1.5 Add focused store concurrency and eligibility tests for multi-scope, ungrouped, no-fallback, global-lock, stale-reclaim, and scope-change cases.
+
+## 2. Cloud automatic join action
+
+- [ ] 2.1 Add the per-account Facebook join automation config store with default-off switch, bounded daily cap, optional week mask, and truthful write results.
+- [ ] 2.2 Add join trigger source to the audit ledger and provide latest-scheduled-result reads without inferring old/manual rows.
+- [ ] 2.3 Extend the platform scheduled-automation registry and content-schedule catalog projection with Facebook `join_group` config, effective limits, scope readiness, and recent result.
+- [ ] 2.4 Gate the existing content scheduler join action by account config, effective intersected window, operator/risk daily caps, session budget, kill switch, and scoped candidates without adding another timer.
+- [ ] 2.5 Extend panel read/write endpoints for group scope filters/facets/bulk replacement/import and per-account join configuration with atomic validation.
+- [ ] 2.6 Add focused Cloud tests for schedule windows, default-off, caps, kill switch, audit source/result, panel contracts, and non-Facebook rejection.
+
+## 3. Console management surfaces
+
+- [ ] 3.1 Extend Facebook group and account-automation API types/queries for scopes, scope facets, join config, effective cap, readiness, and recent result.
+- [ ] 3.2 Add account-group filter/tags, import scope multi-select, no-scope warnings, and selected-row bulk scope replacement to the Facebook groups page.
+- [ ] 3.3 Render the server-declared Facebook `join_group` action in the account automation page with switch, daily cap, inherited/custom week mask, effective cap, readiness, and recent result.
+- [ ] 3.4 Add focused Console tests for mapping/filter/import/bulk writes and Facebook join action editing/result display without affecting other platforms.
+
+## 4. Validation and delivery
+
+- [ ] 4.1 Run focused and full required Cloud tests plus typecheck; run focused Console tests plus typecheck/build and record exact results.
+- [ ] 4.2 Run `openspec validate facebook-group-scoped-auto-join --strict`, integrate isolated branches serially, and record repo commit SHAs and deviations.
+- [ ] 4.3 Deploy clean integrated Cloud and Console revisions to dev only, verify schema/health/static assets/read projections, then perform a bounded default-off/scoped dry validation without bulk-mapping existing business targets.
