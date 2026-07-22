@@ -220,14 +220,14 @@
   "edgeId": "edge-01",        // string  边缘节点标识
   "platform": "xiaohongshu",  // string? 运行时平台标识；缺省按历史 xhs 兼容，cloud 会与 accounts.platform 校验
   "app": "xhs",               // string? 业务/站点标识
-  "capabilities": ["click", "input", "scroll", "captcha_assist_text_v1", "client_core_browser_executor_v1", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? 能力声明（构建能力位由 EdgeClient 构造函数统一并入）
+  "capabilities": ["click", "input", "scroll", "captcha_assist_text_v1", "client_core_browser_executor_v1", "facebook_reel_follow_v1", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? 能力声明（构建能力位由 EdgeClient 构造函数统一并入）
   "accountId": "acc-01",      // string? 账号标识；多账号运行时要求真实账号，default 已退役
   "accountNickname": "小张测评", // string? 账号可读昵称；仅用于展示补充，不参与身份确立或路由
   "machineLabel": "win-aliyun-3" // string? 人类可读机器标签（change captcha-assist-text-answer：已移除背后无能力的 remoteAddr/远程桌面入口，design D13）
 }
 ```
 
-`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge、Facebook edge 或视频号 edge 跨平台接管账号。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。`client_core_browser_executor_v1` 是可选的结构能力位：双方回显只说明客户端能把 core/Cloud transport 与浏览器执行器分别管理，不改变任何旧消息类型；旧 Cloud 不回显时 Edge 保持旧协议兼容。五项 interaction capability 都是 optional；四个扩展 capability 依赖 `interaction_inbox_v1`，新 Edge 只有收到相应 `welcome.capabilities` 回显后才启用对应消息。回显 `interaction_offboarding_v1` 时，Cloud 还必须在 welcome 带当前 account 的 `interactionRecovery.offboardPending`；回显 `interaction_runtime_controls_v1` 时必须带 `interactionRuntime`。任一查询失败都按 all-off/pending 处理，不能沿用别的账号或旧连接的能力。
+`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge、Facebook edge 或视频号 edge 跨平台接管账号。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。`client_core_browser_executor_v1` 是可选的结构能力位：双方回显只说明客户端能把 core/Cloud transport 与浏览器执行器分别管理，不改变任何旧消息类型；旧 Cloud 不回显时 Edge 保持旧协议兼容。`facebook_reel_follow_v1` 表示该 Edge 构建包含绑定规范 Reel、唯一作者和后置 Following 状态的关注执行器；Cloud 未看到此位时不得掷自动 Reel 关注概率或下发对应命令。五项 interaction capability 都是 optional；四个扩展 capability 依赖 `interaction_inbox_v1`，新 Edge 只有收到相应 `welcome.capabilities` 回显后才启用对应消息。回显 `interaction_offboarding_v1` 时，Cloud 还必须在 welcome 带当前 account 的 `interactionRecovery.offboardPending`；回显 `interaction_runtime_controls_v1` 时必须带 `interactionRuntime`。任一查询失败都按 all-off/pending 处理，不能沿用别的账号或旧连接的能力。
 
 **`welcome`**（cloud → edge）
 ```jsonc
