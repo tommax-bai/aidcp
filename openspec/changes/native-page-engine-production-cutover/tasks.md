@@ -107,4 +107,5 @@
 - [ ] 9.5 Run live write/action validation only under separate target-specific authorization, covering interaction and publish ambiguity without broadening the authorized action scope.
 - [x] 9.6 Update this checklist with repository commits, validation evidence, deviations, and package availability; run `openspec validate native-page-engine-production-cutover --strict`.
   <!-- aidcp control + aidcp-edge 317cd47: checklist records completed source gates and explicitly leaves cache/humanization completeness, all-command fixtures, cross-target package/signature, live read/write, and installer release unchecked. Strict validation passed. -->
-- [ ] 9.7 Integrate and push the clean control and Edge changes under the repository workflow. Build or publish a customer installer only after separate explicit release authorization.
+- [x] 9.7 Integrate and push the clean control and Edge changes under the repository workflow. Build or publish a customer installer only after separate explicit release authorization.
+  <!-- aidcp-edge master 317cd47 pushed after fast-forward; this control evidence commit is the final fast-forward input for main. No customer installer was built or published. -->
