@@ -24,8 +24,9 @@
 
 - [x] 4.1 运行 Cloud 聚焦测试、全量测试和 typecheck；运行 Console 聚焦测试、全量测试和 build。
 - [x] 4.2 运行 `openspec validate wechat-ai-polish-auto-send --strict`，记录实现仓库、commit、验证与偏差。
-- [ ] 4.3 快进集成并推送 control/main、Cloud/master、Console/master，按 Cloud 先、Console 后部署 dev。
-- [ ] 4.4 验证 dev 文件哈希、服务/监听/健康、PostgreSQL、Feishu、日志和 isales 不受影响，并确认无真实回复任务或发送尝试新增。
+- [x] 4.3 快进集成并推送 control/main、Cloud/master、Console/master，按 Cloud 先、Console 后部署 dev。
+- [x] 4.4 验证 dev 文件哈希、服务/监听/健康、PostgreSQL、Feishu、日志和 isales 不受影响，并确认无真实回复任务或发送尝试新增。
 
 <!-- Validation 2026-07-22: Cloud focused interaction suite 53 passed, acceptance 68 passed, full suite exited 0, and typecheck passed. Console focused suite 51 passed, full suite 254 passed/1 skipped across 37 files with two workers, and production build passed. The first parallel full run was discarded after host resource contention caused Vitest worker and 5-second test timeouts; serial bounded-worker reruns were green. -->
 <!-- OpenSpec strict validation passed. Implementation commits before integration: aidcp-cloud 3820eef and aidcp-console 8ae55aa. No DTO, schema, database, Edge, WS v2, or package dependency change. -->
+<!-- Delivery 2026-07-22: fast-forward integrated and pushed aidcp-cloud master 3820eef, aidcp-console master 8ae55aa, and control main f010d80, then deployed dev in Cloud-before-Console order from clean default checkouts. Rollback backups: cloud.bak.20260722-200811.tar.gz, cloud.env.20260722-200811.bak, console.bak.20260722-200811.tar.gz. Local/remote hashes matched for reply-auto-send.ts, reply-workflow.ts, send-orchestrator.ts, and console index.html. aidcp-cloud.service active with NRestarts=0; 5432/8088/8090/8091/8787 listened; panel/client/public health returned ok; PostgreSQL SELECT 1 passed; Feishu bot was Dev.A and WSClient reached onReady; error-priority journal was empty; isales api/engine/scheduler/worker remained active. Reply jobs/send attempts/contact comment attempts remained 4/0/64, so validation created no real platform reply or send attempt. Dev AIDCP_INTERACTION_AUTO_ACCOUNT_ALLOWLIST was empty and account k1esb68e was not allowlisted; this existing ops gate was intentionally not expanded, so automatic sending remains dormant until an account is explicitly authorized in addition to published auto policy, channel scope, rule choice, and runtime controls. -->
