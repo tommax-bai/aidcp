@@ -10,14 +10,16 @@
 
 ## 2. Native engine lifecycle and CDP ownership
 
-- [ ] 2.1 Replace the one-shot probe entry point with a long-lived supervised Native engine supporting health, session open/status/close, command execution, cancellation, and graceful shutdown.
+- [x] 2.1 Replace the one-shot probe entry point with a long-lived supervised Native engine supporting health, session open/status/close, command execution, cancellation, and graceful shutdown.
+  <!-- aidcp-edge 80c9296: long-lived process/session, concurrent stdin while commands run, AbortSignal/cancel forwarding, graceful close/shutdown, and process-level cancellation test. cargo test/clippy and TS supervisor tests passed. -->
 - [ ] 2.2 Implement provider-neutral target discovery, attachment, required CDP domain enablement, event dispatch, bounded reconnect, and session restoration without replaying dispatched effects.
 - [ ] 2.3 Enforce one active Xiaohongshu writer per browser session, task/command ownership, deadlines, cancellation safe points, and non-interruptible atomic regions.
 - [ ] 2.4 Enforce a CDP method allowlist and bounded/redacted Native diagnostics that exclude cookies, credentials, upload content, and unnecessary DOM text.
 
 ## 3. Native page model and interaction primitives
 
-- [ ] 3.1 Port page-state classification and URL compatibility for home, explore, `search_result_ai`, note detail, profile, notification, publish, login, error, and unknown states.
+- [x] 3.1 Port page-state classification and URL compatibility for home, explore, `search_result_ai`, note detail, profile, notification, publish, login, error, and unknown states.
+  <!-- aidcp-edge 80c9296: encoded Native probe and typed projections cover every listed state; fixture/unit tests include search_result_ai compatibility, query redaction, login precedence, notification, creator publish, error, and unknown behavior. -->
 - [ ] 3.2 Port DOM-first locating with visibility, geometry, ambiguity rejection, bounded retry/escalation, post-action validation, and cache promotion only after repeated success.
 - [ ] 3.3 Implement Native pointer, wheel, keyboard, text, and file-input primitives with current humanization bounds and cancellation-safe atomic actions.
 - [ ] 3.4 Define bounded structured models for feed cards, search results, note details, profiles, notifications, interaction receipts, and publish receipts.
@@ -49,7 +51,8 @@
 
 ## 7. Edge direct production integration
 
-- [ ] 7.1 Add a selector-free TypeScript Native supervisor/facade that validates protocol v2, version compatibility, lifecycle, bounds, and child-process failures.
+- [x] 7.1 Add a selector-free TypeScript Native supervisor/facade that validates protocol v2, version compatibility, lifecycle, bounds, and child-process failures.
+  <!-- aidcp-edge c5d08b7 + 80c9296: selector-free long-lived facade validates ready manifest/protocol, identities, bounded records/results, lifecycle, timeouts, exits, malformed output, stable errors, cancellation, and effect truth; focused TS tests and npm typecheck passed. Production routing remains tasks 7.2-7.5. -->
 - [ ] 7.2 Start Native only after task admission, provider resolution, account/environment binding, and browser startup; keep browser lifecycle and Cloud transport owned by Edge.
 - [ ] 7.3 Route the full Xiaohongshu browse/search/note/profile/notification/interaction registry directly to Native with no shadow invocation and no JavaScript fallback.
 - [ ] 7.4 Route the full Xiaohongshu publish registry directly to Native with no shadow invocation and no JavaScript fallback.
