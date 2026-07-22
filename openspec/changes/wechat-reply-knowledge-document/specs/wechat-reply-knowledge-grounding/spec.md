@@ -93,7 +93,7 @@ reviewer SHALL 将内容风险与客服措辞分开判断。课程适龄、学�
 - **THEN** reviewer 不得仅因该引导返回 unknown 或 hard-risk tag
 
 #### Scenario: 模型风险字段与安全理由自相矛盾
-- **WHEN** 普通知识问答的三次 AI 步骤均调用成功，候选通过确定性门禁且记录了文档事实，汇总标签除 unknown/meaning_changed/introduced_claim 外没有任何内容风险，但 classifier 或 reviewer 仍给出保守 unknown
+- **WHEN** 普通知识问答 intent 或明确的适龄/年级询问句式下，三次 AI 步骤均调用成功，候选通过确定性门禁且记录了文档事实，汇总标签除 unknown/meaning_changed/introduced_claim 外没有任何内容风险，但 classifier 或 reviewer 仍给出保守 unknown
 - **THEN** Cloud SHALL 移除该 model-only unknown 并把内容风险显示为 low，同时继续要求人工审核；任一机械条件不满足时 MUST 保留 unknown
 
 ### Requirement: 预览必须解释 AI 候选结果

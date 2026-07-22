@@ -75,7 +75,7 @@ control repo 的 ReplyProfile schema 和 AI ProfileSummary 增加可选 nullable
 
 `meaning_changed` 与 `introduced_claim` 是流程标签：它们继续强制人工审核，但不能仅凭自身把普通内容风险抬成 high。Cloud 计算内容 high 时只看订单、价格、退款、医疗、法律等实质风险标签；unknown 继续单独映射 unknown。
 
-模型可能出现“理由明确说普通咨询无风险，但 level/tag 仍给 unknown”的自相矛盾。Cloud 仅在一组可机械证明的窄条件下消除这种 model-only unknown：知识文档非空、intent 属于普通问答、classifier/polisher/reviewer 均调用成功、候选通过确定性门禁、至少记录一项文档事实，且汇总标签除了 unknown/meaning_changed/introduced_claim 外没有任何内容风险。此时内容风险显示 low 并移除 unknown；人工审核仍由 AI 实际运行和流程标签强制保留。任一条件不满足就保留 unknown，不用自然语言理由做脆弱推断。
+模型可能出现“理由明确说普通咨询无风险，但 level/tag 仍给 unknown”的自相矛盾。Cloud 仅在一组可机械证明的窄条件下消除这种 model-only unknown：知识文档非空、intent 属于普通问答或入站命中明确的适龄/年级询问句式、classifier/polisher/reviewer 均调用成功、候选通过确定性门禁、至少记录一项文档事实，且汇总标签除了 unknown/meaning_changed/introduced_claim 外没有任何内容风险。此时内容风险显示 low 并移除 unknown；人工审核仍由 AI 实际运行和流程标签强制保留。任一条件不满足就保留 unknown，不用自然语言理由做脆弱推断。
 
 这只修正风险展示与 reviewer 建议，不放宽发送边界。AI polisher 实际运行时，工作流仍强制 `requiresApproval=true`；模板/规则/全局写开关和确定性实质 hard-risk gate 继续单独生效。
 
