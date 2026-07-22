@@ -18,19 +18,19 @@ Cloud SHALL 以账号主键持久化评论审批覆盖模式 `source_rules|auto_
 
 ### Requirement: 账号全局免审统一覆盖所有评论来源但不绕安全闸
 
-Cloud SHALL 在评论进入授权等待前统一解析有效模式：账号策略为 `auto_approve_all` 时结果 MUST 为 `auto_approve`；否则沿用来源提供的 `review|auto_approve`，来源未提供时为 `review`。该覆盖 MUST 应用于普通浏览、排期、联系评论、mandatory、飞书 `/comment` 与结构化委托评论。自动批准 MUST 先把账号、目标和拟提交终稿发送到无按钮通知口，通知成功后才授权；通知失败 MUST fail-closed。该模式 MUST NOT 绕过风险、自动化配额、去重、目标复核、平台确认或真实终态记录，手工命令已有的风险覆盖语义也不得因本策略改变。
+Cloud SHALL 在评论进入授权等待前统一解析有效模式：账号策略为 `auto_approve_all` 时结果 MUST 为 `auto_approve`；否则沿用来源提供的 `review|auto_approve`，来源未提供时为 `review`。该覆盖 MUST 应用于普通浏览、排期、联系评论、mandatory、飞书 `/comment` 与结构化委托评论。自动批准 MUST 直接授权，并把账号、目标和拟提交终稿旁路发送到无按钮通知口；通知缺失或失败只记日志，MUST NOT 阻止提交、延迟提交或回退为审批卡。该模式 MUST NOT 绕过风险、自动化配额、去重、目标复核、平台确认或真实终态记录，手工命令已有的风险覆盖语义也不得因本策略改变。
 
 #### Scenario: 飞书手工评论服从账号全局免审
 - **WHEN** 运营对 `auto_approve_all` 账号发送精确 `/comment`
-- **THEN** 评论不等待第二次按钮审批，免审通知成功后进入既有提交链
-- **AND** 通知失败时 MUST NOT 下发评论
+- **THEN** 评论不等待第二次按钮审批，直接进入既有提交链
+- **AND** 免审通知失败时只记日志，MUST NOT 阻止评论或产生审批卡
 
 #### Scenario: 来源局部免审继续生效
 - **WHEN** 账号为 `source_rules`，排期或 mandatory 来源已合法提供 `auto_approve`
-- **THEN** 该来源仍按既有通知后授权执行，MUST NOT 被账号默认收紧
+- **THEN** 该来源仍按既有预授权执行并旁路通知，MUST NOT 被账号默认收紧
 
 #### Scenario: 全局免审不伪造评论成功
-- **WHEN** 账号全局免审通知成功但目标复核失败、Edge 提交失败或平台未确认
+- **WHEN** 账号全局免审已授权但目标复核失败、Edge 提交失败或平台未确认
 - **THEN** 系统按真实失败终态收敛，MUST NOT 因已授权记录评论成功
 
 ### Requirement: 分组级稿件审核入口策略持久化且默认双通道
@@ -63,7 +63,7 @@ Cloud SHALL 以 `group_label` 为主键持久化 `client_and_feishu|client_only`
 
 ### Requirement: 后台配置面必须展示策略真态与运行时回退边界
 
-Console SHALL 在账号配置中提供“按来源规则 / 全局免审”选择，在分组通知配置中提供“客户端+飞书 / 仅客户端”选择，并展示该分组活跃账号的客户审批归属覆盖情况。保存 MUST 以 Cloud 写后真态刷新。选择 `client_only` 且覆盖不完整时界面 MUST 明示未覆盖账号运行时仍会回退飞书；路由说明 MUST 如实表达审批卡按来源会话、账号团队群及默认群解析。
+Console SHALL 在账号配置中直接提供“按来源规则 / 全局免审”选择，不为全局免审增加解释性告警或 Tooltip；在分组通知配置中提供“客户端+飞书 / 仅客户端”选择，并展示该分组活跃账号的客户审批归属覆盖情况。保存 MUST 以 Cloud 写后真态刷新。选择 `client_only` 且覆盖不完整时界面 MUST 明示未覆盖账号运行时仍会回退飞书；路由说明 MUST 如实表达审批卡按来源会话、账号团队群及默认群解析。
 
 #### Scenario: 覆盖不完整时不宣称完全静默
 - **WHEN** 管理员选择 `client_only`，但分组内存在客户审批归属不可证账号

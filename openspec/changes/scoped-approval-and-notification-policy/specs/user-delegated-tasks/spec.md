@@ -2,7 +2,7 @@
 
 ### Requirement: 批量和异步委托必须遵守自动化风险额度并保留人审
 
-**精确单次操作员命令**（`source=legacy_command` 且 `targetConstraints.manualSingle=true`，含 `/publish` 与 `/comment`）SHALL 以操作员全权执行——越过风控 status / canDo 与配额闸（发帖侧透传 `operatorOverride=true`，评论侧 `manualOverride=true`）。发布前人审 MUST 仍强制；评论前人审默认强制，但账号显式 `auto_approve_all` 时 MUST 改为通知成功后授权，飞书 `/comment` 不得再要求第二次按钮审批。该账号策略只改变评论授权等待，MUST NOT 改变 `manualOverride` 的风控/配额语义。`targetSuccessCount>1`、跨账号、自然语言（`source=feishu`）或结构化（`source ∈ {edge,console,api}`）委托 MUST 使用自动化额度与风险闸（`governed`），MUST NOT 置 `operatorOverride` / 为每次 attempt 传 `manualOverride=true`。RiskController SHALL 继续是账号风险状态唯一写者。公开评论和发布默认 SHALL 使用 `review`，除非既有受控来源配置或账号全局评论策略明确允许免审。
+**精确单次操作员命令**（`source=legacy_command` 且 `targetConstraints.manualSingle=true`，含 `/publish` 与 `/comment`）SHALL 以操作员全权执行——越过风控 status / canDo 与配额闸（发帖侧透传 `operatorOverride=true`，评论侧 `manualOverride=true`）。发布前人审 MUST 仍强制；评论前人审默认强制，但账号显式 `auto_approve_all` 时 MUST 直接授权，飞书 `/comment` 不得再要求第二次按钮审批。免审通知仅作旁路记录，失败 MUST NOT 阻止提交或回退按钮审批。该账号策略只改变评论授权等待，MUST NOT 改变 `manualOverride` 的风控/配额语义。`targetSuccessCount>1`、跨账号、自然语言（`source=feishu`）或结构化（`source ∈ {edge,console,api}`）委托 MUST 使用自动化额度与风险闸（`governed`），MUST NOT 置 `operatorOverride` / 为每次 attempt 传 `manualOverride=true`。RiskController SHALL 继续是账号风险状态唯一写者。公开评论和发布默认 SHALL 使用 `review`，除非既有受控来源配置或账号全局评论策略明确允许免审。
 
 #### Scenario: 批量评论不能循环绕额度
 - **WHEN** 用户确认一个 5 条评论的委托任务
@@ -17,7 +17,7 @@
 
 #### Scenario: 精确 /comment 服从账号全局免审
 - **WHEN** 管理群对一个 `auto_approve_all` 账号发送精确 `/comment <昵称>`
-- **THEN** 评论沿用 `manualOverride=true` 越过既有手工风险/配额闸，并在免审通知成功后继续
+- **THEN** 评论沿用 `manualOverride=true` 越过既有手工风险/配额闸，并按账号全局免审直接继续
 - **AND** MUST NOT 再发送同意/不发按钮卡或等待第二次人审
 
 #### Scenario: 自然语言与结构化发帖不得越风控
@@ -40,7 +40,7 @@
 
 #### Scenario: 账号策略可在评论授权边界覆盖 review
 - **WHEN** 结构化评论任务的客户端体已被夹成 `review`，但执行时账号权威策略为 `auto_approve_all`
-- **THEN** Cloud 在授权边界解析有效评论模式为免审并先发通知，MUST NOT 把客户端体当作账号策略事实源
+- **THEN** Cloud 在授权边界解析有效评论模式为免审并旁路发送通知，MUST NOT 把客户端体当作账号策略事实源
 
 #### Scenario: 结构化精确入口不出确认卡但保留下游授权
 - **WHEN** 管理后台对一条精选图文点「洗稿」（`source=console`，服务端自建 intent 传 `review`）
