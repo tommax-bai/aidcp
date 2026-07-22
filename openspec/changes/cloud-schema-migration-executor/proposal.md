@@ -2,7 +2,7 @@
 
 `aidcp-cloud` 今天没有迁移执行器，也没有迁移账本。唯一的工具 `aidcp-cloud/scripts/run-migration.ts:20-52` 接一个文件路径、建一次性连接、把整个文件丢给 `client.query()`、打印 `ok` 后退出：不记已应用版本、不排序、不校验内容、不识别执行目标；`aidcp-cloud/package.json` 里没有任何 `migrate` 脚本。59 个迁移文件里编号已出现四组碰撞（`0002` / `0030` / `0037` / `0038` 各两份）且缺 `0012`，两份同号文件的先后顺序今天由人手决定、无法复现。
 
-更根本的问题是：迁移文件不是真实 schema 的事实源。34 个存储文件里有 76 条 `CREATE TABLE IF NOT EXISTS`，由组合根 `aidcp-cloud/src/server.ts` 的 39 处 `.init()` 在启动时执行。按表名对账：迁移目录建 59 张表、存储自建 58 张，并集 83 张，其中 **24 张只由存储自建、任何迁移文件都不存在**（含被 26 处外键引用的 `accounts`，以及 `client_users`、`client_environments`、`anchors`、`curated_content`），25 张只由迁移建（微信收件箱 20 张等），34 张两处都有、可各自漂移。这 17 个存储的启动初始化还整体包在 `aidcp-cloud/src/server.ts:639-660` 的一个 `try/catch` 里，DDL 失败只打 `console.warn` 然后继续跑。
+更根本的问题是：迁移文件不是真实 schema 的事实源。34 个存储文件里 `CREATE TABLE IF NOT EXISTS` **文本命中 76 处、去注释后生效约 58–60 条、分布在 34 个源文件**（三个数 MUST 同时给出，MUST NOT 只写 76——按 76 立收口范围会多出十几条注释内的假目标；口径与定稿 §5.4.1 一致，扫描 MUST 先剥 `--` 与 `/* */` 注释，与 change `cloud-service-boundary-gates` 任务 4.2 同规则），由组合根 `aidcp-cloud/src/server.ts` 的 39 处 `.init()` 在启动时执行。按表名对账：迁移目录建 59 张表、存储自建 58 张，并集 83 张（**此计数 MUST 与 `cloud-service-boundary-gates` 任务 4.1 统一**——该 change 记「84 张 / 59 张由 `src/` 建」，两者只要差一张，它的「未登记的表出现即失败」当天就会红；MUST 由两个 change 中先动工的一个跑一次统一口径脚本、结果同时回写两处、脚本命令写进 tasks），其中 **24 张只由存储自建、任何迁移文件都不存在**（含被 26 处外键引用的 `accounts`，以及 `client_users`、`client_environments`、`anchors`、`curated_content`），25 张只由迁移建（微信收件箱 20 张等），34 张两处都有、可各自漂移。这 17 个存储的启动初始化还整体包在 `aidcp-cloud/src/server.ts:639-660` 的一个 `try/catch` 里，DDL 失败只打 `console.warn` 然后继续跑。
 
 全仓零 `CREATE SCHEMA`、零 `CREATE ROLE`；唯一一条授权语句 `aidcp-cloud/migrations/0050_wechat_group_reply_config_privileges.sql:1-28` 是管理员角色误跑 `0048` 后运行时角色失去 DML 权限的事故补丁。dev 与 ol 不只是共用实例，是**共用同一个数据库**。
 

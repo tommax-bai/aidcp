@@ -23,6 +23,7 @@
 ## 3. aidcp-cloud — 账号归属 target
 
 - [ ] 3.1 `src/account-store.ts` 增加 `getExecutionTarget(accountId)` 与 `claimExecutionTarget(accountId, target)`；后者用条件 UPDATE 原子占位：`UPDATE accounts SET execution_target=$2 WHERE account_id=$1 AND execution_target IS NULL RETURNING execution_target`，返回 `claimed` / `already_owned_by(target)` 两种诚实结果，MUST NOT 在已被占位时覆盖。
+- [ ] 3.1b **跨边界写入登记（MUST 与 3.1 / 3.2 一并读）**：`accounts` 表按拆分方案 §5.1 由 `aidcp-api` **单写**，而 `src/account-store.ts` 归 api、`src/orchestrator/connection-runtime.ts` 归 automation（方案 §4.7）。因此 3.2 在握手路径上调 3.1 占位，拆分后属 **automation 写 api 的表**。二选一并在实施时写死：① 收口为「automation 握手调 api 的窄内部接口占位、api 单写 `accounts`」（与 §5.1 `client_environments` 行同形，为首选）；② 在 change `cloud-service-boundary-gates` 的表写入豁免清单里为该写入留一条具名条目并填 `eliminatedBy`。**MUST NOT 两条都不做**——`AC-OWN-02` 上线当天该写入即判违规。
 - [ ] 3.2 `src/orchestrator/connection-runtime.ts` 的 `onHandshake` 在既有 `platform_mismatch` 闸（`:148-152`）之后增加对称的归属闸：归属为 NULL → 调 3.1 占位；归属为本 target → 放行；归属为对方 target → 走同一个 `this.deps.onConfigError` 通道拒绝，返回 `{ ok:false, code:'execution_target_mismatch', message }`，message 里写清真实归属 target 与「请先在 <owner> 停止该账号自动化再改归属」。
 - [ ] 3.3 强制开关 `AIDCP_RISK_OWNERSHIP_ENFORCE`（默认 `false` = 观察模式）：观察模式下 3.2 的拒绝分支只写告警不拒绝，占位照做。**观察模式 MUST NOT 静默**——每一次本会被拒的握手都必须留一条可检索的告警。
 - [ ] 3.4 新增运维口 `POST /api/accounts/:accountId/risk-owner`（面板，JWT 守卫同既有风控口）：改归属前必须校验该账号在旧属主上无活跃边缘会话，否则返回 409 + `owner_change_blocked_by_active_session`，MUST NOT 强改。
@@ -76,7 +77,7 @@
 
 ## 10. aidcp（控制仓）— 文档
 
-- [ ] 10.1 `docs/cloud-service-decomposition-proposal.md` §14.9 改写为可验收句式：「对任一 `accountId`、任一时刻，`risk_state` 的写入者唯一，且配额判定所依据的计数与库内事实一致」，并写明选定路线 A 及其部署约束（每 target 单实例、stop→start、禁止滚动 / 蓝绿）。
+- [ ] 10.1 `docs/cloud-service-decomposition-proposal.md` **§14.1 红线表 `AC-DECOMP-09` 行**（该文档不存在 §14.9，顶层编号 §1–§17 冻结，**MUST NOT 新增 §14.x 小节**）：在「红线」列补入可验收句式「对任一 `accountId`、任一时刻，`risk_state` 的写入者唯一，且配额判定所依据的计数与库内事实一致」；在「验收方式」列补写者锁与部署约束（每 target 单实例、stop→start、禁止滚动 / 蓝绿）。注意该行的「验收方式」列已按分两段兑现改写（阶段 2 凭据 + 静态门禁 / 子目标 B 后 GRANT），本项 MUST 在其上追加，MUST NOT 覆盖。
 - [ ] 10.2 §12 阶段 2「验证各进程独立停止、重启和回滚」旁补「单实例 / 可多实例」组件分类表（内容见本 change 的 spec delta），并写明新增后台组件必须先归类。
 - [ ] 10.3 §5.1 单一写入者表的「最终风险状态」行补一句：写权按 `accounts.execution_target` 排他，`risk_counters` 作为既成事实账本不按 target 分裂。
 - [ ] 10.4 §11 故障表补一行「自动化写者锁不可获得」：应保持可用=客户数据与内容服务；允许受影响=该 target 的自动化整体不启动（诚实失败，不降级为无锁运行）。

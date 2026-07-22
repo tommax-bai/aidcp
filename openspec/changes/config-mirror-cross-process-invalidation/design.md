@@ -22,7 +22,7 @@
 | 14 | 环境慢启动锚点 | `src/client-auth/client-user-store.ts:447-448` | `client_environments.slow_start_since` | api | automation（risk） |
 | 15 | 环境自动化出口闸 | `src/client-auth/client-user-store.ts:445` | 环境删除生命周期 | api | automation（WS 出口） |
 
-刷新入口只有两个：`init()` 里的一次 `reload()`（`src/config/*-store.ts` 的 `reload()` 全部 `private`，唯一调用点是同文件的 `init()`），以及本进程写入时的就地改缓存。`src/config/` 与 `src/risk/` 下 `setInterval` / `LISTEN` / `NOTIFY` / `pg_notify` 命中数为 0。`src/server.ts:1430` 的注释把这条性质写死：「raw SQL 改库**不刷镜像**（全仓无 watch / setInterval）→ 没有此闸就没有秒级止血手段。重启即生效。」
+刷新入口只有两个：`init()` 里的一次 `reload()`（`src/config/*-store.ts` 的 `reload()` 全部 `private`，唯一调用点是同文件的 `init()`），以及本进程写入时的就地改缓存。`src/config/` 与 `src/risk/` 下 `setInterval` / `LISTEN` / `NOTIFY` / `pg_notify` 命中数为 0。`src/server.ts` 里那条注释把这条性质写死：「raw SQL 改库**不刷镜像**（全仓无 watch / setInterval）→ 没有此闸就没有秒级止血手段。重启即生效。」（定位用 `grep -n "不刷镜像" src/server.ts`；该文件改动频繁、行号会漂，2026-07-22 实测在 `:1411`，本 change 早期稿写的 `:1430` 是错的。）
 
 ### 现状 2：这个缺陷今天就在生产上成立
 
@@ -73,7 +73,7 @@ dev 与 ol 是两个 cloud 进程，读写同一个 `121.89.85.150/aidcp`，只�
 
 因此把这四个 store 与其四张表判给 `aidcp-automation`，是纯归属划线，不需要改任何一行消费方代码。收益是一次性消除四条跨服务同步读，`interaction-risk-gating` 的「每次现读、改完即热生效、MUST NOT 需要重启进程」（`openspec/specs/interaction-risk-gating/spec.md:97`、`:226`）在 automation 进程内逐字成立。
 
-**后台编辑的落点**：Console → `aidcp-api` → `aidcp-automation` 窄内部 HTTP 写。方案 §4.2:160 已允许这条方向。
+**后台编辑的落点**：Console → `aidcp-api` → `aidcp-automation` 窄内部 HTTP 写。方案 §4.2 已允许这条方向（另见 §5.1 表内「四类限频配置」行：后台编辑经 `aidcp-console → aidcp-api → aidcp-automation` 窄内部 HTTP 写，`aidcp-api` MUST NOT 直写）。
 
 **必须同时写死的两条约束**（否则归属重排会制造新缺陷）：
 

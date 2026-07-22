@@ -27,7 +27,7 @@
 
 ## 4. aidcp-cloud — DDL 单一所有者的机械闸
 
-- [ ] 4.1 新增 `test/schema/runtime-ddl-allowlist.test.ts`：扫描 `src/**/*.ts`，收集所有含 `CREATE TABLE` / `ALTER TABLE` / `CREATE INDEX` 的位置，断言集合是 `test/schema/runtime-ddl-allowlist.json` 的子集。基线快照为当前 34 个文件、76 条语句。
+- [ ] 4.1 新增 `test/schema/runtime-ddl-allowlist.test.ts`：扫描 `src/**/*.ts`，收集所有含 `CREATE TABLE` / `ALTER TABLE` / `CREATE INDEX` 的位置，断言集合是 `test/schema/runtime-ddl-allowlist.json` 的子集。基线快照 MUST 按三元组记，MUST NOT 只写 76：**文本命中 76 处 / 去注释后生效约 58–60 条 / 分布在 34 个源文件**（口径与定稿 §5.4.1 一致）。扫描器 MUST 先剥 `--` 行注释与 `/* */` 块注释再判定（与 change `cloud-service-boundary-gates` 任务 4.2 同规则），否则会把注释掉的 DDL 当成运行时建表点、给第 5 节的收口范围凭空加出十几条假目标。
 - [ ] 4.2 允许清单 MUST 只减不增：新增运行时 DDL 即测试失败并提示「DDL 只能加在 migrations/」。每完成一批切换，从清单里删掉对应条目。
 - [ ] 4.3 该测试进 `npm run test:acceptance`，与 `AC-PROTO-*` / `AC-PUB-*` / `AC-RISK-*` 同级作为红线用例，命名 `AC-SCHEMA-DDL-OWNER`。
 

@@ -9,7 +9,7 @@
 3. **今天就在发生的跨进程写冲突**。dev 与 ol 是两个进程、共用 `121.89.85.150/aidcp` 同一个库（`docs/deployment-environments.md:62-64`），共写同一张 `risk_state` / `risk_counters`。面板首页汇总还会为库里**全部**账号（`aidcp-cloud/src/panel/panel-store.ts:471-474` 无 target 过滤）物化并永久缓存 controller（`aidcp-cloud/src/panel/panel-server.ts:711-720`），配合两个整行盲写口（`panel-server.ts:1628-1636` 的 `/risk/signal`、`panel-server.ts:1655-1656` 的 `/risk/quota`），当前就能把另一个 target 刚写下的 `restricted` 盖回 `normal`。后果不是性能问题：配额按进程各算一份 ⇒ 合计放行的点赞 / 评论 / 发帖是单份上限的两倍；受限状态被陈旧的正常状态静默盖回 ⇒ 已被平台警告的账号继续被驱动。这直接违反「状态单写」与「禁止静默假成功」两条红线。
 4. **跨重启丢账**。边缘回执 → 风控记账这条路径今天是进程内事件总线上一句 fire-and-forget、异常只打 `console.warn`（`aidcp-cloud/src/server.ts:1592-1612`，搜索侧同形 `server.ts:1677-1687`）。进程崩在「回执已到、`appendCounter` 未提交」之间，这次真实发生的平台动作就此从账本上消失；后续 `canDo` 据此误以为尚有余量而放行更多真实动作。
 
-云端拆分方案 §14.9 把「账号最终风险状态仍由 RiskController 单写」列为验收红线，但全文没有一句说明拆分后 `aidcp-automation` 对同一 `executionTarget` 必须单实例——这句红线在多进程下会自动「通过」。拆三仓的决定已定，本变更要在拆分之前把这条不变量写成可验收形式并落地，否则拆分只是把一个进程内的假设分发到三个仓里。
+云端拆分方案 §14.1 红线表第 9 行（`AC-DECOMP-09`）把「账号最终风险状态 MUST 由 RiskController 单写」列为验收红线，但全文没有一句说明拆分后 `aidcp-automation` 对同一 `executionTarget` 必须单实例——这句红线在多进程下会自动「通过」。（该方案顶层编号 §1–§17 冻结、§14 下只有 §14.1 红线表与 §14.2 附注，**不存在 §14.9**；本 change 早期稿引用的 `§14.9` 一律指 §14.1 表内 `AC-DECOMP-09` 行。）拆三仓的决定已定，本变更要在拆分之前把这条不变量写成可验收形式并落地，否则拆分只是把一个进程内的假设分发到三个仓里。
 
 ## What Changes
 
@@ -41,4 +41,4 @@
 - Cloud：新增迁移 `0057`（`accounts.execution_target`、`risk_counter_outbox`、`risk_counters.outbox_id`，全部 additive）；改 `src/risk/pg-risk-store.ts` 的 `saveState` 为条件写、`src/risk/risk-controller.ts` 的记账入口、`src/risk/risk-controller-registry.ts` 的只读 / 可写解析与失效、`src/server.ts` 的 `interaction.occurred` / `search.occurred` 订阅、`src/orchestrator/connection-runtime.ts` 的握手准入、`src/panel/panel-server.ts` 的风控读写口；新增写者锁与 outbox worker。
 - Edge：无协议改动、无新消息类型；只需把握手拒绝码 `execution_target_mismatch` 如实呈现给运营，不得渲染成通用离线。
 - Console：账号列表与风控操作按归属 target 显示；非属主账号的风控写按钮禁用并显示归属，收到可区分拒绝时不显示成功。
-- Control：更新 `docs/cloud-service-decomposition-proposal.md` §14.9 / §12 阶段 2 / §5.1 / §11，更新 `docs/risk-control.md` 与 `docs/deployment-environments.md`。
+- Control：更新 `docs/cloud-service-decomposition-proposal.md` §14.1 红线 9（`AC-DECOMP-09`）/ §12 阶段 2 / §5.1 / §11，更新 `docs/risk-control.md` 与 `docs/deployment-environments.md`。**MUST NOT 新增 §14.x 小节**——该文档顶层编号 §1–§17 冻结，红线按 `AC-DECOMP-*` 稳定 ID 引用、不按序号引用。

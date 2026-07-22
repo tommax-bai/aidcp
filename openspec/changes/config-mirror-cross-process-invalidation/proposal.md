@@ -1,10 +1,10 @@
 ## Why
 
-云端有 15 处进程内配置镜像（分布在 14 个 store），全部只在 `init()` 和**本进程写入**时刷新。全仓无 watch、无 `setInterval` 刷配置、无 `LISTEN/NOTIFY`——`aidcp-cloud/src/config/` 与 `src/risk/` 下 `setInterval|LISTEN|NOTIFY|pg_notify` 命中数为 0，`src/server.ts:1430` 的注释已把这条性质写死。
+云端有 15 处进程内配置镜像（分布在 14 个 store），全部只在 `init()` 和**本进程写入**时刷新。全仓无 watch、无 `setInterval` 刷配置、无 `LISTEN/NOTIFY`——`aidcp-cloud/src/config/` 与 `src/risk/` 下 `setInterval|LISTEN|NOTIFY|pg_notify` 命中数为 0，`src/server.ts` 里那条注释已把这条性质写死（定位用 `grep -n "不刷镜像" src/server.ts`；该文件改动频繁、行号会漂，2026-07-22 实测在 `:1411`，本 change 早期稿写的 `:1430` 是错的）。
 
 这不是「拆分之后才会出现」的问题，今天已经在生产上成立：dev 与 ol 是**两个进程共用同一个 PostgreSQL 库**（`docs/deployment-environments.md:64-70`），而 `quota_config`、`pacing_floor_config`、`session_config_global`、`resume_config_global`、`model_config`、`role_config`、`category_config`、`hot_lead_config` 这 8 张表都是全局表、无 `execution_target` 列。在 dev 控制台改一个全局安全限额，ol 进程的镜像**到重启才可见**，中间没有任何日志、没有任何告警、后台还回显写入成功。拆成 `aidcp-api` / `aidcp-content` / `aidcp-automation` 之后，同一缺陷会从「跨 target 不可见」放大成「跨服务永远不可见」。
 
-更硬的约束是读取契约：这些镜像的消费点被代码写死为「同步、零 IO、永不抛」（`aidcp-cloud/src/risk/types.ts:21-40`），`canDo` 在浏览闭环每个动作都调；人设闸是同步读镜像、读不到即返回 `false`（`src/server.ts:2618`、`:3154`、`:3479`、`:3661`）。方案 §5.1:233 的「任务创建时引用版本或快照」与 §6.1 的请求式内部 HTTP，**在形态上都满足不了这个契约**：浏览会话不是任务、没有创建时刻，而 controller 一旦建成永不驱逐（`src/risk/types.ts:38-40`），构造期快照会让后台改动到重启前零生效且零日志。
+更硬的约束是读取契约：这些镜像的消费点被代码写死为「同步、零 IO、永不抛」（`aidcp-cloud/src/risk/types.ts:21-40`），`canDo` 在浏览闭环每个动作都调；人设闸是同步读镜像、读不到即返回 `false`（`src/server.ts:2618`、`:3154`、`:3479`、`:3661`）。方案 §5.1「单一写入者」表中「人设、写作语言」一行的「任务创建时引用版本或快照」与 §6.1 的请求式内部 HTTP，**在形态上都满足不了这个契约**：浏览会话不是任务、没有创建时刻，而 controller 一旦建成永不驱逐（`src/risk/types.ts:38-40`），构造期快照会让后台改动到重启前零生效且零日志。
 
 还有一条方向相反的隐患：今天两个热路径镜像是 **fail-open** 的——`src/account-state.ts:62` 的 `isPaused` 缓存 miss 即视为 `active`，`openspec/specs/accounts-master-data/spec.md:104-110` 把「人设行不存在」直接定义为「未绑」。同进程下这两条都正确（镜像是全量持久化投影）。一旦镜像变成跨进程副本，「副本里没有」就不再等于「库里没有」：前者会让被暂停的账号继续对真实平台动作，后者会把「未知」压成「未绑」，复现 change `persona-bound-tristate` 已经修掉的误弹向导，并把用户委托任务判成非重试终态 `needs_persona_setup`（`src/delegated-task/worker.ts:361-366`）。
 

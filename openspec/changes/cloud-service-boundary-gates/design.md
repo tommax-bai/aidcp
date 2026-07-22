@@ -23,7 +23,7 @@
 
 | 方向 | 条数 | 集中点 |
 | --- | --- | --- |
-| `content→automation` | 79 | `src/event-bus/types.ts` 46、`src/platform/index.ts` 13、`src/comm/protocol.ts` 10（合计 69） |
+| `content→automation` | 79 | `src/event-bus/types.ts` 46、`src/platform/index.ts` 13、`src/comm/protocol.ts` 10（合计 69；**这 69 条不等于可削减量**，处置见下文削减路径表） |
 | `automation→content` | 53 | `src/orchestrator/role-dispatcher.ts` 单文件 43 条 |
 | `api→automation` | 41 | `src/panel/types.ts`、`src/client-auth/client-auth-server.ts`、`src/panel/panel-server.ts` |
 | `api→content` | 33 | 同上三处为主 |
@@ -74,7 +74,9 @@
 
 **为什么要有 `composition`**：`src/server.ts` 有 89 条相对 import、39 处 `.init()` 调用，按定义要横跨全部层。若不单列，它一个文件就会产出上百条豁免、把清单的信噪比冲垮。规则是：`composition` MAY 导入任何层；任何层 MUST NOT 导入 `composition`；`composition` 的成员文件清单必须显式枚举（起手只有 `src/server.ts` 与 `src/cli/*`），不允许靠「新文件声明成 composition」来绕过门禁。
 
-**63 个无归属文件的默认判据**（实施时逐文件核，此处给默认落点，偏离需在归属表里注释理由）：按「这段代码干活时需不需要碰只存在于本进程内存里的活对象（边缘连接注册表 / 进程内事件总线 / 会话上下文 / 风控控制器实例 / 在途租约）」判定——需要即 `automation`。据此：`comment-agent/`→`automation`（其 LLM 组稿段单列 `content`）、`feishu/`→`automation`、`hot-lead/`→`automation`、`planner/`→`automation`、`metrics/`→`api`、`alerts/`→`api`、`onboarding/`→`api`、`storage/`→`content`、`cache/` 按表属主逐文件拆、`time/` 与 `src/deployment-target.ts`→`kernel`、`src/account-store.ts` 与 `src/account-state.ts`→`api`、`src/server.ts` 与 `src/cli/`→`composition`。
+**归属判据已被控制仓定稿取代（本段保留只为记录本 change 的原始推导，MUST NOT 作为实施输入）。** 定稿 `docs/cloud-service-decomposition-proposal.md` §4.7「归属总表」已对全部 `src/` 文件完成分配、未归属 = 0，并声明自己是 `AC-BOUND-*` 的输入。实施时 MUST 逐行照抄 §4.7，MUST NOT 用下面这段默认落点判据；两者冲突的 7 处已在 tasks 1.3 逐条列出（`feishu/`→`api`、`metrics/`→`content`、`alerts/`→`automation`、`config/` 25 api + 5 automation、`onboarding/` 1 api + 1 content、`src/index.ts`→`composition`、`src/cli/` 1 api + 1 automation），`cache/` 的四处反向已在 tasks 1.4 列出。认为 §4.7 某行有误时走控制仓 change 改 §4.7，不得在 `boundaries/module-ownership.json` 里单方面偏离。
+
+原始推导（**已作废**）：按「这段代码干活时需不需要碰只存在于本进程内存里的活对象（边缘连接注册表 / 进程内事件总线 / 会话上下文 / 风控控制器实例 / 在途租约）」判定——需要即 `automation`。据此：`comment-agent/`→`automation`（其 LLM 组稿段单列 `content`）、`feishu/`→`automation`、`hot-lead/`→`automation`、`planner/`→`automation`、`metrics/`→`api`、`alerts/`→`api`、`onboarding/`→`api`、`storage/`→`content`、`cache/` 按表属主逐文件拆、`time/` 与 `src/deployment-target.ts`→`kernel`、`src/account-store.ts` 与 `src/account-state.ts`→`api`、`src/server.ts` 与 `src/cli/`→`composition`。
 
 ### 2. 裁决 §6.4：承认并命名 `kernel`，不复制三份
 
@@ -88,7 +90,7 @@
 
 按此裁定：
 
-- **进 kernel**：`comm/protocol.ts`（零 import，纯类型与信封函数）、`soul/types.ts`（零 import）、`event-bus/types.ts`（只 import 前两者）、`time/shanghai-day.ts`、`deployment-target.ts`、`platform/` 的能力声明（`registry.ts` 的纯数据部分）、`panel/types.ts` 与 `feishu/types.ts` 的纯类型部分。
+- **进 kernel**（本段为本 change 的原始提案，**已被控制仓定稿部分否决，MUST 按 tasks 2.1 执行**）：~~`comm/protocol.ts`~~ —— **该项被定稿 §10.9 终局否决**：`protocol.ts` MUST 归 `aidcp-automation` 独占、MUST NOT 进 kernel（进 kernel 等于让三边都可导入，会把 §10.9 点名的 6 处 api/content 侧 type-only 依赖就地合法化）；`time/shanghai-day.ts`、`deployment-target.ts` 已在定稿 §4.7 的 kernel 名单内；`soul/types.ts`、`panel/types.ts`、`feishu/types.ts` 的「纯类型部分」与 `platform/registry.ts` 的「纯数据部分」**不能按段落进 kernel**——定稿 §4.0 第 1 条是文件级单一归属，要进必须先析出为独立新文件；`event-bus/types.ts` 与 `platform/registry.ts` 纯数据段是否析出，是定稿 §4.7 明列的**两处待裁决项**，由 tasks 2.1 一次判定并回写 §4.7。
 - **进 kernel 但需先做小手术**：`agents/base-role.ts` —— 它现在从 `../event-bus/index.js` 与 `../llm/qwen.js` 导入具体实现（`src/agents/base-role.ts:8,11`），必须先把这两处收窄成 kernel 内的接口声明（`RoleLlm` 已是仓内既有的弱接口范式，见 `src/agents/base-role.ts:14`）。
 - **不进 kernel、必须留在原层**：`cache/curated-content-store.ts`、`client-auth/client-user-store.ts`、`config/content-schedule-store.ts`、`risk/session-limits.ts`、`risk/resume-limits.ts`、`soul/writing-language.ts`、`event-bus/index.ts` —— 它们有 SQL、有业务判定或有进程内活状态。它们被三边共导本身就是违规，进豁免清单等待削减。
 - **需要拆文件**：`cache/pg-anchor-cache.ts` —— `DEFAULT_PG_CONFIG`（`src/cache/pg-anchor-cache.ts:33`）是纯配置、被 32 个文件引用，应移入 kernel（仓内已有半成品出口 `src/cache/pg-config.ts:1-2`，它现在反向 import 回 `pg-anchor-cache.ts`）；同文件里的锚点缓存 store 有 SQL、留 `automation`。
@@ -137,14 +139,14 @@
 
 ### 6. 削减路径按方向优先级排序
 
-**反方向 `content→automation`：79 条 → 10 条，主要靠 kernel 划分，几乎不写代码。**
+**反方向 `content→automation`：79 条，主要靠 kernel 划分，几乎不写代码。原稿的「→ 10 条」结论 MUST 按下表重算——它假定三个目标全部进 kernel，而其中一个已被终局否决、另两个待裁决。**
 
 | 目标文件 | 条数 | 处置 |
 | --- | --- | --- |
-| `src/event-bus/types.ts` | 46 | 进 kernel → 归零 |
-| `src/platform/index.ts` | 13 | 能力声明进 kernel → 归零 |
-| `src/comm/protocol.ts` | 10 | 进 kernel → 归零 |
-| `src/platform/registry.ts` | 4 | 纯数据部分随 `platform/index.ts` 进 kernel |
+| `src/event-bus/types.ts` | 46 | **待裁决**：定稿 §4.7 今天整体判 `automation`；是否析出 `RoleName` 等纯类型段进 kernel 由 tasks 2.1 一次判定并回写 §4.7 |
+| `src/platform/index.ts` | 13 | **待裁决**：同上，随 `platform/registry.ts` 纯数据段的裁决一并定 |
+| `src/comm/protocol.ts` | 10 | **不进 kernel（定稿 §10.9 终局裁决）**；这 10 条 MUST 留豁免并各挂消除 change，MUST NOT 计入削减收益 |
+| `src/platform/registry.ts` | 4 | 纯数据部分随 `platform/index.ts` 的裁决一并定；进 kernel 前 MUST 先析出为独立文件（定稿 §4.7 kernel 新增通道） |
 | `src/comm/edge-task-lease-client.ts` | 2 | 留豁免，属真实跨边界依赖 |
 | `src/event-bus/index.ts` / `src/risk/session-limits.ts` / `src/risk/resume-limits.ts` / `src/comm/preemption.ts` | 各 1 | 留豁免 |
 

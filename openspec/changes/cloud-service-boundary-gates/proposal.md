@@ -12,12 +12,12 @@
 
 ## What Changes
 
-- 建立一张覆盖 `aidcp-cloud/src` **全部**源文件的模块归属表，层枚举为 `kernel` / `api` / `content` / `automation` / `composition`，**没有「未分配」这个取值**；新增文件未声明归属即门禁失败。
+- 建立一张覆盖 `aidcp-cloud/src` **全部**源文件的模块归属表，层枚举为 `kernel` / `api` / `content` / `automation` / `composition`，**没有「未分配」这个取值**；新增文件未声明归属即门禁失败。**归属判据一律引用控制仓定稿 `docs/cloud-service-decomposition-proposal.md` §4.7「归属总表」（该表已覆盖全部 `src/` 文件、未归属 = 0），本 change MUST NOT 另立判据**；认为 §4.7 某行有误时走控制仓 change 改 §4.7。
 - 新增导入方向门禁：解析全量静态与动态 import，按归属层判方向，违规方向即失败。
 - 新增表写入归属门禁：扫 SQL 字面量里的 `INSERT` / `UPDATE` / `DELETE` 与 `CREATE TABLE` / `ALTER TABLE`，对照表归属清单，非属主层写入或建表即失败。
 - 两道门禁都配棘轮式豁免清单：起手记录实测全部现存违规，此后**只允许减少**；清单里出现源码中已不存在的条目同样失败（不留空位给新违规回填）。
 - 裁决 §6.4：**承认并命名一个共享内核层 `kernel`**，不复制三份。`kernel` 有准入测试（不得含 SQL、HTTP 路由、LLM 调用、进程内活状态、业务判定），有单写者纪律（进 CLAUDE.md §7 热点文件清单），拆仓时以版本化包发布、由 `aidcp-automation` 单一拥有。
-- 给出两条削减路径并写成 tasks：反方向 `content→automation` 79 条中 69 条经 kernel 归零；正方向 `automation→content` 53 条中 43 条集中在 `src/orchestrator/role-dispatcher.ts` 一个文件。
+- 给出两条削减路径并写成 tasks：反方向 `content→automation` 79 条主要靠 kernel 划分归零（**具体条数待定**：原稿的 69 条里有 10 条来自 `protocol.ts` 进 kernel，该项已被定稿 §10.9 否决；另 59 条依赖 `event-bus/types.ts` 与 `platform/index.ts` 的 kernel 裁决，是定稿 §4.7 明列的待裁决项，MUST 按任务 2.1 的定案重算）；正方向 `automation→content` 53 条中 43 条集中在 `src/orchestrator/role-dispatcher.ts` 一个文件。
 - 实现方式：照抄仓内既有「读源码做结构断言」的验收测试范式，零新依赖、零 CI 依赖，落在 `test/acceptance/` 由既有 `npm run test:acceptance` 与 `scripts/land-change:38-42` 当天生效。
 - 把「豁免清单剩余条数」写成拆仓阶段 3 的可判定准入条件，并同步进拆分方案文档。
 - 本 change **只提出、不实装**；也不改动任何 `aidcp-cloud` / `aidcp-edge` / `aidcp-console` 业务代码。
@@ -35,6 +35,6 @@
 ## Impact
 
 - Cloud（`aidcp-cloud`）：新增 `boundaries/` 下四份清单文件与 `test/acceptance/` 下两个门禁用例及其扫描器；为满足 kernel 准入，需搬动 `DEFAULT_PG_CONFIG`（`src/cache/pg-anchor-cache.ts:33`）并把 `src/agents/base-role.ts:8-11` 对具体实现的导入收窄为接口。除此之外不改业务逻辑、不改数据库、不改协议。
-- Edge（`aidcp-edge`）：无代码改动。`src/comm/protocol.ts` 进 kernel 不改变「协议五处同步」铁律，边缘侧那份 `protocol.ts` 仍逐字对齐。
+- Edge（`aidcp-edge`）：无代码改动。**注意：本稿原写的「`src/comm/protocol.ts` 进 kernel」已被定稿 §10.9 终局否决**——`protocol.ts` MUST 归 `aidcp-automation` 独占、MUST NOT 进 kernel，否则三边都可导入、会把 §10.9 点名的 6 处 api/content 侧 type-only 依赖就地合法化。协议副本拆分后仍恰好两份（`aidcp-edge` 与 `aidcp-automation`），「协议五处同步」铁律不变。
 - Console（`aidcp-console`）：无改动。Console 只消费云端面板 API，不受模块归属影响。
 - Control（`aidcp`）：更新 `docs/cloud-service-decomposition-proposal.md` 的 §6.4（kernel 例外）、§12 阶段 1（门禁提到首位）、§12 阶段 3（准入引用豁免条数）；在 CLAUDE.md §7 热点文件清单加入 kernel 目录与两份归属清单。

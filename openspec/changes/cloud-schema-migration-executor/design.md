@@ -8,9 +8,9 @@
 
 **F3 真实 schema 由两套互斥机制产出。**
 
-- 自建派：34 个存储文件、76 条 `CREATE TABLE IF NOT EXISTS`，由 `aidcp-cloud/src/server.ts` 的 39 处 `.init()` 触发。例：`src/config/model-config-store.ts:7`、`src/alerts/alert-store.ts:11`、`src/config/quota-config-store.ts:13` 的注释都写着「建表幂等，与 migrations/00xx 同源」——即承认存在两份同源 DDL。
+- 自建派：34 个存储文件、`CREATE TABLE IF NOT EXISTS` 文本命中 76 处（去注释后生效约 58–60 条），由 `aidcp-cloud/src/server.ts` 的 39 处 `.init()` 触发。例：`src/config/model-config-store.ts:7`、`src/alerts/alert-store.ts:11`、`src/config/quota-config-store.ts:13` 的注释都写着「建表幂等，与 migrations/00xx 同源」——即承认存在两份同源 DDL。
 - 迁移派：微信收件箱域三个存储只探测不自建。`src/interactions/interaction-store.ts:293` 注释 `Migrations own the schema`，`:296-331` 用 `to_regclass` + `information_schema.columns` + `pg_indexes` 判断形状；`src/interactions/reply-config-store.ts:72-73`、`src/interactions/reply-config-scope-store.ts:130-131` 同形。
-- 对账结果：迁移目录建 59 张表、存储自建 58 张、并集 83 张。**24 张只由存储自建**（`accounts`、`client_users`、`client_environments`、`client_env_scope`、`client_environment_installations`、`client_environment_deletion_requests`、`client_env_revocation_holds`、`anchors`、`anchor_staging`、`concepts`、`curated_content`、`liked_notes`、`valuable_comments`、`group_route`、`hot_lead_config_global`、`facebook_group_target`、`facebook_group_target_scope`、`facebook_group_membership`、`facebook_group_join_audit`、`facebook_group_join_automation_config`、`account_facebook_publish_image`、`account_facebook_publish_image_set`、`persona_auto_fill_runs`、`persona_auto_fill_targets`），**25 张只由迁移建**，34 张两处都有。
+- 对账结果：迁移目录建 59 张表、存储自建 58 张、并集 83 张（**MUST 与 change `cloud-service-boundary-gates` 任务 4.1 的表全集统一口径**——该处记 84 张 / 59 张由 `src/` 建；两个 change 中先动工的一个 MUST 跑一次统一口径脚本并把结果同时回写两处）。**24 张只由存储自建**（`accounts`、`client_users`、`client_environments`、`client_env_scope`、`client_environment_installations`、`client_environment_deletion_requests`、`client_env_revocation_holds`、`anchors`、`anchor_staging`、`concepts`、`curated_content`、`liked_notes`、`valuable_comments`、`group_route`、`hot_lead_config_global`、`facebook_group_target`、`facebook_group_target_scope`、`facebook_group_membership`、`facebook_group_join_audit`、`facebook_group_join_automation_config`、`account_facebook_publish_image`、`account_facebook_publish_image_set`、`persona_auto_fill_runs`、`persona_auto_fill_targets`），**25 张只由迁移建**，34 张两处都有。
 
 **F4 自建表模式已经在牺牲数据完整性。** `src/client-auth/client-user-store.ts:123-127` 写明：`client_environments.account_id` **故意不写** `REFERENCES accounts(account_id)`，因为 `clientUserStore.init()` 跑在 `PgAccountStore` 构造之前，全新库上 `accounts` 尚不存在、加外键必抛；完整性改由读侧每次 JOIN 承担。这是启动顺序对 schema 的直接反向支配。
 
@@ -29,7 +29,7 @@
 **Goals**
 
 - 让「库里现在是哪个版本」成为可查询、可校验、可复现的事实。
-- 让 DDL 只有一个所有者（迁移执行器），消灭 34 个存储里的 76 条运行时建表。
+- 让 DDL 只有一个所有者（迁移执行器），消灭 34 个存储里的运行时建表（计数按三元组：文本命中 76 处 / 去注释后生效约 58–60 条 / 34 个源文件；**收口范围以「去注释后生效」那一组为准**，MUST NOT 按 76 立范围）。
 - 让代码与 schema 不匹配时**停机报错**，而不是自建表继续跑或静默重建空表。
 - 让迁移期的每一次数据变更都可逆到「不需要恢复备份」的程度，收缩单独隔离。
 - 让今天依赖「同一个数据库」才成立的机制被登记、被机械守住。
@@ -89,7 +89,7 @@
 
 **第一步（零风险，必须先做）**：为 24 张只由存储自建的表补写迁移文件，DDL 从存储代码原样抽出、保留 `CREATE TABLE IF NOT EXISTS`。现有库上这些表已存在，补写迁移不改变任何运行时行为，但让迁移目录第一次成为完整事实源——没有这一步，`verify` 永远查不全，新库也永远只能靠存储自建拉起来。
 
-**第二步（机械闸）**：建立 DDL 白名单快照测试。把当前 34 个文件、76 条 `CREATE TABLE` / `ALTER TABLE` / `CREATE INDEX` 的位置固化成一份清单，测试断言实际集合是清单的子集。清单**只减不增**：任何新增运行时 DDL 立即测试失败。这条闸当天生效，防止边切边被新代码打穿。
+**第二步（机械闸）**：建立 DDL 白名单快照测试。把当前 34 个文件里 `CREATE TABLE` / `ALTER TABLE` / `CREATE INDEX` 的位置固化成一份清单（计数按三元组记：文本命中 76 处 / 去注释后生效约 58–60 条 / 34 个文件；扫描 MUST 先剥注释），测试断言实际集合是清单的子集。清单**只减不增**：任何新增运行时 DDL 立即测试失败。这条闸当天生效，防止边切边被新代码打穿。
 
 **第三步（分批，6 批）**：按域切分，每批把一组存储的建表调用替换为「探测 + 分类」，照抄 `src/interactions/schema-capability.ts` 的范式——探到就正常工作，探不到就该能力 fail-closed 降级并打明确日志，绝不建表。批次顺序按依赖度从低到高：
 

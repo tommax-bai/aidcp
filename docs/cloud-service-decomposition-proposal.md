@@ -9,6 +9,8 @@
 > 替代：2026-07-21 “单个 `aidcp-cloud` 仓库、三个运行单元”草案
 >
 > 编号纪律：顶层编号 §1–§17 冻结。新增内容一律以子节承载，MUST NOT 重排顶层编号。
+>
+> 相对 2026-07-22 裁决书的偏离登记（两处，均不与既有条款冲突，本文档保留之）：(a) 裁决书冻结的是 §1–§16；本文档在**尾部追加** §17「未认领项登记」，不移动任何既有编号，全文 § 引用零悬空。(b) 新增 §4.8 `aidcp-console`，裁决书未涉及，为补全「六仓各自职责」而加，与 §4.0 第 2 条、§11.3 同向。
 
 ## 1. 一页结论
 
@@ -73,7 +75,7 @@ Electron renderer
 
 **具名例外（唯一一条，MUST 逐字保留）：** 创建会产生真实平台副作用的不可逆写（当前实例：委托任务创建）时，服务端 MUST 由活体绑定佐证确认「该环境此刻登录的就是这个账号」，确认不了 MUST 以具名原因 `binding_unverified` 诚实拒绝。实现见 `aidcp-cloud/src/client-auth/client-auth-server.ts:432`（`attestLiveBinding` 定义）与 `:1766-1768`（唯一调用点与 409 `binding_unverified` 应答）。这条闸是**有意保留的 fail-closed**，MUST NOT 被 §14 红线 1 的验收方式（「客户数据 HTTP 用例全绿」）测成缺陷：该红线的用例集 MUST 排除产生平台副作用的写路径，或对该路径断言「拒绝且原因为 `binding_unverified`」而非断言成功。
 
-拆分后，这条例外的落点 MUST 迁移：`aidcp-api` MUST NOT 直接查询自动化连接注册表，MUST 改为调用 `aidcp-automation` 的窄内部接口取绑定佐证；内部接口不可达时 MUST 返回同一个具名拒绝，MUST NOT 乐观放行（迁移约束见 §5.2）。
+拆分后，这条例外的落点 MUST 迁移（三条迁移约束是唯一规范位置，见 **§5.2**，本处 MUST NOT 复述）。
 
 #### 自动化链路
 
@@ -287,7 +289,7 @@ Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或
 - 飞书用官方 SDK 长连接主动外连、不占 HTTP 端口。该长连接 MUST 声明唯一宿主服务（`aidcp-api`）与单实例约束；三个服务 MUST NOT 各建一条长连接——飞书事件对已建立的长连接是广播的，多宿主等于同一条运营指令被多个进程各受理一次，这是重复发布与重复评论的直接路径。
 - **告警出站的例外（MUST 与上一条一并读）**：飞书**入站**长连接与卡片回调的唯一宿主是 `aidcp-api`；**基础设施告警的出站**允许由不属于任何服务的外部探针直发（见 §11.8.6）。两者凭据 MUST 分离：探针 MUST 使用一份独立的、只有发消息权限的飞书出站凭据，与 `aidcp-api` 的 Bot 应用凭据是不同实体（分配见 §6.5.7）。MUST NOT 让探针经由 `aidcp-api` 转发告警——那会让告警链路与被监控对象同生共死。
 - `aidcp-content` 与 `aidcp-automation` MUST NOT 直接 import 飞书模块。现存反向依赖 MUST 在阶段 1 切断，已知三处：`src/publish-agent/roles/publish-executor.ts:15-17`（引 `feishu/cards`、`feishu/types`、`feishu/ws-receiver`）、`src/comm/captcha-coordinator.ts`、`src/alerts/alert-store.ts`（引 `feishu/types` 的 `AlertSeverity`）。切法是 `aidcp-api` 提供通知与审批的版本化合同，另两仓只发事件、不构造卡片。
-- 审批授权信号今天是本机文件 `/tmp/aidcp-publish-approve-<requestId>.json`。写方归 `aidcp-api`、读方归 `aidcp-automation`，两者一旦不同主机该契约当场断，且失败形态是 fail-closed 的静默停滞。拆到不同主机之前 MUST 先把授权事实换成 `aidcp-api` 拥有的持久授权记录，`aidcp-automation` 经 `PublishRequested` 持久命令获知（详见 §6.4）。
+- 审批授权信号今天是本机文件 `/tmp/aidcp-publish-approve-<requestId>.json`。写方归 `aidcp-api`、读方归 `aidcp-automation`，两者一旦不同主机该契约当场断，且失败形态是 fail-closed 的静默停滞。拆到不同主机之前 MUST 先把授权事实换成 `aidcp-api` 拥有的持久授权记录，`aidcp-automation` 经 `PublishApproved` 持久事件获知（详见 §6.4）。
 
 #### 4.6.3 发布管线 `src/publish-agent/`
 
@@ -329,7 +331,7 @@ Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或
 
 硬要求：
 
-- `src/panel/` 全部 12 个文件归 `aidcp-api`（HTTP 表面、鉴权、JWT、吊销、版本、下载清单、发布阶段生命周期投影）。上表前 10 条端点的**路由与鉴权保留在 `aidcp-api`，业务实现 MUST 迁到 `aidcp-automation` 的窄内部接口**，`aidcp-api` 只做转发与诚实降级（自动化不可用时 MUST 返回明确错误，MUST NOT 返回乐观成功）。
+- `src/panel/` 全部 12 个文件归 `aidcp-api`（HTTP 表面、鉴权、JWT、吊销、版本、下载清单、发布阶段生命周期投影）。上表中**「实现归属」列标注为 `aidcp-automation` 的端点**（即除第 5 行「复合，见下」、第 11 行 `aidcp-content`、第 12 行 `aidcp-api` 之外的 9 条），其**路由与鉴权保留在 `aidcp-api`，业务实现 MUST 迁到 `aidcp-automation` 的窄内部接口**，`aidcp-api` 只做转发与诚实降级（自动化不可用时 MUST 返回明确错误，MUST NOT 返回乐观成功）。第 5 行由本节第 3 条单独承接，MUST NOT 按本条整条迁走。
 - `POST /api/accounts/:id/risk/status` 与 `/risk/quota` 今天在面板进程内直接物化 `RiskController` 并写 `risk_state`。这两条 MUST 在阶段 4 前迁走，否则 §14 红线 9「`RiskController` 单写」在拆分后即刻不成立。
 - `POST /api/accounts/:id/command` 的 resume 是唯一真正的跨域复合操作（先写 `accounts.status`，再触发 `resumeEdgesForAccount`）。MUST 按 §6.2 拆成「`aidcp-api` 本地事务写业务数据 + Outbox 命令」两段，MUST NOT 用一次同步调用横跨两个服务。
 - `alerts` 表归 `aidcp-automation`（写入点是验证码协调器与节奏饱和告警器）。`aidcp-api` MUST NOT 直接 UPDATE 该表。
@@ -398,11 +400,13 @@ Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或
 | `session-config-store.ts` | 297 | `session_config_global` |
 | `resume-config-store.ts` | 259 | `resume_config_global` |
 
-判定依据是既成事实而非偏好：这四类配置的**全部消费点都在 automation 域**（`src/risk/risk-controller.ts:294-313` 的 `effectiveQuotas()`、`src/server.ts` 的 `pacingFloors` / `sessionLimitProvider` / `resumeConfigProvider` 装配点），且依赖方向今天已单向倒置——`src/risk/` 全目录对 `src/config/` **零 import**，双方只经反向注入的提供者接口相接。改归属零代码成本，一次消除四条跨服务同步读。完整理由与连带要求见 §11.4 要求一。
+判定依据是既成事实而非偏好，改归属零代码成本。**完整论证（消费点、依赖方向、收益）与连带要求是唯一规范位置，见 §11.4 要求一，本处 MUST NOT 复述。**
 
 ### 4.7 归属总表（`src/` 全量文件覆盖）
 
-统计口径：`aidcp-cloud` 默认分支，2026-07-22 定稿当日实测 `find src -name '*.ts'` 共 **321 个文件 / 85591 行**（该仓测试全在 `test/`，不在 `src/` 内）。评审期快照为 315 文件、章节草稿期为 318/85428、交叉检查期为 319/85523，差额均来自期间新增文件；**本表 MUST 在每次定稿当天重跑分类脚本后固化**，维护义务见 §4.0 第 1 条。
+统计口径：**基线提交 sha = `aidcp-cloud@3d12d21`**（默认分支，2026-07-22），实测 `find src -name '*.ts'` 共 **321 个文件 / 85591 行**（该仓测试全在 `test/`，不在 `src/` 内）。评审期快照为 315 文件、章节草稿期为 318/85428、交叉检查期为 319/85523，差额均来自期间新增文件。
+
+**口径纪律（MUST 按 sha 而非日期读）**：本表与 §11.8.1 的裸 `console.*` 计数 MUST 以基线 sha 标注，MUST NOT 以「定稿当日」这类日期口径标注——在本仓的提交速率下（§12「迁移期与日常开发并行」实测日均约 15 次），任何日期口径在提交那一刻就已过期，本表固化后到本文档提交之间即已漂移。归档本方案前 MUST 对 `git rev-parse HEAD` 的那个提交重跑分类脚本、更新基线 sha 与全部计数。维护义务见 §4.0 第 1 条。
 
 | 目录 | 文件 | 行 | `aidcp-api` | `aidcp-content` | `aidcp-automation` | kernel | composition | 切分依据 |
 | --- | ---: | ---: | --- | --- | --- | --- | --- | --- |
@@ -451,16 +455,28 @@ Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或
 | `index.ts` | 12 | `aidcp-automation` |
 | `pg-config.ts` | 27 | kernel |
 
+`src/cli/` 逐文件切分（该目录同样在总表里被拆开，此处点名以便门禁按文件判定）：
+
+| 文件 | 行 | 归属 |
+| --- | ---: | --- |
+| `test-feishu.ts` | 55 | `aidcp-api`（调用面为飞书，见 §4.6.2） |
+| `trigger-like.ts` | 74 | `aidcp-automation`（导入边云协议并下发互动命令） |
+
+**目录级聚合行的还原义务（MUST 与 §4.0 第 1 条一起读）**：本表除 `src/cache/`、`src/cli/` 外均为目录级聚合。`AC-BOUND-*` 的输入是**文件级**清单，因此 §12 阶段 0 的可重跑脚本 MUST 产出文件级全量清单并与本表逐行对账；不一致时 MUST 回到本表重新裁决并回写，MUST NOT 由子仓单方面取脚本值。已知一处尚未点名：`src/agents/` 归 `aidcp-api` 的 2 个文件 152 行（另 5 个 content 文件已由 §7.2 判据三逐个点名、行数合计 980，43 个 automation 文件为其补集）——该项已登记在 §17。
+
 kernel 与 composition 两栏的处置：
 
 - **composition（2 文件 4777 行：`src/server.ts` 4764 行、`src/index.ts` 13 行）**：在目标结构中**没有继承者**。三个仓库 MUST 各建自己的入口与装配根；`server.ts` MUST 被拆解到各仓，MUST NOT 以任何形式作为共享编排壳保留。
-- **kernel（4 文件 251 行：`src/time/` 2 个、`src/deployment-target.ts`、`src/cache/pg-config.ts`）**：kernel 只收无业务语义、无 SQL、无 HTTP、无 LLM 调用、无进程内活状态的东西。各仓 MUST 各自持有副本或经版本化包消费，MUST NOT 建立跨仓源码共享；按 §6.4，共享包的例外仅限「不含业务逻辑」，本表以外的任何模块 MUST NOT 援引该例外。**`protocol.ts` MUST NOT 进 kernel**（裁决见 §10.9）。
+- **kernel（本基线 sha 上恰好 4 文件 251 行，这是 kernel 的全量名单：`src/time/shanghai-day.ts` 13、`src/time/source-published-time.ts` 201、`src/deployment-target.ts` 10、`src/cache/pg-config.ts` 27）**：kernel 只收无业务语义、无 SQL、无 HTTP、无 LLM 调用、无进程内活状态的东西。各仓 MUST 各自持有副本或经版本化包消费，MUST NOT 建立跨仓源码共享；按 §6.4，共享包的例外仅限「不含业务逻辑」，本名单以外的任何模块 MUST NOT 援引该例外。**`protocol.ts` MUST NOT 进 kernel**（裁决见 §10.9）。
+- **kernel 成员的新增（唯一通道，防两处各判一次）**：本名单是全文唯一的 kernel 花名册。新增成员 MUST 同时满足三条：① 满足上一条与 §10.9 的准入条件；② 因 §4.0 第 1 条是**文件级**单一归属、不承认「半个文件归 kernel」，任何「把某文件的纯类型 / 纯数据段放进 kernel」的做法 MUST 先把该段**析出为一个独立新文件**，再对新文件判 kernel；③ 析出后 MUST 在同一批改动里同步更新本表对应目录行、kernel 计数与合计行。
+- **两处待裁决项 MUST 由 change `cloud-service-boundary-gates` 在 seed 归属表时一次判定并回写本表，MUST NOT 在该 change 与本表各判一次**：`src/event-bus/types.ts`（`RoleName` 所在，本表今天整体归 `aidcp-automation`）与 `src/platform/registry.ts` 的纯数据声明段（本表今天整体归 `aidcp-automation`）是否按上一条析出 kernel 段。**在该裁决回写本表之前，任何依赖「这两者已进 kernel」的削减数字 MUST 视为未定**（该 change 任务 5.1 / 5.2 的「一次性削掉 69 条」即属此列，MUST 按裁决结果重算）。`src/comm/protocol.ts` 不在待裁决之列——§10.9 已终局排除，MUST NOT 再提案。
 - **明文口令兜底**：`DEFAULT_PG_CONFIG` 定义在 `aidcp-cloud/src/cache/pg-anchor-cache.ts:33-39`，口令字面量在 `:38`，被 **32 个源文件**引用为兜底默认值。§5.1 要求各服务独立数据库账号，该常量在拆分后 MUST 消失；MUST NOT 被复制成三份。本文档 MUST NOT 写出该口令内容（处置见 §6.5.6）。
 
-两条机械门禁的验收用例 ID 与规范文字唯一保留在 §12「迁移期与日常开发并行」，本表只作指针：
+两族机械门禁的验收用例 ID、族内编号与规范文字唯一保留在 §12「迁移期与日常开发并行」，本表只作指针：
 
-- 导入方向门禁 `AC-BOUND-01`：以本表为输入。
-- 表写入与建表归属门禁 `AC-OWN-01`：以 §5.1 为输入。
+- 导入方向门禁族 `AC-BOUND-*`：以本表（还原到文件级后）为输入。
+- 表写入与建表归属门禁族 `AC-OWN-*`：以 §5.1 为输入。
+- **两张运维表 `service_metrics` / `service_probe` 不在本表的源文件归属范围内**（它们是表、不是源文件），其归属与「设计内永久例外」形态见 §5.1，例外的记账方式见 §12「豁免清单的棘轮规则」。
 
 ### 4.8 `aidcp-console`：用户界面
 
@@ -485,10 +501,11 @@ Console 的全部数据与指令经 `aidcp-api`。`aidcp-api` 不可用时，Con
 | --- | --- | --- |
 | 客户、环境归属和账号绑定（`client_users`、`client_env_scope`） | `aidcp-api` | 授权 HTTP 或版本化快照 |
 | `client_environments`（环境花名册与绑定事实） | `aidcp-api` **单写** | 自动化握手 MUST 改为经 api 的窄内部接口回写，MUST NOT 直写该表 |
+| 账号主数据（`accounts`，含 `execution_target` 归属列） | `aidcp-api` **单写** | 被 26 处外键指向的核心表（§5.4.5）。`aidcp-automation` 在握手路径上占位 / 改写归属 target MUST 经 api 的窄内部接口完成，MUST NOT 直写该表（形态与上一行 `client_environments` 相同）；风控侧只以 `accounts.execution_target` 为**只读**属主谓词。change `risk-state-cross-process-integrity` 的归属占位任务 MUST 按本行落地，或在 `AC-OWN-*` 的豁免清单里为该写入留一条具名条目并挂消除 change |
 | 人设、写作语言（`persona_config`、`soul_*`） | `aidcp-api` | 任务创建时引用版本或快照；判定路径按 §11.4 要求二取本地只读副本 |
 | 四类限频配置（`quota_config`、`pacing_floor_config`、`session_config_global`、`resume_config_global`） | `aidcp-automation` | 后台编辑经 `aidcp-console → aidcp-api → aidcp-automation` 窄内部 HTTP 写；`aidcp-api` MUST NOT 直写。理由见 §11.4 要求一 |
 | 发布请求与审批台账（`publish_log` 拆分后的审批侧） | `aidcp-api` | 持久命令和结果事件 |
-| 发布授权决定（`publish_approval_decision`，新建） | `aidcp-api` **单写** | `aidcp-automation` 经 `PublishRequested` 持久命令获知，MUST NOT 直读 |
+| 发布授权决定（`publish_approval_decision`，新建） | `aidcp-api` **单写** | `aidcp-automation` 经 `PublishApproved` 持久事件获知，MUST NOT 直读 |
 | 发布下发与执行态（`publish_log` 拆分后的执行侧） | `aidcp-automation` | 结果事件回流 api 投影 |
 | 排期（`content_schedule_*`） | `aidcp-api` | 到点发 `CreationRequested` 持久命令 |
 | 内容事实与评估 | `aidcp-content` | 内部 HTTP 或不可变结果引用 |
@@ -505,9 +522,9 @@ Console 的全部数据与指令经 `aidcp-api`。`aidcp-api` 不可用时，Con
 | 最终风险状态（`risk_state`、`risk_counters`） | `aidcp-automation` 的 `RiskController` | 只读投影 |
 | 客户端本地身份与本地配置（Electron 侧） | Electron 客户端 | 云端只读、MUST NOT 作为业务事实源 |
 
-**总则**：每张业务表 MUST 恰好有一个服务写入；跨服务直接写表属于违规，由 `AC-OWN-01` 门禁机械判定（规范文字见 §12）。
+**总则**：每张业务表 MUST 恰好有一个服务写入；跨服务直接写表属于违规，由 `AC-OWN-*` 门禁族机械判定（跨层 DML 由 `AC-OWN-02` 判、跨层 DDL 由 `AC-OWN-03` 判；族内编号与规范文字见 §12）。
 
-**两张运维表的具名例外**（MUST 在 `AC-OWN-01` 的豁免清单里各留一条具名条目并写明理由与边界）：
+**两张运维表的具名例外**（属**设计内永久例外**，MUST 按 §12「豁免清单的棘轮规则」单列进「例外表清单」，MUST NOT 占用 `AC-OWN-02` / `AC-OWN-03` 豁免清单的条目、MUST NOT 参与棘轮计数）：
 
 | 表 | owner | 例外形态 |
 | --- | --- | --- |
@@ -612,7 +629,7 @@ Console 的全部数据与指令经 `aidcp-api`。`aidcp-api` 不可用时，Con
 
 外键与 advisory lock 都是**数据库级作用域**。拆 schema 不影响两者：同一数据库内跨 schema 的外键合法，advisory lock 空间同一。拆库则两者同时失效，且失效形态是「约束不再存在」而不是报错——正是红线禁止的静默形态。
 
-**(1) 跨边界外键。** 当前会跨越目标服务边界的外键（`src/**` 7 条指向 `accounts`，`migrations/**` 19 条指向 `accounts`）：
+**(1) 全部指向 `accounts` 的外键及其边界判定。** （`src/**` 7 条指向 `accounts`，`migrations/**` 19 条指向 `accounts`。下表 8 行中有 3 行两端同归 `aidcp-api`、**不跨界**，列出只为把判定结果登记清楚；下方「要求」只作用于「跨越的边界」列显示跨界的那几行，MUST NOT 给不跨界的三行强加替换工作。）
 
 | 外键 | 位置 | 跨越的边界 |
 | --- | --- | --- |
@@ -622,7 +639,7 @@ Console 的全部数据与指令经 `aidcp-api`。`aidcp-api` 不可用时，Con
 | `account_facebook_publish_image_set.used_by_publish_log_id → publish_log(id)` | `src/publish-agent/facebook-publish-media-store.ts:109`、`:131` | content → api |
 | `first_post_onboarding.account_id → accounts` | `src/onboarding/first-post-onboarding-store.ts:27`、`migrations/0038_first_post_onboarding.sql:7` | api 内（状态表归 api，见 §4.7） |
 | `persona_config.account_id → accounts` | `migrations/0011_persona_config.sql:12`、`src/config/persona-store.ts:41` | api 内，拆库后仍同库 |
-| `account_approval_policy.account_id → accounts` | `migrations/0056_scoped_approval_policy.sql:6`、`src/config/approval-policy-store.ts:22` | api 内，拆库后仍同库 |
+| `account_comment_approval_policy.account_id → accounts` | `migrations/0056_scoped_approval_policy.sql:6`、`src/config/approval-policy-store.ts:22` | api 内，拆库后仍同库 |
 | 互动域 15 条 `REFERENCES accounts(account_id)` | `migrations/0039_interaction_inbox.sql:9`、`:37`、`:66` 等 | 收件箱/发送侧（automation）→ api；配置侧留 api 内（分段见 §4.6.1） |
 
 要求：
@@ -689,12 +706,12 @@ Console 的全部数据与指令经 `aidcp-api`。`aidcp-api` 不可用时，Con
 - MUST：移除 `src/cache/pg-anchor-cache.ts:33-39` 那样的单一内置默认连接身份，改为按服务注入，缺失即 fail-closed（并按 §6.5.6 先删口令兜底）。
 - 排序依据：`docs/deployment-environments.md:66` 要求先拆 ol 库，再做破坏性 schema 变更。
 
-**中间窗口（显式承认）。** 从子目标 A 完成到子目标 B 生效之间，存在一段「跨服务写表没有任何数据库层强制」的窗口。这段窗口内 §14 红线 6 MUST 由两件东西承担：① `AC-OWN-01` 表所有权检查器（静态扫描表名与 SQL 字面量，对非 owner 表的 `INSERT` / `UPDATE` / `DELETE` / DDL 即失败；无法静态判定的动态拼接 SQL MUST 判为失败，MUST NOT 跳过）；② 代码评审——跨域存储与组合根按 CLAUDE.md §7 的热点文件规则处理：单写者、串行改动、不与他人并行。
+**中间窗口（显式承认）。** 从子目标 A 完成到子目标 B 生效之间，存在一段「跨服务写表没有任何数据库层强制」的窗口。这段窗口内 §14 **红线 6 与红线 9**（两条都以数据库角色 GRANT 为最终验收手段，而窗口内不存在按服务分的数据库角色）MUST 由两件东西承担：① `AC-OWN-*` 表所有权检查器（定义与规范文字见 §12，本处 MUST NOT 复述）；② 代码评审——跨域存储与组合根按 CLAUDE.md §7 的热点文件规则处理：单写者、串行改动、不与他人并行。红线 9 另加一条窗口内的凭据侧承担：按 §6.5.4，能写风控最终状态的路由 MUST 只对 `aidcp-automation` 自身进程内可达，MUST NOT 向另两个服务签发任何可写风控状态的令牌。
 
 窗口本身的约束：
 
 - 该窗口 MUST 有明确的起止条件与最长时限，MUST 在本次 OpenSpec change 的 tasks 中登记。超时 MUST 上报，MUST NOT 默认延长。
-- 前提：`aidcp-cloud` 当前无 CI。`AC-OWN-01` MUST 至少挂进控制仓集成闸 `scripts/land-change:38-42`（见 §12）；在它可执行之前，子目标 A MUST NOT 判定为完成。
+- 前提：`aidcp-cloud` 当前无 CI。`AC-OWN-*` 全族 MUST 至少挂进控制仓集成闸 `scripts/land-change:38-42`（见 §12）；在它可执行之前，子目标 A MUST NOT 判定为完成。
 
 #### 5.4.8 各阶段的回滚点
 
@@ -749,7 +766,7 @@ Console 的全部数据与指令经 `aidcp-api`。`aidcp-api` 不可用时，Con
 | 请求头 | 语义 | 必填 |
 | --- | --- | --- |
 | `x-aidcp-service` | 调用方服务名（`aidcp-api` / `aidcp-content` / `aidcp-automation` / `probe`） | 必填 |
-| `x-aidcp-service-token` | 该有向链路的共享服务令牌，按 §6.5.2 定长时间安全比对 | 必填 |
+| `x-aidcp-service-token` | 该有向链路的共享服务令牌，按 §6.5.2 定长时间安全比对 | 必填（`probe` 除外，见表下注） |
 | `x-aidcp-consumer` | 消费者标识 `<service>@<serviceVersion>`，用于 §10.7 的消费者登记与旧合同下线判定 | 必填（内部调用） |
 | `x-aidcp-contract` | 本次调用所用合同 `<name>@v<N>` | 必填（内部调用） |
 | `x-aidcp-correlation-id` | 一次端到端业务流程标识，全链原样透传，MUST NOT 中途重新生成 | 必填 |
@@ -758,6 +775,8 @@ Console 的全部数据与指令经 `aidcp-api`。`aidcp-api` 不可用时，Con
 | `x-aidcp-execution-target` | 调用方的部署目标（`dev` / `ol`），**仅用于审计与失配检测，不构成执行授权** | 必填 |
 | `x-aidcp-account-id` | 账号标识；语义与 §6.3 信封同名字段逐字一致 | 有账号归属时必填 |
 | `x-aidcp-env-key` | 客户浏览器环境标识；语义与 §6.3 信封同名字段逐字一致 | 有环境归属时必填 |
+
+**表下注——`probe` 取值的作用域（MUST 与 §6.5.2 / §6.5.7 一起读）**：外部探针只调 `/health` 与 `/ready` 两个探测端点，这两个端点是**免服务令牌**的（§6.5.2 只定义 `api→content`、`api→automation`、`automation→content` 三条有向链路的令牌，加 §6.5.4 的分级令牌与 §6.5.5 的秘钥取值令牌；§6.5.7 的 `.env` 分配表也只给探针分配了飞书出站凭据，不含任何服务令牌）。因此：探针 MUST 只用 `x-aidcp-service: probe` 标识自身、MUST NOT 携带 `x-aidcp-service-token`；`probe` 这个取值 MUST NOT 出现在除 `/health` / `/ready` 之外的任何内部路由上，出现即 MUST 按 `unknown_service` fail-closed 拒绝。这两个端点因此 MUST 只绑回环、MUST NOT 返回任何业务数据（返回体字段集见 §11.8.5）。
 
 #### 6.1.1 内部 HTTP 的基本要求
 
@@ -795,7 +814,7 @@ Console 的全部数据与指令经 `aidcp-api`。`aidcp-api` 不可用时，Con
 - 单次完整互动的跨服务同步**总延迟预算** MUST ≤ 60s。调用方 MUST 维护该互动的剩余预算并随每次调用递减。
 - 幂等评估调用允许至多 1 次有界重试，重试耗时 MUST 从剩余预算中扣除。
 - 剩余预算不足以完成下一次调用时，调用方 MUST 立即降级：按 §6.1.5 记一次故障类跳过，并继续推进浏览循环。MUST NOT 排队等待，MUST NOT 追加重试，MUST NOT 延长预算。
-- 因预算耗尽产生的降级 MUST 计入故障类跳过，MUST NOT 计入设计内克制。
+- 因预算耗尽产生的降级 MUST 计入故障类跳过（reason token `budget_exhausted`，见 §6.1.5），MUST NOT 计入设计内克制。
 
 #### 6.1.5 跳过的分类与降级：必须可计量，禁止无声空转
 
@@ -808,7 +827,7 @@ Console 的全部数据与指令经 `aidcp-api`。`aidcp-api` 不可用时，Con
 | class | 含义 | reason token 全集（当前） |
 | --- | --- | --- |
 | `by_design` | 设计内克制，不告警、只看趋势 | `model_pass`、`no_budget`、`cooldown`、`quota_exceeded`、`duplicate`、`not_relevant` |
-| `fault` | 故障吞动作，MUST 告警 | `llm_error`、`parse_failed`、`note_data_unavailable`、`timeout`、`circuit_open`、`assessment_unavailable`、`assessment_timeout`、往返预算耗尽 |
+| `fault` | 故障吞动作，MUST 告警 | `llm_error`、`parse_failed`、`note_data_unavailable`、`timeout`、`circuit_open`、`assessment_unavailable`、`assessment_timeout`、`budget_exhausted`（§6.1.4 的往返预算耗尽） |
 
 - **新增 reason token 未声明 class 时 MUST 默认归入 `fault`**（宁可误告警，不可漏）。
 - 分类语义现役已具备但只落日志：`aidcp-cloud/src/agents/interaction-appraiser-role.ts:80-89` 已发出稳定 token，但全仓唯一订阅者是回列表角色，不落库、不聚合。本条要求的是给已有分类补一个持久 sink，不是新建指标体系。
@@ -817,7 +836,7 @@ Console 的全部数据与指令经 `aidcp-api`。`aidcp-api` 不可用时，Con
 
 - 内容评估超时、报错、输出不可解析、内部调用失败或熔断 OPEN 时，`aidcp-automation` MUST 跳过本次互动或本次选卡，MUST NOT 用乐观默认值继续执行。
 - 两类计数 MUST 持久化，MUST 支持按 `(executionTarget, accountId, 平台, 原因 token, 小时)` 查询。MUST NOT 只写进程日志。
-- 故障类跳过 MUST 触发告警，阈值统一见 §11.8.6（连续次数阈值默认 5；占比按 15 分钟滚动窗判定）。现役 `alerts` 表今天只收验证码与阻断类事件，MUST 扩展到本类。
+- 故障类跳过 MUST 触发告警，阈值统一见 §11.8.6（连续次数阈值默认 5；占比按 15 分钟滚动窗判定）。现役 `alerts` 表今天只收两类事件——验证码 / 阻断（`src/comm/captcha-coordinator.ts`）与节奏饱和（`src/risk/pacing-saturation-alerter.ts:49`），MUST 扩展到本类。
 - 内容服务熔断状态跃迁 MUST 立即产生一条告警，MUST NOT 等待阈值累计——熔断是全车队同时生效的状态。
 - 达到告警阈值后，该账号会话 MUST 进入具名的不可用态（如 `content_unavailable`）并停止发起新的互动判定。该状态 MUST 对运营可见，MUST NOT 表现为「会话正常、按时长到点结束」。
 - 调用失败、超时或熔断时，调用方 MUST 在本地产出带具体原因的降级事件。MUST NOT 依赖 idle 看门狗的恢复 nudge 作为事实上的降级路径——看门狗给出的是通用会话结束原因，会把内容服务故障伪装成时长或空闲结束。
@@ -832,13 +851,14 @@ aidcp-api      → aidcp-content     CreationRequested
 aidcp-content  → aidcp-api         CandidateReady | CreationFailed
 
 aidcp-api      → aidcp-automation  PublishRequested
+aidcp-api      → aidcp-automation  PublishApproved
 aidcp-automation → aidcp-api       ExecutionDispatched
                                       | ExecutionSucceeded
                                       | ExecutionFailed
                                       | ExecutionUnknown
 ```
 
-命令表达「请求某个服务做事」，事件表达「已经发生的事实」，两者 MUST NOT 混用。
+命令表达「请求某个服务做事」，事件表达「已经发生的事实」，两者 MUST NOT 混用。据此，「已授权发布」这一位由**事件** `PublishApproved` 承载（它陈述的是一次已发生的授权事实，见 §6.4），MUST NOT 用字面为命令的 `PublishRequested` 表达；change `publish-approval-signal-to-database` 与本表 MUST 用同一个名字，MUST NOT 两侧各造一个 `messageType` 与 `schemaRef`。
 
 `ContentAssessed`、`InteractionDecided`、`InteractionDispatched`、`InteractionOccurred` 和 `InteractionFailed` 是不同阶段。请求已接收、任务已派发或 Edge 回执已返回，MUST NOT 冒充平台动作已经发生。
 
@@ -967,7 +987,7 @@ aidcp-automation → aidcp-api       ExecutionDispatched
 - 共享包含业务逻辑的「公共包」以绕开服务边界；
 - **用共享文件系统、本机路径、本机临时目录或数据库 advisory lock 传递跨服务的授权、锁或业务事实。**
 
-最后一条 MUST 单列，因为 §12 阶段 1 的两项机械检查（`AC-BOUND-01`、`AC-OWN-01`）与 §14 红线 6 对文件通道与 advisory lock 天然失明。这两类通道在同机多进程部署下**会继续正常工作**，因此能不被发现地穿过阶段 1–4；一旦跨主机、跨容器或跨库，它们**静默失效**，且失效形态是停滞而非报错。系统里现存两个实例：
+最后一条 MUST 单列，因为 §12 阶段 1 的两族机械检查（`AC-BOUND-*`、`AC-OWN-*`）与 §14 红线 6 对文件通道与 advisory lock 天然失明。这两类通道在同机多进程部署下**会继续正常工作**，因此能不被发现地穿过阶段 1–4；一旦跨主机、跨容器或跨库，它们**静默失效**，且失效形态是停滞而非报错。系统里现存两个实例：
 
 **实例一：审批授权只活在一个本机临时文件上。** 「已授权发布」这一位今天的唯一载体是 `/tmp/aidcp-publish-approve-<requestId>.json`。写方是飞书卡片回调与面板审批（`src/feishu/ws-receiver.ts:123` 路径构造 / `:151` O_EXCL first-writer-wins 写入 / `:321` 卡片回调写入调用点；`src/panel/panel-server.ts:1246` 路由分支 / `:1302` 授权写入点），拆分后属 `aidcp-api` 域；读方与删方是发布下发器与评论审批闸（`src/publish-agent/publish-dispatcher.ts:454`），拆分后属 `aidcp-automation` 域。同一路径还是与 `aidcp-edge` 的两端契约（`aidcp-edge/src/publish/approval-gate.ts:56`）。两个服务一旦不共享文件系统，读方永远读不到 `approved=true`，而下发器读不到签名时只 `logger.warn` 后 return，草稿停在 `pending_approval`：AC-PUB-* 安全断言保持全绿（未授权确实没发），运营看到的却是「点了同意，稿子永远不发」。这正是铁律定义的静默假失败。此外写入点分属三个未来域，不是一条 api→automation 单边。
 
@@ -976,7 +996,7 @@ aidcp-automation → aidcp-api       ExecutionDispatched
 由此产生的硬要求：
 
 - 跨服务的授权、互斥与业务事实 MUST 落成数据库持久记录或 §6.2 的持久消息。MUST NOT 落成文件、本机路径、本机临时目录或 advisory lock。
-- 授权改造的目标形态：授权事实 MUST 成为 `aidcp-api` 拥有的持久记录 `publish_approval_decision`，至少含 `candidateVersionId` 或 `contentVersion`、授权人、授权时间、目标 `envKey + executionTarget`、`approve | reject`；`aidcp-automation` MUST 经 §6.2 的 `PublishRequested` 持久命令获知授权；随后 MUST 删除文件通道。注意这是**新建权威记录**而非迁移表所有权（理由见 §4.6.3）。
+- 授权改造的目标形态：授权事实 MUST 成为 `aidcp-api` 拥有的持久记录 `publish_approval_decision`，至少含 `candidateVersionId` 或 `contentVersion`、授权人、授权时间、目标 `envKey + executionTarget`、`approve | reject`；`aidcp-automation` MUST 经 §6.2 的 `PublishApproved` 持久事件获知授权；随后 MUST 删除文件通道。注意这是**新建权威记录**而非迁移表所有权（理由见 §4.6.3）。
 - first-writer-wins 的原子性今天由 O_EXCL 提供，跨服务后 MUST 由数据库唯一约束或 CAS 提供。
 - 「已授权但未下发」MUST 有独立、可观测的状态（对齐 §14 红线 18），MUST NOT 表现为无状态变化、无告警的静默停滞。
 - 迁移期若必须暂时保留文件通道，MUST 把隐式同机约束写成显式部署约束并登记为阻塞项：相关服务 MUST 同主机、MUST 共享同一 `/tmp` 命名空间、各 systemd unit MUST NOT 启用 `PrivateTmp`；该约束 MUST 在任一服务被移到不同主机或容器**之前**解除。
@@ -1041,7 +1061,7 @@ aidcp-automation → aidcp-api       ExecutionDispatched
 - 调用方 MUST 只在内存中持有明文，MUST NOT 落盘、MUST NOT 写日志、MUST NOT 进事件信封或投影、MUST NOT 回传前端。
 - 选 A 不选 B 的理由，三条：
   1. **主密钥收敛为一份**。`AIDCP_CRED_KEY` MUST 只出现在 `aidcp-api` 的配置中。方案 B 要求使用方共享主密钥，会把它复制成三服务 × 两 target 共六份，任一服务被攻陷即全部厂商凭据失守。
-  2. **§6.4 保持零例外**。§6.4「禁止直接读写另一个服务的业务表」是 `AC-OWN-01` 唯一可机械判定的二元条件。一旦为秘钥开一个例外，该检查就从「零跨服务读表」退化为「除白名单外零跨服务读表」，白名单会随时间增长且没有机械手段阻止。
+  2. **§6.4 保持零例外**。§6.4「禁止直接读写另一个服务的业务表」是 `AC-OWN-*` 门禁族唯一可机械判定的二元条件。一旦为秘钥开一个例外，该检查就从「零跨服务读表」退化为「除白名单外零跨服务读表」，白名单会随时间增长且没有机械手段阻止。
   3. **轮换从此有唯一执行点**。写入、加密、失效通知都在 api 一侧，MUST NOT 出现「谁先重启谁先生效」的不确定态。
 - 代价与其必须的兜底（MUST 全部满足）：api 不可用时使用方取不到凭据。此时使用方 MUST 保留上一次成功取得的凭据继续工作；从冷启动即取不到时，MUST 把受影响的出口标为不可用并返回诚实错误（如 `credential_unavailable`），MUST NOT 用空密钥构造客户端——空密钥会让模型调用以「配置错误」的形态失败，并被上层误当成内容评估失败（撞 §14 红线 7）。
 - 迁移期允许保留现有的环境变量回退，但 MUST 在 `/ready` 与启动日志中标注每个 provider 的凭据来源为 `api` 或 `env`，MUST NOT 让回退静默发生。
@@ -1101,7 +1121,15 @@ aidcp-automation → aidcp-api       ExecutionDispatched
 - 分数与置信度 MUST 来自模型的真实输出，或来自一条可复算的确定性规则。
 - 取不到时 MUST 置 `null` 并填写降级原因，**MUST NOT 填默认常量**。一个恒为 `0.7` 的置信度不是置信度，它让下游的阈值判断全部失去意义，且这类伪精度在跨服务后无法被消费方识别。
 - 未被任何消费者解析的字段 MUST NOT 进入版本化合同——进了合同就要承担兼容义务，而它不产生任何信息。
-- **阶段 3 迁 content 的前置清理项**：以下五处默认常量 MUST 在迁移前逐个改为「真实值或 `null` + 降级原因」，或直接从合同中删除：`src/agents/content-evaluator.ts:261` 的无条件 `0.7`、`src/agents/content-scout.ts:84` 的 `?? 0.5`、`src/agents/author-evaluator.ts:185` 的死字段，以及同批扫描出的其余两处。清理结果 MUST 由 §14 对应红线验收。
+- **阶段 3 迁 content 的前置清理项**：下列已坐实的三处伪精度 MUST 在迁移前逐个改为「真实值或 `null` + 降级原因」，或直接从合同中删除。**MUST NOT 以本处的条数为验收口径**——完整清单以阶段 3 开工时一条**可重跑扫描脚本**的产出为准（脚本按 §12 阶段 0 的同一纪律随 change 提交，扫描口径：评估类角色 `parseOutput` 中对 `score` / `confidence` 一类数值字段填写字面量常量、或对模型缺省值做 `??` / 三元兜底的每一处）。
+
+  | # | 位置 | 实际形态 |
+  | --- | --- | --- |
+  | 1 | `src/agents/content-evaluator.ts:261` | `typeof o.confidence === 'number' ? o.confidence : 0.7` —— 模型未返回 confidence 时**兜底填 0.7**（不是无条件 0.7） |
+  | 2 | `src/publish-agent/roles/content-scout.ts:84` | `confidence: Number(obj.confidence ?? 0.5)` —— 兜底填 0.5。**注意目录**：该文件在 `src/publish-agent/roles/`（§4.7 归 content 的 54 文件段），**不在** `src/agents/` |
+  | 3 | `src/agents/author-evaluator.ts:185` **与** `:206-212` | 死字段：`:185` 的 prompt 模板向模型索要 `"confidence":0.8`，而 `:206-212` 的 `parseOutput` 只取 `verdict` / `reason`、**直接丢弃 confidence**。两个锚点 MUST 同时给出，只引 `:185` 无法坐实「死」 |
+
+  清理结果 MUST 由 §14 红线 30 验收；验收对象是**脚本产出的全量清单已清零**，MUST NOT 是「上表三条已改完」。
 
 ### 7.2 分层调用
 
@@ -1124,7 +1152,7 @@ aidcp-automation → aidcp-api       ExecutionDispatched
 - 加群结果判定等动作后置校验（`facebook_group_join_judge`），是「操作后必须验证业务结果真发生」的实现，恒留 `aidcp-automation`；
 - 是否滚动评论区、是否发起搜索、搜哪个关键词一类的行程编排判断，恒留 `aidcp-automation`。这些角色内部合法的内容语义评估可按判据一切出，但切分粒度是**判断**而非**角色**。
 
-**判据三（阶段 3 首批迁移范围）**：阶段 3 提取 `aidcp-content` 时，**首批范围就是下列名单**，MUST 显式枚举、MUST 由 `AC-BOUND-01` 机械守护。§12 阶段 3 只回指本表，MUST NOT 复制名单。
+**判据三（阶段 3 首批迁移范围）**：阶段 3 提取 `aidcp-content` 时，**首批范围就是下列名单**，MUST 显式枚举、MUST 由 `AC-BOUND-*` 门禁族机械守护（跨边界 import 由 `AC-BOUND-04` 判）。§12 阶段 3 只回指本表，MUST NOT 复制名单。
 
 | 首批迁移对象 | 现位置 | 可切依据 |
 | --- | --- | --- |
@@ -1293,7 +1321,7 @@ aidcp-automation/contracts/
 - 清单中任一路径在实现侧退化为「路由未命中 / 接口不存在」MUST 使测试套件失败。
 - 反向同样成立：实现暴露了清单之外的路径 MUST 使测试套件失败。清单与实现路由表之间是双向等价关系，不是单向覆盖。
 - 清单 MUST 与 OpenAPI 同源（由同一份 Schema 生成或互为生成物），MUST NOT 是第三份手工维护的路径副本。
-- 冻结合同的清单以控制仓为权威源，提供方仓镜像。控制仓已有的落点是 `docs/contracts/wechat-channels-interaction/v1/route-inventory.json`。
+- 冻结合同的清单以控制仓为权威源，提供方仓镜像。控制仓的**既定落点**是 `docs/contracts/wechat-channels-interaction/v1/route-inventory.json`（由 change `wechat-customer-api-contract` 任务 2.1 新建，**尚未落地**——该 v1 目录今天只有 `README.md`、`schemas/`、`fixtures/`、`evidence/`）。MUST NOT 被读成已有实装。
 - 理由 MUST 写进合同文档而不是只留在评审记录里：本项目已实证「有真 HTTP 测试、但逐路径手挑覆盖」会让主路径 100% 坏而测试全绿，同一根因已中两次。
 
 ### 10.7 消费者登记与旧合同下线
@@ -1327,10 +1355,11 @@ aidcp-automation/contracts/
 
 ### 10.9 边云协议的归属裁决
 
-- `protocol.ts` MUST 归 `aidcp-automation` 独占，**MUST NOT 放进 kernel 层**。拆分后协议副本仍**恰好两份**：`aidcp-edge` 与 `aidcp-automation`。kernel 只保留无业务语义、无 SQL、无 HTTP、无 LLM、无进程内活状态的东西（`RoleName` 联合类型、`src/time/`、`deployment-target.ts` 之类，清单见 §4.7）。把 `protocol.ts` 放进 kernel 等于让三边都可导入，会把下面这 6 处违规就地合法化，与本节第 2 条当场互斥。
+- `protocol.ts` MUST 归 `aidcp-automation` 独占，**MUST NOT 放进 kernel 层**。拆分后协议副本仍**恰好两份**：`aidcp-edge` 与 `aidcp-automation`。kernel 只保留无业务语义、无 SQL、无 HTTP、无 LLM、无进程内活状态的东西（`src/time/`、`deployment-target.ts`、`cache/pg-config.ts`；**全量名单以 §4.7 为准**，本处不另列）。把 `protocol.ts` 放进 kernel 等于让三边都可导入，会把下面这 6 处违规就地合法化，与本节第 2 条当场互斥。
 - `aidcp-api` 与 `aidcp-content` **MUST NOT 导入边云协议文件，包括仅类型导入**。
-- 现状与此相反，6 处 type-only 依赖 MUST 登记为 `AC-BOUND-01` 的具名豁免条目，**每条各挂一个消除它的 change**，并在阶段 1 内改写：`aidcp-cloud/src/client-auth/client-auth-server.ts:29-36`（把发布审批、日用量、慢启动等边云协议载荷类型直接当客户 HTTP 响应形状用）、`src/panel/types.ts:50`、`src/config/pacing-config-store.ts:28`、`src/config/pacing-config-facade.ts:14`、`src/cache/pg-anchor-cache.ts:15`、`src/cache/notification-contact-store.ts:18`。这些形状 MUST 在 `aidcp-api` / `aidcp-content` 自己的 `contracts/` 内重新声明。
-- **收口登记**：change `cloud-service-boundary-gates` 的任务 5.1（把 `src/comm/protocol.ts` 移进 `src/kernel/`）**按本裁决取消**；该 change 的门禁任务描述 MUST 改用统一 ID `AC-BOUND-01` / `AC-OWN-01`。
+- 现状与此相反，**按 §4.7 / §4.6.8 的归属重算后**，属 api / content 侧的边云协议 type-only 依赖共 6 处，MUST 登记为 `AC-BOUND-04`（未豁免违规用例）的具名豁免条目，**每条各挂一个消除它的 change**，并在阶段 1 内改写：`aidcp-cloud/src/client-auth/client-auth-server.ts:29-36`（把发布审批、日用量、慢启动等边云协议载荷类型直接当客户 HTTP 响应形状用）、`src/panel/types.ts:50`、`src/panel/panel-server.ts:332`（内联 `import('../comm/protocol.js').CaptchaAssistTrajectoryPayload`）、`src/cache/notification-contact-store.ts:18`、`src/publish-agent/client-publish-approval.ts:4`、`src/publish-agent/draft-image-remove.ts:14`（后两个文件正是 §4.6.3「台账与审批」段点名归 `aidcp-api` 的 7 个文件中的两个）。这些形状 MUST 在 `aidcp-api` / `aidcp-content` 自己的 `contracts/` 内重新声明。
+- **本清单 MUST 由可重跑脚本产出（§12 阶段 0 已要求跨边界 import 图脚本化），MUST NOT 手工枚举。** 三处曾被误列、按本文档自己的归属裁决**不构成违规**、MUST NOT 为其立消除 change：`src/config/pacing-config-store.ts:28` 与 `src/config/pacing-config-facade.ts:14`（§4.6.8 已判归 `aidcp-automation`，而 automation 正是 `protocol.ts` 的独占方）、`src/cache/pg-anchor-cache.ts:15`（§4.7 的 `src/cache/` 逐文件表已判归 `aidcp-automation`）。
+- **收口登记（四个落点，MUST 逐条执行，MUST NOT 只写「任务 5.1 取消」）**：change `cloud-service-boundary-gates` 中 —— ① 任务 5.1 的三个搬迁目标里 **`src/comm/protocol.ts` 一项取消**（另两项 `event-bus/types.ts`、`platform/index.ts` 的处置随 §4.7 kernel 名单的待裁决项定案），其「一次性削掉 69 条」MUST 按定案重算；② 任务 2.1 的 kernel 名单 MUST 删除 `src/comm/protocol.ts`；③ 任务 2.6 的物理搬迁范围 MUST 排除该文件；④ `proposal.md` Impact 段与 `design.md` 中「`protocol.ts` 进 kernel」的对应表述 MUST 一并改写。只删 5.1 而不动 2.1 + 2.6，`protocol.ts` 仍会经这两步进 kernel，本节点名要消除的 6 处依赖会就地合法化。门禁 ID 的对齐方式见 §17 第 2 项。
 - 边云协议中承载客户数据的消息（当前为界面快照与客户端内审批动作及其应答）：**载荷语义归 `aidcp-api`，传输仍归 `aidcp-automation`**。`aidcp-automation` MUST 把这类消息的载荷类型定义为对 `aidcp-api` 合同生成物的引用，MUST NOT 在协议文件内二次声明同名字段。
 - **同步点数量 MUST NOT 增加**。拆分后，现行协议同步点清单（CLAUDE.md §2 所列五处）全部落在 `aidcp-edge` 与 `aidcp-automation` 两个仓内，不因拆分而新增。任何要求 `aidcp-api` 或 `aidcp-content`「也知道一点协议」的设计 MUST 被拒绝：它会把五处变六处，而新增的那一处没有任何机械检查。
 - `docs/protocol.md` 与 `docs/contracts/` MUST 留在控制仓 `aidcp`；协议变更仍走控制仓 OpenSpec change，MUST NOT 由 `aidcp-automation` 单方面改写后再通知边缘。
@@ -1453,7 +1482,7 @@ api 停止之所以今天等于 automation 全停，是因为四类限频配置�
 
 - 无日志库、无指标库：`aidcp-cloud` 运行时依赖只有 6 个包。
 - 无贯穿标识：`correlationId` / `traceId` 在 `aidcp-cloud/src` 全仓 0 命中。边-云信封只有 `{v, type, id, ts, payload}`，`id` 只用于单次请求-响应配对。
-- 裸 `console.*` **295 处、分布在 17 个文件**（2026-07-22 定稿当日复核值；章节草稿期为 290，评审报告的 276 为更早快照），集中在 `src/server.ts` 与 `src/orchestrator/role-dispatcher.ts`。
+- 裸 `console.*` **295 处、分布在 17 个文件**（基线提交 sha = `aidcp-cloud@3d12d21`，口径纪律同 §4.7 表头：MUST 按 sha 标注、MUST NOT 按日期；章节草稿期为 290，评审报告的 276 为更早快照），集中在 `src/server.ts` 与 `src/orchestrator/role-dispatcher.ts`。
 - 无 `/metrics` 端点。两个健康检查均无条件返回成功：`src/client-auth/client-auth-server.ts:478-481`、`src/panel/panel-server.ts:402-405`，不查数据库、不查任何依赖。
 - 告警写入者与被监控进程同源：验证码 / 限流告警由 `src/comm/captcha-coordinator.ts:173-215` 在被监控进程内落库并投递飞书；节奏饱和告警同进程发出。进程死亡即无任何告警。
 - systemd 单元只有 `Restart=on-failure` / `RestartSec=5`，无 `OnFailure=`；ECS 上无 crontab 探针、无任何 exporter。反复重启失败今天是静默的。
@@ -1490,7 +1519,7 @@ api 停止之所以今天等于 automation 全停，是因为四类限频配置�
 | `target` | `executionTarget` | 是 |
 | `evt` | 稳定事件 token | 是 |
 | `res` | 结果，枚举 `ok` / `skipped` / `failed` / `unknown` | 是 |
-| `reason` | 原因 token（取值全集见 §6.1.5） | `res != ok` 时必填 |
+| `reason` | 原因 token。**跳过类**（`res=skipped`）的取值全集见 §6.1.5；**其余失败类**（`res=failed` / `unknown`）的 token 由各自章节定义，例如 §11.8.7 的 `storage_unavailable` | `res != ok` 时必填 |
 | `ms` | 本步耗时（毫秒） | 有耗时语义时必填 |
 | `lvl` | 级别 | 是 |
 | `msg` | 人读文本 | 是 |
@@ -1542,7 +1571,8 @@ api 停止之所以今天等于 automation 全停，是因为四类限频配置�
 **本节是健康检查语义的唯一规范位置。§12 阶段 2 的退出判据与运维工件、§14 对应红线均 MUST 只写一句指针「按 §11.8.5 交付并验收」。**
 
 1. 每个服务 MUST 暴露两个语义分离的端点：
-   - `GET /health`（存活）：MUST 只表示本进程事件循环还能响应 HTTP，MUST 不查任何依赖；200 body MUST 带 `svc`、`ver`、`contract`、`target`（即本服务的 `executionTarget`，供 §8 的跨服务互核使用）、`pid`、`uptimeSeconds`。
+   - `GET /health`（存活）：MUST 只表示本进程事件循环还能响应 HTTP，MUST 不查任何依赖；200 body MUST 带 `svc`、`ver`、`contract`、`target`（即本服务的 `executionTarget`，供 §8 的跨服务互核使用）、`processId`（操作系统进程号）、`uptimeSeconds`。
+   - **命名消歧（照 §6.3.3「误用即假闸」的同一纪律）**：本方案中 `pid` **恒指因果标识**（§6.1.0 请求头 `x-aidcp-causation-id` 的日志 / 信封短名，见 §11.8.2 第 5 条与 §11.8.3 字段表），MUST NOT 被用作进程号。健康检查里的进程号字段 MUST 命名为 `processId`，MUST NOT 写成 `pid`。
    - `GET /ready`（就绪）：MUST 真实探测本服务**自有依赖**，任一自有依赖不可达时 MUST 返回 503，且 body MUST 逐项列出不可达的依赖。
 2. 「自有依赖」MUST 在各仓部署清单里逐服务写死，且只包含：本服务拥有写权的 PostgreSQL schema（探测方式 MUST 是一次真实 `select 1`，超时 MUST ≤ 2 秒）、本服务的 Outbox / Inbox 表可读写、本服务自有的对象存储桶（仅 `aidcp-content`）、本服务自有的监听端口。
 3. **红线一**：自有依赖不可达 MUST 返回不健康。MUST NOT 因为「还能返回缓存 / 投影」而报健康，MUST NOT 无条件返回成功。
@@ -1572,13 +1602,14 @@ api 停止之所以今天等于 automation 全停，是因为四类限频配置�
 | 服务降级 | `/ready` 返回 degraded（自有依赖不可达） | MUST 在 **5 分钟**内告警 |
 | 熔断器状态跃迁 | `circuit_state` 发生变化 | MUST **立即**产一条告警；持续 5 分钟 MUST 升一级 |
 | 故障类跳过占比 | 按 **15 分钟滚动窗**判定（1 小时口径已废弃） | 超阈值即告警；连续次数阈值默认 5 |
+| 内容服务不可用时的故障类跳过 | `decision_skipped_total{class=fault,reason=assessment_unavailable}` 在 **5 分钟**内 > 0 | 即告警。这是上一行的**独立加严条件**，不是它的替代：内容服务熔断 / 不可用是全车队同时生效，等 15 分钟窗占比达标会漏掉整批被吞的动作 |
 | 消息积压 | `outbox_oldest_age_seconds` > 10 分钟 | 即告警 |
 | 死信新增 | `dead_letter_total` 增长 | 即告警 |
 | PostgreSQL 不可达 | 任一服务 `/ready` 因自有 schema 不可达失败 1 次 | 即告警（探针 MUST 走飞书直报，不依赖落库） |
 
 分级沿用既有 P0–P3（`src/alerts/alert-store.ts:20-34` 的 CHECK 约束）：
 
-- **P0**：任一服务 `/health` 连续 3 次失败；PostgreSQL 不可达；死信新增。
+- **P0**：任一服务 `/health` 连续 3 次失败；PostgreSQL 不可达；死信新增；内容服务不可用时 5 分钟内 `reason=assessment_unavailable` 的 `fault` 类跳过 > 0。
 - **P1**：`/ready` 降级持续 5 分钟；15 分钟窗内 `fault` 类跳过占比超阈值；`outbox_oldest_age_seconds` > 10 分钟。
 - **P2**：熔断器 `open` 持续 5 分钟；服务版本与合同版本错配。
 - **P3**：趋势类（`by_design` 跳过率异常波动）。
@@ -1596,8 +1627,9 @@ api 停止之所以今天等于 automation 全停，是因为四类限频配置�
 | --- | --- | --- | --- |
 | `aidcp-automation` 停止 | 外部探针 `/health` 失败；`service_probe` 心跳行停更 | 连续 3 次（≤ 3 分钟） | P0 |
 | `aidcp-api` 停止 | 外部探针 `/health` 失败；其他两服务的 `internal_http_calls{peer=aidcp-api,outcome=transport_error}` 上升 | 同上 | P0 |
-| `aidcp-content` 停止 | 外部探针 `/health` 失败；automation 侧 `circuit_state{peer=aidcp-content}=open`；`decision_skipped_total{class=fault,reason=assessment_unavailable}` 上升 | 探针同上；fault 类跳过 5 分钟内 > 0 | P0 |
-| Edge 离线（两行合一） | `edge_online_gauge{target}` 下降；对应环境的 `platform_action_total{outcome=dispatched}` 无后继 `occurred` | 环境无在线边缘 > 10 分钟（业务时段） | P1 |
+| `aidcp-content` 停止 | 外部探针 `/health` 失败；automation 侧 `circuit_state{peer=aidcp-content}=open`；`decision_skipped_total{class=fault,reason=assessment_unavailable}` 上升 | 探针连续 3 次（≤ 3 分钟）；`reason=assessment_unavailable` 的 fault 类跳过 5 分钟内 > 0（§11.8.6 阈值表「内容服务不可用时的故障类跳过」行） | P0 |
+| Edge 离线（**不可逆提交之前**） | `edge_online_gauge{target}` 下降；对应环境无在线边缘的持续时长 | 环境无在线边缘 > 10 分钟（业务时段） | P1 |
+| Edge 离线（**不可逆提交之后、回执之前**） | `platform_action_total{platform,action,outcome=unknown}` 出现；`res=unknown` 日志行（即红线 18 的第三态信号）；对应环境的 `platform_action_total{outcome=dispatched}` 无后继 `occurred` | 任一 `unknown` 出现即须可查；`dispatched` 无后继 `occurred` 持续 > 5 分钟 | P1 |
 | 浏览器槽位满 | 槽位等待队列深度与最老等待年龄 | 最老等待 > 10 分钟 | P2 |
 | 对象存储不可用 | `aidcp-content` 的 `/ready` `degraded[]` 含对象存储项；媒体任务日志 `res=failed reason=storage_unavailable` | `/ready` 降级持续 5 分钟 | P1 |
 | 内部评估超时 | `internal_http_calls{outcome=timeout}`；`decision_skipped_total{class=fault,reason=assessment_timeout}` | 15 分钟滚动窗内 fault 类跳过占比超阈值 | P1 |
@@ -1669,17 +1701,17 @@ Tier 0 的全部成本：一个约 60 行的自写 logger、一个约 100 行的
 
 | 类别 | 盘点内容 | 拆分后的失效方向 |
 | --- | --- | --- |
-| 1. 表 | 每张业务表、其唯一 owner、现有多方写入点 | 报错（GRANT 缺失）或**静默**（同库多进程共写） |
+| 1. 表 | 每张业务表、其唯一 owner、现有多方写入点。**MUST 含一类 SQL 字面量扫描抓不到的实例**：写点全在 owner 一侧的存储、但由组合根在**另一边界的路径**上调用——已知实例 `client_environments`（全部写点在 `src/client-auth/client-user-store.ts`，属 api；由 `src/server.ts:2213` 的 `registerEnvironments` 在自动化握手路径上调用）。`AC-OWN-02` 的 SQL 字面量扫描对这类形态天然失明，MUST 靠本盘点登记 | 报错（GRANT 缺失）或**静默**（同库多进程共写；跨边界调用型更是零信号） |
 | 2. 进程内内存事实 | 连接注册表、会话聚合、配置镜像、`inFlight` / `accountTail` 一类进程内幂等集合 | **静默**：另一进程看不到，表现为重复或永不生效 |
 | 3. 本机文件信号 | `/tmp/aidcp-publish-approve-<requestId>.json`、本机触发文件、downloads 目录 | **静默**：读方永远读不到，表现为停滞而非报错 |
 | 4. 本机锁与 PG advisory lock | `interaction-env:<envKey>`、批次幂等锁、发送串行锁 | **静默**：拆库后互斥消失，并发写不再串行、日志无异常 |
 | 5. EventBus 事件 | 每个事件的生产者、消费者、是否需跨重启 | **静默**：跨进程后订阅方收不到 |
-| 6. 常驻定时任务 | 14 处 `setInterval` 及其扫描目标表（逐项见 §4.6.5） | 报错（表无权限）或**静默**（两个服务各跑一份、或无人跑） |
+| 6. 常驻定时任务 | **14 个常驻任务宿主 / 约 23–24 处 `setInterval` 调用点**（两个数 MUST 同时给出、MUST 在实施当天重测：§4.6.5 的 14 是逐个定归属的**宿主**数、且其第 13/14 项并非 `setInterval`；23–24 是 `grep -rn setInterval src` 的**调用点**数，2026-07-22 当日即在两值间漂动。change `publish-approval-signal-to-database` 任务 1.7 的计数 MUST 与本行同口径）及其扫描目标表 | 报错（表无权限）或**静默**（两个服务各跑一份、或无人跑） |
 
 **合同面量级基线（MUST 与上表分开登记）**
 
 - **既有对外面**：面板路由约 97 + 客户路由 37 + 互动三子路由 43 ≈ **177 条 method 分支**；Edge WS **91 条消息**；已冻结的 wechat v1/v2 共 **71 个 JSON**。
-- **拆分新增的内部面**：约 **10–25 个内部端点** + §6.2 的 **13 条跨服务命令与事件**。
+- **拆分新增的内部面**：约 **10–25 个内部端点** + §6.2 的 **14 条跨服务命令与事件**（8 条命令 / 结果事件 + 授权事件 `PublishApproved` + 5 条互动阶段事件）。
 - 两者 MUST 分开登记。**既有对外面的 OpenAPI 化归阶段 4 增量，不是拆分的前置条件**；把 177 条既有分支的合同化算进拆分工期会让量级估计失真一个数量级。
 
 **运维工件（MUST）**
@@ -1694,7 +1726,7 @@ Tier 0 的全部成本：一个约 60 行的自写 logger、一个约 100 行的
 
 - 表所有权表 MUST 覆盖全部已声明的表，无未认领项。覆盖范围以两处并集为准：`aidcp-cloud/migrations/` 下 59 个 SQL 文件里的 `CREATE TABLE`，以及 34 个在启动时自建表的源文件里的 `CREATE TABLE IF NOT EXISTS`（文本命中 76 处、去注释后生效约 58–60 条）。
 - 表所有权表中每张表 MUST 恰好有一个 owner 边界；当前存在多方写入的表 MUST 逐张给出收敛方案或显式登记为阶段 1 的待清理项。
-- `aidcp-cloud/src/**/*.ts` 中每个文件 MUST 被标注唯一归属（五层分类见 §4.0 第 1 条），未认领文件数 MUST 为 0。（评审实测约 63 个文件、18630 行今天三条边界一个都不认领，这批是本判据的主要工作量。）
+- `aidcp-cloud/src/**/*.ts` 中每个文件 MUST 被标注唯一归属（五层分类见 §4.0 第 1 条），未认领文件数 MUST 为 0。（**评审期**曾有约 63 个文件、18630 行不属于任何一条边界；该批已在 §4.7 归属总表内完成分配，合计行的「未归属 = 0」即其结果。因此本阶段的工作量**不是**从零判定归属，而是①验证 §4.7 那张表、②把目录级聚合行还原到文件级、③把这两件做成可重跑脚本。）
 - 跨边界 import 图与跨边界写表清单 MUST 以可重跑的脚本产出，而不是一次性手工清单；脚本 MUST 随 change 一起提交。
 - 回滚计划 MUST 逐阶段写明「回滚触发条件、回滚动作、回滚后系统处于哪个已知良好状态」。
 - `openspec validate <change> --strict` MUST 通过。
@@ -1703,7 +1735,7 @@ Tier 0 的全部成本：一个约 60 行的自写 logger、一个约 100 行的
 
 本阶段任务 MUST 按以下顺序执行，门禁先行：
 
-1. 先落地 `AC-BOUND-01` 与 `AC-OWN-01` 两道门禁（规范文字见本节「迁移期与日常开发并行」）。这两件 MUST 先于任何边界重构合并，MUST NOT 排在本阶段末尾——它们保护的正是本阶段其余全部任务的产出。
+1. 先落地 `AC-BOUND-*` 与 `AC-OWN-*` 两族门禁（规范文字与族内编号见本节「迁移期与日常开发并行」）。这两件 MUST 先于任何边界重构合并，MUST NOT 排在本阶段末尾——它们保护的正是本阶段其余全部任务的产出。
 2. 建立 API、Content、Automation 的模块边界；
 3. 禁止跨领域直接写表；
 4. 把跨领域调用收口到明确接口；
@@ -1722,10 +1754,10 @@ Tier 0 的全部成本：一个约 60 行的自写 logger、一个约 100 行的
 
 **退出判据（全部满足才可进入阶段 2）：**
 
-- `AC-BOUND-01`（导入方向）与 `AC-OWN-01`（表写入与建表归属）两条验收用例 MUST 存在于 `aidcp-cloud/test/acceptance/`，并随 `npm run test:acceptance` 执行。
+- `AC-BOUND-*`（导入方向，6 条）与 `AC-OWN-*`（表写入与建表归属，5 条）两族验收用例 MUST 全部存在于 `aidcp-cloud/test/acceptance/`，并随 `npm run test:acceptance` 执行。
 - 跨边界 import 的实际违规集合 MUST 是豁免清单的子集，且清单条目数 MUST 不大于阶段 1 首个 change 里 seed 时的条目数。
 - 跨边界写表的实际违规集合 MUST 同样是豁免清单的子集，且新增违规数 MUST 为 0。
-- 阶段 0 登记的多方写表 MUST 全部收敛到单一 owner，或逐张写明推迟到阶段 2 的理由与承接 change 名。至少以下四处 MUST 有明确结论：`interaction_runtime_controls` 与 `interaction_auth_state`（`src/interactions/interaction-store.ts` ↔ `src/client-auth/client-user-store.ts` 双写）、`first_post_onboarding`（`src/config/persona-store.ts` ↔ `src/onboarding/first-post-onboarding-store.ts` 双写）、跨域清理（`src/panel/retention-sweeper.ts:69,76,83`）。
+- 阶段 0 登记的多方写表 MUST 全部收敛到单一 owner，或逐张写明推迟到阶段 2 的理由与承接 change 名。至少以下**五处** MUST 有明确结论：`interaction_runtime_controls` 与 `interaction_auth_state`（`src/interactions/interaction-store.ts` ↔ `src/client-auth/client-user-store.ts` 双写）、`first_post_onboarding`（`src/config/persona-store.ts` ↔ `src/onboarding/first-post-onboarding-store.ts` 双写）、跨域清理（`src/panel/retention-sweeper.ts:69,76,83`）、**`client_environments` 的自动化握手写入路径**（今天全部写点在 `src/client-auth/client-user-store.ts`、属 api，但由 `src/server.ts:2213` 的 `registerEnvironments` 在自动化握手路径上调用；MUST 在本阶段收口为经 api 的窄内部接口回写（§5.1），或写明推迟到阶段 2 的理由与承接 change 名。**这一条 `AC-OWN-02` 的 SQL 字面量扫描抓不到**——它是跨边界调用而非跨边界 SQL，没有阶段任务就真的无人执行）。
 - 跨领域接口的参数与返回值 MUST 可序列化：MUST NOT 出现函数、类实例、EventEmitter、WebSocket 连接、数据库连接池句柄。MUST 有一条验收用例对这批接口逐个断言，而不是靠 review 目视。
 - 跨重启工作已迁至 Outbox/Inbox，且 MUST 有一条用例证明：进程在「边缘回执已收到」与「持久记账已落库」之间被杀，重启后记账结果恰好一次、不丢不重。
 - 发布下发的幂等闸 MUST 已落在 DB 级 claim 上，MUST 有一条用例证明两个进程并发下发同一稿件时恰好一次成功。
@@ -1850,10 +1882,10 @@ Tier 0 的全部成本：一个约 60 行的自写 logger、一个约 100 行的
 **退出判据（全部满足才可进入阶段 4）：**
 
 - `aidcp-content` MUST 可从零 clone 后独立完成 `npm ci` → build → `npm test` → `npm run typecheck`，全绿，且 MUST NOT 引用 `aidcp-cloud` 的源码路径。
-- **跨仓源码 import 数 MUST 为 0**，且该判据的作用对象**就是 §7.2 判据三的首批名单**：`AC-BOUND-01` MUST 扩展为跨仓检查并在两仓各自的验收套件里执行。
+- **跨仓源码 import 数 MUST 为 0**，且该判据的作用对象**就是 §7.2 判据三的首批名单**：`AC-BOUND-04`（未豁免的跨边界 import）MUST 扩展为跨仓检查并在两仓各自的验收套件里执行。
 - `aidcp-cloud` 对内容能力的全部调用 MUST 经版本化 HTTP 客户端；合同版本协商 MUST 有自动化用例，错配 MUST 返回明确错误、MUST NOT 静默降级。
 - 内容服务不可用时的降级 MUST 有用例覆盖：自动化侧 MUST 明确跳过并回报不可用原因，MUST NOT 静默假成功，MUST NOT 让浏览闭环停在「无动作可下发」的空转状态。
-- §7.1 点名的五处默认常量 MUST 已清理完毕。
+- §7.1 的伪精度默认常量 MUST 已清理完毕，判据是**该节那条可重跑扫描脚本的产出为空**（MUST NOT 以正文点名的条数收工——正文只举证三条已坐实的，全量以脚本为准）。
 - fleet 工具链 MUST 已识别新仓：`scripts/task-preflight`、`scripts/new-change`、`scripts/spawn-change`、`scripts/land-change`、`scripts/deploy-target` MUST 全部覆盖新增仓库，并各跑通一次。
 - 新仓的部署与回滚 MUST 各演练一次并留下记录。
 
@@ -1864,7 +1896,7 @@ Tier 0 的全部成本：一个约 60 行的自写 logger、一个约 100 行的
 - 建立自动化结果和内容结果的本地投影；
 - 删除对连接注册表、RiskController 和内容 Store 的**直接读取与直接调用**（对象清单见 §4.6.4 的 12 条控制指令表）；
 - 建立 `aidcp-api` 自有的用户级失效通知推送通道（§6.1 表第 8 行）；
-- 把审批授权从文件通道改为 api 持久记录 + `PublishRequested` 持久命令（§6.4）；
+- 把审批授权从文件通道改为 api 持久记录 + `PublishApproved` 持久事件（§6.4）；
 - 验证浏览器、Edge 或 Automation 离线时数据面仍可用。
 
 **运维工件（MUST）**
@@ -1878,7 +1910,7 @@ Tier 0 的全部成本：一个约 60 行的自写 logger、一个约 100 行的
 **退出判据（全部满足才可进入阶段 5）：**
 
 - MUST 有一条端到端用例：停掉自动化服务与全部 Edge 后，Console 与客户端的全部业务路由（读与写）仍返回业务正确结果，无一路由因自动化不可用而失败。**该用例集 MUST 排除 §2.2 的具名例外路径**，或对其断言「拒绝且原因为 `binding_unverified`」。
-- 客户数据面对连接注册表、`RiskController` 实例、内容 Store 的直接读取数 MUST 为 0，由 `AC-BOUND-01` 断言。
+- 客户数据面对连接注册表、`RiskController` 实例、内容 Store 的直接读取数 MUST 为 0，由 `AC-BOUND-04` 断言。
 - 今天唯一一处硬违规 MUST 已消除：`src/client-auth/client-auth-server.ts:432` 定义、`:1766` 唯一调用的在线绑定核验，MUST 改为经 automation 窄内部接口取佐证（§5.2），MUST NOT 保留「进程内查 WebSocket 在线连接」这一实现。
 - 跨进程配置失效通道 MUST 已上线并有用例：人设配置、账号暂停态、慢启动起点三处由客户面写、自动化面读，写入后 MUST 在陈旧上限 T 内被读方看到；超时 MUST 可观测（§11.4 要求二）。
 - 投影数据 MUST 携带陈旧性标记（生成时间或版本），消费方 MUST 能区分「投影为空」与「投影未更新」。
@@ -1906,7 +1938,7 @@ Tier 0 的全部成本：一个约 60 行的自写 logger、一个约 100 行的
 
 - §14 红线 5 MUST 已实测通过：三个仓库各自独立构建、测试、部署、健康检查、回滚，每仓各留一次完整记录。
 - §14 红线 16 MUST 已实测通过：合同版本错配的自动化用例存在且通过，告警通道已上线，且当前无未决的版本错配告警。
-- §14 全部 30 条红线 MUST 逐条有对应的自动化用例或实测记录，无未认领项。
+- §14 红线中**兑现阶段 ≤ 阶段 5** 的各条 MUST 逐条有对应的自动化用例或实测记录，无未认领项。红线 15（`AC-DECOMP-15`）的兑现阶段是阶段 6、排在本阶段之后，MUST 按其兑现阶段单独验收，MUST NOT 计入本前置判据（否则本判据字面不可满足）。
 
 **改名本身的退出判据：**
 
@@ -1931,10 +1963,11 @@ Tier 0 的全部成本：一个约 60 行的自写 logger、一个约 100 行的
 
 结论：迁移期 MUST NOT 冻结日常功能开发。在这个改动速率下，靠约定维持的边界会被新代码边建边打穿，而且打穿是静默的。边界 MUST 由机械门禁保护。
 
-**两道门禁（验收 ID 全文唯一，此处是唯一规范位置）：**
+**两族门禁（验收 ID 全文唯一，此处是唯一规范位置；族内编号与语义以本处为准，change `cloud-service-boundary-gates` 的任务 3.3 / 4.3 MUST 与本处逐条对齐）：**
 
-1. **`AC-BOUND-01`（导入方向）**：解析 `src/**/*.ts` 的 import 说明符，按 §4.7 的文件归属表判定跨边界方向，禁止方向命中即失败。首批 MUST 锁住已坐实的三类集中违规：`src/orchestrator/role-dispatcher.ts` 的 40 条 `../agents/` import、面板模块对通信/风控/事件总线的直读、客户面对风控的直读；另 MUST 覆盖 §10.9 点名的 6 处边云协议 type-only 依赖。
-2. **`AC-OWN-01`（表写入与建表归属）**：扫描 `src/` 内 SQL 字面量的 `INSERT` / `UPDATE` / `DELETE` 与 `CREATE TABLE` 目标表，对照 §5.1 所有权表，跨边界写入或跨边界建表即失败。`service_metrics` / `service_probe` 两张表按 §5.1 的具名例外条目处理。
+1. **`AC-BOUND-*`（导入方向门禁族）**：解析 `src/**/*.ts` 的 import 说明符，按 §4.7 的文件归属表（还原到文件级后）判定跨边界方向，禁止方向命中即失败。族内编号：`01` 归属表全覆盖且无孤儿条目；`02` 层枚举合法且 `composition` 成员在白名单内；`03` kernel 准入断言（准入条件见 §4.7 kernel 段与 §10.9）；`04` **无未豁免的跨边界 import**；`05` 无失效（源码中已不存在）的豁免条目；`06` 条目数 ≤ `frozenTotal` 棘轮。**其中 `04` 是唯一带豁免清单的用例**，首批 MUST 锁住已坐实的三类集中违规：`src/orchestrator/role-dispatcher.ts` 的 40 条 `../agents/` import、面板模块对通信/风控/事件总线的直读、客户面对风控的直读；另 MUST 覆盖 §10.9 点名的 6 处边云协议 type-only 依赖。
+2. **`AC-OWN-*`（表写入与建表归属门禁族）**：扫描 `src/` 内 SQL 字面量的写操作目标表，对照 §5.1 所有权表，跨边界即失败。扫描范围 MUST 同时含 **DML**（`INSERT INTO` / `UPDATE` / `DELETE FROM`）与 **DDL**（`CREATE TABLE [IF NOT EXISTS]` / `ALTER TABLE`）；扫描前 MUST 先剥掉 `--` 行注释与 `/* */` 块注释；**无法静态判定的动态拼接 SQL MUST 判为失败，MUST NOT 跳过**；命中一个不在表全集里的标识符时 MUST 失败并报出，MUST NOT 静默跳过。族内编号：`01` 表归属表覆盖全部已知表且无孤儿；`02` **无未豁免的跨层 DML 写入**；`03` **无未豁免的跨层 DDL（建表 / 改表）**；`04` 无失效豁免条目；`05` `frozenTotal` 棘轮。**其中 `02` / `03` 是带豁免清单的两条**。`service_metrics` / `service_probe` 两张表按 §5.1 的具名例外处理，走下文「例外表清单」而非豁免清单。
+3. **本族门禁对两类形态天然失明，MUST 由人工盘点补位、MUST NOT 因门禁全绿即判定无违规**：① 写点全在 owner 一侧的存储、但由组合根在另一边界的路径上调用（已知实例 `client_environments`，登记见阶段 0 清单第 1 行）；② 文件系统信号与 advisory lock 通道（见 §14 红线 24）。
 
 **落地方式与时机（硬要求）：**
 
@@ -1942,17 +1975,18 @@ Tier 0 的全部成本：一个约 60 行的自写 logger、一个约 100 行的
 - MUST 实现为 `aidcp-cloud/test/acceptance/` 下的验收用例，沿用现有 `AC-<域>-<序号>` 命名与 `tsx --test` 范式（参照 `aidcp-cloud/test/server-startup-order.test.ts`、`aidcp-cloud/test/interactions/migration-contract.test.ts`）。
 - MUST NOT 为此引入 eslint / biome / dependency-cruiser / madge 等新依赖：新增依赖会连带全量安装的部署代价。MUST NOT 把门禁生效寄托在尚不存在的 CI 上。
 - 门禁的机械执行点 MUST 是现有集成闸 `scripts/land-change:38-42`（合并前在 worktree 内跑 `test:acceptance` + `test` + `typecheck`，未过即拒绝合并）。挂在这里当天生效，不依赖新流程。
-- 阶段 3 起（跨仓之后），`AC-BOUND-01` 的跨仓部分 MUST 由两侧各自执行的合同用例接管。MUST NOT 依赖「两份手抄源码逐字一致」这类只在同仓 typecheck 下才有效的手段。
-- change `cloud-service-boundary-gates` 的任务描述 MUST 改用这两个 ID，MUST NOT 另立命名。
+- 阶段 3 起（跨仓之后），`AC-BOUND-*` 的跨仓部分 MUST 由两侧各自执行的合同用例接管。MUST NOT 依赖「两份手抄源码逐字一致」这类只在同仓 typecheck 下才有效的手段。
+- change `cloud-service-boundary-gates` 的任务描述 MUST 采用本处的族名与族内编号，MUST NOT 另立命名，MUST NOT 出现「同名不同义」（对齐方式见 §17 第 2 项）。
 
 **豁免清单的棘轮规则（严口径为默认）：**
 
-- 豁免清单 MUST 是版本控制下的单一文件，每条 MUST 含四个字段：违规项、所属边界对、豁免理由、计划消除它的 change 名。
+- 豁免清单 MUST 是版本控制下的单一文件，每条 MUST 含四个字段：违规项、所属边界对、豁免理由、**计划消除它的 change 名**（`AC-BOUND-04` 与 `AC-OWN-02` / `AC-OWN-03` 各一份）。第四个字段是 §10.9「每条各挂一个消除它的 change」的唯一承载位，MUST NOT 省略；seed 期允许为空，但为空的条目数 MUST 单调不增，并 MUST 由一条族内用例断言。
 - 清单 MUST 在阶段 1 的第一个 change 里用扫描器一次性 seed 全量既存违规；**此后 MUST NOT 新增条目**。
 - 用例 MUST 断言「实际违规集合 ⊆ 豁免清单」，任何不在清单内的违规即失败。
 - seed 之后发现的既存违规 MUST 当场修复，MUST NOT 通过追加豁免条目放行。
 - **每个消除违规的 change MUST 在同一提交里删除对应豁免条目，使清单条目数单调递减。**
-- **例外通道（唯一）**：「具名上调冻结总数」MUST 由控制仓 change 显式批准，且 MUST 在该 change 内写明上调数量与消除时限。MUST NOT 由子仓自行上调，MUST NOT 无时限上调。change `cloud-service-boundary-gates` 的对应措辞 MUST 与本条逐字对齐。
+- **例外通道（唯一）**：「具名上调冻结总数」MUST 由控制仓 change 显式批准，且 MUST 在该 change 内写明上调数量与消除时限。MUST NOT 由子仓自行上调，MUST NOT 无时限上调。change `cloud-service-boundary-gates` 的对应措辞 MUST 与本条逐字对齐：上调记录的每个元素 MUST 含「上调数量 / 批准它的控制仓 change 名 / 消除日期」三个字段，任一缺失即门禁失败。
+- **例外表清单（与豁免清单分立，防死结）**：§5.1 具名的**设计内永久例外**（当前 `service_metrics` / `service_probe` 两张运维表）MUST 单列为一份「例外表清单」，**不占豁免清单条目、不参与棘轮计数**。理由是时序与性质双重不可调和：这两张表按 §11.8.4 / §11.8.6 到阶段 2 才建，其条目必然产生在阶段 1 的一次性 seed 之后，而它们按设计是永久例外、写不出「消除时限」——若强塞进豁免清单，实施者会撞上「加条目违反棘轮、不加条目 `AC-OWN-02` / `AC-OWN-03` 判违规」的死结。新增该类条目 MUST 由控制仓 change 批准并写明**为何无消除时限**；例外表清单的条目数同样 MUST 只减不增（新增走控制仓 change）。
 
 **热点文件单写者（对 CLAUDE.md §7 现有清单的增补）：**
 
@@ -1966,13 +2000,13 @@ Tier 0 的全部成本：一个约 60 行的自写 logger、一个约 100 行的
 
 | 阶段 | openspec change 数（量级） | 人日区间（量级） | 主要不确定性 |
 | --- | --- | --- | --- |
-| 阶段 0 | 1 | 5–8 | 约 63 个文件、18630 行今天不属于任何一条边界，归属判定可能引出边界重划 |
+| 阶段 0 | 1 | 4–6 | 归属判定本身已在 §4.7 完成（未归属 = 0），残余不确定性只剩三项：目录级聚合行还原到文件级时可能翻出个别错判、`src/agents/` 与 kernel 两处待裁决项（§17 第 2、7 项）、以及分类脚本与 §4.7 对账后可能引出的小范围边界重划 |
 | 阶段 1 | 15–23 | 76–118 | 发布链 15131 行三分；面板依赖注入面收窄为窄接口；9 个横跨角色的「评估」与「决策」分离；同表双写收敛 |
 | 阶段 2 | 4–6 | 25–40 | 迁移执行器与账本从零建；dev/ol 共库下的 Schema 所有权；ol 机器内存预算未实测 |
 | 阶段 3 | 3–5 | 20–30 | 合同工具链从零；fleet 脚本与守卫从 4 仓扩到 5 仓；跨仓测试归属重排 |
 | 阶段 4 | 3–5 | 20–30 | 配置内存镜像的跨进程失效通道；断电演练暴露的隐式在线依赖 |
 | 阶段 5 | 1–2 | 5–8 | 改名波及部署、监控、告警、文档六个面 |
-| 合计（不含阶段 6） | 27–42 | 151–234 | 单人全职约 7–11 个月 |
+| 合计（不含阶段 6） | 27–42 | 150–232 | 单人全职约 7–11 个月 |
 | 阶段 6（每平台） | 2–4 | 15–25 | 平台真机验收依赖共享真机环境的排期 |
 
 关于本表的硬要求：
@@ -2011,10 +2045,10 @@ MUST NOT 使用 Git submodule 把多个仓库重新绑成一个原子提交。�
 | 3 | `AC-DECOMP-03` | 任意服务重启后，已确认的业务任务 MUST NOT 丢失；业务副作用 MUST 最多发生一次。 | 阶段 1 建立（Outbox/Inbox），阶段 2 验证 | 阶段 2 重启矩阵：逐单元 `kill -9` 与 restart 后对账 + 幂等键断言 |
 | 4 | `AC-DECOMP-04` | 重复、乱序或延迟事件 MUST NOT 造成重复发布、重复互动或状态倒退。 | 阶段 1 建立，阶段 2 验证 | 消息重放夹具（重复 / 乱序 / 延迟）在各消费方为阻断项 |
 | 5 | `AC-DECOMP-05` | 每个运行单元 MUST 能独立构建、测试、部署、健康检查与回滚。任一单元回滚 MUST NOT 要求同时回滚其他单元，MUST NOT 使其他单元不可用。回滚窗口内，跨单元合同 MUST 至少存在一个双方共同可用的版本。 | 阶段 2 兑现进程级；阶段 3、阶段 4 各兑现一次仓级 | 对每个部署单元执行「部署 N → 部署 N+1 → 回滚到 N」：期间其余单元 MUST NOT 重启、其健康检查 MUST 全程通过、业务用例 MUST NOT 失败 |
-| 6 | `AC-DECOMP-06` | 跨服务业务源码导入与跨服务业务表写入 MUST NOT 存在。 | 阶段 1 上线机械检查，阶段 3/4/5 持续 | 阶段 1：`AC-BOUND-01` + `AC-OWN-01` 为阻断项；出仓后由「不得引用对方仓 src 路径」检查接管；数据侧由每张表写入者的数据库角色 GRANT 可验 |
+| 6 | `AC-DECOMP-06` | 跨服务业务源码导入与跨服务业务表写入 MUST NOT 存在。 | 阶段 1 上线机械检查，阶段 3/4/5 持续 | 阶段 1：`AC-BOUND-*` + `AC-OWN-*` 两族全条为阻断项（族内编号见 §12）；出仓后由「不得引用对方仓 src 路径」检查接管；数据侧由每张表写入者的数据库角色 GRANT 可验（GRANT 一项按 §5.4.7 子目标 B 生效后验收，窗口内由静态门禁 + 评审承担） |
 | 7 | `AC-DECOMP-07` | 内容评估失败或超时时，MUST NOT 执行依赖该评估的互动；MUST NOT 以默认值、缓存值或乐观假设代替评估结果。 | 阶段 1 收口接口，阶段 3 跨进程后重验 | 阶段 3 准入前，把现有进程内强制闸用例改写为消费方合同测试：content 返回 5xx / 超时 / 未知字段时 automation 不下发互动 |
 | 8 | `AC-DECOMP-08` | 最终动作下发前 MUST 同时通过平台能力、策略、RiskController、配额与冷却判断。 | 阶段 1 起持续，阶段 5 收口 | automation 仓内的强制闸用例；适用范围见表下注 2 |
-| 9 | `AC-DECOMP-09` | 账号最终风险状态 MUST 由 RiskController 单写；其他服务 MUST 只提交事件或读投影，MUST NOT 改写最终状态。 | 阶段 2（schema 唯一所有者），阶段 5 收口 | 风险相关表的写权限只授予 automation 的数据库角色，GRANT 可机械核对；跨服务写尝试 MUST 在数据库层失败。凭据侧的落实见 §6.5.4 |
+| 9 | `AC-DECOMP-09` | 账号最终风险状态 MUST 由 RiskController 单写；其他服务 MUST 只提交事件或读投影，MUST NOT 改写最终状态。 | 阶段 2（凭据 + 静态门禁）；GRANT 层按 §5.4.7 子目标 B 生效后；阶段 5 收口 | **分两段兑现，MUST NOT 把第二段的手段写成第一段的验收方式**。① 阶段 2（dev/ol 仍共库、不存在按服务分的数据库角色）：由 §6.5.4 的凭据分级承担——能写风控最终状态的路由 MUST 只对 automation 自身进程内可达，MUST NOT 向另两服务签发任何可写风控状态的令牌；外加 `AC-OWN-02` / `AC-OWN-03` 对风险相关表的静态写入检查为阻断项。② 子目标 B（ol 真正拆库、角色物理分离）生效后：风险相关表的写权限只授予 automation 的数据库角色，GRANT 可机械核对，跨服务写尝试 MUST 在数据库层失败。中间窗口的承担物见 §5.4.7 |
 | 10 | `AC-DECOMP-10` | 发布审批 MUST 绑定不可变 `candidateVersionId`；同一授权凭证 MUST NOT 授权另一个候选版本。 | 阶段 4（审批权威表建于 api） | 审批决定表以 `candidateVersionId` 为不可变外键；候选版本变更后旧凭证 MUST 被拒 |
 | 11 | `AC-DECOMP-11` | **一切发布**（自动、手动、立即审批）MUST 绑定可信的 `envKey + executionTarget`；恢复与重试 MUST NOT 换环境、MUST NOT 串 target。 | 阶段 2（target 注入），阶段 4 兑现 | 恢复路径用例 + 跨 target 投递拒绝用例；**手动稿与立即审批稿 MUST 各有一条用例**，MUST NOT 因「非自动」豁免 |
 | 12 | `AC-DECOMP-12` | `executionTarget` MUST 由服务端注入；**缺失、非法或跨服务不一致**时相关 Worker MUST fail-closed 不启动。 | 阶段 2 | 三服务各自的启动自检用例 + 启动期 target 互核用例 + Worker 准入用例 + 生产方侧 `no_consumer_for_target` 滞留告警用例（§8） |
@@ -2029,13 +2063,13 @@ MUST NOT 使用 Git submodule 把多个仓库重新绑成一个原子提交。�
 | 21 | `AC-DECOMP-21` | **（安全）** 控制类内部接口（会话启停、账号暂停与恢复、边缘恢复、审批授权写入、风控状态写入、配额与冷却改写、发布下发）与只读投影接口 MUST 使用不同凭据；授权 MUST 按白名单补集判定；`aidcp-content` MUST NOT 持有任何控制类凭据；任一服务被单独攻陷 MUST NOT 能直接驱动另一服务的平台副作用。 | 阶段 2 | 逐路由的令牌授权矩阵用例；越权调用 MUST 被拒且无副作用 |
 | 22 | `AC-DECOMP-22` | **（安全）** 数据库口令与凭据主密钥 MUST 只从配置读取；源码、测试夹具、脚本与文档 MUST NOT 含任何口令或密钥字面量；配置缺失时相关服务 MUST 拒启并报出缺失项，MUST NOT 回落到内置常量。 | §6.5.6 定为拆分前置；阶段 2 复验 | 全文检索口令字面量零命中；置空 `PGPASSWORD` 与 `DATABASE_URL` 启动 MUST 拒启 |
 | 23 | `AC-DECOMP-23` | **（安全）** 厂商凭据明文 MUST NOT 进入日志、事件信封、投影与任何面向前端的响应；秘钥取值接口每次 MUST 只返回单条；调用方 MUST NOT 落盘；主加密密钥 MUST 只存在于 `aidcp-api` 的配置中。 | 阶段 2 | 秘钥接口用例（批量导出 MUST 被拒）+ 日志字段白名单用例 + 各服务「不应持有的密钥项为空」启动断言 |
-| 24 | `AC-DECOMP-24` | **（安全）** 跨服务的状态、锁与授权信号 MUST NOT 承载在共享文件系统路径（含 `/tmp`）或数据库 advisory lock 上。迁移期若暂时保留该通道，MUST 在部署文档显式声明同主机与共享 `/tmp` 约束、systemd 单元禁用 `PrivateTmp`，MUST NOT 让它继续作为未声明的隐式约束。 | 迁移期约束自阶段 2 起显式声明；阶段 4 删除通道 | 通道删除后全仓检索无审批信号文件路径；两端契约测试改为授权凭证契约测试。注意 `AC-BOUND-01` / `AC-OWN-01` 对文件通道天然失明，MUST 单独设检 |
+| 24 | `AC-DECOMP-24` | **（安全）** 跨服务的状态、锁与授权信号 MUST NOT 承载在共享文件系统路径（含 `/tmp`）或数据库 advisory lock 上。迁移期若暂时保留该通道，MUST 在部署文档显式声明同主机与共享 `/tmp` 约束、systemd 单元禁用 `PrivateTmp`，MUST NOT 让它继续作为未声明的隐式约束。 | 迁移期约束自阶段 2 起显式声明；阶段 4 删除通道 | 通道删除后全仓检索无审批信号文件路径；两端契约测试改为授权凭证契约测试。注意 `AC-BOUND-*` / `AC-OWN-*` 两族对文件通道天然失明（§12 门禁定义第 3 条），MUST 单独设检 |
 | 25 | `AC-DECOMP-25` | **（可检测性）** §11.2 表中每一行「MUST 呈现为受影响的诚实态」MUST 有一个对应的检测信号（指标或状态字段）；降级 MUST NOT 只以自由文本日志的形式存在。 | 阶段 2 | 按 §11.8.7 逐行对照：制造该故障后，对应信号 MUST 在其定义的时限内变化 |
 | 26 | `AC-DECOMP-26` | **（可检测性）** 服务不可用 MUST 在 **3 分钟**内、服务降级 MUST 在 **5 分钟**内产生可路由告警；熔断状态跃迁 MUST 立即告警。告警产生与投递链路 MUST NOT 与被监控服务同进程。阈值以 §11.8.6 为准。 | 阶段 2 建设；阶段 3、阶段 4 随新单元同步扩容 | 逐单元 stop 后计时观察告警到达；被监控进程整体退出（而非仅降级）的场景 MUST 同样产出告警 |
 | 27 | `AC-DECOMP-27` | **（可检测性）** 内部 HTTP MUST 按 §6.1.0 透传请求头，被调方 MUST 原样写入自己的日志行；缺失时 MUST 生成并回填，MUST NOT 静默丢弃。一次跨服务业务链路的全部日志行 MUST 能用同一个 `correlationId` 检索出来；存在未透传关联标识的跨服务调用即为缺陷。迁移期 MUST NOT 改写既有日志关键字。 | 阶段 1 起（进程内适配器阶段即按合同形状携带） | 跨服务用例断言同一标识贯穿三条 journal 流；关键字回归检查对照真机验收清单 |
 | 28 | `AC-DECOMP-28` | **（回滚）** 代码回滚 MUST NOT 静默重建已迁走的表并分叉写入。任何 schema 归属迁移之前，MUST 取消服务启动期自建表、把 DDL 收口到唯一的迁移执行器并建立迁移账本；旧版本代码指向已迁移 schema 时 MUST fail-closed 报错退出。 | 阶段 2，且 MUST 排在任何 schema 归属迁移之前 | 启动期 DDL 执行次数为 0；用上一版本代码指向已迁移 schema 启动 MUST 拒绝启动而非建表 |
-| 29 | `AC-DECOMP-29` | **（健康检查真实性）** 每个服务的健康检查在其自有依赖不可达时 MUST 返回不健康；MUST NOT 无条件返回成功（无条件成功视同静默假成功）。同时 MUST NOT 把下游 Cloud 服务不可达转化为自身不健康——下游故障只体现为 `degraded[]`、降级指标与告警。语义按 §11.8.5。 | 阶段 2 | 断开该服务数据库连接后探针 MUST 转不健康；停下游服务后该服务探针 MUST 保持健康，且红线 25 的降级信号 MUST 变化 |
-| 30 | `AC-DECOMP-30` | **（可检测性）** 跳过与失败计数 MUST 按 `by_design` / `fault` 分离（分类与 token 全集见 §6.1.5），平台动作计数 MUST 按 `occurred` / `dispatched` / `unknown` 分离；任何把它们合并的统计视为违反「禁止静默假成功」。评估输出的分数与置信度 MUST 来自真实输出或可复算规则，缺失时 MUST 置 `null` 并填降级原因，MUST NOT 填默认常量。 | 阶段 1 起持续；阶段 3 复验 | 指标标签断言 + §7.1 五处默认常量的清理用例 |
+| 29 | `AC-DECOMP-29` | **（健康检查真实性）** 服务健康检查语义 MUST 按 §11.8.5 交付并验收（存活 / 就绪分离、就绪不级联、MUST NOT 无条件成功）。细节 MUST NOT 在本表复述，以 §11.8.5 为唯一规范位置。 | 阶段 2 | 断开该服务数据库连接后探针 MUST 转不健康；停下游服务后该服务探针 MUST 保持健康，且红线 25 的降级信号 MUST 变化 |
+| 30 | `AC-DECOMP-30` | **（可检测性）** 跳过与失败计数 MUST 按 `by_design` / `fault` 分离（分类与 token 全集见 §6.1.5），平台动作计数 MUST 按 `occurred` / `dispatched` / `unknown` 分离；任何把它们合并的统计视为违反「禁止静默假成功」。评估输出的分数与置信度 MUST 来自真实输出或可复算规则，缺失时 MUST 置 `null` 并填降级原因，MUST NOT 填默认常量。 | 阶段 1 起持续；阶段 3 复验 | 指标标签断言 + 伪精度清理用例：验收对象是 **§7.1 那条可重跑扫描脚本产出的全量清单已清零**，MUST NOT 以 §7.1 正文点名的条数为口径 |
 
 **注 1（红线 16 的性质：这是拆分引入的义务，不是拆分带来的收益）**
 
@@ -2128,9 +2162,11 @@ MUST NOT 使用 Git submodule 把多个仓库重新绑成一个原子提交。�
 
 | # | 条目 | 责任落点 | 时限 |
 | --- | --- | --- | --- |
-| 1 | CLAUDE.md §7「热点文件单写者」清单增补五处（`server.ts`、`role-dispatcher.ts`、`publish-agent/`、`panel/`、`agents/`）——属控制仓法条变更，不进本方案文档 | 独立 OpenSpec change（控制仓） | §12 阶段 1 开工前 |
-| 2 | change `cloud-service-boundary-gates` 的措辞对齐：任务 5.1（`protocol.ts` 移进 `src/kernel/`）按 §10.9 取消；门禁 ID 改用 `AC-BOUND-01` / `AC-OWN-01`；豁免清单「具名上调」按 §12 降级为例外通道 | 该 change 自身 | §12 阶段 1 首个 change 之前 |
+| 1 | CLAUDE.md §7「热点文件单写者」清单增补，**合并为一个控制仓 change、共 8 项**：本方案 §12 点名的五处（`server.ts`、`role-dispatcher.ts`、`publish-agent/`、`panel/`、`agents/`）+ change `cloud-service-boundary-gates` 任务 6.5 点名的三项（`aidcp-cloud/src/kernel/**`、`boundaries/module-ownership.json`、`boundaries/table-ownership.json`）。属控制仓法条变更，不进本方案文档，也 MUST NOT 由 boundary-gates 在子仓 change 内各改一半 | 独立 OpenSpec change（控制仓）；boundary-gates 任务 6.5 改为「登记依赖：门禁生效前该 change MUST 已合入」 | §12 阶段 1 开工前 |
+| 2 | change `cloud-service-boundary-gates` 的措辞对齐，**四件**：① `protocol.ts` 进 kernel 的四个落点按 §10.9「收口登记」逐条改（任务 5.1 该项取消 / 任务 2.1 名单删除 / 任务 2.6 搬迁范围排除 / `proposal.md` 与 `design.md` 表述改写）；② 门禁 ID 采用族名 `AC-BOUND-*` / `AC-OWN-*`；族内编号（`AC-BOUND-01..06` / `AC-OWN-01..05`）已在本方案 §12 与该 change 任务 3.3 / 4.3 之间逐条对齐，§12 为规范位置。该 change MUST NOT 把 11 条用例压成 2 个 ID，MUST NOT 保留同名不同义；本方案凡具名引用 MUST 落到族内编号（豁免清单归 `AC-BOUND-04` / `AC-OWN-02` / `AC-OWN-03`，覆盖率归 `01`）；③ 豁免清单「具名上调」按 §12 降级为例外通道，上调记录须带「数量 / 批准 change / 消除日期」；④ 模块归属判据整体改为引用本方案 §4.7，MUST NOT 另立一套 | 该 change 自身 | §12 阶段 1 首个 change 之前 |
 | 3 | 陈旧上限 T（§11.4）与心跳 p99 安全裕度（§14.2）两个具体数值 | `docs/deployment-environments.md` | §12 阶段 2 开工前 |
 | 4 | `interaction_reply_jobs` / `interaction_reply_attempts` 的 `idempotency_key` 是否补 `execution_target` 列（§6.3.2 反例登记） | §12 阶段 1 的互动域 change | 阶段 1 结束前 |
 | 5 | 两份 `protocol.ts` 的一次性格式归一化提交（§10.3 第 6 条），作为 sha256 纳管的前置 | `aidcp-edge` / `aidcp-cloud` 各一次小 change，MUST 与 §11.8.2 的 `cid` / `pid` 改动串行 | §12 阶段 2 之前 |
 | 6 | 评审报告 `docs/cloud-service-decomposition-review.md` 的三处数字口径回写（建表语句 74→「76 文本命中 / 58–60 生效 / 34 文件」、裸 `console.*` 276→295、`src/` 315→321） | 该报告加一行「计数已于 2026-07-22 复核更新」 | 归档本方案时 |
+| 7 | §4.7 两处目录级聚合行尚未点名到文件：`src/agents/` 归 `aidcp-api` 的 2 个文件（152 行）具体是哪两个（另 5 个 content 文件已由 §7.2 判据三点名，43 个 automation 文件为其补集）。`AC-BOUND-*` 的输入是文件级清单，此项不闭合则这 2 个文件在门禁上无解 | §12 阶段 0 的分类脚本产出文件级清单后回写 §4.7 | §12 阶段 1 开工前 |
+| 8 | 表全集与常驻定时器两处计数在同批 change 间口径不一，MUST 由先动工者跑一次统一口径脚本、结果同时回写三处：表全集（`boundary-gates` 任务 4.1 记 84 张 / 59 张由 `src/` 建；`cloud-schema-migration-executor` 记并集 83 张 / 存储自建 58 张）与 `setInterval`（本方案阶段 0 记「14 宿主 / 约 23 调用点」；`publish-approval-signal-to-database` 任务 1.7 记 24 调用点） | 两个 change 中先动工的一个，脚本命令 MUST 写进其 tasks | 各自实施当天 |
