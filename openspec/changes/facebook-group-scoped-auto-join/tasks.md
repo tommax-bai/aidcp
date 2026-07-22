@@ -17,10 +17,14 @@
 
 ## 3. Console management surfaces
 
-- [ ] 3.1 Extend Facebook group and account-automation API types/queries for scopes, scope facets, join config, effective cap, readiness, and recent result.
-- [ ] 3.2 Add account-group filter/tags, import scope multi-select, no-scope warnings, and selected-row bulk scope replacement to the Facebook groups page.
-- [ ] 3.3 Render the server-declared Facebook `join_group` action in the account automation page with switch, daily cap, inherited/custom week mask, effective cap, readiness, and recent result.
-- [ ] 3.4 Add focused Console tests for mapping/filter/import/bulk writes and Facebook join action editing/result display without affecting other platforms.
+- [x] 3.1 Extend Facebook group and account-automation API types/queries for scopes, scope facets, join config, effective cap, readiness, and recent result.
+  <!-- aidcp-console dec70481373f7702240cc41bc3830996b7e45f5e: Cloud-frozen DTO types and exact group query filter. -->
+- [x] 3.2 Add account-group filter/tags, import scope multi-select, no-scope warnings, and selected-row bulk scope replacement to the Facebook groups page.
+  <!-- aidcp-console dec70481373f7702240cc41bc3830996b7e45f5e: omit/replace/clear import semantics plus bulk scope UI. -->
+- [x] 3.3 Render the server-declared Facebook `join_group` action in the account automation page with switch, daily cap, inherited/custom week mask, effective cap, readiness, and recent result.
+  <!-- aidcp-console dec70481373f7702240cc41bc3830996b7e45f5e: dedicated join endpoint; no client-side platform inference. -->
+- [x] 3.4 Add focused Console tests for mapping/filter/import/bulk writes and Facebook join action editing/result display without affecting other platforms.
+  <!-- Focused: 4 files / 31 tests pass. Full single-worker: 36 files, 245 pass, 1 skip. Typecheck/build pass; existing >500 KiB chunk warning only. -->
 
 ## 4. Validation and delivery
 
