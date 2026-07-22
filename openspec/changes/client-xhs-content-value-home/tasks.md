@@ -34,10 +34,11 @@
 ## 4. Validation and delivery
 
 - [x] 4.1 Run focused Cloud store/worker/customer-auth tests, publish safety acceptance tests, full Cloud tests, and typecheck; record bounded evidence.
-  <!-- Cloud: focused refinement/store/routes 29 pass; acceptance 68/68; full 2904 pass, 8 gated skips, 0 fail; typecheck pass. -->
+  <!-- Cloud: focused refinement/store/routes 29 pass; acceptance 68/68; final integration run 2901 pass, 8 gated skips, 0 fail; typecheck pass. -->
 - [x] 4.2 Run focused Edge content-workspace/IPC/fleet tests, publish safety acceptance tests, full Edge tests, renderer syntax checks, and typecheck; record bounded evidence.
-  <!-- Edge: workspace/security 37/37, fleet 84/84, companion 83/83; acceptance 29/29; full 2251/2251; renderer/main/preload syntax and typecheck pass. -->
+  <!-- Edge: workspace/security 37/37, fleet 84/84, companion 83/83; acceptance 29/29; final integration run 2248/2248; renderer/main/preload syntax and typecheck pass. -->
 - [x] 4.3 Perform browser/Electron visual acceptance for content, empty, stopped, first-start guide, running, editing, refinement progress, failure, and narrow-window states; confirm no horizontal overflow or fake success.
   <!-- Browser production-renderer acceptance covered content, empty/stopped, running/refinement, editing, runtime-detail expansion, and 640px narrow states; fleet/companion regressions covered first-start guide and failed mutation truth. -->
-- [ ] 4.4 Run `openspec validate client-xhs-content-value-home --strict`, update task evidence with repo SHAs and deviations, then integrate/push Cloud and Edge through the documented fast-forward workflow.
+- [x] 4.4 Run `openspec validate client-xhs-content-value-home --strict`, update task evidence with repo SHAs and deviations, then integrate/push Cloud and Edge through the documented fast-forward workflow.
+  <!-- Strict validation pass; Cloud master 313eba2992d0031ff833da9b0ae6fda6c8a6c82a and Edge master a742611e4972443f3a519f1a4f6703ef669909a6 were rebased, fully revalidated, ff-pushed, and synced to clean canonical checkouts. No protocol, risk, or auto-publish deviation; Edge installer intentionally not built. -->
 - [ ] 4.5 Deploy the integrated Cloud revision to `dev` from the canonical checkout with backup, health/readiness/log verification, and rollback evidence; record that Edge source delivery does not produce an installer.
