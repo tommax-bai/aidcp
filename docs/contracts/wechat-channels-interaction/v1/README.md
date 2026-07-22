@@ -160,7 +160,9 @@ GET        /api/accounts/:accountId/reply-config/audit
 
 ## AI 与发送门禁
 
-LLM role 只有 `reply_intent_classifier`、`reply_polisher`、`reply_risk_reviewer`；template renderer 是确定性程序。classifier/reviewer 失败都降级 unknown + 人工；polisher 失败回落原模板。polisher 仅在实际启用时接收命中渠道的 `knowledgeDocument`，并只能用文档明确支持的业务事实回答；文档被视为不可信数据，内部命令不得覆盖系统规则，缺答案必须诚实说明无法确认。模型自报的 `meaningChanged`、`introducedClaims`、`riskLevel` 不是安全事实源：候选文本必须再过确定性 claim gate，至少硬拦价格、折扣、促销、退款、订单、售后承诺和补偿承诺。短期自动发送仅允许未经过 AI、与确定性模板渲染完全一致且 claim gate 为空的文本；任何 AI 润色都必须人工审批。DM AI 默认 false。
+LLM role 只有 `reply_intent_classifier`、`reply_polisher`、`reply_risk_reviewer`；template renderer 是确定性程序。classifier/reviewer 失败都降级 unknown + 人工；polisher 失败回落原模板并强制人工。polisher 仅在实际启用时接收命中渠道的 `knowledgeDocument`，并只能用文档明确支持的业务事实回答；文档被视为不可信数据，内部命令不得覆盖系统规则，缺答案必须诚实说明无法确认。模型自报的 `meaningChanged`、`introducedClaims`、`riskLevel` 与 `allowAutoSend` 都不是安全事实源：候选文本必须再过确定性 profile/claim gate，至少硬拦价格、折扣、促销、退款、订单、售后承诺和补偿承诺。
+
+规则级 `actions.allowAutoSend` 对模板原文和 AI 回复使用相同的“人工审核 / 自动回复”语义。AI 风格润色只有在全部角色调用成功、候选通过确定性检查、reviewer 为 low 且建议自动、没有改义或新增事实时才能自动；普通知识问答允许记录 `meaning_changed`/`introduced_claim` 审计标签，但必须同时具备当前渠道知识文档、普通问题、完整 introducedClaims 和仅流程标签的低风险结果。无文档新增事实、无审计事实的改义、unknown、模型 fallback、候选拒绝、规则实际命中的 `forceHumanTags` 或任何实质 hard-risk 都强制人工。生成准入和真实派发前分别复核；派发仍要求账号 allowlist、runtime controls、active identity/capability、登录冷却、RiskController、专用限速、CAS、幂等和结果核验。DM AI 默认 false。
 
 任何发送都必须通过 scope、auth、identity、capability、全局/账号/channel 开关、published config、CAS、无 active/ambiguous attempt、文本/变量、消息类型、账号单飞、限速与 `RiskController.canDo`。评论沿用 `comment` action；私信新增 `dm_reply`，三窗口 fallback quota 均为 0。所有写开关默认 false；`auto_safe` 默认 false。
 
