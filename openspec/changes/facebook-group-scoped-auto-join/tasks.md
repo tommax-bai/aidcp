@@ -1,19 +1,21 @@
 ## 1. Cloud group scope data model
 
-- [ ] 1.1 Add additive target-scope schema, types, normalization, and target-store transaction methods for list/filter/bulk replace.
-- [ ] 1.2 Extend group import with optional request-level account-group scopes while preserving mappings when the field is absent.
-- [ ] 1.3 Make pooled candidate claim resolve the account's current Facebook group label and retain the global one-group-one-account atomic lock.
-- [ ] 1.4 Revalidate unfinished scoped assignments before actuation, release mismatches safely, and preserve terminal/joined membership facts.
-- [ ] 1.5 Add focused store concurrency and eligibility tests for multi-scope, ungrouped, no-fallback, global-lock, stale-reclaim, and scope-change cases.
+- [x] 1.1 Add additive target-scope schema, types, normalization, and target-store transaction methods for list/filter/bulk replace.
+- [x] 1.2 Extend group import with optional request-level account-group scopes while preserving mappings when the field is absent.
+- [x] 1.3 Make pooled candidate claim resolve the account's current Facebook group label and retain the global one-group-one-account atomic lock.
+- [x] 1.4 Revalidate unfinished scoped assignments before actuation, release mismatches safely, and preserve terminal/joined membership facts.
+- [x] 1.5 Add focused store concurrency and eligibility tests for multi-scope, ungrouped, no-fallback, global-lock, stale-reclaim, and scope-change cases.
+  <!-- aidcp-cloud 1ef8549d1f513a645a073470762b631abef37a0d: additive scope store, scoped atomic claim, pre-actuation revalidation, and focused coverage. -->
 
 ## 2. Cloud automatic join action
 
-- [ ] 2.1 Add the per-account Facebook join automation config store with default-off switch, bounded daily cap, optional week mask, and truthful write results.
-- [ ] 2.2 Add join trigger source to the audit ledger and provide latest-scheduled-result reads without inferring old/manual rows.
-- [ ] 2.3 Extend the platform scheduled-automation registry and content-schedule catalog projection with Facebook `join_group` config, effective limits, scope readiness, and recent result.
-- [ ] 2.4 Gate the existing content scheduler join action by account config, effective intersected window, operator/risk daily caps, session budget, kill switch, and scoped candidates without adding another timer.
-- [ ] 2.5 Extend panel read/write endpoints for group scope filters/facets/bulk replacement/import and per-account join configuration with atomic validation.
-- [ ] 2.6 Add focused Cloud tests for schedule windows, default-off, caps, kill switch, audit source/result, panel contracts, and non-Facebook rejection.
+- [x] 2.1 Add the per-account Facebook join automation config store with default-off switch, bounded daily cap, optional week mask, and truthful write results.
+- [x] 2.2 Add join trigger source to the audit ledger and provide latest-scheduled-result reads without inferring old/manual rows.
+- [x] 2.3 Extend the platform scheduled-automation registry and content-schedule catalog projection with Facebook `join_group` config, effective limits, scope readiness, and recent result.
+- [x] 2.4 Gate the existing content scheduler join action by account config, effective intersected window, operator/risk daily caps, session budget, kill switch, and scoped candidates without adding another timer.
+- [x] 2.5 Extend panel read/write endpoints for group scope filters/facets/bulk replacement/import and per-account join configuration with atomic validation.
+- [x] 2.6 Add focused Cloud tests for schedule windows, default-off, caps, kill switch, audit source/result, panel contracts, and non-Facebook rejection.
+  <!-- aidcp-cloud 1ef8549d1f513a645a073470762b631abef37a0d: 96 core focused + 2 panel contract tests pass; typecheck and diff-check pass. Full test is recorded under 4.1. -->
 
 ## 3. Console management surfaces
 
