@@ -1,13 +1,13 @@
 # AGENTS.md
 
-Active Codex guide for the `aidcp*` family. Keep this file at or below 8 KiB because Codex loads it into every task; move details to task-specific references. `CLAUDE.md` is legacy background and is not a default prerequisite.
+Codex guide for `aidcp*`; keep it at or below 8 KiB. Put details in task references. `CLAUDE.md` is legacy background, not a default prerequisite.
 
 ## 1. Repo role and task admission
 
-- `aidcp` is the control repo for contracts, architecture, OpenSpec, product docs, and orchestration helpers. Business code lives in sibling repos: `../aidcp-edge`, `../aidcp-cloud`, and `../aidcp-console` (default branches `master`; control repo default is `main`). Confirm a sibling exists before using it.
+- `aidcp` owns contracts, architecture, OpenSpec, product docs, and orchestration. Business code lives in `../aidcp-edge`, `../aidcp-cloud`, and `../aidcp-console` (`master`; control repo uses `main`). Confirm a sibling exists before using it.
 - Do not run root `npm test`, `npm run build`, or `npm run lint`; this is not an app checkout. Validate control changes with OpenSpec.
-- Before opening a task, creating/reusing a worktree, or using task helpers, run `& "$env:ProgramFiles\Git\bin\bash.exe" ./scripts/task-preflight` in Windows PowerShell or `./scripts/task-preflight` in Bash. Use the same Git Bash prefix for every extensionless `scripts/*` entry. A failure blocks admission; do not switch branches, stash, clean, remove worktrees, or override it automatically.
-- Canonical checkouts stay on their default branches. Feature work uses `../<repo>.wt/<change-name>` and `codex/<change-name>` branches. Never put `main` in an `aidcp.wt` worktree or switch the canonical control checkout to a feature branch.
+- Before task/worktree/helper use, run `& "$env:ProgramFiles\Git\bin\bash.exe" ./scripts/task-preflight` in Windows PowerShell or `./scripts/task-preflight` in Bash. Use that Git Bash prefix for extensionless `scripts/*`. Failure blocks admission; do not switch, stash, clean, remove worktrees, or override it.
+- Canonical checkouts stay on defaults. Feature work uses `../<repo>.wt/<change-name>` and `codex/<change-name>`. Never put `main` in an `aidcp.wt` worktree or switch the control checkout.
 - Preserve unrelated dirty/untracked files. Use isolated worktrees and explicit pathspecs.
 
 Read on demand:
@@ -15,8 +15,8 @@ Read on demand:
 - Architecture/protocol/risk work: `docs/architecture.md`, `docs/protocol.md`, `docs/risk-control.md`.
 - Worktree/integration work: `docs/parallel-dev-worktrees.md`.
 - Any SSH, `rsync`, or deployment: `docs/deployment-environments.md`.
-- Edge Electron process launch or packaging: the active `aidcp-edge` checkout's `CLAUDE.md` packaging section and `docs/release-desktop.md`.
-- An assigned OpenSpec change: its `proposal.md`, `design.md` when present, `tasks.md`, spec deltas, and `openspec instructions apply --change <name> --json` when useful.
+- Edge Electron launch/packaging: active `aidcp-edge/CLAUDE.md` packaging section and `docs/release-desktop.md`.
+- Assigned OpenSpec change: read its proposal, optional design, tasks, spec deltas, and apply instructions when useful.
 - Read root `CLAUDE.md` only when this guide and the references above do not resolve a material legacy detail.
 
 ## 2. Architecture invariants
@@ -24,6 +24,7 @@ Read on demand:
 - Decide first whether work belongs in edge, cloud, console, or control docs/contracts.
 - Edge stays light: browser actions belong on edge; planning, selection strategy, orchestration, persistence, and primary pacing belong in cloud.
 - Cloud `RiskController` is the single writer of final account risk state.
+- DEV and OL share PostgreSQL long-term. Durable async work scanned, claimed, retried, or recovered by background code stores server-injected `execution_target=dev|ol`; all lifecycle reads/writes filter the local target. Missing/invalid `AIDCP_DEPLOY_ENV` disables that worker. Shared business data/config is excluded.
 - Never fake success. Missing targets, bad pages, missing data, movement, and counts must be reported honestly.
 - DOM-first locating keeps post-action validation, bounded retry/escalation, and cache promotion only after repeated success.
 - Protocol v2 changes stay synchronized across cloud/edge types, cloud command mapping, edge active-command routing, and `docs/protocol.md`.
