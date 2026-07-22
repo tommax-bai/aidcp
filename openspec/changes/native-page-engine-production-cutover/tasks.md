@@ -90,9 +90,9 @@
 - [x] 8.2 Remove the legacy Xiaohongshu page-understanding/action modules from production build inputs and add a build-time import-graph gate that fails on reintroduction.
   <!-- aidcp-edge 317cd47: build:dist keeps only the static main graph and fails on forbidden legacy modules/markers; production check reported reachable=109, removed=31. -->
 - [x] 8.3 Build and stage architecture-matched Native artifacts with a manifest containing protocol version, platform, architecture, and artifact hash.
-  <!-- aidcp-edge 228e3e9 + 317cd47: locked host build stages outside ASAR with engine/protocol/adapter versions, capability digest, platform, arch, executable, and SHA-256; current darwin-arm64 artifact b919422... verified locally. No installer was built. -->
+  <!-- aidcp-edge 228e3e9 + 317cd47 + 87cd1ab: locked host build stages outside ASAR with engine/protocol/adapter versions, capability digest, platform, arch, executable, and SHA-256; darwin-arm64 worktree b919422... and canonical recovery 952ce40... artifacts verified locally. No installer was built. -->
 - [x] 8.4 Package Native outside ASAR, resolve it from `process.resourcesPath`, and add installed-artifact startup/health/command/shutdown smoke tests.
-  <!-- aidcp-edge d7e178f + 317cd47: extraResources, startup artifact checks, afterPack verification, and packaged smoke hooks are wired and contract-tested. Final installer execution remains release gate 9.3. -->
+  <!-- aidcp-edge d7e178f + 317cd47 + 87cd1ab: extraResources, startup checks, afterPack smoke, and Electron dev/OL verify-or-rebuild bootstrap are wired and contract-tested; rustup resolves the crate-pinned toolchain when Cargo is absent from PATH. Final installer execution remains release gate 9.3. -->
 - [ ] 8.5 Extend CI packaging and nested signing/notarization to the Native artifact for supported macOS architectures and Windows x64; fail packaging when a required artifact is missing or incompatible.
 - [x] 8.6 Add final ASAR/resources leakage scans for legacy module paths, representative selectors/rules, source maps, debug fixtures, and unredacted diagnostics.
   <!-- aidcp-edge 317cd47: final ASAR scanner accepts a clean Native facade fixture and rejects legacy paths/markers/maps; production dist reports legacy_xhs=absent and source_maps=absent. -->
