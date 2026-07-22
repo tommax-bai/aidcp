@@ -9,7 +9,7 @@
 - 精选页在一个 `overflow:auto` 的内部容器中承载作品卡片，`window.scrollBy` 不会推进内容。该容器当前包含 52 个唯一 `data-aweme-id`；页面另有导航和横向 tab 滚动容器，不能选择“第一个可滚动元素”。
 - 用户手工登录后，登录按钮和手机号表单消失、页面出现用户链接，且没有可见验证或访问限制，足以形成不读取账号身份值的结构化登录证据。
 - 精选卡片的脚本 `.click()` 不会可靠导航；对卡片内可见封面发送 CDP trusted pointer event 后，页面进入 `jingxuan?modal_id=<data-aweme-id>`。详情 modal 暴露 `feed-active-video`、`feed-item`、`video-player-digg`、`feed-comment-icon`、`video-player-collect` 和 `video-player-share`。相同作品的 `/video/<id>` 直链会间歇性只渲染导航骨架，不能作为唯一详情入口或 ready 证据。
-- 当前未点赞样本的 `video-player-digg` 没有 `aria-pressed`，SVG path 仅为 `currentColor`/白色；在没有正反状态对照样本前，点赞状态仍不可可靠读取，真实点赞必须保持封锁。
+- 点赞前负样本的 `video-player-digg` 没有 `aria-pressed` 或点赞 state 属性，且只有固定 24×24 心形 path 和白色 `currentColor`；白色本身不构成判据。一次获授权的真实点击后，同一 `modal_id` 的同一控件出现精确 `data-e2e-state="video-player-is-digged"` 和 90×94 红色点赞动画，形成了可脱敏复现的正反 fixture。
 - 页面已暴露 `https://creator.douyin.com/creator-micro/content/upload`，登录态可直接访问。上传首页存在一个启用、非 multiple 的视频文件 input，支持常见视频格式；未选择文件前没有文案编辑器。本次没有选择文件。
 - 作品 modal 中可观察 `feed-comment-icon` 和“评论”表面，但只读展开未稳定得到评论编辑器；观察到的“发一条弹幕吧” input 属于弹幕，不得误识别为评论编辑器。
 
@@ -84,9 +84,9 @@
 - 抖音已登录，页面无阻断；
 - 当前作品 ID 唯一，点赞控件唯一且状态可读。
 
-默认仅返回 `shadow_ready`。已点赞时返回 `already_liked` 且绝不点击；未点赞时最多点击一次，并在重新探测后要求同一作品变为 liked，才返回 `ui_confirmed`。作品变化、控件歧义或状态未闭环均返回 `ambiguous`，不得重试点击或宣称服务器已持久化。
+默认仅返回 `shadow`。已点赞时返回 `already_active` 且绝不点击；未点赞时最多点击一次，并在重新探测后要求同一作品变为 active，才返回 `ui_confirmed`。作品变化、控件歧义或状态未闭环返回 `postcondition_unknown`/`ambiguous`，不得重试点击或宣称服务器已持久化。
 
-登录后现场证据只确认了唯一 `video-player-digg` 控件，没有得到可区分未赞/已赞的可访问性属性。实现阶段必须先用脱敏 fixture 建立正反状态判据；在此之前，即使两个运行门都打开，也只能返回 `state_unreadable`，真实点击路径不得启用。点赞计数和白色 `currentColor` SVG 均不能作为状态判据。
+负态只在唯一控件同时满足固定 24×24 心形 path、白色 `currentColor`、无 active state 时成立；正态优先要求精确 `data-e2e-state="video-player-is-digged"`，兼容固定心形呈抖音红的静态态。其他结构均返回 `state_unknown` 且不点击。首次 live runner 已在负态和坐标命中预检后点击一次；旧映射未识别 90×94 动画，立即结果为 `postcondition_unknown`，随后没有重试，而是只读复查同一 `modal_id` 并由精确 digged state 确认 active。该偏差与修正后的正样本均保留在证据中。
 
 备选方案是单布尔开关、按计数变化确认或点击后盲等；前两者易误用/误判，后者可能造成重复动作，故不采用。
 
@@ -120,7 +120,9 @@ Cloud 负责审批、调度、token 生命周期、幂等和最终状态；Edge 
 
 ### 9. 私信回复只针对一个明确入站会话和固定文本
 
-私信真实动作要求 `AIDCP_DOUYIN_PROBE_DM_REPLY=1`、精确 profile 确认和允许文本。允许文本固定为 `好的` 或 `ok`，本轮 live validation 使用 `好的`。探针只能选择一个可证明“最新消息来自对方、存在唯一回复编辑器、不存在安全阻断”的会话；若只能看到会话列表而不能证明消息方向，返回 `inbound_unconfirmed`。
+私信真实动作要求 `AIDCP_DOUYIN_PROBE_DM_REPLY=1`、精确 profile 确认和允许文本。允许文本固定为 `好的` 或 `ok`。探针只能选择一个可证明“会话类型为一对一私聊、最新消息来自对方、存在唯一回复编辑器、不存在安全阻断”的会话；若只能看到会话列表而不能证明类型或消息方向，返回 `conversation_type_unknown`/`inbound_unconfirmed`。
+
+2026-07-22 的正反样本表明：群聊右侧消息面板具有 group-specific DOM（例如群已读/群通知结构），并在成员消息上展示发送者标题；已知私聊样本不具备这些结构，消息内容盒则通过 `messageMessageBoxisFromMe` 区分出站方向。分类先判 `group`，再在无任何群结构、存在实际消息盒时才允许判 `private`；没有足够结构时保持 `unknown`。命中 `group` 必须返回 `group_chat`，即使其最新消息明确入站也不得输入或发送。
 
 探针不得打印联系人身份、消息正文或会话列表；报告只记录候选数、方向证据类别、输入长度、提交是否触发以及 UI 回查。最多提交一次；提交后只通过编辑器清空、新消息节点数量或同会话尾部方向等结构证据报告 `ui_confirmed`，不宣称对方收到。
 
@@ -145,19 +147,19 @@ Cloud 负责审批、调度、token 生命周期、幂等和最终状态；Edge 
 - [评论草稿被网页本地保存] → no-submit 只保证不发送，不保证没有本地草稿；真实 fill 必须另获明确授权并由操作员清理。
 - [官方发布权限或应用审核不可用] → 显示 `official_api_unavailable` 并停止，不回退到网页提交。
 - [已运行 profile 被其他操作者占用] → 仅附着模式不控制生命周期；任何 target 不唯一或 ownership 不完整都停止。
-- [私信误回错误联系人] → 只允许一个方向可证明的最近入站会话；身份或方向不明即停止，并且不记录正文。
+- [私信误回群聊或错误联系人] → 先用群结构判定会话类型，只允许明确私聊且方向可证明的最近入站会话；群聊、类型不明或方向不明即停止，并且不记录正文。
 - [直播“回复”退化为普通发言] → 要求目标评论与回复编辑器绑定证据；无法证明时返回 `reply_target_unavailable`，不发送 `666`。
 - [动作重复或开关串权] → 每种动作使用独立环境变量和单次预算，任一执行后 runner 内锁死该动作。
 - [新手交互提示截获动作点击] → 精确关闭唯一“我知道了”按钮，并在动作前验证坐标顶层命中；遮罩未消失时禁止继续。
 - [详情直链和脚本 click hydration 不稳定] → 使用 trusted pointer event 进入 modal，并同时校验 `modal_id` 与 ready 结构；骨架页面诚实返回 `page_not_hydrated`。
-- [点赞缺少可读状态] → 在获得正反 fixture 前只允许 shadow 并返回 `state_unreadable`，不得以计数或白色 SVG 推断。
+- [点赞状态映射漂移] → 负态要求固定心形结构与中性颜色组合，正态要求精确 digged state 或同心形红色态；任何新结构返回 `state_unknown`，且单次预算在点击前消耗，回查不明也不得重试。
 - [评论 surface 与弹幕输入易混淆] → 明确排除 placeholder 为“发一条弹幕吧”的 input；只有唯一、作品绑定的评论编辑器才能进入 fill 路径。
 
 ## Migration Plan
 
 1. 在独立 `aidcp-edge` worktree 实现纯探测模块、runner 和 fixture 测试，不接生产导出或 command router。
 2. 先用 `k1evgky5` 运行只读预检，复现精选页、隐藏验证 iframe、内部滚动容器和稳定作品 ID 证据。
-3. 用户手工完成抖音登录后，先重新运行只读结构探针；未经新的明确授权，不执行点赞、评论输入、上传或发布。
+3. 用户手工完成抖音登录后，先重新运行只读结构探针；仅在用户新增明确授权后执行过一次点赞，评论输入、上传和发布仍未执行。
 4. 通过聚焦测试、静态 no-submit 检查和 Edge typecheck；只提交探针代码，不部署、不打安装包。
 5. 如需生产接入，另建跨 Edge/Cloud/Console 的 OpenSpec change，先完成抖音开放平台应用、权限、OAuth、批准和回查设计。
 

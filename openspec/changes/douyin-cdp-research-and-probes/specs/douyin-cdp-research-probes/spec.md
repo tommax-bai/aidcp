@@ -70,15 +70,15 @@ The Douyin like probe SHALL default to shadow mode and SHALL perform at most one
 
 #### Scenario: Like probe runs without both action gates
 - **WHEN** either `AIDCP_DOUYIN_PROBE_LIKE` is not `1` or `AIDCP_DOUYIN_PROBE_CONFIRM_PROFILE` does not exactly equal the connected profile
-- **THEN** the probe returns `shadow_ready` or `gated` and does not click a like control
+- **THEN** the probe returns `shadow` or `gate_rejected` and does not click a like control
 
 #### Scenario: Current work is already liked
 - **WHEN** the unique current work and unique like control report the liked state before action
-- **THEN** the probe returns `already_liked` and MUST NOT click or toggle the control
+- **THEN** the probe returns `already_active` and MUST NOT click or toggle the control
 
 #### Scenario: Like state has no proven positive and negative mapping
 - **WHEN** the like control is unique but its accessible and structural state cannot distinguish liked from unliked using validated fixtures
-- **THEN** the probe returns `state_unreadable` and MUST NOT click even when both real-action gates are present
+- **THEN** the probe returns `state_unknown` and MUST NOT click even when both real-action gates are present
 
 #### Scenario: One real like is UI-confirmed
 - **WHEN** both gates are satisfied, the account is logged in, the target is unique and initially unliked, and one click is followed by the same work id in liked state
@@ -86,7 +86,7 @@ The Douyin like probe SHALL default to shadow mode and SHALL perform at most one
 
 #### Scenario: Target or state changes ambiguously
 - **WHEN** the current work id changes, controls are not unique, or the same work does not become liked after the single click
-- **THEN** the probe returns `ambiguous`, performs no second click, and MUST NOT report success
+- **THEN** the probe returns `ambiguous` or `postcondition_unknown`, performs no second click, and MUST NOT report success
 
 ### Requirement: Comment fill has no submit capability
 The Douyin comment probe SHALL provide only a fill operation and SHALL structurally exclude comment submission behaviors.
@@ -168,20 +168,24 @@ The Douyin probe SHALL treat the first-interaction tutorial as a separate bounde
 - **WHEN** the prompt is not unique, remains visible, or `elementFromPoint` resolves the intended action coordinate to another overlay
 - **THEN** the probe returns an honest blocked or ambiguous result and MUST NOT claim or retry the social action as successful
 
-### Requirement: Single bounded direct-message reply
-The Douyin direct-message probe SHALL reply to at most one uniquely identified recent inbound conversation, SHALL accept only the allowlisted text `好的` or `ok`, and SHALL keep conversation identities and message bodies out of its report.
+### Requirement: Single bounded private direct-message reply
+The Douyin direct-message probe SHALL reply to at most one uniquely identified one-to-one private conversation whose latest real message is inbound, SHALL reject group or unknown conversation types, SHALL accept only the allowlisted text `好的` or `ok`, and SHALL keep conversation identities and message bodies out of its report.
 
 #### Scenario: Direct-message reply is gated
 - **WHEN** `AIDCP_DOUYIN_PROBE_DM_REPLY` is not `1`, the confirmed profile mismatches, or the text is outside the exact allowlist
 - **THEN** the probe returns `gated` or `invalid_text` without opening or sending a reply
 
-#### Scenario: Latest inbound conversation is replied to once
-- **WHEN** exactly one selected conversation proves its latest message is inbound, one reply editor is visible, the text is allowlisted, and all gates are satisfied
+#### Scenario: Latest inbound private conversation is replied to once
+- **WHEN** exactly one selected conversation proves it is one-to-one private, its latest real message is inbound, one reply editor is visible, the text is allowlisted, and all gates are satisfied
 - **THEN** the probe enters and submits the text once, then reports only structural UI confirmation and text length
 
-#### Scenario: Conversation direction or target is ambiguous
-- **WHEN** the probe cannot prove a unique conversation, inbound direction, or reply editor
-- **THEN** it returns `conversation_ambiguous`, `inbound_unconfirmed`, or `editor_not_found` without input or submission
+#### Scenario: Selected conversation is a group
+- **WHEN** the selected conversation exposes group-specific read/notice structures or member sender-title structures
+- **THEN** the probe returns `group_chat` and MUST NOT focus, input, or submit any reply
+
+#### Scenario: Conversation type, direction, or target is ambiguous
+- **WHEN** the probe cannot prove a one-to-one private conversation, inbound direction, or reply editor
+- **THEN** it returns `conversation_ambiguous`, `conversation_type_unknown`, `inbound_unconfirmed`, or `editor_not_found` without input or submission
 
 ### Requirement: Separate bounded live chat and comment reply
 The Douyin live probe SHALL keep ordinary live chat and comment-targeted reply as distinct, independently gated single-action capabilities.
