@@ -436,4 +436,4 @@ font-family:
 - 设计规范更新与 Edge 实现可以分阶段进行，但 PR / OpenSpec 必须记录“仅规范”或“已实现”的边界。
 - 视觉示例与规范冲突时，以本文文字和 token 为准。
 - 当前代码中的历史近似色可以渐进迁移；新代码不得继续扩大颜色漂移。
-- 吉祥物资产的选择和使用方式参见 [mascot-transparent/README.md](./mascot-transparent/README.md)。
+- 吉祥物透明状态图和动画原型参见 [mascot-transparent/README.md](./mascot-transparent/README.md)；线框动作、页面插画、生成锚点和跨产品语义规则参见 [mascot/README.md](./mascot/README.md)。
