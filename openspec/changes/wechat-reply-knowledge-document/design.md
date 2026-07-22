@@ -67,13 +67,15 @@ control repo 的 ReplyProfile schema 和 AI ProfileSummary 增加可选 nullable
 
 `PolisherInput` 增加 classifier 已确定的 `intent`。当当前渠道文档非空，且 intent 属于问题/信息请求类时，prompt 不再只说“可以”引用文档，而是要求第一优先级直接回答用户问题：文档有明确答案就给出答案，文档没有答案就明确说暂时无法确认，然后再按剩余字数保留模板导流/联系方式边界。
 
-若首次结构化候选在 trim 后仍与 rendered template 完全相同，Cloud 将其视为 `knowledge_answer_missing`，而不是成功润色。在最多两次 polisher 调用的总预算内，第二次纠正 prompt 明确要求“不能只复制模板”；这与超长压缩共用同一个重试额度，任何原因都不得触发第三次调用。第二次仍未回答、超长或结构无效时，回退 rendered template 并保留具名原因。
+若首次结构化候选在 trim 后仍与 rendered template 完全相同，或候选没有列出任何文档事实且没有明确说明无法确认，Cloud 将其视为 `knowledge_answer_missing`，而不是成功润色。在最多两次 polisher 调用的总预算内，第二次纠正 prompt 明确要求直接回答并记录文档事实；这与超长压缩共用同一个重试额度，任何原因都不得触发第三次调用。第二次仍未回答、超长或结构无效时，回退 rendered template 并保留具名原因。
 
 ### 8. reviewer 使用内容风险而非客服措辞作判断
 
 `reply_risk_reviewer` prompt 增加稳定 rubric：普通课程适龄、学习范围、上课方式等非交易咨询，在没有订单、价格、优惠、退款、医疗、法律、个人数据、绝对承诺或其它 hard tag 时属于 low；模板已有的中性私聊引导本身不是风险。`unknown` 只用于输入缺失、候选含义确实无法判断或模型/结构化调用失败，不作为“谨慎起见”的默认值。
 
-`meaning_changed` 与 `introduced_claim` 是流程标签：它们继续强制人工审核，但不能仅凭自身把普通内容风险抬成 high。Cloud 计算内容 high 时只看订单、价格、退款、医疗、法律等实质风险标签；unknown 继续单独映射 unknown。这样“知识库新增了适龄事实”可以显示 low + 需要人工审核，不再混成“高风险内容”。
+`meaning_changed` 与 `introduced_claim` 是流程标签：它们继续强制人工审核，但不能仅凭自身把普通内容风险抬成 high。Cloud 计算内容 high 时只看订单、价格、退款、医疗、法律等实质风险标签；unknown 继续单独映射 unknown。
+
+模型可能出现“理由明确说普通咨询无风险，但 level/tag 仍给 unknown”的自相矛盾。Cloud 仅在一组可机械证明的窄条件下消除这种 model-only unknown：知识文档非空、intent 属于普通问答、classifier/polisher/reviewer 均调用成功、候选通过确定性门禁、至少记录一项文档事实，且汇总标签除了 unknown/meaning_changed/introduced_claim 外没有任何内容风险。此时内容风险显示 low 并移除 unknown；人工审核仍由 AI 实际运行和流程标签强制保留。任一条件不满足就保留 unknown，不用自然语言理由做脆弱推断。
 
 这只修正风险展示与 reviewer 建议，不放宽发送边界。AI polisher 实际运行时，工作流仍强制 `requiresApproval=true`；模板/规则/全局写开关和确定性实质 hard-risk gate 继续单独生效。
 
