@@ -1,7 +1,9 @@
 # shared-mascot-visual-library Specification
 
 ## Purpose
-TBD - created by archiving change centralize-mascot-visual-library. Update Purpose after archive.
+
+Define canonical ownership, runtime-consumption boundaries, and honest semantic usage for reusable AIDCP mascot artwork and guidance.
+
 ## Requirements
 ### Requirement: Shared mascot design sources have a product-wide owner
 The project SHALL keep reusable mascot concept artwork, visual identity anchors, generation guidance, and semantic selection rules in the `aidcp` control repository rather than an individual application repository.
@@ -39,4 +41,3 @@ Mascot selection guidance SHALL distinguish visual intent from evidence that an 
 #### Scenario: Success is confirmed
 - **WHEN** the product has a confirmed success state for the represented action
 - **THEN** it may use the celebration concept as positive feedback
-
