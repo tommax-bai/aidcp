@@ -65,3 +65,9 @@
 - [x] 9.1 将 settings、当前账号环境同步和最终 fleet 读取串行为一个 loading 阶段，登录初期空快照不得提前触发新用户空态
 - [x] 9.2 补充老用户登录同步延迟回归测试，完成聚焦测试、验收、全量测试、typecheck、OpenSpec strict 校验、ff-only 集成与默认分支推送；不部署 ECS、不构建安装包
 <!-- Delivered as aidcp-edge 13b4025 to origin/master by ff-only merge and push. Validation: the delayed account-roster regression failed before the fix and passed after it; unresolved account sync plus empty fleet stays retryable instead of entering onboarding; fleet-console 84/84; renderer smoke + fleet + companion-ui + ui-logic 302/302; acceptance 29 passed with the gated real-machine E2E skipped; final committed tree full suite exited 0; npm run typecheck; node --check; git diff --check. Source-only Edge delivery: no ECS deployment and no desktop installer build. -->
+
+## 10. 全屏线框吉祥物 Loading
+
+- [x] 10.1 从共享 `wireframe-execute` 源派生页面专用优化资产，Loading 与错误未决态隐藏整个环境栏和骨架，标题栏下使用全宽中性画布
+- [x] 10.2 补充全屏结构、真实状态文案、错误重试和减弱动态回归，完成聚焦测试、typecheck、OpenSpec strict 校验、ff-only 集成与默认分支推送；不部署 ECS、不构建安装包
+<!-- Delivered as aidcp-edge ba7cffb to origin/master by ff-only push. The shared control-repo wireframe source was derived into a 640x640, 35 KiB purpose-specific WebP; roster loading/error now suppress the whole rail and skeleton until the authoritative account-scoped fleet settles. Validation: fleet-console 84/84 after rebase; acceptance 29/29 with gated real-machine E2E skipped; full suite 2198/2198; npm run typecheck; node --check; git diff --check; Chromium visual QA at 1440x900 and 1024x700; OpenSpec strict validation. The full-suite rerun used the canonical checkout's byte-matched Electron 31.7.7 dist via ELECTRON_OVERRIDE_DIST_PATH because macOS provenance blocked the new worktree copy at dyld startup. Source-only Edge delivery: no ECS deployment and no desktop installer build. -->
