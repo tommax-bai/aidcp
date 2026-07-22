@@ -64,7 +64,8 @@
 
 - [ ] 8.1 Split any genuinely shared selector-free DTOs/utilities away from legacy Xiaohongshu page-rule modules so production Edge code has no runtime import path to them.
 - [ ] 8.2 Remove the legacy Xiaohongshu page-understanding/action modules from production build inputs and add a build-time import-graph gate that fails on reintroduction.
-- [ ] 8.3 Build and stage architecture-matched Native artifacts with a manifest containing protocol version, platform, architecture, and artifact hash.
+- [x] 8.3 Build and stage architecture-matched Native artifacts with a manifest containing protocol version, platform, architecture, and artifact hash.
+  <!-- aidcp-edge 9706064: locked host build stages outside ASAR with engine/protocol/adapter versions, capability digest, platform, arch, executable, and SHA-256; darwin-arm64 release artifact d44734a... verified locally. Cross-target CI/signing remains 8.5 and no installer was built. -->
 - [ ] 8.4 Package Native outside ASAR, resolve it from `process.resourcesPath`, and add installed-artifact startup/health/command/shutdown smoke tests.
 - [ ] 8.5 Extend CI packaging and nested signing/notarization to the Native artifact for supported macOS architectures and Windows x64; fail packaging when a required artifact is missing or incompatible.
 - [ ] 8.6 Add final ASAR/resources leakage scans for legacy module paths, representative selectors/rules, source maps, debug fixtures, and unredacted diagnostics.
