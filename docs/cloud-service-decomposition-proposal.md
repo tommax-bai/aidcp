@@ -1,285 +1,411 @@
-# Cloud 服务适度拆分方案
+# Cloud 服务与 Git 仓库拆分方案
 
-> 状态：方案草案
+> 状态：目标方案，尚未实施
 >
-> 日期：2026-07-21
+> 日期：2026-07-22
 >
-> 适用仓库：`aidcp-cloud`、`aidcp-edge`、`aidcp-console`、控制仓 `aidcp`
+> 适用范围：`aidcp`、`aidcp-cloud`、`aidcp-edge`、`aidcp-console` 及计划新增的 Cloud 仓库
 >
-> 目标阶段：增加 TikTok、抖音及视频/音频解析与简化生成能力之前
+> 替代：2026-07-21 “单个 `aidcp-cloud` 仓库、三个运行单元”草案
 
 ## 1. 一页结论
 
-当前阶段不建议继续维持单进程 Cloud，也不建议立即拆成多个业务微服务或多个 Git 仓库。
+建议把现有 Cloud 按三种稳定业务能力拆成三个独立 Git 仓库：
 
-建议把 `aidcp-cloud` 调整为**同一仓库内的三个独立运行单元**：
+| 目标仓库 | 核心职责 | 主要通信 |
+| --- | --- | --- |
+| `aidcp-api` | 客户、环境、人设、审批、发布业务记录、客户端数据 API 和查询投影 | 对客户端提供 customer-auth HTTP；对内部服务使用 HTTP 和持久消息 |
+| `aidcp-content` | 内容理解、价值评估、创作、候选版本、图片/视频/音频处理及资产管理 | 提供内部评估 API；消费创作任务并发布持久事件 |
+| `aidcp-automation` | 自动化调度、Edge Gateway、任务状态机、策略、风控和平台执行编排 | 对 Edge 使用自动化 WebSocket；对 Cloud 服务使用 HTTP 和持久消息 |
 
-1. **Data API**：客户、环境、人设、配置、内容、草稿、审批、发布记录和客户端 HTTP 数据面。
-2. **Automation**：Edge WebSocket、自动化调度、平台执行编排、任务状态机和风控。
-3. **Media Worker**：视频/音频探测、解析、转写、简化生成、转码和产物校验。
+同时保留：
 
-三者初期继续：
+- `aidcp`：跨仓架构、OpenSpec、协议和开发编排；
+- `aidcp-edge`：自动化引擎和平台真实执行；
+- `aidcp-console`：用户界面，只通过 `aidcp-api` 使用业务能力。
 
-- 使用同一个 `aidcp-cloud` Git 仓库；
-- 部署在同一 Cloud 环境；
-- 使用同一个 PostgreSQL 集群，但采用独立 Schema、账号和迁移边界；
-- 使用 PostgreSQL Outbox/Inbox 完成可靠异步交接；
-- 使用对象存储承载视频、音频和派生文件。
+这个拆分的依据不是技术层级，也不是“代码看起来很多”，而是三种不同的业务所有权和运行模型：
 
-平台扩展采用统一能力合同和平台适配器，不为小红书、Facebook、微信视频号、TikTok、抖音分别建立 Cloud 服务。
+1. 客户数据是请求式管理，应当像普通 Web 网站一样随时可用；
+2. 内容能力是可复用、可版本化、计算特征独立的智能能力；
+3. 自动化是长连接、任务状态机、风控和真实平台副作用的控制面。
 
-## 2. 背景与当前问题
+浏览器、Edge、自动化 WebSocket 或浏览器槽位的状态，不得成为客户数据和内容管理的准入条件。
 
-### 2.1 已经确定的客户端边界
+## 2. 先固定客户端与云端边界
 
-当前架构已经明确：
+### 2.1 客户端不是“自动化引擎的外壳”
 
-- Electron 应用是客户端；
-- Edge 子进程是按需运行的自动化引擎；
-- 浏览器/CDP 是页面自动化执行器；
-- 客户自有数据通过 customer-auth HTTP 逐请求读写；
-- 自动化任务通过 Edge 与 Cloud 之间的 WebSocket 调度；
-- 自动化事件可以触发客户端重新 HTTP 拉取，但不能覆盖 Cloud 已确认的数据；
-- 普通数据管理不得依赖自动化引擎、WebSocket、浏览器或浏览器槽位。
+客户端内部的角色应固定为：
 
-详细合同见 [架构说明](architecture.md) 和 [边云协议](protocol.md)。
+| 组件 | 定义 | 是否依赖浏览器 |
+| --- | --- | --- |
+| Electron 客户端 | 身份、本地配置、界面和 HTTP 请求入口 | 否 |
+| Edge 子进程 | 按需连接 Cloud 的自动化引擎 | 自动化时需要 |
+| 浏览器/CDP | 页面自动化执行器 | 仅页面动作需要 |
 
-### 2.2 Cloud 当前仍是单一运行单元
+首次获取并安全保存本地身份后，普通客户数据操作不应再次依赖浏览器环境。浏览器只服务于登录检查和需要页面执行的自动化动作。
 
-虽然 Cloud 已经存在不同网络入口，但目前仍由同一个 `src/server.ts` 组合和启动：
+### 2.2 两条数据链路必须分开
 
-- Edge 自动化 WebSocket；
-- 管理后台 HTTP；
-- 客户端 customer-auth HTTP；
-- 进程内调度器、连接注册表、EventBus、RiskController；
-- 内容、发布、客户、配置、风险等领域 Store。
-
-因此当前只有传输和鉴权层面的初步隔离，没有形成独立的故障、重启、扩容和验收边界。
-
-客户 HTTP 与管理后台还会直接读取自动化进程内对象，例如在线连接、调度开关、运行中任务和 RiskController 状态。单进程内开发方便，但会带来以下问题：
-
-- 数据接口和自动化运行时形成隐性耦合；
-- 自动化模块调整时难以独立判断对客户数据面的影响；
-- 重启和多实例部署后，进程内状态的权威性不明确；
-- 无法独立验收“自动化停止但数据管理仍可用”；
-- 后续拆分会一次性暴露大量内部调用和共享状态。
-
-### 2.3 后续能力会放大运行模型差异
-
-计划增加：
-
-- TikTok 平台支持；
-- 抖音平台支持；
-- 视频和音频解析；
-- 音频抽取、语音识别、字幕与内容理解；
-- 简化的脚本、封面、字幕、音频或模板视频生成。
-
-媒体任务通常持续数秒至数十分钟，并产生明显的 CPU、内存、磁盘和网络负载。把这些任务放进 Automation 进程，可能影响 Edge 心跳、WebSocket 稳定性和任务调度，因此需要独立资源边界。
-
-## 3. 设计目标与非目标
-
-### 3.1 目标
-
-- 客户数据面不依赖自动化和媒体任务在线；
-- 自动化调度不受媒体高负载影响；
-- 已批准任务和执行结果跨服务重启不丢失；
-- 明确每类状态的唯一写入者；
-- 支持 TikTok、抖音以显式能力声明接入；
-- 保留当前单仓协作效率，控制部署和联调成本；
-- 为将来按负载或团队进一步拆分保留稳定边界。
-
-### 3.2 非目标
-
-当前阶段不做：
-
-- 按平台建立独立 Cloud 服务；
-- 把 Edge Gateway、调度器、RiskController 分别部署；
-- 把人设、发布、身份、查询、通知拆成独立微服务；
-- 拆分 `aidcp-cloud` 为多个 Git 仓库；
-- 引入 Kafka、服务网格或分布式事务；
-- 建设完整 GPU 调度平台；
-- 把平台持久凭据迁移到 Cloud；
-- 让媒体处理完成后绕过审批自动发布。
-
-## 4. 目标架构
-
-```text
-┌──────────────────┐       customer-auth HTTP       ┌──────────────────┐
-│ Electron 客户端   │ ─────────────────────────────▶ │ Data API         │
-└──────────────────┘                                └────────┬─────────┘
-                                                               │
-                         AutomationRequested / MediaJobRequested
-                                                               │
-                         ┌─────────────────────────────────────┼──────────┐
-                         ▼                                     ▼          │
-                ┌──────────────────┐                  ┌──────────────────┐│
-                │ Automation       │                  │ Media Worker     ││
-                │ 调度 + 风控 + WS │                  │ 解析 + 简化生成   ││
-                └────────┬─────────┘                  └────────┬─────────┘│
-                         │                                     │          │
-             automation WebSocket                        对象存储         │
-                         │                                     │          │
-                         ▼                                     ▼          │
-                ┌──────────────────┐                  ┌──────────────────┐│
-                │ Edge 自动化引擎   │                  │ 原始/派生媒体资产 ││
-                │ 平台适配器 + 浏览器│                  └──────────────────┘│
-                └──────────────────┘                                     │
-                         │                                                │
-                         └──── ExecutionResult / MediaAssetReady ─────────┘
-```
-
-## 5. 服务职责
-
-### 5.1 Data API
-
-Data API 是客户业务数据的唯一入口，负责：
-
-- 客户鉴权和客户状态；
-- 客户与环境归属；
-- `envKey` 与平台账号的权威绑定；
-- 人设、写作语言和运营配置；
-- 内容素材、草稿和审批；
-- 发布计划、业务状态和发布记录；
-- 媒体资产元数据；
-- 媒体任务的创建和查询；
-- 客户端首页概览和其他查询投影；
-- 管理后台中的持久数据接口；
-- customer-auth HTTP。
-
-Data API 不负责：
-
-- 持有 Edge WebSocket；
-- 直接启动或控制浏览器；
-- 执行平台 API 或页面操作；
-- 运行 FFmpeg、ASR 或媒体生成任务；
-- 直接读取 Automation 的连接注册表或运行时对象。
-
-管理后台需要读取实时自动化状态或下达启停操作时，Data API 可以调用 Automation 的窄内部接口。该接口失败只影响自动化状态卡，不得把客户业务数据标记为离线。
-
-### 5.2 Automation
-
-Automation 是自动化控制面，当前阶段包含：
-
-- Edge WebSocket Gateway；
-- 握手、心跳、能力协商和连接路由；
-- 自动化任务状态机；
-- 调度、租约、超时、重试、取消和幂等；
-- 平台 API 自动化；
-- 浏览器和页面自动化编排；
-- RiskController；
-- 配额、慢启动和节奏控制；
-- 自动化运行时 EventBus；
-- 执行回执和真实结果接收。
-
-Automation 不负责：
-
-- 修改客户、人设、草稿和审批业务表；
-- 把普通数据命令推送给客户端；
-- 保存媒体二进制文件；
-- 承担视频和音频解析或生成计算。
-
-Edge Gateway、任务调度和 RiskController 暂时保持在同一运行单元，因为三者运行时交互频繁。等连接规模或团队边界真正独立后，再评估继续拆分。
-
-### 5.3 Media Worker
-
-Media Worker 是无客户会话、无公开业务 API 的后台任务进程，负责：
-
-- 媒体格式、时长、尺寸和编码探测；
-- 视频抽帧；
-- 音频抽取；
-- 语音识别和字幕解析；
-- 内容分段、摘要和结构化理解；
-- 简化脚本生成；
-- 简化封面、字幕、音频或模板视频生成；
-- 转码、压缩和输出校验；
-- 处理过程、尝试次数和失败原因记录。
-
-媒体文件必须保存到对象存储。数据库、业务事件和 Automation WebSocket 中只能传输资源标识和元数据，不得传输视频或音频二进制。
-
-Media Worker 必须具备：
-
-- 幂等任务键；
-- 有界重试；
-- 超时和取消；
-- 进程重启恢复；
-- 输入、输出内容哈希；
-- 独立 CPU、内存和并发限制；
-- 处理结果校验。
-
-## 6. 数据和状态所有权
-
-| 状态 | 唯一写入者 | 存储位置 | 其他服务如何使用 |
-| --- | --- | --- | --- |
-| 客户与环境归属 | Data API | `business` | HTTP 或授权投影 |
-| 人设和配置 | Data API | `business` | 任务创建时生成版本化快照 |
-| 草稿和审批 | Data API | `business` | 通过持久事件触发自动化 |
-| 发布业务记录 | Data API | `business` | 消费执行结果后更新 |
-| 自动化任务与尝试 | Automation | `automation` | Data API 读取状态投影 |
-| Edge 在线连接 | Automation | 进程内/实时路由存储 | 窄内部状态接口 |
-| 页面租约和在途执行 | Automation | `automation` + 进程内 | 不允许 Data API 直接读取 |
-| 最终风险状态 | RiskController | `automation` | Data API 读取持久投影 |
-| 媒体资产业务元数据 | Data API | `business` | HTTP 返回给客户端 |
-| 媒体处理尝试 | Media Worker | `media_runtime` | Data API 消费结果投影 |
-| 原始视频和音频文件 | Data API（登记，客户端按授权直传） | 对象存储输入区 | 通过 `assetId` 和短期签名地址访问 |
-| 解析和生成的派生文件 | Media Worker | 对象存储输出区 | Data API 消费结果后纳入资产视图 |
-
-每张业务表只能有一个服务写入。共享 PostgreSQL 集群不等于共享数据所有权。
-
-## 7. 服务交互合同
-
-### 7.1 普通客户数据
-
-客户数据继续使用逐请求 HTTP：
+#### 普通客户数据链路
 
 ```text
 Electron renderer
   → 窄 IPC
   → Electron main customer-auth HTTP adapter
-  → Data API
+  → aidcp-api
 ```
 
-请求不检查 Automation、Edge WebSocket、浏览器、CDP 或槽位状态。
+适用内容包括今日进展、历史统计、已发布内容、人设、配置、稿件、审批、环境管理和内容工作区。
 
-### 7.2 发布任务
+这条链路不得检查：
+
+- Edge 是否运行；
+- 自动化 WebSocket 是否连接；
+- 浏览器是否打开；
+- CDP 是否连接；
+- 浏览器槽位是否可用。
+
+#### 自动化链路
 
 ```text
-客户端批准稿件
-  → Data API 在同一事务保存审批和 Outbox
-  → Automation 消费 AutomationRequested
-  → RiskController 判断是否允许执行
-  → Edge Gateway 下发任务
-  → Edge 平台适配器执行并验证
-  → Automation 保存真实任务终态
-  → 发出 ExecutionResult
-  → Data API 更新发布记录和首页投影
+aidcp-automation
+  → automation WebSocket
+  → Edge 自动化引擎
+  → 平台 API 或浏览器/CDP
 ```
 
-Automation 不在线时，审批仍可成功保存并进入等待。Automation 恢复后只能执行一次。
+只有需要真实平台副作用的自动化任务进入这条链路，例如浏览、点赞、评论、关注、发帖和平台结果校验。
 
-### 7.3 媒体任务
+用户级实时通知只能表示“数据已变化，请重新 HTTP 拉取”。通知不得携带普通业务写命令，也不得覆盖 `aidcp-api` 已确认的数据。
+
+## 3. 当前问题为什么需要拆分
+
+当前 `aidcp-cloud` 由一个组合根同时装配：
+
+- customer-auth HTTP 和管理接口；
+- Edge 自动化 WebSocket；
+- 连接注册表、调度器、EventBus 和 RiskController；
+- 内容评估、内容创作、图片生成、审批和发布执行角色；
+- 客户、环境、内容、发布、风险等 Store。
+
+这种结构在早期开发简单，但形成了四类耦合：
+
+1. **运行时耦合**：HTTP 数据接口可以直接读取连接注册表或自动化进程内对象；
+2. **代码耦合**：内容角色、自动化角色和业务 API 可以互相直接导入；
+3. **数据耦合**：多个模块可能通过同一数据库连接修改彼此领域表；
+4. **故障耦合**：媒体生成或自动化重启可能同时影响普通客户数据。
+
+增加 TikTok、抖音、视频、音频解析和简化生成后，依赖、资源和发布节奏会进一步分化。继续只按目录或进程拆分，仍然无法形成明确的版本、测试、部署和回滚边界。
+
+## 4. 目标仓库结构
 
 ```text
-客户端上传或引用素材
-  → Data API 保存素材元数据并写入 MediaJobRequested
-  → Media Worker 领取任务
-  → 从对象存储读取原始文件
-  → 解析、转写或简化生成
-  → 派生文件写回对象存储
-  → 发出 MediaAssetReady / MediaJobFailed
-  → Data API 更新媒体资产状态
+aidcp
+aidcp-api
+aidcp-content
+aidcp-automation
+aidcp-edge
+aidcp-console
 ```
 
-媒体任务成功只表示产物已准备好，不表示已经批准或发布。
+```mermaid
+flowchart LR
+    Console["aidcp-console"] -->|"customer-auth HTTP"| API["aidcp-api"]
+    Client["Electron client"] -->|"customer-auth HTTP"| API
+    API -->|"bounded internal HTTP"| Content["aidcp-content"]
+    API -->|"durable commands"| Automation["aidcp-automation"]
+    Automation -->|"bounded assessment HTTP"| Content
+    Content -->|"durable result events"| API
+    Automation -->|"durable execution events"| API
+    Automation -->|"automation WebSocket"| Edge["aidcp-edge"]
+    Edge -->|"platform API / browser / CDP"| Platform["Platform"]
+```
 
-### 7.4 实时通知
+### 4.1 `aidcp`：控制仓
 
-当前阶段可以继续采用客户端主动刷新或在既有用户级通道上发送失效提示。通知只能表达“数据发生变化，请重新 HTTP 拉取”，不能携带普通业务写命令，也不能复用环境自动化 WebSocket。
+负责：
 
-## 8. TikTok 与抖音平台设计
+- 跨仓架构与行为合同；
+- OpenSpec proposal、design、spec 和 tasks；
+- Cloud/Edge 协议说明；
+- 风控、部署和跨仓开发规范；
+- 多仓工作树、集成和发布编排脚本。
 
-### 8.1 独立平台身份
+不放业务运行代码，不成为共享代码包，也不直接部署为业务服务。
 
-TikTok 与抖音必须是两个独立平台标识：
+### 4.2 `aidcp-api`：客户业务数据面
+
+负责：
+
+- customer-auth HTTP；
+- 客户身份、客户与环境归属；
+- `envKey` 与平台账号的权威绑定；
+- 人设、写作语言和运营配置；
+- 发布审批、排期和业务台账；
+- 客户端与管理后台的查询投影；
+- 首页统计、最近发布和任务可见状态；
+- 用户级数据失效通知。
+
+不负责：
+
+- 持有 Edge WebSocket；
+- 读取自动化连接注册表或进程内调度对象；
+- 执行平台动作；
+- 决定最终点赞、评论或关注；
+- 保存创作候选和媒体处理过程的权威状态。
+
+`aidcp-console` 只调用 `aidcp-api`。需要实时自动化状态或控制时，由 `aidcp-api` 调用 `aidcp-automation` 的窄内部接口，不能让 Console 绕过业务入口直接访问内部服务。
+
+### 4.3 `aidcp-content`：内容智能与创作
+
+负责：
+
+- 内容事实提取和受控标签；
+- 内容价值、账号适配度和作者价值评估；
+- 灵感、素材、创作项目和创作任务；
+- 文本、图片、视频和音频候选版本；
+- 视频探测、抽帧、音频抽取、ASR、字幕和转码；
+- 简化脚本、封面、字幕、音频或模板视频生成；
+- 质量、合规、来源、模型和供应商用量记录；
+- 媒体资产元数据和对象存储访问。
+
+一个仓库内可以有多个独立进程：
+
+```text
+content-api
+analysis-worker
+creation-worker
+```
+
+其中低延迟评估与长耗时创作、媒体处理可以独立扩容，但共享同一个内容领域模型和发布节奏。当前阶段不再拆 `aidcp-media`、`aidcp-generation` 或 `aidcp-evaluation` 仓库。
+
+`aidcp-content` 返回事实、标签、分数和置信度，不返回“必须点赞”之类的最终平台动作。
+
+### 4.4 `aidcp-automation`：自动化控制面
+
+负责：
+
+- Edge Gateway、握手、心跳、能力协商和连接路由；
+- 自动化任务、尝试、租约、取消、重试和幂等；
+- 平台能力准入和平台执行编排；
+- InteractionPolicy；
+- RiskController、配额、冷却和节奏；
+- 发布与互动的执行状态；
+- Edge 回执和真实结果接收；
+- 自动化运行时状态和窄内部查询。
+
+最终点赞、评论、关注或发布决策由 `aidcp-automation` 综合以下输入产生：
+
+```text
+内容评估
++ 账号人设
++ 平台能力
++ RiskController
++ 配额与冷却
++ 当前会话历史
+= 最终动作决策
+```
+
+RiskController 仍是账号最终风险状态的唯一写入者。Edge 不根据标签自行决定动作，只执行明确指令并完成真实结果验证。
+
+### 4.5 `aidcp-edge`：真实执行边界
+
+负责：
+
+- 页面与账号观测；
+- 目标定位；
+- 操作前身份、页面和目标复核；
+- 平台 API、浏览器、DOM/CDP 操作；
+- 操作后验证；
+- 对缺目标、页面异常、能力不足和结果不确定作诚实回执。
+
+Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或最终风险状态。
+
+## 5. 数据所有权
+
+### 5.1 单一写入者
+
+| 数据 | 权威仓库/服务 | 其他服务如何使用 |
+| --- | --- | --- |
+| 客户、环境归属和账号绑定 | `aidcp-api` | 授权 HTTP 或版本化快照 |
+| 人设和运营配置 | `aidcp-api` | 任务创建时引用版本或快照 |
+| 审批、排期和发布业务台账 | `aidcp-api` | 持久命令和结果事件 |
+| 内容事实与评估 | `aidcp-content` | 内部 HTTP 或不可变结果引用 |
+| 创作项目与候选版本 | `aidcp-content` | `candidateVersionId` |
+| 媒体资产和处理尝试 | `aidcp-content` | `assetId` 和短期授权地址 |
+| 自动化任务、尝试和租约 | `aidcp-automation` | 状态投影或窄查询接口 |
+| Edge 在线连接 | `aidcp-automation` | 窄内部状态接口 |
+| 最终风险状态 | `aidcp-automation` 的 RiskController | 只读投影 |
+
+每张业务表只能有一个服务写入。可以在迁移期共用 PostgreSQL 实例，但必须使用独立 Schema、数据库账号和迁移目录；跨服务直接写表属于违规。
+
+查询界面优先读取 `aidcp-api` 的本地投影，避免一个页面请求同步串联多个服务。确需实时性的自动化连接状态，才调用明确、可降级的内部查询接口。
+
+### 5.2 候选版本和审批不能隐式漂移
+
+审批必须引用不可变的 `candidateVersionId`。候选内容发生变化时创建新版本，旧版本的审批不能自动继承。
+
+发布请求至少冻结：
+
+- `candidateVersionId`；
+- `envKey`；
+- `executionTarget`；
+- 账号和平台身份；
+- 需要的能力版本。
+
+自动化恢复执行时不得因为“同账号在另一个环境在线”而改投到新的 Edge。
+
+### 5.3 媒体二进制不进入业务通道
+
+原始和派生视频、音频、图片保存在对象存储。数据库、事件和自动化 WebSocket 只传：
+
+- `assetId`；
+- 内容哈希；
+- MIME、尺寸、时长等元数据；
+- 授权引用；
+- 处理状态和失败原因。
+
+## 6. 服务间通信方式
+
+### 6.1 通信选择
+
+| 场景 | 方式 | 原因 |
+| --- | --- | --- |
+| 客户端普通数据读写 | customer-auth HTTP → `aidcp-api` | 请求式、可鉴权、与自动化无关 |
+| 自动化查询内容评估 | `aidcp-automation` → `aidcp-content` 内部 HTTP | 需要有界、即时结果 |
+| API 查询自动化实时状态或控制自动化 | `aidcp-api` → `aidcp-automation` 内部 HTTP | 明确同步结果，故障可局部降级 |
+| API 查询候选详情 | `aidcp-api` → `aidcp-content` 内部 HTTP 或本地投影 | 保持内容权威单写 |
+| 创作、发布和长耗时媒体任务 | Outbox/Inbox 持久消息 | 跨重启、可重试、避免长同步链 |
+| 内容服务内部 Worker 调度 | `aidcp-content` 自有队列 | 属于同一领域内部实现 |
+| 自动化任务下发 | `aidcp-automation` → Edge WebSocket | 仅用于自动化 |
+| 客户端实时更新 | 失效通知 + HTTP 重拉 | 不建立第二个业务事实源 |
+
+内部 HTTP 必须有超时、调用预算、熔断和诚实错误。内容评估超时或失败时，自动化应跳过本次互动，不能用乐观默认值继续执行。
+
+### 6.2 持久工作流
+
+建议的跨服务命令和事件包括：
+
+```text
+aidcp-api      → aidcp-content     CreationRequested
+aidcp-content  → aidcp-api         CandidateReady | CreationFailed
+
+aidcp-api      → aidcp-automation  PublishRequested
+aidcp-automation → aidcp-api       ExecutionDispatched
+                                      | ExecutionSucceeded
+                                      | ExecutionFailed
+                                      | ExecutionUnknown
+```
+
+命令表达“请求某个服务做事”，事件表达“已经发生的事实”，两者不得混用。
+
+`ContentAssessed`、`InteractionDecided`、`InteractionDispatched`、`InteractionOccurred` 和 `InteractionFailed` 是不同阶段。请求已接收、任务已派发或 Edge 回执已返回，都不能冒充平台动作已经发生。
+
+持久消息采用：
+
+- 本地事务写业务数据和 Outbox；
+- 至少一次投递；
+- 消费方 Inbox 去重；
+- 业务副作用幂等；
+- 按聚合版本处理乱序；
+- 死信、重放和人工检查能力。
+
+禁止建立“客户端等待 API，API 等内容，内容等自动化，自动化再等 Edge 最终结果”的长同步调用链。
+
+### 6.3 消息信封
+
+跨服务消息至少包含：
+
+```json
+{
+  "messageId": "uuid",
+  "messageType": "PublishRequested",
+  "messageVersion": 1,
+  "aggregateType": "publish_request",
+  "aggregateId": "pub_123",
+  "aggregateVersion": 3,
+  "tenantId": "customer_123",
+  "envKey": "env_123",
+  "executionTarget": "dev",
+  "correlationId": "uuid",
+  "causationId": "uuid",
+  "occurredAt": "2026-07-22T10:00:00Z",
+  "payload": {}
+}
+```
+
+不是所有内容事件都需要 `envKey`，但任何可能产生环境自动化副作用的命令或事件都必须具备可信环境归属。
+
+### 6.4 禁止的通信方式
+
+跨服务后禁止：
+
+- 直接导入另一个业务仓库的源码；
+- 直接读写另一个服务的业务表；
+- 用进程内 EventBus 充当跨服务消息总线；
+- 用自动化 WebSocket 传普通客户数据命令；
+- 让用户级推送直接修改业务数据；
+- 把 Git submodule 或文件路径依赖当成合同分发；
+- 共享包含业务逻辑的“公共包”以绕开服务边界。
+
+进程内 EventBus 可以保留在单个服务内部，但不能承诺跨进程可靠性。
+
+## 7. 内容评估与动作决策
+
+### 7.1 评估输出
+
+内容评估建议拆成三个稳定对象：
+
+1. `ContentFacts`：主题、格式、语言、显式风险、内容类型等客观事实；
+2. `AccountFitAssessment`：相对某个人设和账号目标的匹配度；
+3. `AuthorAssessment`：作者长期质量、相关度和风险特征。
+
+输出应包含：
+
+- 受控标签，不仅是自由文本；
+- 分数与置信度；
+- `modelVersion`；
+- `contentHash`；
+- `personaVersion`；
+- 生成时间和有效期；
+- 缺失证据和降级原因。
+
+### 7.2 分层调用
+
+自动化可以按成本分层：
+
+| 层级 | 内容 | 默认落点 |
+| --- | --- | --- |
+| L0 | 平台能力、硬规则、重复和风险预筛 | `aidcp-automation` |
+| L1 | 卡片级事实和轻量评估 | `aidcp-content` analysis API |
+| L2 | 详情、正文、转录和深度评估 | `aidcp-content` analysis API/worker |
+| L3 | 作者长期评估 | `aidcp-content` 持久评估 |
+
+只有可复用、可版本化、可审计的内容资产和评估进入 `aidcp-content`。强实时且只服务某个自动化步骤的临时微判断，可以先留在 `aidcp-automation`，待合同稳定后再迁移。
+
+## 8. 环境和执行目标隔离
+
+`envKey` 与 `executionTarget` 不是同一概念：
+
+- `envKey`：客户浏览器环境身份；
+- `executionTarget`：Cloud 部署目标，只能是 `dev` 或 `ol`。
+
+所有会被后台扫描、领取、重试或恢复的持久异步任务必须：
+
+1. 由服务端当前部署配置注入 `executionTarget`；
+2. 禁止从客户端请求、自然语言、Edge 上报或 `envKey` 推导；
+3. 在创建、去重、领取、恢复、重试和终态写入时过滤本地 target；
+4. 缺少或非法部署目标时禁用对应 Worker，保持 fail-closed；
+5. 让幂等键在 target 范围内生效；
+6. 对发布任务同时冻结 `envKey` 和 `executionTarget`。
+
+共享客户配置和普通业务数据不需要人为按 target 分裂；上述隔离只针对可能被 dev/ol 后台消费者竞争的异步工作。
+
+## 9. TikTok 与抖音扩展
+
+TikTok 和抖音必须是两个平台标识：
 
 ```text
 xiaohongshu
@@ -289,222 +415,193 @@ tiktok
 douyin
 ```
 
-两者可以复用底层工具和抽象，但不能共享账号语义、能力声明、页面假设、风控参数或成功验证规则。
-
-### 8.2 平台能力注册表
+它们可以复用基础工具，但不能共享账号语义、页面假设、能力声明、风控参数或成功验证规则。
 
 平台注册表必须显式声明：
 
-- 支持的内容类型；
-- 图文、视频发布能力；
-- 即时或预约发布能力；
-- 浏览、点赞、评论、回复、关注等动作；
-- API 执行还是页面执行；
+- 内容类型和发布能力；
+- 浏览、点赞、评论、回复和关注能力；
+- API 执行或页面执行；
 - 是否需要浏览器槽位；
-- 需要的 Edge 能力版本；
-- 平台节奏和风控参数；
+- 所需 Edge 和协议版本；
+- 平台节奏、风控参数和验证规则；
 - 不支持能力的明确原因。
 
-新增平台时，未知能力和缺少声明必须 fail-closed，返回 `capability_unsupported` 或更具体的原因。不得回落成小红书，不得因为注册表缺项而按支持处理。
+新增平台缺少声明或能力时必须返回 `capability_unsupported`，不能回落到其他平台。迁移时只对新增平台路径建立明确的 fail-closed 准入，不应未经专项验证就改变现有平台有意保留的兼容行为。
 
-### 8.3 平台适配器
+不按平台拆 Cloud 服务或仓库。平台差异通过 `aidcp-automation` 和 `aidcp-edge` 内的适配器解决。
 
-建议保持一个平台无关的任务外壳，并允许版本化的平台专有载荷：
+## 10. 合同与版本管理
 
-```text
-platforms/
-  xiaohongshu/
-  facebook/
-  wechat-channels/
-  tiktok/
-  douyin/
-```
-
-Cloud 负责平台能力、策略和任务编排；Edge 负责真实平台 API、浏览器、DOM/CDP 操作和结果验证。
-
-只有页面自动化可以申请浏览器槽位。媒体处理和普通客户数据不得占用浏览器槽位。
-
-## 9. 仓库和部署组织
-
-### 9.1 仓库
-
-当前阶段保留一个 `aidcp-cloud` 仓库：
+不新增中央 `aidcp-contracts` 仓库。合同由能力提供方拥有：
 
 ```text
-src/
-  apps/
-    data-api/
-      main.ts
-    automation/
-      main.ts
-    media-worker/
-      main.ts
-
-  domains/
-    identity/
-    environment/
-    persona/
-    content/
-    publishing/
-    automation/
-    risk/
-    media/
-
-  platforms/
-    xiaohongshu/
-    facebook/
-    wechat-channels/
-    tiktok/
-    douyin/
-
-  contracts/
-    automation-request/
-    automation-result/
-    media-job/
-    media-result/
-
-  infrastructure/
-    postgres/
-    outbox/
-    object-storage/
+aidcp-api/contracts/
+aidcp-content/contracts/
+aidcp-automation/contracts/
 ```
 
-`contracts` 只包含版本化协议和 DTO，不得成为共享业务实现的后门。
+提供方发布：
 
-### 9.2 部署单元
+- OpenAPI；
+- JSON Schema 或事件 Schema；
+- 版本化 TypeScript 客户端和类型；
+- 兼容性测试夹具。
 
-建议部署为：
+消费者固定合同版本，不通过 Git 路径直接引用提供方源码。合同兼容规则至少要求：
 
-```text
-aidcp-cloud-data.service
-aidcp-cloud-automation.service
-aidcp-cloud-media-worker.service
-```
+- 只新增可选字段可保持向后兼容；
+- 删除、重命名、改语义或收窄枚举需要新版本；
+- 生产者和消费者必须覆盖版本错配测试；
+- 事件升级期允许新旧版本并行消费；
+- 跨仓行为变化仍由 `aidcp` 中同一个 OpenSpec change 统一描述。
 
-每个服务独立拥有：
+每个业务仓库独立拥有：
 
-- 启动入口；
-- 配置校验；
-- 健康检查；
-- 日志标识；
-- systemd 生命周期；
-- 资源限制；
-- 回滚和就绪验证。
+- `package.json` 和 lockfile；
+- CI、测试和类型检查；
+- 数据库迁移；
+- 部署清单和健康检查；
+- 版本、回滚和变更日志。
 
-客户 HTTP 的独立 JWT 密钥和路由边界必须保留。即使管理后台 HTTP 和 customer-auth HTTP 同属 Data API，也可以继续使用不同监听端口、密钥和路由表。
-
-### 9.3 数据库
-
-初期继续使用同一个 PostgreSQL 实例，至少划分：
-
-```text
-business
-automation
-media_runtime
-```
-
-每个运行单元使用独立数据库账号。允许通过明确授权读取必要投影，禁止跨 Schema 任意写业务表。
-
-可靠交接初期采用 PostgreSQL Outbox/Inbox。只有当事件量、跨机器部署或消费者数量证明 PostgreSQL 已成为瓶颈时，再引入专门消息中间件。
-
-## 10. 故障与降级语义
+## 11. 故障与降级语义
 
 | 故障 | 应保持可用 | 允许受影响 |
 | --- | --- | --- |
-| Automation 停止 | 人设、配置、草稿、审批、历史、媒体管理 | 新自动化任务等待、实时在线状态不可用 |
-| Data API 停止 | 已领取的自动化和媒体任务安全收敛，结果持久等待 | 新客户数据请求和新任务创建 |
-| Media Worker 停止 | 客户数据、已有自动化、发布记录 | 新媒体任务等待处理 |
-| Edge 离线 | 客户数据和媒体处理 | 对应环境自动化任务等待或明确失败 |
-| 浏览器槽位满 | 客户数据、API 自动化、媒体处理 | 页面自动化排队 |
-| 对象存储不可用 | 非媒体客户数据、无需媒体的自动化 | 媒体读取、生成和发布等待/失败 |
-| PostgreSQL 不可用 | 已在 Edge 安全边界内的动作按合同收敛 | 三个 Cloud 单元进入不可写或不可就绪状态 |
+| `aidcp-automation` 停止 | 客户数据、内容管理、创作和媒体处理 | 新自动化等待，实时在线状态降级 |
+| `aidcp-api` 停止 | 已领取的内容和自动化任务按合同安全收敛 | 新客户请求和新业务任务 |
+| `aidcp-content` 停止 | 客户历史数据和无需新评估的自动化 | 新评估、创作和媒体任务 |
+| Edge 离线 | 客户数据和内容服务 | 对应环境自动化等待或明确失败 |
+| 浏览器槽位满 | 客户数据、内容服务和不需页面的动作 | 页面自动化排队 |
+| 对象存储不可用 | 非媒体客户数据和无需媒体的自动化 | 媒体处理和相关发布 |
+| 内部评估超时 | 客户数据和其他账号任务 | 本次互动跳过，不乐观执行 |
 
-任何降级都不得把请求已接收、任务已派发或进程仍在运行冒充业务成功。
+任何服务故障都不得把请求已接收、任务已创建、消息已投递、任务已派发或结果未知显示为业务成功。
 
-## 11. 分阶段实施
+## 12. Git 仓库迁移顺序
 
-### 阶段 1：建立代码和状态边界
+不要在同一次改动中拆服务、迁数据并把 `aidcp-cloud` 改名。建议按以下顺序迁移。
 
-- 盘点 `src/server.ts` 的组合根；
-- 盘点所有进程内状态及其读取方；
-- 标记每张表和每类状态的唯一写入者；
-- 把跨领域直接调用收口到显式接口；
-- 增加模块导入边界检查；
-- 将必须跨重启保留的事件迁出进程内 EventBus。
+### 阶段 0：OpenSpec 和清单
 
-此阶段可以仍运行一个进程，但代码边界必须先成立。
+- 在 `aidcp` 创建一个跨仓 OpenSpec change；
+- 盘点 `src/server.ts` 的组合根、角色注册和直接导入；
+- 盘点进程内状态、EventBus 事件、Store 和每张表；
+- 建立当前调用图、数据所有权表和回滚计划；
+- 定义合同版本、故障语义和验收夹具。
 
-### 阶段 2：拆分 Data API 与 Automation
+### 阶段 1：先在 `aidcp-cloud` 内建立边界
 
-- 增加两个启动入口；
-- 分离 HTTP 数据面与 Edge WebSocket；
-- 增加独立 systemd 服务和健康检查；
-- 使用 Outbox/Inbox 交接任务与结果；
-- 管理后台实时状态改走窄内部接口或投影；
-- 验证独立启动、停止、重启和回滚。
+- 建立 API、Content、Automation 的模块边界；
+- 禁止跨领域直接写表；
+- 把跨领域调用收口到明确接口；
+- 即使暂时使用进程内适配器，也采用未来 HTTP/消息的合同形状；
+- 将跨重启工作从进程内 EventBus 迁到 Outbox/Inbox；
+- 增加模块导入和数据所有权检查。
 
-### 阶段 3：增加 Media Worker
+这一阶段的目标是先消除源码和状态耦合，不是假装已经完成微服务化。
 
-- 建立对象存储资产模型；
-- 建立媒体任务和处理尝试模型；
-- 首批支持探测、音频抽取、转写和摘要；
-- 再增加简化生成、转码和结果校验；
-- 配置独立资源限制和并发控制。
+### 阶段 2：拆独立进程和迁移所有权
 
-### 阶段 4：扩展 TikTok 和抖音
+- 为三个边界建立独立入口、配置和健康检查；
+- 为 Schema、数据库账号和迁移建立唯一所有者；
+- 验证各进程独立停止、重启和回滚；
+- 验证重复、乱序和延迟消息；
+- 建立服务版本与合同版本可观测性。
 
-- 扩展 `PlatformId` 和能力注册表；
-- 先消除新增平台路径上的未知能力 fail-open；
-- 定义 Cloud 和 Edge 的能力协商版本；
-- 每次只接入一个平台和一组可真实验收的能力；
-- 未完成能力保持 `capability_unsupported`；
-- 完成真实账号、真实目标和真实结果的端到端验收后再扩大范围。
+### 阶段 3：先提取 `aidcp-content`
 
-## 12. 验收红线
+内容服务优先提取，因为：
 
-拆分完成至少满足：
+- AI、FFmpeg、ASR、Python 或 GPU 依赖与自动化明显不同；
+- 创作和评估拥有清晰输入输出；
+- 高负载最容易影响 WebSocket 心跳；
+- 后续能力增长速度和部署节奏更独立。
 
-1. Automation 停止或重启时，客户数据 HTTP 仍可用。
-2. Media Worker 高负载不影响 Edge WebSocket 心跳和自动化调度。
-3. Automation 停止时批准稿件，恢复后任务只执行一次。
-4. Data API 暂时不可用时，Automation 和 Media Worker 的结果不会丢失。
-5. 三个运行单元可以独立启动、健康检查、重启和回滚。
-6. Data API 不直接引用连接注册表、调度器或 RiskController 对象。
-7. Automation 不直接修改客户、人设、草稿和审批业务表。
-8. 最终风险状态仍由 RiskController 单写。
-9. 未知平台和未声明能力 fail-closed，不回落到其他平台。
-10. TikTok 与抖音任务不能串账号、串环境或串平台适配器。
-11. 视频和音频二进制不进入 PostgreSQL、业务事件或 Automation WebSocket。
-12. 媒体处理成功不等于发布成功，发布仍经过审批、自动化执行和平台结果验证。
-13. 浏览器关闭、槽位满和 Edge 离线不影响普通客户数据和媒体任务。
-14. 自动化事件只能使客户端缓存失效并触发 HTTP 重拉，不能覆盖 Cloud 权威数据。
+提取后先保持 `aidcp-cloud` 内现有 API 和 Automation，不急于改名。
 
-## 13. 后续进一步拆分的触发条件
+### 阶段 4：提取 `aidcp-api`
 
-只有出现明确证据时才继续拆分：
+- 迁移 customer-auth HTTP 和业务表所有权；
+- 建立面向 Console/客户端的稳定 API；
+- 建立自动化结果和内容结果的本地投影；
+- 删除对连接注册表、RiskController 和内容 Store 的直接读取；
+- 验证浏览器、Edge 或 Automation 离线时数据面仍可用。
 
-- Edge WebSocket 连接规模需要独立扩容：考虑拆 Edge Gateway；
-- GPU 或转码任务成为主要负载：考虑拆媒体分析与媒体生成 Worker 池；
-- 某个平台形成独立团队和发布节奏：考虑独立平台包或仓库，不默认独立服务；
-- Data API 查询投影成为独立瓶颈：考虑独立 Query/Projection 服务；
-- PostgreSQL Outbox 无法满足吞吐、延迟或跨机器可靠性：考虑专门消息中间件；
-- 两个服务长期由独立团队维护、绝大多数变更不再跨边界：再评估拆 Git 仓库。
+### 阶段 5：收敛 Automation
 
-在这些条件出现前，继续保持三个运行单元和一个 Cloud 仓库。
+当 Content 和 API 提取完成后，`aidcp-cloud` 剩余部分即 Automation。稳定运行一段时间后，再单独评估是否将仓库和部署名称改为 `aidcp-automation`。
 
-## 14. 待确认事项
+改名必须独立处理：
 
-进入 OpenSpec proposal 前需要最终确认：
+- Git 远端和 CI；
+- systemd 服务；
+- 部署脚本；
+- 环境变量；
+- 监控、告警和日志；
+- 文档和运维手册。
 
-1. `TK` 是否统一指国际版 TikTok，并与中国区抖音完全分开建模；
-2. 首期媒体输入来源：客户上传、平台采集、对象存储引用，还是三者都支持；
-3. “简化生成”的首期范围：摘要/脚本、封面/字幕、音频、模板视频分别做到哪一层；
-4. 对象存储沿用现有 OSS 还是建立新的媒体 Bucket 和生命周期规则；
-5. 首期 TikTok、抖音需要真实交付的动作集合与验收账号；
-6. Media Worker 初期与 Cloud 同机部署，还是从第一版开始使用独立计算节点。
+在此之前，`aidcp-cloud` 是迁移来源，不创建一个重复实现的 `aidcp-automation` 仓库。
 
-## 15. 建议决策
+### 阶段 6：扩展 TikTok 和抖音
 
-建议批准以下方向作为后续 OpenSpec 的输入：
+平台扩展放在能力合同、精确环境绑定和 fail-closed 准入稳定之后。每次只交付一个平台的一组可真实验收能力。
 
-> `aidcp-cloud` 保持单仓，拆分 Data API、Automation、Media Worker 三个运行单元；客户数据走 HTTP，自动化走 Edge WebSocket，媒体处理走异步任务与对象存储；TikTok、抖音通过显式平台能力和 Edge 适配器接入，不按平台拆 Cloud 服务。
+## 13. 多仓开发规范
+
+跨仓行为变更采用：
+
+1. `aidcp` 中一个命名明确的 OpenSpec change；
+2. 每个受影响仓库使用相同 change name 的 `codex/<change-name>` 分支和独立 worktree；
+3. 提供方先发布兼容合同；
+4. 消费方再升级并通过合同测试；
+5. 各仓独立提交、推送和验证；
+6. 集成与部署串行进行；
+7. 旧合同和兼容适配器只在所有消费者升级后删除。
+
+不得使用 Git submodule 把多个仓库重新绑成一个原子提交。跨仓一致性由 OpenSpec、合同版本、CI 和分阶段发布保证。
+
+## 14. 验收红线
+
+目标架构完成后至少满足：
+
+1. Automation、Edge、浏览器和槽位都不可用时，普通客户数据 HTTP 仍可用。
+2. 内容或媒体高负载不影响 Edge WebSocket 心跳。
+3. 任意服务重启后，已确认业务任务不丢失且业务副作用最多发生一次。
+4. 重复或乱序事件不会造成重复发布、重复互动或状态倒退。
+5. 三个 Cloud 仓库可以独立构建、测试、部署、健康检查和回滚。
+6. 不存在跨服务业务源码导入和跨服务业务表写入。
+7. 内容评估失败时不执行依赖该评估的互动。
+8. 最终动作同时经过平台能力、策略、RiskController、配额和冷却判断。
+9. 账号最终风险状态仍由 RiskController 单写。
+10. 发布审批绑定不可变 `candidateVersionId`。
+11. 自动发布绑定可信 `envKey + executionTarget`，恢复时不得换环境或串 target。
+12. `executionTarget` 由服务端注入，缺失或非法时相关 Worker fail-closed。
+13. 视频和音频二进制不进入 PostgreSQL、业务事件或自动化 WebSocket。
+14. 内容或媒体处理成功不等于审批成功或平台发布成功。
+15. 新平台未知能力返回 `capability_unsupported`。
+16. 服务和合同版本错配有自动化测试与清晰告警。
+17. 客户端实时事件只触发 HTTP 重拉，不覆盖 Cloud 权威数据。
+18. 请求已接收、任务已派发和执行结果未知都有独立、诚实的用户状态。
+
+## 15. 当前阶段明确不拆的内容
+
+当前不新增：
+
+- `aidcp-contracts`；
+- `aidcp-media`；
+- `aidcp-risk`；
+- `aidcp-tiktok`；
+- `aidcp-douyin`；
+- 每个 Worker 一个 Git 仓库；
+- Kafka、服务网格或分布式事务。
+
+只有出现独立团队、独立发布节奏、明确扩容瓶颈或隔离要求时，才继续拆分。优先通过同一领域仓库内的独立 Worker 解决计算扩容问题。
+
+## 16. 最终建议
+
+批准以下方向作为后续 OpenSpec 和实施依据：
+
+> 客户业务、内容智能和自动化控制面拆为 `aidcp-api`、`aidcp-content`、`aidcp-automation` 三个独立 Git 仓库；Cloud 服务之间以版本化 HTTP 合同和持久消息通信，普通客户端数据始终走 customer-auth HTTP，只有自动化任务通过 Edge WebSocket 下发。迁移先在 `aidcp-cloud` 内建立可独立运行的边界，依次提取 Content、API，最后再决定是否把剩余仓库改名为 Automation。
+
+本文件描述目标方案，不代表当前运行系统已经完成拆分。进入实现前必须创建 OpenSpec change，并同步更新 [架构说明](architecture.md)、[边云协议](protocol.md)、[风控说明](risk-control.md) 和相关部署文档。
