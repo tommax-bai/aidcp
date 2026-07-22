@@ -24,6 +24,6 @@
 - [x] 4.1 Run Cloud focused tests, acceptance, full tests and typecheck; run Console focused tests, full tests and build.
   <!-- Validation: Cloud focused 71/71, acceptance 65/65, full 2791 passed + 8 skipped, typecheck passed. Console focused 12/12, full 230 passed + 1 skipped, typecheck/build passed. -->
 - [x] 4.2 Run `openspec validate account-activity-content-schedule --strict` and record validation evidence and implementation commit SHAs in this task file.
-  <!-- OpenSpec strict validation passed before and after implementation; Cloud c87c251; Console 02c3b54. -->
+  <!-- OpenSpec strict validation passed before and after implementation; control 98a4404; Cloud c87c251; Console 02c3b54. -->
 - [ ] 4.3 Rebase and fast-forward land the control, Cloud and Console branches onto their default branches, then push without force.
 - [ ] 4.4 Deploy the clean default Cloud and Console revisions to `dev` only after target preflight/backups, then verify schema/hash, service/listener/health and bounded logs; record truthful deployment evidence.
