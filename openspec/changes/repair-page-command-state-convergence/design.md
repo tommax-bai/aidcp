@@ -37,6 +37,12 @@ Native IPC continues to receive only allowlisted high-level command fields. Elec
 
 When Native returns search `page_cards`, Electron reports the cards and a correlated `results_ready` or `no_results` terminal with the observed result count. This keeps activity accounting honest without passing orchestration metadata into the Rust page-rule payload.
 
+### D2a. Keep live AI-search actuation inside Native with trusted input and exact readback
+
+The live Xiaohongshu AI-search composer is a visible `textarea[name=aiSearchTextarea]`, not the older input-only shape. Native resolves a visible input or textarea geometry through an encoded helper, focuses it with trusted CDP pointer input, clears and inserts the keyword through CDP, verifies the exact page value, then submits with a trusted Enter event. If the browser is already on a matching `search_result_ai` route, Native does not submit again. After route confirmation, it polls within a fixed budget for result cards instead of treating route arrival alone as `no_results`.
+
+The geometry helper is encoded into the Rust binary alongside the other Native resources, so the production artifact verifier continues to reject cleartext selector/script leakage. This raises extraction cost without claiming that runtime CDP behavior is unobservable.
+
 ### D3. Model Facebook transition state separately from first-card readiness
 
 The Reels reader will return a structured transition result: `ready` with a card, `route_ready` when a canonical Reels route is confirmed but no active card is yet readable, or `failed` when navigation itself is unconfirmed. On `route_ready`, Edge commits `listMode=reels` and marks the transition pending, but reports no view/card success.
@@ -57,6 +63,7 @@ The 240-second idle nudge remains unchanged for unknown stalls. Known transition
 
 - [A task envelope could bypass Native quiescence] → `main.ts` continues to reject task IDs that do not match the active coordinator lease; focused tests cover owned, stale, and absent task IDs.
 - [Duplicate search accounting] → Cloud's existing activity-ID dedup remains authoritative; Electron emits one correlated terminal per Native command.
+- [AI-search route arrives before result cards] → Native separates matching-route confirmation from bounded card hydration and reports the observed result count honestly.
 - [A Reels route is confirmed but never becomes semantically readable] → retries are bounded and remain honest failures; no view or interaction is counted.
 - [Mixed Edge/Cloud versions use `no_target` instead of `reels_pending`] → pending Cloud state treats an immediate fallback `no_target` as an unconfirmed transition and preserves bounded retry/reset behavior.
 - [View quota blocks a retry] → the existing quota gate remains authoritative and the transition stays pending rather than being declared successful.

@@ -11,6 +11,8 @@
   <!-- Search activityId/purpose/scope survive Native routing; results_ready/no_results and not_submitted/failed_after_submit terminals are emitted with honest phase metadata. -->
 - [x] 2.3 Add focused Edge tests for owned-task admission, ordinary/stale command rejection, correlated `not_submitted`, and `results_ready`/`no_results` reporting.
   <!-- npx tsx --test test/native-page-engine/browse-session.test.ts test/execution/edge-task-coordinator.test.ts test/native-page-engine/direct-routing-contract.test.ts: 36 passed, 0 failed. npm run typecheck also passed. -->
+- [x] 2.4 Repair the live Native Xiaohongshu AI-search path for textarea geometry, trusted CDP input/readback, matching `search_result_ai` reuse, and bounded result-card hydration.
+  <!-- Live acceptance exposed textarea[name=aiSearchTextarea] and late result hydration. Rust now owns trusted pointer/key/text actuation; the encoded geometry resource preserves the release verifier boundary. Native router contract and Rust suites passed. -->
 
 ## 3. Facebook Reels transition convergence
 
@@ -31,7 +33,7 @@
 ## 5. Validation
 
 - [x] 5.1 Run Edge focused tests, acceptance, full tests, and typecheck with concise evidence.
-  <!-- Focused Native 36/36; Reels reader 28/28 plus Facebook session regression passed; acceptance 29/29; serialized full suite 2245/2245; typecheck and diff-check passed. Two default-concurrency timing flakes were each isolated and passed before the serialized green run. -->
+  <!-- Final post-hotfix evidence: focused Native TS 11/11; Rust 34 unit + 1 contract + 4 fake-CDP + 1 process-protocol passed; Reels reader 28/28 plus Facebook late-hydration regression passed; acceptance 29/29; serialized Edge full suite 2248/2248; typecheck, build:dist, Native release verifier, and production-dist verifier passed. -->
 - [x] 5.2 Run Cloud focused tests, acceptance, full tests, and typecheck with concise evidence.
   <!-- Focused RoleDispatcher/Facebook run 54/54; acceptance 68/68; full suite 2876 passed, 0 failed, 8 gated skips; typecheck and diff-check passed. -->
 - [x] 5.3 Run protocol-drift checks and `openspec validate repair-page-command-state-convergence --strict`.
@@ -39,6 +41,9 @@
 
 ## 6. Integration and DEV delivery
 
-- [ ] 6.1 Commit isolated Edge/Cloud/control changes, fetch/rebase onto latest defaults, revalidate, fast-forward push default branches, and record final SHAs without force.
-- [ ] 6.2 Restart the local source Electron runtime and verify the XHS task-search and Facebook late-Reels paths from correlated logs without performing a write interaction.
-- [ ] 6.3 Deploy the clean Cloud default branch to DEV only after target preflight and backup, then verify service, listeners, health, PostgreSQL, Feishu, and unchanged unrelated services.
+- [x] 6.1 Commit isolated Edge/Cloud/control changes, fetch/rebase onto latest defaults, revalidate, fast-forward push default branches, and record final SHAs without force.
+  <!-- Edge master fast-forwarded/pushed at 424ef375 (base convergence 86d9a88 + Native AI-search parity); Cloud master fast-forwarded/pushed at 3d12d21b. Control proposal started at 15948bc and its final evidence commit is integrated by this task. No force push. -->
+- [x] 6.2 Validate the source-built production components against the exact live XHS and Facebook accounts from correlated logs without performing a write interaction.
+  <!-- XHS k1e0ero8: coordinator-owned Native search activity live-search-activity-20260722 completed results_ready with 29 real cards. Facebook So La/k1es0359: production FacebookBrowseSession + FacebookReelsReader entered Reel 1024088900337945 and emitted one real reels page.cards; no like/follow/comment was invoked. The naturally late-card branch is deterministic-regression covered; this live sample hydrated within the initial settle budget. Both AdsPower profiles were confirmed stopped after probing. -->
+- [x] 6.3 Deploy the clean Cloud default branch to DEV only after target preflight and backup, then verify service, listeners, health, PostgreSQL, Feishu, and unchanged unrelated services.
+  <!-- DEV 121.89.85.150 deployed from clean Cloud master 3d12d21b after deploy-target check. Backups: /opt/aidcp/backups/cloud-20260722-205440.tgz and cloud-env-20260722-205440. Only aidcp-cloud.service restarted; service/listener/health/version/PostgreSQL/Feishu passed and unrelated isales PIDs were unchanged. -->
