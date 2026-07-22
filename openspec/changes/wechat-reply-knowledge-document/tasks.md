@@ -34,3 +34,13 @@
   <!-- Follow-up validation: Cloud focused 5/5, full 2863 passed + 8 skipped, typecheck passed; contract metaschema/internal-api/AI fixtures and OpenSpec strict passed. The boundary test proves two model calls maximum and no string truncation. -->
 - [x] 6.4 Commit, integrate, push, deploy the Cloud follow-up to `dev`, and verify service health, logs, state counts, and no real platform write.
   <!-- Follow-up delivery 2026-07-22: Cloud master e179025 was pushed and deployed to dev from the clean default checkout. Backups: cloud.bak.20260722-162458.tar.gz and cloud.env.20260722-162458.bak. Only reply-ai.ts and its test changed remotely; local/remote hashes matched. aidcp-cloud stayed active/running with NRestarts=0; 5432/8088/8090/8787 listened; public /api/health and /capi/health returned ok; PostgreSQL SELECT 1 passed; Feishu remained Dev.A with WSClient onReady; no actual error-priority journal entries were present; isales services remained active. Reply jobs/send attempts/contact comment attempts stayed 4/0/63, so deployment performed no real platform write. -->
+
+## 7. Knowledge-answer effectiveness and explainable risk
+
+- [x] 7.1 Specify required knowledge answering, one shared correction retry, ordinary-consultation risk rubric, preview reasons, and missing-contact honesty.
+- [x] 7.2 Extend the frozen polisher input with classifier intent and the internal preview contract with a named fallback reason.
+- [x] 7.3 Implement Cloud knowledge-answer correction, bounded retry sharing, reviewer rubric, deterministic rejection reason, and focused tests.
+- [x] 7.4 Update Console preview reason labels and tests without exposing discarded candidates or knowledge document bodies.
+- [x] 7.5 Run contract validation, focused/full Cloud and Console tests, Cloud typecheck, Console build, and strict OpenSpec validation.
+  <!-- Effectiveness validation: Cloud focused reply-config/AI 28/28, full 2867 passed + 8 skipped across 200 suites, and typecheck passed. Console focused 52/52, full 253 passed + 1 skipped, and production build passed. Contract metaschema/internal-api/AI fixture checks, diff checks, and OpenSpec strict validation passed. -->
+- [ ] 7.6 Commit, integrate, push, deploy Cloud then Console to `dev`, live-preview the current v8 question without sending, and verify health/logs/state counts.

@@ -13,6 +13,9 @@
 - 让文档跟随现有 scope draft/publish/CAS/audit 生命周期，不产生旁路配置。
 - 保留博主式短回复、模板联系方式单写、AI 人审和既有安全闸。
 - 让 AI 生成与润色从第一次生成起就遵守渠道 `maxLength`，并对仅超长的候选执行最多一次有界压缩重写。
+- 让知识型问题必须得到实际回答或明确的“无法确认”，不接受无解释地原样复制通用模板。
+- 让普通教育咨询稳定显示为低风险，同时保留 AI 回复人工审核与写入闸。
+- 让预览解释最终采用模板或 AI 候选的真实原因。
 - 对旧 profile 数据和 Cloud/Console 分步部署保持兼容。
 
 **Non-Goals:**
@@ -60,6 +63,26 @@ control repo 的 ReplyProfile schema 和 AI ProfileSummary 增加可选 nullable
 
 不对模型文本做字符串截断。截断可能破坏语义、JSON 后处理、联系方式或受保护导流行。如果 rendered template 自身已经超过 `maxLength`，在保留模板单写边界的同时不存在可满足候选；系统如实回退并保留超限原因，配置应由运营缩短模板或提高上限。
 
+### 7. classifier intent 驱动知识回答有效性
+
+`PolisherInput` 增加 classifier 已确定的 `intent`。当当前渠道文档非空，且 intent 属于问题/信息请求类时，prompt 不再只说“可以”引用文档，而是要求第一优先级直接回答用户问题：文档有明确答案就给出答案，文档没有答案就明确说暂时无法确认，然后再按剩余字数保留模板导流/联系方式边界。
+
+若首次结构化候选在 trim 后仍与 rendered template 完全相同，Cloud 将其视为 `knowledge_answer_missing`，而不是成功润色。在最多两次 polisher 调用的总预算内，第二次纠正 prompt 明确要求“不能只复制模板”；这与超长压缩共用同一个重试额度，任何原因都不得触发第三次调用。第二次仍未回答、超长或结构无效时，回退 rendered template 并保留具名原因。
+
+### 8. reviewer 使用内容风险而非客服措辞作判断
+
+`reply_risk_reviewer` prompt 增加稳定 rubric：普通课程适龄、学习范围、上课方式等非交易咨询，在没有订单、价格、优惠、退款、医疗、法律、个人数据、绝对承诺或其它 hard tag 时属于 low；模板已有的中性私聊引导本身不是风险。`unknown` 只用于输入缺失、候选含义确实无法判断或模型/结构化调用失败，不作为“谨慎起见”的默认值。
+
+`meaning_changed` 与 `introduced_claim` 是流程标签：它们继续强制人工审核，但不能仅凭自身把普通内容风险抬成 high。Cloud 计算内容 high 时只看订单、价格、退款、医疗、法律等实质风险标签；unknown 继续单独映射 unknown。这样“知识库新增了适龄事实”可以显示 low + 需要人工审核，不再混成“高风险内容”。
+
+这只修正风险展示与 reviewer 建议，不放宽发送边界。AI polisher 实际运行时，工作流仍强制 `requiresApproval=true`；模板/规则/全局写开关和确定性实质 hard-risk gate 继续单独生效。
+
+### 9. 预览解释采用或回退原因
+
+内部 preview `polish` 对象新增 `fallbackReason` 枚举，同时保留 `fallbackUsed` 兼容旧 Console。原因至少区分 `none`、模型 timeout/upstream/JSON/schema 错误、`too_long`、`knowledge_answer_missing` 和 `candidate_rejected`。Console 把原因映射为简短中文：当 before/after 相同且原因是 none 时显示“AI 判断无需改写”，不能继续让运营猜测模型是否运行或候选是否被丢弃。
+
+当前账号没有配置联系方式时，系统不得替运营编造真实微信/手机号。模板可以继续使用既有 `support_channel` fallback，但要实现真实“模板 + 联系方式”必须先由运营配置账号联系方式；这不是 AI 可以推断的值。
+
 ## Risks / Trade-offs
 
 - [长文档增加模型 token、延迟和成本] → 单渠道硬限 20,000 字符，只在实际调用 polisher 时发送；第一版不承诺长文档检索质量。
@@ -69,6 +92,9 @@ control repo 的 ReplyProfile schema 和 AI ProfileSummary 增加可选 nullable
 - [Cloud 回滚但 Console 未回滚时旧 Cloud 拒新字段] → 按 Cloud 先、Console 后部署；回滚时同步恢复两者备份。
 - [一个 group 共用文档不适合个别账号差异] → 延续现有 group/default 配置事实，不恢复账号级旁路；需要差异时调整账号分组。
 - [过小上限无法同时容纳回答与受保护模板行] → 完整候选统一计数，不截断受保护内容；一次压缩仍无法满足时回退，并提示运营调整模板或上限。
+- [模型把模板原文当作安全答案] → classifier intent 明确问题场景，原样候选触发一次纠正并输出具名原因。
+- [reviewer 为保守而把明确普通咨询判 unknown] → 给出可执行 low/unknown rubric；AI 路径仍强制人审，避免风险展示修正意外扩大自动发送。
+- [新增纠正导致调用次数失控] → 超长与知识回答缺失共享一次 retry，总调用次数仍最多两次。
 
 ## Migration Plan
 

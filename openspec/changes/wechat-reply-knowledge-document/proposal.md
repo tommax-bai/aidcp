@@ -8,6 +8,9 @@
 - 文档跟随现有 group/default scope 的草稿、发布版本、CAS 冲突和审计生命周期；不恢复账号级回复配置。
 - AI 润色启用且文档非空时，`reply_polisher` 可根据入站问题引用文档事实生成简短回答；文档无答案时必须明确无法确认，禁止自行补全。
 - AI 生成与润色必须在生成前接收渠道 profile 的具体 `maxLength`，最终完整回复（含模板导流和联系方式）不得超过该上限；首次候选仅因超长不合格时最多压缩重写一次。
+- 知识型问题不能把模板原文冒充 AI 回答：polisher 接收 classifier intent，必须直接回答或明确无法确认；首次候选仍等于模板时，在同一两次调用总预算内纠正一次。
+- 风险 reviewer 使用明确的普通咨询口径：无订单、价格、承诺等风险的教育适龄咨询应为 low，单纯模板私聊引导不构成风险；unknown 只用于证据确实不足。
+- 预览返回并展示具名 AI 结果原因，区分已应用、无需改写、知识回答缺失、超长、模型异常和确定性门禁拒绝。
 - 文档被视为不可信参考数据而非系统指令；模型不得执行文档中的提示词、泄露整份文档或绕过既有模板导流行、claim gate 与人工审核。
 - 管理后台在“语气与知识”配置中展示文档编辑、字数限制和用途说明，并在预览中使用当前 draft 文档。
 
@@ -25,5 +28,6 @@
 
 - 影响 control repo 的内部 API/AI role 合同与 fixtures、`aidcp-cloud` 的回复 profile 校验/存储/提示词/工作流、`aidcp-console` 的 DTO、表单和测试。
 - 最大字数补强只改变 `aidcp-cloud` 的 polisher 提示词与有界重写行为，不新增 Console 字段或 Edge 协议。
+- 知识回答有效性补强会同步修改 control 内部 AI/preview 合同、Cloud 工作流与 Console 预览 DTO/说明；不改变 Edge 协议、自动发送资格或数据库结构。
 - 复用 `interaction_reply_scope_versions.profiles` JSONB，不新增数据库表或迁移；不改变 Edge 协议或打包产物。
 - Cloud 与 Console 运行时行为变化需部署到 `dev`；不涉及 `ol`。

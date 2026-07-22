@@ -124,12 +124,13 @@
     "PolisherInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["role", "requestId", "accountId", "inbound", "renderedText", "profile"],
+      "required": ["role", "requestId", "accountId", "inbound", "intent", "renderedText", "profile"],
       "properties": {
         "role": { "const": "reply_polisher" },
         "requestId": { "$ref": "common.schema.json#/$defs/Id" },
         "accountId": { "$ref": "common.schema.json#/$defs/Id" },
         "inbound": { "$ref": "#/$defs/MinimalInbound" },
+        "intent": { "$ref": "#/$defs/Intent" },
         "renderedText": { "type": "string", "minLength": 1, "maxLength": 4000 },
         "profile": { "$ref": "#/$defs/ProfileSummary" }
       }

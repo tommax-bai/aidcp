@@ -32,6 +32,14 @@ comment 与 dm 的 ReplyProfile SHALL 各自允许一个可选 `knowledgeDocumen
 - **WHEN** 用户问题在当前渠道文档中没有明确支持信息
 - **THEN** polisher 被要求说明暂时无法确认，不得猜测答案或自行追加私聊 CTA/联系方式
 
+#### Scenario: 模型复制或轻改模板而没有回答
+- **WHEN** classifier 将入站识别为问题/信息请求类 intent、当前渠道文档非空，且首次合格 polisher 文本与 rendered template 相同，或没有记录任何文档事实且没有明确说明无法确认
+- **THEN** Cloud 不得把该文本记为成功知识回答，应在两次调用总预算内纠正一次，要求直接回答并记录文档事实，或明确无法确认
+
+#### Scenario: 纠正后仍没有实际回答
+- **WHEN** 第二次候选仍与 rendered template 相同
+- **THEN** Cloud 回退模板并记录 `knowledge_answer_missing`，不得发起第三次调用或把模板原文标成 AI 已回答
+
 #### Scenario: AI 未调用时文档不离开 Cloud 配置链
 - **WHEN** 规则未开启 polish、渠道 AI 开关关闭，或 DM 全局隐私闸关闭
 - **THEN** 知识文档不进入 classifier、polisher、reviewer 或其它模型请求，回复继续使用既有确定性路径
@@ -67,6 +75,34 @@ comment 与 dm 的 ReplyProfile SHALL 各自允许一个可选 `knowledgeDocumen
 #### Scenario: 模板自身超过最大字数
 - **WHEN** rendered template 的受保护内容本身已超过 `maxLength`
 - **THEN** 系统不得删除或截断模板行来伪装满足上限，应如实回退并保留可诊断的超限结果，供运营缩短模板或调整上限
+
+#### Scenario: 超长与知识纠正共享重试预算
+- **WHEN** 同一 polisher 首次候选同时需要长度或知识回答纠正
+- **THEN** Cloud 最多只再调用一次模型，第二次任何不合格结果直接安全回退
+
+### Requirement: 普通知识咨询必须使用明确风险口径
+
+reviewer SHALL 将内容风险与客服措辞分开判断。课程适龄、学习范围、上课方式等普通教育咨询，在候选不含实质 hard-risk 类别、交易信息、个人数据、绝对承诺或未知含义时 SHALL 返回 low；模板中已有的中性私聊引导 MUST NOT 单独导致 unknown。`meaning_changed` 与 `introduced_claim` SHALL 作为强制人审的流程标签，MUST NOT 仅凭自身把内容风险抬成 high。unknown MUST 只用于事实或含义确实无法判断、输入缺失或 AI 调用失败。无论 reviewer 返回 low 与否，知识型 AI 回复 MUST 继续要求人工审核，MUST NOT 因本要求获得自动发送资格。
+
+#### Scenario: 询问课程适龄范围
+- **WHEN** 用户询问“适合几岁的孩子”，知识文档回答小学三至六年级，候选没有订单、价格、优惠、退款、医疗、法律、个人数据或绝对承诺
+- **THEN** reviewer 与最终内容风险均为 low 且不附加 unknown；工作流可记录 meaning_changed/introduced_claim，但仍因 AI 实际运行而要求人工审核
+
+#### Scenario: 私聊引导不等于未知风险
+- **WHEN** 候选逐字保留模板提供的中性私聊引导且没有新增联系方式或敏感承诺
+- **THEN** reviewer 不得仅因该引导返回 unknown 或 hard-risk tag
+
+### Requirement: 预览必须解释 AI 候选结果
+
+Cloud preview SHALL 返回向后兼容的 `fallbackUsed` 和具名 `fallbackReason`；Console SHALL 用简短中文展示模型异常、输出无效、超长、知识回答缺失或确定性候选拒绝。若 AI 成功运行且文本与模板相同，界面 SHALL 明示“AI 判断无需改写”，MUST NOT 暗示没有运行 AI。
+
+#### Scenario: 知识回答缺失后回退
+- **WHEN** 两次 polisher 候选都没有回答问题而最终使用 rendered template
+- **THEN** 预览显示“AI 未回答问题，已回退模板”，而不是只展示相同的 before/after
+
+#### Scenario: 候选被确定性门禁拒绝
+- **WHEN** AI 候选命中长度、emoji、链接、禁词、声明或受保护行检查
+- **THEN** 预览显示候选被安全规则拒绝，且不得展示已被丢弃的候选正文或知识文档正文
 
 ### Requirement: 管理后台必须提供安全可验证的文档配置
 
