@@ -7,7 +7,11 @@
 - profile 对应的 Chromium 正在运行，AdsPower active API 在其他会话占用时可能返回 `Inactive`；profile 的 `DevToolsActivePort` 仍可给出动态 CDP 端口，且 `start.adspower.net/?id=k1evgky5` marker 可精确证明 profile 归属。
 - `https://www.douyin.com/jingxuan` 可正常加载，没有可见安全验证 iframe、访问受限提示或阻断 dialog；页面存在登录按钮和手机号登录表单，说明抖音账号当前未登录。
 - 精选页在一个 `overflow:auto` 的内部容器中承载作品卡片，`window.scrollBy` 不会推进内容。该容器当前包含 52 个唯一 `data-aweme-id`；页面另有导航和横向 tab 滚动容器，不能选择“第一个可滚动元素”。
-- 未登录状态可观察精选卡片，但单作品互动控件、评论编辑器和创作者上传页不能形成有效验收证据；这些必须在用户手工登录后重新调研。
+- 用户手工登录后，登录按钮和手机号表单消失、页面出现用户链接，且没有可见验证或访问限制，足以形成不读取账号身份值的结构化登录证据。
+- 精选卡片的脚本 `.click()` 不会可靠导航；对卡片内可见封面发送 CDP trusted pointer event 后，页面进入 `jingxuan?modal_id=<data-aweme-id>`。详情 modal 暴露 `feed-active-video`、`feed-item`、`video-player-digg`、`feed-comment-icon`、`video-player-collect` 和 `video-player-share`。相同作品的 `/video/<id>` 直链会间歇性只渲染导航骨架，不能作为唯一详情入口或 ready 证据。
+- 当前未点赞样本的 `video-player-digg` 没有 `aria-pressed`，SVG path 仅为 `currentColor`/白色；在没有正反状态对照样本前，点赞状态仍不可可靠读取，真实点赞必须保持封锁。
+- 页面已暴露 `https://creator.douyin.com/creator-micro/content/upload`，登录态可直接访问。上传首页存在一个启用、非 multiple 的视频文件 input，支持常见视频格式；未选择文件前没有文案编辑器。本次没有选择文件。
+- 作品 modal 中可观察 `feed-comment-icon` 和“评论”表面，但只读展开未稳定得到评论编辑器；观察到的“发一条弹幕吧” input 属于弹幕，不得误识别为评论编辑器。
 
 抖音开放平台当前提供网站应用 OAuth、`video.create` 权限、视频上传与创建、授权账号视频列表和视频数据查询。官方文档还明确要求代用户创建视频时，除授权外，每次调用都要在产品设计中让用户明确感知。由此，正式发布应优先走官方 API；网页 CDP 只用于调研页面能力和补充尚无官方接口的窄交互，不作为绕开授权的发布通道。
 
@@ -63,10 +67,10 @@
 浏览探针先识别 surface：
 
 - `jingxuan_grid`：以 `data-aweme-id` 为作品身份，从唯一拥有作品后代且可纵向滚动的容器推进；
-- `video_detail`：以规范 URL、页面 `data-aweme-id` 或二者一致性确定当前作品，并使用详情页自身的下一条/滚动机制；
+- `video_detail_modal`：从当前卡片 `data-aweme-id` 出发，对其可见封面发送 trusted pointer event，并要求随后 `modal_id` 与原作品 ID 一致；再以 `feed-active-video`、`modal-video-container` 和唯一动作控件确认详情 ready；
 - 其他 surface：只报告结构，不猜测动作。
 
-每次推进前后重新扫描、去重并比较作品 ID 集合，不缓存 DOM node，不用 `nth-child`，也不默认滚动 `window` 或第一个可滚动元素。有界尝试后作品集合未变化时返回 `no_change`，而不是假报已浏览。
+每次推进前后重新扫描、去重并比较作品 ID 集合，不缓存 DOM node，不用 `nth-child`，也不默认滚动 `window` 或第一个可滚动元素。脚本 `.click()` 返回和路由字符串变化都不单独构成导航成功；详情必须同时满足 modal identity 和 ready 结构。`/video/<id>` 直链只可作为可选观察路径，骨架超时返回 `page_not_hydrated`。有界尝试后作品集合未变化时返回 `no_change`，而不是假报已浏览。
 
 备选方案是按卡片文本、列表序号或视频播放状态识别内容；这些证据会受推荐排序、节点复用、自动播放和文案变化影响，故不采用。
 
@@ -81,6 +85,8 @@
 
 默认仅返回 `shadow_ready`。已点赞时返回 `already_liked` 且绝不点击；未点赞时最多点击一次，并在重新探测后要求同一作品变为 liked，才返回 `ui_confirmed`。作品变化、控件歧义或状态未闭环均返回 `ambiguous`，不得重试点击或宣称服务器已持久化。
 
+登录后现场证据只确认了唯一 `video-player-digg` 控件，没有得到可区分未赞/已赞的可访问性属性。实现阶段必须先用脱敏 fixture 建立正反状态判据；在此之前，即使两个运行门都打开，也只能返回 `state_unreadable`，真实点击路径不得启用。点赞计数和白色 `currentColor` SVG 均不能作为状态判据。
+
 备选方案是单布尔开关、按计数变化确认或点击后盲等；前两者易误用/误判，后者可能造成重复动作，故不采用。
 
 ### 6. 评论探针在类型和 DOM 行为上都没有发送能力
@@ -93,7 +99,7 @@
 
 ### 7. 正式发布优先官方 API；网页发布探针本期只读
 
-本期网页探针最多发现创作者/上传入口、路由、文件输入 accept/multiple、编辑器和阻断状态，不选择文件、不填写文案、不寻找或点击最终发布控件，结果固定包含 `uploaded=false`、`submitted=false`。
+本期网页探针最多发现创作者/上传入口、路由、文件输入 accept/multiple、编辑器和阻断状态，不选择文件、不填写文案、不寻找或点击最终发布控件，结果固定包含 `uploaded=false`、`submitted=false`。当前已确认入口为 `creator.douyin.com/creator-micro/content/upload`，首页存在一个启用的单文件视频 input；文案编辑器只允许在未来单独授权文件选择后重新调研，不能从上传前 DOM 推断。
 
 未来正式发布另建 OpenSpec change，推荐数据流为：
 
@@ -118,7 +124,9 @@ Cloud 负责审批、调度、token 生命周期、幂等和最终状态；Edge 
 - [评论草稿被网页本地保存] → no-submit 只保证不发送，不保证没有本地草稿；真实 fill 必须另获明确授权并由操作员清理。
 - [官方发布权限或应用审核不可用] → 显示 `official_api_unavailable` 并停止，不回退到网页提交。
 - [已运行 profile 被其他操作者占用] → 仅附着模式不控制生命周期；任何 target 不唯一或 ownership 不完整都停止。
-- [当前未登录，详情/创作者页证据不完整] → 将登录后结构调研列为实现前置验收，不能从未登录页面推断选择器。
+- [详情直链和脚本 click hydration 不稳定] → 使用 trusted pointer event 进入 modal，并同时校验 `modal_id` 与 ready 结构；骨架页面诚实返回 `page_not_hydrated`。
+- [点赞缺少可读状态] → 在获得正反 fixture 前只允许 shadow 并返回 `state_unreadable`，不得以计数或白色 SVG 推断。
+- [评论 surface 与弹幕输入易混淆] → 明确排除 placeholder 为“发一条弹幕吧”的 input；只有唯一、作品绑定的评论编辑器才能进入 fill 路径。
 
 ## Migration Plan
 
@@ -132,7 +140,8 @@ Cloud 负责审批、调度、token 生命周期、幂等和最终状态；Edge 
 
 ## Open Questions
 
-- 用户手工登录 `k1evgky5` 后，精选卡片进入单作品详情的稳定 route、点赞状态属性和评论编辑器语义分别是什么？
-- 抖音创作者网页当前的上传入口、文件 input、文案编辑器和草稿持久化边界是什么？本期只读观察能否获得足够证据？
+- `video-player-digg` 的已赞正样本使用什么稳定属性或结构？需要什么最小授权才能只形成一次正反对照而不误取消？
+- modal 中真正的评论编辑器需要怎样的 surface/tab 状态才出现，如何与“发一条弹幕吧”的弹幕 input 稳定区分？
+- 选择文件后才出现的文案编辑器、草稿持久化和上传完成证据是什么？该调研需要另行明确授权，因为文件选择可能形成服务端暂存。
 - AIDCP 计划申请哪一种抖音开放平台应用，是否已具备 `video.create`、`video.list`、`video.data` 和所需互动管理权限？
 - 产品首期目标是仅做研究探针，还是在官方权限到位后优先交付“人工批准的一键发布 + 状态回查”？

@@ -45,6 +45,14 @@ The Douyin browse probe SHALL identify the current page surface, use a surface-s
 - **WHEN** rendered cards expose `data-aweme-id`
 - **THEN** the probe de-duplicates those identifiers and reports only identifiers associated with the selected content surface
 
+#### Scenario: Grid card enters a detail modal
+- **WHEN** a trusted pointer event on the unique visible cover for a grid work opens a detail modal
+- **THEN** the probe requires the resulting `modal_id` to equal the source `data-aweme-id` and requires the active-feed and modal-ready structures before reporting `video_detail_modal`
+
+#### Scenario: Direct detail route remains a navigation skeleton
+- **WHEN** `/video/<id>` or a script `.click()` does not produce both matching identity and detail-ready structures within the bounded hydration window
+- **THEN** the probe returns `page_not_hydrated` and MUST NOT infer detail readiness from the URL alone
+
 #### Scenario: Content changes after bounded advancement
 - **WHEN** a bounded advancement yields a changed de-duplicated set of work identifiers
 - **THEN** the probe returns `advanced` with before and after identifiers and re-probes all target nodes
@@ -68,6 +76,10 @@ The Douyin like probe SHALL default to shadow mode and SHALL perform at most one
 - **WHEN** the unique current work and unique like control report the liked state before action
 - **THEN** the probe returns `already_liked` and MUST NOT click or toggle the control
 
+#### Scenario: Like state has no proven positive and negative mapping
+- **WHEN** the like control is unique but its accessible and structural state cannot distinguish liked from unliked using validated fixtures
+- **THEN** the probe returns `state_unreadable` and MUST NOT click even when both real-action gates are present
+
 #### Scenario: One real like is UI-confirmed
 - **WHEN** both gates are satisfied, the account is logged in, the target is unique and initially unliked, and one click is followed by the same work id in liked state
 - **THEN** the probe returns `ui_confirmed` and explicitly marks server persistence as unproven
@@ -87,6 +99,10 @@ The Douyin comment probe SHALL provide only a fill operation and SHALL structura
 - **WHEN** no unique visible comment editor can be proven for the current work
 - **THEN** the probe returns `editor_not_found` or `ambiguous` without input
 
+#### Scenario: Only the danmaku input is visible
+- **WHEN** the only work-adjacent input is identified by the placeholder `发一条弹幕吧`
+- **THEN** the probe excludes it from comment-editor candidates and returns `editor_not_found` without input
+
 #### Scenario: Work changes before comment input
 - **WHEN** the stable work id differs between editor discovery and the moment before input
 - **THEN** the probe returns `target_changed` without entering text
@@ -101,6 +117,10 @@ The Douyin publishing probe SHALL inspect the web creator/upload surface without
 #### Scenario: Upload entry or composer structure is observed
 - **WHEN** a unique creator or upload route and its structural controls are visible
 - **THEN** the probe reports the route, candidate counts, accepted file types, multiple-file mode, and editor metadata with `uploaded=false` and `submitted=false`
+
+#### Scenario: Upload landing page has no pre-upload editor
+- **WHEN** `creator.douyin.com/creator-micro/content/upload` exposes one enabled single-file video input but no editor before file selection
+- **THEN** the probe reports the input metadata and `editor_not_present_before_upload` without selecting a file
 
 #### Scenario: Publishing page requires login or verification
 - **WHEN** the creator or upload surface presents a login requirement, visible challenge, or access restriction
