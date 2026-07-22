@@ -19,7 +19,7 @@ Stable boundaries remain unchanged:
 **Goals:**
 
 - Make the Rust binary the only production Xiaohongshu page executor in supported desktop packages.
-- Cover the complete currently registered Xiaohongshu page-command surface: browse/search/navigation/read, note and profile traversal, notifications, interactions, captcha assistance, bounded legacy plan steps, the legacy whole-publish command, and atomic publish steps.
+- Cover the complete retained Xiaohongshu page-command surface: browse/search/navigation/read, note and profile traversal, notifications, interactions, captcha assistance, bounded legacy plan steps, and atomic publish steps. Retire the obsolete whole-publish registration and callers under the existing protocol-compatible migration path.
 - Preserve existing Cloud protocol payloads and honest outcome semantics while moving all selectors, page scripts, CDP writes, retries, and verification into Native.
 - Supervise a long-lived Native session with explicit protocol/version negotiation, correlation, deadlines, cancellation, crash handling, and no ambiguous-write replay.
 - Remove migrated Xiaohongshu page rules and action modules from distributable JavaScript and prove that removal by inspecting the final package.
@@ -60,7 +60,7 @@ IPC remains newline-delimited JSON with bounded records, stdout reserved for pro
 - an explicit cancellation request correlated to the active task and command;
 - an engine manifest record containing protocol, engine, platform-adapter, and artifact versions.
 
-Command kinds mirror the existing Xiaohongshu execution surface rather than CDP methods: page/feed refresh and scroll, search, note open/close/read/browse, navigation back, profile and notification traversal, like/collect/follow/comment/comment-like, captcha capture/click, allowlisted legacy plan actions, the legacy whole-publish transaction, and each existing atomic publish step. IPC never accepts selector text, evaluated source, WebSocket URLs, raw CDP method names, free-form plan goals, or arbitrary command payloads. For legacy `plan.response`, Edge sends only allowlisted `actionId`/operation/value tuples after validation; descriptive goals remain outside Native and cannot select arbitrary elements.
+Command kinds mirror the retained Xiaohongshu execution surface rather than CDP methods: page/feed refresh and scroll, search, note open/close/read/browse, navigation back, profile and notification traversal, like/collect/follow/comment/comment-like, captcha capture/click, allowlisted legacy plan actions, and each existing atomic publish step. The obsolete whole-publish transaction is deliberately unregistered rather than preserved as a second executor. IPC never accepts selector text, evaluated source, WebSocket URLs, raw CDP method names, free-form plan goals, or arbitrary command payloads. For legacy `plan.response`, Edge sends only allowlisted `actionId`/operation/value tuples after validation; descriptive goals remain outside Native and cannot select arbitrary elements.
 
 ### D4. Represent write outcomes as effect phases
 
