@@ -126,8 +126,8 @@
 <!-- aidcp-cloud aef34a0 README §5 -->
 - [x] 7.4 新增 `test/schema/expand-only.test.ts`：扫描所有 `kind=expand` 的迁移文件，断言不含 `DROP TABLE` / `DROP COLUMN` / `RENAME TO` / `ALTER COLUMN … TYPE` / `SET NOT NULL` / `DROP INDEX`；命中即失败并提示改标 contract。
 <!-- aidcp-cloud 9c9e72b 两条断言：expand 里没有收缩语句 + contract 里确实有收缩语句（防止误标 contract、白白吃掉一次显式授权）。判定先剥注释——迁移注释里大量出现「本文件不做 DROP TABLE」这类说明文字，不剥会制造假阳性、最后逼着给用例加豁免 -->
-- [ ] 7.5 在 `aidcp/docs/deployment-environments.md` 的破坏性 DDL 冻结段落（第 66-69 行）加一句指针，说明本纪律是该冻结在迁移期的延伸，并指向 `migrations/README.md`。
-<!-- BLOCKED: 中控仓 docs/ 由主控串行套用。改动稿已写在 scratchpad/docpatch-cloud-schema-migration-executor.md 的 ② 2.1 -->
+- [x] 7.5 在 `aidcp/docs/deployment-environments.md` 的破坏性 DDL 冻结段落（第 66-69 行）加一句指针，说明本纪律是该冻结在迁移期的延伸，并指向 `migrations/README.md`。
+<!-- 2026-07-23 主控套用 docpatch ② 2.1：docs/deployment-environments.md 破坏性 DDL 冻结段（item 1）末尾追加指向 migrations/README.md §5 与 table-ownership-migration.md 六步模板的指针。 -->
 
 ## 8. aidcp-cloud — 表所有权迁移模板
 
@@ -146,21 +146,21 @@
 
 ## 9. aidcp — 库级作用域盘点（控制仓）
 
-- [ ] 9.1 新增 `docs/database-scope-inventory.md`，表头固定为：机制 / 位置 file:line / 当前作用域 / 拆 schema 后是否成立 / 拆库后是否成立 / 拆库替代方案。开篇必须先纠正误读：advisory lock 与外键都是**数据库级**，搬 schema 不失效，拆库才失效，且失效是静默的。
-<!-- BLOCKED: 中控仓 docs/ 由主控串行套用。整份文件内容已写在 scratchpad/docpatch-cloud-schema-migration-executor.md 的 ① -->
-- [ ] 9.2 登记 advisory lock 7 处：`aidcp-cloud/src/interactions/interaction-store.ts:339`、`:409`、`:989`，`aidcp-cloud/src/client-auth/client-user-store.ts:619`、`:1468`、`:2001`、`:2128`。标注 `interaction-env:<envKey>` 命名空间被 client-auth 与 interactions 两域共用（`interaction-store.ts:337-339` 注释确认）。替代方案：改为对权威表行 `SELECT … FOR UPDATE`，或持久命令 + Inbox 去重。
-<!-- BLOCKED: 同 9.1，稿在 docpatch ① §1 -->
+- [x] 9.1 新增 `docs/database-scope-inventory.md`，表头固定为：机制 / 位置 file:line / 当前作用域 / 拆 schema 后是否成立 / 拆库后是否成立 / 拆库替代方案。开篇必须先纠正误读：advisory lock 与外键都是**数据库级**，搬 schema 不失效，拆库才失效，且失效是静默的。
+<!-- 2026-07-23 主控套用 docpatch ①：新建 docs/database-scope-inventory.md（§0 误读纠正 + §1 advisory lock 6 处 + §2 外键 + §3 跨表单事务 + §4 硬编码 schema 名 7 处）。 -->
+- [x] 9.2 登记 advisory lock 7 处：`aidcp-cloud/src/interactions/interaction-store.ts:339`、`:409`、`:989`，`aidcp-cloud/src/client-auth/client-user-store.ts:619`、`:1468`、`:2001`、`:2128`。标注 `interaction-env:<envKey>` 命名空间被 client-auth 与 interactions 两域共用（`interaction-store.ts:337-339` 注释确认）。替代方案：改为对权威表行 `SELECT … FOR UPDATE`，或持久命令 + Inbox 去重。
+<!-- 2026-07-23 主控套用：docs/database-scope-inventory.md §1（advisory lock 6 处，含历史修正 7→6：client-user-store 的 3 处 interaction-env 锁已被 publish-approval 换成行锁）。 -->
 <!-- 实测修正：现在是 **6 处**且构成不同。client-user-store 的 3 处 interaction-env: 锁已被 change publish-approval-signal-to-database 换成 client_environments 行锁（src/db/environment-row-lock.ts），并由 AC-LOCK-01 断言其消失。当前 6 处 = interaction-store.ts:430/:1011 + risk/writer-lock.ts:143/:205（风控单写者会话锁）+ scripts/migrate.ts:148/:209（迁移执行器整批锁）。docpatch 里记的是当前事实并显式写了这条修正 -->
-- [ ] 9.3 登记跨域外键：指向 `accounts(account_id)` 26 处（迁移 19 处，其中 `migrations/0039_interaction_inbox.sql` 14 处；源码 7 处含 `src/config/persona-store.ts:41`、`src/config/approval-policy-store.ts:22`、`src/delegated-task/store.ts:30`、`src/onboarding/first-post-onboarding-store.ts:27`、`src/comment-agent/facebook-group-store.ts:405`、`src/publish-agent/facebook-publish-media-store.ts:102`）；指向 `client_users(user_id)` 3 处；指向 `publish_log(id)` 2 处（`src/publish-agent/facebook-publish-media-store.ts:109`、`:131`）。替代方案：应用层校验 + 读侧 fail-closed，先例见 `src/client-auth/client-user-store.ts:123-127`。
-<!-- BLOCKED: 同 9.1，稿在 docpatch ① §2 -->
+- [x] 9.3 登记跨域外键：指向 `accounts(account_id)` 26 处（迁移 19 处，其中 `migrations/0039_interaction_inbox.sql` 14 处；源码 7 处含 `src/config/persona-store.ts:41`、`src/config/approval-policy-store.ts:22`、`src/delegated-task/store.ts:30`、`src/onboarding/first-post-onboarding-store.ts:27`、`src/comment-agent/facebook-group-store.ts:405`、`src/publish-agent/facebook-publish-media-store.ts:102`）；指向 `client_users(user_id)` 3 处；指向 `publish_log(id)` 2 处（`src/publish-agent/facebook-publish-media-store.ts:109`、`:131`）。替代方案：应用层校验 + 读侧 fail-closed，先例见 `src/client-auth/client-user-store.ts:123-127`。
+<!-- 2026-07-23 主控套用：docs/database-scope-inventory.md §2（源码外键 21 处 + 迁移外键 + 指向 accounts 合计 27 处，扫描先剥注释）。 -->
 <!-- 实测修正：指向 accounts(account_id) 合计 **27 处**（迁移 21 + 源码 6）。差额两处来源：① 第 3 节补齐的迁移把两条既有外键写进了迁移目录；② tasks 记的源码 7 处里有一处（client-user-store.ts:126）其实是注释里的反例说明「**故意不写** REFERENCES accounts」——不剥注释的扫描会把它当成真实外键。扫描器因此先剥注释。publish_log(id) 实测 3 处（多一处 src/publish-agent/draft-refinement.ts:50） -->
-- [ ] 9.4 登记跨 11 表单事务清理 `aidcp-cloud/src/interactions/interaction-store.ts:1634-1686`：拆 schema 仍原子、拆库不原子；替代方案为可重入分表 saga。
-<!-- BLOCKED: 同 9.1，稿在 docpatch ① §3 -->
-- [ ] 9.5 登记硬编码 `'public.'` 8 处：`aidcp-cloud/src/interactions/interaction-store.ts:300-302`、`src/interactions/reply-config-store.ts:72-73`、`src/interactions/reply-config-scope-store.ts:130-131`、`src/cache/curated-content-store.ts:357`。标注改 `search_path` 救不了这些。
-<!-- BLOCKED: 同 9.1，稿在 docpatch ① §4 -->
+- [x] 9.4 登记跨 11 表单事务清理 `aidcp-cloud/src/interactions/interaction-store.ts:1634-1686`：拆 schema 仍原子、拆库不原子；替代方案为可重入分表 saga。
+<!-- 2026-07-23 主控套用：docs/database-scope-inventory.md §3（purgeDueOffboards 跨 11 表单事务清理）。 -->
+- [x] 9.5 登记硬编码 `'public.'` 8 处：`aidcp-cloud/src/interactions/interaction-store.ts:300-302`、`src/interactions/reply-config-store.ts:72-73`、`src/interactions/reply-config-scope-store.ts:130-131`、`src/cache/curated-content-store.ts:357`。标注改 `search_path` 救不了这些。
+<!-- 2026-07-23 主控套用：docs/database-scope-inventory.md §4（硬编码 schema 名 7 处 + 收口进度：第 8 处已收口 qualifiedObjectName，剩 7 处在 src/interactions/** 未动）。 -->
 <!-- 实测修正：现在是 **7 处**——第 8 处（curated-content-store）已在任务 5.5 收口到 qualifiedObjectName()。剩余 7 处全在 src/interactions/**，未在本 change 内改动（定稿 §5.4.2 要求 8 处全收口，缺口见 docpatch ⑤ 5.2） -->
-- [ ] 9.6 在 `docs/cloud-service-decomposition-proposal.md` §5.1 与 §12 阶段 2 各加一条指针：本 change 是「为 Schema、数据库账号和迁移建立唯一所有者」的前置，不依赖拆分、可立即执行；并回指 `docs/database-scope-inventory.md`。
-<!-- BLOCKED: 中控仓 docs/ 由主控串行套用。两段指针稿在 docpatch ③ -->
+- [x] 9.6 在 `docs/cloud-service-decomposition-proposal.md` §5.1 与 §12 阶段 2 各加一条指针：本 change 是「为 Schema、数据库账号和迁移建立唯一所有者」的前置，不依赖拆分、可立即执行；并回指 `docs/database-scope-inventory.md`。
+<!-- 2026-07-23 主控套用 docpatch ③：docs/cloud-service-decomposition-proposal.md §5.1 表后加「前置说明（cloud-schema-migration-executor）」段；第二段指针按 docpatch 锚点落在 §5.4.7「子目标 A：迁移目录与所有权归属」之前（docpatch 标注为「§12 阶段 2」实为该锚点所在的 §5.4.7），均回指 database-scope-inventory.md。 -->
 
 ## 10. aidcp-cloud — 清单机械化与部署接线
 
@@ -169,12 +169,12 @@
 <!-- aidcp-cloud 9c9e72b 扩了两类：除 advisory lock 与 REFERENCES 外，还锁死硬编码 schema 名的形状探测点；扫描范围含 scripts/（迁移执行器的整批锁同样是库级机制，漏掉它就是漏掉一条） -->
 - [x] 10.2 该测试进 `npm run test:acceptance`，命名 `AC-SCHEMA-DB-SCOPE`。
 <!-- aidcp-cloud 9c9e72b test/acceptance/schema-db-scope.test.ts（4 例）。同 4.3 的偏离：用例文件放 test/acceptance/，JSON 仍在 test/schema/ -->
-- [ ] 10.3 在 `aidcp/docs/deployment-environments.md` 的 dev 与 ol 部署流程各插入迁移步骤：restart 之前跑 `npm run migrate status`（只读）确认无 pending 与无异常；有 pending 时人工审阅并跑 `migrate up`；`migrate` 失败即中止部署，MUST NOT 带着未应用迁移重启服务。
-<!-- BLOCKED: 中控仓 docs/ 由主控串行套用。稿在 docpatch ② 2.2。**这一步是第 5 节的部署前置**：存储不再自建表，带着未应用迁移重启会让对应能力 fail-closed -->
-- [ ] 10.4 在同一文档写明：契约门为 `enforce` 后，账本落后于代码会直接表现为服务启动失败，这是预期行为，处置是补跑迁移而不是回滚代码或关闭契约门。
-<!-- BLOCKED: 同 10.3，稿在 docpatch ② 2.3 -->
-- [ ] 10.5 部署验收信号补一条：restart 后除现有健康检查外，还须确认启动日志出现 schema 契约门的通过行（含账本最高版本 id），MUST NOT 只看进程 `active (running)`。
-<!-- BLOCKED: 同 10.3，稿在 docpatch ② 2.3 -->
+- [x] 10.3 在 `aidcp/docs/deployment-environments.md` 的 dev 与 ol 部署流程各插入迁移步骤：restart 之前跑 `npm run migrate status`（只读）确认无 pending 与无异常；有 pending 时人工审阅并跑 `migrate up`；`migrate` 失败即中止部署，MUST NOT 带着未应用迁移重启服务。
+<!-- 2026-07-23 主控套用 docpatch ② 2.2：docs/deployment-environments.md dev 与 ol 部署流程各插入「Apply and verify database migrations before restarting」步（restart 之前跑 migrate status，pending 则人工 migrate up，失败即中止），后续步号顺延。 -->
+- [x] 10.4 在同一文档写明：契约门为 `enforce` 后，账本落后于代码会直接表现为服务启动失败，这是预期行为，处置是补跑迁移而不是回滚代码或关闭契约门。
+<!-- 2026-07-23 主控套用 docpatch ② 2.3：docs/deployment-environments.md 新增 ### Schema Contract Gate 段（enforce 后账本落后=启动失败、处置=补跑迁移、超前需具体版本 id 放行）。 -->
+- [x] 10.5 部署验收信号补一条：restart 后除现有健康检查外，还须确认启动日志出现 schema 契约门的通过行（含账本最高版本 id），MUST NOT 只看进程 `active (running)`。
+<!-- 2026-07-23 主控套用 docpatch ② 2.3：同 Schema Contract Gate 段写明部署验收信号新增「启动日志确认契约门通过行（含账本最高版本 id）」，仅 active (running) 不算通过。 -->
 
 ## 11. 验证与交付
 
@@ -206,5 +206,5 @@
      OL 未部署（需用户明确要求 + 发布分支）。逐批观察项留 backlog 簇 110.3 / 110.5 -->
 - [x] 11.6 跑 `openspec validate cloud-schema-migration-executor --strict` 并记录输出。
 <!-- 输出：Change 'cloud-schema-migration-executor' is valid -->
-- [ ] 11.7 真机验收项（共库 baseline、契约门 `warn→enforce` 切换、每批空库拉起验证）登记进 `docs/real-machine-acceptance-backlog.md`，按共享真机环境聚簇。
-<!-- BLOCKED: 中控仓 docs/ 由主控串行套用。新簇 110（10 项）稿在 docpatch ④ -->
+- [x] 11.7 真机验收项（共库 baseline、契约门 `warn→enforce` 切换、每批空库拉起验证）登记进 `docs/real-machine-acceptance-backlog.md`，按共享真机环境聚簇。
+<!-- 2026-07-23 主控套用 docpatch ④：docs/real-machine-acceptance-backlog.md 新增簇 111（10 项，111.1–111.10）。原稿写簇 110，因 risk-state 按套用顺序先占 110，本 change 顺延为 111，内部 110.x 引用同步改 111.x；簇头「未部署」按 tasks 11.3/11.5 已部署 dev sha 89c286d 更正。 -->

@@ -4,22 +4,22 @@
 > 为避免互相冲突，本 session **未直接修改**该文件，改为把精确编辑写成 docpatch 交主控 session 串行套用：
 > `/private/tmp/claude-501/-Users-baitianxing-codes-aidcp/f0ef76c1-69d8-483a-8df8-115c38a2f9d0/scratchpad/docpatch-publish-approval-signal-to-database.md`
 
-- [ ] 1.1 在 `docs/cloud-service-decomposition-proposal.md` §5.2「候选版本和审批不能隐式漂移」后补一段：审批授权 MUST 是 `aidcp-api` 单写的持久记录，至少含候选版本标识、决策人、决策时间、决策渠道、`envKey`、`executionTarget` 与决策本身；MUST NOT 以本机文件、本机内存或共享路径承载。
-<!-- docpatch 补丁 2 已写就；控制仓文档由主控 session 串行套用，本 session 不直接改 -->
+- [x] 1.1 在 `docs/cloud-service-decomposition-proposal.md` §5.2「候选版本和审批不能隐式漂移」后补一段：审批授权 MUST 是 `aidcp-api` 单写的持久记录，至少含候选版本标识、决策人、决策时间、决策渠道、`envKey`、`executionTarget` 与决策本身；MUST NOT 以本机文件、本机内存或共享路径承载。
+<!-- 2026-07-23 主控套用 docpatch 补丁 2：docs/cloud-service-decomposition-proposal.md §5.2 在「自动化恢复执行时…」之后新增一段（审批授权 MUST 是 api 单写持久记录、原子性靠活跃行唯一约束、作废=状态迁移不删行）。 -->
 - [x] 1.2 **降级为核对，MUST NOT 再新增条目**：本项写于定稿整合之前，§6.4 禁止清单**现已是 8 条**，第 8 条逐字为「用共享文件系统、本机路径、本机临时目录或数据库 advisory lock 传递跨服务的授权、锁或业务事实」，已覆盖本 change 的形态（并在其下以「实例一」逐点列出了审批信号文件的读写方与失效形态）。本项的义务改为：核对该条措辞确已覆盖，如有缺口再提最小增补；照原文再加一条会产出重复条目。
 <!-- 核对完成：§6.4 第 8 条 + 实例一/实例二逐点覆盖本 change 两个形态，无缺口，不新增条目。结论记于 docpatch「已核对无需改动」一节 -->
 - [x] 1.3 **降级为核对，MUST NOT 再新增类别**：定稿 §12 阶段 0 的「状态盘点清单」**现已是六类表**（表 / 进程内内存事实 / 本机文件信号 / 本机锁与 PG advisory lock / EventBus 事件 / 常驻定时任务），本 change 坐实的四类通道已全部在内。本项的义务改为：核对六类已覆盖，并把本 change 新坐实的实例填进对应行。
 <!-- 核对完成：六类已覆盖，不扩表。新坐实实例落在 aidcp-cloud/docs/cross-service-shared-state-inventory.md，由 docpatch 补丁 3 在定稿里加指针 -->
-- [ ] 1.4 **仍是活任务**（定稿六类表现只有「类别 / 盘点内容 / 失效方向」三列）：在 §12 阶段 0 补一句盘点行的必填字段：引用点 `文件:行` → 拆分后归属服务 → 是否跨服务 → 替代机制 → 不替代会怎样失效（必须写出失效方向是静默还是报错）。
-<!-- docpatch 补丁 3 已写就；控制仓文档由主控 session 串行套用 -->
-- [ ] 1.5 在 §12 阶段 4 与「删除对连接注册表、RiskController 和内容 Store 的直接读取」并列增一条：把审批授权的文件实现替换为持久授权记录 + `PublishApproved` 命令，并明确 edge 侧文件闸是随迁还是就地废弃。
-<!-- docpatch 补丁 4 已写就（定稿原文已有「改为 api 持久记录 + PublishApproved」一行，缺的是 edge 侧处置口径 → 补丁改为「就地废弃」）；控制仓文档由主控 session 串行套用 -->
-- [ ] 1.6 在 §14 验收红线增一条：审批通过后下发侧不可用时，用户 MUST 看到明确的待下发或失败态，MUST NOT 呈现为与「待审批」不可区分的静默停滞。
-<!-- docpatch 补丁 5 已写就（尾部追加 AC-DECOMP-31，编号纪律：1–18 冻结、19–30 已用）；控制仓文档由主控 session 串行套用 -->
+- [x] 1.4 **仍是活任务**（定稿六类表现只有「类别 / 盘点内容 / 失效方向」三列）：在 §12 阶段 0 补一句盘点行的必填字段：引用点 `文件:行` → 拆分后归属服务 → 是否跨服务 → 替代机制 → 不替代会怎样失效（必须写出失效方向是静默还是报错）。
+<!-- 2026-07-23 主控套用 docpatch 补丁 3：docs/cloud-service-decomposition-proposal.md §12 阶段 0 六类表下方新增「每行盘点行的必填字段」段 + 指向 aidcp-cloud/docs/cross-service-shared-state-inventory.md 的指针。 -->
+- [x] 1.5 在 §12 阶段 4 与「删除对连接注册表、RiskController 和内容 Store 的直接读取」并列增一条：把审批授权的文件实现替换为持久授权记录 + `PublishApproved` 命令，并明确 edge 侧文件闸是随迁还是就地废弃。
+<!-- 2026-07-23 主控套用 docpatch 补丁 4：docs/cloud-service-decomposition-proposal.md §12 阶段 4「把审批授权从文件通道改为 api 持久记录」一行补 edge 侧同路径文件闸「就地废弃、降级为必须显式启用的开发夹具」。 -->
+- [x] 1.6 在 §14 验收红线增一条：审批通过后下发侧不可用时，用户 MUST 看到明确的待下发或失败态，MUST NOT 呈现为与「待审批」不可区分的静默停滞。
+<!-- 2026-07-23 主控套用 docpatch 补丁 5：docs/cloud-service-decomposition-proposal.md §14.1 尾部追加红线 AC-DECOMP-32（可检测性·已批准待下发）。原稿拟 31，因三条并行新增红线按套用顺序排号、config-mirror 先取 31，本 change 顺延为 32（boundary-gates=33）。 -->
 - [x] 1.7 在仓内产出阶段 0 盘点表初版（六类，至少覆盖本 change 已坐实的：审批信号文件、`interaction-env:<envKey>` advisory lock、`interaction-store.ts:409` / `:989` 两把单服务内锁、常驻定时任务）。**常驻定时任务的计数 MUST 同时给出两个数、且 MUST 在实施当天重测**：定稿 §4.6.5 / §12 阶段 0 的「14」是逐个定归属的**宿主**数（其第 13、14 项并非 `setInterval`），本稿的「24」是 `grep -rn setInterval src` 的**调用点**数（2026-07-22 实测在 23–24 之间漂动）。两者不是一回事，只写一个数会让盘点者提前收工。
 <!-- aidcp-cloud 66d05e7 docs/cross-service-shared-state-inventory.md；计数两口径：宿主 14（引定稿）/ 调用点 2026-07-23 当日实测 26（含本 change 新增看门狗，主干应为 25）。表放 sub-repo 而非控制仓：控制仓 docs/ 是 5 个并行 change 的冲突热点，指针由 docpatch 补丁 3 加入定稿 -->
 - [ ] 1.8 影子写关闭后更新 `CLAUDE.md` §4 中「发布审批信号文件两端契约路径必须一致」的表述，改为「授权以持久记录为准，两端不得依赖同机路径」。
-<!-- BLOCKED: 前置条件未满足——影子写仍默认开（AIDCP_PUBLISH_APPROVAL_LEGACY_SIGNAL_FILE 默认 true），两端确实仍写同一路径，CLAUDE.md 现有表述在过渡窗口内仍准确。改法已备在 docpatch 补丁 6，标注「现在还不能套用」 -->
+<!-- BLOCKED: 前置条件未满足——影子写仍默认开（AIDCP_PUBLISH_APPROVAL_LEGACY_SIGNAL_FILE 默认 true），两端确实仍写同一路径，CLAUDE.md 现有表述在过渡窗口内仍准确。改法已备在 docpatch 补丁 6，标注「现在还不能套用」。2026-07-23 主控复核：docpatch 补丁 6 未套用，CLAUDE.md §4 保持原表述（影子写关闭 + 两端满一发布周期无读者后另起独立收尾）。 -->
 
 ## 2. aidcp-cloud — 持久授权记录与单写出口（未来 api 域）
 
@@ -86,7 +86,7 @@
 <!-- aidcp-cloud 5ebe1d2（/api/content/queue 的 lifecycle）+ c1f18fa（/api/content/published 每行）。status 枚举**不加新取值**——加了会让未升级前端落 default 分支整页白屏，细分改由这四个增量可选字段承担 -->
 <!-- aidcp-cloud a9ce113 修：面板侧投影读失败被裸 catch 吞掉（读失败与「未接线」同样返回 null、服务端零留痕）⇒ PG 抖动时「已批准·待下发」会无声消失、排障无线索。已补 warn，与 server.ts 同口径 -->
 - [x] 4.7 `src/comm/protocol.ts` 的 `PublishApprovalActionResultPayload` 增量可选字段 `dispatchState?: 'pending_dispatch' | 'dispatching' | 'blocked'` 与 `dispatchBlockedReason?: string`；`state` 的既有取值 MUST NOT 变更。改动与 edge 同名文件逐字一致，并同步 `docs/protocol.md`（该消息按信封 id 应答，不进主动命令白名单）。
-<!-- aidcp-cloud 4ad06a2 / aidcp-edge 0b5f536（两份 protocol.ts 该段逐字一致，diff 已核；两文件其余既有差异为本 change 之前就存在的注释/枚举顺序漂移，未触碰）。docs/protocol.md 属控制仓 → docpatch 补丁 1 -->
+<!-- aidcp-cloud 4ad06a2 / aidcp-edge 0b5f536（两份 protocol.ts 该段逐字一致，diff 已核；两文件其余既有差异为本 change 之前就存在的注释/枚举顺序漂移，未触碰）。docs/protocol.md 属控制仓 → docpatch 补丁 1。2026-07-23 主控套用补丁 1：docs/protocol.md publish.approval_action.result 的 jsonc 块加 dispatchState / dispatchBlockedReason 两个增量可选字段 + 说明 bullets；消息类型数未变、头部计数无需改。 -->
 
 ## 5. aidcp-cloud — advisory lock 替换
 

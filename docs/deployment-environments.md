@@ -44,6 +44,8 @@
 - Local cloud is not a production substitute. Run cloud tests locally, but runtime cloud lives on ECS.
 - Deploy only from a clean main checkout/default branch for `dev`, and from a clean release branch checkout for `ol`. A tag or clean SHA may be used to create the release branch, but the deployed ref is the branch.
 - Never deploy from an arbitrary dirty worktree.
+- The automation writer (the cloud process that owns risk state) MUST run **exactly one instance per target**. Deployment MUST be stop-then-start. **Rolling and blue-green deployment MUST NOT be used for it** — the overlap window makes the single-writer invariant false while both builds are live. (change `risk-state-cross-process-integrity`)
+- A cloud process that cannot acquire the automation writer lock MUST be treated as a correct refusal, not as an outage. Do not "fix" it by force-killing the current holder before confirming that holder is genuinely dead — that is exactly how a double-write window is created.
 - Never record secrets in git, OpenSpec tasks, docs, shell history snippets, or memory. Record only env key names, paths, services, and validation commands.
 - Do not touch unrelated `isales` services, directories, ports, or databases on `dev`.
 
@@ -63,10 +65,12 @@ As of the 2026-07-06 probe, dev PostgreSQL was reachable from ol, listened on `*
 
 **Status 2026-07-11 (ol turned stable-production while still sharing dev PG — split deferred by user decision).** `ol` production and `dev` unstable-trunk both read/write `121.89.85.150/aidcp`, isolated only by `account_id`. Until `ol` gets its own PostgreSQL boundary, two guardrails are MANDATORY:
 
-1. **Freeze destructive/incompatible dev schema migrations.** `dev` runs the unstable trunk (incl. freshly merged feature work) against the *same* schema `ol` production reads. Additive DDL (`ADD COLUMN IF NOT EXISTS`) is tolerable (ol just ignores the new column); DROP/RENAME/type-narrowing is NOT — it would corrupt ol production reads. Before landing any change that introduces such a migration, split the ol DB first.
+1. **Freeze destructive/incompatible dev schema migrations.** `dev` runs the unstable trunk (incl. freshly merged feature work) against the *same* schema `ol` production reads. Additive DDL (`ADD COLUMN IF NOT EXISTS`) is tolerable (ol just ignores the new column); DROP/RENAME/type-narrowing is NOT — it would corrupt ol production reads. Before landing any change that introduces such a migration, split the ol DB first. 该冻结在迁移期的延伸写在 `aidcp-cloud/migrations/README.md` §5（change `cloud-schema-migration-executor`）：每个迁移文件 MUST 声明 `-- aidcp:kind=expand|contract`；共库期执行器**默认拒绝**应用 `contract`，只在显式 `npm run migrate up --allow-contract` 时应用并把授权者写进账本。重命名 MUST NOT 用 `ALTER … RENAME`，MUST 改写为新增列 + 双写 + 影子读 + 切读 + 一次独立的 contract 删旧列（六步模板见 `aidcp-cloud/docs/table-ownership-migration.md`）。这不是新增护栏，是同一条冻结的机械化。
 2. **Tighten dev PostgreSQL `pg_hba`** away from `0.0.0.0/0` to local-dev + the ol source only (still pending as of 2026-07-11).
 
 Verify at every dev deploy that the batch introduces no destructive migration (`migrations/*.sql` additions are the tell). The 2026-07-11 `feature/fb-full-integration → master` merge added no migration.
+
+**共库的一个已知副作用（change config-mirror-cross-process-invalidation 修复中）**：`quota_config`、`pacing_floor_config`、`session_config_global`、`resume_config_global`、`model_config`、`role_config`、`category_config`、`hot_lead_config` 这 8 张是**全局表、无 `execution_target` 列**。云端此前对配置只在启动与本进程写入时刷新内存镜像（全仓无 watch / 无定时刷配置 / 无 LISTEN/NOTIFY），因此在一个部署目标的后台改动这些配置，**另一个部署目标的进程到重启才可见**，中间没有任何日志、没有任何告警、后台还回显写入成功。本变更引入共享版本表 `config_mirror_version` + 消费侧有界轮询（默认 5s、硬上界 30s，env `AIDCP_CONFIG_MIRROR_POLL_MS`；整体开关 `AIDCP_CONFIG_MIRROR_REFRESH`，默认开、置 `false` 即秒级回滚到旧行为），把可见性延迟收敛到「轮询周期 + 一次查询耗时」。闸门类配置（人设、运营暂停态、环境出口闸、慢启动锚点、内容排期）副本超过 60s 陈旧上限即**停手**：不下发新的平台动作、已在跑的会话自然收敛，并落 `config_mirror_stale` 告警。（本段同时兑现定稿 §11.4「陈旧上限 T MUST 是部署文档中写死的一个具体值」= 60s）
 
 ## Target Selection
 
@@ -203,8 +207,9 @@ or a future ol domain. Packaged edge releases intended for ol must not silently 
 3. From the clean main checkout, back up cloud/env on `dev`.
 4. `rsync` excluding `.env`, `node_modules`, and `.git`.
 5. If the batch changes `package.json`/`package-lock.json`, run a FULL `npm ci` on the ECS (`--registry=https://registry.npmmirror.com` as fallback). Never use `--omit=dev`: the service runs source via `npx tsx`, and `tsx`/`typescript` live in devDependencies — omitting them bricks the restart. Runtime asset dirs (e.g. `assets/fonts/`) travel with rsync automatically.
-6. Restart only `aidcp-cloud.service`.
-7. Health-check service state, `8787`, panel `8090`, PostgreSQL, Feishu if enabled, and console if touched. If the batch touches the text-card renderer (`src/render/`, `assets/fonts/`, satori/resvg deps), also run the render smoke: instantiate the renderer on the ECS and assert a golden card renders at 1728x2304 with non-zero bytes (verifies napi prebuilds against the host glibc).
+6. **Apply and verify database migrations before restarting** (change `cloud-schema-migration-executor`). Run `npm run migrate status` on the ECS (read-only). It MUST report no anomalies. If it lists pending migrations, a human MUST review them and then run `npm run migrate up`. If `migrate status` or `migrate up` fails, **abort the deployment** — do not restart the service. Never restart with unapplied migrations: since the stores no longer self-create tables, a lagging schema now surfaces as a fail-closed capability with a named missing-object list instead of a silently recreated empty table.
+7. Restart only `aidcp-cloud.service`.
+8. Health-check service state, `8787`, panel `8090`, PostgreSQL, Feishu if enabled, and console if touched. If the batch touches the text-card renderer (`src/render/`, `assets/fonts/`, satori/resvg deps), also run the render smoke: instantiate the renderer on the ECS and assert a golden card renders at 1728x2304 with non-zero bytes (verifies napi prebuilds against the host glibc).
 
 ### Ol
 
@@ -213,9 +218,65 @@ or a future ol domain. Packaged edge releases intended for ol must not silently 
 3. Verify all affected artifacts are built from matching release branch sources.
 4. Back up the existing ol runtime if present.
 5. `rsync` committed cloud files and built console static files to ol.
-6. Restart only ol `aidcp-cloud.service` and reload ol nginx when needed.
-7. Health-check cloud, panel, console, database, and Feishu if enabled.
-8. Record the release branch, deployed SHAs, database mode, and validation notes in the OpenSpec task.
+6. **Apply and verify database migrations before restarting** (change `cloud-schema-migration-executor`). Run `npm run migrate status` on the ol ECS (read-only). It MUST report no anomalies. If it lists pending migrations, a human MUST review them and then run `npm run migrate up`. If `migrate status` or `migrate up` fails, **abort the deployment** — do not restart the service. Never restart with unapplied migrations: since the stores no longer self-create tables, a lagging schema now surfaces as a fail-closed capability with a named missing-object list instead of a silently recreated empty table.
+7. Restart only ol `aidcp-cloud.service` and reload ol nginx when needed.
+8. Health-check cloud, panel, console, database, and Feishu if enabled.
+9. Record the release branch, deployed SHAs, database mode, and validation notes in the OpenSpec task.
+
+### Schema Contract Gate
+
+(change `cloud-schema-migration-executor`) Cloud 启动时先读迁移账本的最高版本，与本构建声明的 `REQUIRED_SCHEMA_VERSION` / `KNOWN_MAX_SCHEMA_VERSION` 按复合版本序比较（`aidcp-cloud/src/schema/schema-contract.ts`）。
+
+- 模式由 `AIDCP_SCHEMA_GATE=warn|enforce` 控制，**当前默认 `warn`**：判定照做、结论照打，暂不拒绝启动。跑满一个发布周期并覆盖一次 ol 部署后切 `enforce` 并把默认值改为 `enforce`。
+- **`enforce` 之后，账本落后于代码会直接表现为服务启动失败。这是预期行为**，处置是**补跑迁移**；MUST NOT 关闭契约门、MUST NOT 回滚代码来掩盖。
+- 账本**超前**于代码（回滚到旧构建的典型场景）同样拒绝启动。放行通道 `AIDCP_ALLOW_SCHEMA_AHEAD` **必须填具体版本 id**，布尔值 / 空串 / 通配值一律视为未放行；不存在「一次开启即永久生效」的形态。共库期 dev 应用一条新 expand 迁移后，ol 上的旧构建会观察到超前——这不是误报，是必须逐次显式放行并记录的事实。
+- **部署验收信号新增一条**：restart 之后除服务状态、`8787`、panel `8090`、PostgreSQL、飞书之外，还 MUST 在启动日志里确认出现 schema 契约门的**通过行**（含账本最高版本 id，形如 `[aidcp-cloud] schema 契约门（warn） schema 契约门通过：账本最高版本 <version>`）。仅确认进程 `active (running)` MUST NOT 被视为通过。
+
+## Automation Writer Lock
+
+(change `risk-state-cross-process-integrity`) The cloud process that owns risk state takes a PostgreSQL session-scoped advisory
+lock keyed by its `executionTarget` before enabling any risk write path. The lock
+rides a dedicated long-lived connection, not a pooled one: a pooled connection can
+be recycled, and the lock would be released with it.
+
+**Startup logs.** A healthy start prints `自动化写者锁已持有（target=<dev|ol>）`.
+A refused start prints `自动化写者锁获取失败` plus the reason, writes a P1 alert
+naming the holder, and exits non-zero. The refusal is the designed behaviour —
+refusing to start beats silently double-writing.
+
+**Who holds it.** On the target host:
+
+```sql
+SELECT a.pid, a.application_name, a.client_addr, a.backend_start, a.state
+  FROM pg_locks l
+  JOIN pg_stat_activity a ON a.pid = l.pid
+ WHERE l.locktype = 'advisory'
+   AND l.classid  = hashtext('aidcp_automation_writer');
+```
+
+Match `pid` against the running service (`systemctl status aidcp-cloud.service`)
+before concluding anything.
+
+**Forcing a release.** Only after confirming the holder is genuinely dead — the
+old process was `kill -9`'d and its TCP connection has not yet been reaped, so
+PostgreSQL still counts the session as live:
+
+```sql
+SELECT pg_terminate_backend(<pid>);   -- terminates that backend; the advisory lock goes with it
+```
+
+MUST NOT terminate a backend that belongs to a *running* service. If the service
+is up and holding the lock, the correct action is to stop it first
+(`systemctl stop aidcp-cloud.service`), which releases the lock cleanly.
+
+**Why rolling/blue-green is forbidden here.** Both shapes deliberately keep the
+old and new builds alive at the same time. For a stateless HTTP tier that is the
+whole point; for this process it means two copies simultaneously hold the
+admission authority for real platform side effects. The mechanical lock turns that
+into a loud startup failure rather than a silent double-write, but the deployment
+shape must not create the situation in the first place. The current
+`systemctl restart` is already stop-then-start, with a zero overlap window — this
+section only records that as a hard constraint rather than an accident.
 
 ## Preflight Helper
 

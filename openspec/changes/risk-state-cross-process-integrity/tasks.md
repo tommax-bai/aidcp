@@ -89,18 +89,18 @@
 
 ## 10. aidcp（控制仓）— 文档
 
-- [ ] 10.1 `docs/cloud-service-decomposition-proposal.md` **§14.1 红线表 `AC-DECOMP-09` 行**（该文档不存在 §14.9，顶层编号 §1–§17 冻结，**MUST NOT 新增 §14.x 小节**）：在「红线」列补入可验收句式「对任一 `accountId`、任一时刻，`risk_state` 的写入者唯一，且配额判定所依据的计数与库内事实一致」；在「验收方式」列补写者锁与部署约束（每 target 单实例、stop→start、禁止滚动 / 蓝绿）。注意该行的「验收方式」列已按分两段兑现改写（阶段 2 凭据 + 静态门禁 / 子目标 B 后 GRANT），本项 MUST 在其上追加，MUST NOT 覆盖。
-  <!-- BLOCKED: 中控仓文档为 5 个并行 change 的共享写点，本 session 只读。精确编辑已写进 scratchpad/docpatch-risk-state-cross-process-integrity.md（§14.1 AC-DECOMP-09 行），由主控串行套用。 -->
-- [ ] 10.2 §12 阶段 2「验证各进程独立停止、重启和回滚」旁补「单实例 / 可多实例」组件分类表（内容见本 change 的 spec delta），并写明新增后台组件必须先归类。
-  <!-- BLOCKED: 中控仓文档为 5 个并行 change 的共享写点，本 session 只读。精确编辑已写进 scratchpad/docpatch-risk-state-cross-process-integrity.md（§12 阶段 2 单实例分类表），由主控串行套用。 -->
-- [ ] 10.3 §5.1 单一写入者表的「最终风险状态」行补一句：写权按 `accounts.execution_target` 排他，`risk_counters` 作为既成事实账本不按 target 分裂。
-  <!-- BLOCKED: 中控仓文档为 5 个并行 change 的共享写点，本 session 只读。精确编辑已写进 scratchpad/docpatch-risk-state-cross-process-integrity.md（§5.1 最终风险状态行），由主控串行套用。 -->
-- [ ] 10.4 §11 故障表补一行「自动化写者锁不可获得」：应保持可用=客户数据与内容服务；允许受影响=该 target 的自动化整体不启动（诚实失败，不降级为无锁运行）。
-  <!-- BLOCKED: 中控仓文档为 5 个并行 change 的共享写点，本 session 只读。精确编辑已写进 scratchpad/docpatch-risk-state-cross-process-integrity.md（§11 故障表新增一行），由主控串行套用。 -->
-- [ ] 10.5 `docs/risk-control.md` 补跨进程单写、outbox 记账链路、对账机制三节。
-  <!-- BLOCKED: 中控仓文档为 5 个并行 change 的共享写点，本 session 只读。精确编辑已写进 scratchpad/docpatch-risk-state-cross-process-integrity.md（docs/risk-control.md §7.4–§7.6），由主控串行套用。 -->
-- [ ] 10.6 `docs/deployment-environments.md` 补写者锁运维段：如何确认锁持有者、`kill -9` 后如何强制释放、为什么禁止滚动 / 蓝绿。
-  <!-- BLOCKED: 中控仓文档为 5 个并行 change 的共享写点，本 session 只读。精确编辑已写进 scratchpad/docpatch-risk-state-cross-process-integrity.md（docs/deployment-environments.md 写者锁运维段），由主控串行套用。 -->
+- [x] 10.1 `docs/cloud-service-decomposition-proposal.md` **§14.1 红线表 `AC-DECOMP-09` 行**（该文档不存在 §14.9，顶层编号 §1–§17 冻结，**MUST NOT 新增 §14.x 小节**）：在「红线」列补入可验收句式「对任一 `accountId`、任一时刻，`risk_state` 的写入者唯一，且配额判定所依据的计数与库内事实一致」；在「验收方式」列补写者锁与部署约束（每 target 单实例、stop→start、禁止滚动 / 蓝绿）。注意该行的「验收方式」列已按分两段兑现改写（阶段 2 凭据 + 静态门禁 / 子目标 B 后 GRANT），本项 MUST 在其上追加，MUST NOT 覆盖。
+  <!-- 2026-07-23 主控套用：docs/cloud-service-decomposition-proposal.md §14.1 红线表 AC-DECOMP-09 行——「红线」列追加可验收判据、「验收方式」列追加 ③ 写者单实例与部署形态，均在既有两段兑现之上追加、未覆盖。 -->
+- [x] 10.2 §12 阶段 2「验证各进程独立停止、重启和回滚」旁补「单实例 / 可多实例」组件分类表（内容见本 change 的 spec delta），并写明新增后台组件必须先归类。
+  <!-- 2026-07-23 主控套用：docs/cloud-service-decomposition-proposal.md §12 阶段 2 新增「运维工件（MUST）——后台组件的单实例 / 可多实例分类表」，置于「部署前置检查器」块之前。 -->
+- [x] 10.3 §5.1 单一写入者表的「最终风险状态」行补一句：写权按 `accounts.execution_target` 排他，`risk_counters` 作为既成事实账本不按 target 分裂。
+  <!-- 2026-07-23 主控套用：docs/cloud-service-decomposition-proposal.md §5.1 最终风险状态行——写权按 execution_target 排他、risk_counters 不按 target 分裂；同批新增 risk_counter_outbox 行。 -->
+- [x] 10.4 §11 故障表补一行「自动化写者锁不可获得」：应保持可用=客户数据与内容服务；允许受影响=该 target 的自动化整体不启动（诚实失败，不降级为无锁运行）。
+  <!-- 2026-07-23 主控套用：docs/cloud-service-decomposition-proposal.md §11.2 降级语义表新增「自动化写者锁不可获得」行，置于 PostgreSQL 行之前。 -->
+- [x] 10.5 `docs/risk-control.md` 补跨进程单写、outbox 记账链路、对账机制三节。
+  <!-- 2026-07-23 主控套用：docs/risk-control.md §7 首条 bullet 追加跨进程指针，并新增 §7.5 / §7.6 / §7.7（原稿拟 §7.4–§7.6，因 §7.4「降级操作」已存在故顺延一位，bullet 指针同步改为 §7.5–§7.7）。 -->
+- [x] 10.6 `docs/deployment-environments.md` 补写者锁运维段：如何确认锁持有者、`kill -9` 后如何强制释放、为什么禁止滚动 / 蓝绿。
+  <!-- 2026-07-23 主控套用：docs/deployment-environments.md Invariants 加两条（写者单实例 / 锁抢不到=诚实失败），并新增 ## Automation Writer Lock 段（持有者查询 / 强制释放 / 禁滚动蓝绿）。 -->
 
 ## 11. 验证与交付
 
@@ -112,5 +112,5 @@
   <!-- 2026-07-23 deployed 主控串行执行：备份 cloud.bak.20260722-185821Z.tar.gz + .env.bak.20260722-185821Z → 从 git archive HEAD 干净快照 rsync（--exclude .env/node_modules/.git）→ restart → healthcheck。部署 sha d9c550e（含本 change 全部 5 个提交）。实测四项：① 日志「自动化写者锁已持有（target=dev）」；② `select status,count(*) from risk_counter_outbox` 返回空集（零行、零积压），启动日志「启动回收在途行=0」；③ 对账器已启动、15 分钟内零偏差告警；④ 归属模式 = observe，`accounts.execution_target` 36 行全 NULL（迁移刻意不回填，等运行时首次真实握手自证占位）。零 error 日志。 -->
 - [ ] 11.6 观察期结束后单独提交一次「翻开 `AIDCP_RISK_OWNERSHIP_ENFORCE=true`」的变更，并在 tasks 里记录观察期实测的跨 target 争用次数（预期 0；非 0 则先查清归属再翻）。
   <!-- BLOCKED: 依赖 11.5 的观察期数据。翻 AIDCP_RISK_OWNERSHIP_ENFORCE=true 须单独提交，且先统计 alerts 里 risk_owner_mismatch_observed / risk_state_not_owned 条数（预期 0）。 -->
-- [ ] 11.7 真机验收项（双 target 同时驱动同一账号被拒、滚动部署第二实例启动失败、崩溃点补记）登记进 `docs/real-machine-acceptance-backlog.md`，按共享真机环境归簇。
-  <!-- BLOCKED: docs/real-machine-acceptance-backlog.md 是中控仓共享文档，本 session 只读。8 条真机项已写进 scratchpad/docpatch-risk-state-cross-process-integrity.md 的附录，由主控串行登记。 -->
+- [x] 11.7 真机验收项（双 target 同时驱动同一账号被拒、滚动部署第二实例启动失败、崩溃点补记）登记进 `docs/real-machine-acceptance-backlog.md`，按共享真机环境归簇。
+  <!-- 2026-07-23 主控套用：docs/real-machine-acceptance-backlog.md 新增簇 110（8 项，110.1–110.8）。原稿未指定簇号，主控按套用顺序分配 110（schema-migration 顺延至 111）。 -->

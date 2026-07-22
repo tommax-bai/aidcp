@@ -1953,3 +1953,44 @@ Phase 0（云端）不依赖 UI，可先用 SQL 造态 + 后台仪表盘验（�
 - [ ] 109.4 **（换 Cloud 不动浏览器）** 同时准备浏览器已开、已关和一个模拟重绑失败的环境，从 dev 切到测试 Cloud 再切回：逐环境展示实际 Cloud、目标 Cloud 与失败原因，部分成功不得冒充全部成功；全程不 `SIGTERM` 核心、不调用 `queueStartEnv`，浏览器开关态与槽位所有权保持不变。
 - [ ] 109.5 **（执行器崩溃隔离）** 页面任务中终止 AdsPower 浏览器或制造 CDP 不可恢复：在途页面任务诚实失败并释放租约/provider/槽位，界面显示“浏览器执行器异常”与“重新打开浏览器”；客户端核心和 Cloud 不掉线，随后可重新打开新一代浏览器并重新核验真实身份。
 - [ ] 109.6 **（视频号离场清理的一次性授权）** 对一个可回滚视频号测试环境发起解绑，关闭浏览器后让客户端用 Cloud 签发的短时 cleanup grant 启动受限清理核心：只允许接收其绑定 offboard command/ack，成功消费一次后 replay 拒绝；分别篡改 `offboardId/envKey/accountId/edgeId` 和等待过期，均转人工处理且绝不回落启动浏览器。
+
+## 簇 110 — 跨进程风控单写：两套云端会不会各放各的、崩在半路会不会丢账
+
+### change `risk-state-cross-process-integrity` 真机验收（Cloud `aef96c4` / Edge `22a9c31` / Console `c73b6bc` 已 land 各仓 master、**部署 dev sha `d9c550e`**（观察模式 `AIDCP_RISK_OWNERSHIP_ENFORCE=false`）；登记于 2026-07-23）
+
+**前置环境**：dev + ol 两套云端 + 真 PostgreSQL 共库 + 真边缘节点。下列各项全部属**桩验不了**的类别：要么依赖真 PostgreSQL 的语义，要么依赖两套云端同时在线。
+
+**改了什么（一句话）**：以前每套云端各按自己内存里的计数放行、各写各的风控状态，合计能放行两倍的量、还会互相盖回；现在用数据库锁保证「每个部署目标只有一个写者」，风控写带属主校验，记账先落库再推进，并周期性与库对账。
+
+- [ ] 110.1 **双 target 同时驱动同一账号被拒**（需 dev + ol 两套云端 + 一个边缘节点）：把一个归属 `ol` 的账号的边缘节点接到 `dev`，确认握手被拒、拒绝码为 `execution_target_mismatch`、客户端界面显示真实归属与处理办法而不是「云端离线」。观察模式下确认不拒绝但有告警。
+- [ ] 110.2 **滚动部署的第二实例启动失败**（需 dev ECS）：在 `aidcp-cloud.service` 运行时，从同一目录手工再起一个进程，确认它在有界等待后以非零码退出、`alerts` 表出现 `risk_writer_lock_unavailable`、且**正在跑的那个实例毫发无伤**。
+- [ ] 110.3 **持锁连接断开 → 停止下发互动**（需 dev ECS）：用 `pg_terminate_backend` 掐掉持锁后端，确认进程转入 fail-closed（互动准入一律拒绝、浏览仍放行）、`alerts` 出现 `risk_writer_lock_lost`。
+- [ ] 110.4 **崩溃点补记**（需 dev ECS + 真边缘）：在一次真实互动回执之后、outbox apply 之前 `kill -9` 云端，重启后确认启动日志的回收条数 ≥1、该次动作出现在 `risk_counters` 且**只有一行**。
+- [ ] 110.5 **属主谓词的 SQL 真值**（需真 PostgreSQL）：手工把某账号 `execution_target` 改成另一 target，触发一次风控状态写，确认影响行数为 0 且 `risk_state` 未变（桩只能验证 0 行之后的分支，验证不了 0 行本身）。
+- [ ] 110.6 **`FOR UPDATE SKIP LOCKED` 的多 worker 互斥**（需真 PostgreSQL）：两个 worker 并发认领同一批 outbox 行，确认无重复 apply、`risk_counters` 行数等于 outbox 行数。
+- [ ] 110.7 **迁移 `0061` 在 dev 上的 additive 性**（tasks 1.6，需 dev ECS）：只跑迁移、不改代码，确认 `\d accounts` 有 `execution_target`（全 NULL、**未被回填**）、`\d risk_counters` 有 `outbox_id`、`risk_counter_outbox` 表与两个索引到位，且既有查询零回归。
+- [ ] 110.8 **观察期实测跨 target 争用次数**（tasks 11.6）：`AIDCP_RISK_OWNERSHIP_ENFORCE=false` 观察一段时间后统计 `alerts` 里 `risk_owner_mismatch_observed` 与 `risk_state_not_owned` 的条数；预期 0，非 0 则先查清归属再翻强制。
+
+## 簇 111 — 迁移账本上线：库到底跑没跑过那些迁移
+
+### change `cloud-schema-migration-executor` 真机验收（Cloud `aef34a0` + `9c9e72b` + `ecf5290` + `a6c00c1` 已 land、**部署 dev sha `89c286d`**（2026-07-23）；下列需连真库/临时库的验收项一次都没跑过。登记于 2026-07-22，2026-07-23 随审计返工更新）
+
+**前置环境**：dev ECS（`121.89.85.150`）上的 `/opt/aidcp/cloud`，可跑 `npm run migrate`；一个**一次性临时库**（MUST NOT 用 dev/ol 共库做空库拉起验证）。本簇全部项都必须在 **restart 之前**做，因为 §10.3 的新部署步骤就在那儿。
+
+**改了什么（一句话）**：数据库表结构从此只由 `migrations/` 一处产生；云端启动时先核对「库里是哪个版本」，对不上就明确报错而不是自己把表建出来继续跑。
+
+> **本地已坐实**：`npm test` tests 3068 / pass 3060 / fail 0 / skipped 8、`test:acceptance` 81 全绿、`typecheck` 0 error；`AC-SCHEMA-DDL-OWNER` / `AC-SCHEMA-NO-SILENT-RECREATE` / `AC-SCHEMA-DB-SCOPE` 三条新红线用例已进 acceptance。
+> **所有需要连真库的动作（verify / baseline / 空库拉起）一次都没跑过**，下列各项不得写成已验。
+>
+> **`a6c00c1` 改了什么、为什么影响本簇的执行顺序**：审计发现补齐迁移的编号排在「后续 ALTER 这些表」的历史迁移之后，全新空库上 `migrate up` 第 5 条就整批停住。返工把 `0065`+`0066` 合并重编为 `0000_baseline_identity_and_corpus_tables.sql` 并重生成了受影响文件的头声明。这意味着**同一批迁移的版本 id 与校验和都变了**——`a6c00c1` 之前的构建不得用来跑 111.2。一次性证据（PGlite 真空库、复刻执行器「任一条失败即停整批」语义）：返工后 69/69 全部应用、建出 89 张表，且把全部存储 DDL 常量解析成要求集合与该库比对缺口为 0。**PGlite 不是 PG、也没起 cloud 进程，111.6 仍必须做。**
+
+- [ ] 111.1 **（本簇最高价值 · 实测对账）** 在 dev 上跑 `npm run migrate verify`：把**缺失对象**与**多余对象**两张清单**原文**贴回本 change 的 tasks.md（不含任何凭据值）。缺失清单非空是**发现**不是失败——逐条判断该补跑哪一条迁移，MUST NOT 为了让清单变空而放宽比对。
+- [ ] 111.2 **（基线登记 · 这一步是单向门）** 缺失清单为空后跑 `npm run migrate baseline --by=<操作者>`，记录**账本行数**与**最高版本 id**。再跑一次 `baseline` 确认**幂等跳过、不覆盖任何已有行**。**执行前 MUST 确认所用构建含 `a6c00c1`**：版本 id 是账本主键、校验和进账本，落账之后再改任何迁移文件名或内容都会变成「改两个已上线库的账本主键 / 触发 `migration_checksum_mismatch` 整批拒绝」，而不再是改几个文件名。
+- [ ] 111.3 **（部署序列真的挡得住）** 故意在未跑 `migrate up` 的情况下走一次 dev 部署流程：`npm run migrate status` MUST 列出 pending 并使部署停在该步，MUST NOT 进到 restart。
+- [ ] 111.4 **（契约门通过行）** restart 之后在启动日志里确认 schema 契约门的通过行，含账本最高版本 id；确认它出现在**任何存储 `init()` 之前**。
+- [ ] 111.5 **（存储不再自建表）** 在 dev 上确认 33 个存储启动时**没有**发出任何建表语句（日志无 `schema_missing_*` / `schema_incomplete_*` 即为 ready；出现任一条即说明该库缺对象，按 111.1 的清单补跑迁移，MUST NOT 打开 `AIDCP_SCHEMA_SELF_CREATE` 绕过）。
+- [ ] 111.6 **（全新空库拉起 · 必须在一次性临时库上做）** 空库 → `npm run migrate up --allow-contract`（历史迁移里有 6 条 contract：`0036`/`0041`/`0045`/`0046`/`0052`/`0069`）→ 启动 cloud → 断言全部存储无需自建即 ready。**MUST NOT 对 dev/ol 共库执行本项。** 口径提醒：`a6c00c1` 之后仓内有两条**静态**闸守着这件事——`test/schema/ddl-parity.test.ts` 守「对象没抄漏」、`test/schema/migration-order.test.ts` 守「按复合序跑得完」。两条都绿仍不等于本项已做：静态模拟不会执行 SQL，也没起过 cloud 进程。
+- [ ] 111.7 **（回滚场景 · 契约门真的拦得住）** 在临时库上把账本推到一个比构建更高的版本，用当前构建启动：MUST 报 `schema_ahead_of_code` 并列出超前版本；确认**没有任何表被重建**。再用 `AIDCP_ALLOW_SCHEMA_AHEAD=<具体版本 id>` 放行一次，确认启动日志与告警通道**各**记一条。
+- [ ] 111.8 **（warn → enforce 切换）** 契约门以 `warn` 跑满一个发布周期且覆盖一次 ol 部署后，切 `AIDCP_SCHEMA_GATE=enforce` 并把默认值改为 `enforce`；把实际跑满的**日历天数**记进 tasks.md（design.md「Open Questions」要求这个数字落在 tasks 而不是代码注释里）。
+- [ ] 111.9 **（收尾清账）** 上述各项稳定后，执行 tasks 5.11：删除 `AIDCP_SCHEMA_SELF_CREATE` 旋钮与 33 个存储里的 DDL 常量、删除 `test/schema/ddl-parity.test.ts`、删除 `scripts/run-migration.ts`（保留它等于保留一条无账本旁路）；届时 `test/schema/runtime-ddl-allowlist.json` 的条目才真正变少。
+- [ ] 111.10 **（被 risk 域挡住的那一个）** `src/risk/pg-risk-store.ts` 的自建表未随本批收口（归 change `risk-state-cross-process-integrity` 独占，它刚在该文件落了写者锁与 outbox）。待其稳定后另起一批，按同一范式收口并从允许清单里删掉对应条目。

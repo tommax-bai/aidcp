@@ -997,9 +997,16 @@ first-writer-wins 审批信号。动作成功只表示审批决定已受理：`a
   "state": "approved",       // approved | rejected
   "alreadyDecided": false,    // 可选；重复动作命中既有决定时为 true
   "reason": "version_stale", // 可选；失败原因
-  "currentVersion": 1         // 可选；版本过期时返回当前版本
+  "currentVersion": 1,        // 可选；版本过期时返回当前版本
+  "dispatchState": "pending_dispatch",       // 可选；pending_dispatch | dispatching | blocked
+  "dispatchBlockedReason": "edge_offline_waiting"  // 可选；下发阻塞原因
 }
 ```
+
+- `dispatchState` / `dispatchBlockedReason` 是 change `publish-approval-signal-to-database` 新增的**增量可选字段**：与 `state` 是两个轴——`state` 是审批结论，它们是「批完之后走到哪了」，使客户端稿件卡能把「已批准·待下发」与「待审批」区分开，杜绝批准后界面毫无变化的静默停滞。
+- `state` 的既有取值 **MUST NOT** 变更：给 `state` 加新取值会让旧客户端落进 else 分支显示为失败；加**可选字段**则被旧客户端安全忽略、行为不变。
+- 本消息按信封 id 应答、由客户端 pending 表 resolve，**不进** `edge-client.ts` 的主动命令路由白名单。
+- `dispatchBlockedReason` 取值：`edge_offline_waiting` / `browser_slot_waiting` / `breaker_open` / `captcha_paused` / `approval_unreadable`。
 
 **`publish.draft_image_remove`**（edge → cloud）——客户端稿件预览内删除某张配图
 ```jsonc

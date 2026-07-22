@@ -117,18 +117,18 @@
 
 ## 8. aidcp — 控制仓文档与契约
 
-- [ ] 8.1 更新 `docs/cloud-service-decomposition-proposal.md` §5.1：把 `quota_config` / `pacing_floor_config` / `session_config_global` / `resume_config_global` 从「人设和运营配置 → aidcp-api」显式剥离，改判 `aidcp-automation`；并补一条限定——被 automation 同步闸门消费的 api 权威事实 MUST 以本地只读副本 + 版本 + 失效通知消费，MUST NOT 用构造期快照、MUST NOT 每次调用做跨服务同步请求。
-  <!-- BLOCKED: 该文件由 5 个并行 change 共同修改，本 session 按 fleet 编排约定不直接改，精确编辑已写入 scratchpad/docpatch-config-mirror-cross-process-invalidation.md 由主控串行套用。**核对结果**：四类限频配置在现文档 §5.1 已单列成行并判给 aidcp-automation（`:506`），「显式剥离」已兑现；docpatch 只保留一处必要微改——把人设那一行的「任务创建时引用版本或快照」改掉，它与 §11.4 要求二自相矛盾且在形态上不成立 -->
-- [ ] 8.2 更新 §6.1 通信表：新增一行「跨进程配置镜像失效 | 共享 PostgreSQL 版本表 + 有界轮询（`pg_notify` 仅作加速器）| 无消息队列、陈旧上限可证明」。
-  <!-- BLOCKED: 同 8.1，精确编辑在 docpatch（含表下一句「MUST NOT 套用 §6.2 Outbox/Inbox」的理由） -->
-- [ ] 8.3 更新 §11 故障表第 2 行：把「按合同安全收敛」替换为可验收三态——已在跑会话按有界陈旧度收敛到自然终点；已领取未开始的持久任务保持 claim 并按 `deferred` 延后；新会话被拒并回 `persona_unavailable` / `config_mirror_stale` 而非静默。
-  <!-- BLOCKED: 同 8.1，精确编辑在 docpatch（§11.2 表第 2 行、实测 `:1394`） -->
-- [ ] 8.4 更新 §14 红线：新增一条——权威不可达时 automation MUST NOT 以缺省人设或缺省配额继续执行平台动作；副本超过声明陈旧上限后的行为 MUST 是文档中声明的停手，且 MUST 有具名告警与可计量记录。
-  <!-- BLOCKED: 同 8.1，精确编辑在 docpatch（按 §14.1「新增只在尾部追加」的编号纪律，拟为 31 / AC-DECOMP-31） -->
-- [ ] 8.5 更新 §12 阶段 1 交付物：加入「为闸门类跨服务事实建立本地副本 + 版本 + 失效通知适配器，并补一条『写方更新后读方在 T 内可见』的测试」。
-  <!-- BLOCKED: 同 8.1，精确编辑在 docpatch（含一条对应的退出判据） -->
-- [ ] 8.6 在 `docs/deployment-environments.md` 的共库状态块补一句现存缺陷与本变更的关系：8 张全局配置表在 dev/ol 双进程间不互相刷新，重启前不可见。
-  <!-- BLOCKED: 控制仓除本 change 的 tasks.md 外一律只读（fleet 编排约束），精确编辑在 docpatch §8.6；该段同时兑现定稿 §11.4「陈旧上限 T MUST 是部署文档中写死的一个具体值」= 60s -->
+- [x] 8.1 更新 `docs/cloud-service-decomposition-proposal.md` §5.1：把 `quota_config` / `pacing_floor_config` / `session_config_global` / `resume_config_global` 从「人设和运营配置 → aidcp-api」显式剥离，改判 `aidcp-automation`；并补一条限定——被 automation 同步闸门消费的 api 权威事实 MUST 以本地只读副本 + 版本 + 失效通知消费，MUST NOT 用构造期快照、MUST NOT 每次调用做跨服务同步请求。
+  <!-- 2026-07-23 主控套用：docs/cloud-service-decomposition-proposal.md §5.1 人设行「其他服务如何使用」列改写（MUST 取本地只读副本 + 禁构造期快照 + 禁判定路径跨服务同步请求）。四类限频配置「显式剥离」现文档早已兑现，故仅此一处微改。 -->
+- [x] 8.2 更新 §6.1 通信表：新增一行「跨进程配置镜像失效 | 共享 PostgreSQL 版本表 + 有界轮询（`pg_notify` 仅作加速器）| 无消息队列、陈旧上限可证明」。
+  <!-- 2026-07-23 主控套用：docs/cloud-service-decomposition-proposal.md §6.1 通信表新增「跨进程配置镜像失效」一行，并在表下补「MUST NOT 套用 §6.2 Outbox/Inbox」一段。 -->
+- [x] 8.3 更新 §11 故障表第 2 行：把「按合同安全收敛」替换为可验收三态——已在跑会话按有界陈旧度收敛到自然终点；已领取未开始的持久任务保持 claim 并按 `deferred` 延后；新会话被拒并回 `persona_unavailable` / `config_mirror_stale` 而非静默。
+  <!-- 2026-07-23 主控套用：docs/cloud-service-decomposition-proposal.md §11.2 表 aidcp-api 停止行末列改为可验收三态（在跑会话 / 已领取任务 / 新会话与新命令）。 -->
+- [x] 8.4 更新 §14 红线：新增一条——权威不可达时 automation MUST NOT 以缺省人设或缺省配额继续执行平台动作；副本超过声明陈旧上限后的行为 MUST 是文档中声明的停手，且 MUST 有具名告警与可计量记录。
+  <!-- 2026-07-23 主控套用：docs/cloud-service-decomposition-proposal.md §14.1 尾部追加红线 AC-DECOMP-31（未知≠否）。本 change 是三条并行新增红线中第一个套用者，取得 31（publish-approval=32、boundary-gates=33）。 -->
+- [x] 8.5 更新 §12 阶段 1 交付物：加入「为闸门类跨服务事实建立本地副本 + 版本 + 失效通知适配器，并补一条『写方更新后读方在 T 内可见』的测试」。
+  <!-- 2026-07-23 主控套用：docs/cloud-service-decomposition-proposal.md §12 阶段 1 新增交付物第 6 项（本地副本 + 版本 + 失效通知适配器）并顺延原 6/7 为 7/8；同批在退出判据加一条对应用例。 -->
+- [x] 8.6 在 `docs/deployment-environments.md` 的共库状态块补一句现存缺陷与本变更的关系：8 张全局配置表在 dev/ol 双进程间不互相刷新，重启前不可见。
+  <!-- 2026-07-23 主控套用：docs/deployment-environments.md 共库状态块末尾补 8 张全局配置表跨进程不刷新的缺陷与本变更修复（版本表 + 有界轮询），并写死陈旧上限 T=60s（兑现定稿 §11.4）。 -->
 - [x] 8.7 在 `openspec/changes/config-mirror-cross-process-invalidation/tasks.md` 回写各 sub-repo 的 commit-sha，格式 `<!-- <repo> <commit-sha> 备注 -->`。
   <!-- aidcp-cloud 4495050 / 860a951 / 259706d / cedb586 / f05f1b0 / 78b8958（审计修复）—— **均为分支本地未推送 sha**（本 session 按 fleet 约定不 push）；集成时若发生 rebase，主控需按新 sha 修订 -->
 - [x] 8.8 跑 `openspec validate config-mirror-cross-process-invalidation --strict` 并贴出输出。
