@@ -130,6 +130,78 @@ The Douyin publishing probe SHALL inspect the web creator/upload surface without
 - **WHEN** the publishing probe implementation and focused tests are inspected
 - **THEN** they contain no file selection, publish-text input, final publish-control lookup, Enter-family dispatch, form submission, or enable-submit flag
 
+### Requirement: Gated one-way follow and collection probes
+The Douyin probes SHALL treat follow and collection as separate one-way actions with independent authorization gates, a single-action budget, exact work identity, readable pre-action state, and post-action UI confirmation.
+
+#### Scenario: Follow is not independently authorized
+- **WHEN** `AIDCP_DOUYIN_PROBE_FOLLOW` is not `1` or the confirmed profile does not exactly match the connected profile
+- **THEN** the follow probe returns `shadow_ready` or `gated` without clicking
+
+#### Scenario: Unique un-followed author is followed once
+- **WHEN** the detail modal id remains stable, one follow control has proven un-followed semantics, and both follow gates are satisfied
+- **THEN** the probe clicks once and returns `ui_confirmed` only after the same modal reports followed state
+
+#### Scenario: Author is already followed or state is unreadable
+- **WHEN** the follow control reports followed state or cannot distinguish followed from un-followed
+- **THEN** the probe returns `already_followed` or `state_unreadable` and MUST NOT click
+
+#### Scenario: Collection is not independently authorized
+- **WHEN** `AIDCP_DOUYIN_PROBE_COLLECT` is not `1` or the confirmed profile does not exactly match the connected profile
+- **THEN** the collection probe returns `shadow_ready` or `gated` without clicking
+
+#### Scenario: Unique uncollected work is collected once
+- **WHEN** the detail modal id remains stable, validated fixtures prove one collection control is uncollected, and both collection gates are satisfied
+- **THEN** the probe clicks once and returns `ui_confirmed` only after the same work reports collected state
+
+#### Scenario: Work is already collected or state is unreadable
+- **WHEN** the collection control reports collected state or lacks a validated state mapping
+- **THEN** the probe returns `already_collected` or `state_unreadable` and MUST NOT click
+
+### Requirement: Known interaction prompt cannot hide action targets
+The Douyin probe SHALL treat the first-interaction tutorial as a separate bounded UI preflight and SHALL NOT count input intercepted by its overlay as a social action.
+
+#### Scenario: Exact known interaction prompt is visible
+- **WHEN** exactly one visible `button` has the exact text `我知道了`
+- **THEN** the probe clicks it once, confirms it disappears, and rechecks that the intended action coordinate resolves to the intended control before any social action
+
+#### Scenario: Prompt or target hit is ambiguous
+- **WHEN** the prompt is not unique, remains visible, or `elementFromPoint` resolves the intended action coordinate to another overlay
+- **THEN** the probe returns an honest blocked or ambiguous result and MUST NOT claim or retry the social action as successful
+
+### Requirement: Single bounded direct-message reply
+The Douyin direct-message probe SHALL reply to at most one uniquely identified recent inbound conversation, SHALL accept only the allowlisted text `好的` or `ok`, and SHALL keep conversation identities and message bodies out of its report.
+
+#### Scenario: Direct-message reply is gated
+- **WHEN** `AIDCP_DOUYIN_PROBE_DM_REPLY` is not `1`, the confirmed profile mismatches, or the text is outside the exact allowlist
+- **THEN** the probe returns `gated` or `invalid_text` without opening or sending a reply
+
+#### Scenario: Latest inbound conversation is replied to once
+- **WHEN** exactly one selected conversation proves its latest message is inbound, one reply editor is visible, the text is allowlisted, and all gates are satisfied
+- **THEN** the probe enters and submits the text once, then reports only structural UI confirmation and text length
+
+#### Scenario: Conversation direction or target is ambiguous
+- **WHEN** the probe cannot prove a unique conversation, inbound direction, or reply editor
+- **THEN** it returns `conversation_ambiguous`, `inbound_unconfirmed`, or `editor_not_found` without input or submission
+
+### Requirement: Separate bounded live chat and comment reply
+The Douyin live probe SHALL keep ordinary live chat and comment-targeted reply as distinct, independently gated single-action capabilities.
+
+#### Scenario: Ordinary live chat sends the authorized text once
+- **WHEN** `AIDCP_DOUYIN_PROBE_LIVE_CHAT=1`, the profile confirmation matches, one live room and one ordinary chat editor are uniquely ready, and the text is exactly `1111`
+- **THEN** the probe submits the text once and reports `ui_confirmed` only from same-room structural evidence
+
+#### Scenario: Comment-targeted live reply sends the authorized text once
+- **WHEN** `AIDCP_DOUYIN_PROBE_LIVE_COMMENT_REPLY=1`, the profile confirmation matches, one non-self live comment has a unique reply entry bound to a reply editor, and the text is exactly `666`
+- **THEN** the probe submits the bound reply once and reports `ui_confirmed` only from same-room reply evidence
+
+#### Scenario: Targeted reply is unavailable
+- **WHEN** the page exposes only an ordinary live chat editor or cannot prove which comment owns the reply editor
+- **THEN** the probe returns `reply_target_unavailable` and MUST NOT send `666` as an ordinary chat message
+
+#### Scenario: Live action text or gates are invalid
+- **WHEN** either live action lacks its independent gate, has a profile mismatch, or receives text other than its exact authorized value
+- **THEN** that action returns `gated` or `invalid_text` without input or submission
+
 ### Requirement: Official API is the preferred production publishing path
 The research result SHALL identify the Douyin Open Platform as the preferred future production publishing path and SHALL NOT silently fall back to web submission when official authorization is unavailable.
 
