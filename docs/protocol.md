@@ -77,7 +77,7 @@
 | `browse.scroll` | cloud → edge | 在当前页面滚动 |
 | `note.open` | cloud → edge | 打开一条笔记（可选 `surface`:'feed'\|'detail' 就地读/进详情；可选 `purpose`:'read'\|'navigate'，navigate=只带浏览器到详情供评论迁移、MUST NOT 上报 note.detail；change platform-browse-protocol，均 optional、缺省=今天） |
 | `note.close` | cloud → edge | 关闭当前笔记 |
-| `search.execute` | cloud → edge | 执行一次关键词搜索 |
+| `search.execute` | cloud → edge | 执行一次关键词搜索；协商 `search_activity_receipt_v1` 时携稳定 `activityId` 与 purpose/scope，Edge 回诚实提交边界和结果终态 |
 | `session.end` | cloud → edge | 结束本次浏览会话 |
 
 ### 2.3 角色/命令式驱动指令（v2 新增，cloud → edge）
@@ -110,7 +110,7 @@
 | `page.cards` | edge → cloud | 上报当前可见卡片列表；可选 `listKind`/`listState` 是页面形态与内容状态观察，缺省 `feed/ready`，不扩展 `feed/detail` Surface |
 | `note.detail` | edge → cloud | 上报笔记详情（正文/作者/计数） |
 | `profile.detail` | edge → cloud | 上报作者主页数据（粉丝数/作品数） |
-| `action.completed` | edge → cloud | 确认某个 action 执行完成（可选 `noteId`=从被点 article DOM 派生的规范 postId、MUST NOT 抄命令 payload；可选 `observation`=独立见证包 {surface?/listKey?/author?/textPreviewHead?/reactionText?/articleIndex?}，供云端归账仲裁逐字段比对选中卡；change platform-browse-protocol，均 optional、缺省=今天回落 currentNoteId） |
+| `action.completed` | edge → cloud | 确认某个 action 执行完成（可选 `noteId`=从被点 article DOM 派生的规范 postId、MUST NOT 抄命令 payload；可选 `observation`=独立见证包 {surface?/listKey?/author?/textPreviewHead?/reactionText?/articleIndex?}，供云端归账仲裁逐字段比对选中卡；search 另可携 `activityId/purpose/scope/actuated/searchOutcome/resultCount`；均 optional，旧端缺省按兼容路径处理） |
 | `notification.detected` | edge → cloud | 检测到「消息」有未读（仅信号；`epoch` 每次由无变有 +1，去重用） |
 | `notification.home` | edge → cloud | 通知首页各类未读快照（评论/赞收藏/关注计数，喂分诊） |
 | `notification.items` | edge → cloud | 上报本次巡视抽取的通知项（`NotificationItem`：`kind`=comment/mention/like/collect/follow、`fromUser`昵称、`fromUserId?`主页ID稳定身份、`content`、`noteTitle?`、`itemKey?`；是否通知由云端判，发送者沉淀进通知联系人名册） |
@@ -220,21 +220,21 @@
   "edgeId": "edge-01",        // string  边缘节点标识
   "platform": "xiaohongshu",  // string? 运行时平台标识；缺省按历史 xhs 兼容，cloud 会与 accounts.platform 校验
   "app": "xhs",               // string? 业务/站点标识
-  "capabilities": ["click", "input", "scroll", "captcha_assist_text_v1", "client_core_browser_executor_v1", "facebook_reel_follow_v1", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? 能力声明（构建能力位由 EdgeClient 构造函数统一并入）
+  "capabilities": ["click", "input", "scroll", "captcha_assist_text_v1", "client_core_browser_executor_v1", "facebook_reel_follow_v1", "search_activity_receipt_v1", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? 能力声明（构建能力位由 EdgeClient 构造函数统一并入）
   "accountId": "acc-01",      // string? 账号标识；多账号运行时要求真实账号，default 已退役
   "accountNickname": "小张测评", // string? 账号可读昵称；仅用于展示补充，不参与身份确立或路由
   "machineLabel": "win-aliyun-3" // string? 人类可读机器标签（change captcha-assist-text-answer：已移除背后无能力的 remoteAddr/远程桌面入口，design D13）
 }
 ```
 
-`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge、Facebook edge 或视频号 edge 跨平台接管账号。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。`client_core_browser_executor_v1` 是可选的结构能力位：双方回显只说明客户端能把 core/Cloud transport 与浏览器执行器分别管理，不改变任何旧消息类型；旧 Cloud 不回显时 Edge 保持旧协议兼容。`facebook_reel_follow_v1` 表示该 Edge 构建包含绑定规范 Reel、唯一作者和后置 Following 状态的关注执行器；Cloud 未看到此位时不得掷自动 Reel 关注概率或下发对应命令。五项 interaction capability 都是 optional；四个扩展 capability 依赖 `interaction_inbox_v1`，新 Edge 只有收到相应 `welcome.capabilities` 回显后才启用对应消息。回显 `interaction_offboarding_v1` 时，Cloud 还必须在 welcome 带当前 account 的 `interactionRecovery.offboardPending`；回显 `interaction_runtime_controls_v1` 时必须带 `interactionRuntime`。任一查询失败都按 all-off/pending 处理，不能沿用别的账号或旧连接的能力。
+`platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge、Facebook edge 或视频号 edge 跨平台接管账号。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。`client_core_browser_executor_v1` 是可选的结构能力位：双方回显只说明客户端能把 core/Cloud transport 与浏览器执行器分别管理，不改变任何旧消息类型；旧 Cloud 不回显时 Edge 保持旧协议兼容。`facebook_reel_follow_v1` 表示该 Edge 构建包含绑定规范 Reel、唯一作者和后置 Following 状态的关注执行器；Cloud 未看到此位时不得掷自动 Reel 关注概率或下发对应命令。`search_activity_receipt_v1` 表示 Edge 能为每条 search 命令回传稳定关联、真实提交边界与唯一终态；只有双方在 welcome 中协商成功时，Cloud 才以该回执记 search 风控事实并延后概念池 `markSearched`。未协商的旧 Edge 继续沿用历史搜索/关键词尝试记账，不得由 Cloud 伪造已执行 search 风控事实。五项 interaction capability 都是 optional；四个扩展 capability 依赖 `interaction_inbox_v1`，新 Edge 只有收到相应 `welcome.capabilities` 回显后才启用对应消息。回显 `interaction_offboarding_v1` 时，Cloud 还必须在 welcome 带当前 account 的 `interactionRecovery.offboardPending`；回显 `interaction_runtime_controls_v1` 时必须带 `interactionRuntime`。任一查询失败都按 all-off/pending 处理，不能沿用别的账号或旧连接的能力。
 
 **`welcome`**（cloud → edge）
 ```jsonc
 {
   "sessionId": "sess-1",      // string  云端分配的会话 id
   "serverVersion": "0.1.0",   // string  服务端版本
-  "capabilities": ["client_core_browser_executor_v1", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? Cloud 确认双方支持；旧端忽略
+  "capabilities": ["client_core_browser_executor_v1", "search_activity_receipt_v1", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? Cloud 确认双方支持；旧端忽略
   "interactionRecovery": { "offboardPending": false }, // object? 协商 offboard 时必带；缺失/true=Edge 不恢复 connector
   "interactionRuntime": { // object? 协商账号开关时必带；缺失=Edge 全能力关闭
     "accountId": "acc-01", "envKey": "env-01", "version": 7,
@@ -304,8 +304,8 @@ Cloud 切换通过 Electron→core 的本地 `lifecycle.cloud_rebind` 控制协�
   "dailyUsage": { // 可选；账号用量与限额窗口，边缘优先用它替代本机实时计数
     "asOf": 1730000001000,
     "quotaLevel": "normal", // conservative / normal / aggressive
-    "totals": { "view": 10, "like": 3, "collect": 1, "comment": 0, "follow": 2, "publish": 1 },
-    "quotas": { "view": 150, "like": 50, "collect": 25, "comment": 8, "follow": 15, "publish": 1 },
+    "totals": { "view": 10, "search": 2, "like": 3, "collect": 1, "comment": 0, "follow": 2, "publish": 1 },
+    "quotas": { "view": 150, "search": 10, "like": 50, "collect": 25, "comment": 8, "follow": 15, "publish": 1 },
     "saturated": ["publish"], // 向后兼容：以上三项是 day 窗口别名
     "firstPost": { // 可选；仅账号终身首作状态正在寻找/生成时出现
       "state": "searching", // searching | generating
@@ -546,6 +546,9 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 **`search.execute`**（cloud → edge）
 ```jsonc
 {
+  "activityId": "search-7f3d", // string? 协商 search_activity_receipt_v1 时必填；同一条逻辑命令重试保持稳定
+  "purpose": "discovery",      // ? discovery | task_targeting | operator
+  "scope": "global",           // ? global | container；container 时须同时给合法 container
   "keyword": "露营装备",   // string  搜索关键词
   "source": "extract_from_liked", // ? extract_from_liked | random_from_interests | new_concept | manager
   "maxResults": 10,       // number? 本次搜索最多浏览的结果数
@@ -557,6 +560,10 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
   "container": "https://www.facebook.com/groups/123"
 }
 ```
+
+协商 `search_activity_receipt_v1` 后，Cloud 在下发前同时检查账号 `search` 风控配额、会话 search 预算和关键词限流；任一闸拒绝都不下发，也不生成已执行事实。purpose 只描述业务来源：自主概念发现为 `discovery/global`，评论等定向任务为 `task_targeting`（Facebook 群内为 `container`），人工命令为 `operator`；operator 仍计真实风控用量，但不触发自主节奏告警。
+
+旧 Edge 可以忽略新增可选字段。Cloud 对旧 Edge 保留历史关键词尝试/概念池兼容行为，但不得把“命令送达”推断成 search 已真实执行；升级后只认下述 terminal receipt。
 
 **`session.end`**（cloud → edge）
 ```jsonc
@@ -705,6 +712,17 @@ Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有
 **`action.completed`**——确认某 action 执行完成
 ```jsonc
 { "action": "like", "ok": true, "reason": "..." } // reason 可选
+// search_activity_receipt_v1：每个 activityId 正好一个终态；actuated 只在真实提交键/搜索导航已派发后为 true
+{
+  "action": "search",
+  "ok": true,
+  "activityId": "search-7f3d",
+  "purpose": "discovery",
+  "scope": "global",
+  "actuated": true,
+  "searchOutcome": "results_ready", // results_ready | no_results | failed_after_submit | not_submitted
+  "resultCount": 8                    // 非负整数? 当前已验证可见结果数；no_results 时为 0
+}
 // group.join 回执：ok=true 只表示点击后观测到 member-now；observe-only / already_member / pending / questionnaire_required 均不计成功加群
 {
   "action": "join_group",
@@ -715,6 +733,8 @@ Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有
   "observation": { "mainCtaText": "Join group", "modalText": null }
 }
 ```
+
+search 回执的计数边界是 `actuated=true`，而不是 `ok=true`：`results_ready`、`no_results` 和 `failed_after_submit` 都说明平台已接收一次搜索尝试，应各记一笔；`not_submitted` 必须是 `actuated=false`，不得扣 search 风控配额或把概念标成已搜。Cloud 按连接内 `activityId` 有界去重，重复/矛盾终态只消费第一次；search 事实进入独立内部事件，不进入点赞、收藏、评论等互动 feed。
 
 ### 3.9 风控预算与互动判定
 
@@ -741,7 +761,7 @@ Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有
 **`risk.canDo`**（edge → cloud）：互动前请求许可
 ```jsonc
 { "action": "like", "accountId": "acc-01" }
-// action: view | like | collect | comment | follow | publish；accountId 可选
+// action: view | search | like | collect | comment | follow | publish | comment_like | join_group | dm_reply；accountId 可选
 ```
 
 **`risk.canDo.result`**（cloud → edge）
