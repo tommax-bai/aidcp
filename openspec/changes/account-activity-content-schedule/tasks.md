@@ -25,5 +25,7 @@
   <!-- Validation: Cloud focused 71/71, acceptance 65/65, post-rebase full 2796 passed + 8 skipped, typecheck passed. Console focused 12/12, full 230 passed + 1 skipped, typecheck/build passed. -->
 - [x] 4.2 Run `openspec validate account-activity-content-schedule --strict` and record validation evidence and implementation commit SHAs in this task file.
   <!-- OpenSpec strict validation passed before and after implementation; control deb51f0; Cloud 02e052d; Console 02c3b54. -->
-- [ ] 4.3 Rebase and fast-forward land the control, Cloud and Console branches onto their default branches, then push without force.
-- [ ] 4.4 Deploy the clean default Cloud and Console revisions to `dev` only after target preflight/backups, then verify schema/hash, service/listener/health and bounded logs; record truthful deployment evidence.
+- [x] 4.3 Rebase and fast-forward land the control, Cloud and Console branches onto their default branches, then push without force.
+  <!-- Fast-forward pushed and canonical checkouts synced: aidcp main 3722b75; aidcp-cloud master 02e052d; aidcp-console master 02c3b54. No force push. -->
+- [x] 4.4 Deploy the clean default Cloud and Console revisions to `dev` only after target preflight/backups, then verify schema/hash, service/listener/health and bounded logs; record truthful deployment evidence.
+  <!-- DEV deployed 2026-07-22: backups cloud/console/.env 20260722-034841Z; Cloud source hashes and Console index/bundle hashes matched local defaults; .env hash unchanged. aidcp-cloud.service active with NRestarts=0; 8787/8090/8091 listening; panel/client/public health all ok; active_week_mask query succeeded; Feishu WS onReady and bot Dev.A confirmed; isales-api/isales-scheduler remained active. -->
