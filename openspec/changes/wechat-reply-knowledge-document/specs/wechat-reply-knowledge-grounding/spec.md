@@ -48,6 +48,26 @@ comment 与 dm 的 ReplyProfile SHALL 各自允许一个可选 `knowledgeDocumen
 - **WHEN** 知识型 AI 候选删除或改写模板中受保护的私聊引导/联系方式行
 - **THEN** 工作流丢弃候选并回退完整 rendered template，且该次 AI 调用仍不得自动发送
 
+### Requirement: AI 生成与润色必须遵守渠道最大字数
+
+`reply_polisher` 的首次生成提示 MUST 包含当前渠道 profile 的具体 `maxLength`，并 SHALL 要求完整 `polishedText` 在 1 到该上限之间。计数 MUST 包含 AI 自然回答、模板私聊引导、联系方式及其它受保护行，MUST NOT 只限制 AI 新增片段。Cloud MUST 在接受候选前确定性校验长度，MUST NOT 通过字符串截断伪造合规结果。
+
+#### Scenario: 首次生成即遵守最大字数
+- **WHEN** 渠道 `maxLength` 为 30 且规则调用 `reply_polisher`
+- **THEN** 首次 prompt 明确要求最终完整回复不超过 30 字符，模型返回的合格候选可直接进入既有 claim、reviewer 与人工审核流程
+
+#### Scenario: 首次候选仅因超长而压缩重写
+- **WHEN** 首次模型响应通过 JSON/schema 校验但完整 `polishedText` 超过 `maxLength`
+- **THEN** Cloud 最多再调用一次同一 polisher，要求在保留知识事实、模板导流与联系方式边界的前提下压缩到具体上限内
+
+#### Scenario: 第二次候选仍不满足限制
+- **WHEN** 压缩候选仍为空、超长、结构无效或改写受保护行
+- **THEN** Cloud 不进行第三次调用且不截断文本，回退完整 rendered template，并保持 fail-closed、人工审核和不得自动发送
+
+#### Scenario: 模板自身超过最大字数
+- **WHEN** rendered template 的受保护内容本身已超过 `maxLength`
+- **THEN** 系统不得删除或截断模板行来伪装满足上限，应如实回退并保留可诊断的超限结果，供运营缩短模板或调整上限
+
 ### Requirement: 管理后台必须提供安全可验证的文档配置
 
 管理后台 SHALL 在每个 comment/dm profile 中提供 Markdown/纯文本知识文档编辑、20,000 字符计数和用途说明，并与品牌语气使用同一 profile 保存操作。界面 MUST 保留 loading/empty/error/permission/version-conflict 状态和账号/scope 切换的 stale-response 隔离；draft preview SHALL 使用尚未发布的当前文档，且 MUST 明示预览本身不会发送平台回复。

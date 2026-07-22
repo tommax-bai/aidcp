@@ -12,6 +12,7 @@
 - 让 AI 只依据该文档中明确存在的业务事实回答问题，找不到答案时诚实说明无法确认。
 - 让文档跟随现有 scope draft/publish/CAS/audit 生命周期，不产生旁路配置。
 - 保留博主式短回复、模板联系方式单写、AI 人审和既有安全闸。
+- 让 AI 生成与润色从第一次生成起就遵守渠道 `maxLength`，并对仅超长的候选执行最多一次有界压缩重写。
 - 对旧 profile 数据和 Cloud/Console 分步部署保持兼容。
 
 **Non-Goals:**
@@ -51,6 +52,14 @@ control repo 的 ReplyProfile schema 和 AI ProfileSummary 增加可选 nullable
 
 后台把 tab 改名为“语气与知识”，在每个渠道 profile 表单增加“AI 回答说明文档” TextArea、20,000 字符计数和用途提示。它与其它 profile 字段一起走现有 `dirty.profiles`、expectedVersion、scope mismatch、AbortController 和保存回读流程；不另建前端 schema 或旁路接口。预览使用当前 draft profile，所以运营可先验证回答再发布。
 
+### 6. 最大字数是完整 AI 候选的生成硬约束
+
+`reply_polisher` 的首次 prompt 必须写入当前渠道的具体 `maxLength`，并要求模型在输出前自行压缩，使完整 `polishedText`（包括必须逐字保留的模板私聊引导和联系方式行）处于 1 到该上限之间。不能只在模型返回后校验，因为这会让正常可压缩的回答直接回退模板，造成“配置了最大字数但 AI 没按它生成”的假象。
+
+若首次返回已经通过 JSON/schema 校验，但 `polishedText` 仅因超过 `maxLength` 不合格，Cloud 使用同一 role 再调用一次压缩 prompt；该 prompt 携带原问题、模板、渠道 profile、知识文档、首次候选及其实际长度，明确只压缩自然回答，不得删除/改写受保护行、引入新事实或放宽其它安全约束。总调用次数最多两次，第二次仍超长或无效时回退完整 rendered template，并沿用既有 fail-closed/reviewer/人工审核口径。
+
+不对模型文本做字符串截断。截断可能破坏语义、JSON 后处理、联系方式或受保护导流行。如果 rendered template 自身已经超过 `maxLength`，在保留模板单写边界的同时不存在可满足候选；系统如实回退并保留超限原因，配置应由运营缩短模板或提高上限。
+
 ## Risks / Trade-offs
 
 - [长文档增加模型 token、延迟和成本] → 单渠道硬限 20,000 字符，只在实际调用 polisher 时发送；第一版不承诺长文档检索质量。
@@ -59,6 +68,7 @@ control repo 的 ReplyProfile schema 和 AI ProfileSummary 增加可选 nullable
 - [旧 scope JSONB 没有新字段] → 读取归一为 null，PUT 兼容字段缺失，默认 profile 显式写 null。
 - [Cloud 回滚但 Console 未回滚时旧 Cloud 拒新字段] → 按 Cloud 先、Console 后部署；回滚时同步恢复两者备份。
 - [一个 group 共用文档不适合个别账号差异] → 延续现有 group/default 配置事实，不恢复账号级旁路；需要差异时调整账号分组。
+- [过小上限无法同时容纳回答与受保护模板行] → 完整候选统一计数，不截断受保护内容；一次压缩仍无法满足时回退，并提示运营调整模板或上限。
 
 ## Migration Plan
 

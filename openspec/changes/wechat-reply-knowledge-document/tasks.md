@@ -25,3 +25,11 @@
   <!-- Delivery: control main 80d4800, Cloud master 7d02d1f, and Console master 65b9df0 were fast-forward integrated and pushed after validation; no Edge protocol or installer change. -->
 - [x] 5.2 Deploy Cloud then Console from clean default checkouts to `dev`; verify hashes, services, health, logs, PostgreSQL, Feishu, unchanged reply/contact counts, and no real platform write.
   <!-- Dev 2026-07-22: Cloud deployed from clean current master 833b160 (contains feature 7d02d1f), then Console 65b9df0. Backups: cloud.bak.20260722-145823.tar.gz, cloud.env.20260722-145823.bak, console.bak.20260722-145944.tar.gz. Local/remote feature-file and static-asset hashes matched; aidcp-cloud active with NRestarts=0; 8787/8090/8088/5432 listened; panel/public health returned ok; PostgreSQL SELECT 1 passed; Feishu bot Dev.A and WSClient onReady verified; recent error count was zero; isales-api/isales-scheduler remained active. Reply jobs/send attempts/contact comment attempts stayed 4/0/63 before and after, so no real platform write occurred. No migration or Edge package was involved. -->
+
+## 6. Maximum-length follow-up
+
+- [x] 6.1 Specify that initial AI generation and polishing receive the concrete channel `maxLength`, count the complete candidate, and never truncate protected content.
+- [x] 6.2 Implement the hard prompt constraint plus at most one compression retry for an otherwise valid over-length polisher candidate.
+- [x] 6.3 Add focused retry/boundary tests and run Cloud full tests, typecheck, contract checks, and strict OpenSpec validation.
+  <!-- Follow-up validation: Cloud focused 5/5, full 2863 passed + 8 skipped, typecheck passed; contract metaschema/internal-api/AI fixtures and OpenSpec strict passed. The boundary test proves two model calls maximum and no string truncation. -->
+- [ ] 6.4 Commit, integrate, push, deploy the Cloud follow-up to `dev`, and verify service health, logs, state counts, and no real platform write.
