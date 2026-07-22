@@ -56,6 +56,9 @@
 - [x] 3.4-b 「根本没开始」从**任务结果**回流（关键）：接管边端失败发生在触发回执回了 ok **之后**，那时小时格早被记为已消耗。评论管线跑完发现 `not_started` → `ContentScheduler.reportNotStarted()` 归还名额。<!-- aidcp-cloud 87f53b9 -->
 - [x] 3.5 `browser_wake_failed` 作为**独立的**租约失败码，绝不折进 `edge_unhealthy`（前者可恢复、后者是控制面故障；混为一谈会让运维去查一个根本没坏的连接）。结果卡如实说「浏览器待机、未能唤醒（可恢复，稍后自动重试）」。<!-- aidcp-cloud 87f53b9 -->
 - [x] 3.6 单测：未开始归还名额并可在小时内重试；重试有界（用尽后诚实放弃、整格只回**一张**卡）；真开跑 / 抛异常都不归还（宁可少发绝不重发）。<!-- aidcp-cloud e78d18e -->
+- [x] 3.4-c **修异步终态回流重置预算的线上回归**：触发入口先返回已开跑时，不得清掉同小时已有重试预算；稍后 `reportNotStarted()` 必须继续递减，首次 + 5 次后放弃。<!-- aidcp-cloud fd32fcf: same-cell retry budget retained until terminal outcome -->
+- [x] 3.5-b **自动未开始结果卡去噪**：排期调度器已接管重试/放弃通知时，中间 `not_started` 不逐次发卡；预算用尽只由 `onCellAbandoned` 发一张，手动结果卡保持不变。<!-- aidcp-cloud fd32fcf: handled signal gates only automatic intermediate cards; missing/failed abandonment notifier falls back to the final immediate card -->
+- [x] 3.6-b 补异步终态回流、预算递减、整格单卡和手动卡不受影响的回归测试。<!-- aidcp-cloud fd32fcf; focused 131/131; acceptance 65/65; full 2807 with 2799 pass + 8 gated skips; typecheck pass -->
 - [ ] 3.1 / 3.2 「区分引擎在线与浏览器就绪 + 两段式派发」**未做，且大部分已自然消解**：边缘现在会自己唤醒，所以云端把停泊账号当可派发对象是**对的**——`acquire` 就是那个「先唤醒」信号。剩余价值只在可观测性（运维界面区分停泊 / 空闲就绪），随 1.10 一起做。
 
 ## 4. 验收与部署
@@ -72,6 +75,7 @@
   - 停泊账号收到排期任务 → 被唤醒 → 任务**真正执行**（旧行为是回一句假的 `cdp_unhealthy`）。
   - 单次浏览墙钟耗时（0.2 的分水岭数据）。
 - [x] 4.5 edge 桌面安装包**未打**（CLAUDE.md §6：需用户明确要求才出包）。
+- [x] 4.7 运行 Cloud 聚焦测试、acceptance、全量测试、typecheck 与 `openspec validate browser-slot-scheduling --strict`；提交推送并从干净 master 部署 dev，核验服务、连接与日志。<!-- 2026-07-22: aidcp-cloud fd32fcf ff-only pushed to master. dev backup `/opt/aidcp/backups/cloud.bak.20260722-141939.tar.gz`; deployed two runtime files from clean master with matching sha256; cloud active/NRestarts=0, 8787/8088/8090/8091 listening, health ok, PG select 1, Feishu WS onReady, isales services active. Tmax/工程师大白 remained offline after restart, so no live comment retry was fabricated. -->
 
 ## 5. 后续（多 agent 对抗性评审 2026-07-14 挖出，按价值排序；每条独立成 change，不塞进本 change）
 
