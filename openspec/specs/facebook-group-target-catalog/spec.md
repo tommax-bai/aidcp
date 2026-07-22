@@ -54,3 +54,31 @@ The Facebook group target catalog SHALL expose filter facets derived from stored
 - **WHEN** stored targets include URL-only rows with null region, park, and direction
 - **THEN** those null values are not returned as selectable facets
 
+### Requirement: Facebook 群目标可关联多个账号分组
+
+Facebook 群目标目录 SHALL 在保持 canonical group URL 单一事实行的同时，支持零个或多个适用账号分组标签。一个目标 MAY 同时映射多个分组；映射 MUST 独立于 region、park、direction、enabled、priority、join gating 和 membership 事实，修改范围不得复制目标行或重置这些字段。无任何分组映射的目标仍可管理和明确 URL 人工作业，但 MUST NOT 进入自动或裸 `--join` 候选池。
+
+#### Scenario: 一个群属于多个账号分组
+- **WHEN** 运营把同一 canonical group URL 的适用分组设为“华东组”和“招聘组”
+- **THEN** 目录仍只有一个目标事实行并返回两个分组标签，两个分组的账号都可把它视为候选，但数据库全局群归属锁仍只允许一个账号最终认领
+
+#### Scenario: 无范围目标不进入自动池
+- **WHEN** 某启用目标没有任何账号分组映射
+- **THEN** 它仍出现在群组管理目录并标记“未设置适用分组”，但任何账号自动加群和裸 `--join` 都不得认领它
+
+### Requirement: 群目标目录支持账号分组过滤和批量范围真态
+
+群目标列表 SHALL 返回每行完整账号分组标签集合，并接受可选精确账号分组过滤；群组管理面 SHALL 支持选中一个或多个目标后以一个显式分组集合替换其范围。范围写入 MUST 校验目标存在、标签规范化且为当前 Facebook 账号实际使用的分组，任一非法时整块拒绝；成功后 SHALL 返回数据库回读的完整映射真态。
+
+#### Scenario: 按账号分组过滤
+- **WHEN** 群列表以账号分组“华东组”过滤
+- **THEN** 只返回范围集合包含“华东组”的目标，目标属于其它分组的标签仍在该行完整返回
+
+#### Scenario: 批量替换范围整块成功
+- **WHEN** 运营选择三个现有目标并把完整范围集合替换为“招聘组”和“销售组”
+- **THEN** 三个目标均只保留这两个映射，接口返回三个目标的回读真态
+
+#### Scenario: 非 Facebook 账号分组拒绝
+- **WHEN** 范围集合包含一个当前只由非 Facebook 账号使用或不存在的标签
+- **THEN** 整个范围写请求具名拒绝，任何选中目标的映射都不改变
+

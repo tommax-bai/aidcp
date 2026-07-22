@@ -1,3 +1,8 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: 本能力覆盖发帖、评论与联系评论，声明已知缺口`
+- TO: `### Requirement: 本能力覆盖发帖、评论、联系评论与 Facebook 自动加群，声明已知缺口`
+
 ## MODIFIED Requirements
 
 ### Requirement: 调度器动作循环与每动作幂等
@@ -65,4 +70,3 @@
 #### Scenario: 会话额度耗尽仍拦截
 - **WHEN** 账号配置和风控日额度尚有余量但当前会话 `join_groups` 预算为 0
 - **THEN** 本次自动加群不执行并诚实记录 session budget 拒因
-

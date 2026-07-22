@@ -283,3 +283,51 @@ Web 发布审批 SHALL 与飞书审批调用**同一个** `writeApprovalSignal(r
 - **WHEN** 审核人把 scheduled 待审稿切回 immediate
 - **THEN** 同一 CAS 写将 `mode='immediate'` 且 `publishTime=null`，其它元数据逐字保留
 
+### Requirement: 内容排期写入按账号平台校验动作能力
+
+`PUT /api/content-schedule/:accountId` SHALL 在写入前读取并规范化账号平台，并按服务端平台注册声明校验 `post*`、`comment*`、`contactComment*` 动作字段簇。对支持动作，非关闭模式 MUST 属于该平台允许模式且日上限 MUST 不超过平台注册上限；对不支持动作，启用、非 `off` 模式或正日上限写入 MUST 以可区分的 `unsupported_automation_action` 整块拒绝、绝不部分落库。显式安全关闭值（`enabled=false`、`mode=off`、`dailyCap=0`）SHALL 允许用于清理遗留配置，公共总开关和周历字段不得因其它动作不支持而被误拒。
+
+#### Scenario: 视频号开启自动评论被整块拒绝
+- **WHEN** 运营或外部调用为视频号账号提交 `commentMode=review` 或正数 `commentDailyCap`
+- **THEN** Cloud 返回 `unsupported_automation_action` 并且该请求中的任何字段都不落库
+
+#### Scenario: Facebook 不允许的免审发帖被拒绝
+- **WHEN** 为当前只允许待审发帖的 Facebook 账号提交 `postMode=auto_approve`
+- **THEN** Cloud 返回平台动作不支持的可区分拒绝且不改变原排期
+
+#### Scenario: 不支持动作可安全清零
+- **WHEN** 视频号历史排期含评论配置且运营提交 `commentEnabled=false`、`commentMode=off`、`commentDailyCap=0`
+- **THEN** Cloud 允许写入并回读关闭真态，便于清理遗留脏配置
+
+#### Scenario: 公共周历写入不被动作矩阵误伤
+- **WHEN** 运营只为无内容动作的平台账号修改总开关或账号周历覆盖，未提交任何动作启用值
+- **THEN** 写入口继续按既有公共字段规则校验和落库，不因平台动作列表为空而拒绝
+
+### Requirement: 群目标账号分组范围经事务单写并回读真态
+
+群目标范围写 SHALL 只经 Facebook group target store 的一等方法完成，MUST NOT 从 panel handler 发 raw SQL。请求 SHALL 包含一个或多个 canonicalizable group URL 以及作为完整替换值的账号分组标签集合；服务端 MUST 在同一事务内验证所有目标存在、所有标签为当前 Facebook 账号实际使用的规范化分组，并原子替换全部选中目标的映射。任一失败 SHALL 整块拒绝、不部分修改；成功 SHALL 返回数据库回读真态及审计更新人/时间。
+
+#### Scenario: 任一目标不存在则整块拒绝
+- **WHEN** 批量范围写中两个 URL 存在、一个 URL 不存在
+- **THEN** 接口具名拒绝，三个目标相关的映射均不改变
+
+#### Scenario: 写后返回完整映射
+- **WHEN** 合法批量范围写成功
+- **THEN** 响应来自同一事务写后回读，并精确返回每个目标当前完整账号分组集合
+
+### Requirement: Facebook 自动加群配置经专属单写且只允许 Facebook 账号
+
+每账号自动加群配置 SHALL 经 JWT 保护的专属一等写方法保存，写前校验账号存在且规范化平台为 Facebook；`enabled` 必须为 boolean，`dailyCap` 必须为服务端界限内非负整数，`weekMask` 必须为 null 或合法 168 位 `0/1` 掩码，非法值整块拒绝。无配置默认关闭；写后 SHALL 回读真实配置并聚合返回，MUST NOT 乐观假成功。该写不得修改 RiskController 额度、全局 kill switch、通用内容周历或其它动作字段。
+
+#### Scenario: 非 Facebook 账号拒绝
+- **WHEN** 对小红书或视频号账号提交自动加群配置
+- **THEN** 接口返回可区分 `unsupported_automation_action`，不创建配置行
+
+#### Scenario: 非法周历整块拒绝
+- **WHEN** 提交的加群动作周历不是 168 位 `0/1` 掩码
+- **THEN** enabled、dailyCap 和 weekMask 全部不落库，接口返回可区分 invalid value
+
+#### Scenario: 合法配置写后回真态
+- **WHEN** 为 Facebook 账号设置 enabled=true、dailyCap=1 和合法动作周历
+- **THEN** 专属存储写入并回读相同真态，RiskController 与公共内容周历保持不变
+

@@ -66,3 +66,19 @@ Both modes SHALL submit through the existing structured Facebook group import AP
 - **WHEN** the import response contains imported, updated, duplicate, and invalid counts
 - **THEN** the console displays each count and clears only the successfully submitted mode's input state
 
+### Requirement: 群组导入可选应用公共账号分组范围且缺省不清空
+
+单条添加和文件导入 SHALL 提供可选“适用账号分组”多选，并把该集合作为本次提交所有导入目标的公共范围。请求未携带范围字段时，已存在目标的范围 MUST 保持不变，新目标 SHALL 保持无范围；请求显式携带范围集合（包括空集合）时，成功导入/更新的目标 SHALL 用该集合替换范围。范围校验失败 MUST 在写目标和映射前拒绝该提交，不能出现元数据已更新但范围未更新的半成功。
+
+#### Scenario: 重复导入未选择范围时保留映射
+- **WHEN** 已映射“华东组”的目标被再次导入且请求没有账号分组范围字段
+- **THEN** 目标元数据按既有规则更新，而“华东组”映射保持不变
+
+#### Scenario: 文件导入统一应用多个分组
+- **WHEN** 运营选择“华东组”和“招聘组”后导入一个 CSV
+- **THEN** 本次成功导入或更新的每个目标都回读为同时映射这两个分组
+
+#### Scenario: 显式空集合清除范围
+- **WHEN** 运营明确把本次导入范围提交为空集合
+- **THEN** 成功目标的范围被清空并诚实标记为不会被自动或裸 `--join` 认领
+
