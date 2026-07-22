@@ -1,5 +1,11 @@
 # 真机验收专项（Real-Machine Acceptance Backlog）
 
+> **2026-07-22 隐藏产品门禁退役口径**：历史验收项中出现的 `AIDCP_CONTENT_SCHEDULE_AUTO`、
+> `AIDCP_PUBLISH_AUTO`、`AIDCP_COMMENT_LIKE`、`AIDCP_FB_COMMENT_AUTO/SHADOW/REVIEW_ALL`、
+> `AIDCP_FB_GROUP_JOIN_AUTO/SHADOW`、`AIDCP_INTERACTION_AUTO_ACCOUNT_ALLOWLIST` 和
+> `AIDCP_INTERACTION_DM_AI_ENABLED` 只记录当时 rollout 事实，新版本不再读取。复验时直接使用后台账号、渠道、
+> 排期和审批配置；身份、能力、风险、限速、熔断、确认成功与投影的全局互动紧急停写仍照常生效。
+
 > **为什么有这份文档**：本系统的 openspec change 归档门槛里，大量是「真机验收」（边缘节点在线、
 > 运营放行、浏览器点测、飞书肉眼确认）。这些验收**彼此高度关联**、且只能在真机上做，逐个 change
 > 都单独验一次效率太低。于是**把归档与真机验收解耦**：代码写完 + 已部署即归档清账（不再等真机），
