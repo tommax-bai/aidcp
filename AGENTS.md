@@ -1,10 +1,10 @@
 # AGENTS.md
 
-Codex guide for `aidcp*`; keep it at or below 8 KiB. Put details in task references. `CLAUDE.md` is legacy background, not a default prerequisite.
+Codex guide for `aidcp*`; keep it below 8 KiB. Details belong in task references; `CLAUDE.md` is legacy.
 
 ## 1. Repo role and task admission
 
-- `aidcp` owns contracts, architecture, OpenSpec, product docs, and orchestration. Business code lives in `../aidcp-edge`, `../aidcp-cloud`, and `../aidcp-console` (`master`; control repo uses `main`). Confirm a sibling exists before using it.
+- `aidcp` owns contracts, architecture, OpenSpec, product docs, and orchestration. Business code lives in `../aidcp-edge`, `../aidcp-cloud`, and `../aidcp-console` (`master`; control uses `main`). Confirm siblings before use.
 - Do not run root `npm test`, `npm run build`, or `npm run lint`; this is not an app checkout. Validate control changes with OpenSpec.
 - Before task/worktree/helper use, run `& "$env:ProgramFiles\Git\bin\bash.exe" ./scripts/task-preflight` in Windows PowerShell or `./scripts/task-preflight` in Bash. Use that Git Bash prefix for extensionless `scripts/*`. Failure blocks admission; do not switch, stash, clean, remove worktrees, or override it.
 - Canonical checkouts stay on defaults. Feature work uses `../<repo>.wt/<change-name>` and `codex/<change-name>`. Never put `main` in an `aidcp.wt` worktree or switch the control checkout.
@@ -17,7 +17,7 @@ Read on demand:
 - Any SSH, `rsync`, or deployment: `docs/deployment-environments.md`.
 - Edge Electron launch/packaging: active `aidcp-edge/CLAUDE.md` packaging section and `docs/release-desktop.md`.
 - Assigned OpenSpec change: read its proposal, optional design, tasks, spec deltas, and apply instructions when useful.
-- Read root `CLAUDE.md` only when this guide and the references above do not resolve a material legacy detail.
+- Read root `CLAUDE.md` only for legacy gaps.
 
 ## 2. Architecture invariants
 
@@ -25,7 +25,8 @@ Read on demand:
 - Edge stays light: browser actions belong on edge; planning, selection strategy, orchestration, persistence, and primary pacing belong in cloud.
 - Cloud `RiskController` is the single writer of final account risk state.
 - DEV and OL share PostgreSQL long-term. Durable async work scanned, claimed, retried, or recovered by background code stores server-injected `execution_target=dev|ol`; all lifecycle reads/writes filter the local target. Missing/invalid `AIDCP_DEPLOY_ENV` disables that worker. Shared business data/config is excluded.
-- Never fake success. Missing targets, bad pages, missing data, movement, and counts must be reported honestly.
+- Never fake success; report missing/ambiguous targets, bad pages/data, movement, and counts honestly.
+- Add cooldowns, retries, fallbacks, compatibility branches, or knobs only for an observed failure or explicit contract; state why a simpler path fails and keep them observable/testable. Fail closed only at safety-sensitive irreversible writes; never turn unknown/failure into success.
 - DOM-first locating keeps post-action validation, bounded retry/escalation, and cache promotion only after repeated success.
 - Protocol v2 changes stay synchronized across cloud/edge types, cloud command mapping, edge active-command routing, and `docs/protocol.md`.
 - Prefer the current event-driven v2 browse loop; do not revive deleted legacy planner/card-filter paths.
@@ -41,13 +42,13 @@ Read on demand:
 ## 4. Context and command-output budget
 
 - Project `.codex/config.toml` caps retained output from an individual tool call at 4,000 tokens. Treat this as a ceiling, not a target.
-- Default requested output budgets: 1,000-2,000 tokens for discovery/status commands and at most 4,000 for tests, builds, deploy checks, or focused failure evidence.
-- Use `rg`/`rg --files`, targeted file ranges, focused tests, and concise reporters. Do not dump entire files, full test suites, build logs, `journalctl`, SSH output, database result sets, or repeated polling output into the task transcript.
-- On success, retain the command, exit status, duration when relevant, and a short pass/count summary. On failure, retain the failing test/check names, primary error block, and at most the final 120 relevant lines; narrow and rerun before expanding.
+- Default output budgets: 1,000-2,000 tokens for discovery/status and at most 4,000 for tests, builds, deploy checks, or focused failures.
+- Use `rg`/`rg --files`, targeted ranges/tests, and concise reporters. Do not dump full files/suites/logs, `journalctl`, SSH output, database results, or repeated polls.
+- On success, retain command, exit status, relevant duration, and a short pass/count summary. On failure, retain failing checks, primary error, and at most 120 relevant tail lines; narrow before expanding.
 - If output is truncated, do not infer success. Check the exit code and inspect smaller slices until the cause and validation result are supported.
-- Run independent repo tests/builds in parallel; serialize only failed retries likely caused by resource contention. Full suites remain risk/final-integration only.
+- Run independent repo tests/builds in parallel; serialize contention-related retries. Full suites remain risk/final-integration only.
 - For long-running commands, use a background session and report only new state or bounded deltas on each poll.
-- Detailed operating examples and the failure-expansion ladder live in `docs/codex-output-budget.md`; read it when a command may be noisy.
+- See `docs/codex-output-budget.md` for noisy-command examples and the failure-expansion ladder.
 
 ## 5. Testing and closeout
 
@@ -71,6 +72,7 @@ Read on demand:
 - Before integration, fetch/rebase onto the latest default, resolve conflicts, rerun required validation, then fast-forward merge. Never force-push or use non-fast-forward history without explicit approval.
 - Within an explicitly requested deployment, database changes may proceed after backup, read-only impact checks, and a rollback plan. Stop when the target or rows are unclear, rollback is uncertain, or scope expands. Still stop before secret/key changes, unrelated production deletion, failed-test releases, or unrelated-service impact.
 - Default user-facing prose is Chinese; code, comments, commits, PR text, commands, and filenames remain English unless the file establishes otherwise.
+- Comments explain non-obvious rationale, external quirks, or invariants; use names/types/tests for the rest.
 - Explain mechanism first, preserve honest validation boundaries, never record secrets, and close with what changed, impact, and next step.
 
 ## 8. Codex mapping
