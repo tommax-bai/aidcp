@@ -449,6 +449,14 @@ Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或
 
 **待定稿裁决（子仓已按最保守判据暂判并标注，`aidcp-cloud@89c286d`；归档本方案前 MUST 由本表 owner 复核并回写逐格数字）**：① `src/schema/` 整目录暂判 `aidcp-automation`、目录规则 `newFile: adjudicate`——它含 SQL 字面量（`schema-capability.ts` / `pg-catalog.ts`），`AC-BOUND-03` 的 kernel「无 SQL」准入当场不过，故 MUST NOT 判 kernel；消除路径见子仓 `boundaries/`（可选：从 `schema-capability.ts` 析出无 SQL 的纯判定段后判 kernel，一次消除其带来的 21 条 import 豁免）。② `src/config-mirror-freshness.ts`、`src/db/environment-row-lock.ts`、`src/config/mirror-stop-work.ts`、`src/publish-agent/pending-dispatch-watchdog.ts` 四个文件判据两可，已按最保守暂判 api、`basis` 标「待定稿裁决」。子仓侧用 `fileOverride` 而非目录默认层接住，故不会静默落入默认层。
 
+**kernel 花名册增量（change `lift-shared-contracts-to-kernel`，实测于 `aidcp-cloud@2a1905b`）**：本刀把 4 个**纯共享契约**文件经 `git mv` 抬进 kernel（各自本就是独立文件、满足本节下方「kernel 成员新增」三条通道 + §6.4 准入五条 + AC-BOUND-03 逐条断言），**kernel 花名册 4 → 8**（下方 line 482 的 4 文件 251 行名单相应扩为 8 文件 1186 行）：
+- `src/kernel/soul-types.ts`（119，原 `src/soul/types.ts`，消 16 条跨边界 import）；
+- `src/kernel/interaction-types.ts`（726，原 `src/interactions/types.ts`，消 9 条）；
+- `src/kernel/persona-format.ts`（16，原 `src/agents/persona-format.ts` 纯 `tieredInterests`，消 6 条）；
+- `src/kernel/title-clamp.ts`（74，原 `src/publish-agent/title-clamp.ts` 纯字形截断，消 2 条）。
+
+源目录逐格随之下调（归档整表重算时并入）：`src/soul/` 7→6、`src/interactions/` −1、`src/agents/`（api 段）2→1、`src/publish-agent/` −1；分层计数 **api 104→102 / automation 166→165 / content 80→79 / kernel 4→8**（合计文件数不变，均为搬迁非新增）。**跨边界 import 台账 `frozenTotal` 266 → 233**（净减 33 = 16+9+6+2）。均行为零变更（纯类型/纯函数搬迁 + import 路径重写）。已 land origin/master + 部署 dev（`2a1905b`）。下一刀 `extract-schema-capability-contract` 析出 `schema-capability.ts` 无 SQL 纯判定段（消 ~20 条）。
+
 **跨边界 import 与表写入基线（`AC-BOUND` 度量物，`aidcp-cloud@89c286d`）**：首批 seed 实测 **295 条**跨边界 import + **12 条**跨层表写入；`involvingContent` = **117**。方向分解：`api→automation` 101 / `automation→api` 77 / `api→content` 34 / `automation→content` 28 / `content→automation` 32 / `content→api` 23。复核命令（在 `aidcp-cloud` 内跑，只读）：`npm run boundaries:census`。
 
 `src/cache/` 逐文件切分（该目录是唯一按文件而非按语义分组切开的目录）：
