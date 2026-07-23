@@ -75,6 +75,14 @@ The primary order is:
 
 The dashboard uses the existing content-home responsive styles inside the environment content width. At narrow widths, summaries and paired sections stack without horizontal overflow. The AI work panel retains its desktop 255px maximum and same-size completed process text.
 
+### 7. Content evidence remains visual-first
+
+The environment move must not replace the July 22 content cards with compact administrative rows. The featured lineage keeps two substantial visual panes with a clear source-to-output relationship, engagement evidence and direct actions. The reference section keeps portrait-led cards so customers can recognize collected content before reading metadata; customer drafts remain compact because their status is the primary scan target.
+
+When an upstream item has no usable image URL, the renderer uses a deterministic, low-saturation editorial cover derived from the item identity. It must not display a large flat gray block or imply that a real image was collected. The fallback is decoration, while title, source and engagement values remain the evidence.
+
+The idle work panel uses the same compact 240px frame as the active state, but its process side still previews the stages that will appear after a task starts. This prevents the most important panel from reading as an unfinished empty container. The account schedule remains a quiet entry row and must not visually outweigh the featured lineage or work panel.
+
 ## Risks / Trade-offs
 
 - **[Existing controller assumes content workspace is open]** → Separate “dashboard visible” from “deep workspace active” and add focused tests for initial selection, reload, switching and late responses.
@@ -82,6 +90,7 @@ The dashboard uses the existing content-home responsive styles inside the enviro
 - **[Back navigation loops between two homes]** → Remove the home tab and define dashboard as the sole root; root close always exits to it.
 - **[Lifecycle guide points to a hidden legacy button]** → Keep the shared lifecycle button as command owner but make the dashboard proxy the visible guide target and test first-use start.
 - **[Schedule failure degrades the whole dashboard]** → Keep its controller and failure state isolated; dashboard content requests and rendering proceed independently.
+- **[Missing media makes the value page look broken]** → Render a clearly decorative deterministic cover fallback without fabricating a source image or engagement evidence.
 
 ## Migration Plan
 

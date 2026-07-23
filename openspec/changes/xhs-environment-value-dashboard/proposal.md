@@ -7,6 +7,7 @@ The customer-facing value dashboard designed for Xiaohongshu was implemented beh
 - Make the full value dashboard the primary landing view when a customer selects a Xiaohongshu environment.
 - Keep the established dashboard structure together: value summary, compact AI work panel, live work process, featured inspiration lineage, reference content, customer content, honest empty/error states and expandable runtime details.
 - Integrate the account schedule as a compact dashboard section instead of presenting it as the only new environment-home experience.
+- Preserve the July 22 prototype's visual-first content hierarchy: prominent source/output covers, visible engagement evidence, clear lineage actions, portrait reference cards and a purposeful idle work state instead of compressing the dashboard into administrative data rows.
 - Remove “内容首页” as a second first-level destination. “精选灵感” and “我的内容” remain deeper content views and return to the environment dashboard.
 - Reuse the existing environment lifecycle, browser controls, customer-auth reads, request-epoch isolation, new-user start guide and content controllers; do not create duplicate running or content state.
 - Preserve the existing legacy environment landing experience for Facebook, WeChat Channels and unknown platforms.

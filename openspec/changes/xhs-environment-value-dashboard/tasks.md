@@ -25,3 +25,11 @@
   <!-- Edge 5ccc917 was fast-forwarded and pushed to master after the post-rebase full suite. Control proposal 91db694 was rebased onto d1641cc; this completion record is the final fast-forward control commit. -->
 - [x] 4.3 Record that this delivery updates Edge source only and does not build, publish or install a desktop package.
   <!-- Delivery boundary: renderer source only; no Cloud runtime, database, installer, auto-update feed or installed desktop client was changed. -->
+
+## 5. Prototype fidelity correction
+
+- [x] 5.1 Restore the featured lineage's substantial source/output covers, engagement evidence, actions and honest unlinked-draft state.
+- [x] 5.2 Restore portrait-led reference cards and deterministic decorative fallbacks for missing media while keeping real titles, summaries and counts authoritative.
+- [x] 5.3 Complete the idle work-panel process preview and reduce schedule emphasis without exceeding the 255px desktop panel ceiling or supported-width bounds.
+- [x] 5.4 Add focused renderer/static tests, compare the populated and idle states against the July 22 prototype in-browser, run full Edge tests/typecheck, validate OpenSpec and integrate the correction.
+  <!-- Edge f734708: focused renderer/security/schedule/fleet tests 129/129; full suite 2284/2284; typecheck passed. Browser comparison covered populated and idle states at 1280px and 900px with no horizontal overflow; integration is recorded by the delivery commit. -->
