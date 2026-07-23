@@ -1,6 +1,6 @@
 ## Context
 
-`aidcp-edge` 已能通过 AdsPower 本地 API 启动指定 profile，并使用现有 CDP client 驱动 Chromium。Facebook 与小红书已有手动探针，但 TikTok 尚无平台模块或真实页面证据。本变更必须在不接入生产协议、Cloud 调度和风险计数的前提下，回答四个窄问题：网页信息流能否稳定浏览、一次点赞能否由页面状态确认、评论文本能否只填入编辑器而不提交、合成素材能否进入发布编排器并停在最终发布之前。
+`aidcp-edge` 已能通过 AdsPower 本地 API 启动指定 profile，并使用现有 CDP client 驱动 Chromium。现有 TikTok 探针已经回答 For You/单视频浏览、一次点赞、评论只输入和发布前编排器四个窄问题。对照抖音调研后，仍需补充多 surface、关注/收藏/分享 shadow、消息/通知/直播入口和回复语言边界的只读证据。
 
 TikTok 信息流采用客户端渲染与虚拟化复用，页面结构会因语言、地区、登录状态和 A/B 实验变化。探针不能缓存长期 DOM node，也不能把鼠标事件派发或页面静止误判为业务成功。
 
@@ -11,6 +11,7 @@ TikTok 信息流采用客户端渲染与虚拟化复用，页面结构会因语�
 - 复用现有 AdsPower + CDP 基础设施连接明确指定的本地 profile。
 - 对浏览、点赞和评论输入分别产生可测试、可回查且不含敏感数据的证据。
 - 参考 Facebook 与小红书现有探针，以独立、语义定位的 no-submit 路径验证 TikTok 上传和编排器状态。
+- 参考抖音的 surface adapter、独立动作门和私聊误分类修正，只读盘点缺失能力，不把抖音选择器或成功语义直接套到 TikTok。
 - 真实点赞必须双重显式授权、目标唯一、状态前后闭环；评论路径必须在代码层没有发送能力。
 - 登录失效、挑战页、页面歧义、虚拟列表换项和确认超时均诚实失败。
 
@@ -18,7 +19,7 @@ TikTok 信息流采用客户端渲染与虚拟化复用，页面结构会因语�
 
 - 不注册 TikTok 为正式生产平台，不接 Cloud 自动浏览、发布、评论或风控计数。
 - 不绕过验证码、登录验证、风控限制或平台安全措施。
-- 不实现批量点赞、批量评论、关注、最终发布、数据抓取或私有接口调用。
+- 不执行关注、收藏、分享给联系人、评论/私信/直播发送或最终发布，不实现批量动作、数据抓取或私有接口调用。
 - 不保证当前探针选择器可长期跨 TikTok 页面版本稳定工作。
 
 ## Decisions
@@ -61,6 +62,26 @@ AdsPower 本地 API 是首选 profile→debug port 绑定来源。如果 API 暂
 
 备选方案是复用未来生产发布 executor 的 dry-run 分支；这会让最终提交能力进入探针代码并扩大误触风险，因此不采用。也不为本次探测新增平台注册、协议、Cloud 编排或持久化模型。
 
+### 7. 多 surface 只做结构盘点，不做全能页面执行器
+
+能力差异探针按当前 route 和结构分别报告 `for_you`、`following`、`profile`、`video_detail`、`search_entry`、`tag_or_music_entry`、`messages_entry`、`notifications_entry` 和 `live_entry`。每次重新读取规范 href、当前稳定 video id 和候选数，不缓存跨页面节点；本期只允许导航到公开浏览 surface，不自动搜索、不选择私信会话、不打开通知内容。
+
+备选方案是把所有页面塞进现有 For You snapshot 并用通用 selector 猜测；抖音调研已证明内部滚动容器、modal/detail hydration 和入口语义会因 surface 改变，因此不采用。
+
+### 8. 关注、收藏和分享本期固定 shadow
+
+探针只观察与当前稳定 video id 绑定的关注、收藏和分享控件，报告候选数、可见性和可读状态。没有本次用户逐项授权，也没有 TikTok 正负状态 fixture，因此代码不提供点击方法和真实动作开关；`unknown` 必须保持未知。分享只观察入口，不打开收件人或复制/发送路径。
+
+### 9. 消息、评论和直播回复先建立语言与目标边界
+
+探针可观察消息、通知和直播入口是否存在，但不得选择会话、读取或输出正文、进入编辑器或发送。报告将页面 UI locale 与账号回复语言分开：UI locale 只服务选择器，不能决定对外语言。TikTok 尚无账号级 `writing_language` 合同，因此回复语言固定为 `unconfigured`，任何回复能力保持 blocked。
+
+未来若单独授权消息测试，必须同时提供精确 profile、能力类型、语言枚举、精确允许文本和单次授权；私信还必须先证明唯一一对一会话和最近消息入站。不得复用抖音固定“好的”或 `ok`。
+
+### 10. 官方 API readiness 只记录公开契约，不读取凭据
+
+正式发布优先 TikTok Login Kit + Content Posting API：区分 Upload-to-draft 与 Direct Post，并通过 creator info、publish status 或 webhook 形成状态链；授权账号资料和公开视频优先 Display API。当前探针只记录所需产品、scope、审核和回查能力，不扫描、打印或调用任何 token/client secret，也不尝试官方上传或发布。
+
 ## Risks / Trade-offs
 
 - [TikTok DOM/可访问性标签随语言或实验变化] → 使用结构、规范链接和多语言语义组合，无法唯一确认时失败，并以真机观测更新 fixture。
@@ -69,6 +90,9 @@ AdsPower 本地 API 是首选 profile→debug port 绑定来源。如果 API 暂
 - [评论文本可能被浏览器草稿机制暂存] → 不发送仍是硬边界；探针不宣称页面刷新后不会保留本地草稿，且默认留给操作员观察和手工清理。
 - [选择文件会把素材传到 TikTok 或形成服务端草稿] → 只使用可丢弃的无敏感合成素材，明确报告上传/暂存事实，不把它描述为公开发布。
 - [上传页面和控件因 TikTok Studio 实验变化] → 使用 route、`data-e2e`、role、accept 等语义组合；候选不唯一或上传状态不明确时失败关闭。
+- [抖音选择器被错误复用] → 只复用失败语义和动作边界；TikTok 的 route、`data-e2e`、视频 ID 和控件状态必须由本平台 fixture 证明。
+- [UI 语言被误当回复语言] → 分开报告 `uiLocale` 与 `replyLanguage=unconfigured`；没有账号语言合同和精确批准文本时不进入任何回复编辑器。
+- [查看私信/通知改变未读状态或暴露身份] → 本期只观察导航入口，不选择会话或打开通知内容，报告不含身份、正文或联系人列表。
 - [本地 profile 已被其他进程占用] → 复用 active debug port 或由 AdsPower 返回明确失败，不做跨机器强占。
 
 ## Migration Plan

@@ -110,3 +110,43 @@ TikTok CDP 探针 SHALL 要求调用方明确提供 AdsPower profile id，并 SH
 #### Scenario: 生成发布探针报告
 - **WHEN** 发布探针完成或失败
 - **THEN** 报告以脱敏状态区分 `file_selected`、`upload_acknowledged` 和 `composer_ready_not_submitted`，并明确 `submitted=false`
+
+### Requirement: 能力差异探针必须按 TikTok surface 分开报告
+探针 SHALL 通过当前 route、规范 href、语义属性和稳定 video id 区分 For You、Following、作者主页、视频详情及搜索/标签/音乐/消息/通知/直播入口。探针 MUST NOT 复用抖音选择器，MUST NOT 仅凭按钮文字宣称 surface 可用，且候选不唯一时 SHALL 报告歧义。
+
+#### Scenario: 当前页面和导航入口可识别
+- **WHEN** TikTok 页面已登录且导航及当前视频结构唯一
+- **THEN** 探针报告当前 surface、稳定 video id、各入口候选数和脱敏 path，不自动搜索、不选择会话且不打开通知内容
+
+#### Scenario: 页面结构或目标不唯一
+- **WHEN** 当前 surface、视频或入口存在多个不一致候选
+- **THEN** 探针报告 `ambiguous` 或 `unknown`，不得选取 DOM 顺序中的第一个作为成功
+
+### Requirement: 关注收藏分享探针本期只能 shadow
+探针 SHALL 只观察与当前稳定视频绑定的关注、收藏和分享控件，报告候选数、可见性和可读状态。实现 MUST NOT 提供关注、收藏、打开分享对象或发送分享的点击方法、动作开关或提交路径；无法证明正负状态时 SHALL 保持 `unknown`。
+
+#### Scenario: 社交控件唯一可见
+- **WHEN** 当前视频唯一且关注、收藏或分享控件可唯一识别
+- **THEN** 探针返回 `shadow` 证据且页面状态不变
+
+#### Scenario: 控件状态不可读
+- **WHEN** 控件存在但没有经过 fixture 证明的状态语义
+- **THEN** 探针报告 `state_unknown`，不得从颜色、计数或按钮存在推断已操作或未操作
+
+### Requirement: 回复语言与消息目标不明确时不得进入编辑器
+探针 SHALL 分开记录页面 `uiLocale` 和账号 `replyLanguage`。本期 `replyLanguage` SHALL 为 `unconfigured`；消息、评论和直播能力 SHALL 只观察入口，不选择会话、不读取或输出正文、不进入编辑器、不发送。UI locale MUST NOT 被当作回复语言。
+
+#### Scenario: 页面使用越南语或其他 UI locale
+- **WHEN** 页面 `lang` 或界面词表表明某种 UI locale
+- **THEN** 探针只将其用于结构证据，仍报告 `replyLanguage=unconfigured` 和 `replyBlocked=true`
+
+#### Scenario: 消息或直播入口存在
+- **WHEN** 探针识别出唯一消息、通知或直播入口
+- **THEN** 只报告入口 path/候选数，不打开内容、不读取身份/正文且不执行输入或发送
+
+### Requirement: 官方 API readiness 不得调用或泄露凭据
+探针 SHALL 以静态结构化清单记录 TikTok Login Kit、Content Posting API、Display API 所需产品、scope、审核与状态回查能力。探针 MUST NOT 扫描、读取、打印或调用 token/client secret；官方能力未配置时 SHALL 报告 `not_configured`，不得回退到网页最终提交。
+
+#### Scenario: 生成官方 API readiness 报告
+- **WHEN** 运行能力差异探针
+- **THEN** 报告 Upload-to-draft、Direct Post、creator info、publish status/webhook 和 Display API 为文档能力，并把本地配置状态记为 `not_checked` 或 `not_configured`

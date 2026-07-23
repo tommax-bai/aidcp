@@ -50,3 +50,19 @@
 <!-- Live evidence on k1eu5amn: a 2-second 720x1280 solid-color MP4 was set on the unique video input. The input then disappeared and TikTok Studio exposed a blob thumbnail plus canvas preview, one `contenteditable=true role=combobox` caption seeded with the 20-character filename, and a separate Vietnamese location search input. A first-use editing tutorial was acknowledged only by an exact `role=alertdialog` + `Đã hiểu` match. The caption was replaced with a 38-character probe marker and read back exactly: status=composer_ready_not_submitted, uploadAcknowledged=true, matched=true, submitted=false. Read-only settings evidence included publish-now/schedule radios, audience=`Mọi người`, location, high-quality upload, music copyright check, and quick content check. The browser remains open on the composer; no final publish control was queried or activated. -->
 - [x] 6.7 回写真机结论、未证明边界、提交 SHA 与验证结果，提交并推送 Edge/控制仓 feature 分支；不部署、不归档。
 <!-- Delivery: aidcp-edge a6b0ee0; aidcp control OpenSpec artifact 6ff0fbe followed by this ledger-only closeout commit. Both remain on `codex/tiktok-cdp-interaction-probes`. Proven boundary is browser UI upload/composer readiness only: no final publish control lookup, no submission, no server-publication proof, no production platform registration, no deployment, and no archive. -->
+
+## 7. Douyin 差异能力调研（只读）
+
+- [x] 7.1 对照抖音 OpenSpec、探针实现和 TikTok 官方资料，明确多 surface、社交 shadow、消息/直播入口、回复语言和官方 API readiness 的最小范围。
+<!-- 2026-07-23: comparison captured in `docs/research/tiktok-web-and-douyin-comparison-2026-07-23.md`. Reused principles are surface-specific adapters, independent write authorization, exact target binding, UI-only evidence, and official API preference; Douyin selectors and its DM/live outcomes are not treated as TikTok proof. -->
+- [x] 7.2 在 `k1eu5amn` 另开临时 TikTok 标签，只读盘点当前 surface、For You/Following/作者主页及搜索、标签/音乐、消息、通知、直播入口，不破坏现有 Studio 草稿。
+  <!-- 2026-07-23: 通过 AdsPower API 绑定 profile 后仅创建、激活并关闭自己的临时标签。For You 水合后存在稳定 video id，并发现 Following、主页、搜索、标签/音乐、消息、通知、直播入口；Following 与主页为不同 DOM surface。后台标签仅 readyState 完成但未水合，必须激活并有界轮询。未点击、未输入、未发送。 -->
+- [x] 7.3 在 `src/tiktok/probes/` 实现独立能力差异 snapshot：surface、入口候选、当前 video id、关注/收藏/分享 shadow、`uiLocale`、`replyLanguage=unconfigured` 和官方 API 静态 readiness；不新增真实动作方法。
+  <!-- 2026-07-23: Edge `src/tiktok/probes/capability-research-probe.ts` 使用 TikTok 精确 data-e2e 做只读 inventory；动态主页/标签/音乐路径不进入 snapshot，官方 API readiness 不读取凭证、不发网络请求。 -->
+- [x] 7.4 新增手动 runner，严格绑定显式 profile，使用临时标签完成只读盘点并关闭自己的标签；不得选择会话、打开通知内容、搜索、输入或发送。
+  <!-- 2026-07-23: Edge `scripts/tiktok-capability-research-probe.ts` 仅走 AdsPower API，并限定 Target.createTarget/activateTarget/closeTarget；不会进入消息、通知、直播、搜索或编辑器。 -->
+- [x] 7.5 增加 fixture、行为和源码边界测试，覆盖 surface 歧义、抖音 selector 不复用、社交状态 unknown、消息/通知只入口、UI/回复语言分离及零输入/零点击。
+  <!-- 2026-07-23: `npx tsx --test test/tiktok/capability-research-probe.test.ts` 8/8；`npm run typecheck` 通过。 -->
+- [x] 7.6 在 `k1eu5amn` 运行只读 runner，记录真实入口、可识别/缺失 surface 和未证明边界；所有社交/回复/发布动作保持未执行。
+  <!-- 2026-07-23: 正式 runner 通过 AdsPower API 附着。For You 有唯一 stable video id；Following 与个人主页已水合。For You 精确识别 follow/favorite/share 各 1 个，均 shadow_ready/state unknown；搜索 2 候选为 ambiguous，消息/通知/直播/音乐入口存在，标签入口缺失。UI locale=vi-VN，replyLanguage=unconfigured/replyBlocked=true。report actionsExecuted=[]/submitted=false，临时标签均关闭。 -->
+- [ ] 7.7 运行 TikTok 聚焦测试、Edge typecheck、diff 检查和 OpenSpec strict validation，回写提交 SHA 并推送两个 feature 分支；不合并、不部署、不归档。
