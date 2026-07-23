@@ -42,12 +42,15 @@ TikTok Web 可以通过 Chromium CDP 控制，但目前只交付了隔离的研�
 - 默认 shadow、双门授权、单向且最多一次的点赞探针；
 - 评论只填写不发送，输入后回读，源码没有发送按钮、回车或表单提交路径；
 - 进入 TikTok Studio，选择合成视频、等待页面进入编排器、填写文案并停在最终发布之前；
-- 只读观察编排器的立即发布/定时、受众、位置、高质量上传和内容检查等设置。
+- 只读观察编排器的立即发布/定时、受众、位置、高质量上传和内容检查等设置；
+- 分别盘点 For You、Following 和个人主页 surface，以及搜索、消息、通知、直播、音乐等入口；
+- 以 TikTok 精确控件把关注、收藏和分享报告为 shadow，不执行点击；
+- 形成后续正式接入的系统设计输入，明确复用 Facebook/XHS 机制但隔离平台适配。
 
 尚未完成：
 
-- Following、搜索、作者主页、标签/音乐页等多 surface 浏览；
-- 关注、收藏、分享；
+- Following、搜索、作者主页、标签/音乐页等 surface 的生产浏览闭环；
+- 关注、收藏、分享的正负状态 fixture、真实动作和后置确认；
 - 评论列表读取、精确评论回复和普通评论真实发送；
 - 私信、通知、直播聊天和直播定向回复；
 - 图片轮播、封面、草稿恢复、定时规则和发布后回查；
@@ -407,14 +410,18 @@ Direct Post 当前文档化的设置包括：
 - TikTok Edge 模块：
   - `aidcp-edge/src/tiktok/probes/interaction-probe.ts`
   - `aidcp-edge/src/tiktok/probes/publish-composer-probe.ts`
+  - `aidcp-edge/src/tiktok/probes/capability-research-probe.ts`
 - TikTok runner：
   - `aidcp-edge/scripts/tiktok-interaction-probe.ts`
   - `aidcp-edge/scripts/tiktok-publish-composer-probe.ts`
+  - `aidcp-edge/scripts/tiktok-capability-research-probe.ts`
 - TikTok tests：
   - `aidcp-edge/test/tiktok/interaction-probe.test.ts`
   - `aidcp-edge/test/tiktok/publish-composer-probe.test.ts`
-- TikTok Edge commits：`c5e0fa0`、`a6b0ee0`
-- TikTok Control commits：`9695885`、`9885784`、`6ff0fbe`、`6370acb`
+  - `aidcp-edge/test/tiktok/capability-research-probe.test.ts`
+- 系统设计输入：`docs/design/tiktok-system-design-input-2026-07-23.md`
+- TikTok Edge commits：`c5e0fa0`、`a6b0ee0`、`0a1dac1`
+- TikTok Control commits：`9695885`、`9885784`、`6ff0fbe`、`6370acb`、`1bd15b4`、`435fdde`、`ff9e97a`
 - 抖音 OpenSpec：`openspec/changes/douyin-cdp-research-and-probes/`
 - 抖音 Edge 模块：`aidcp-edge/src/douyin/probes/interaction-probe.ts`
 - 抖音 Edge commits：`11022ec`、`49aeb4e`
@@ -422,9 +429,9 @@ Direct Post 当前文档化的设置包括：
 
 验证记录：
 
-- TikTok 聚焦测试：25/25；
+- TikTok 聚焦测试：34/34；
 - TikTok Edge typecheck：通过；
-- TikTok OpenSpec strict validation：通过，21/21 tasks；
+- TikTok OpenSpec strict validation：探针与 Douyin 差异阶段通过，28/28 tasks；
 - 抖音聚焦测试：21/21；
 - 抖音 Edge typecheck：通过；
 - 抖音 OpenSpec strict validation：通过，但 tasks 中仍有明确未完成的浏览、评论和发布研究项；

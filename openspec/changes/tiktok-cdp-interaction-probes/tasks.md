@@ -67,3 +67,9 @@
   <!-- 2026-07-23: 正式 runner 通过 AdsPower API 附着。For You 有唯一 stable video id；Following 与个人主页已水合。For You 精确识别 follow/favorite/share 各 1 个，均 shadow_ready/state unknown；搜索 2 候选为 ambiguous，消息/通知/直播/音乐入口存在，标签入口缺失。UI locale=vi-VN，replyLanguage=unconfigured/replyBlocked=true。report actionsExecuted=[]/submitted=false，临时标签均关闭。 -->
 - [x] 7.7 运行 TikTok 聚焦测试、Edge typecheck、diff 检查和 OpenSpec strict validation，回写提交 SHA 并推送两个 feature 分支；不合并、不部署、不归档。
   <!-- 2026-07-23: Edge 0a1dac1；control 435fdde。`npx tsx --test test/tiktok/*.test.ts` 34/34，`npm run typecheck`、两仓 `git diff --check`、`openspec validate tiktok-cdp-interaction-probes --strict` 均通过。两个现有 feature 分支使用普通 fast-forward push；未合并、未部署、未归档。 -->
+
+## 8. 后续系统设计输入
+
+- [x] 8.1 基于 TikTok 真机证据、Douyin 偏差和现有 Facebook/XHS 平台边界，形成一份面向后续正式 OpenSpec 的系统设计输入文档；区分可复用机制、TikTok 专属适配、最小切片和明确不做，避免预先发明完整协议或数据库模型。
+  <!-- 2026-07-23: 新增 `docs/design/tiktok-system-design-input-2026-07-23.md`。文档以 For You 只读浏览为首个生产切片，复用 PlatformDriver/Cloud registry/EventBus/RiskController/审批/语言边界，保持 TikTok selector、surface、成功语义和官方授权专属；评论、互动、官方发布分开立项，私信/通知回复/直播暂不设计。 -->
+- [ ] 8.2 更新研究证据索引，运行文档 diff 检查与 OpenSpec strict validation，提交并推送 control feature 分支；不合并、不部署、不归档。
