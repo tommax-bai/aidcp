@@ -89,6 +89,16 @@ The dashboard is embedded beside the environment rail, so viewport media queries
 
 The responsive change preserves the same information architecture and 240px desktop work-panel frame. It increases the minimum readable size of customer-facing titles, body copy, evidence chips and actions, keeps empty-state panels visually commensurate with populated content, and only stacks the work panel at genuinely narrow content widths.
 
+### 9. The prototype defines one visual state matrix
+
+The July 22 HTML demo is not only a populated-page reference. Its populated, loading, empty, error, active, waiting and collapsed compositions define one state matrix for the environment dashboard. The renderer keeps the same section shells while data changes: a failed or empty lower section does not resize the whole page, a missing draft does not collapse the featured relationship, and a running process does not replace the stable 240px work frame.
+
+Featured status badges size to their text instead of stretching across the copy column. The source and output covers remain substantial, with enough central relationship space to explain provenance. Reference cards keep a portrait-led top-aligned reading rhythm and expose the truthful “可创作” or “已创作” state at scan level. Customer drafts remain compact status rows.
+
+Reference and customer-content placeholders are section-specific 218px cards with restrained radial emphasis. Loading and continuing-search states use an accessible live indicator; idle states use a static neutral indicator; failures expose retry without being painted as empty data. Dynamic work states keep stage-specific wording such as “判断中...” and “判断完成”, use equal text sizing for current and completed rows, type only the current summary character by character, and distinguish waiting from running without showing elapsed time.
+
+Visual validation uses the reported environment content width as well as narrow container widths. Review covers populated, mixed populated/empty, all-empty, loading/error, active, waiting and collapsed states; it compares section proportions and whitespace, not only the absence of overflow.
+
 ## Risks / Trade-offs
 
 - **[Existing controller assumes content workspace is open]** → Separate “dashboard visible” from “deep workspace active” and add focused tests for initial selection, reload, switching and late responses.

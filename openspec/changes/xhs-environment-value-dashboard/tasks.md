@@ -42,3 +42,12 @@
   <!-- Edge 187e3f3: focused renderer/security/schedule/fleet tests 130/130; full suite 2285/2285; typecheck passed. Browser QA used an 847px environment content container and a 620px narrow frame, confirmed 240px desktop work height, container-driven stacking, decorative tone-0 fallback and no horizontal overflow. -->
 - [x] 6.4 Rebase, integrate and push the renderer and OpenSpec correction while preserving the source-only delivery boundary.
   <!-- Edge 187e3f3 was fast-forwarded and pushed to master. Control was rebased onto the latest origin/main; this completion record is the final control delivery commit. Source-only boundary remains unchanged: no desktop package or installed client was updated. -->
+
+## 7. State-matrix visual fidelity
+
+- [x] 7.1 Treat the July 22 HTML demo as the shared visual contract for populated, loading, empty, error, active, waiting and collapsed states.
+- [x] 7.2 Restore content-sized featured badges, balanced source/relation/output proportions, portrait reference-card rhythm and explicit “可创作 / 已创作” scan states.
+- [x] 7.3 Replace stretched generic lower-section placeholders with independently designed 218px reference and customer-content states, including honest live, idle, error and action treatments.
+- [x] 7.4 Align the 240px work panel's idle, active, waiting and collapsed states while preserving stage-specific labels, completed-label visibility and character-by-character current output.
+- [ ] 7.5 Add focused state/render regressions, visually compare the client at the reported content width against the populated and empty prototype states, then run full Edge tests, typecheck and strict OpenSpec validation.
+  <!-- Edge da825dd: focused renderer/security tests passed 41/41; full suite passed 2285/2285; typecheck passed. Strict OpenSpec validation passed. Automated visual reload remains open because Browser rejected reload of the existing local file URL under its URL policy; no alternate browser surface or policy bypass was used. -->
