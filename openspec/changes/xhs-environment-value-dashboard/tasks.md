@@ -33,3 +33,11 @@
 - [x] 5.3 Complete the idle work-panel process preview and reduce schedule emphasis without exceeding the 255px desktop panel ceiling or supported-width bounds.
 - [x] 5.4 Add focused renderer/static tests, compare the populated and idle states against the July 22 prototype in-browser, run full Edge tests/typecheck, validate OpenSpec and integrate the correction.
   <!-- Edge f734708: focused renderer/security/schedule/fleet tests 129/129; full suite 2284/2284; typecheck passed. Browser comparison covered populated and idle states at 1280px and 900px with no horizontal overflow; integration is recorded by the delivery commit. -->
+
+## 6. Embedded-width fidelity correction
+
+- [x] 6.1 Base dashboard responsiveness on the environment content container and preserve readable customer-facing typography.
+- [x] 6.2 Stack the featured lineage and lower content sections at medium embedded widths, and balance populated versus empty section height.
+- [x] 6.3 Add static regression coverage, visually compare the reported width against the July 22 hierarchy, and rerun required Edge/OpenSpec validation.
+  <!-- Edge 187e3f3: focused renderer/security/schedule/fleet tests 130/130; full suite 2285/2285; typecheck passed. Browser QA used an 847px environment content container and a 620px narrow frame, confirmed 240px desktop work height, container-driven stacking, decorative tone-0 fallback and no horizontal overflow. -->
+- [ ] 6.4 Rebase, integrate and push the renderer and OpenSpec correction while preserving the source-only delivery boundary.

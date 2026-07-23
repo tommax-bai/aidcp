@@ -83,6 +83,12 @@ When an upstream item has no usable image URL, the renderer uses a deterministic
 
 The idle work panel uses the same compact 240px frame as the active state, but its process side still previews the stages that will appear after a task starts. This prevents the most important panel from reading as an unfinished empty container. The account schedule remains a quiet entry row and must not visually outweigh the featured lineage or work panel.
 
+### 8. Responsive hierarchy follows the environment content container
+
+The dashboard is embedded beside the environment rail, so viewport media queries do not describe its actual usable width. The dashboard establishes an inline-size container and adapts the featured lineage and lower content grid from that container. At medium environment widths, the source and output panes stack in reading order and the reference/customer-content sections become full-width sections instead of shrinking all typography and evidence into desktop columns.
+
+The responsive change preserves the same information architecture and 240px desktop work-panel frame. It increases the minimum readable size of customer-facing titles, body copy, evidence chips and actions, keeps empty-state panels visually commensurate with populated content, and only stacks the work panel at genuinely narrow content widths.
+
 ## Risks / Trade-offs
 
 - **[Existing controller assumes content workspace is open]** → Separate “dashboard visible” from “deep workspace active” and add focused tests for initial selection, reload, switching and late responses.
@@ -91,6 +97,7 @@ The idle work panel uses the same compact 240px frame as the active state, but i
 - **[Lifecycle guide points to a hidden legacy button]** → Keep the shared lifecycle button as command owner but make the dashboard proxy the visible guide target and test first-use start.
 - **[Schedule failure degrades the whole dashboard]** → Keep its controller and failure state isolated; dashboard content requests and rendering proceed independently.
 - **[Missing media makes the value page look broken]** → Render a clearly decorative deterministic cover fallback without fabricating a source image or engagement evidence.
+- **[Viewport is wide while the embedded environment area is narrow]** → Use container queries owned by the Xiaohongshu dashboard and test the actual environment content width rather than relying on the outer Electron window.
 
 ## Migration Plan
 
