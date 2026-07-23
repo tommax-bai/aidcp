@@ -51,6 +51,8 @@ git worktree list
 - [`product-exception.md`](product-exception.md)
 - [`anti-detection.md`](anti-detection.md)
 - [`design-gaps-and-models.md`](design-gaps-and-models.md)
+- [`research/tiktok-web-and-douyin-comparison-2026-07-23.md`](research/tiktok-web-and-douyin-comparison-2026-07-23.md)
+  — TikTok Web 真机证据、抖音对照、官方发布路径、回复语言边界和后续调研建议
 - `design/` 与 `research/`
 
 这些文档中的界面、字段、状态或路线图可能只处于设计阶段。实现判断必须回到 OpenSpec、
