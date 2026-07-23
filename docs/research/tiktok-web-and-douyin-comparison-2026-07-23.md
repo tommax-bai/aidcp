@@ -431,7 +431,7 @@ Direct Post 当前文档化的设置包括：
 
 - TikTok 聚焦测试：34/34；
 - TikTok Edge typecheck：通过；
-- TikTok OpenSpec strict validation：探针与 Douyin 差异阶段通过，28/28 tasks；
+- TikTok OpenSpec strict validation：通过，系统设计输入完成后 30/30 tasks；
 - 抖音聚焦测试：21/21；
 - 抖音 Edge typecheck：通过；
 - 抖音 OpenSpec strict validation：通过，但 tasks 中仍有明确未完成的浏览、评论和发布研究项；

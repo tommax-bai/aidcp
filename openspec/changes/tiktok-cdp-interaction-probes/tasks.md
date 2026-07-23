@@ -72,4 +72,5 @@
 
 - [x] 8.1 基于 TikTok 真机证据、Douyin 偏差和现有 Facebook/XHS 平台边界，形成一份面向后续正式 OpenSpec 的系统设计输入文档；区分可复用机制、TikTok 专属适配、最小切片和明确不做，避免预先发明完整协议或数据库模型。
   <!-- 2026-07-23: 新增 `docs/design/tiktok-system-design-input-2026-07-23.md`。文档以 For You 只读浏览为首个生产切片，复用 PlatformDriver/Cloud registry/EventBus/RiskController/审批/语言边界，保持 TikTok selector、surface、成功语义和官方授权专属；评论、互动、官方发布分开立项，私信/通知回复/直播暂不设计。 -->
-- [ ] 8.2 更新研究证据索引，运行文档 diff 检查与 OpenSpec strict validation，提交并推送 control feature 分支；不合并、不部署、不归档。
+- [x] 8.2 更新研究证据索引，运行文档 diff 检查与 OpenSpec strict validation，提交并推送 control feature 分支；不合并、不部署、不归档。
+  <!-- 2026-07-23: 文档提交 5f627fb 已普通 fast-forward push；`git diff --check` 与 `openspec validate tiktok-cdp-interaction-probes --strict` 均通过。后续仅有本任务台账与验证数字收口提交；未修改代码、协议或运行时，未合并、未部署、未归档。 -->
