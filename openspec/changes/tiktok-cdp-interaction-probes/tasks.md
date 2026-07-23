@@ -65,4 +65,5 @@
   <!-- 2026-07-23: `npx tsx --test test/tiktok/capability-research-probe.test.ts` 8/8；`npm run typecheck` 通过。 -->
 - [x] 7.6 在 `k1eu5amn` 运行只读 runner，记录真实入口、可识别/缺失 surface 和未证明边界；所有社交/回复/发布动作保持未执行。
   <!-- 2026-07-23: 正式 runner 通过 AdsPower API 附着。For You 有唯一 stable video id；Following 与个人主页已水合。For You 精确识别 follow/favorite/share 各 1 个，均 shadow_ready/state unknown；搜索 2 候选为 ambiguous，消息/通知/直播/音乐入口存在，标签入口缺失。UI locale=vi-VN，replyLanguage=unconfigured/replyBlocked=true。report actionsExecuted=[]/submitted=false，临时标签均关闭。 -->
-- [ ] 7.7 运行 TikTok 聚焦测试、Edge typecheck、diff 检查和 OpenSpec strict validation，回写提交 SHA 并推送两个 feature 分支；不合并、不部署、不归档。
+- [x] 7.7 运行 TikTok 聚焦测试、Edge typecheck、diff 检查和 OpenSpec strict validation，回写提交 SHA 并推送两个 feature 分支；不合并、不部署、不归档。
+  <!-- 2026-07-23: Edge 0a1dac1；control 435fdde。`npx tsx --test test/tiktok/*.test.ts` 34/34，`npm run typecheck`、两仓 `git diff --check`、`openspec validate tiktok-cdp-interaction-probes --strict` 均通过。两个现有 feature 分支使用普通 fast-forward push；未合并、未部署、未归档。 -->
