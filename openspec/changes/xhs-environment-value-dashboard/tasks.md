@@ -40,4 +40,5 @@
 - [x] 6.2 Stack the featured lineage and lower content sections at medium embedded widths, and balance populated versus empty section height.
 - [x] 6.3 Add static regression coverage, visually compare the reported width against the July 22 hierarchy, and rerun required Edge/OpenSpec validation.
   <!-- Edge 187e3f3: focused renderer/security/schedule/fleet tests 130/130; full suite 2285/2285; typecheck passed. Browser QA used an 847px environment content container and a 620px narrow frame, confirmed 240px desktop work height, container-driven stacking, decorative tone-0 fallback and no horizontal overflow. -->
-- [ ] 6.4 Rebase, integrate and push the renderer and OpenSpec correction while preserving the source-only delivery boundary.
+- [x] 6.4 Rebase, integrate and push the renderer and OpenSpec correction while preserving the source-only delivery boundary.
+  <!-- Edge 187e3f3 was fast-forwarded and pushed to master. Control was rebased onto the latest origin/main; this completion record is the final control delivery commit. Source-only boundary remains unchanged: no desktop package or installed client was updated. -->
