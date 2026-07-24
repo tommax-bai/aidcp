@@ -79,3 +79,12 @@
   <!-- Browser QA: at 1080px the dashboard kept a 28px effective inner heading gutter, both populated lower bodies measured 328px, the four-stage runtime detail measured 154px and horizontal overflow was 0. Both empty cards remained independently 218px. At 720px the lower grid stacked, runtime stages became two columns and horizontal overflow remained 0. Focused Edge tests passed 44/44 and typecheck passed. -->
 - [x] 10.4 Run focused Edge tests, the full Edge suite, typecheck and strict OpenSpec validation; integrate and push the source-only correction.
   <!-- Edge 7c4f439 was fast-forwarded and pushed to master after focused tests passed 44/44, the full suite passed 2285/2285 and typecheck passed. Strict OpenSpec validation passed. Source-only delivery; no desktop package or installed client was updated. -->
+
+## 11. Remove the duplicate titlebar inspiration pool
+
+- [x] 11.1 Remove the titlebar inspiration DOM, visual styles and click wiring while preserving account-scoped summary loading and page-level inspiration navigation.
+- [x] 11.2 Replace titlebar-specific regressions with environment-dashboard summary, stale-account, failure/zero and shell-order coverage.
+- [x] 11.3 Run focused Edge tests, the full Edge suite, typecheck and strict OpenSpec validation; visually confirm that the remaining titlebar controls align without a gap.
+  <!-- Focused renderer/security tests passed 40/40; full Edge passed 2284/2284; typecheck and strict OpenSpec validation passed. At 1080px the titlebar contained zero duplicate inspiration entries, had zero horizontal overflow and its flexible spacer aligned the remaining cloud-environment and settings controls to the right. -->
+- [x] 11.4 Integrate and push the Edge and control changes while preserving the source-only delivery boundary.
+  <!-- Edge cf10b0c was fast-forwarded and pushed to master. Control artifacts were strictly validated before integration; this completion record is the final control delivery commit. Source-only delivery: no desktop package, installed client, Cloud runtime or database was changed. -->

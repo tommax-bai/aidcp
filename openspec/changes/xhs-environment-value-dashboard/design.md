@@ -111,6 +111,12 @@ The collapsed runtime summary remains a compact statement of confirmed daily bro
 
 The environment value page owns a small internal horizontal safe area in addition to the shell gutter so section headings never touch the dashboard background boundary. In the populated desktop composition, the four reference cards occupy two 160px rows and the three customer-content rows use the same 328px body height; responsive stacked layouts and independently designed 218px empty/error states retain their existing contracts.
 
+### 12. The titlebar does not duplicate the inspiration pool
+
+The selected Xiaohongshu environment dashboard is the primary place for inspiration totals, value evidence and navigation into the inspiration library. The global titlebar therefore removes the compact “灵感 / 已成稿” pool entry instead of repeating a second summary above the environment page. The titlebar keeps account identity on the left and uses its flexible space to align cloud environment, health and settings controls on the right without a visual gap.
+
+Removing the titlebar entry does not remove account-scoped summary loading or the inspiration library. The dashboard continues to read the authoritative summary, reject late responses from a previously selected account and expose its page-level “查看全部灵感” and related creation actions.
+
 ## Risks / Trade-offs
 
 - **[Existing controller assumes content workspace is open]** → Separate “dashboard visible” from “deep workspace active” and add focused tests for initial selection, reload, switching and late responses.
@@ -121,6 +127,7 @@ The environment value page owns a small internal horizontal safe area in additio
 - **[Missing media makes the value page look broken]** → Render a clearly decorative deterministic cover fallback without fabricating a source image or engagement evidence.
 - **[Viewport is wide while the embedded environment area is narrow]** → Use container queries owned by the Xiaohongshu dashboard and test the actual environment content width rather than relying on the outer Electron window.
 - **[CSS font shorthand silently falls back]** → Declare family, size, weight and line height separately for customer-facing text controls and lock the computed contract in static tests.
+- **[Removing the titlebar entry accidentally disables summary loading]** → Delete only its DOM, style and event wiring; keep dashboard summary reads and test account-switch stale-response rejection through the environment value page.
 
 ## Migration Plan
 
