@@ -51,3 +51,12 @@
 - [x] 7.4 Align the 240px work panel's idle, active, waiting and collapsed states while preserving stage-specific labels, completed-label visibility and character-by-character current output.
 - [x] 7.5 Add focused state/render regressions, visually compare the client at the reported content width against the populated and empty prototype states, then run full Edge tests, typecheck and strict OpenSpec validation.
   <!-- Edge 30c5c97: focused renderer/security tests passed 41/41; full suite passed 2285/2285; typecheck passed. Browser QA used a 892px dashboard content width and covered populated, empty, loading, error, active and waiting states: work panel 240px, populated lineage 193.3px, featured empty 160px, lower empty states 218px and horizontal overflow 0. Strict OpenSpec validation passed. Source-only delivery; no desktop package or installed client was updated. -->
+
+## 8. Idle first-screen density correction
+
+- [x] 8.1 Make the idle or environment-off desktop work panel no taller than 168px while keeping the active and waiting panel at 240px.
+- [x] 8.2 Recompose the idle process preview horizontally so actions, the non-publishing boundary and the three future-stage groups remain visible without a large empty center.
+- [x] 8.3 Update the July 22 HTML demo and focused static regressions, then visually verify the reported window proportion, active state and narrow state without horizontal overflow.
+  <!-- Browser QA: 920px viewport rendered idle at 168px and active at 240px; 720px viewport kept the idle card at 168px with zero horizontal overflow and exposed the featured section in the first screen. Focused Edge renderer/security tests passed 41/41. -->
+- [x] 8.4 Run focused Edge tests, the full Edge suite, typecheck and strict OpenSpec validation; integrate and push the source-only correction.
+  <!-- Edge 1f77ed0: focused renderer/security tests passed 41/41; a concurrent full run had one unrelated Native engine timeout, that case passed 1/1 when serialized, and the subsequent full run passed 2285/2285; typecheck and strict OpenSpec validation passed. Edge was fast-forwarded and pushed to master. Source-only delivery; no desktop package or installed client was updated. -->

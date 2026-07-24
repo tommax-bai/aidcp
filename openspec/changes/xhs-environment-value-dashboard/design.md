@@ -19,7 +19,7 @@ The newly implemented schedule entry exposed this mismatch because it was placed
 - Keep “精选灵感” and “我的内容” as deeper pages that return to the environment dashboard.
 - Place account schedule in the dashboard as a secondary, compact, account-level module.
 - Preserve all independently designed loading, empty, error and content states.
-- Preserve 255px desktop height for the expanded work panel and supported-width overflow guarantees.
+- Preserve a 255px desktop ceiling for the expanded work panel, use a compact idle frame, and keep supported-width overflow guarantees.
 
 **Non-Goals:**
 
@@ -81,17 +81,17 @@ The environment move must not replace the July 22 content cards with compact adm
 
 When an upstream item has no usable image URL, the renderer uses a deterministic, low-saturation editorial cover derived from the item identity. It must not display a large flat gray block or imply that a real image was collected. The fallback is decoration, while title, source and engagement values remain the evidence.
 
-The idle work panel uses the same compact 240px frame as the active state, but its process side still previews the stages that will appear after a task starts. This prevents the most important panel from reading as an unfinished empty container. The account schedule remains a quiet entry row and must not visually outweigh the featured lineage or work panel.
+The active and waiting work panel uses a stable 240px frame. When the environment is not started or no task exists, the panel contracts to a desktop frame no taller than 168px while retaining the real start/inspiration action, the non-publishing boundary and a compact preview of the stages that will appear after a task starts. The idle process preview changes from a large centered empty composition to a horizontal explanation so unused space does not push content evidence below the first screen. The account schedule remains a quiet entry row and must not visually outweigh the featured lineage or work panel.
 
 ### 8. Responsive hierarchy follows the environment content container
 
 The dashboard is embedded beside the environment rail, so viewport media queries do not describe its actual usable width. The dashboard establishes an inline-size container and adapts the featured lineage and lower content grid from that container. At medium environment widths, the source and output panes stack in reading order and the reference/customer-content sections become full-width sections instead of shrinking all typography and evidence into desktop columns.
 
-The responsive change preserves the same information architecture and 240px desktop work-panel frame. It increases the minimum readable size of customer-facing titles, body copy, evidence chips and actions, keeps empty-state panels visually commensurate with populated content, and only stacks the work panel at genuinely narrow content widths.
+The responsive change preserves the same information architecture, a 240px active desktop frame and a no-taller-than-168px idle desktop frame. It increases the minimum readable size of customer-facing titles, body copy, evidence chips and actions, keeps empty-state panels visually commensurate with populated content, and only stacks the work panel at genuinely narrow content widths.
 
 ### 9. The prototype defines one visual state matrix
 
-The July 22 HTML demo is not only a populated-page reference. Its populated, loading, empty, error, active, waiting and collapsed compositions define one state matrix for the environment dashboard. The renderer keeps the same section shells while data changes: a failed or empty lower section does not resize the whole page, a missing draft does not collapse the featured relationship, and a running process does not replace the stable 240px work frame.
+The July 22 HTML demo is not only a populated-page reference. Its populated, loading, empty, error, active, waiting and collapsed compositions define one state matrix for the environment dashboard. The renderer keeps the same section shells while data changes: a failed or empty lower section does not resize the whole page, a missing draft does not collapse the featured relationship, and a running process does not replace the stable 240px active work frame. An idle process is intentionally shorter because it contains no timeline and must leave room for the first value-evidence section in the initial viewport.
 
 Featured status badges size to their text instead of stretching across the copy column. The source and output covers remain substantial, with enough central relationship space to explain provenance. Reference cards keep a portrait-led top-aligned reading rhythm and expose the truthful “可创作” or “已创作” state at scan level. Customer drafts remain compact status rows.
 
