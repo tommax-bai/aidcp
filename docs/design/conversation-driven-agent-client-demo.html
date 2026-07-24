@@ -1,0 +1,2451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Agent Conversation Codex Layout</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;max-width:1280px;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="Agent Conversation Codex Layout" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;Agent Conversation Codex Layout&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(--background) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: light-dark(rgb(255 255 255), rgb(24 24 24));
+  --foreground: light-dark(rgb(26 28 31), rgb(255 255 255));
+  --card: color-mix(in oklab, var(--foreground) 5%, transparent);
+  --card-foreground: var(--foreground);
+  --popover: light-dark(rgb(255 255 255), rgb(45 45 45));
+  --popover-foreground: var(--foreground);
+  --primary: light-dark(rgb(51 156 255), rgb(131 195 255));
+  --primary-foreground: light-dark(rgb(255 255 255), rgb(13 13 13));
+  --secondary: light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%));
+  --secondary-foreground: var(--foreground);
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: light-dark(
+    rgb(26 28 31 / 49.4%),
+    rgb(255 255 255 / 49.8%)
+  );
+  --accent: light-dark(rgb(229 242 255), rgb(13 39 63));
+  --accent-foreground: var(--primary);
+  --destructive: light-dark(rgb(226 85 7), rgb(255 133 73));
+  --border: light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%));
+  --input: light-dark(
+    rgb(26 28 31 / 11.8%),
+    color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+  );
+  --ring: light-dark(rgb(51 156 255), rgb(131 195 255 / 76%));
+  --font-size-base: 14px;
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --radius: 12.5px;
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+  --color-background-primary: var(--background);
+  --color-text-primary: var(--foreground);
+  --color-border-secondary: var(--border);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  margin: 0;
+  padding: 5px;
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--viz-font-weight-medium);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: superellipse(1.5);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: superellipse(1.5);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+    [aria-pressed=&quot;true&quot;],
+    [aria-selected=&quot;true&quot;],
+    .is-selected
+  ) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;style&gt;
+  #aidcp-codex-workspace-v5 {
+    --dk-rail: color-mix(in srgb, var(--foreground) 4%, var(--background));
+    --dk-soft: color-mix(in srgb, var(--foreground) 3%, var(--background));
+    --dk-hover: color-mix(in srgb, var(--primary) 8%, var(--background));
+    --dk-line: color-mix(in srgb, var(--foreground) 11%, transparent);
+    --dk-line-strong: color-mix(in srgb, var(--foreground) 18%, transparent);
+    --dk-blue: color-mix(in srgb, var(--primary) 11%, var(--background));
+    --dk-green: light-dark(rgb(23 145 102), rgb(88 211 163));
+    --dk-amber: light-dark(rgb(181 119 17), rgb(237 183 79));
+    color: var(--foreground);
+  }
+
+  #aidcp-codex-workspace-v5,
+  #aidcp-codex-workspace-v5 * {
+    box-sizing: border-box;
+  }
+
+  #aidcp-codex-workspace-v5 [hidden] {
+    display: none !important;
+  }
+
+  #aidcp-codex-workspace-v5 button,
+  #aidcp-codex-workspace-v5 textarea,
+  #aidcp-codex-workspace-v5 select {
+    font: inherit;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-shell {
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+    background: var(--background);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-titlebar,
+  #aidcp-codex-workspace-v5 .dk-brand,
+  #aidcp-codex-workspace-v5 .dk-brand-copy,
+  #aidcp-codex-workspace-v5 .dk-title-actions,
+  #aidcp-codex-workspace-v5 .dk-center-head,
+  #aidcp-codex-workspace-v5 .dk-center-title,
+  #aidcp-codex-workspace-v5 .dk-message-meta,
+  #aidcp-codex-workspace-v5 .dk-context-head,
+  #aidcp-codex-workspace-v5 .dk-context-title,
+  #aidcp-codex-workspace-v5 .dk-tool,
+  #aidcp-codex-workspace-v5 .dk-context-row,
+  #aidcp-codex-workspace-v5 .dk-expert-copy,
+  #aidcp-codex-workspace-v5 .dk-person,
+  #aidcp-codex-workspace-v5 .dk-composer-foot,
+  #aidcp-codex-workspace-v5 .dk-composer-tools,
+  #aidcp-codex-workspace-v5 .dk-status,
+  #aidcp-codex-workspace-v5 .dk-summary-head {
+    display: flex;
+    align-items: center;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-titlebar {
+    min-height: 48px;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--dk-line);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-brand,
+  #aidcp-codex-workspace-v5 .dk-title-actions {
+    gap: 9px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-brand-mark {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border-radius: 8px;
+    color: var(--primary-foreground);
+    background: var(--primary);
+    font-weight: 500;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-brand-copy,
+  #aidcp-codex-workspace-v5 .dk-center-title,
+  #aidcp-codex-workspace-v5 .dk-context-title,
+  #aidcp-codex-workspace-v5 .dk-expert-copy {
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr) 320px;
+    min-width: 0;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-left {
+    min-width: 0;
+    padding: 12px 9px;
+    border-right: 1px solid var(--dk-line);
+    background: var(--dk-rail);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-left-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 4px 10px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-conversations {
+    display: grid;
+    gap: 4px;
+    margin-top: 8px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-conversation {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 5px 8px;
+    width: 100%;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 9px;
+    color: inherit;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-conversation:hover {
+    background: var(--dk-hover);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-conversation[aria-pressed=&quot;true&quot;] {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-conversation-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-conversation-copy strong,
+  #aidcp-codex-workspace-v5 .dk-conversation-copy span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-conversation-copy span,
+  #aidcp-codex-workspace-v5 .dk-conversation-time {
+    color: var(--muted-foreground);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-conversation[aria-pressed=&quot;true&quot;] .dk-conversation-copy span,
+  #aidcp-codex-workspace-v5 .dk-conversation[aria-pressed=&quot;true&quot;] .dk-conversation-time {
+    color: currentColor;
+    opacity: .72;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-conversation-state {
+    grid-column: 1 / -1;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-shell.is-left-collapsed .dk-layout {
+    grid-template-columns: 56px minmax(0, 1fr) 320px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-shell.is-left-collapsed .dk-left {
+    padding-inline: 7px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-shell.is-left-collapsed .dk-left-head strong,
+  #aidcp-codex-workspace-v5 .dk-shell.is-left-collapsed .dk-left &gt; .btn,
+  #aidcp-codex-workspace-v5 .dk-shell.is-left-collapsed .dk-conversation-copy,
+  #aidcp-codex-workspace-v5 .dk-shell.is-left-collapsed .dk-conversation-time,
+  #aidcp-codex-workspace-v5 .dk-shell.is-left-collapsed .dk-conversation-state {
+    display: none;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-shell.is-left-collapsed .dk-conversation {
+    display: grid;
+    min-height: 34px;
+    place-items: center;
+    padding: 5px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-shell.is-left-collapsed .dk-conversation::before {
+    content: attr(data-index);
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--dk-soft);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-center {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-width: 0;
+    min-height: 720px;
+    background:
+      linear-gradient(180deg, var(--dk-soft), transparent 140px),
+      var(--background);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-center-head {
+    min-height: 58px;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--dk-line);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-center-body {
+    display: grid;
+    grid-template-rows: minmax(340px, 1fr) auto;
+    min-width: 0;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-stream-wrap,
+  #aidcp-codex-workspace-v5 .dk-compose-wrap {
+    width: min(100%, 850px);
+    margin-inline: auto;
+    padding-inline: 18px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-stream-wrap {
+    padding-block: 20px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-stream {
+    display: grid;
+    align-content: start;
+    gap: 18px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-message {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 10px;
+    max-width: 740px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-message.is-user {
+    grid-template-columns: minmax(0, 1fr) 38px;
+    justify-self: end;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-message.is-user .dk-avatar,
+  #aidcp-codex-workspace-v5 .dk-message.is-user .dk-user-avatar {
+    grid-column: 2;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-message.is-user .dk-message-content {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-message-content {
+    min-width: 0;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-message-meta {
+    gap: 6px;
+    margin-bottom: 5px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-message.is-user .dk-message-meta {
+    justify-content: flex-end;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-bubble {
+    padding: 11px 13px;
+    border-radius: 13px;
+    background: var(--dk-soft);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-message.is-user .dk-bubble {
+    background: var(--accent);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-bubble p {
+    margin: 0;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-bubble p + p {
+    margin-top: 8px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-avatar {
+    position: relative;
+    display: inline-grid;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    overflow: hidden;
+    place-items: center;
+    border-radius: 9px;
+    background: var(--muted);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-avatar.is-sm {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+    border-radius: 7px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-avatar.is-lg {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+    border-radius: 10px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-avatar img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    image-rendering: pixelated;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-avatar-dot {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 7px;
+    height: 7px;
+    border: 2px solid var(--background);
+    border-radius: 50%;
+    background: var(--dk-green);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-avatar-dot.is-waiting {
+    background: var(--dk-amber);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-user-avatar {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border-radius: 9px;
+    color: var(--primary);
+    background: var(--dk-blue);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-summary {
+    margin-left: 48px;
+    border-top: 1px solid var(--dk-line);
+    border-bottom: 1px solid var(--dk-line);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-summary-head {
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 0 7px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-summary-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-summary-row + .dk-summary-row {
+    border-top: 1px solid var(--dk-line);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-person {
+    gap: 8px;
+    min-width: 0;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-status {
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-dot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
+    border-radius: 50%;
+    background: var(--muted-foreground);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-dot.is-working {
+    background: var(--primary);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-dot.is-done {
+    background: var(--dk-green);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-dot.is-waiting {
+    background: var(--dk-amber);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-expert-head {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--dk-line);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-output-list {
+    display: grid;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-output-row {
+    display: grid;
+    grid-template-columns: 94px minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--dk-line);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-output-row p {
+    margin: 0;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-output-row p + p {
+    margin-top: 5px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-compose-wrap {
+    padding-bottom: 14px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-expert-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 7px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-expert-tab {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 7px;
+    min-width: 126px;
+    padding: 5px 8px;
+    border: 1px solid transparent;
+    border-radius: 22px;
+    color: inherit;
+    background: var(--dk-soft);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-expert-tab:hover {
+    background: var(--dk-hover);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-expert-tab[aria-pressed=&quot;true&quot;] {
+    border-color: var(--dk-line-strong);
+    background: var(--background);
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--foreground) 8%, transparent);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-composer {
+    padding: 12px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-composer textarea {
+    width: 100%;
+    min-height: 74px;
+    resize: vertical;
+    border: 0;
+    color: var(--foreground);
+    background: transparent;
+    outline: none;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-composer-foot {
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-composer-tools {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-mobile-conversation {
+    display: none;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-context {
+    position: relative;
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    min-width: 0;
+    border-left: 1px solid var(--dk-line);
+    background: var(--background);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-tool-rail {
+    display: grid;
+    align-content: center;
+    gap: 8px;
+    padding: 10px 7px;
+    border-right: 1px solid var(--dk-line);
+    background: var(--dk-rail);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-tool {
+    min-height: 42px;
+    justify-content: center;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-tool[aria-pressed=&quot;true&quot;] {
+    color: var(--primary);
+    background: var(--dk-blue);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-context-panel {
+    min-width: 0;
+    padding: 12px 14px 18px;
+    background: var(--background);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-context-head {
+    justify-content: space-between;
+    gap: 9px;
+    padding-bottom: 11px;
+    border-bottom: 1px solid var(--dk-line);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-context-content {
+    display: grid;
+    gap: 0;
+    padding-top: 6px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-context-row {
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--dk-line);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-context-row:last-child {
+    border-bottom: 0;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-context-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-context-copy strong,
+  #aidcp-codex-workspace-v5 .dk-context-copy span {
+    overflow-wrap: anywhere;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-context-section {
+    padding: 10px 0 5px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-context-actions {
+    display: grid;
+    gap: 5px;
+    margin-top: 9px;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-context-actions .btn {
+    justify-content: flex-start;
+  }
+
+  #aidcp-codex-workspace-v5 .dk-progress {
+    height: 5px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--muted);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-progress &gt; span {
+    display: block;
+    width: 68%;
+    height: 100%;
+    background: var(--primary);
+  }
+
+  #aidcp-codex-workspace-v5 .dk-close-context {
+    display: none;
+  }
+
+  @media (max-width: 1000px) {
+    #aidcp-codex-workspace-v5 .dk-layout {
+      grid-template-columns: 190px minmax(0, 1fr) 56px;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-shell.is-left-collapsed .dk-layout {
+      grid-template-columns: 56px minmax(0, 1fr) 56px;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-context {
+      display: block;
+      border-left: 1px solid var(--dk-line);
+    }
+
+    #aidcp-codex-workspace-v5 .dk-tool-rail {
+      height: 100%;
+      border-right: 0;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-context-panel {
+      position: absolute;
+      z-index: 5;
+      top: 0;
+      right: 56px;
+      width: 300px;
+      min-height: 100%;
+      border-left: 1px solid var(--dk-line);
+      box-shadow: -12px 0 30px color-mix(in srgb, var(--foreground) 10%, transparent);
+    }
+
+    #aidcp-codex-workspace-v5 .dk-context-panel:not(.is-open) {
+      display: none;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-close-context {
+      display: inline-flex;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-stream-wrap,
+    #aidcp-codex-workspace-v5 .dk-compose-wrap {
+      padding-inline: 14px;
+    }
+  }
+
+  @media (max-width: 620px) {
+    #aidcp-codex-workspace-v5 .dk-layout,
+    #aidcp-codex-workspace-v5 .dk-shell.is-left-collapsed .dk-layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    #aidcp-codex-workspace-v5 .dk-left {
+      display: none;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-mobile-conversation {
+      display: block;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--dk-line);
+      background: var(--dk-rail);
+    }
+
+    #aidcp-codex-workspace-v5 .dk-mobile-conversation .form-select {
+      width: 100%;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-titlebar,
+    #aidcp-codex-workspace-v5 .dk-center-head,
+    #aidcp-codex-workspace-v5 .dk-composer-foot {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-title-actions {
+      justify-content: flex-end;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-center {
+      min-height: 0;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-stream-wrap,
+    #aidcp-codex-workspace-v5 .dk-compose-wrap {
+      padding-inline: 12px;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-summary {
+      margin-left: 0;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-output-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    #aidcp-codex-workspace-v5 .dk-expert-tab {
+      min-width: 0;
+      flex: 1 1 145px;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-context {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      border-top: 1px solid var(--dk-line);
+      border-left: 0;
+    }
+
+    #aidcp-codex-workspace-v5 .dk-tool-rail {
+      display: flex;
+      justify-content: space-around;
+      height: auto;
+      padding: 6px;
+      border-bottom: 1px solid var(--dk-line);
+    }
+
+    #aidcp-codex-workspace-v5 .dk-context-panel {
+      position: static;
+      width: auto;
+      min-height: 0;
+      border-left: 0;
+      box-shadow: none;
+    }
+  }
+&lt;/style&gt;
+
+&lt;div id=&quot;aidcp-codex-workspace-v5&quot;&gt;
+  &lt;section class=&quot;dk-shell&quot; aria-label=&quot;AIDCP Codex 式对话工作台&quot;&gt;
+    &lt;header class=&quot;dk-titlebar&quot;&gt;
+      &lt;div class=&quot;dk-brand&quot;&gt;
+        &lt;span class=&quot;dk-brand-mark&quot; aria-hidden=&quot;true&quot;&gt;环&lt;/span&gt;
+        &lt;span class=&quot;dk-brand-copy&quot;&gt;
+          &lt;strong&gt;AIDCP&lt;/strong&gt;
+          &lt;span class=&quot;text-small text-muted&quot;&gt;北美品牌组&lt;/span&gt;
+        &lt;/span&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;dk-title-actions&quot;&gt;
+        &lt;span class=&quot;viz-badge&quot;&gt;3 个账号&lt;/span&gt;
+        &lt;span class=&quot;dk-status text-small&quot;&gt;
+          &lt;span class=&quot;dk-dot is-done&quot; aria-hidden=&quot;true&quot;&gt;&lt;/span&gt;
+          全部正常
+        &lt;/span&gt;
+        &lt;button class=&quot;btn btn-ghost&quot; type=&quot;button&quot; aria-label=&quot;工作区设置&quot;&gt;
+          &lt;i data-lucide=&quot;settings&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+        &lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/header&gt;
+
+    &lt;div class=&quot;dk-layout&quot;&gt;
+      &lt;aside class=&quot;dk-left&quot; aria-label=&quot;对话列表&quot;&gt;
+        &lt;div class=&quot;dk-left-head&quot;&gt;
+          &lt;strong&gt;对话&lt;/strong&gt;
+          &lt;button id=&quot;dk-toggle-left&quot; class=&quot;btn btn-ghost&quot; type=&quot;button&quot; aria-label=&quot;收起对话栏&quot;&gt;
+            &lt;i data-lucide=&quot;panel-left-close&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+          &lt;/button&gt;
+        &lt;/div&gt;
+        &lt;button class=&quot;btn btn-primary btn-block&quot; type=&quot;button&quot;&gt;
+          &lt;i data-lucide=&quot;plus&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+          新对话
+        &lt;/button&gt;
+        &lt;nav id=&quot;dk-conversation-list&quot; class=&quot;dk-conversations&quot; aria-label=&quot;最近对话&quot;&gt;&lt;/nav&gt;
+      &lt;/aside&gt;
+
+      &lt;main class=&quot;dk-center&quot;&gt;
+        &lt;div class=&quot;dk-mobile-conversation&quot;&gt;
+          &lt;label class=&quot;form-label&quot; for=&quot;dk-mobile-select&quot;&gt;当前对话&lt;/label&gt;
+          &lt;select id=&quot;dk-mobile-select&quot; class=&quot;form-select&quot;&gt;&lt;/select&gt;
+        &lt;/div&gt;
+
+        &lt;header class=&quot;dk-center-head&quot;&gt;
+          &lt;span class=&quot;dk-center-title&quot;&gt;
+            &lt;span class=&quot;text-small text-muted&quot;&gt;北美品牌组 / 当前对话&lt;/span&gt;
+            &lt;h2 id=&quot;dk-center-title&quot;&gt;三账号热点研究与内容准备&lt;/h2&gt;
+          &lt;/span&gt;
+          &lt;div class=&quot;dk-title-actions&quot;&gt;
+            &lt;span id=&quot;dk-center-status&quot; class=&quot;dk-status text-small&quot;&gt;
+              &lt;span class=&quot;dk-dot is-working&quot; aria-hidden=&quot;true&quot;&gt;&lt;/span&gt;
+              执行中
+            &lt;/span&gt;
+            &lt;button class=&quot;btn btn-ghost&quot; type=&quot;button&quot; aria-label=&quot;对话菜单&quot;&gt;
+              &lt;i data-lucide=&quot;ellipsis&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+            &lt;/button&gt;
+          &lt;/div&gt;
+        &lt;/header&gt;
+
+        &lt;div class=&quot;dk-center-body&quot;&gt;
+          &lt;div class=&quot;dk-stream-wrap&quot;&gt;
+            &lt;section id=&quot;dk-stream&quot; class=&quot;dk-stream&quot; aria-live=&quot;polite&quot;&gt;&lt;/section&gt;
+          &lt;/div&gt;
+
+          &lt;div class=&quot;dk-compose-wrap&quot;&gt;
+            &lt;div id=&quot;dk-expert-strip&quot; class=&quot;dk-expert-strip&quot; aria-label=&quot;切换对话参与者&quot;&gt;&lt;/div&gt;
+            &lt;div class=&quot;card dk-composer&quot;&gt;
+              &lt;label class=&quot;sr-only&quot; for=&quot;dk-message-input&quot;&gt;发送消息&lt;/label&gt;
+              &lt;textarea id=&quot;dk-message-input&quot; placeholder=&quot;安排 A 与专家团队继续工作&quot;&gt;&lt;/textarea&gt;
+              &lt;div class=&quot;dk-composer-foot&quot;&gt;
+                &lt;div class=&quot;dk-composer-tools&quot;&gt;
+                  &lt;button id=&quot;dk-call-expert&quot; class=&quot;btn btn-ghost&quot; type=&quot;button&quot;&gt;
+                    &lt;i data-lucide=&quot;plus&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+                    调用专家
+                  &lt;/button&gt;
+                  &lt;button class=&quot;btn btn-ghost&quot; type=&quot;button&quot;&gt;
+                    &lt;i data-lucide=&quot;shield-check&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+                    默认权限
+                  &lt;/button&gt;
+                &lt;/div&gt;
+                &lt;button id=&quot;dk-send&quot; class=&quot;btn btn-primary&quot; type=&quot;button&quot;&gt;
+                  &lt;i data-lucide=&quot;arrow-up&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+                  发送
+                &lt;/button&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/main&gt;
+
+      &lt;aside class=&quot;dk-context&quot; aria-label=&quot;当前对话工作台&quot;&gt;
+        &lt;nav class=&quot;dk-tool-rail&quot; aria-label=&quot;对话工具&quot;&gt;
+          &lt;button class=&quot;btn btn-ghost dk-tool&quot; type=&quot;button&quot; data-context=&quot;home&quot; aria-pressed=&quot;true&quot; aria-label=&quot;工作台&quot;&gt;
+            &lt;i data-lucide=&quot;layout-dashboard&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+          &lt;/button&gt;
+          &lt;button class=&quot;btn btn-ghost dk-tool&quot; type=&quot;button&quot; data-context=&quot;tasks&quot; aria-pressed=&quot;false&quot; aria-label=&quot;任务&quot;&gt;
+            &lt;i data-lucide=&quot;list-checks&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+          &lt;/button&gt;
+          &lt;button class=&quot;btn btn-ghost dk-tool&quot; type=&quot;button&quot; data-context=&quot;team&quot; aria-pressed=&quot;false&quot; aria-label=&quot;团队&quot;&gt;
+            &lt;i data-lucide=&quot;users&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+          &lt;/button&gt;
+          &lt;button class=&quot;btn btn-ghost dk-tool&quot; type=&quot;button&quot; data-context=&quot;environments&quot; aria-pressed=&quot;false&quot; aria-label=&quot;阵地&quot;&gt;
+            &lt;i data-lucide=&quot;layers-3&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+          &lt;/button&gt;
+          &lt;button class=&quot;btn btn-ghost dk-tool&quot; type=&quot;button&quot; data-context=&quot;results&quot; aria-pressed=&quot;false&quot; aria-label=&quot;成果&quot;&gt;
+            &lt;i data-lucide=&quot;archive&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+          &lt;/button&gt;
+        &lt;/nav&gt;
+
+        &lt;section id=&quot;dk-context-panel&quot; class=&quot;dk-context-panel&quot;&gt;
+          &lt;header class=&quot;dk-context-head&quot;&gt;
+            &lt;span class=&quot;dk-context-title&quot;&gt;
+              &lt;span id=&quot;dk-context-kicker&quot; class=&quot;text-small text-muted&quot;&gt;当前对话&lt;/span&gt;
+              &lt;h3 id=&quot;dk-context-title&quot;&gt;工作台&lt;/h3&gt;
+            &lt;/span&gt;
+            &lt;button id=&quot;dk-close-context&quot; class=&quot;btn btn-ghost dk-close-context&quot; type=&quot;button&quot; aria-label=&quot;收起工作台&quot;&gt;
+              &lt;i data-lucide=&quot;panel-right-close&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+            &lt;/button&gt;
+          &lt;/header&gt;
+          &lt;div id=&quot;dk-context-content&quot; class=&quot;dk-context-content&quot;&gt;&lt;/div&gt;
+        &lt;/section&gt;
+      &lt;/aside&gt;
+    &lt;/div&gt;
+  &lt;/section&gt;
+&lt;/div&gt;
+
+&lt;script&gt;
+  (() =&gt; {
+    const root = document.getElementById(&#x27;aidcp-codex-workspace-v5&#x27;);
+    if (!root) return;
+
+    const q = (selector) =&gt; root.querySelector(selector);
+    const qa = (selector) =&gt; Array.from(root.querySelectorAll(selector));
+
+    const avatarCatalog = {
+      zhang: &#x27;data:image/png;base64,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&#x27;,
+      g: &#x27;data:image/png;base64,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&#x27;,
+      a: &#x27;data:image/png;base64,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&#x27;,
+      max: &#x27;data:image/png;base64,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&#x27;,
+      iris: &#x27;data:image/png;base64,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&#x27;,
+      boton: &#x27;data:image/png;base64,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&#x27;,
+      dim: &#x27;data:image/png;base64,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&#x27;,
+      li: &#x27;data:image/png;base64,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&#x27;,
+      lin: &#x27;data:image/png;base64,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&#x27;,
+      kai: &#x27;data:image/png;base64,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&#x27;
+    };
+
+    const avatarSources = {
+      zhang: avatarCatalog.zhang,
+      g: avatarCatalog.dim,
+      a: avatarCatalog.boton,
+      max: avatarCatalog.a,
+      iris: avatarCatalog.iris,
+      boton: avatarCatalog.max,
+      dim: avatarCatalog.li,
+      li: avatarCatalog.g,
+      lin: avatarCatalog.lin,
+      kai: avatarCatalog.kai
+    };
+
+    const experts = {
+      a: [&#x27;助理&#x27;, &#x27;A&#x27;, &#x27;统一汇总&#x27;, &#x27;理解目标、拆分任务、协调专家并向你汇总&#x27;],
+      max: [&#x27;热门分析师&#x27;, &#x27;Max&#x27;, &#x27;研究中&#x27;, &#x27;已读取 28 条来源，形成 3 个方向&#x27;],
+      zhang: [&#x27;浏览者&#x27;, &#x27;小张&#x27;, &#x27;可调用&#x27;, &#x27;浏览页面、验证目标和允许的轻互动&#x27;],
+      g: [&#x27;社群爱好者&#x27;, &#x27;J&#x27;, &#x27;可调用&#x27;, &#x27;发现匹配社群并形成加入建议&#x27;],
+      dim: [&#x27;作家&#x27;, &#x27;Dim&#x27;, &#x27;创作中&#x27;, &#x27;正在准备 6 篇账号化草稿&#x27;],
+      li: [&#x27;评论员&#x27;, &#x27;小李&#x27;, &#x27;等待你&#x27;, &#x27;3 条评论候选等待逐条确认&#x27;],
+      iris: [&#x27;Persona 策划师&#x27;, &#x27;Iris&#x27;, &#x27;可调用&#x27;, &#x27;校准账号定位、受众和表达边界&#x27;],
+      boton: [&#x27;自动化专员&#x27;, &#x27;Boton&#x27;, &#x27;可调用&#x27;, &#x27;编排重复流程并保留执行证据&#x27;],
+      lin: [&#x27;数据核验员&#x27;, &#x27;Lin&#x27;, &#x27;可调用&#x27;, &#x27;核对来源、数量和交付物一致性&#x27;],
+      kai: [&#x27;合规巡检员&#x27;, &#x27;Kai&#x27;, &#x27;可调用&#x27;, &#x27;检查公开动作、额度和平台边界&#x27;]
+    };
+
+    const expertOrder = [&#x27;a&#x27;, &#x27;max&#x27;, &#x27;zhang&#x27;, &#x27;g&#x27;, &#x27;dim&#x27;, &#x27;li&#x27;, &#x27;iris&#x27;, &#x27;boton&#x27;, &#x27;lin&#x27;, &#x27;kai&#x27;];
+
+    const conversations = {
+      m2048: {
+        title: &#x27;三账号热点研究与内容准备&#x27;,
+        short: &#x27;三账号热点研究&#x27;,
+        snippet: &#x27;Max 研究中 · Dim 创作中&#x27;,
+        time: &#x27;刚刚&#x27;,
+        status: &#x27;执行中&#x27;,
+        kind: &#x27;is-working&#x27;,
+        participants: [&#x27;a&#x27;, &#x27;max&#x27;, &#x27;dim&#x27;, &#x27;li&#x27;]
+      },
+      c2031: {
+        title: &#x27;北美妈妈社群候选清单&#x27;,
+        short: &#x27;北美社群候选&#x27;,
+        snippet: &#x27;J 已交付 · 等待 A 汇总&#x27;,
+        time: &#x27;12 分&#x27;,
+        status: &#x27;待汇总&#x27;,
+        kind: &#x27;is-waiting&#x27;,
+        participants: [&#x27;a&#x27;, &#x27;g&#x27;, &#x27;zhang&#x27;]
+      },
+      c2018: {
+        title: &#x27;夏日轻户外内容复盘&#x27;,
+        short: &#x27;夏日内容复盘&#x27;,
+        snippet: &#x27;8 项成果 · 已完成&#x27;,
+        time: &#x27;昨天&#x27;,
+        status: &#x27;已完成&#x27;,
+        kind: &#x27;is-done&#x27;,
+        participants: [&#x27;a&#x27;, &#x27;max&#x27;, &#x27;lin&#x27;]
+      },
+      c1996: {
+        title: &#x27;新手妈妈评论策略&#x27;,
+        short: &#x27;评论策略&#x27;,
+        snippet: &#x27;小李等待你确认&#x27;,
+        time: &#x27;周二&#x27;,
+        status: &#x27;等待你&#x27;,
+        kind: &#x27;is-waiting&#x27;,
+        participants: [&#x27;a&#x27;, &#x27;li&#x27;, &#x27;kai&#x27;]
+      }
+    };
+
+    const state = {
+      conversation: &#x27;m2048&#x27;,
+      persona: &#x27;a&#x27;,
+      context: &#x27;home&#x27;,
+      extraMessages: {}
+    };
+
+    const avatar = (id, size = &#x27;&#x27;) =&gt; `
+      &lt;span class=&quot;dk-avatar ${size}&quot; aria-hidden=&quot;true&quot;&gt;
+        &lt;img src=&quot;${avatarSources[id]}&quot; alt=&quot;&quot;&gt;
+        &lt;span class=&quot;dk-avatar-dot ${experts[id][2] === &#x27;等待你&#x27; ? &#x27;is-waiting&#x27; : &#x27;&#x27;}&quot;&gt;&lt;/span&gt;
+      &lt;/span&gt;
+    `;
+
+    const status = (label, kind = &#x27;&#x27;) =&gt; `
+      &lt;span class=&quot;dk-status text-small&quot;&gt;
+        &lt;span class=&quot;dk-dot ${kind}&quot; aria-hidden=&quot;true&quot;&gt;&lt;/span&gt;
+        ${label}
+      &lt;/span&gt;
+    `;
+
+    function refreshIcons() {
+      if (globalThis.lucide) {
+        globalThis.lucide.createIcons({ attrs: { width: 16, height: 16 } });
+      }
+    }
+
+    function renderConversations() {
+      q(&#x27;#dk-conversation-list&#x27;).innerHTML = Object.entries(conversations).map(([id, item], index) =&gt; `
+        &lt;button
+          class=&quot;dk-conversation&quot;
+          type=&quot;button&quot;
+          data-conversation=&quot;${id}&quot;
+          data-index=&quot;${index + 1}&quot;
+          aria-pressed=&quot;${state.conversation === id}&quot;
+          aria-label=&quot;${item.short}&quot;
+        &gt;
+          &lt;span class=&quot;dk-conversation-copy&quot;&gt;
+            &lt;strong&gt;${item.short}&lt;/strong&gt;
+            &lt;span class=&quot;text-small&quot;&gt;${item.snippet}&lt;/span&gt;
+          &lt;/span&gt;
+          &lt;span class=&quot;dk-conversation-time text-small&quot;&gt;${item.time}&lt;/span&gt;
+          &lt;span class=&quot;dk-conversation-state&quot;&gt;${status(item.status, item.kind)}&lt;/span&gt;
+        &lt;/button&gt;
+      `).join(&#x27;&#x27;);
+
+      q(&#x27;#dk-mobile-select&#x27;).innerHTML = Object.entries(conversations).map(([id, item]) =&gt; `
+        &lt;option value=&quot;${id}&quot; ${id === state.conversation ? &#x27;selected&#x27; : &#x27;&#x27;}&gt;${item.short}&lt;/option&gt;
+      `).join(&#x27;&#x27;);
+
+      qa(&#x27;[data-conversation]&#x27;).forEach((button) =&gt; {
+        button.addEventListener(&#x27;click&#x27;, () =&gt; {
+          state.conversation = button.dataset.conversation;
+          state.persona = &#x27;a&#x27;;
+          state.context = &#x27;home&#x27;;
+          render();
+        });
+      });
+    }
+
+    function renderHeader() {
+      const conversation = conversations[state.conversation];
+      q(&#x27;#dk-center-title&#x27;).textContent = conversation.title;
+      q(&#x27;#dk-center-status&#x27;).innerHTML = `
+        &lt;span class=&quot;dk-dot ${conversation.kind}&quot; aria-hidden=&quot;true&quot;&gt;&lt;/span&gt;
+        ${conversation.status}
+      `;
+    }
+
+    function renderASummary() {
+      const conversation = conversations[state.conversation];
+      const working = conversation.participants.filter((id) =&gt; id !== &#x27;a&#x27;);
+
+      if (state.conversation !== &#x27;m2048&#x27;) {
+        return `
+          &lt;article class=&quot;dk-message is-user&quot;&gt;
+            &lt;span class=&quot;dk-user-avatar&quot; aria-hidden=&quot;true&quot;&gt;&lt;i data-lucide=&quot;user&quot;&gt;&lt;/i&gt;&lt;/span&gt;
+            &lt;div class=&quot;dk-message-content&quot;&gt;
+              &lt;div class=&quot;dk-message-meta&quot;&gt;&lt;strong&gt;你&lt;/strong&gt;&lt;span class=&quot;text-small text-muted&quot;&gt;${conversation.time}&lt;/span&gt;&lt;/div&gt;
+              &lt;div class=&quot;dk-bubble&quot;&gt;&lt;p&gt;继续处理「${conversation.title}」，把结果与需要决定的事项统一汇总给我。&lt;/p&gt;&lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/article&gt;
+          &lt;article class=&quot;dk-message&quot;&gt;
+            ${avatar(&#x27;a&#x27;)}
+            &lt;div class=&quot;dk-message-content&quot;&gt;
+              &lt;div class=&quot;dk-message-meta&quot;&gt;&lt;strong&gt;A&lt;/strong&gt;&lt;span class=&quot;text-small text-muted&quot;&gt;助理 · ${conversation.time}&lt;/span&gt;&lt;/div&gt;
+              &lt;div class=&quot;dk-bubble&quot;&gt;
+                &lt;p&gt;收到。专家过程保留在各自工作视图；我只在这里同步结论、风险和下一步。&lt;/p&gt;
+                &lt;p&gt;${conversation.snippet}。&lt;/p&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/article&gt;
+        `;
+      }
+
+      return `
+        &lt;article class=&quot;dk-message is-user&quot;&gt;
+          &lt;span class=&quot;dk-user-avatar&quot; aria-hidden=&quot;true&quot;&gt;&lt;i data-lucide=&quot;user&quot;&gt;&lt;/i&gt;&lt;/span&gt;
+          &lt;div class=&quot;dk-message-content&quot;&gt;
+            &lt;div class=&quot;dk-message-meta&quot;&gt;&lt;strong&gt;你&lt;/strong&gt;&lt;span class=&quot;text-small text-muted&quot;&gt;刚刚&lt;/span&gt;&lt;/div&gt;
+            &lt;div class=&quot;dk-bubble&quot;&gt;
+              &lt;p&gt;A，让 Max 研究三个账号的本周热点；Dim 每个账号准备 2 篇草稿；小李准备评论候选。评论逐条确认，草稿禁止发布。&lt;/p&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/article&gt;
+        &lt;article class=&quot;dk-message&quot;&gt;
+          ${avatar(&#x27;a&#x27;)}
+          &lt;div class=&quot;dk-message-content&quot;&gt;
+            &lt;div class=&quot;dk-message-meta&quot;&gt;&lt;strong&gt;A&lt;/strong&gt;&lt;span class=&quot;text-small text-muted&quot;&gt;助理 · 刚刚&lt;/span&gt;&lt;/div&gt;
+            &lt;div class=&quot;dk-bubble&quot;&gt;
+              &lt;p&gt;已拆成一张工作单，并冻结三个账号、搜索额度和公开动作边界。&lt;/p&gt;
+              &lt;p&gt;我会在这里统一汇总；具体过程可从输入框上方切换专家查看。&lt;/p&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/article&gt;
+        &lt;section class=&quot;dk-summary&quot; aria-label=&quot;A 的当前汇总&quot;&gt;
+          &lt;div class=&quot;dk-summary-head&quot;&gt;
+            &lt;strong&gt;当前汇总&lt;/strong&gt;
+            &lt;span class=&quot;text-small text-muted&quot;&gt;3 位专家协作中 · 发布 0 次&lt;/span&gt;
+          &lt;/div&gt;
+          ${working.map((id) =&gt; `
+            &lt;div class=&quot;dk-summary-row&quot;&gt;
+              &lt;span class=&quot;dk-person&quot;&gt;
+                ${avatar(id, &#x27;is-sm&#x27;)}
+                &lt;span&gt;&lt;strong&gt;${experts[id][1]}&lt;/strong&gt;&lt;span class=&quot;text-small text-muted&quot;&gt; · ${experts[id][3]}&lt;/span&gt;&lt;/span&gt;
+              &lt;/span&gt;
+              ${status(experts[id][2], experts[id][2] === &#x27;等待你&#x27; ? &#x27;is-waiting&#x27; : &#x27;is-working&#x27;)}
+            &lt;/div&gt;
+          `).join(&#x27;&#x27;)}
+        &lt;/section&gt;
+      `;
+    }
+
+    function expertOutputs(id) {
+      const outputs = {
+        max: [
+          [&#x27;任务输入&#x27;, &#x27;三个账号，每账号最多 6 次搜索。&#x27;, &#x27;只研究和回读来源，不执行公开动作。&#x27;],
+          [&#x27;进行中&#x27;, &#x27;已读取 28 条来源，排除 7 条重复或弱相关内容。&#x27;, &#x27;三个账号分别保留独立趋势判断。&#x27;],
+          [&#x27;阶段交付&#x27;, &#x27;趋势简报 v1：轻户外、碎片化自我照顾、低成本手作。&#x27;, &#x27;已交接 Dim 与小李；来源可回读。&#x27;]
+        ],
+        dim: [
+          [&#x27;任务输入&#x27;, &#x27;收到趋势简报和三个账号 Persona。&#x27;, &#x27;每个账号 2 篇，默认只保存草稿。&#x27;],
+          [&#x27;创作中&#x27;, &#x27;已完成 4 / 6 篇。&#x27;, &#x27;没有混用账号口吻，也没有生成发布动作。&#x27;],
+          [&#x27;当前产物&#x27;, &#x27;晚风手作 2 篇、北美好物 2 篇已持久化。&#x27;, &#x27;最后 2 篇完成后交回 A。&#x27;]
+        ],
+        li: [
+          [&#x27;任务输入&#x27;, &#x27;从热点目标中选择适合互动的内容。&#x27;, &#x27;每个账号准备 1 条评论候选。&#x27;],
+          [&#x27;已准备&#x27;, &#x27;3 条候选附带目标内容、执行身份和选择理由。&#x27;, &#x27;当前没有评论提交记录。&#x27;],
+          [&#x27;等待你&#x27;, &#x27;候选 1：回应“把 20 分钟过成自己的时间”。&#x27;, &#x27;批准后仍需等待页面执行与平台回读。&#x27;]
+        ]
+      };
+      return outputs[id] || [
+        [&#x27;任务输入&#x27;, `A 已向 ${experts[id][1]} 派发当前对话的子任务。`, experts[id][3]],
+        [&#x27;当前状态&#x27;, experts[id][2], &#x27;完成后先交回 A，再进入统一汇总。&#x27;]
+      ];
+    }
+
+    function renderExpert() {
+      const id = state.persona;
+      return `
+        &lt;section class=&quot;dk-expert-head&quot;&gt;
+          ${avatar(id, &#x27;is-lg&#x27;)}
+          &lt;span class=&quot;dk-expert-copy&quot;&gt;
+            &lt;strong&gt;${experts[id][0]} ${experts[id][1]}&lt;/strong&gt;
+            &lt;span class=&quot;text-small text-muted&quot;&gt;${experts[id][3]}&lt;/span&gt;
+          &lt;/span&gt;
+          &lt;button class=&quot;btn btn-ghost&quot; type=&quot;button&quot; data-return-a&gt;返回 A 汇总&lt;/button&gt;
+        &lt;/section&gt;
+        &lt;div class=&quot;dk-output-list&quot;&gt;
+          ${expertOutputs(id).map(([label, title, copy]) =&gt; `
+            &lt;div class=&quot;dk-output-row&quot;&gt;
+              &lt;span class=&quot;text-small text-muted&quot;&gt;${label}&lt;/span&gt;
+              &lt;div&gt;
+                &lt;p&gt;&lt;strong&gt;${title}&lt;/strong&gt;&lt;/p&gt;
+                &lt;p class=&quot;text-small text-muted&quot;&gt;${copy}&lt;/p&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          `).join(&#x27;&#x27;)}
+        &lt;/div&gt;
+      `;
+    }
+
+    function renderExtraMessages() {
+      const key = `${state.conversation}:${state.persona}`;
+      return (state.extraMessages[key] || []).map((message) =&gt; `
+        &lt;article class=&quot;dk-message ${message.author === &#x27;user&#x27; ? &#x27;is-user&#x27; : &#x27;&#x27;}&quot;&gt;
+          ${message.author === &#x27;user&#x27;
+            ? &#x27;&lt;span class=&quot;dk-user-avatar&quot; aria-hidden=&quot;true&quot;&gt;&lt;i data-lucide=&quot;user&quot;&gt;&lt;/i&gt;&lt;/span&gt;&#x27;
+            : avatar(state.persona)}
+          &lt;div class=&quot;dk-message-content&quot;&gt;
+            &lt;div class=&quot;dk-message-meta&quot;&gt;
+              &lt;strong&gt;${message.author === &#x27;user&#x27; ? &#x27;你&#x27; : experts[state.persona][1]}&lt;/strong&gt;
+              &lt;span class=&quot;text-small text-muted&quot;&gt;刚刚&lt;/span&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;dk-bubble&quot;&gt;&lt;p&gt;${message.text}&lt;/p&gt;&lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/article&gt;
+      `).join(&#x27;&#x27;);
+    }
+
+    function renderStream() {
+      q(&#x27;#dk-stream&#x27;).innerHTML = (state.persona === &#x27;a&#x27; ? renderASummary() : renderExpert()) + renderExtraMessages();
+      q(&#x27;#dk-message-input&#x27;).placeholder = state.persona === &#x27;a&#x27;
+        ? &#x27;安排 A 与专家团队继续工作&#x27;
+        : `给 ${experts[state.persona][1]} 追加要求；切回 A 查看统一汇总`;
+
+      qa(&#x27;[data-return-a]&#x27;).forEach((button) =&gt; {
+        button.addEventListener(&#x27;click&#x27;, () =&gt; {
+          state.persona = &#x27;a&#x27;;
+          renderStream();
+          renderExpertStrip();
+        });
+      });
+      refreshIcons();
+    }
+
+    function renderExpertStrip() {
+      const participants = conversations[state.conversation].participants;
+      q(&#x27;#dk-expert-strip&#x27;).innerHTML = participants.map((id) =&gt; `
+        &lt;button class=&quot;dk-expert-tab&quot; type=&quot;button&quot; data-persona=&quot;${id}&quot; aria-pressed=&quot;${state.persona === id}&quot;&gt;
+          ${avatar(id, &#x27;is-sm&#x27;)}
+          &lt;span class=&quot;dk-expert-copy&quot;&gt;
+            &lt;strong&gt;${experts[id][0]} ${experts[id][1]}&lt;/strong&gt;
+            &lt;span class=&quot;text-small text-muted&quot;&gt;${id === &#x27;a&#x27; ? &#x27;只看汇总&#x27; : &#x27;查看工作&#x27;}&lt;/span&gt;
+          &lt;/span&gt;
+          &lt;i data-lucide=&quot;${experts[id][2] === &#x27;等待你&#x27; ? &#x27;clock-3&#x27; : &#x27;check&#x27;}&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+        &lt;/button&gt;
+      `).join(&#x27;&#x27;);
+
+      qa(&#x27;[data-persona]&#x27;).forEach((button) =&gt; {
+        button.addEventListener(&#x27;click&#x27;, () =&gt; {
+          state.persona = button.dataset.persona;
+          renderStream();
+          renderExpertStrip();
+        });
+      });
+      refreshIcons();
+    }
+
+    function contextRows(rows) {
+      return rows.map(([title, copy, label, kind]) =&gt; `
+        &lt;div class=&quot;dk-context-row&quot;&gt;
+          &lt;span class=&quot;dk-context-copy&quot;&gt;
+            &lt;strong&gt;${title}&lt;/strong&gt;
+            &lt;span class=&quot;text-small text-muted&quot;&gt;${copy}&lt;/span&gt;
+          &lt;/span&gt;
+          ${status(label, kind)}
+        &lt;/div&gt;
+      `).join(&#x27;&#x27;);
+    }
+
+    function contextHome() {
+      const conversation = conversations[state.conversation];
+      return `
+        &lt;section class=&quot;dk-context-section&quot;&gt;
+          &lt;span class=&quot;text-small text-muted&quot;&gt;Mission #M-2048&lt;/span&gt;
+          &lt;h3&gt;${conversation.short}&lt;/h3&gt;
+          &lt;p class=&quot;text-small text-muted&quot;&gt;当前对话的所有工作对象都在这里，主对话只保留沟通与专家输出。&lt;/p&gt;
+          &lt;div class=&quot;dk-progress&quot; aria-label=&quot;任务完成 68%&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;/div&gt;
+        &lt;/section&gt;
+        &lt;div class=&quot;dk-context-actions&quot;&gt;
+          &lt;button class=&quot;btn btn-ghost btn-block&quot; type=&quot;button&quot; data-context-jump=&quot;tasks&quot;&gt;
+            &lt;i data-lucide=&quot;list-checks&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+            任务 · 1 个执行中
+          &lt;/button&gt;
+          &lt;button class=&quot;btn btn-ghost btn-block&quot; type=&quot;button&quot; data-context-jump=&quot;team&quot;&gt;
+            &lt;i data-lucide=&quot;users&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+            团队 · ${conversation.participants.length} 位已调用
+          &lt;/button&gt;
+          &lt;button class=&quot;btn btn-ghost btn-block&quot; type=&quot;button&quot; data-context-jump=&quot;environments&quot;&gt;
+            &lt;i data-lucide=&quot;layers-3&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+            阵地 · 3 个绑定
+          &lt;/button&gt;
+          &lt;button class=&quot;btn btn-ghost btn-block&quot; type=&quot;button&quot; data-context-jump=&quot;results&quot;&gt;
+            &lt;i data-lucide=&quot;archive&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;
+            成果 · 6 项
+          &lt;/button&gt;
+        &lt;/div&gt;
+      `;
+    }
+
+    function contextTasks() {
+      return contextRows([
+        [&#x27;热点研究、草稿与评论候选&#x27;, &#x27;Max → Dim / 小李&#x27;, &#x27;执行中&#x27;, &#x27;is-working&#x27;],
+        [&#x27;账号与环境绑定&#x27;, &#x27;A · XHS-01 / 02 / 03&#x27;, &#x27;已冻结&#x27;, &#x27;is-done&#x27;],
+        [&#x27;公开动作&#x27;, &#x27;评论逐条确认 · 内容禁止发布&#x27;, &#x27;等待你&#x27;, &#x27;is-waiting&#x27;]
+      ]);
+    }
+
+    function contextTeam() {
+      const participants = conversations[state.conversation].participants;
+      return expertOrder.map((id) =&gt; {
+        const joined = participants.includes(id);
+        return `
+          &lt;div class=&quot;dk-context-row&quot;&gt;
+            &lt;span class=&quot;dk-person&quot;&gt;
+              ${avatar(id, &#x27;is-sm&#x27;)}
+              &lt;span class=&quot;dk-context-copy&quot;&gt;
+                &lt;strong&gt;${experts[id][0]} ${experts[id][1]}&lt;/strong&gt;
+                &lt;span class=&quot;text-small text-muted&quot;&gt;${joined ? experts[id][3] : &#x27;尚未加入当前对话&#x27;}&lt;/span&gt;
+              &lt;/span&gt;
+            &lt;/span&gt;
+            &lt;button class=&quot;btn btn-ghost&quot; type=&quot;button&quot; data-team-expert=&quot;${id}&quot;&gt;
+              ${joined ? &#x27;查看&#x27; : &#x27;调用&#x27;}
+            &lt;/button&gt;
+          &lt;/div&gt;
+        `;
+      }).join(&#x27;&#x27;);
+    }
+
+    function contextEnvironments() {
+      return contextRows([
+        [&#x27;XHS-01 · 晚风手作&#x27;, &#x27;Max / Dim · 研究与草稿&#x27;, &#x27;已绑定&#x27;, &#x27;is-done&#x27;],
+        [&#x27;XHS-02 · 北美好物&#x27;, &#x27;Max / Dim · 研究与草稿&#x27;, &#x27;已绑定&#x27;, &#x27;is-done&#x27;],
+        [&#x27;XHS-03 · 新手妈妈&#x27;, &#x27;Max / Dim / 小李 · 评论需确认&#x27;, &#x27;受控&#x27;, &#x27;is-waiting&#x27;]
+      ]);
+    }
+
+    function contextResults() {
+      return contextRows([
+        [&#x27;趋势简报 v1&#x27;, &#x27;Max · 28 条来源 · 可回读&#x27;, &#x27;已核验&#x27;, &#x27;is-done&#x27;],
+        [&#x27;账号化草稿 × 4&#x27;, &#x27;Dim · 已保存 · 未发布&#x27;, &#x27;已交付&#x27;, &#x27;is-done&#x27;],
+        [&#x27;账号化草稿 × 2&#x27;, &#x27;Dim · 创作中&#x27;, &#x27;进行中&#x27;, &#x27;is-working&#x27;],
+        [&#x27;评论候选 × 3&#x27;, &#x27;小李 · 0 已提交&#x27;, &#x27;等待你&#x27;, &#x27;is-waiting&#x27;],
+        [&#x27;内容发布&#x27;, &#x27;当前工作单没有发布授权&#x27;, &#x27;0 次&#x27;, &#x27;is-done&#x27;]
+      ]);
+    }
+
+    function renderContext() {
+      const titles = {
+        home: [&#x27;当前对话&#x27;, &#x27;工作台&#x27;],
+        tasks: [&#x27;Mission #M-2048&#x27;, &#x27;任务&#x27;],
+        team: [&#x27;当前对话&#x27;, &#x27;团队&#x27;],
+        environments: [&#x27;当前对话&#x27;, &#x27;阵地&#x27;],
+        results: [&#x27;当前对话&#x27;, &#x27;成果&#x27;]
+      };
+      q(&#x27;#dk-context-kicker&#x27;).textContent = titles[state.context][0];
+      q(&#x27;#dk-context-title&#x27;).textContent = titles[state.context][1];
+      q(&#x27;#dk-context-content&#x27;).innerHTML = {
+        home: contextHome,
+        tasks: contextTasks,
+        team: contextTeam,
+        environments: contextEnvironments,
+        results: contextResults
+      }[state.context]();
+
+      qa(&#x27;[data-context]&#x27;).forEach((button) =&gt; {
+        button.setAttribute(&#x27;aria-pressed&#x27;, String(button.dataset.context === state.context));
+      });
+
+      qa(&#x27;[data-context-jump]&#x27;).forEach((button) =&gt; {
+        button.addEventListener(&#x27;click&#x27;, () =&gt; {
+          state.context = button.dataset.contextJump;
+          openContext();
+          renderContext();
+        });
+      });
+
+      qa(&#x27;[data-team-expert]&#x27;).forEach((button) =&gt; {
+        button.addEventListener(&#x27;click&#x27;, () =&gt; {
+          const id = button.dataset.teamExpert;
+          const participants = conversations[state.conversation].participants;
+          if (!participants.includes(id)) participants.push(id);
+          state.persona = id;
+          renderHeader();
+          renderStream();
+          renderExpertStrip();
+          renderContext();
+        });
+      });
+      refreshIcons();
+    }
+
+    function openContext() {
+      q(&#x27;#dk-context-panel&#x27;).classList.add(&#x27;is-open&#x27;);
+    }
+
+    function sendMessage() {
+      const input = q(&#x27;#dk-message-input&#x27;);
+      const text = input.value.trim();
+      if (!text) return;
+      const persona = state.persona;
+      const key = `${state.conversation}:${persona}`;
+      state.extraMessages[key] ||= [];
+      state.extraMessages[key].push({ author: &#x27;user&#x27;, text });
+      input.value = &#x27;&#x27;;
+      renderStream();
+      window.setTimeout(() =&gt; {
+        state.extraMessages[key].push({
+          author: &#x27;agent&#x27;,
+          text: persona === &#x27;a&#x27;
+            ? &#x27;收到。我会更新当前对话的工作范围，并继续只在这里汇总结论与待决定事项。&#x27;
+            : &#x27;收到。我会把要求加入自己的工作记录；完成后先交回 A，由 A 统一汇总。&#x27;
+        });
+        if (state.persona === persona) renderStream();
+      }, 520);
+    }
+
+    function render() {
+      renderConversations();
+      renderHeader();
+      renderStream();
+      renderExpertStrip();
+      renderContext();
+      refreshIcons();
+    }
+
+    qa(&#x27;[data-context]&#x27;).forEach((button) =&gt; {
+      button.addEventListener(&#x27;click&#x27;, () =&gt; {
+        state.context = button.dataset.context;
+        openContext();
+        renderContext();
+      });
+    });
+
+    q(&#x27;#dk-close-context&#x27;).addEventListener(&#x27;click&#x27;, () =&gt; {
+      q(&#x27;#dk-context-panel&#x27;).classList.remove(&#x27;is-open&#x27;);
+    });
+
+    q(&#x27;#dk-call-expert&#x27;).addEventListener(&#x27;click&#x27;, () =&gt; {
+      state.context = &#x27;team&#x27;;
+      openContext();
+      renderContext();
+    });
+
+    q(&#x27;#dk-toggle-left&#x27;).addEventListener(&#x27;click&#x27;, () =&gt; {
+      const shell = q(&#x27;.dk-shell&#x27;);
+      shell.classList.toggle(&#x27;is-left-collapsed&#x27;);
+      const collapsed = shell.classList.contains(&#x27;is-left-collapsed&#x27;);
+      q(&#x27;#dk-toggle-left&#x27;).setAttribute(&#x27;aria-label&#x27;, collapsed ? &#x27;展开对话栏&#x27; : &#x27;收起对话栏&#x27;);
+      q(&#x27;#dk-toggle-left&#x27;).innerHTML = collapsed
+        ? &#x27;&lt;i data-lucide=&quot;panel-left-open&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&#x27;
+        : &#x27;&lt;i data-lucide=&quot;panel-left-close&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&#x27;;
+      refreshIcons();
+    });
+
+    q(&#x27;#dk-mobile-select&#x27;).addEventListener(&#x27;change&#x27;, (event) =&gt; {
+      state.conversation = event.target.value;
+      state.persona = &#x27;a&#x27;;
+      state.context = &#x27;home&#x27;;
+      render();
+    });
+
+    q(&#x27;#dk-send&#x27;).addEventListener(&#x27;click&#x27;, sendMessage);
+    q(&#x27;#dk-message-input&#x27;).addEventListener(&#x27;keydown&#x27;, (event) =&gt; {
+      if ((event.metaKey || event.ctrlKey) &amp;&amp; event.key === &#x27;Enter&#x27;) sendMessage();
+    });
+
+    render();
+  })();
+&lt;/script&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handleLeave = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>

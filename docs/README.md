@@ -51,6 +51,7 @@ git worktree list
 - [`product-exception.md`](product-exception.md)
 - [`anti-detection.md`](anti-detection.md)
 - [`design-gaps-and-models.md`](design-gaps-and-models.md)
+- [`design/conversation-driven-agent-client.md`](design/conversation-driven-agent-client.md)
 - `design/` 与 `research/`
 
 这些文档中的界面、字段、状态或路线图可能只处于设计阶段。实现判断必须回到 OpenSpec、

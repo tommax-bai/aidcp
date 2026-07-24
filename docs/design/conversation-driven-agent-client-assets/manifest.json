@@ -1,0 +1,16 @@
+{
+  "source": "Sharp redraw based on the user-provided Qoder reference screenshot",
+  "rendering": "Use image-rendering: pixelated; preserve the original square crop",
+  "avatars": [
+    { "id": "qoder-01", "file": "qoder-01.png", "currentRole": "浏览者 小张" },
+    { "id": "qoder-02", "file": "qoder-02.png", "currentRole": "评论员 小李" },
+    { "id": "qoder-03", "file": "qoder-03.png", "currentRole": "热门分析师 Max" },
+    { "id": "qoder-04", "file": "qoder-04.png", "currentRole": "自动化专员 Boton" },
+    { "id": "qoder-05", "file": "qoder-05.png", "currentRole": "Persona 策划师 Iris" },
+    { "id": "qoder-06", "file": "qoder-06.png", "currentRole": "助理 A" },
+    { "id": "qoder-07", "file": "qoder-07.png", "currentRole": "社群爱好者 J" },
+    { "id": "qoder-08", "file": "qoder-08.png", "currentRole": "作家 Dim" },
+    { "id": "qoder-09", "file": "qoder-09.png", "currentRole": "数据核验员 Lin" },
+    { "id": "qoder-10", "file": "qoder-10.png", "currentRole": "合规巡检员 Kai" }
+  ]
+}
