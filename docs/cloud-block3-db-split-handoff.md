@@ -6,6 +6,36 @@
 
 ---
 
+## 0. 状态更新（2026-07-24 夜，本 session 续做 L2）
+
+**L2 已全做完 + 部署 dev + 真机验证。cloud `origin/master` = `653e910`（在 Block² 的 90319eb 之上 +L2）。**
+
+已核实并坐实的关键事实（原文多处「先核实」的结论）：
+- **dev 与 ol 的 `.env` 都只设 `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD`，均未设 `DATABASE_URL`，三个 `AIDCP_PG_*_URL` 也都没设。** ⇒ 交接文档 §4.2 风险①判为安全：resolver 回落链 `DATABASE_URL(未设)→PGHOST/...` 与今天 HOST-param / ENVCFG 三条路径全部塌成同一份 PGHOST 配置，**L2 接线在 dev+ol 都字节等价**。
+- **master 早已有 0071–0074**（tasks.md 里「3e75332 未合入 master」的注释已过时）；`schema-contract` `KNOWN_MAX=0074_event_outbox`、`REQUIRED=0070`，与迁移目录顶端一致。
+
+本 session 已完成：
+1. **baseline 共享库（执行器 11.4 / 3.4）**——dev 上 `migrate verify` 缺失 0/多余 0（先定向补了 `migrations/0073 publish_execution_state`，属另一 change publish-log-split-prep 的自建缺表、幂等纯 expand）；`migrate baseline` 写账本 **73 行 / 最高 0074**。**dev/ol 共用物理库 → 一次覆盖两端**。部署后启动日志契约门（warn）**通过**：账本 0074 ≥ REQUIRED 0070。
+2. **L2 池接线（Track A）**——组合根建 `apiPool/automationPool/contentPool`（max 30）+ `tokenUsagePool`（content 专用 max 4）；`configMirrorPool = apiPool`（现有引用零改）。**39 store 全按属主接线：api 20 / automation 14 / content 5**。⚠️ **quota/pacing/session/resume 四个 automation 配置 store 钉在 api 池**（它们在自己写事务里同连接 bump api 属主 `config_mirror_version`，跨库不可分 → L3 前必须先把该 bump 移出事务，见 §4.2 风险②，代码里已留 inline 注释）。测试：tsc 0 / acceptance 105/0 / 全量 3194/0（monolith 字节等价）。
+3. **resolver 落 kernel** + 边界裁定（`boundaries/ownership-rules.json` fileOverrides + `kernel-non-members.json` roster + 重生成 `module-ownership.json`）。
+4. **0075/0076 以 staged ops 脚本入库**（`scripts/db-split/`，**未执行**）。
+
+**L2 未做/推迟（交给 L3 或需 admin）：**
+- **`account-delete-cascade.ts` 推迟到 L3**（未接线的跨 owner purge；它在 `src/transport/`（自动继承 automation），但 purge 写 content 表 → 静态跨层 DML，需要写豁免，而豁免只有在真接线后才有正当性。L2 为死代码登记豁免不划算）。
+- **0075 建三空库 BLOCKED**：dev 上 app 角色 `aidcp` **无 CREATEDB 权限**（`rolcreatedb=f`），需 admin（postgres 角色）或 `GRANT aidcp CREATEDB` 才能建。三个 owner 库现**尚不存在**。非关键路径（L3 数据迁移前才需要）。
+- **OL 代码未部署 L2**：OL 是**稳定生产、从 `release/*` 分支部署**（非 master）。L2 代码→OL 是独立的发布分支决策；baseline（DB）已覆盖 OL；L2 字节等价 ⇒ dev 跑 L2、OL 跑旧码、共库无 skew。
+- **enforce（6.5）暂不切**：活跃 schema 重构期 `warn` 更安全（漂移只记不砖）；账本 0074==KNOWN_MAX、enforce 会通过，但等拆库稳定 + 覆盖一次 ol 部署后再切。
+
+**L3 剩余工作（破坏性 / 需决策，用户不在时未擅自对共享生产库动手）：**
+- **① cascade 单库验收形态（设计任务，先解再接线）**：naive 单库接线会死循环——relay 读 api outbox 又 emit 到 content/automation，而单库单 `event_outbox` 表 = relay 再读到自己的投递 → 无限重放。需独立 outbox 流（拆库后天然成立）或给 relay 加「带 sourceEventId 的不再 relay」守卫。cascade 单测用的是**每 owner 一个独立内存 outbox 桩**，即假设拆库后拓扑。
+- **② 切换策略分叉（用户拍板）**：**owner-URL 整体翻转**（粗粒度、每 owner 一次短停机切换）vs **逐表五阶双写**（细粒度、零停机，但 §8.5 团队自订模板强制每阶段 ≥3 自然日观察、覆盖 dev+ol 各一完整业务日）。resolver+owner-URL 设计暗示前者；§5.3 / `docs/table-ownership-migration.md` 模板是后者。**两者对共享生产库数据的风险与时长完全不同，动数据前必须先定**。
+- **③ 0076 降 12 条跨域外键**：危险窗口——**只在 ① cascade 接线并验证跑通之后**才 drop；共库期可逆（附了重建语句）；drop 前**共享库先整库 `pg_dump`**。
+- **④ 数据切换**：建 owner 库（0075，需 admin）→ 各 owner 表+数据搬进各自库 → 配 `AIDCP_PG_<OWNER>_URL`（dev/ol 同值、共享三库）→ 切换。含不可逆 DROP、跨多日、共享生产库。
+- **⑤ 四个钉 api 的配置 store**：automation 库拆出去前，必须先把它们的 `config_mirror_version` bump 移出跨库事务。
+- **⑥ segC/segD outbox 地雷**：`bridgeEventBusToOutbox` / `PanelEventReplay` / `startRiskCommandConsumer` / `emitRiskCommand` 都跑在 api 池，但 `event_outbox` 属 automation——单库字节等价，automation 库拆出后就读/写错库。
+
+---
+
 ## 1. 操作要求（OVERRIDE 默认工作方式，务必遵守）
 
 用户对本重构的长期铁律（速度第一）：

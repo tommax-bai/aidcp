@@ -43,15 +43,17 @@
 - [x] 3.1 新增 `migrations/0058_baseline_self_created_tables.sql`（`kind=expand`）：把 24 张只由存储自建、迁移目录从未创建的表的 DDL 原样抽出，保留 `CREATE TABLE IF NOT EXISTS`。清单：`accounts`、`client_users`、`client_environments`、`client_env_scope`、`client_environment_installations`、`client_environment_deletion_requests`、`client_env_revocation_holds`、`anchors`、`anchor_staging`、`concepts`、`curated_content`、`liked_notes`、`valuable_comments`、`group_route`、`hot_lead_config_global`、`facebook_group_target`、`facebook_group_target_scope`、`facebook_group_membership`、`facebook_group_join_audit`、`facebook_group_join_automation_config`、`account_facebook_publish_image`、`account_facebook_publish_image_set`、`persona_auto_fill_runs`、`persona_auto_fill_targets`。文件可按域拆成多个，但每个都必须带 kind 与 objects 头。
 <!-- aidcp-cloud aef34a0 按域拆成 0065 身份 / 0066 缓存语料 / 0067 Facebook / 0068 人设自动填充；0069 单独承接身份域两条 SET NOT NULL（kind=contract，留在 0065 会把一个纯基线文件整体标成 contract） -->
 <!-- aidcp-cloud a6c00c1 **编号返工（审计坐实的 blocker）**：0065/0066 排在「后续 ALTER 这些表」的历史迁移之后，全新空库上按执行器自己的复合序跑 `migrate up`，第 5 条 0005_account_id_columns 就整批停住（relation "concepts" does not exist）——即「迁移目录是完整事实源」这句话只在旧库上成立（旧库表早被存储自建，走 baseline 记账不跑 up）。0065+0066 合并为 **0000_baseline_identity_and_corpus_tables.sql**、排在全部历史迁移之前；合并成一个文件是因为复合序要求数字前缀唯一，而 0001-0011 之间没有空号（0012 是登记在案的空洞）。0067（对 publish_log 有外键）/ 0068 保持原位——无任何历史迁移引用它们的表。改名成本为零的前提是这批迁移**尚未进任何真库账本**；一旦按 backlog 110.2 在 dev baseline 落账，改版本 id 就是改两个已上线库的账本主键（D3 明令禁止）。 -->
+<!-- aidcp-cloud 3e75332（worktree branch migration-baseline-object-coverage，未 push / 未合入 master）补齐 a6c00c1 漏掉的**两张表**：dev `migrate verify` 实测报出 group_comment_attempts / hot_lead_queue「库里有、任何迁移都没声明」（见 11.3 的多余清单）。根因：0030 建 group_comment_attempts、0036 本应 RENAME 为 contact_comment_attempts，共库上 store 先自愈出新名，致 0036 的 `IF EXISTS(old) AND NOT EXISTS(new)` 守卫跳过 RENAME、旧表原地存活；hot_lead_queue 由 1bb0406(feed-hot-lead-auto-group-comment) 删掉的 src/hot-lead/hot-lead-queue.ts 建、表在共库存活。新增 migrations/0071_baseline_surviving_orphan_tables.sql（kind=expand，DDL 原样抽自 migrations/0030 与 hot-lead-queue.ts@1bb0406^ HOT_LEAD_SCHEMA_SQL）。边界门禁：boundaries/table-ownership.json 登记 hot_lead_queue→automation（同域 src/hot-lead/ 属 automation；group_comment_attempts 早已登记）。三件套全绿：acceptance 105/0、test 3084/0（8 gated skip）、typecheck 0。 -->
 - [x] 3.2 抽取时必须包含存储侧的自愈 `ALTER TABLE … ADD COLUMN IF NOT EXISTS` 与 `CREATE INDEX IF NOT EXISTS`（例：`src/client-auth/client-user-store.ts:120-160` 的一串加列与两条索引），否则新库建出的表会缺列。
 <!-- aidcp-cloud aef34a0 24 张表的自愈语句全部抽出 -->
 <!-- aidcp-cloud 9c9e72b 新增 migrations/0070_baseline_self_heal_columns.sql 补第二类缺口：**表本身在迁移目录里、后续自愈加列却只活在存储常量里**的 16 列 3 索引（account_content_schedule 三档模式列、contact_comment_attempts 四个审计列、delegated_tasks.origin_chat_id + 两个局部表达式索引、publish_log 八列 + idx_publish_log_platform）。这类缺口在 dev/ol 上完全看不出来（列是存储早年自建的），只有全新空库才缺；由 test/schema/ddl-parity.test.ts 新增的「空库拉起静态前提」用例逐条找出 -->
+<!-- aidcp-cloud 3e75332（同上 worktree branch，未 push）补齐 a6c00c1 漏掉的**三列**（同为 dev verify 的多余清单，见 11.3）：accounts.group_chat_info（源 migrations/0027）、account_content_schedule.group_comment_enabled / group_comment_daily_cap（源 migrations/0030）——同属 0036 本应 RENAME 为 contact_* 却因守卫跳过 RENAME 而在共库存活的旧列。新增 migrations/0072_baseline_surviving_orphan_columns.sql（kind=expand，DDL 原样抽自 0027/0030）。src/schema/schema-contract.ts 的 KNOWN_MAX_SCHEMA_VERSION 抬到 0072_baseline_surviving_orphan_columns；REQUIRED_SCHEMA_VERSION 保持 0070（这些孤儿对象无任何存储依赖，不进硬前置）。 -->
 - [x] 3.3 新增 `test/schema/ddl-parity.test.ts`：对这 24 张表，比对存储源码 DDL 与新迁移文件的列名集合、索引名集合，不一致即失败。此测试在第 5 节切换完成、存储侧 DDL 删除后随之删除。
 <!-- aidcp-cloud 9c9e72b 四条断言：24 张表的列集合 / 索引集合 / 表存在性，外加一条更强的「只跑迁移建出的库能满足全部存储的探测要求」（不限于 24 张表）。解析口径收口在 src/schema/ddl-objects.ts，与探测层同源 -->
 <!-- aidcp-cloud a6c00c1 修一处**诚实性问题**：第四条用例原名「只跑迁移建出的库能满足全部存储的探测要求（空库拉起的静态前提）」，但它只比对象**集合**、对执行顺序完全无感，所以上面那条编号缺陷它永远不会红。用例改名为「迁移目录没抄漏对象：存储探测要求的对象都在（只比集合，不含顺序）」，顺序那一半新增 test/schema/migration-order.test.ts（静态模拟复合序，断言没有任何迁移引用尚未建出的表；判定层在 src/schema/migration-order.ts）。该检查器在返工前的 HEAD 上报出 15 处顺序缺陷、返工后 0 处 -->
-- [ ] 3.4 本节 MUST NOT 修改任何存储代码，MUST NOT 改变启动行为。交付后在 dev 跑 `migrate verify`，缺失清单应为空。
+- [x] 3.4 本节 MUST NOT 修改任何存储代码，MUST NOT 改变启动行为。交付后在 dev 跑 `migrate verify`，缺失清单应为空。
 <!-- aidcp-cloud aef34a0 前半句成立：0065-0070 全部为 CREATE/ALTER … IF NOT EXISTS，现网库上是 no-op，且该批未动任何存储代码 -->
-<!-- BLOCKED: 「在 dev 跑 migrate verify」需要真库，本 session 无 ECS 权限（集成与部署由主控串行做）。已登记 docs/real-machine-acceptance-backlog.md 新簇 110.1 -->
+<!-- 2026-07-24 主控在 dev（共享库 aidcp）实测 `migrate verify`：声明 1148 对象 / 覆盖 94 表，**缺失 0 / 多余 0**。唯一缺口是 publish_execution_state（属另一 change publish-log-split-prep 的 migrations/0073，非本 change 批次；共享库该表从未自建），定向补 0073（幂等 CREATE TABLE IF NOT EXISTS、纯 expand）后归零。本 change 的基线批（0065-0072）零缺失得证。BLOCKED 解除。 -->
 
 ## 4. aidcp-cloud — DDL 单一所有者的机械闸
 
@@ -195,8 +197,14 @@
      column:account_content_schedule.group_comment_daily_cap、column:account_content_schedule.group_comment_enabled、
      column:accounts.group_chat_info。这 5 个是历史自建表从未补迁移留下的真实缺口，
      MUST 在空库拉起验证前补齐迁移（否则新库起不来），已随 11.7 登记 backlog。 -->
-- [ ] 11.4 在 dev 完成一次 `baseline` 并记录账本行数与最高版本 id。
-<!-- BLOCKED: 同 11.3。已登记 backlog 簇 110.2 -->
+<!-- 2026-07-23 上述 5 个多余对象已补齐迁移，缺口清零：aidcp-cloud 3e75332（worktree branch migration-baseline-object-coverage，未 push / 未合入 master），新增 migrations/0071（两表）+ 0072（三列）+ boundaries 登记 hot_lead_queue 属主 + 抬 KNOWN_MAX 到 0072。详见 3.1 / 3.2 下方注释。合入 master 部署 dev 后，dev `migrate verify` 的多余清单预期归零。 -->
+<!-- 2026-07-24 已实测归零：0071/0072 现已在 master（迁移目录顶到 0074、schema-contract KNOWN_MAX=0074_event_outbox）。dev（共享库）`migrate verify` = 缺失 0 / **多余 0**。3e75332 的等价内容已随后续提交合入 master，不再是未 push 状态。 -->
+- [x] 11.4 在 dev 完成一次 `baseline` 并记录账本行数与最高版本 id。
+<!-- 2026-07-24 主控在 dev 执行 `AIDCP_MIGRATE_BY=block3-l2-baseline npm run migrate baseline`（构建 = 部署 sha 90319eb，含执行器 + 0064-0074）。
+     baseline 内部先 ensureLedger（幂等建 schema_migrations 表）→ verify（缺失 0）→ 逐条 INSERT ON CONFLICT DO NOTHING、不跑任何迁移 SQL。
+     结果：**新增 73 行 / 已存在跳过 0 / 账本行数 73 / 最高版本 id `0074_event_outbox`**。
+     ⚠️ dev 与 ol 共用同一物理库 aidcp，账本表只有一份 → 本次 baseline **一次覆盖 dev+ol 两端**（applied_from_target=unknown，AIDCP_DEPLOY_ENV 在 dev 为空，仅审计列）。
+     部署 L2（653e910）重启后启动日志实测契约门通过行：「schema 契约门（warn）通过：账本最高版本 0074_event_outbox（所需 0070，本构建认识到 0074）」，PG `select 1` + `count(schema_migrations)=73` 自证。BLOCKED 解除。 -->
 - [ ] 11.5 每批存储切换按 §5.10 逐批部署 dev 并记录 commit sha 与观察结论；OL 部署只在用户明确要求时从发布分支执行。
 <!-- 部分完成 / 2026-07-23 deployed：主控已把六批一次性部署 dev（sha 89c286d，含本 change 全部 4 个提交）。
      **「逐批观察」这一半未兑现**——六批代码在同一提交 9c9e72b，物理上无法分批上线，不改状态为 [x]。
