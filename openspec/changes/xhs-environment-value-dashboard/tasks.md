@@ -60,3 +60,13 @@
   <!-- Browser QA: 920px viewport rendered idle at 168px and active at 240px; 720px viewport kept the idle card at 168px with zero horizontal overflow and exposed the featured section in the first screen. Focused Edge renderer/security tests passed 41/41. -->
 - [x] 8.4 Run focused Edge tests, the full Edge suite, typecheck and strict OpenSpec validation; integrate and push the source-only correction.
   <!-- Edge 1f77ed0: focused renderer/security tests passed 41/41; a concurrent full run had one unrelated Native engine timeout, that case passed 1/1 when serialized, and the subsequent full run passed 2285/2285; typecheck and strict OpenSpec validation passed. Edge was fast-forwarded and pushed to master. Source-only delivery; no desktop package or installed client was updated. -->
+
+## 9. Final client visual polish
+
+- [x] 9.1 Accent only the dynamic inspiration phrase, shorten the stopped status to “未启动”, and correct the collapse and section-link typography with explicit font declarations.
+- [x] 9.2 Remove the idle process preview's top whitespace and add a restrained shared shadow to real and fallback note covers.
+- [x] 9.3 Change the authenticated client default width to 1080px while preserving the login and minimum-window dimensions.
+- [x] 9.4 Update the HTML demo and focused regressions, visually verify idle, active and narrow states, then run the full Edge suite, typecheck and strict OpenSpec validation.
+  <!-- Browser QA: 1080x720 idle rendered at 168px with zero horizontal overflow and the featured section visible; active rendered at 240px. Computed styles confirmed #2f6fe4 value emphasis, 8.5px/680 collapse text, 10.5px/680 section links, an 8px process-header gap and the shared two-layer cover shadow. Focused tests passed 44/44, full Edge passed 2285/2285, typecheck and strict OpenSpec validation passed. -->
+- [x] 9.5 Integrate and push the Edge and control changes while preserving the source-only delivery boundary.
+  <!-- Edge 05cd2ed was fast-forwarded and pushed to master after focused tests passed 44/44, the full suite passed 2285/2285 and typecheck passed. Control artifacts were strictly validated before push. Source-only delivery; no desktop package or installed client was updated. -->

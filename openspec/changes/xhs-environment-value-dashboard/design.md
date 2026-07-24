@@ -99,6 +99,12 @@ Reference and customer-content placeholders are section-specific 218px cards wit
 
 Visual validation uses the reported environment content width as well as narrow container widths. Review covers populated, mixed populated/empty, all-empty, loading/error, active, waiting and collapsed states; it compares section proportions and whitespace, not only the absence of overflow.
 
+### 10. Final typography and window proportions stay explicit
+
+The value heading uses semantic emphasis only around the changing value phrase such as “2 条精选灵感”, rendered in the prototype blue while the surrounding sentence remains dark. Work-stream collapse and section-link controls use explicit font family, size, weight and line height instead of an invalid shorthand that can silently inherit oversized text. The idle process explanation starts immediately below its header rather than being vertically centered in the remaining column.
+
+The authenticated Electron client starts at 1080px wide so the environment rail and dashboard retain the intended reading proportions. The login window remains 900px because it has a different, intentionally compact composition. Real and deterministic note covers share a restrained two-layer shadow that separates them from white cards without making them look elevated like dialogs.
+
 ## Risks / Trade-offs
 
 - **[Existing controller assumes content workspace is open]** → Separate “dashboard visible” from “deep workspace active” and add focused tests for initial selection, reload, switching and late responses.
@@ -108,6 +114,7 @@ Visual validation uses the reported environment content width as well as narrow 
 - **[Schedule failure degrades the whole dashboard]** → Keep its controller and failure state isolated; dashboard content requests and rendering proceed independently.
 - **[Missing media makes the value page look broken]** → Render a clearly decorative deterministic cover fallback without fabricating a source image or engagement evidence.
 - **[Viewport is wide while the embedded environment area is narrow]** → Use container queries owned by the Xiaohongshu dashboard and test the actual environment content width rather than relying on the outer Electron window.
+- **[CSS font shorthand silently falls back]** → Declare family, size, weight and line height separately for customer-facing text controls and lock the computed contract in static tests.
 
 ## Migration Plan
 
