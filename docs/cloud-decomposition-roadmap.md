@@ -2,7 +2,21 @@
 
 > 2026-07-23 定。本文件是「拆云端为三仓」的执行顺序与边界约定，是 `cloud-service-decomposition-proposal.md`（架构定稿）的**落地节奏**视图。核心原则：**可逆的先上、跑稳；不可逆的（删数据结构、拆表、拆库）押后到验证过。**
 
-## 进度快照 · 2026-07-23（覆盖式，最新在此）
+## 进度快照 · 2026-07-24（覆盖式，最新在此）
+
+**Block ① 代码解耦已到自然地板：跨边界 import `frozenTotal` 266 → 101（消除 62%），全部 land + dev 部署 + 逐刀全量测试绿、行为零变更。** kernel 4 → 约 44 个纯共享文件。本轮 7 刀：纯契约抬取 / 互动端口 / 类型批抬 / store 簇（pg-config→kernel + schemaEnsurer 端口）/ llm-lang 契约 / platform 类型闭包 / 行为类接口抽取 / 长尾抬取 / prompt 构建器（手法与 residual 见 `scratchpad/docpatch-*.md`）。
+
+**剩余 101 条已逐条定性，落成接缝地图 `docs/cloud-decoupling-seam-inventory.md`（Block② 拆进程的设计输入）：**
+
+- **共享契约 27**（protocol/RoleName 12 + §9 平台 8 + LLM 接口 7）——本就该放共享包，因 §2/§9/kernel 门禁挡着没搬，概念上无耦合。
+- **真 RPC 接缝 55**（行为/存储 37 + 风控单写 13 + orchestration 5）——三服务真实行为耦合数，主战场 **api↔automation**（api/panel 读 automation/content 数据）。
+- **拆完自动消失 9**（基类继承 7 + panel hub 2）+ **config-mirror 模块状态 10**。
+
+**结论：62% 是干净解耦的正确终点，剩余无「该消未消的错层」**——再往下即被否掉的「激进口径」（违反 §2/§9/门禁）。**Block ① 收尾，可进 Block ② 拆进程**（用接缝地图设计：api/panel 是否收口成数据网关、风控走异步事件、共享契约随 kernel 成三仓内部包）。
+
+---
+
+## 进度快照 · 2026-07-23
 
 **已 land 到 cloud `master` + 部署 dev（行为等价、可回滚）：**
 
