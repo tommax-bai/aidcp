@@ -105,6 +105,12 @@ The value heading uses semantic emphasis only around the changing value phrase s
 
 The authenticated Electron client starts at 1080px wide so the environment rail and dashboard retain the intended reading proportions. The login window remains 900px because it has a different, intentionally compact composition. Real and deterministic note covers share a restrained two-layer shadow that separates them from white cards without making them look elevated like dialogs.
 
+### 11. Runtime detail explains the value pipeline
+
+The collapsed runtime summary remains a compact statement of confirmed daily browsing and interaction counts. Expanding it groups only available authoritative values into four customer-readable stages: discovering content, interaction evidence, inspiration selection and content creation. Daily action counters remain explicitly labelled as today, while collection and draft counts remain explicitly labelled as current account totals; the UI does not imply that accumulated content was created today.
+
+The environment value page owns a small internal horizontal safe area in addition to the shell gutter so section headings never touch the dashboard background boundary. In the populated desktop composition, the four reference cards occupy two 160px rows and the three customer-content rows use the same 328px body height; responsive stacked layouts and independently designed 218px empty/error states retain their existing contracts.
+
 ## Risks / Trade-offs
 
 - **[Existing controller assumes content workspace is open]** → Separate “dashboard visible” from “deep workspace active” and add focused tests for initial selection, reload, switching and late responses.

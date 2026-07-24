@@ -70,3 +70,12 @@
   <!-- Browser QA: 1080x720 idle rendered at 168px with zero horizontal overflow and the featured section visible; active rendered at 240px. Computed styles confirmed #2f6fe4 value emphasis, 8.5px/680 collapse text, 10.5px/680 section links, an 8px process-header gap and the shared two-layer cover shadow. Focused tests passed 44/44, full Edge passed 2285/2285, typecheck and strict OpenSpec validation passed. -->
 - [x] 9.5 Integrate and push the Edge and control changes while preserving the source-only delivery boundary.
   <!-- Edge 05cd2ed was fast-forwarded and pushed to master after focused tests passed 44/44, the full suite passed 2285/2285 and typecheck passed. Control artifacts were strictly validated before push. Source-only delivery; no desktop package or installed client was updated. -->
+
+## 10. Runtime stages and lower-grid alignment
+
+- [x] 10.1 Redesign expanded system runtime details as four honest value stages while preserving the compact confirmed-daily summary.
+- [x] 10.2 Restore the environment dashboard's internal horizontal safe area and align populated reference/customer-content body heights without stretching empty states.
+- [x] 10.3 Update the HTML demo and focused regressions, then visually verify populated, empty, expanded-runtime and supported-width states.
+  <!-- Browser QA: at 1080px the dashboard kept a 28px effective inner heading gutter, both populated lower bodies measured 328px, the four-stage runtime detail measured 154px and horizontal overflow was 0. Both empty cards remained independently 218px. At 720px the lower grid stacked, runtime stages became two columns and horizontal overflow remained 0. Focused Edge tests passed 44/44 and typecheck passed. -->
+- [x] 10.4 Run focused Edge tests, the full Edge suite, typecheck and strict OpenSpec validation; integrate and push the source-only correction.
+  <!-- Edge 7c4f439 was fast-forwarded and pushed to master after focused tests passed 44/44, the full suite passed 2285/2285 and typecheck passed. Strict OpenSpec validation passed. Source-only delivery; no desktop package or installed client was updated. -->
