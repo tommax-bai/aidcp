@@ -26,7 +26,12 @@
 - **OL 代码未部署 L2**：OL 是**稳定生产、从 `release/*` 分支部署**（非 master）。L2 代码→OL 是独立的发布分支决策；baseline（DB）已覆盖 OL；L2 字节等价 ⇒ dev 跑 L2、OL 跑旧码、共库无 skew。
 - **enforce（6.5）暂不切**：活跃 schema 重构期 `warn` 更安全（漂移只记不砖）；账本 0074==KNOWN_MAX、enforce 会通过，但等拆库稳定 + 覆盖一次 ol 部署后再切。
 
-**L3 剩余工作（破坏性 / 需决策，用户不在时未擅自对共享生产库动手）：**
+**L3 进展（2026-07-25，策略已定=owner-URL 整体翻转）：**
+- **完整跨 owner 依赖地图已测绘**（3 agent 并行扫三 owner + 综合，逐处 file:line 核实）：**58 依赖 / 55 raw**，**没有一个 owner 现在能干净翻转**。权威计划 + 逐 owner 修法 + 排序见新文档 **`docs/cloud-block3-l3-cutover-plan.md`**。核心：owner-URL 翻转机械上简单，但拆库前必须先把 55 处 raw 跨库访问路由过传输层（Block² 端口模式），其中 **9 处跨库事务**（4 config-mirror bump + 5 offboard 联合提交）+ 1 处跨库写（interaction_audit_events 双写）**需架构级最终一致重设计**，不是 HTTP 化能解。这是把 Block² 未完的数据层解耦补齐的大工程、多变更、须每步测+部署。
+- **step0 已做（纯字节等价）**：outbox 传输 helper 池改绑——`startRiskCommandConsumer`/`bridgeEventBusToOutbox`/`PanelEventReplay`/`emitRiskCommand` 从 api 的 configMirrorPool 改绑 **automation 池**（event_outbox / 风控命令 outbox 属 automation；ConfigMirrorRefresher 读 api 的 config_mirror_version、保持 api 池）。monolith 下这 4 个 helper 不实例化 → dev/ol 零影响；修掉拆库后读写错库的接线 bug。**cloud master `f8651f0`，测试 tsc0/acc0/全量3194·0，部署 dev 验证通过。**
+- **未做（行为变更 / 架构级 / 须监督）**：55 处跨库读路由、9 处跨库事务重设计、DDL FK 降级、任何实际翻转——用户睡时不对生产数据路径盲改。
+
+**L3 剩余工作（破坏性 / 需决策；详见 `docs/cloud-block3-l3-cutover-plan.md`）：**
 - **① cascade 单库验收形态（设计任务，先解再接线）**：naive 单库接线会死循环——relay 读 api outbox 又 emit 到 content/automation，而单库单 `event_outbox` 表 = relay 再读到自己的投递 → 无限重放。需独立 outbox 流（拆库后天然成立）或给 relay 加「带 sourceEventId 的不再 relay」守卫。cascade 单测用的是**每 owner 一个独立内存 outbox 桩**，即假设拆库后拓扑。
 - **② 切换策略分叉（用户拍板）**：**owner-URL 整体翻转**（粗粒度、每 owner 一次短停机切换）vs **逐表五阶双写**（细粒度、零停机，但 §8.5 团队自订模板强制每阶段 ≥3 自然日观察、覆盖 dev+ol 各一完整业务日）。resolver+owner-URL 设计暗示前者；§5.3 / `docs/table-ownership-migration.md` 模板是后者。**两者对共享生产库数据的风险与时长完全不同，动数据前必须先定**。
 - **③ 0076 降 12 条跨域外键**：危险窗口——**只在 ① cascade 接线并验证跑通之后**才 drop；共库期可逆（附了重建语句）；drop 前**共享库先整库 `pg_dump`**。
