@@ -52,6 +52,12 @@
 
 **发现的隐患（已修/登记）**：① 解耦把 `DEFAULT_PG_CONFIG` 搬 kernel 后，`scripts/`（不在 tsconfig typecheck 范围）里 3 个脚本仍引旧路径 → 迁移执行器运行时崩、挡住所有迁移；已修（repoint kernel）+ 部署验证。**建议把 scripts/ 纳入 typecheck 防复发。** ② dev 迁移账本整个未 baseline（表历史自建、账本空，执行器视全部迁移为待应用）——已登记真机 backlog，需单独 baseline，非本阶段副作用。
 
-## 6. 下一步：2d 拆进程（先拆 content）
+## 6. 2d 拆进程 · 第一刀 ✅ landed + dev（2026-07-24，master 87b3429）
 
-传输 + 网关地基已就位且 dev 验证。2d：先把最独立的 **content（segB）** 拆成独立进程，经传输与单体（api+automation）通信（gateway 切 http、content 读端点 listen），dev 验证；再拆 api，剩 automation 为核。deploy-target 扩多服务。**这是首个"真拆进程"的不可逆度较高步骤，需专门设计（先拆哪个/怎么起/多服务部署）。**
+给 `server.ts` 的 `main()` 加 `AIDCP_SERVICE` 三模式（一套代码、多入口，非三仓）：**monolith**（默认/未设/未识别值 = 四段全跑、无新监听、gateway 默认 local、**逐字节等价**，唯一不可破不变量）、**content**（segA+segB、跳 C/D、起 InternalHttpServer 在 `AIDCP_CONTENT_PORT ?? 8092` 只服务自有 curated 读端点）、**core**（segA+segC+segD、跳 segB、配 `AIDCP_GATEWAY_MODE=http`+`AIDCP_GATEWAY_BASE_URL` 时 curated 读走网关 HTTP）。新增零 import 纯模式选择器 `src/gateway/service-mode.ts`（+单测）；对抗审计 verdict clean、命门独立复跑坐实（`env -u AIDCP_SERVICE npm test` 3155/3155 绿）；frozenTotal 守 101、热文件零改动。dev 部署后进程照常开机（active+8787+飞书 onReady+config-mirror 变化=0）。
+
+### ⚠️ 关键真实发现：core 现在起不来（开机崩，非运行路径坏）
+
+原设计假设「segB = content only」**是错的**。实测 segB 还构造了 **~34 个共享地基对象**（eventBus、账号/人设各类 store、概念池、图片、委托任务、发布编排、审批策略、路由、各类 feed/like store、回调解析器…，全清单见 `cloud-process-split-handoff.md`），segC/segD 在**构造期**硬依赖它们。跳过 segB 起 core = 启动即崩。impl 特意**没硬拆**（大改、威胁 monolith 等价），只铺骨架 + 如实列 brokenPaths。
+
+**下一大刀（2d 第二步）：把这 ~34 个共享地基从 segB 抽到 segA**（基础段，content+core 都跑它）。抽完 segB 只剩真 content 私有构造（发布/洗稿/精选/配图）。必守 monolith 逐字节等价。这是 core 能开机、两进程 dev 真跑起来的解锁点。**详细剧本 + 红线见交接文档 `docs/cloud-process-split-handoff.md`。** 之后：2d 第三步 dev 起两进程验证 → 再拆 api、剩 automation 为核 → 2e 三仓 + kernel 共享包 + deploy-target 多服务。

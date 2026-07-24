@@ -18,7 +18,7 @@
 - **2a 传输原语 ✅ landed+dev**：DB 事件 outbox（安全水位治乱序提交、真 PG 验证过）+ 内部 HTTP 读 API 骨架。纯 additive、默认零行为。
 - **2b 数据网关 ✅ landed+dev**：api 侧 DataGateway 聚合三 kernel 读端口、默认 local 同实例零行为；client-auth/panel 已收口。
 - **2c 风控异步 —— 已消解**：13 条"风控接缝"全是别的服务读风控策略/类型，无跨服务写风控；风控本就单写解耦，符合意图，无需新异步接线。
-- **下一步 2d 拆进程**（先拆 content，首个不可逆度较高步骤，需专门设计）。
+- **2d 拆进程 · 第一刀 ✅ landed+dev（master 87b3429）**：main() 加 `AIDCP_SERVICE` 三模式（monolith 默认逐字节等价 / content / core）。对抗审计 clean、命门独立复跑坐实、frozenTotal 守 101、dev 开机绿。**关键发现：core 现起不来（开机崩）——segB 除 content 还构造 ~34 个共享地基对象，segC/segD 构造期硬依赖，跳 segB=启动即崩。** 下一大刀＝把这批共享地基从 segB 抽到 segA。**详细交接见 `docs/cloud-process-split-handoff.md`。**
 - **发现并修复隐患**：`scripts/`（不在 typecheck 范围）3 脚本引旧 `DEFAULT_PG_CONFIG` 路径 → 迁移执行器崩，已修+部署；dev 迁移账本未 baseline，登记真机 backlog。
 
 ---
