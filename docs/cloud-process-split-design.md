@@ -42,6 +42,16 @@
 
 **可逆边界**：2a–2c 全在单体内（传输抽象默认本地直调）→ 完全可逆、dev 可测。2d 起是真拆进程（仍可合回）。2e 建仓是提交点。**Block③ 物理拆库全程不碰**——传输是 DB-backed，正好借共享库，拆库时再各自带走 outbox。
 
-## 5. 第一步（现在做）
+## 5. 执行进度（2026-07-24）
 
-**2a-①：DB outbox 事件传输原语。** 建事件表 + 发/收（pg_notify+轮询兜底），先接风控事件双写、单进程内验证消费与现有 EventBus 等价。行为零变更、可回滚、dev 冒烟。这是拆进程的承重地基，且完全可逆。
+- **2a 传输原语 ✅ landed + dev**：① DB 事件 outbox（`src/transport/event-outbox.ts` + 迁移 0074）——emit（事务内 INSERT + pg_notify）+ OutboxConsumer（快照安全水位 `xmin<txid_snapshot_xmin` 治乱序提交丢事件 + 轮询兜底 + per-consumer 游标 + execution_target 隔离）。**审计抓到经典"乱序提交空洞"blocker、已用安全水位修复，并在 dev 真 PG 上验证通过**（并发乱序不吞事件）。② 内部 HTTP 读 API 骨架（`src/transport/internal-http.ts`：InternalHttpServer/Client + `makeReadPort` 默认 local）。两者纯 additive、默认零行为、未接 server.ts。`src/transport/` 暂归 automation（属主待接线时定，见 §待定项）。
+- **2b 数据网关 ✅ landed + dev**：`src/gateway/data-gateway.ts`（api）聚合三个 kernel 读端口（CuratedContentReader / DelegatedTaskServicePort / InteractionStoreReaderPort），经默认 local 开关（`AIDCP_GATEWAY_MODE`，缺省 local ⇒ 返回同一注入实例、零 HTTP、零行为）；三端口各有 server route + http client；client-auth/panel 的干净消费者已收口经网关，interaction 宽端口消费者留 residual（渐进）。frozenTotal 守 101（网关只引 kernel）。**内部 HTTP server 的实际 listen 属 2d，本阶段只建能力。**
+- **2c 风控异步 —— 已消解，无需单独做**：核查 13 条"风控接缝"发现**全是别的服务"读"风控策略/类型**（session-limits 预算函数、RiskStatus、QUOTA_MAX、panel 读状态展示），**没有一条是跨服务写风控**。风控最终状态本来就单写在 RiskController（3 入口 1 出口 + `risk_state` 条件写），已符合"异步/单写解耦"意图。这 13 条作为**共享风控策略读接缝**保留（§9/风控域禁碰，不 kernel-lift）；拆进程时走共享策略包或读投影。**用户选的"风控异步"已成立。**
+
+**待定项（接线时定）**：`src/transport/` 归属——outbox 首消费者是 automation、http server 端点在 automation/content、client 在 api，是跨层共享运行时基础设施；现 frozenTotal-neutral（只引 kernel），拆进程时随各服务分（client→api、server→各服务、outbox→共享运行时包）。
+
+**发现的隐患（已修/登记）**：① 解耦把 `DEFAULT_PG_CONFIG` 搬 kernel 后，`scripts/`（不在 tsconfig typecheck 范围）里 3 个脚本仍引旧路径 → 迁移执行器运行时崩、挡住所有迁移；已修（repoint kernel）+ 部署验证。**建议把 scripts/ 纳入 typecheck 防复发。** ② dev 迁移账本整个未 baseline（表历史自建、账本空，执行器视全部迁移为待应用）——已登记真机 backlog，需单独 baseline，非本阶段副作用。
+
+## 6. 下一步：2d 拆进程（先拆 content）
+
+传输 + 网关地基已就位且 dev 验证。2d：先把最独立的 **content（segB）** 拆成独立进程，经传输与单体（api+automation）通信（gateway 切 http、content 读端点 listen），dev 验证；再拆 api，剩 automation 为核。deploy-target 扩多服务。**这是首个"真拆进程"的不可逆度较高步骤，需专门设计（先拆哪个/怎么起/多服务部署）。**

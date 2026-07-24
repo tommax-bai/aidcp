@@ -12,7 +12,14 @@
 - **真 RPC 接缝 55**（行为/存储 37 + 风控单写 13 + orchestration 5）——三服务真实行为耦合数，主战场 **api↔automation**（api/panel 读 automation/content 数据）。
 - **拆完自动消失 9**（基类继承 7 + panel hub 2）+ **config-mirror 模块状态 10**。
 
-**结论：62% 是干净解耦的正确终点，剩余无「该消未消的错层」**——再往下即被否掉的「激进口径」（违反 §2/§9/门禁）。**Block ① 收尾，可进 Block ② 拆进程**（用接缝地图设计：api/panel 是否收口成数据网关、风控走异步事件、共享契约随 kernel 成三仓内部包）。
+**结论：62% 是干净解耦的正确终点，剩余无「该消未消的错层」**——再往下即被否掉的「激进口径」（违反 §2/§9/门禁）。**Block ① 收尾。**
+
+**Block ② 拆进程进行中（用户拍板：数据网关收口 + 风控异步 + 三服务；设计见 `docs/cloud-process-split-design.md`）：**
+- **2a 传输原语 ✅ landed+dev**：DB 事件 outbox（安全水位治乱序提交、真 PG 验证过）+ 内部 HTTP 读 API 骨架。纯 additive、默认零行为。
+- **2b 数据网关 ✅ landed+dev**：api 侧 DataGateway 聚合三 kernel 读端口、默认 local 同实例零行为；client-auth/panel 已收口。
+- **2c 风控异步 —— 已消解**：13 条"风控接缝"全是别的服务读风控策略/类型，无跨服务写风控；风控本就单写解耦，符合意图，无需新异步接线。
+- **下一步 2d 拆进程**（先拆 content，首个不可逆度较高步骤，需专门设计）。
+- **发现并修复隐患**：`scripts/`（不在 typecheck 范围）3 脚本引旧 `DEFAULT_PG_CONFIG` 路径 → 迁移执行器崩，已修+部署；dev 迁移账本未 baseline，登记真机 backlog。
 
 ---
 
