@@ -84,9 +84,10 @@
 <!-- aidcp-cloud 9c9e72b 8 个存储全部切换；curated-content-store 的 to_regclass('public.curated_content') 已改用 src/schema/schema-name.ts 的 qualifiedObjectName()，行为不变（默认仍 public）。全仓硬编码 'public.' 从 8 处降到 7 处，剩余 7 处全在 src/interactions/**（定稿 §5.4.2 要求 8 处全收口，本 change 的 tasks 只授权了这一处；缺口见 docpatch ⑤ 5.2） -->
 - [x] 5.6 批 4 — Facebook 群组与发布媒体（`src/comment-agent/facebook-group-store.ts`、`facebook-comment-audit-store.ts`、`src/publish-agent/publish-log-store.ts`、`facebook-publish-media-store.ts`、`src/config/facebook-group-join-automation-store.ts`、`src/config/persona-auto-fill-store.ts`）。
 <!-- aidcp-cloud 9c9e72b 6 个文件 8 个 init（facebook-group-store 一个文件里三个 store 各一个 init） -->
-- [ ] 5.7 批 5 — 委托任务、风控与引导（`src/delegated-task/store.ts`、`src/risk/pg-risk-store.ts`、`src/onboarding/first-post-onboarding-store.ts`）。
+- [x] 5.7 批 5 — 委托任务、风控与引导（`src/delegated-task/store.ts`、`src/risk/pg-risk-store.ts`、`src/onboarding/first-post-onboarding-store.ts`）。
 <!-- aidcp-cloud 9c9e72b 三者中已完成两个：src/delegated-task/store.ts、src/onboarding/first-post-onboarding-store.ts -->
-<!-- BLOCKED: src/risk/pg-risk-store.ts 归 risk-state-cross-process-integrity 独占，待其稳定后另起一批 -->
+<!-- aidcp-cloud f3f6ed9 完成 src/risk/pg-risk-store.ts：init 默认改为 ensureCapabilitySchema 探测，AIDCP_SCHEMA_SELF_CREATE=true 才允许回滚自建；并用可失败重试的 single-flight 防止多账号握手重复初始化。同期修复 RiskControllerRegistry 永久缓存 rejected Promise 的线上缺陷：失败条目按 Promise 身份驱逐，下一次真实请求重新物化，不增加自动重试。 -->
+<!-- validation: focused risk 26/26；schema 49/49；acceptance 115/115；full test exit 0；npm run typecheck exit 0。 -->
 - [ ] 5.8 批 6 — 身份与账号（`src/account-store.ts`、`src/client-auth/client-user-store.ts`）。同批用迁移补回 `client_environments.account_id → accounts(account_id)` 外键（`src/client-auth/client-user-store.ts:123-127` 记录的那处因启动顺序被迫放弃的完整性），并在补外键前先跑一次悬空绑定清理迁移。
 <!-- aidcp-cloud 9c9e72b 两个存储的自建表已切换为探测 -->
 <!-- BLOCKED: 外键与悬空绑定清理迁移**没有做**，且不建议按原样做。① 放弃外键的公开理由（启动顺序）确实随本 change 消失了；② 但还有一个没写进 design.md 的理由：src/server.ts:3869-3873 把 ensureAccount() 的失败显式吞掉并继续握手（注释直写「不阻塞握手」），而 src/client-auth/client-user-store.ts:1733 的 upsertEnvironment 会在同一次握手里写 account_id——加上外键会把「今天被容忍、且由读侧 binding_unknown 自愈」的软状态变成一次硬失败（环境登记直接报错）。③ 配套的清理迁移把 account_id 置空会擦掉绑定审计，与 client_environments 既有不变量「删除只改变环境生命周期，绝不擦账号绑定审计」冲突。建议独立 change 按六步模板做：先让 ensureAccount 在握手路径上从「失败即吞」改成「失败即拒绝环境登记并留具名错误」→ 观察一个周期 → 加 NOT VALID 外键 → 独立 contract change 做 VALIDATE。详见 docpatch ⑤ 5.5 -->
@@ -96,6 +97,7 @@
 <!-- BLOCKED: 需要一次性临时库 + 真跑 migrate up + 真启动 cloud，本 session 无 ECS / 真库权限。已登记 docs/real-machine-acceptance-backlog.md 簇 110.6 -->
 - [ ] 5.10 每批部署 dev 并观察后再进下一批；每批在 tasks 里记录 commit sha 与观察结论。
 <!-- BLOCKED: 部署由主控串行做，本 session 明确禁止 push / 部署 / 碰 ECS。六批的代码改动在同一个提交 9c9e72b 里交付（无法逐批部署观察），**部署前必须先按 10.3 的新步骤在 dev 上跑 migrate status/up**——存储不再自建表，带着未应用的迁移重启会让对应能力 fail-closed。已登记 backlog 簇 110.3 / 110.5 -->
+<!-- 批 5 / risk dev observation 2026-07-25：aidcp-cloud f3f6ed9 已从 clean master 推送并部署；备份 /opt/aidcp/cloud.bak.20260725-190910.tar.gz + .env.bak.20260725-190910。部署前后 migrate status：content 20/20、automation 42/42、api 53/53，待应用均 0；enforce 三属主启动门全部通过。现役拓扑仍为 AIDCP_SERVICE 未设的 monolith（多服务源码已具备、unit 未启用），本修复归 segC automation，未来切独立 automation 进程时同样生效。服务 active、NRestarts=0，8787/8090/8091、panel/public health、三库 SELECT 1、Feishu onReady、writer lock、risk outbox/reconciler 均通过；部署文件 hash 与本地一致；automation 累计 deadlocks 保持修复前 3，重启后 deadlock/risk schema error 日志 0。isales-api/isales-scheduler 保持 active。 -->
 - [ ] 5.11 全部批次完成后删除 `AIDCP_SCHEMA_SELF_CREATE` 旋钮与 `test/schema/ddl-parity.test.ts`，并删除 `scripts/run-migration.ts`（保留它等于保留一条无账本旁路）。
 <!-- BLOCKED: 这是过渡期结束后的收尾动作，按 design.md D4「保留一个发布周期后随本 change 的收尾任务删除」。现在删掉旋钮等于取消第四重保险；scripts/run-migration.ts 也要等执行器在真库上跑通（110.1/110.2）之后才能删。已登记 backlog 簇 110.9 -->
 <!-- 2026-07-25 用户裁定：本条第三半「删除 scripts/run-migration.ts」**有意保留、不再执行**。理由=enforce 开启后该旁路的失效模式已从「账本与库静默分叉、零告警」变成「下次启动契约门拒绝启动」，从静默变响亮，留着不再是隐患。记于 docs/cloud-block3-l3-next-session-handoff.md §2「已裁定保持现状」。前两半（删 AIDCP_SCHEMA_SELF_CREATE 旋钮、删 ddl-parity.test.ts）不受此裁定影响，仍待 110.1/110.2。 -->
