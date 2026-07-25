@@ -33,6 +33,11 @@ The Edge SHALL identify the active Reel by the pair `noteId + videoKey`, where t
 - **WHEN** the freshly probed active Reel has a different `noteId` or `videoKey`
 - **THEN** the Edge reports one fresh Reels card batch derived from the moved-to active Reel
 
+#### Scenario: Route identity has no matching permalink-bearing article
+
+- **WHEN** a `/reel/<id>` page has one active video whose bounded container contains only repeated `/reel/hashtag/` navigation links and no `article` or current-Reel permalink
+- **THEN** the Edge binds the canonical route `noteId` to that active-video container, excludes the hashtag routes as post identities, and reports exactly one current Reels card
+
 ### Requirement: Reels no-change terminates honestly
 
 If all bounded Reels navigation methods complete without a provable active identity change, or the Reels route has no unique active video, the Edge SHALL emit one failed scroll action receipt and SHALL NOT emit a normal `page.cards` result. This terminal MUST stop the current decision cycle instead of triggering an unbounded high-rate scroll loop.

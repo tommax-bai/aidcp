@@ -26,3 +26,13 @@
 
 <!-- Edge: 8b48f75 on master and pushed to origin/master. Validation: focused TypeScript 23/23; Rust all-targets 60/60; clippy with -D warnings; Native build and verification; Edge acceptance 30/30 with one explicitly gated real-machine suite skipped; Edge full test 2293/2293; typecheck; git diff --check; OpenSpec strict validation. Delivery remains source-only: no installer packaging, signing, release, installed-client update, or live Facebook-account acceptance. Deviation: cargo/rustfmt were invoked through the installed rustup toolchain because Cargo was not on the shell PATH. -->
 <!-- Control: OpenSpec change 7238693 on main and pushed to origin/main before this completion-ledger update. Edge integration was a clean fast-forward from current origin/master; control was current with origin/main before commit. -->
+
+## 5. Real Reels route-card closure
+
+- [x] 5.1 Record the observed `/reel/<id>` DOM shape where the active video has no permalink-bearing article and only `/reel/hashtag/` navigation anchors.
+- [x] 5.2 Project one route-identified Reel card from the bounded active-video container while excluding non-content Reel routes from post identity.
+- [x] 5.3 Add router regressions for route-only identity, repeated hashtag anchors, and unchanged ambiguous/missing-target behavior.
+- [x] 5.4 Run focused and full Edge validation, repeat the live read-only `reel_cards` probe, then commit, fast-forward integrate, and push without packaging an installer.
+
+<!-- Live DEV diagnosis 2026-07-25: target ads-k1etgm0e was on https://www.facebook.com/reel/1528556722142425 with one active video and one enabled next control. `reel_probe` succeeded, but `reel_cards` returned cards=[]/present_unreportable because the local video container had no current-Reel permalink/article and contained repeated `/reel/hashtag/` navigation anchors. Cloud therefore retained fallback pending and re-navigated to the same first Reel instead of entering ordinary Reels scrolling. -->
+<!-- Closure: aidcp-edge ec0d7c4 was fast-forwarded and pushed to origin/master. Focused TypeScript 25/25, router regression 14/14 after rebase, Rust all-targets 60/60, acceptance 30/30 with one explicit real-machine gate skipped, full Edge 2295/2295, typecheck, Native build/verification, and git diff --check passed. The same live page evaluated with the repaired embedded router returned one ready Reel card bound to https://www.facebook.com/reel/1528556722142425. The canonical development checkout rebuilt its unsigned darwin-arm64 Native binary for the next local automation start; no installer was packaged, signed, or released, and no live navigation write was injected during diagnosis. -->

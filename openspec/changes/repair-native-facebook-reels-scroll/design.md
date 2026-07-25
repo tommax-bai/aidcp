@@ -49,6 +49,12 @@ The active Reel probe selects the single visible video with the largest viewport
 
 Navigation succeeds only when either component changes from the pre-action identity and the active target remains unambiguous. A successful move returns a fresh `page_cards{listKind:'reels'}`. Exhausting all methods returns `action_receipt{action:'scroll', ok:false, reason:'no_target'}` and does not emit `page_cards`.
 
+### Project a route-identified Reel from the active video container
+
+Real `/reel/<id>` pages can expose the canonical Reel identity only in `location.href`; the active video's bounded container may contain several `/reel/hashtag/` links but no link back to the current Reel and no `article` role. The route identity remains authoritative in this shape. The router SHALL pair it with the nearest bounded active-video container when projecting the current Reel card, instead of requiring a permalink-bearing article.
+
+`/reel/hashtag/` and other non-content navigation routes MUST NOT be parsed as Reel post identities. Multiple hashtag anchors therefore neither make the current Reel ambiguous nor replace the numeric route identity. The projected card may have partial text/author facts, but it MUST retain the exact canonical `noteId + videoKey`; Cloud can then confirm the Reels surface and issue an ordinary paced scroll rather than repeatedly re-entering the fallback route.
+
 ### Keep Feed behavior separate
 
 Non-Reels `page_scroll` continues through the existing Feed router. The Reels probe's `not_reel` result is the only condition that selects that path; missing or ambiguous active video on a Reels route fails honestly instead of falling back to document scroll.
@@ -59,6 +65,7 @@ Non-Reels `page_scroll` continues through the existing Feed router. The Reels pr
 - [A delayed transition happens between fallback probes] → Re-probe immediately before each write and accept the late movement without issuing another input.
 - [Dwell wait delays shutdown or task takeover] → Make the wait abortable and part of the session's existing active-command boundary.
 - [A video element is reused without a URL change] → Include a page-local video element identity in `videoKey`; require the pair rather than route alone.
+- [A Reel container has no self-permalink] → Bind the canonical route identity to the nearest active-video container; reject `/reel/hashtag/` as content identity and test this exact DOM shape.
 - [Normal Feed regresses] → Keep its router branch unchanged and add a contract regression proving it still uses the existing document scroll path.
 
 ## Migration Plan
