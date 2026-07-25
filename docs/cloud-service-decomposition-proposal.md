@@ -297,9 +297,21 @@ Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或
 
 | 段 | 归属 | 文件 / 行 | 文件清单 |
 | --- | --- | --- | --- |
-| 生成候选 | `aidcp-content` | 54 / 10723 | `publish-orchestrator.ts`、`pipeline-context.ts`、`prompts.ts`、`prompts-preview.ts`、`types.ts`、`roles/` 下除 `publish-executor.ts`、`approval-gatekeeper.ts` 外全部，以及 `visual-reference-*.ts`、`visual-fidelity-auditor.ts`、`text-card-*.ts`、`cover-form-sensor.ts`、`post-image-form-profile.ts`、`content-visual-brief.ts`、`reference-image-guidance.ts`、`image-provider*.ts`、`wanxiang-client.ts`、`seedream-client.ts`、`post-processor.ts`、`title-clamp.ts`、`json-repair.ts`、`curated-gate.ts`、`facebook-publish-media-store.ts`、`retry-strategy.ts` |
+| 生成候选 | `aidcp-content` | 55 / 10723+ | `publish-orchestrator.ts`、`pipeline-context.ts`、`prompts.ts`、`prompts-preview.ts`、`types.ts`、`roles/` 下除 `publish-executor.ts` 外全部（**含 `approval-gatekeeper.ts`，2026-07-25 修正**），以及 `visual-reference-*.ts`、`visual-fidelity-auditor.ts`、`text-card-*.ts`、`cover-form-sensor.ts`、`post-image-form-profile.ts`、`content-visual-brief.ts`、`reference-image-guidance.ts`、`image-provider*.ts`、`wanxiang-client.ts`、`seedream-client.ts`、`post-processor.ts`、`title-clamp.ts`、`json-repair.ts`、`curated-gate.ts`、`facebook-publish-media-store.ts`、`retry-strategy.ts` |
 | 下发执行 | `aidcp-automation` | 6 / 2308 | `publish-dispatcher.ts`、`command-sequencer.ts`、`platform-profile.ts`、`fill-budget.ts`、`scheduled-publish-reconciler.ts`、`roles/publish-executor.ts` |
-| 台账与审批 | `aidcp-api` | 7 / 2100 | `publish-log-store.ts`、`publish-pipeline-log-store.ts`、`publish-scheduler.ts`、`client-publish-approval.ts`、`draft-image-remove.ts`、`schedule-policy.ts`、`roles/approval-gatekeeper.ts` |
+| 台账与审批 | `aidcp-api` | 6 / 2100- | `publish-log-store.ts`、`publish-pipeline-log-store.ts`、`publish-scheduler.ts`、`client-publish-approval.ts`、`draft-image-remove.ts`、`schedule-policy.ts` |
+
+> **2026-07-25 修正：`roles/approval-gatekeeper.ts` 从「台账与审批」移入「生成候选」。**
+> 依据是**本节自己写的机械判据**——「引 `../llm/` 或图片供应商客户端即为生成段，直接写 `publish_log`
+> 或授权记录即为台账与审批段」。实测该文件：引 `../../llm/qwen.js`（注入 `ChatLlmClient` 调模型）✓生成段特征；
+> 引 `../comm/` 零命中；`publish_log` / 授权记录 / INSERT / UPDATE **全部零命中**——它不写任何台账。
+> 它继承生成段的 `BasePublishRole`、用生成段的 prompt 构造与重试兜底，是该目录 31 个角色里唯一被判 api 的一个。
+>
+> **误判的根源**：本节把两个不同的「审批」混成了一个——「运营审批台账」（谁批的、批了什么，确属 api）
+> 与「生成管线里的审批闸角色」（用模型判这稿能不能进候审，属生成段）。
+>
+> **反证是硬的**：若坚持留 api，就得把基类 / 管线上下文 / prompt 构造 / 重试策略 / 模型客户端接口五样
+> 一起抬进 kernel，而这五样**全部撞 kernel 准入门**——机械上无解。
 
 对应的硬要求：
 
@@ -390,17 +402,41 @@ Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或
 
 #### 4.6.8 限频配置的归属修正（`src/config/` 不整体归 api）
 
-`src/config/` 共 30 文件 6108 行，其中 **5 个文件 1039 行 MUST 归 `aidcp-automation`**，其余 25 文件 5069 行归 `aidcp-api`：
+`src/config/` 共 30 文件，其中 **8 个文件 MUST 归 `aidcp-automation`**，其余 22 文件归 `aidcp-api`：
 
-| 文件 | 行 | 承载的表 |
-| --- | ---: | --- |
-| `quota-config-store.ts` | 233 | `quota_config` |
-| `pacing-config-store.ts` | 180 | `pacing_floor_config` |
-| `pacing-config-facade.ts` | 70 | （门面，无独立表） |
-| `session-config-store.ts` | 297 | `session_config_global` |
-| `resume-config-store.ts` | 259 | `resume_config_global` |
+| 文件 | 承载的表 |
+| --- | --- |
+| `quota-config-store.ts` | `quota_config` |
+| `pacing-config-store.ts` | `pacing_floor_config` |
+| `session-config-store.ts` | `session_config_global` |
+| `resume-config-store.ts` | `resume_config_global` |
+| `quota-config-facade.ts` | （门面，无独立表） |
+| `pacing-config-facade.ts` | （门面，无独立表） |
+| `session-config-facade.ts` | （门面，无独立表） |
+| `resume-config-facade.ts` | （门面，无独立表） |
 
-判定依据是既成事实而非偏好，改归属零代码成本。**完整论证（消费点、依赖方向、收益）与连带要求是唯一规范位置，见 §11.4 要求一，本处 MUST NOT 复述。**
+判定依据是既成事实而非偏好，改归属零代码成本。
+
+> **2026-07-25 补齐四个门面中漏列的三个**（`quota` / `session` / `resume`）。这不是新裁决，是**转写遗漏**：
+> §11.4 要求一已经把这四张表的**写入权**判给 `aidcp-automation`，而这三个门面的文件头逐字写着
+> 「本外观即该表后台编辑的**唯一窄内部写口**，归 aidcp-automation（依据定稿方案 §5.1 / §4.6.8）」——
+> 它们援引的正是本节，本节的文件表却只列了 `pacing-config-facade.ts`（四个门面里最早存在的那个）。
+> 归属表按本节生成，于是三个门面被标成 `api`，形成「api 侧文件持有 automation 表的唯一写口」这一
+> 与 §11.4「`aidcp-api` MUST NOT 直写这四张表」直接冲突的状态。
+>
+> **翻转的代价必须一并记账**：三个门面对 `src/panel/types.ts`（api）的 type-only import 会各变成一条
+> `automation → api` 反向边（与 `pacing-config-facade.ts` 今天的形态一样）。这**不是把窟窿挪个位置**——
+> 翻转把「api 进程直写 automation 的表」这一**铁律级硬违背**降级成「automation 侧 type-only 引一个接口」
+> 这一可由把 `Panel*Config` 四个接口提进 kernel 消除的**软边**。该消除记在耦合处置清单的 P2-1，
+> 见 `docs/cloud-cross-service-coupling-resolution.md`。
+>
+> **归属表的翻转已延后到 P2 那一批落，本节判定不变**（2026-07-25）。理由是**棘轮当场逼出来的**：
+> 豁免清单只许下降、不许静默追加，翻转带来的 3 条新边会被拒绝，只能走「问责冻结」通道占用额度。
+> 而**今天是单进程，这条违背没有活体形态** —— 它只在 `aidcp-api` 真正独立成进程时才成立。
+> 既然如此，把翻转推到 P2-1 那一批（届时四个 `Panel*Config` 接口进 kernel、3 条新边同批归零）
+> 比现在先欠 3 条问责额度更干净。**本节的判定是对的，只是落到归属表的时机换了。**
+>
+> **完整论证（消费点、依赖方向、收益）与连带要求是唯一规范位置，见 §11.4 要求一，本处 MUST NOT 复述。**
 
 ### 4.7 归属总表（`src/` 全量文件覆盖）
 
@@ -444,6 +480,11 @@ Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或
 - `src/risk/` 19 → **24**（新增写者锁 / 归属 / 记账 / outbox / 对账 5 个文件，automation）；
 - `src/publish-agent/` 67 → **73**（§4.6.3 计数相应为 **11 api / 56 content / 6 automation**）；
 - `src/config/` 30 → **34**（§4.6.8 计数相应为 **29 api / 5 automation**）；
+
+> **2026-07-25 两处归属修正后的实测计数**（子仓 `boundaries/module-ownership.json` 现值，随文件增长已超出上面这份快照）：
+> `src/publish-agent/` 共 71 → **10 api / 55 content / 6 automation**（审批闸角色由 api 移入 content，见 §4.6.3 修正注）；
+> `src/config/` 共 36 → **27 api / 9 automation**（三个限频配置门面由 api 移入 automation，见 §4.6.8 补齐注）。
+> 上面两行与 §4.7 主表的对应格是**修正前**的旧快照，按本节口径纪律留待整表重算时并入，此处不逐格改写。
 - **新增目录** `src/schema/`（**12 文件**，automation，见下方待裁决）与 `src/db/`（**1 文件** `environment-row-lock.ts` 56 行，api）；
 - `src/` 根文件 +1（`config-mirror-freshness.ts` 95 行，api）。
 
