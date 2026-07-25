@@ -1,9 +1,12 @@
 # Edge 仓拆分 · 下一 session 交接（可直接执行）
 
-> 生成于 2026-07-25。**给接手 session 用**：从头读到尾，按本文执行。
+> 生成于 2026-07-25，**同日第二轮更新**（提案七处已改完 + 主进程归属已盘完）。
+> **给接手 session 用**：从头读到尾，按本文执行。
 > 对象 = openspec change `split-classic-client-edge-host`（把 `aidcp-edge` 拆成 `aidcp-classic-client` +
-> `aidcp-edge-host`）。本文 = 一次完整评审 + 四项落地调查 + 用户六轮拍板之后的执行版。
-> **本文里凡是写「已核实」的，都是对着代码/命令实跑出来的，可以当事实用；凡是写「待定」的，必须先问用户。**
+> `aidcp-edge-host`）。
+> **本文里凡是写「已核实」的，都是对着代码/命令实跑出来的；凡是写「待定」的，必须先问用户。**
+> ⚠️ **但第一轮里九条标着「已核实」的事实，第二轮执行时实测是错的或已过期——见 §2.5。
+> 这不是打脸，是给接手者的告诫：「已核实」只代表写下那一刻，fleet 活跃，一律自己复核。**
 
 ---
 
@@ -15,19 +18,26 @@ ls -d ../aidcp-edge ../aidcp-cloud ../aidcp-console            # 缺了就停手
 openspec list | head -5
 ```
 
-生成时的指针（fleet 活跃，接手时务必自己复核）：
+**当前进度一句话**：提案七处缺陷已改完并推送；主进程归属台账已盘完（0.C.2/0.C.3/0.C.5 完成）；
+**下一步是 0.C.0「让引擎发结构化事实」，但真正动 `main.cjs` 之前卡在一个未决的冻结窗口上**（§7.1）。
+
+第二轮结束时的指针（fleet 活跃，接手时务必自己复核）：
 
 | 位置 | 值 |
 | --- | --- |
-| 控制仓 `main` | `234562d` |
-| 提案所在 worktree | `../aidcp.wt/split-classic-client-edge-host`，分支 `codex/split-classic-client-edge-host`，HEAD `06a3311` |
-| **提案尚未合入 main** | change 目录只存在于那个 worktree 里，`openspec list` 在主 checkout 上看不到它 |
-| edge `origin/master` | `cf10b0c` |
-| edge worktree 数 | 36 |
-| 活跃 change 数 | 120 |
+| 控制仓 `main` | `275f78d`（第一轮写的是 `234562d`，已推进） |
+| 提案所在 worktree | `../aidcp.wt/split-classic-client-edge-host`，分支 `codex/split-classic-client-edge-host`，HEAD `fff7f1a` |
+| **提案仍未合入 main** | change 目录只存在于那个 worktree 里，`openspec list` 在主 checkout 上看不到它 |
+| edge `origin/master` | `cf10b0c`（两轮之间未动） |
+| edge worktree 数 | 36（其中 35 个 linked，全部工作区干净） |
+| 活跃 change 数 | 121 |
 
-提案文件（7 份，全在那个 worktree 的 `openspec/changes/split-classic-client-edge-host/`）：
-`proposal.md` / `design.md` / `tasks.md`（60 条，0 完成）/ `specs/` 下 4 份增量。
+提案文件（**8 份**，全在那个 worktree 的 `openspec/changes/split-classic-client-edge-host/`）：
+`proposal.md` / `design.md` / `tasks.md`（**88 条，3 完成**）/ `specs/` 下 **5 份**增量
+（新增 `canonical-default-branch-guard/`，见 §3 B3）。
+
+**另一份必读产出**（在主 checkout 上，已合入 main）：`docs/edge-split-ownership-inventory.md` ——
+82 条通道 + 5 条传输 + 230 个行段的归属台账，`main.cjs` 动刀前的作业依据。
 
 ---
 
@@ -92,6 +102,48 @@ openspec list | head -5
    声称对它有增量，但它的 `specs/` 下根本没有这份 delta；真正持有该 delta 的是
    `native-page-engine-production-cutover`。两个都归档的话，ads-runtime 那条打包需求会**静默地
    永远到不了主 spec**。与拆仓无关，但该单独修。
+
+---
+
+## 2.6 主进程归属已盘完（第二轮，控制仓 `275f78d` + 分支 `fff7f1a`）
+
+产出 `docs/edge-split-ownership-inventory.md`（540 行）。tasks **0.C.2 / 0.C.3 / 0.C.5 已勾**。
+
+**覆盖度（可当事实用，因为是独立复核过的）**：82 条运行时通道全部有主，零重复、零归属冲突；
+230 个行段块覆盖 1–7396 行**无空洞**。复核链路**自己重新从源码抽了一遍**通道清单（不是复用盘点结果），
+得到同样的 82，并与渲染层预加载暴露的 82 个调用名**一一对应**——既无「渲染层调得到但主进程没实现」，
+也无「主进程实现了但没人调」。
+
+**两条改变计划的结论**：
+
+1. **须切开的是 30 条，不是 10 条。** 多出来的 20 条是那批「直连云端 HTTPS」的产品通道。它们的
+   HTTP 调用确实归产品侧，但**每一条都要先把环境 id 翻译成环境键，而那张表在引擎侧**。更要命的是
+   那个解析函数在 id 认不出时**回落到「当前选中环境」**——所以 Classic 拿不到正确解析器时**不会报错**，
+   而是把发布草稿编辑、发布队列取消这类**写操作静默打到另一个账号上**。
+   ⇒ Classic 必须有自己的解析器，数据源是产品侧名册，不是引擎侧运行时注册表。
+2. **0.C 自己有前置，顺序必须调（新增 0.C.0）。** 今天外壳**不是收到**引擎事实，而是**从引擎日志文本里
+   正则猜**出来的：一张 22 条规则的表产生活动流，子串匹配产生状态徽标。后果三条——云边协议的
+   **23 个命令名活在产品界面展示层里**（协议改名会随机弄坏 UI，而 CLAUDE.md §2 的协议同步铁律
+   覆盖不到那个位置）；原始核心日志行**逐字**进产品界面；每次向执行侧写浏览器控制指令都以
+   「日志里见没见过某一句话」为闸门。**这层不换掉，状态类通道哪边都拿不干净。**
+   而且那个解析器**自己的文件头就写着**：它的测试只测自己、从不执行发出端 ⇒ 核心改一句日志措辞，
+   **测试照样全绿而活动条目静默消失**。
+
+**第二轮又推翻的三条「实测事实」**（第一轮喂下去的前提，逐条订正）：
+
+| 原说法 | 实测 |
+| --- | --- |
+| 只有两条非生命周期通道能命令运行中的执行侧 | **至少四条**。改环境昵称、人设落库都经「更新状态」那个函数连锁写到执行侧标准输入。**真正的接缝是那个函数的扇出，不是通道清单**——任何未来调用它的产品侧通道都自动继承这条路径。按通道清单画边界必然漏 |
+| 删除环境走云端 HTTPS、完全绕过执行侧 | **两处都错**。用的不是那条云端封装函数；且只有视频号走云端，其余平台终局直接调指纹浏览器本机删除，删前还触发注册表 reconcile（会停执行侧、释放槽位）。整块判产品侧 ⇒ 删一个正在跑的环境会「云端撤销 + 名册移除成功，但它的执行侧还活着、还占着槽位」 |
+| 人设落库到不了执行侧 | 错，见上 |
+
+**还有四条推送通道原先完全无主**（状态更新 / 活动流 / 名册更新 / 批量代理进度）。只路由那 82 条
+请求-应答通道，界面会**没有状态、没有名册、没有活动流、没有进度**。已补 0.C.0b。
+
+**七处双方共读写的模块级状态**见 inventory §5。其中两条**两个方向都是坏的**，必须显式设计而不是二选一：
+- **退出中标志**：归 Host 则产品侧关窗永远收不到、**应用永远退不掉**；归 Classic 则退出时每个核心的
+  退出都判为异常、**收尾过程中反复重启核心**并弹「已停止运行」。
+- **环境注册表**：见上面第 1 条。
 
 ---
 
@@ -198,6 +250,11 @@ active 直连分支**，不是只加固孤儿收养）、跨进程限频闸（�
 
 ## 5. 冻结清单（按文件冻，不是按仓冻）
 
+> ⚠️ **本节的表格已被第二轮实测超越，别单独读它。** 实际触及冻结集的是 **35 个 linked worktree 里的
+> 10 个**，不是表里那三个 change；且 `browser-slot-scheduling` 的 edge 分支**已全量并入 master**
+> （ahead=0，worktree 是孤儿），§4.2 说的「不能并行」约束**实际已解除**。权威判据见 §2.5 表与
+> change 的 design.md Phase 0：**用 git 反查，不要在 change 文档里搜文件名**。
+
 全组停工不可行也没必要（120 个活跃 change、36 个 edge worktree）。**只冻这 5 个位置**：
 
 1. `src/electron/main.cjs`
@@ -247,13 +304,20 @@ active 直连分支**，不是只加固孤儿收养）、跨进程限频闸（�
 
 ---
 
-## 7. 仍需用户拍板（不要自己替他定）
+## 7. 仍需用户拍板
 
-1. **冻结窗口开在什么时候、谁负责**（用户已同意冻结，日期与负责人未定）。
-2. **Windows 那个坏包**：先撤下载入口，还是等新包替换？
-3. **Windows 要不要买代码签名证书**？不买就接受「未知发布者」提示并在下载页写明放行步骤。
-4. **`wechat-customer-api-contract` / `wechat-edge-runtime-honesty` 关闭时留下的两个现网缺陷**
-   （客户改稿保存 100% 失败；视频号「明知没关掉却上报已关闭」）——还修不修？要修需另起 change。
+1. **⚠️ 唯一仍未决、且正在挡路的：冻结窗口开在什么时候、谁负责。**（用户已同意冻结原则，日期与
+   负责人未定。）**它挡的是 0.C.1「切文件」这一步**——`main.cjs` 是冻结集里最热的文件：35 个 edge
+   linked worktree 里**有 8 个带着未合并提交压在它上面**，master 在 2026-07-24 还被一个无关改动
+   （小红书面板）碰过。CLAUDE.md §7 明写热点文件单写者。
+   **注意 0.C.0（让引擎发结构化事实）主要动的是核心侧发出端与解析层，不是 `main.cjs` 本体，
+   可以先开工**；真正要改 `main.cjs` 结构时再需要这个窗口。
+2. ~~Windows 那个坏包先撤入口还是等新包替换~~ —— **已定（2026-07-25）：等新包替换，不撤入口。**
+   已接受的风险写进 tasks 0.A.3：替换落地之前新装 Windows 的客户大概率起不了核心。
+3. ~~Windows 要不要买代码签名证书~~ —— **已定（2026-07-25）：暂缓**，先把 0.A 自包含出包打通、
+   真出一次包，再按实际安装体验决定。当前 Windows 包本来就配置为不签名。
+4. ~~两个 wechat 现网缺陷还修不修~~ —— **已定（2026-07-25）：都先不修，留 backlog。**
+   决定与三条别被误读的说明已写进 `docs/real-machine-acceptance-backlog.md` 顶部第 24–41 行那段。
 
 ---
 
@@ -265,9 +329,12 @@ cd ../aidcp.wt/split-classic-client-edge-host
 openspec list && openspec validate split-classic-client-edge-host --strict
 
 # 改提案：就在那个 worktree 的 openspec/changes/split-classic-client-edge-host/ 下改，改完提交推分支
-# 归档演练（每次改完 spec 增量都要跑）
+# 归档演练（每次改完 spec 增量都要跑；change 目录不在主 checkout，必须显式拷进去）
 S=/private/tmp/claude-501/.../scratchpad/probe; rm -rf $S; mkdir -p $S
-cp -R openspec $S/openspec; cd $S && openspec archive <change> --yes
+cp -R openspec $S/openspec
+cp -R ../aidcp.wt/split-classic-client-edge-host/openspec/changes/split-classic-client-edge-host $S/openspec/changes/
+cd $S && openspec archive split-classic-client-edge-host --yes 2>&1 | grep -E "failed for header|Aborted|Totals|archived as"
+# ⚠️ 读输出，别看退出码——中止时它照样返回 0（§6 坑 1）
 
 # 子仓验证四连（改 edge 代码时）
 cd ../aidcp-edge && npm run test:acceptance && npm test && npm run typecheck
@@ -278,3 +345,24 @@ scripts/deploy-target dev --check
 
 **默认授权**（CLAUDE.md §6，不必逐次问）：提交、推送、部署 dev。
 **必须先问**：force-push、非 fast-forward、`ol` 部署、打桌面安装包。
+
+---
+
+## 9. 下一步（接手直接从这里开始）
+
+**做 0.C.0：让引擎发结构化事实。** 依据是 `docs/edge-split-ownership-inventory.md` §1 与 §4。
+这一步**不需要等冻结窗口**——它动的是核心侧的事件发出端与外壳的解析层，不是 `main.cjs` 的结构。
+
+顺序建议：
+
+1. 先把 inventory §4 那份「由传输推导出的 Host 公开面」当作目标形状（它已经取代 design.md §3 里
+   那份 9 个动词的草稿）。
+2. 从**活动流**下手而不是状态徽标：活动流的结构化通道**已经存在**（有一条结构化事件行的旁路，
+   Facebook 已经在独占使用它），把其余平台迁过去即可，那张 22 条正则表随后整表删掉。
+   **正则回退表绝不能带进 Classic**。
+3. 再做状态徽标：把子串推断换成引擎侧的 typed 状态文档（快照 + 增量）。这一步会顺带解决
+   「浏览器控制就绪」靠 grep 日志当闸门的问题。
+4. 全程守住一条：**拆后标准输出必须降级为纯诊断**，任何产品行为都不得再依赖解析它——
+   这条要有测试，写进 0.C.6 准入判据了。
+
+**动 `main.cjs` 结构之前先回来问冻结窗口（§7.1）。**
