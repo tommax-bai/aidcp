@@ -151,3 +151,115 @@ Task Runtime MAY use an in-process EventBus for high-frequency per-card browse-l
 #### Scenario: Approval crosses a service boundary
 - **WHEN** API records an approval decision
 - **THEN** authorization SHALL reach Task Runtime through a durable contract rather than an in-process event or shared local file
+
+### Requirement: Observations MUST be honest about context, absence, and convergence
+
+Capability outputs SHALL distinguish `not_observed` (the observation itself failed: locator miss, extractor gap, unreachable surface, unverified context) from `observed_absent` (the platform genuinely has no such content or the action legitimately had no effect). Downstream nodes, counts, and assessments MUST NOT treat `not_observed` as an observed negative, and sustained `not_observed` on a published capability MUST be observable as capability degradation rather than as ordinary content outcomes. A read/observe capability MUST declare and verify its context preconditions — that the executor is on the intended surface, and that any requested sort/filter actually took effect — at the moment results are harvested; unverified context MUST produce an honest failure instead of results. Reported platform facts MUST be observed values only: a field the platform did not expose MUST be reported absent and MUST NOT be substituted, derived, or inferred from another field. Where a node's goal is expressed as an external target state, convergence SHALL be judged by re-observing that state; declared loop bounds are backstops and MUST NOT be used as the completion condition.
+
+#### Scenario: Extractor stops matching after a platform layout change
+- **WHEN** the body-text extractor returns nothing because its selectors no longer match
+- **THEN** the result SHALL be `not_observed` and MUST NOT be recorded as "the content has no body", and the repeated occurrence SHALL surface as capability degradation
+
+#### Scenario: Search navigation is unverified
+- **WHEN** a search step cannot prove it reached the results surface for this search term
+- **THEN** it MUST fail honestly and MUST NOT report the currently displayed cards as its results
+
+#### Scenario: Sweep target is expressed as a platform state
+- **WHEN** a node's goal is "no unread items remain"
+- **THEN** it SHALL re-read the unread state after each pass and continue while any remain, stopping at its bound with a recorded reason rather than declaring completion after a fixed number of passes
+
+### Requirement: Nested deadlines MUST be monotonic and cancellation MUST propagate
+
+Nested execution deadlines MUST be monotonic: an outer wait budget SHALL be greater than or equal to the sum of the inner budgets it wraps on the critical path plus round-trip margin, and an inner executor's total bounded window SHALL be strictly less than the caller's wait budget, so the executor's honest terminal reason arrives before the orchestrator gives up. Any admission or acceptance timeout SHALL likewise exceed the counterparty's declared bounded completion deadline plus margin and SHALL cover only total silence, never conditions that have their own immediate negative receipt. When an outer layer stops waiting it MUST propagate cancellation into the inner call rather than abandoning an in-flight request. Each such deadline SHALL have exactly one source of truth, and injection sites MUST NOT hard-code a fallback that differs from the declared default. A dedicated wait budget MUST NOT be shared with probes that run inside per-round retry loops, and enlarging an executor window MUST trigger re-reckoning of every enclosing deadline.
+
+#### Scenario: Executor window exceeds the orchestrator deadline
+- **WHEN** a comment submit capability's humanized typing plus post-submit confirmation window is longer than the StepRun's wait budget
+- **THEN** the configuration MUST be rejected as contract-invalid, because cutting the executor short converts a knowable outcome into `submitted_unknown`
+
+#### Scenario: Outer layer gives up
+- **WHEN** a node's wall-clock bound expires while a model or child job call is in flight
+- **THEN** cancellation SHALL be propagated to that call and MUST NOT leave it running to its own default timeout
+
+### Requirement: Preparatory steps MUST be classified and verified before irreversible dispatch
+
+Every preparatory StepRun that precedes an irreversible dispatch MUST declare a post-condition verified from observed state — a necessary signal alone MUST NOT be accepted as sufficient — and MUST be classified as `required` or `best_effort`. Failure of any `required` step SHALL abort the sequence before the irreversible step, and the failure context MUST enumerate every `best_effort` step that was skipped. A verification whose evidence would be destroyed by the irreversible step itself MUST be performed before that step rather than after.
+
+#### Scenario: Media attachment cannot be verified
+- **WHEN** the file-input control reports a populated value that is not corroborated by observed editor state
+- **THEN** the step MUST NOT be treated as satisfied, and the sequence MUST abort before submission rather than submit a degraded result
+
+#### Scenario: A best-effort step is skipped
+- **WHEN** an optional metadata step fails and the sequence continues
+- **THEN** the eventual outcome context MUST list that step as skipped so a partially degraded result is never indistinguishable from a complete one
+
+### Requirement: Waits MUST be bounded, honest, and separately accounted
+
+A TaskRun/StepRun SHALL account for named waits separately from its working-time budget: time spent in a declared wait MUST NOT consume the work budget, and MUST remain subject to an independent stall/liveness bound that a wait MUST NOT suspend. A wait SHALL terminate immediately with its true reason as soon as its precondition is known to be unsatisfiable (executor gone, target destroyed, referenced job failed) and MUST NOT continue until its deadline; a timeout or budget-exhaustion outcome MUST NOT be reported when a more specific terminal cause was already known. A budget or deadline that expires while execution is inside a declared non-interruptible unit SHALL be deferred to that unit's next safe point rather than terminating it mid-way. Stall handling SHALL distinguish a recovery nudge that does not end the run from a give-up that reclaims it.
+
+#### Scenario: Executor disappears during a wait
+- **WHEN** the connection or resource a wait depends on is known to be gone
+- **THEN** the wait MUST end at once with that cause rather than run to its deadline and be reported as a timeout
+
+#### Scenario: Deadline lands inside a non-interruptible unit
+- **WHEN** a wall-clock bound expires while an inspection excursion is mid-way
+- **THEN** termination SHALL be deferred to that unit's next safe point instead of severing it
+
+### Requirement: Resumed runs MUST be re-driven
+
+When a TaskRun resumes from a wait or is reactivated, Task Runtime SHALL re-issue the command needed to drive the executor loop rather than only marking the run active. A run in `running` status MUST be backed by either an in-flight dispatched command or a named wait; a run that is neither MUST be detected and surfaced as a stall rather than presented as progressing. Liveness of a driven loop MUST NOT depend on the executor spontaneously re-reporting.
+
+#### Scenario: Run resumes after Edge handshake
+- **WHEN** a `waiting_for_edge` TaskRun is admitted again after a new authoritative handshake
+- **THEN** Task Runtime SHALL re-issue the driving command, and MUST NOT set the run to `running` with nothing in flight
+
+### Requirement: Terminal state MUST be exactly once and MUST NOT be reopened by late work
+
+Terminal transition handling for a TaskRun, StepRun, or ManagedCycle SHALL be idempotent and its side effects SHALL execute exactly once per terminal event; a repeated invocation for the same terminal MUST NOT cancel, revoke, or supersede follow-on work already scheduled by the first invocation. Once a run reaches a terminal outcome, late results from work that was still in flight MUST be discarded at every persistence and outbound-delivery point and MUST NOT create a second outcome, durable artifact, or notification for the same trigger. After any executor interruption (connection loss, control-plane recovery, process restart), an in-flight capability invocation SHALL be discarded and reported honestly as failed — including for capabilities whose side-effect class is `none` or `reversible` — and resumption MUST re-observe current platform state rather than replay the interrupted invocation or reuse coordinates, handles, or snapshots captured before the interruption.
+
+#### Scenario: Terminal handler runs twice
+- **WHEN** a cycle's terminal handler is invoked a second time for the same terminal event
+- **THEN** it MUST NOT cancel the next cycle already armed by the first invocation
+
+#### Scenario: Timed-out generation returns late
+- **WHEN** a generation round already reported as failed returns a result afterwards
+- **THEN** that result MUST be discarded before persistence and before any approval card is emitted
+
+### Requirement: Task scope MUST bound targets as well as capabilities
+
+A Task SHALL carry an explicit target scope (which containers, surfaces, or relationship sets its actions may touch) alongside its CapabilityScope, and admission MUST reject any target outside it. When the eligible target set is empty, the TaskRun MUST terminate with an honest no-target outcome and MUST NOT widen its scope, surface, or search space to obtain one. Once a TaskRun has committed to a concrete target, a failure at any later node MUST terminate that run honestly against that target: it MUST NOT re-select or substitute another target within the same run, and a completion count MUST NOT be satisfied by a target other than the one committed to. A denied capability MUST be expressible as a runtime skip that still executes the preceding selection, composition, and validation nodes and produces auditable output without recording cooldown, risk, de-duplication, or success, in addition to being expressible as compile-time removal.
+
+#### Scenario: No qualified target exists
+- **WHEN** a comment Task finds no candidate meeting its relevance and target-scope constraints
+- **THEN** it SHALL report zero with a no-qualified-target reason and MUST NOT broaden its search space or relax its constraints to produce one
+
+#### Scenario: Approval is rejected after target commitment
+- **WHEN** a human rejects the drafted comment for the committed target
+- **THEN** the run SHALL terminate honestly and MUST NOT select a different target to satisfy the same count
+
+#### Scenario: Rehearsal before enabling an unattended write
+- **WHEN** a Task denies the submit capability for rehearsal
+- **THEN** it SHALL still run target selection, composition, and validators and emit auditable output, while recording no cooldown, risk, de-duplication, or success fact
+
+### Requirement: Content production outcomes MUST be evidenced and MUST NOT be substituted
+
+When a required content component of an external write cannot be produced or is rejected (composition abstained, empty, over-length, plagiarised, or a mandatory payload such as a contact block is unavailable), the StepRun MUST terminate with an honest skip. It MUST NOT substitute template, placeholder, previously used, or auto-corrected text, and MUST NOT dispatch a degraded variant whose business meaning differs from the authorized action. A non-platform production goal SHALL count a unit as produced only when its artifact is durably persisted and readable back.
+
+#### Scenario: Composition abstains for a mandatory comment
+- **WHEN** a rule marks a comment mandatory and composition abstains or fails validation within its bounds
+- **THEN** the run MUST skip honestly and MUST NOT satisfy the mandatory rule with template text
+
+#### Scenario: Model returned text but nothing was persisted
+- **WHEN** a Task asked for three candidates and the model returned text for all three but none was durably stored
+- **THEN** the produced count SHALL be zero
+
+### Requirement: Execution timing MUST have declared floors, spread, and monotone slowing
+
+Capability execution timing SHALL declare a non-zero lower bound as well as an upper bound. Configuration MAY only slow execution and MUST NOT reduce any interval below its built-in floor, enforced both at the authoritative read path and at the executor. Sampled intervals SHALL be distributed rather than pinned at the floor. Pacing factors derived from risk state or quota tier SHALL be monotonically slowing — a more permissive tier MUST NOT speed execution up — and a tier change SHALL propagate to in-flight work, not only at the next dispatch. A missing timing parameter MUST fall back to a non-zero default and MUST NOT fall back to zero. Any probabilistic or randomized branching SHALL be a bounded declared parameter of the compiled ExecutionPlan with an injectable random source and its draw recorded in the Decision Trace; a model or Agent output MUST NOT be relied on to produce randomness or frequency.
+
+#### Scenario: Pacing parameters are absent
+- **WHEN** a dispatched command carries no think/dwell values
+- **THEN** the executor SHALL apply non-zero defaults and MUST NOT leave a content page with zero delay
+
+#### Scenario: Risk tier changes mid-run
+- **WHEN** an account moves to a more restricted tier while a TaskRun is executing
+- **THEN** the slower pacing SHALL apply to the remainder of that run rather than only to subsequently created work

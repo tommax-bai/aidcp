@@ -947,6 +947,111 @@ Host event 只能触发 refetch 或推进，不能直接把业务卡片改成“
 | 取消发生在 dispatch 后 | `cancel_requested` 并继续归并 | 覆盖真实平台结果 |
 | Task/ManagedPlan 新 revision 到达 | 未派发可 supersede；已派发独立归并 | 原地改写旧 ExecutionPlan 或旧意图 |
 
+### 24. 与已上线规格的关系
+
+本设计不是在空地上建模：它在运行模型层覆盖了 `openspec/specs/` 中约 60 份已上线能力的一部分。用户已裁定**重叠处以本方案为准**。因此本节的作用不是论证该不该重叠，而是把边界写死，让接手人**不读原始规格也知道**：哪一部分不再由旧规格说了算、哪一部分仍然是它说了算、以及哪几处两边要求的行为正好相反。
+
+三条使用规则：
+
+- **处置口径**。`取代` = 旧要求的语义被本方案同等或更强地表达，cutover 后旧要求应在其 delta 中删除或改写；`收编` = 方向被覆盖但旧要求含更具体的判据、终态区分或红线，必须先把这些补成本方案的新要求（见 tasks §1.11）再取代；`保留` = 与本方案无关，本变更不碰。
+- **时机口径**。表中「delta 时机」对应 Migration Plan 的 Phase：Phase 2 = Edge Gateway 与能力合同、Phase 3 = Account Work Arbiter、Phase 4 = 只读研究纵切、Phase 5 = 创作/发布/评论/回复纵切、Phase 6 = Managed Cycle 与全托管投影。**delta 未落地前，旧要求仍是该行为的权威**。
+- **冲突口径**。冲突表中的每一条都是「同一情形、两边要求相反行为」。未裁决即视为该纵切的发布阻塞项，不得靠「新方案更权威」一句带过。
+
+#### 24.1 处置映射表
+
+| 已上线能力 | 涉及/总要求 | 处置 | 本方案承接条款 | delta 时机 |
+| --- | --- | --- | --- | --- |
+| `user-delegated-tasks` | 19/20 | 取代（含 1 冲突） | plans:15,55；task-runtime:67,115,131；arbitration:3,19；ledger:3,43,59 | Phase 5 |
+| `session-auto-resume` | 6/7 | 取代 + 收编 2 | plans:15；task-runtime:67；arbitration:55 | Phase 4 |
+| `multi-tenant-orchestration` | 3/3 | 取代 + 收编 2 | arbitration:3；ledger:3,83；plans:67 | Phase 2 |
+| `content-schedule` | 19/23 | 取代 + 收编 6（含 2 冲突） | plans:27,43；arbitration:3,71；policy:3,19,47 | Phase 5 |
+| `publish-pipeline` | 23/49 | 取代运行/授权/终态；平台细节保留 | plans:55；task-runtime:67,79；ledger:3,31,83；policy:3,19,31 | Phase 5 |
+| `publish-submit-integrity` | 3/5 | 收编 | ledger:31,43 | Phase 5 |
+| `publish-dispatch-resilience` | 7/9 | 取代 + 收编 3（含 1 冲突） | arbitration:43,55；ledger:15,59；policy:19,31 | Phase 5 |
+| `publish-post-link-capture` | 2/2 | 收编 | ledger:31 | Phase 5 |
+| `publish-account-attribution` | 3/3 | 取代 + 收编 2 | arbitration:3；ledger:3,83；policy:47 | Phase 5 |
+| `publish-generation-concurrency` | 7/7 | 取代 + 收编 3（含 1 冲突） | plans:27,43,67；arbitration:3；task-runtime:115 | Phase 5 |
+| `xhs-native-scheduled-publish` | 5/6 | 收编 | ledger:15,31,43；task-runtime:3 | Phase 5 |
+| `comment-interaction` | 11/15 | 取代 + 收编 4（含 2 冲突） | task-runtime:3,79；arbitration:71；ledger:15,31；policy:3,19,31 | Phase 5 |
+| `comment-search-command` | 13/18 | 取代 + 收编 6（含 2 冲突） | task-runtime:3,15,39；arbitration:71；ledger:3,83；policy:19,63 | Phase 5 |
+| `comment-like-interaction` | 5/7 | 收编 | task-runtime:27；ledger:3,31；policy:3,75 | Phase 5 |
+| `facebook-scheduled-comment` | 11/16 | 收编（含 1 冲突） | task-runtime:27,79；arbitration:71；ledger:31；policy:3,19 | Phase 5 |
+| `facebook-comment-verification` | 7/8 | 收编 | ledger:15,31,59 | Phase 5 |
+| `facebook-comment-idempotency` | 1/1 | 取代 + 收编 2 | ledger:3,15,59 | Phase 5 |
+| `feed-hot-lead-group-comment` | 4/9 | 收编（含 1 冲突） | ledger:3；policy:19,47 | Phase 5 |
+| `browse-loop-resilience` | 15/20 | 取代 + 收编 8 | plans:15；task-runtime:15,67；arbitration:31；ledger:15,83 | Phase 4 |
+| `platform-browse-surface` | 11/11 | 取代 + 收编 5（含 3 冲突） | task-runtime:3,27；ledger:31,83；arbitration:71 | Phase 4 |
+| `platform-search-activity` | 8/8 | 收编 3 | task-runtime:3；ledger:3,15,83；policy:47,87 | Phase 4 |
+| `detail-deep-read` / `deep-read-fidelity` | 4/6 | 收编 | task-runtime:3；ledger:31 | Phase 4 |
+| `feed-depth-refresh` | 4/7 | 收编 | task-runtime:99；ledger:31；policy:47 | Phase 4 |
+| `note-extraction-fidelity` | 3/5 | 收编 | task-runtime:3,99；policy:75 | Phase 4 |
+| `interaction-appraisal` | 5/9 | 收编（含 1 冲突） | task-runtime:27；policy:19,63 | Phase 5 |
+| `read-to-write-note-lane` | 1/4 | 收编 | task-runtime:39；policy:75 | Phase 6 |
+| `interaction-risk-gating` | 31/32 | 取代闸位 + 收编 16（含 1 冲突） | policy:19,47；ledger:15,31,83；arbitration:3,43 | Phase 3 / 5 |
+| `interaction-cooldown` | 8/8 | 收编 5 | policy:19,47；ledger:15,31 | Phase 3 |
+| `manual-command-override` | 3/3 | **冲突** | policy:19 | Phase 5（须先裁决） |
+| `command-pacing` | 5/16 | 收编（新方案当前无承载条款） | design §1（节奏归属 Automation）；task-runtime:3 | Phase 4 |
+| `weekly-active-window` | 4/4 | 收编（新方案当前无承载条款） | plans:15；arbitration:19 | Phase 3 |
+| `edge-task-execution-coordination` | 16/18 | 取代 2 + 收编 11（含 3 冲突） | arbitration:3,31,43,71；ledger:15,83 | Phase 3 |
+| `same-account-parallel-safety` | 4/4 | 取代（含 lane 键前提） | arbitration:3；ledger:3；policy:47 | Phase 3 |
+| `browser-cold-standby` | 2/8 | 收编 | arbitration:43,71 | Phase 3 |
+| `client-core-browser-executor-separation` | 3/4 | 取代 2 + 收编 1 | task-runtime:3；arbitration:19；policy:19,87 | Phase 2 |
+| `edge-cloud-handshake-admission` | 3/5 | 收编 | ledger:83 | Phase 2 |
+| `edge-command-targeting` | 3/3 | 收编 | ledger:83；design §13 | Phase 2 |
+| `edge-multi-environment-supervisor` | 2/12 | 收编 | ledger:83；arbitration:3 | Phase 2 |
+| `pluggable-browser-provider` | 2/16 | 收编 | ledger:83；arbitration:3 | Phase 2 |
+| `deployment-environments` | 2/12 | 收编 | plans:67 | Phase 0 |
+| `captcha-incident-handling` | ~5/36 | 收编（其余保留；新方案无事故域） | policy:19,63；plans:55 | Phase 3 |
+| `cdp-control-health-recovery` | 1/2 | 收编 | ledger:15；arbitration:43 | Phase 2 |
+| `edge-node-supervised-recycle` | 2/14 | 收编 | task-runtime:131；arbitration:43 | Phase 2 |
+| `account-identity-resolution` | 2/16 | 收编 | policy:19；arbitration:19 | Phase 2 |
+| `alert-manual-resolution` | 1/5 | 收编 | policy:31 | Phase 6 |
+| `accounts-master-data` | 1/11 | 收编 | plans:55；policy:3 | Phase 6 |
+| `client-customer-auth` | 2/33 | 收编 | policy:19；arbitration:43 | Phase 6 |
+| `notification-monitoring` | 1/7 | 收编 | task-runtime:67；arbitration:31 | Phase 5 |
+| `curated-note-actions` | 2/9 | 收编 | task-runtime:115,131 | Phase 5 |
+| `interaction-attribution` | 1/4 | 收编 | ledger:3；policy:87 | Phase 5 |
+| `follow-decision` | 1/4 | 收编 | task-runtime:3 | Phase 5 |
+| `publish-multi-image` | 1/10 | 收编 | ledger:31 | Phase 5 |
+| `llm-token-usage-stats` | 1/8 | 收编（极性相反，见冲突表 C12） | policy:47 | Phase 5 |
+| `wechat-channels-interaction` | 3/13 | 收编 | arbitration:55；ledger:59；policy:19 | Phase 5 |
+| `wechat-lifecycle-status-honesty` / `wechat-test-reset-completion-honesty` | 3/5 | 收编 | ledger:15,31 | Phase 5 |
+| `feishu-notification-routing` | 7/11 | 收编 1 + 保留投递解析（须回收） | policy:31 | Phase 6 |
+| `console-panel-api` | 12/36 | 收编 | policy:87；arbitration:83；ledger:15 | Phase 6 |
+| `llm-output-honesty` | 2/5 | 收编 | policy:75 | Phase 5 |
+
+未在表中出现的能力（UI/视觉、平台机械细节、打包与构建、纯配置面等约 50 份）判定为与本方案无实质重叠，**保留**，本变更不产生任何 delta。
+
+#### 24.2 冲突表（同一情形、两边要求相反行为，须先裁决）
+
+| # | 冲突面 | 已上线要求 | 本方案要求 | 裁决建议 |
+| --- | --- | --- | --- | --- |
+| C1 | 操作员在线人工命令的授权类别 | 精确单次操作员命令越风控状态与配额、但绝不越人审（`user-delegated-tasks:79`、`content-schedule:162`、`comment-search-command:366`、`manual-command-override:6`、`interaction-cooldown:166`、`feed-hot-lead-group-comment:154`） | 常驻授权不得绕过任何实时安全闸（policy:19） | **两者都要**：新增 `operator_override` 授权类，明确它只越「节奏类软闸」，绝不越人审、内容安全与记账；同时把 `interaction-appraisal:166` 的软/硬闸分层写进 policy |
+| C2 | 确定性命中的强制互动 | 跳过会话软预算与冷却、但仍过风控硬闸（`interaction-appraisal:166`、`comment-interaction:57`） | risk/quota/cooldown 并列为不可绕过（policy:19） | 并入 C1 的软/硬闸分层裁决 |
+| C3 | 安全点的定义 | 安全点 = 首次真正改写页面之前的整段，含阻断浮层等待、犹豫、停留；交接绝不等纯等待（`edge-task-execution-coordination:38`） | 安全点 = StepRun 边界或已确认的原子命令边界，未验证的页面跳转中不得抢占（arbitration:31、design §7） | **采已上线口径**：安全点按「有无平台副作用」判定；否则一条停在验证码等待里的命令不可抢占，重演已记录的硬死锁 |
+| C4 | 救援档位 | 系统恢复（验证码/风控协助）可在任何时刻从已填表未提交的写者手上取走浏览器（`edge-task-execution-coordination:171`） | 半填表单中不得抢占；最高档只有「紧急停止冻结 lane」（arbitration:31、design §7 优先级表） | **采已上线口径**：新增可抢占的 recovery 优先级类；紧急停止是停机，不能替代一个自己需要浏览器的恢复任务 |
+| C5 | 不可抢占窗口 | 明确禁止设立不可抢占窗口，重复由「不自动重试」防（`edge-task-execution-coordination:208`） | 已派发未知结果期间不得抢占或释放（arbitration:31） | 折中：允许抢占并回执「已提交、结果未知」；不得让一条 `submitted_unknown` 长期钉住整条账号 lane |
+| C6 | 能力查询失败的极性 | 查询未命中/抛错必须 fail-open、按今天行为放行并只读（`platform-browse-surface:6,57,133`） | 未知能力一律 fail-closed（task-runtime:15、ledger:83） | 区分「显式声明 unsupported」（拒）与「解析未命中/出错」（保持既有行为 + 运营可见降级告警） |
+| C7 | 演进契约 | 新字段一律可选、缺省等于今天行为，允许新旧混编滚动升级（`platform-browse-surface:83`） | 能力/版本不匹配即拒发（ledger:83） | 按面裁决：**协议字段**滚动兼容，**能力/命令版本**锁步；写进 Phase 2 的 cutover 说明 |
+| C8 | 审批后边缘离线 | 作废该次授权、回待审、要求重批（`publish-pipeline:300`、`publish-dispatch-resilience:6`） | 保留审批，窗口内进入 `waiting_for_edge`（policy:31、design §9） | **采本方案**；cutover 时必须同步删除旧的作废路径，两套并存会互相踩 |
+| C9 | 人审等待的到期 | 未授权草稿无限期待审，超时绝不改判/丢弃/自动发布（`publish-pipeline:320`） | 每个 work 声明 `latestStartAt` + `missPolicy`，审批未到即 skip/cancel（arbitration:55、policy:31） | **采已上线口径**：`latestStartAt` 只约束派发窗口，不得终结人审等待；窗口过期至多撤销当次执行授权、内容保持可重批 |
+| C10 | 发布人审是否可配置 | `approved===true` 之前永不下发，无条件红线（`publish-pipeline:733`） | 授权可配为 `standing_authorized`，无逐稿人审（policy:3） | **采本方案 + 补能力级下限**：CapabilityDefinition 可声明最低审批级别，客户授权只能更严不能更松（Facebook 发布/评论维持 review） |
+| C11 | 待审是否构成 ownership | `waiting_approval` 同样算在途，第二个来源必须跳过（`content-schedule:282`） | 长审批期必须释放页面资源与账号 lane（arbitration:71） | **两者都要**：补「逻辑 claim 在资源释放后依然成立」，把 ownership 与资源占用解耦 |
+| C12 | 记账失败的极性 | 安全账本入队失败必须停手（`interaction-risk-gating:786`）；成本账本失败绝不阻塞调用（`llm-token-usage-stats:35`） | 三类预算平行、只要求可观测（policy:47） | 逐类声明极性：平台风险账本 halting、AI 成本账本 best-effort 且非幂等累加不得重试 |
+| C13 | 生成 lane 的粒度 | 禁止用同账号粗粒度 ownership 串行化跨来源洗稿（`publish-generation-concurrency:99`） | 账号 lane 覆盖可冲突工作，含 api_only（arbitration:3、design §7） | **采已上线口径**：lane 只覆盖有平台副作用的工作；纯云端生成与审批等待按输入身份键并行 |
+| C14 | 人审期间是否持锁 | 手动与自动排期两路都持 keep-open 租约贯穿人审（`comment-search-command:26`、`facebook-scheduled-comment:223`） | 排期与全托管评论必须两段占用、审批期释放（arbitration:71） | 采本方案用于排期/全托管；同时**显式界定** full-managed 是否含运营手动指令，避免手动路径落进「MAY 持有」的未定义地带 |
+| C15 | 免审通知是否为派发前置 | 免审评论的通知口未接线或发送失败即 fail-closed 不发（`comment-interaction:89,187`） | 通知失败不得阻塞或延迟派发（policy:31） | 拆成两类：**派发前的免审知会**属授权链、必须送达；**派发后的结果通知**才是 best-effort |
+| C16 | 风险账本是否按 target 分裂 | 账号级风险消耗账本 append-only，绝不按 `execution_target` 分裂（`interaction-risk-gating:720`） | 一切可认领/幂等作用域按 target 隔离、跨 target 回执一律拒收（plans:67、ledger:83） | 隔离只适用于生命周期、claim 与幂等作用域；**消耗账本不分裂**（平台只有一双眼睛） |
+| C17 | lane 键是否含环境 | 同账号无论几条边缘接入都共用一份配额（`same-account-parallel-safety:6`、`edge-multi-environment-supervisor:86`） | lane 键含冻结的 `envKey` 与 binding revision（arbitration:3、design §7） | **采已上线口径**：lane 身份 = 平台账号；`envKey`/edge/机器是执行属性不是身份 |
+
+#### 24.3 三类结构性缺口（不是逐条差异，是整层缺席）
+
+宣告取代前必须承认这三层在本方案中当前不存在，并按 tasks §1.11 补齐或显式放弃：
+
+1. **阻塞态与事故的生命周期**。本方案的安全全部发生在派发之前；没有「账号此刻被外部阻碍卡住」这一族对象——没有事故、没有带最小穿透白名单的阻塞暂停、没有 detected/cleared 配对、没有升级/降级不对称、没有「运营确认 ≠ 条件解除」。已上线侧为此付了 36 条要求（`captcha-incident-handling`）。
+2. **不确定与置信度的一等地位**。本方案只有 `submitted_unknown` 一处不确定，其余一律 fail-closed；缺置信度分级、缺「此刻无法确认」的第三态、缺按误报/漏报代价不对称校准闸的极性。已上线侧反复付过的代价恰恰是「fail-closed 用错地方 = 把健康账号砖住」。
+3. **降级态的自愈义务**。本方案有失败与终态，没有「降级/抑制」这个中间态，因而没有它的有限退避恢复、没有 wall-clock 自过期兜底、没有「哪些失败才有资格成为无自愈终局」的准入判据。CLAUDE.md 的「自愈不自残」在本方案中只剩「不自残」那一半。
+
 ## Risks / Trade-offs
 
 - **[状态对象变多，理解成本上升]** → API 对客户只投影“周期、当前工作、结果”三层；内部 TaskRun/StepRun/Attempt 主要用于恢复和审计，不全部暴露。

@@ -30,7 +30,7 @@ Each registered Work Kind SHALL declare priority class, browser requirement, `sc
 
 ### Requirement: Preemption MUST occur only at declared safe points
 
-Higher-priority work MAY quiesce lower-priority work only at a TaskDefinition/Edge-declared safe point. The system MUST NOT preempt during partially filled forms, an in-flight submit command, unresolved external outcome, or a page transition that has not been validated. Resume SHALL revalidate account, page, target, and capability state.
+Higher-priority work MAY quiesce lower-priority work only at a TaskDefinition/Edge-declared safe point. The system MUST NOT preempt during an in-flight submit command, an unresolved external outcome, or a page transition that has not been validated. Preemption during a partially filled form is likewise prohibited for every ordinary priority class; it is permitted only for the recovery priority class defined below, whose admission MUST NOT be deferred until the incumbent completes, because the incumbent may be blocked by the very condition the recovery work exists to clear. Resume SHALL revalidate account, page, target, and capability state.
 
 #### Scenario: Publish arrives between browse cards
 - **WHEN** browse processing reaches a confirmed card boundary and a higher-priority approved publish is waiting
@@ -87,3 +87,91 @@ The Arbiter SHALL record queue entry, admission, quiesce, resume, deadline miss,
 #### Scenario: Managed browsing is repeatedly delayed
 - **WHEN** higher-priority writes repeatedly postpone a managed browse work item
 - **THEN** metrics and Decision Trace SHALL show cumulative wait and starvation evidence rather than silently resetting its queue age
+
+### Requirement: Lane identity MUST be the platform account and lanes MUST cover only platform-affecting work
+
+The account lane, its quota/risk accounting, and its duplicate-target scope SHALL be keyed by the authoritative platform account alone; `envKey`, edge id, connection, machine, and profile MUST be execution attributes of the lane, never part of its identity. When one platform account is reachable through multiple environments or edges, all such work MUST share one lane, one merged quota/risk ledger, and one duplicate-target scope. Lane admission SHALL be required only for work that can conflict on the platform account itself; work with no platform side effect (content generation, model calls, waiting for approval or another service) MUST NOT hold an account lane, and its concurrency SHALL be governed by finer-grained input-identity keys so that distinct inputs for one account remain parallel.
+
+#### Scenario: One account on two environments
+- **WHEN** the same platform account is connected through two environments on two machines
+- **THEN** their work SHALL serialize in one lane and consume one merged daily allowance, not two
+
+#### Scenario: Generation and approval wait
+- **WHEN** a Task is generating a candidate or waiting for human approval with no platform command in flight
+- **THEN** it MUST NOT occupy the account lane, so other sources for that account remain admissible
+
+### Requirement: Safe points MUST be defined by absence of platform side effects
+
+A safe point SHALL be defined by the absence of platform side effects, not by command boundaries. Any segment of an in-flight command before its first real page mutation — blocking-overlay waits, inter-action delays, pre-action hesitation, and pre-exit dwell — MUST be cancellable on the spot with a zero-side-effect honest failure receipt, and quiesce SHALL wait only for actions actively mutating the page. The Arbiter SHALL recognise a recovery priority class (captcha, risk-control, and human-assist work that itself needs the browser) which MAY preempt any lower-class work at any time before that work's irreversible dispatch, including work holding a partially filled form; recovery-class admission MUST NOT be deferred until the incumbent completes, and priority MUST be re-evaluated on every arrival rather than only at grant time. A capability MAY declare a read operation as irreversible-consuming when the act of reading destroys unrecoverable platform state; within such a declared window the Arbiter MUST refuse preemption and MUST NOT inject a safe cancellation point even though no page write has occurred. A user-supplied priority flag SHALL only reorder work within the automated classes and MUST NOT promote asynchronous work into the operator or recovery class.
+
+#### Scenario: Browse command is waiting on a captcha overlay
+- **WHEN** captcha assist work needs the browser while a browse command sits in a blocking-overlay wait
+- **THEN** that command MUST be cancelled immediately with a zero-side-effect receipt and the lane granted, because waiting for it would require the very captcha the assist work is meant to clear
+
+#### Scenario: Notification triage has consumed unread state
+- **WHEN** a read step has opened a notification tab whose unread state is destroyed by the act of reading and cannot be re-reported
+- **THEN** the Arbiter MUST refuse preemption for the declared window and report the remaining budget instead
+
+### Requirement: Quiesce MUST be verifiable, bounded, and reversible
+
+Quiesce SHALL be considered complete only when the preempted executor has verifiably stopped issuing page-mutating operations; issuing a cancel signal MUST NOT satisfy it. Every executor capable of mutating a page SHALL be registered in one page-write accounting registry and SHALL honour one cancellation token, and no executor may reach the browser control endpoint outside that registry. Quiesce SHALL have a bounded wall-clock limit; if it does not converge within that limit the Arbiter MUST NOT grant the lane, MUST terminate the queued admission with an honest terminal reason, and MUST roll back every suppression or freeze flag it set when quiesce began. Failure to yield within the bound SHALL be classified as a control-plane fault with a machine-readable reason distinguishable from benign retryable conditions; it MUST NOT trigger automatic retry, automatic redispatch, or automatic restoration of queue budget, and MUST surface a named operator action. Work terminated by arbitration — preemption, quiesce, lane release, deadline checkpointing — SHALL be recorded as a scheduling outcome and MUST NOT increment any business failure, retry-exhaustion, or circuit-breaker counter.
+
+#### Scenario: Preempted executor keeps writing
+- **WHEN** an executor has not stopped mutating the page within the quiesce bound
+- **THEN** the lane MUST NOT be granted, the freeze flags set at quiesce start MUST be rolled back, and a control-plane fault requiring a named operator action MUST be raised
+
+#### Scenario: Publish is preempted by recovery work
+- **WHEN** a publish work item is preempted before its irreversible submit
+- **THEN** its termination MUST NOT count toward the account's consecutive-failure or circuit-breaker counters
+
+### Requirement: Lane admission MUST be atomic and resolve to exactly one runner
+
+Lane admission — claim, conflict check, intent preparation, and transition to running — SHALL execute as one atomic serialized section per account lane, and admission of the next candidate SHALL only proceed after the current one has established observable ownership. When two conflicting candidates are evaluated concurrently, arbitration MUST resolve to exactly one runner; both deferring on symmetric observation of each other is a defect. Discovery, scanning, and claiming across accounts MUST NOT serialize on any single account's in-flight execution. When an admitted work item holds an exclusive lane, every command it dispatches MUST carry the holder identity of that admission and the enforcement point MUST admit the holder's own commands while blocking others. Worker concurrency SHALL be bounded and configurable.
+
+#### Scenario: Two sources evaluate the same lane at once
+- **WHEN** a delegated task and a scheduled task both find the lane free at the same instant
+- **THEN** exactly one SHALL be admitted; both observing the other as busy and deferring is a defect, not an honest skip
+
+#### Scenario: Lane holder issues its own command
+- **WHEN** the work item holding an exclusive keep-open lane dispatches its next command
+- **THEN** that command MUST carry the holder identity and MUST NOT be blocked by the exclusion it installed
+
+### Requirement: Logical ownership MUST survive resource release
+
+Ownership of a work scope SHALL be a logical claim independent of physical resource occupancy. Releasing page, browser, or lane resources during composition, approval, or any other wait MUST NOT make the work invisible to other sources: a second source evaluating the same `(account, action family)` scope MUST observe the outstanding claim and skip or queue accordingly. Ownership SHALL be cleared only by a terminal outcome, an authorized cancellation, or claim expiry.
+
+#### Scenario: A draft is awaiting human approval
+- **WHEN** a publish work item has released its resources and is awaiting approval
+- **THEN** a scheduled publish trigger for the same account and action family SHALL observe the outstanding claim and MUST NOT generate a second candidate for the same slot
+
+### Requirement: Resource release MUST pair with a wake path
+
+Whenever the system releases or parks a resource in favour of a wait, it SHALL simultaneously establish a wake path that does not depend on computing a recovery time; if no such wake path exists for that wait, the resource MUST NOT be released. Wake paths SHALL be dead-man safe: a periodic re-evaluation channel plus a bounded revisit deadline whose semantics are "come back and ask again", which MUST NOT be presented as a promise that the block will be cleared by then. Release SHALL be denied whenever clearing the current blocker itself requires that resource (captcha, re-login, operator intervention in the browser, resource held elsewhere, unknown state); this veto SHALL be evaluated before and above every release trigger rather than inside an individual trigger branch, and the "requires the resource" fact SHALL come from an authoritative server-side source. When a requester abandons an admission or resource request after its own timeout, it SHALL actively release that request's identity and re-release upon any late grant carrying the same identity, until the owner confirms convergence or the request record expires.
+
+#### Scenario: Account is blocked by a captcha
+- **WHEN** an account is blocked pending captcha resolution in its browser
+- **THEN** the browser MUST NOT be released or parked, because the action that clears the block needs it
+
+#### Scenario: Admission request times out and is granted late
+- **WHEN** a requester gives up waiting and the resource is granted afterwards
+- **THEN** the requester MUST release it rather than leave an ownerless lease held until natural expiry
+
+### Requirement: Consecutive external-write failures MUST suspend the account lane
+
+The Arbiter SHALL track consecutive external-write failures per account and, on reaching a configured threshold, MUST suspend admission of further already-authorized irreversible work for that account while preserving each item's authorization, and MUST emit an operator alert. Clearing the suspension SHALL require an explicit human action that is always reachable, so a suspended account can never become undispatchable with no path to recovery. Preemption and other scheduling terminations MUST NOT contribute to this counter.
+
+#### Scenario: Edge page automation breaks
+- **WHEN** three consecutive publish dispatches for one account fail at the sequence level
+- **THEN** further approved publishes for that account SHALL be suspended with their authorizations retained, rather than each burning down its own retry bound
+
+### Requirement: Budget admission MUST precede physical resource acquisition
+
+Budget and quota admission for a work item SHALL be evaluated against the authoritative ledger before any physical resource (browser wake, profile, browser slot, model call) is acquired, and SHALL be a stateless recomputation rather than a cached derived flag. A denial SHALL place that work item into a bounded named wait scheduled by the budget's release time; it MUST NOT terminate the account's session, MUST NOT block admission of unrelated authorized work for the same account, and MUST NOT be answered by an unbounded or implementation-chosen delay.
+
+#### Scenario: Daily view quota is already exhausted
+- **WHEN** a browse work item is evaluated for an account whose view quota is spent
+- **THEN** it MUST be denied before the browser is woken, and the denial MUST NOT stop an unrelated approved publish for the same account
+
+#### Scenario: Session resumes after a long sleep
+- **WHEN** a denied work item's wait elapses
+- **THEN** eligibility SHALL be recomputed from the authoritative ledger rather than from a stored sleep flag

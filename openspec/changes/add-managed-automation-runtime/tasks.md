@@ -7,7 +7,11 @@
 - [ ] 1.5 Decide and document `personaVersion` as either an API-owned monotonic version or normalized content hash; add the required API schema/contract change and prohibit `updated_at` as a version.
 - [ ] 1.6 Define the initial action-scope authorization mapping from existing `off|review|auto_approve` controls to `disabled|require_approval|standing_authorized`.
 - [ ] 1.7 Define platform-specific evidence contracts for unique content reads and platform-confirmed publish/comment/reply outcomes; mark unsupported evidence paths explicitly.
-- [ ] 1.8 Create separate follow-up OpenSpec deltas before changing any existing content-schedule, publish, comment, reply, delegated-task, browser-slot, client projection, or protocol behavior.
+- [ ] 1.8 Treat every existing content-schedule, publish, comment, reply, delegated-task, browse-loop, risk/quota, arbitration, client projection, or protocol behavior change as requiring its own OpenSpec delta; a delta MUST be created, `--strict` validated, and landed before the corresponding Trigger Binding or Capability version is enabled, and enabling one while its superseded live requirements are still authoritative MUST be treated as a release blocker.
+- [ ] 1.9 Publish the capability-by-capability supersession map in `proposal.md` "Modified Capabilities" and `design.md` §24, keyed by live capability name with involved/total requirement counts, disposition (superseded / absorbed / retained), the new requirement that carries it, and the migration phase that lands its delta; keep the map the single source of truth and reject any slice whose live capability is absent from it.
+- [ ] 1.10 Adjudicate every recorded conflict in `design.md` §24.2 — operator-override authority, deterministic mandatory interactions, safe-point definition, recovery preemption class, non-preemptible windows, capability-resolution polarity, optional-field vs lock-step evolution, offline-approval invalidation, approval-wait expiry, unconditional publish approval floor, ownership during approval, generation-lane granularity, in-session approval leases, standing-authorization notice, risk-ledger target partitioning, and lane key composition — with a written decision, the losing side's removal plan, and the owner who accepts the behavior change; an unadjudicated conflict blocks its slice's cutover.
+- [ ] 1.11 Reconcile every absorbed live requirement against the five new capability specs; each absorbed guarantee MUST map to either a landed new requirement (see §24 and the delta backlog) or a written "intentionally dropped" decision with an accepting owner, and the inventory MUST be rejected as incomplete otherwise. Explicitly cover the three structural gaps recorded in §24.3: blocking/incident lifecycle, confidence tiers and the inconclusive third state, and self-healing obligations for degraded states.
+- [ ] 1.12 Record the per-class fail-safe polarity matrix (authorization, operational thresholds, capability resolution, safety reads, cost accounting, trust-critical deployment target) so no single global fail-closed posture is assumed during implementation.
 
 ## 2. Build the durable runtime foundation
 
@@ -28,6 +32,10 @@
 - [ ] 3.5 Implement ManagedCycle creation, bounded child-Task derivation, Task budget allocation, partial summaries, and API result events.
 - [ ] 3.6 Implement Task Runtime TaskRun/StepRun checkpoints, named waits, terminal outcomes, cancellation safe points, TaskRevision supersession, and restart recovery without duplicate external jobs.
 - [ ] 3.7 Add tests for duplicate triggers, unknown schemas, derivation loops, latest-wins before/after dispatch, process restart, content waits, approval waits, partial completion, and truthful parent summaries.
+- [ ] 3.8 Implement the account operating-window calendar, inter-cycle rest interval with variance, and deterministic per-account schedule stagger; prove that running work stops at a safe point when the window closes and that reopening proactively re-admits eligible work.
+- [ ] 3.9 Implement single trigger ownership per `(account, action, window)`: deterministic startup disablement of the legacy trigger for any cut-over scope, no legacy fallback path, observable cutover state, and a shared idempotency scope across trigger sources for the same account and action family.
+- [ ] 3.10 Add tests for terminal-handler idempotency, discard of late in-flight results after a terminal outcome, re-driving of resumed runs, and detection of a `running` TaskRun backed by neither an in-flight command nor a named wait.
+- [ ] 3.11 Implement observation honesty in capability outputs: `not_observed` vs `observed_absent`, verified read-context preconditions, absent-rather-than-substituted platform fields, and convergence judged by re-observation with loop bounds used only as backstops.
 
 ## 4. Implement account arbitration and policy-risk admission
 
@@ -39,6 +47,19 @@
 - [ ] 4.6 Implement plan-time and commit-time Policy-Risk admission using API authorization revisions, runtime stop/pause, binding/page identity, capabilities, RiskController, quota, cooldown, duplicate target, content/approval revisions, and deadlines.
 - [ ] 4.7 Implement independent platform-risk, execution-resource, and AI/content-cost budget allocation, reservation, consumption, release, and denial evidence.
 - [ ] 4.8 Add safety tests proving standing authorization cannot bypass risk, quota, identity, version, deadline, or platform confirmation and notification failure never changes authorization.
+- [ ] 4.9 Prove lane identity is the platform account alone: one account reachable through two environments or edges shares one lane, one merged quota/risk ledger, and one duplicate-target scope; prove work with no platform side effect never holds a lane.
+- [ ] 4.10 Implement side-effect-based safe points, a recovery priority class able to preempt pre-irreversible work including partially filled forms, declared irreversible-consuming read windows, and priority-flag containment; prove a command parked in a pure wait is cancellable on the spot.
+- [ ] 4.11 Implement verified quiesce: one page-write registry, one cancellation token, a bounded quiesce limit, rollback of suppression flags on non-convergence, a control-plane fault reason that never auto-retries, and proof that arbitration-driven termination increments no business failure or circuit-breaker counter.
+- [ ] 4.12 Implement atomic lane admission resolving to exactly one runner, holder self-admission for exclusive lanes, non-blocking cross-account scanning, and logical ownership that survives resource release during composition or approval.
+- [ ] 4.13 Implement release/wake pairing: no resource may be parked without a dead-man wake path, release is vetoed when clearing the blocker requires that resource, and an abandoned admission request releases any late grant.
+- [ ] 4.14 Implement per-account consecutive external-write suspension with retained authorizations, an operator alert, and an always-reachable human clearing path.
+- [ ] 4.15 Prove budget/quota admission runs before any browser wake or slot acquisition, is a stateless recomputation, and that a denial yields a bounded named wait without ending the session or blocking unrelated authorized work for the same account.
+- [ ] 4.16 Implement the soft/hard gate classification and the `operator_override` authorization class; prove an override skips only named pacing and quota gates, never approval, content safety, accounting, or the absolute content prohibition set, and never propagates into batched or derived work.
+- [ ] 4.17 Implement trigger-path-scoped authorization and capability-declared minimum approval floors; prove a schedule-scoped standing authorization cannot unattend an operator- or event-triggered action in the same action domain, and that a customer setting cannot lower a capability minimum.
+- [ ] 4.18 Implement confidence-tiered safety signals with persistence confirmation for the lowest tier, immediate fail-closed for identified blockers, blast radius matching the observed scope, and an inconclusive third state that neither convicts nor heals.
+- [ ] 4.19 Implement suppression lifecycle: bounded self-expiry, non-zero recovery backoff, a narrowly enumerated pass-through allowlist for the clearing path, detected/cleared pairing, de-escalation only via state machine or operator, and alert acknowledgement that never resumes a runtime condition.
+- [ ] 4.20 Implement single-writer, platform-signal-only risk state with durable counters and startup replay, ownership predicates on every write, zero-row writes surfaced as failures, burst-vs-daily alert differentiation, and throttled-but-never-silent suppression records.
+- [ ] 4.21 Implement backstop-vs-quota arithmetic proofs, no derived transform that zeroes a positive allowance, and a considered cross-action daily exposure aggregate per account.
 
 ## 5. Implement Ledger, Gateway, reconciliation, and trace
 
@@ -51,6 +72,15 @@
 - [ ] 5.7 Implement forward-only cancellation and separate authorization/intents for delete or withdraw actions.
 - [ ] 5.8 Implement structured Decision Trace append/query APIs and consistency checks proving Trace cannot override TaskRun/Ledger truth.
 - [ ] 5.9 Run protocol-drift, replay, target-isolation, unauthorized-write, submitted-unknown, cancellation, reconciliation ambiguity, and result-event exactly-once tests.
+- [ ] 5.10 Implement evidence attribution rules: independence from the dispatched payload, same-source as the judgement, scoping to the acting account identity plus submitted content plus frozen target, refusal of attribution instead of guessing, declarable veto signals, rejection of weak page-state proxies, and never synthesizing an unobservable field.
+- [ ] 5.11 Extend the Attempt outcome taxonomy with `accepted_pending`, `held_for_moderation`, platform-refused (terminal, non-retryable) within `confirmed_not_applied`, and `precondition_already_satisfied`; persist the strongest observed progress evidence on `submitted_unknown`.
+- [ ] 5.12 Classify pre-dispatch non-start by observed fact (executor body ran / command sent) rather than an error-code allowlist, keep unavailable-executor, degraded-control, acquisition-timeout, and resource-wait reasons distinct, and prove only an explicit resource-wait reason retains authorization for automatic retry.
+- [ ] 5.13 Make settlement of an actuated fact unconditional (no re-gating by policy, risk, quota, or authorization at receipt time) and make failure to durably enqueue a consumption fact halt further automatic actions for that account.
+- [ ] 5.14 Extend idempotency to attempts and terminal successes, suppress re-selection of targets with a non-success terminal outcome for a bounded window, block new intents for a target with an outstanding `submitted_unknown`, anchor keys to the approved artifact and platform-stable identifiers, and verify a clean authoring surface before re-attempting after a partially composed cancellation.
+- [ ] 5.15 Enforce byte-for-byte application of frozen intent, invalidate approvals on system-side normalization, verify the observed result against the frozen field set before confirmation, and correct the persisted record when a frozen field was dropped.
+- [ ] 5.16 Separate Gateway transport admission from business readiness, enforce unique and restart-stable node identity, commit same-identity replacement only after a successful welcome, require capability withdrawal on mid-connection loss, fail undelivered commands explicitly, and extend capability negotiation to the execution substrate.
+- [ ] 5.17 Prove directed dispatch never fans out on an unresolved target, requires a distinct named operation for broadcast, deterministically selects and logs one recipient when an account has multiple live connections, and never transmits a payload to another customer's connection.
+- [ ] 5.18 Keep the per-account platform-risk consumption ledger single and unpartitioned by `execution_target` while lifecycle, claim, scan, recovery, and idempotency scopes remain target-isolated; add a test for in-flight ownership change across targets.
 
 ## 6. Deliver the first read-only vertical slice
 
@@ -72,6 +102,9 @@
 - [ ] 7.6 Adapt existing single-action `delegated_tasks`, schedules, and publish/comment/reply entrypoints to create or reference Task/ExecutionPlan/TaskRun/Intent/Attempt records without turning `delegated_tasks` into a task-graph or second runtime table.
 - [ ] 7.7 Add per-slice backward-compatibility, target-isolation, authorization, risk-honesty, cancellation, unknown-result, deadline, and platform-confirmation acceptance tests before enabling its Trigger Binding.
 - [ ] 7.8 Perform named DEV-account probes for each platform-writing slice only after explicit test authorization; report approved, dispatched, platform-confirmed, unknown, and client-visible states separately.
+- [ ] 7.9 Gate each slice on its supersession contract: the live capability's delta change exists, validates `--strict`, and has landed; every conflict touching that slice has a written adjudication; and every absorbed guarantee for that slice maps to a landed new requirement or an accepted drop decision — before its Trigger Binding is enabled.
+- [ ] 7.10 Land the absorbed-guarantee acceptance tests per slice: publish (frozen-byte fidelity, required-vs-best-effort steps, generation-stage profile fail-closed, approval anchored to the rendered version, resource-wait authorization retention), comment (target scope and no substitution, pre-dispatch notice for unattended actions, veto evidence, moderation-held outcome), research/browse (observation honesty, wait accounting, re-driven resume, timing floors), and reply (API-only lane routing, actuated-fact recording).
+- [ ] 7.11 Retire the superseded legacy path in the same slice cutover: remove the offline-approval invalidation path when adopting `waiting_for_edge`, remove per-message-type routing allowlists when adopting complement fallback, and remove any second trigger owner; prove by test that no legacy branch remains reachable for the cut-over scope.
 
 ## 8. Add full-managed cycles and customer projections
 
@@ -94,6 +127,7 @@
 - [ ] 9.6 After single-writer and contract gates pass, extract the nine modules into the independent `aidcp-automation` repository without cross-repository source imports or shared-file authorization/locks.
 - [ ] 9.7 Create separate build, typecheck, focused/full safety tests, migration, DEV deployment, rollback, and version-reporting pipelines for `aidcp-automation`.
 - [ ] 9.8 Re-run Cloud/Automation/API/Content/Edge contract, protocol, risk, unauthorized-publish, target-isolation, data-plane separation, and end-to-end acceptance suites after extraction.
+- [ ] 9.9 Extend Ledger/Trace shadow mode to compare absorbed-guarantee behavior, not only terminal outcomes: pre-dispatch reason fidelity, budget consumption timing, notification delivery obligations, duplicate-target suppression on non-success terminals, and inconclusive identity rounds; resolve every mismatch before making Ledger authoritative.
 
 ## 10. Final validation and closeout
 
@@ -101,4 +135,5 @@
 - [ ] 10.2 Verify no arbitrary TaskDefinition scripting, first-class Workflow/CapabilityRun runtime, direct Agent/Client→Capability/Edge action path, second risk-state writer, cross-service business-table write, hidden authorization gate, or optimistic platform success was introduced.
 - [ ] 10.3 Validate protocol documentation and both endpoint implementations for every new capability/message version; prove unknown capability/version fails honestly.
 - [ ] 10.4 Validate clean DEV deployment, health, listeners, workers, shared-DB target isolation, dashboards, customer projections, and bounded rollback before any OL release proposal.
+- [ ] 10.6 Verify the supersession map is complete and current: no live capability with a landed delta remains marked retained, no `superseded`/`absorbed` entry lacks its carrying requirement, every §24.2 conflict has a recorded decision with an accepting owner, and every §24.3 structural gap is either closed by a landed requirement or explicitly accepted as out of scope with the follow-up change named.
 - [ ] 10.5 Run `openspec validate add-managed-automation-runtime --strict`, update task evidence, and archive only after all required implementation and truthful live-validation boundaries are complete.
