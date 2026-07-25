@@ -1,8 +1,8 @@
 ## 1. Freeze contracts and current-state inventory
 
 - [ ] 1.1 Inventory current Automation-owned modules, tables, workers, locks, Edge commands, receipts, and process entrypoints in `aidcp-cloud`; map each item to one of the nine target modules or record a named exception.
-- [ ] 1.2 Inventory `RoleDispatcher`, content schedules, `delegated_tasks`, publish/comment/reply state machines, EdgeTaskCoordinator, browser-slot scheduling, RiskController, and current reconcilers; record their state and failure-semantics mappings to Plan/Cycle/Run/Step/Attempt.
-- [ ] 1.3 Freeze versioned schemas for ManagedPlan runtime projection, ManagedCycle, AutomationRun, WorkflowStep, ExecutionIntent, ExecutionAttempt, DecisionTrace, Trigger Binding, and Definition.
+- [ ] 1.2 Inventory `RoleDispatcher`, content schedules, `delegated_tasks`, publish/comment/reply state machines, EdgeTaskCoordinator, browser-slot scheduling, RiskController, and current reconcilers; record their state and failure-semantics mappings to ManagedPlan/ManagedCycle/Task/ExecutionPlan/TaskRun/StepRun/Attempt.
+- [ ] 1.3 Freeze versioned schemas for CapabilityDefinition, TaskDefinition.executionGraph, Task/TaskRevision/CapabilityScope runtime projection, immutable ExecutionPlan, ManagedPlan runtime projection, ManagedCycle, TaskRun, StepRun, ExecutionIntent, ExecutionAttempt, DecisionTrace, and Trigger Binding.
 - [ ] 1.4 Freeze the durable message envelope and first message set, including message/idempotency/aggregate versions, correlation/causation/trace identifiers, schema references, and trusted execution target.
 - [ ] 1.5 Decide and document `personaVersion` as either an API-owned monotonic version or normalized content hash; add the required API schema/contract change and prohibit `updated_at` as a version.
 - [ ] 1.6 Define the initial action-scope authorization mapping from existing `off|review|auto_approve` controls to `disabled|require_approval|standing_authorized`.
@@ -11,22 +11,22 @@
 
 ## 2. Build the durable runtime foundation
 
-- [ ] 2.1 Add additive migrations for plan runtime projections, cycles, runs, steps, trigger bindings/inbox, definitions, intents, attempts, receipts, reconciliation work, decision traces, and budget allocations/consumption.
+- [ ] 2.1 Add additive migrations for plan/task runtime projections, task revisions, cycles, immutable execution plans, task/step runs, trigger bindings/inbox, capability/task definitions, intents, attempts, receipts, reconciliation work, decision traces, and budget allocations/consumption.
 - [ ] 2.2 Add target-first claim/recovery indexes and `(execution_target, idempotency_key)` uniqueness where applicable; make all target values server-injected and disable workers on invalid deployment target.
-- [ ] 2.3 Add legal lifecycle/CAS predicates for Run, Step, Intent, and Attempt transitions so stale messages cannot move terminal state backward.
+- [ ] 2.3 Add legal lifecycle/CAS predicates for TaskRun, StepRun, Intent, and Attempt transitions so stale messages cannot move terminal state backward.
 - [ ] 2.4 Implement typed stores with transaction boundaries, owner checks, pagination/retention hooks, and no cross-domain writes to API/Content-owned tables.
 - [ ] 2.5 Implement Outbox/Inbox publishing and consumption with message-version/schema validation, durable deduplication, aggregate ordering, retry/dead-letter metrics, and correlation propagation.
 - [ ] 2.6 Add execution-target isolation, duplicate delivery, stale aggregate version, illegal transition, and worker-disabled acceptance tests.
 - [ ] 2.7 Add schema ownership and cross-repository import/DML gates before extracting code from `aidcp-cloud`.
 
-## 3. Implement Definition, Trigger, Cycle, and Workflow modules
+## 3. Implement Capability, TaskDefinition, Trigger, Cycle, and Task Runtime modules
 
-- [ ] 3.1 Implement a code-reviewed Definition registry with immutable versions, typed step/input/output schemas, action/capability requirements, and finite bounds.
-- [ ] 3.2 Implement the initial registered step adapters: resolve search terms, search, browse, assess, request/await creation, await approval, interact, publish, reply, wait-until, and return-home.
-- [ ] 3.3 Reject arbitrary scripts, unknown actions, raw Edge commands, unrestricted URLs/SQL, dynamic imports, and unbounded loops at Definition publication and Run creation.
+- [ ] 3.1 Implement code-reviewed CapabilityDefinition and TaskDefinition registries with immutable versions, typed inputs/outputs, side-effect/evidence metadata, typed execution-graph edges, and finite bounds.
+- [ ] 3.2 Implement initial Capability adapters for search-term resolution, search, feed observation/advance, content assessment/read, creation request, like, comment compose/submit, publish, reply, and return; add registered runtime nodes for waits and child-Task references.
+- [ ] 3.3 Implement Plan Compiler validation for graph type compatibility, terminal paths, bounded loops, Task CapabilityScope, API authorization, platform capability, completion semantics, and immutable ExecutionPlan output; reject arbitrary scripts, unknown actions, raw Edge commands, unrestricted URLs/SQL, and dynamic imports.
 - [ ] 3.4 Implement Trigger Registry allowlists, binding versions, event/schedule/manual/Agent-intent admission, idempotent creation, concurrency policies, and causal-depth protection.
-- [ ] 3.5 Implement ManagedCycle creation, child-Run budget allocation, bounded lifecycle, partial summaries, and API result events.
-- [ ] 3.6 Implement Workflow Runtime checkpoints, named waits, terminal outcomes, cancellation safe points, supersession, and restart recovery without duplicate external jobs.
+- [ ] 3.5 Implement ManagedCycle creation, bounded child-Task derivation, Task budget allocation, partial summaries, and API result events.
+- [ ] 3.6 Implement Task Runtime TaskRun/StepRun checkpoints, named waits, terminal outcomes, cancellation safe points, TaskRevision supersession, and restart recovery without duplicate external jobs.
 - [ ] 3.7 Add tests for duplicate triggers, unknown schemas, derivation loops, latest-wins before/after dispatch, process restart, content waits, approval waits, partial completion, and truthful parent summaries.
 
 ## 4. Implement account arbitration and policy-risk admission
@@ -49,13 +49,13 @@
 - [ ] 5.5 Implement bounded action-specific Reconciler adapters for supported publish/comment/reply capabilities, including unique match, proven absence, multiple-candidate ambiguity, and exhausted-window attention.
 - [ ] 5.6 Enforce retry only before dispatch or after confirmed non-application; reject redispatch of submitted-unknown actions.
 - [ ] 5.7 Implement forward-only cancellation and separate authorization/intents for delete or withdraw actions.
-- [ ] 5.8 Implement structured Decision Trace append/query APIs and consistency checks proving Trace cannot override Run/Ledger truth.
+- [ ] 5.8 Implement structured Decision Trace append/query APIs and consistency checks proving Trace cannot override TaskRun/Ledger truth.
 - [ ] 5.9 Run protocol-drift, replay, target-isolation, unauthorized-write, submitted-unknown, cancellation, reconciliation ambiguity, and result-event exactly-once tests.
 
 ## 6. Deliver the first read-only vertical slice
 
-- [ ] 6.1 Publish `persona-refresh-research@1` with typed `resolve_search_terms → search → browse 10 → search → browse 20 → assess → return_home` steps and finite page/time/browser budgets.
-- [ ] 6.2 Connect API `PersonaUpdated` to a versioned Trigger Binding and freeze persona, plan, Definition, binding, capability, and execution-target facts into the Run.
+- [ ] 6.1 Publish `persona-refresh-research@1` TaskDefinition with typed `resolve search terms → search → read 10 → search → read 20 → assess → return` capability nodes and finite page/time/browser budgets.
+- [ ] 6.2 Connect API `PersonaUpdated` to a versioned Trigger Binding; create the authorized Task/TaskRevision and freeze persona, plan, TaskDefinition, Capability, binding, and execution-target facts into its immutable ExecutionPlan.
 - [ ] 6.3 Adapt Agent/Content search-term generation to return schema-valid candidates without direct tools or Edge commands.
 - [ ] 6.4 Implement capability-specific verified unique-read counting, persistent ID checkpoints, duplicate exclusion, and actual-count partial outcomes.
 - [ ] 6.5 Integrate account arbitration, Edge waiting/handshake wakeup, browser-slot acquisition, safe quiesce/resume, and return-home without changing unrelated browse-loop behavior.
@@ -69,15 +69,15 @@
 - [ ] 7.3 Add/update the required comment OpenSpec deltas, then implement prepare/commit account and Edge leases, stable target snapshots, resource release during composition/approval, commit-time reopen/revalidation, and honest zero-target outcomes.
 - [ ] 7.4 Normalize comment standing authorization across sources while preserving visible configuration; prove best-effort notification cannot block/delay/fallback and review remains fail-closed.
 - [ ] 7.5 Add/update the required reply OpenSpec deltas, then integrate inbox trigger, candidate generation, review/standing authorization, account lane, API-only/browser capability routing, Ledger, and confirmation.
-- [ ] 7.6 Adapt existing single-action `delegated_tasks`, schedules, and publish/comment/reply entrypoints to create or reference Run/Intent/Attempt records without turning `delegated_tasks` into a multi-step workflow table.
+- [ ] 7.6 Adapt existing single-action `delegated_tasks`, schedules, and publish/comment/reply entrypoints to create or reference Task/ExecutionPlan/TaskRun/Intent/Attempt records without turning `delegated_tasks` into a task-graph or second runtime table.
 - [ ] 7.7 Add per-slice backward-compatibility, target-isolation, authorization, risk-honesty, cancellation, unknown-result, deadline, and platform-confirmation acceptance tests before enabling its Trigger Binding.
 - [ ] 7.8 Perform named DEV-account probes for each platform-writing slice only after explicit test authorization; report approved, dispatched, platform-confirmed, unknown, and client-visible states separately.
 
 ## 8. Add full-managed cycles and customer projections
 
-- [ ] 8.1 Add API customer-auth contracts for ManagedPlan lifecycle, per-action authorization, three budget classes, emergency stop, cycle/run queries, and trace summaries.
-- [ ] 8.2 Add Agent Service contracts for PlanProposal/PlanPatch with schema validation, API authorization, and no direct Automation/Edge tool path.
-- [ ] 8.3 Implement daily/campaign Trigger Bindings and ManagedCycle composition for research, interaction, creation, publish, and reply child Runs.
+- [ ] 8.1 Add API customer-auth contracts for Task/TaskRevision and ManagedPlan lifecycle, per-action authorization, three budget classes, emergency stop, cycle/task/run queries, and trace summaries.
+- [ ] 8.2 Add Agent Service contracts for `CreateTaskProposal`, `ReviseTaskProposal`, `CancelTaskProposal`, `QueryTaskRequest`, and matching ManagedPlan commands with schema validation, API authorization, and no direct Capability/Automation/Edge tool path.
+- [ ] 8.3 Implement daily/campaign Trigger Bindings and ManagedCycle composition for bounded research, interaction, creation, publish, and reply child Tasks.
 - [ ] 8.4 Implement pause/offboard behavior that freezes new work, cancels undispatched intents, preserves dispatched reconciliation, and starts owner-specific retention/deletion flows.
 - [ ] 8.5 Build API projections that distinguish local Host state, durable Automation state, and platform-confirmed result; realtime events SHALL only invalidate/refetch.
 - [ ] 8.6 Update Classic Client to consume the API projections and retain Edge Host lifecycle control without direct platform-action methods.
@@ -87,10 +87,10 @@
 ## 9. Privacy, operations, extraction, and cutover
 
 - [ ] 9.1 Define and implement retention/access policies for third-party snapshots, private messages, Agent/model inputs, traces, execution evidence, and logs; add deletion/offboarding tests.
-- [ ] 9.2 Add metrics and alerts for trigger duplicates/loops, queue wait/starvation, missed windows, invalid Definitions, stale bindings, policy denials, budget exhaustion, unsupported capabilities, unknown Attempts, reconciliation ambiguity, and target mismatch.
+- [ ] 9.2 Add metrics and alerts for trigger duplicates/loops, queue wait/starvation, missed windows, invalid CapabilityDefinitions/TaskDefinitions, stale bindings, policy denials, budget exhaustion, unsupported capabilities, unknown Attempts, reconciliation ambiguity, and target mismatch.
 - [ ] 9.3 Add dashboards/runbooks that distinguish API authorization, Automation dispatch, Edge/Host transport, and platform-confirmed outcomes.
 - [ ] 9.4 Run Ledger/Trace shadow mode against existing state machines, compare outcomes, and resolve every semantic mismatch before making Ledger authoritative.
-- [ ] 9.5 Cut over one capability/Definition version at a time with a kill switch that stops new Runs but leaves dispatched Attempts available for receipt/reconciliation.
+- [ ] 9.5 Cut over one Capability/TaskDefinition version at a time with a kill switch that stops new TaskRuns but leaves dispatched Attempts available for receipt/reconciliation.
 - [ ] 9.6 After single-writer and contract gates pass, extract the nine modules into the independent `aidcp-automation` repository without cross-repository source imports or shared-file authorization/locks.
 - [ ] 9.7 Create separate build, typecheck, focused/full safety tests, migration, DEV deployment, rollback, and version-reporting pipelines for `aidcp-automation`.
 - [ ] 9.8 Re-run Cloud/Automation/API/Content/Edge contract, protocol, risk, unauthorized-publish, target-isolation, data-plane separation, and end-to-end acceptance suites after extraction.
@@ -98,7 +98,7 @@
 ## 10. Final validation and closeout
 
 - [ ] 10.1 Verify all five capability specs have automated acceptance coverage and every implementation deviation is recorded with repo, commit, validation, deployment, and rollback evidence.
-- [ ] 10.2 Verify no arbitrary Workflow scripting, direct Agent/Client→Edge action path, second risk-state writer, cross-service business-table write, hidden authorization gate, or optimistic platform success was introduced.
+- [ ] 10.2 Verify no arbitrary TaskDefinition scripting, first-class Workflow/CapabilityRun runtime, direct Agent/Client→Capability/Edge action path, second risk-state writer, cross-service business-table write, hidden authorization gate, or optimistic platform success was introduced.
 - [ ] 10.3 Validate protocol documentation and both endpoint implementations for every new capability/message version; prove unknown capability/version fails honestly.
 - [ ] 10.4 Validate clean DEV deployment, health, listeners, workers, shared-DB target isolation, dashboards, customer projections, and bounded rollback before any OL release proposal.
 - [ ] 10.5 Run `openspec validate add-managed-automation-runtime --strict`, update task evidence, and archive only after all required implementation and truthful live-validation boundaries are complete.

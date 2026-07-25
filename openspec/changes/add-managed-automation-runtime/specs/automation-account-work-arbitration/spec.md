@@ -5,12 +5,12 @@
 Account Work Arbiter SHALL create a lane from the API-authoritative account/platform binding and frozen `envKey`, binding revision, and execution target. Work that can conflict on the same platform account SHALL be admitted through this lane before requesting Edge or connector resources. Display names, client-provided IDs, and mutable aliases MUST NOT define the lane.
 
 #### Scenario: Browse and publish target the same account
-- **WHEN** a managed browse Run is active and an approved publish Run becomes eligible for the same account
+- **WHEN** a managed browse TaskRun is active and an approved publish TaskRun becomes eligible for the same account
 - **THEN** Account Work Arbiter SHALL order them by declared priority and safe-point rules rather than allowing uncontrolled concurrent page work
 
 #### Scenario: Binding revision changed
 - **WHEN** queued work references an obsolete account/environment binding revision
-- **THEN** admission MUST fail closed or require a new Run instead of executing against the new binding implicitly
+- **THEN** admission MUST fail closed or require a new TaskRun instead of executing against the new binding implicitly
 
 ### Requirement: Every work kind MUST declare scheduling and arbitration metadata
 
@@ -26,11 +26,11 @@ Each registered Work Kind SHALL declare priority class, browser requirement, `sc
 
 ### Requirement: Preemption MUST occur only at declared safe points
 
-Higher-priority work MAY quiesce lower-priority work only at a Workflow/Edge-declared safe point. The system MUST NOT preempt during partially filled forms, an in-flight submit command, unresolved external outcome, or a page transition that has not been validated. Resume SHALL revalidate account, page, target, and capability state.
+Higher-priority work MAY quiesce lower-priority work only at a TaskDefinition/Edge-declared safe point. The system MUST NOT preempt during partially filled forms, an in-flight submit command, unresolved external outcome, or a page transition that has not been validated. Resume SHALL revalidate account, page, target, and capability state.
 
 #### Scenario: Publish arrives between browse cards
 - **WHEN** browse processing reaches a confirmed card boundary and a higher-priority approved publish is waiting
-- **THEN** the browse Run MAY checkpoint and release the account lane before publish is admitted
+- **THEN** the browse TaskRun MAY checkpoint and release the account lane before publish is admitted
 
 #### Scenario: Publish arrives during comment submit
 - **WHEN** a comment command is dispatched and its result is not yet known

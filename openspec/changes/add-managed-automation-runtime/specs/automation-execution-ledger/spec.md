@@ -2,10 +2,10 @@
 
 ### Requirement: Every external action MUST have an immutable execution intent
 
-Before dispatching a platform action, Execution Ledger SHALL persist an immutable intent containing account/environment/platform/execution target and binding revision, action and stable target, frozen content/approval/schedule fields, required capability/protocol version, Run/Step correlation, and a target-scoped idempotency key. Edge Gateway MUST dispatch from that intent rather than from mutable workflow memory.
+Before dispatching a platform action, Execution Ledger SHALL persist an immutable intent containing account/environment/platform/execution target and binding revision, action and stable target, frozen content/approval/schedule fields, required capability/protocol version, Task/TaskRun/StepRun correlation, and a target-scoped idempotency key. Edge Gateway MUST dispatch from that intent rather than from mutable Task Runtime memory.
 
 #### Scenario: Publish intent is prepared
-- **WHEN** a publish Step passes workflow admission
+- **WHEN** a publish StepRun passes Task Runtime and Policy-Risk admission
 - **THEN** Ledger SHALL persist the exact candidate, target, visibility, schedule, binding, capability, and idempotency facts before any Edge command is sent
 
 #### Scenario: Duplicate intent is requested
@@ -58,14 +58,14 @@ Reconciler SHALL process only Attempts requiring external-state reconciliation, 
 
 ### Requirement: Retries MUST create bounded Attempts only after non-application is known
 
-Workflow MAY create another Attempt for the same intent only before initial dispatch or after the prior Attempt is `confirmed_not_applied`, while authorization, deadline, risk, capability, and retry bounds remain valid. Retry counts and reasons MUST be persisted; no implicit fallback or compatibility branch may add attempts.
+Task Runtime MAY create another Attempt for the same intent only before initial dispatch or after the prior Attempt is `confirmed_not_applied`, while authorization, deadline, risk, capability, and retry bounds remain valid. Retry counts and reasons MUST be persisted; no implicit fallback or compatibility branch may add attempts.
 
 #### Scenario: Edge rejects before action starts
 - **WHEN** Edge provides authoritative evidence that the action was not applied and the retry contract allows one more attempt
-- **THEN** Workflow MAY create a new Attempt under the same business idempotency scope after live re-admission
+- **THEN** Task Runtime MAY create a new Attempt under the same business idempotency scope after live re-admission
 
 #### Scenario: Prior Attempt is unknown
-- **WHEN** a workflow retry timer fires for an Attempt in `submitted_unknown`
+- **WHEN** a Task Runtime retry timer fires for an Attempt in `submitted_unknown`
 - **THEN** Ledger MUST reject redispatch and route the Attempt to reconciliation instead
 
 ### Requirement: Cancellation MUST not erase dispatched truth
@@ -82,7 +82,7 @@ An authorized cancellation before dispatch SHALL prevent dispatch and record a c
 
 ### Requirement: Gateway receipts MUST be capability-versioned, deduplicated, and target-scoped
 
-Edge Gateway SHALL accept commands and receipts only for a valid handshake generation, account/environment binding, protocol version, capability declaration, execution target, Run/Step/Attempt identity, and replay-protected command context. Unknown capability or version MUST return `unsupported`; duplicate receipts MUST be idempotent.
+Edge Gateway SHALL accept commands and receipts only for a valid handshake generation, account/environment binding, protocol version, capability declaration, execution target, TaskRun/StepRun/Attempt identity, and replay-protected command context. Unknown capability or version MUST return `unsupported`; duplicate receipts MUST be idempotent.
 
 #### Scenario: Edge lacks required capability
 - **WHEN** an intent requires `publish_x_v2` but the connected Edge declares only `publish_x_v1`

@@ -18,7 +18,7 @@ API SHALL expose customer-controlled authorization separately for at least resea
 
 ### Requirement: Irreversible actions MUST pass plan-time and commit-time admission
 
-Policy-Risk SHALL validate Definition/action scope/budget when a Run is created and SHALL revalidate customer stop/pause, account binding and page identity, authorization revision, required capability, RiskController, quota, cooldown, duplicate target, content/approval revisions, and schedule deadline immediately before irreversible dispatch. A standing authorization MUST NOT bypass any live safety gate.
+Policy-Risk SHALL validate TaskDefinition/action scope/budget when a TaskRun is created and SHALL revalidate customer stop/pause, account binding and page identity, authorization revision, required capability, RiskController, quota, cooldown, duplicate target, content/approval revisions, and schedule deadline immediately before irreversible dispatch. A standing authorization MUST NOT bypass any live safety gate.
 
 #### Scenario: Risk state changes while waiting
 - **WHEN** a standing-authorized comment waits for account work and RiskController later denies comments
@@ -42,11 +42,11 @@ An approval decision SHALL authorize a matching frozen intent but MUST NOT imply
 
 #### Scenario: Approval exists but Edge is offline
 - **WHEN** immutable publish content remains approved and Edge is temporarily offline within `latestStartAt`
-- **THEN** the Run MAY wait for Edge while displaying approved-but-not-dispatched, and MUST NOT display published
+- **THEN** the TaskRun MAY wait for Edge while displaying approved-but-not-dispatched, and MUST NOT display published
 
 ### Requirement: Platform, execution, and AI budgets MUST be independent
 
-ManagedPlan/Cycle/Run admission SHALL track separate platform-risk budgets, execution-resource budgets, and AI/content-cost budgets. Exhausting one budget MUST block or end the affected work even when another budget remains. Budget allocation, reservation, consumption, release, and denial reason MUST be observable.
+ManagedPlan/Cycle/TaskRun admission SHALL track separate platform-risk budgets, execution-resource budgets, and AI/content-cost budgets. Exhausting one budget MUST block or end the affected work even when another budget remains. Budget allocation, reservation, consumption, release, and denial reason MUST be observable.
 
 #### Scenario: AI budget is exhausted
 - **WHEN** a cycle has remaining platform actions but no remaining authorized creation cost
@@ -54,7 +54,7 @@ ManagedPlan/Cycle/Run admission SHALL track separate platform-risk budgets, exec
 
 #### Scenario: Browser budget is exhausted
 - **WHEN** research reaches its browser-minute bound before its requested content count
-- **THEN** the Step SHALL stop with actual progress and MUST NOT consume extra browser time because platform quota remains
+- **THEN** the StepRun SHALL stop with actual progress and MUST NOT consume extra browser time because platform quota remains
 
 #### Scenario: Comment quota is exhausted
 - **WHEN** execution and AI budgets remain but the account comment quota is exhausted
@@ -62,10 +62,10 @@ ManagedPlan/Cycle/Run admission SHALL track separate platform-risk budgets, exec
 
 ### Requirement: Decision Trace MUST explain consequential choices without replacing state
 
-Trigger, Cycle, Workflow, Arbiter, Policy-Risk, Ledger, and Reconciler SHALL append structured Decision Trace records for creation, selection, admission, delay, denial, skip, supersession, dispatch, and reconciliation decisions. Each record MUST carry correlation/causation and relevant Plan/Definition/persona/policy/risk/budget version references, reason code, input references, and affected Run/Step/Attempt. Trace records MUST NOT mutate or override authoritative lifecycle state.
+Trigger, ManagedCycle, Task Runtime, Arbiter, Policy-Risk, Ledger, and Reconciler SHALL append structured Decision Trace records for creation, selection, admission, delay, denial, skip, supersession, dispatch, and reconciliation decisions. Each record MUST carry correlation/causation and relevant ManagedPlan/Task/TaskDefinition/persona/policy/risk/budget version references, reason code, input references, and affected TaskRun/StepRun/Attempt. Trace records MUST NOT mutate or override authoritative lifecycle state.
 
 #### Scenario: User asks why only 23 items were read
-- **WHEN** a research Run stops below its requested count
+- **WHEN** a research TaskRun stops below its requested count
 - **THEN** the API projection SHALL be able to show actual count and a trace-derived reason such as content exhaustion, deadline, Edge unavailability, or budget limit
 
 #### Scenario: Trace disagrees with Ledger
@@ -74,27 +74,27 @@ Trigger, Cycle, Workflow, Arbiter, Policy-Risk, Ledger, and Reconciler SHALL app
 
 ### Requirement: Platform content and Agent output MUST be treated as untrusted input
 
-Platform posts, comments, messages, DOM text, model output, and Agent proposals MUST pass schema validation, capability/action allowlists, authorization, and policy checks before they influence executable work. Text from those sources MUST NOT be interpreted as an Automation Definition, raw tool call, Edge command, credential request, or authorization grant.
+Platform posts, comments, messages, DOM text, model output, and Agent proposals MUST pass schema validation, capability/action allowlists, authorization, and policy checks before they influence executable work. Text from those sources MUST NOT be interpreted as an TaskDefinition, raw tool call, Edge command, credential request, or authorization grant.
 
 #### Scenario: Platform post contains tool instructions
 - **WHEN** browsed content asks the Agent to call a tool or publish a message
-- **THEN** the text MAY be assessed as content but MUST NOT create an executable action outside a registered and authorized Definition
+- **THEN** the text MAY be assessed as content but MUST NOT create an executable action outside a registered and authorized TaskDefinition
 
 #### Scenario: Agent returns an unknown action
-- **WHEN** an Agent PlanPatch contains a step or action outside the registered schema
-- **THEN** the patch MUST be rejected and traced without forwarding it to Edge
+- **WHEN** an Agent `ReviseTaskProposal` contains a Capability or graph change outside the registered schema
+- **THEN** the proposal MUST be rejected and traced without forwarding it to Automation execution or Edge
 
 ### Requirement: Client projections MUST distinguish local, durable, and confirmed truth
 
-Customer-facing projections SHALL distinguish Edge Host local runtime state, Automation durable Run/Step/wait state, and platform-confirmed action result. Host events and user-level realtime notifications MAY invalidate/refetch API data but MUST NOT directly assert business success. Before first successful API read, clients MUST show unknown/loading/failure rather than fabricated zero or success.
+Customer-facing projections SHALL distinguish Edge Host local runtime state, Automation durable TaskRun/StepRun/wait state, and platform-confirmed action result. Host events and user-level realtime notifications MAY invalidate/refetch API data but MUST NOT directly assert business success. Before first successful API read, clients MUST show unknown/loading/failure rather than fabricated zero or success.
 
 #### Scenario: Host reports command completion
 - **WHEN** Classic receives a local Host event but Automation Ledger still shows `submitted_unknown`
 - **THEN** the client SHALL show the durable unknown result after API refetch and MUST NOT show platform-confirmed success
 
 #### Scenario: Automation waits while Host is stopped
-- **WHEN** a Run is `waiting_for_edge` and the local Host is stopped
-- **THEN** the client MAY show both facts separately and starting Host MUST only trigger a new handshake, not mark the Run complete
+- **WHEN** a TaskRun is `waiting_for_edge` and the local Host is stopped
+- **THEN** the client MAY show both facts separately and starting Host MUST only trigger a new handshake, not mark the TaskRun complete
 
 ### Requirement: Trace and evidence retention MUST be purpose-limited and revocable
 
