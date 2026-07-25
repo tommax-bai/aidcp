@@ -160,9 +160,13 @@ kernel 准入门实测：14 个文件里只有 6 个 CLEAN，**最承重的内�
 两侧各自编译通过、各自测试通过，只有真跑起来才 404。这与本仓「两份 `protocol.ts` 必须逐字一致」是同一个问题，
 区别只在协议那边有 `Record<MessageType,true>` 穷举兜着，这边什么都没有。一个包 = 一份定义 = 不可能漂。
 
-**⚠️ 一条真前置：`risk-command-outbox.ts` 现在 import `src/risk/types.ts`（automation）。**
-Phase 2 的 P2-6 会把那个文件整体提进 kernel；**在那之前动传输层，这条会变成包 → 业务层的反向依赖**。
-故 **`aidcp-transport` 必须排在 Phase 2 之后**。（这也是本文原先没写出来的一条顺序约束。）
+**~~⚠️ 一条真前置：`risk-command-outbox.ts` import `src/risk/types.ts`，故传输层必须排在 Phase 2 之后。~~
+更正（同日）：这条约束是我推错的** —— 那个文件的判定是**随属主留在 automation**，压根不进包，
+它的出边自然也就与包无关。**判顺序约束要看「进包那几个的出边」，不是「整目录里谁 import 了什么」。**
+
+**实测：8 个进包候选的出边只有三种** —— 彼此（`internal-http.ts`）、kernel 文件、node 内置。
+**对 api / automation / content 的业务层出边为 0。** 因此 `aidcp-transport` **完全不被 Phase 2 阻塞、随时可建**。
+（`internal-http.ts` 今天标 automation 只是因为整个 `src/transport/` 目录规则如此；它进包后那条边变成包内边。）
 
 ## 6. 硬阻断：schema 契约门的判定范围 ✅ 已解（`aidcp-cloud` master `e4558de`，已部署 dev）
 
