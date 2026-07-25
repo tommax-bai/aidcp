@@ -21,6 +21,24 @@
 
 > **2026-07-11 清账批**（第二次 openspec 分诊清账）：本批归档 **31 个** landed+deployed change，真机验收项按既有簇归并——发布链路 → 簇 3（`publish-select-mode-layout-robust` 5.3）、textcard → 簇 23（`textcard-carousel-form-parity` 6.3）、FB 加群评论 → 簇 32（新增 `facebook-group-join-observe-i18n` / `fb-group-join-wait-render` 两项 i18n + 就绪修复复核，见簇 32 补登）、`/comment` 搜索闭环 → 簇 34/55（`comment-search-command` 12.1，多次已跑通）、FB 评论人审 → 簇 48（`facebook-comment-review-and-targeted-join`）、**FB 公开组放量 → 新簇 59**（`facebook-group-join-and-commenting` 9.1-9.5）。归档后全库 `openspec validate --specs --all --strict` 106 项全绿。**本批刻意未归档（5 个仍活跃，另有门槛）**：① `publish-trigger-and-apply`（§11 统一部署待核）；② `edge-environment-platform-select`（tasks 3.3 明确 gate 在 FB edge driver `facebook-browser-env-and-login` 落 master，当前仅 probes 落地）；③ `humanize-interaction-prompts`（代码已部署 dev，但 tasks 9.4 spec 交织须待 `category-adaptive-images-and-judgment` 先归档）；④ `estimate-token-cost-column` + ⑤ `manual-billing-price-refresh`（代码已 shipped，但 `llm-token-usage-stats` spec delta 应用失败——前者用英文 header MODIFY 中文「console 提供…」需求、后者 MODIFY 一个无人创建的 `Token Usage Cost Estimates` 需求；两者对 cost/billing 需求建模不一致，须 owner 理顺 delta header / 重建模型后再归档）。**已废弃删除（1 个）**：`facebook-scheduled-comment`（2026-07-11 用户决定关为 superseded）——其 target-URL 定向评论设计已被 keyword-in-container 版取代（见归档 `2026-07-09-facebook-scheduled-comment` + `facebook-group-join-and-commenting`）；34/35 核心任务空，change 目录已 `git rm` 删除（内容存 git 历史）。**注**：唯一落地的 task 2.9（云端在握手时持久化 FB 昵称）代码仍在线；其需求已由后续小 change `facebook-nickname-handshake-persist`（2026-07-11 归档）正式补登进 `facebook-identity` capability——剔除了已被 `facebook-nickname-inplace-read`（簇 42）取代的 `/me` 探针描述、按现网「就地读取 → hello 附带 → 云端仅库内空时写、既有不覆盖」校订。至此该行为「代码在线 + 主 spec 有据」齐全。另 `category-adaptive-images-and-judgment`（高风险图产后校验待选视觉模型）、`self-contained-ads-runtime`（dev CLI 解析等代码活 + baked-key 决策）、及 4 个纯提案（`transcribe-textcard-image-text` / `facebook-consent-structural-detect` / `facebook-join-actuation-decouple` / `edge-installer-oss-distribution`）本就在研、非本批对象。
 
+> **2026-07-25 废弃关闭批（4 个，用户决定）**：为给 `split-classic-client-edge-host`（Edge 仓拆分）腾出「冻结文件集」，
+> 用户决定直接关闭以下 4 个活跃 change，change 目录已 `git rm` 删除（内容全部存 git 历史，可按本条追回）。
+> ① `wechat-customer-api-contract`（0/25）—— 关闭时**未修**的两个已坐实缺陷随之搁置：客户 API 草稿保存走五段路径
+> `PUT /environments/:envKey/replies/:jobId/draft`、云端只实现四段 ⇒ 人工改稿链路 100% 不可达；同一处把最长 180s 的
+> 模型调用整个包在授权数据库事务里、全程持有授权行共享锁。另该 change 原本要订正的台账不实项
+> （`wechat-channels-interaction-management` 任务 3.6「完全按冻结契约实现客户 API」标 `[x]` 与现网不符）**仍未订正**。
+> 未提交产物：`aidcp.wt/wechat-customer-api-contract` 内的 `docs/contracts/wechat-channels-interaction/v1/route-inventory.json`
+> 与 README 两行改动（未 commit、未 push，随 worktree 清理丢弃）。
+> ② `wechat-edge-runtime-honesty`（0/25）—— 关闭时**未修**的缺陷随之搁置：视频号 sidecar 在未确认浏览器真死时即丢弃句柄、
+> 运行时吞掉该诚实信号并无条件退出 ⇒「明知没关掉却上报已关闭」，直接命中 §2「MUST NOT 静默假成功」红线；另有解绑闸不覆盖
+> 浏览器授权（已解绑环境重启仍弹码并回写凭据、形成 AdsPower 删除永远失败的自维持环）、早退结果不落投递箱等三处同源缺口。
+> ③ `edge-installer-oss-distribution`（1/21）—— 安装包继续留在 ECS 生产盘 `/opt/aidcp/downloads/` 经 Nginx `autoindex` 分发。
+> 与同日「Host tarball 走 GitHub Release + 现有 downloads 通道、不绑 OSS」的决定一致；桶 `aidcp` 匿名读 403 的问题不再阻塞发行。
+> 唯一已勾任务 1.1（用户已在阿里云控制台建桶）为外部事实，不受删除影响。
+> ④ `ol-client-auto-update`（0/17）—— OL 桌面客户端继续无自动更新，用户须回下载页手动取包。
+> **遗留孤儿 worktree（待清，均无未推送提交）**：`aidcp.wt/{wechat-customer-api-contract,wechat-edge-runtime-honesty,ol-client-auto-update}`、
+> `aidcp-cloud.wt/wechat-customer-api-contract`、`aidcp-edge.wt/ol-client-auto-update` 及各自 `codex/<name>` 分支。
+
 ---
 
 ## 簇 1 — 多账号 / 多租户内核 ⭐最关键
