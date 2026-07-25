@@ -22,6 +22,7 @@
 - [x] 4.1 Run focused Edge TypeScript tests and Rust tests for the changed modules.
 - [x] 4.2 Run Native build/verification, Edge acceptance tests, full tests, and typecheck.
 - [x] 4.3 Run `openspec validate repair-native-facebook-reels-scroll --strict` and record repository commits, validation results, delivery boundary, and deviations.
-- [ ] 4.4 Commit, rebase, fast-forward integrate, and push the control and Edge changes without packaging or releasing an installer.
+- [x] 4.4 Commit, rebase, fast-forward integrate, and push the control and Edge changes without packaging or releasing an installer.
 
 <!-- Edge: 8b48f75 on master and pushed to origin/master. Validation: focused TypeScript 23/23; Rust all-targets 60/60; clippy with -D warnings; Native build and verification; Edge acceptance 30/30 with one explicitly gated real-machine suite skipped; Edge full test 2293/2293; typecheck; git diff --check; OpenSpec strict validation. Delivery remains source-only: no installer packaging, signing, release, installed-client update, or live Facebook-account acceptance. Deviation: cargo/rustfmt were invoked through the installed rustup toolchain because Cargo was not on the shell PATH. -->
+<!-- Control: OpenSpec change 7238693 on main and pushed to origin/main before this completion-ledger update. Edge integration was a clean fast-forward from current origin/master; control was current with origin/main before commit. -->
