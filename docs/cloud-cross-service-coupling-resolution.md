@@ -399,6 +399,38 @@ automation 要 `TriggerOutcome` + `ReferenceNote`（`delegated-task/executors.ts
 
 ---
 
+### ⚠️ 2026-07-26 实测发现：那 3 条「维持豁免」是 content 仓的**硬阻断**，不是可以一直挂着的账
+
+Phase 4 落地后剩余 10 条，逐条对上号：**P5-1 一条、P5-2 四条、P5-3 两条、⛔ 三条**。前七条有处置方案；
+**后三条按现行裁决是「不做、维持豁免」，而这在拆仓语境下走不通**：
+
+| 边 | 借的符号 |
+| --- | --- |
+| `agents/concept-extractor-role.ts`（content）→ `event-bus/types.ts`（automation） | `NoteDetailData` |
+| `agents/curated-note-evaluator.ts`（content）→ 同上 | `NoteDetailData` |
+| `cache/concept-store.ts`（content）→ 同上 | `ConceptPool` |
+
+**为什么之前的裁决在当时是对的、现在不够**：那条裁决（2026-07-22）是在**单体语境**下做的——
+豁免是一种「治理上允许它继续存在」的记账，单体里三个域同在一个进程，边挂着不影响任何东西。
+**但 content 一旦真的成为独立仓，它的 `src/` 里根本没有 `event-bus/types.ts` 这个文件**，
+这三行 import 解析不了、**仓编译不过**。豁免管得住门禁，管不住模块解析。
+
+**所以它必须在批次 2（content `main()`）之前有个结论**，可选路径（按代价排）：
+
+1. **`NoteDetailData` 只借形状**——两个消费方各自只读其中若干字段。可在 content 侧声明所需的窄结构，
+   配一道类型级漂移闸（与 Phase 2 那道 api 侧重抄闸同款）。**⚠️ 它经 `images?: NoteImagePayload[]`
+   直挂在被 §10.9 终局排除的协议文件上**，所以重抄必须连带那层，且**两份协议载荷的漂移
+   现有穷举类型抓不到**（那张表只覆盖消息名、不覆盖 payload 结构）——闸不能省。
+2. **`ConceptPool` 随概念池整体归属重裁**（它今天在 content，事实源却在 automation 的事件总线里）。
+3. **推翻 2026-07-22 的裁决**，把这三个符号析出到共享层——需在事件总线类型文件的串行独占窗口内做。
+
+**另有一条已登记、必须与之同批处理的隐患**：`ConceptPool.source` 是 `Map<string,string>`，
+**不可 JSON 序列化**。今天同进程传引用所以没事；拆完仓它变成跨进程 DTO，
+**Map 序列化后静默变成 `{}`** —— 不报错、只让概念池变空、搜索词悄悄退化成种子词。
+三个构造点（概念池存储 / 调度器 / 搜索评估角色）要一并改成普通对象。
+
+---
+
 ### ⛔ 不做：被终局裁决否决，维持豁免（3 条）
 
 `concept-extractor-role.ts` / `curated-note-evaluator.ts` 的 `NoteDetailData` + `concept-store.ts` 的 `ConceptPool` → `src/event-bus/types.ts`。
