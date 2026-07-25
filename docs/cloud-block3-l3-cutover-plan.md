@@ -100,7 +100,15 @@ split brain（读端看到空库或陈旧副本，写端的离场 / 授权状态
 >
 > **两条修法上的要点，照抄会出事**：
 > 1. **`AutomationWriterLock` MUST NOT 注入池**——advisory lock 是会话级的，池回收连接即释放锁（该文件头注释已写明）。
->    修法是让它的**连接配置**跟随 `resolveOwnerPgConfig('automation')`，而不是给它一个共享池。
+>    ⚠️ **但「让连接配置跟随 `resolveOwnerPgConfig('automation')`」这个处方是错的、会引入 bug**（2026-07-25
+>    对抗性评审拦下）：它的 `WriterLockConnectionConfig` 只有 `host/port/database/user/password`、
+>    **没有 `connectionString` 字段**，而 owner resolver 在 owner URL **已设**时返回的正是 `{connectionString}`
+>    ⇒ 五个字段全 `undefined` → 回落 `pgRiskConfigFromEnv()` → `DEFAULT_PG_CONFIG`（本机 `aidcp` + 内置明文口令兜底）
+>    ⇒ **在错的库上取锁，而且会成功** —— 正是这把锁要防的静默失效形态，由这一刀亲手引入。
+>    另两条：它今天认 `AIDCP_PG_*` 家族而 owner resolver 不认（**故也不是字节等价**）；失败后果是
+>    `process.exit(1)`、**整个云端拒绝启动**，不是风控降级。
+>    ⇒ **正确修法**：先给它的连接配置结构加上连接串支持（或另写一个 owner→writer-lock 专用解析），
+>    再改来源；并且必须有一条断言「设了 owner URL 之后它连的是 automation 库」。
 > 2. **`PgAlertStore` 的两处构造性质不同**：常规 `alertStore` 可注入属主池；启动期 `raiseStandaloneAlert`
 >    那一处 `finally` 里调 `store.close()`（= `pool.end()`），**注入共享池会把 automationPool 整个 end 掉**
 >    —— 与 `7f5232a` 修掉的那个 bug 同形。那一处只应把**配置来源**换成 owner resolver、继续自建池。
@@ -195,6 +203,70 @@ split brain（读端看到空库或陈旧副本，写端的离场 / 授权状态
 - **读后即取的语义**：`getOffboard` 是 `beginEnvironmentOffboard` 的读回半边，路由端点对「查不到」答 **404
   not_found**（`client-auth-server.ts:1946`）。离场写一旦变成 automation 侧独立提交，这个轮询会对**已受理**
   的离场合法地 404，端点目前**没有「已受理、尚未物化」这个词**。改最终一致时须同时给它一个诚实的中间态。
+
+### 2.2 剩余工作全量清单（2026-07-25 定稿，按可做性排序）
+
+> 口径：**「今天可做」= 三个 owner URL 全未设的当下逐字节等价、或「只把错误的失败改成正确的失败」**，
+> 且不需要用户在场。**「须用户在场」= 语义变化 / 碰生产数据路径 / 不可逆。**
+> 每条都标注了阻塞源，别跳过阻塞去做。
+
+### A. 今天可做（无阻塞、byte-eq 或纯修 bug）
+
+| # | 事项 | 为什么现在做 | 阻塞 |
+|---|---|---|---|
+| A1 | **面板事件 tee 的三个生产隐患**（见 §2.3）：无「没人看就短路」闸、无截断、outbox 零保留 | **一旦有人启用非单体模式当天就咬人**，而进程拆分正是要启用它 | 无 |
+| A2 | **`core` 模式的生成传输超时未接线**：组合根没给 HTTP 生成客户端传 `timeoutMs`（180s），落 15s 默认，而分段轮询是 150s ⇒ **每一次跨服务发帖生成在 15 秒确定性失败**，且抛出未被 catch | 它是「拆内容域」那一步的**硬阻断**，不是「潜伏的参数漂移」 | 无 |
+| A3 | **接上 `LISTEN`/`NOTIFY` 唤醒**（`wake()` 生产零调用者）+ **消费游标键加 `topic` 维** | 这两个先手吃掉 broker 的两个主卖点；见 redis 决策文档 §3.2 | 无 |
+| A4 | **让真库集成测试能在常规流程里跑**（今天 gate 在一个无人设置的 env 变量上 ⇒ 永久 skip） | 「先接通验证装置，再动语义」——否则后面的语义改造无从验证 | **必须带守卫**：那些测试会 `TRUNCATE` 客户身份/归属/离场台账，而 dev+ol 连同一台生产库、内置默认还兜底本机 `aidcp` ⇒ 拒绝已知生产 host + 强制专用库名前缀 + 仅 CI |
+| A5 | **行锁的机械门禁**：现有 AC-LOCK-01/02 只扫咨询锁、**不覆盖行锁** ⇒ 加一条「禁 api 层文件在事务内对 automation 属主表加锁，反之亦然」的扫描器 | 这是 §2.1 那 7 处唯一可能的回归保障 | 无 |
+| A6 | **面板事件信封补原始时间戳**：`created_at` 在解码时被丢弃 ⇒ 任何回放都被面板当成「刚刚发生」 | 诚实性缺陷，且回放是拆进程后的常规路径 | 无 |
+
+### B. 被活跃 change 挡住（等它归档，别并行动）
+
+| # | 事项 | 阻塞源 |
+|---|---|---|
+| B1 | `PgRiskStore` / `PgRiskCounterOutboxStore` 补接属主池 | change `risk-state-cross-process-integrity` 独占 `src/risk/`（§7 热点单写者） |
+| B2 | **`AutomationWriterLock` 换连接来源**——最严重的一处（advisory lock 按库 ⇒ 翻转后**静默双写 `risk_state`**）。**修法见 §1 callout c 的更正，照抄错处方会引入 bug** | 同上 |
+
+### C. 须先裁决设计，才能动
+
+| # | 事项 | 待裁决的问题 |
+|---|---|---|
+| C1 | `runSchemaContractGate` 的账本 Client（`schema_migrations` 属 automation，翻转后 enforce 模式**假绿**） | **迁移账本是一份，还是每个 owner 库一份？** 这决定了怎么改 |
+| C2 | 三条**今天就违反**「一个域绝不直连另一个域的库」的已落地链路：api 写 automation 的 outbox、api 读 automation 的 outbox 并写其游标、automation 读写 api 的审批 outbox | 传输层形态（本仓 redis 决策文档 §1 推荐「本域 outbox + 中继推 HTTP + 消费方 inbox 去重」）。定了才能重做这三条缝 |
+| C3 | 切换策略（owner-URL 整体翻转 vs 逐表双写） | 见 §3 与 handoff §5；**动数据前必须先定** |
+
+### D. 须用户在场（语义变化 / 碰关键路径）
+
+| # | 事项 | 性质 |
+|---|---|---|
+| D1 | **`client-user-store.ts` 余下 7 处跨库行锁 / 事务内读**（逐处见 §2.1） | 失效**无声**；须最终一致重设计 + 逐条测 |
+| D2 | **反方向的跨属主互斥**（`upsertAuthStatus` 在 automation 事务里锁 api 的 `client_environments` / `client_env_scope`；`assertAccountScope` 对 api 的 `client_env_revocation_holds` / `accounts` 取 `FOR SHARE`）——**这是「收口后就没有跨域互斥了」那句话的反例**，属主收口消不掉，因为两个对手按定义在两个域 | 正解 = 把授权首写点收敛进 api 的窄内部端点，互斥落回 api 一张表上的条件写。**不是加锁服务** |
+| D3 | 9 处跨库事务（4 个配置镜像版本 bump + 5 处离场联合提交）+ 1 处跨库写 | 架构级最终一致 |
+| D4 | automation → api 的 `accounts` 守卫读（去规范化 / 移守卫） | 多在写事务内 |
+| D5 | DDL 外键降级、建库、拷数据、翻 URL | 不可逆、碰生产库 |
+
+### E. 与拆库无关但有硬期限
+
+| # | 事项 | 期限 |
+|---|---|---|
+| E1 | 离场清理的盲删（`purgeDueOffboards` 生涯至今删 0 行，故其正确性从未被真实数据检验过） | **2026-08-14** —— 第一条 `purge_due_at` 到期日，那天它第一次有机会咬人 |
+
+### F. 已知的纪律欠账（不紧急，但别忘）
+
+- `interaction_offboards` / `client_env_revocation_holds` **没有 `execution_target` 列**（不是查询忘加过滤，是列不存在）⇒ 撤权对账 60 秒定时器与小时级清理定时器**在 dev 和 ol 两台各跑一份、扫同一批行**。今天不出事的原因是 `FOR UPDATE SKIP LOCKED` 在共享库上真的互斥。⚠️ **补这一列要连带想清楚回填**：存量行没有该列，猜错 target 的行从此两台都不认领、回填不到的行按「缺失即不处理」规则永不清理 —— 会与 E1 的期限直接冲突。故它的位置是「撤行锁之前」，不是「立刻」。
+- 多数被注入属主池的 store 的 `close()` 仍会 end 共享池（只是当前无人调用）。**给任何 store 新增 close 调用前先看 `ownsPool`。**
+
+### 2.3 面板事件 tee 的三个叠加隐患（A1 的细节）
+
+面板事件旁路（automation → api 的观测流）与面板推送端相比，**少了三道闸**：
+
+1. **没有「没人在看就短路」这道闸**。推送端第一行就是「没有已认证订阅者则直接 return」；tee 侧**无条件**写 outbox + 发通知。⇒ **后台没人开的绝大部分时间里，这条流仍以满速率往生产库写纯废行。**
+2. **没有截断**。推送端有单帧上限（超限降级为摘要帧）；tee 侧只做可序列化净化、**不限大小**。而「整批卡片到达」可带 20 张卡、「详情到达」带正文 + 评论 ⇒ 单条常在 KB 量级、可到几十 KB。按 1–3 KB 均值估 **0.4–3 GB/天**。
+3. **`event_outbox` 零保留策略**。全仓无任何 delete / prune / retention 命中，**行只进不出、无界增长**，且落在 dev 与 ol **共用的那台生产 PG** 上。
+
+⚠️ **三者与 `core` 模式的组合是最坏情形**：`core` 下 tee 的门禁**开**、而回放的门禁**不开**（它只在 api 模式开），同时面板推送在同进程内已经直连拿到了同一条流 ⇒ **每一条编排事件都被写进共享生产库，没有任何消费者，没有任何剪裁**。而「所有声明的消费者都有进度行才允许剪裁」这类守卫在 `core` 下会**永久拒绝剪裁 + 永久每小时告警**（那个消费者永远不会有进度行）。
+**用户会看到什么**：什么都看不到 —— 面板一切正常（走进程内直连），飞书没消息，只有一小时一条告警混在噪声里，直到共享生产库磁盘告急，而那台库同时服务 ol 生产。
 
 ## 3. 推荐执行顺序
 
