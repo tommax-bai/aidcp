@@ -4,9 +4,10 @@
 
 面向客户的桌面安装包 SHALL 仅由 `aidcp-classic-client` 构建，并 SHALL 从 lockfile 中精确锁定的
 `@aidcp/edge-host` release 组装 Host API、编译后 Core、Native Page Engine 与 AdsPower runtime
-资源。构建 MUST 校验 Host manifest、平台/架构和全部资源 SHA-256，并把 Classic version、Host
-version、双方 commit 和 manifest hash 写入可诊断 provenance。`aidcp-edge-host` MUST NOT 另行
-产出一个带产品 UI 的竞争安装包。
+资源。构建 MUST 校验 Host manifest、Electron major、Node modules ABI、runtime format、AdsPower
+runtime/protocol compatibility、平台/架构和全部资源 SHA-256，并把 Classic version、Host version、
+双方 commit 和 manifest hash 写入可诊断 provenance。`aidcp-edge-host` MUST NOT 另行产出一个带
+产品 UI 的竞争安装包。
 
 #### Scenario: Classic 构建已锁定的 Host
 
@@ -17,6 +18,22 @@ version、双方 commit 和 manifest hash 写入可诊断 provenance。`aidcp-ed
 
 - **WHEN** 打包输入中的 Core、Native 或 AdsPower runtime hash 与已锁定 Host manifest 不一致
 - **THEN** Classic 构建失败且不产出安装包，MUST NOT 复用上一次资源或联网选择另一 Host version
+
+#### Scenario: Electron 或 native ABI 不兼容
+
+- **WHEN** Classic 的 Electron major 或 Node modules ABI 与已锁定 Host manifest 不一致
+- **THEN** Classic 构建失败且不产出安装包，MUST NOT 依赖目标机启动时碰运气加载 native module
+
+### Requirement: 安装后的 Host MUST 随 Classic installer 固定版本
+
+Host 独立发版 SHALL 只产生供 Classic 构建消费的不可变输入。已安装应用中的 Host、Core、Native 与
+AdsPower template 版本 SHALL 由该 Classic installer 固定；运行时 MUST NOT 自行查询 latest、在线
+替换 Host package 或绕过 Classic 签名、公证和回滚链升级。
+
+#### Scenario: Registry 发布了新 Host
+
+- **WHEN** 客户机器仍运行旧 Classic，而 registry 已发布一个更新 Host release
+- **THEN** 已安装应用继续使用并校验 installer 内的旧精确版本，直到客户安装一个明确包含新 Host 的 Classic release
 
 ### Requirement: Host spawn 与 native 资源 MUST 使用真实 Resources 路径
 

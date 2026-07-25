@@ -32,3 +32,52 @@
 
 - **WHEN** 持有租约的客户端进程异常退出且新的实例随后请求相同环境
 - **THEN** Host 仅在原子锁已由操作系统释放或已证明旧 owner 不存活后取得新租约，并在取得前不启动任何执行资源
+
+## ADDED Requirements
+
+### Requirement: MachineRuntimeCoordinator MUST coordinate the machine-level AdsPower runtime across Host processes
+
+Every `@aidcp/edge-host` process SHALL use one MachineRuntimeCoordinator backed by cross-process atomic
+primitives before it stages, starts, inspects or uses the machine-level AdsPower runtime. The coordinator
+SHALL serialize runtime initialization, publish non-secret owner/version diagnostics and ensure concurrent
+Host processes resolve one authoritative compatible Local API base. Separate in-memory single-flight
+promises in each Host process MUST NOT be treated as machine-level coordination.
+
+#### Scenario: Two Hosts start on a cold machine
+
+- **WHEN** two Host processes concurrently request different profiles before the AdsPower daemon is running
+- **THEN** one process performs the bounded runtime stage/start while the other waits and then adopts the same verified compatible runtime/base without starting a second daemon
+
+#### Scenario: Runtime initialization fails
+
+- **WHEN** the Host holding the runtime-init lock cannot stage or start the packaged runtime
+- **THEN** it publishes a named factual failure, releases only its coordination ownership and the waiting Host MUST NOT infer that the daemon is ready
+
+### Requirement: AdsPower Local API pacing MUST be global across Host processes
+
+The MachineRuntimeCoordinator SHALL enforce the configured AdsPower Local API minimum interval across every
+Host and Core process using the shared daemon. It SHALL serialize the relevant lifecycle/write calls with a
+cross-process rate gate and authoritative last-call fact. Per-process `1.1s` queues MAY remain as local
+admission helpers but MUST NOT be the only protection.
+
+#### Scenario: Different Hosts start different profiles concurrently
+
+- **WHEN** Host A and Host B each pass their distinct profile lease and request Local API lifecycle writes at the same time
+- **THEN** the machine rate gate releases the calls in one globally paced sequence, so the distinct profile leases do not create a Local API burst
+
+### Requirement: An active incompatible machine runtime MUST fail closed without replacement
+
+Host SHALL compare the running AdsPower runtime/protocol version with its embedded Host manifest. Compatible
+Hosts MAY share the daemon. If the runtime is incompatible and has a live owner or active profile, the new
+Host SHALL fail as `ads_runtime_version_conflict`; it MUST NOT stop, replace, restage over or start a competing
+daemon. Host shutdown MUST NOT run machine-level `ads stop` merely because that Host is exiting.
+
+#### Scenario: New Classic embeds an incompatible runtime while an old Host is active
+
+- **WHEN** the new Host detects a different incompatible runtime/protocol version and the old Host still owns an active profile
+- **THEN** the new Host reports `ads_runtime_version_conflict` and leaves the old daemon, profile and owner untouched
+
+#### Scenario: One of two compatible Hosts exits
+
+- **WHEN** two compatible Host processes share the daemon and one shuts down
+- **THEN** the exiting Host closes only its Core/profile resources and releases its locks while the machine daemon and the other Host remain available
