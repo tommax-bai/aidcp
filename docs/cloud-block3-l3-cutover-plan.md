@@ -76,6 +76,8 @@
 业务写入归零。ol 走发布分支 `release/20260725-db-split`（= master `41f2c73`）。终局实测数据与翻转当天暴露的
 三个运维缺陷（`pg_hba` 按库名授权 / 重建 `public` 丢授权导致「表明明在却报 does not exist」/ `pg_dump --table`
 不带触发器函数）见 `docs/cloud-block3-l3-next-session-handoff.md` §1.5 与 §2。
+**旧库 `aidcp` 已于同日 16:03 退役（`DROP DATABASE`，不可逆）**：退役前连接数六次采样恒为 0、两份已验证备份留档，
+退役后冷启动 47 子系统就绪 / 三门全过 / 0 错误。⚠️ 回滚方式随之改变，详见 handoff §2。
 
 <details><summary>下面是本批之前的原始矩阵（追溯用）</summary>
 

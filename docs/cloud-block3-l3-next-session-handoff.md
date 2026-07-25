@@ -121,27 +121,48 @@ AC-OWN   crossLayerWrites: 0  dmlViolations: 0    ddlViolations: 0  exemptions: 
 **ol 的部署走的是发布分支** `release/20260725-db-split`（= master `41f2c73`），部署前已做
 `/opt/aidcp/cloud.bak.20260725-oldbsplit.tar.gz` 与 `.env.bak.20260725-oldbsplit`。
 
-### 回滚（成本极低，随时可退）
+### 旧库已退役（2026-07-25 16:03，不可逆）
 
-整个翻转对旧库 `aidcp` 是**只读**的 —— 数据是拷出去的，旧库一个字节没动，且仍是完整可用的全量副本。
-退回今天只需两步（两台各做一次）：
+`DROP DATABASE aidcp` 已执行。实例上现在只有 `aidcp_content` / `aidcp_automation` / `aidcp_api`
+（+ 同机 `isales`，**一字未动**）。
 
+退役前做实的三件事：
+1. **六次采样、跨一分钟，`aidcp` 上的连接数恒为 0** —— 没有任何消费者。
+2. **两份备份**（都在 `/opt/aidcp/pgbackup/`，该目录在 `cloud/` 之外、不受部署 rsync 影响）：
+   - `aidcp-pre-l3-20260725.dump` —— **拆库之前**的完整状态（跨属主外键都还在），要整体回到「一个库」就用它；
+   - `aidcp-final-before-drop-20260725.dump` —— 旧库**最终**状态，已用 `pg_restore --list` 验证可读、**含全部 98 张表的数据**。
+3. **退役后冷启动验证**：dev 重启一次，47 条子系统就绪、三个契约门全过、**0 错误** —— 证明没有任何东西依赖旧库。
+
+### ⚠️ 回滚方式已经变了
+
+**「注释掉三行 URL + 重启」这条路已经不通了** —— 属主 URL 未设时会回落到 `PGDATABASE=aidcp`，而那个库已经不存在，
+进程会**响亮地起不来**（这是对的方向：不存在的退路不该假装还在）。
+
+现在真要回到单库，必须：
 ```bash
-# 注释掉 .env 里那三行 AIDCP_PG_{CONTENT,AUTOMATION,API}_URL
-systemctl restart aidcp-cloud.service
+# 1. 停两端服务
+# 2. 从备份重建旧库（选哪一份取决于你要回到哪个时点）
+sudo -u postgres createdb -O aidcp aidcp
+sudo -u postgres pg_restore -d aidcp /opt/aidcp/pgbackup/aidcp-final-before-drop-20260725.dump
+# 3. 把三个属主库在退役之后产生的增量搬回去（这一步没有现成脚本，且随时间越来越大）
+# 4. 注释掉两端 .env 的三行 AIDCP_PG_*_URL，重启
 ```
+⇒ **实际上这已经是单向门。** 从这里往前只有修，没有退。
 
-⚠️ **但退回会丢掉翻转之后写进属主库的数据**。翻转已在真实运行，越晚回滚代价越大 ——
-若要回滚，先把三个属主库的增量搬回 `aidcp`。备份：`/opt/aidcp/pgbackup/aidcp-pre-l3-20260725.dump`（翻转前的完整快照）。
+### 两处已知的残留（都无害，登记备查）
+
+- 两端 `.env` 里 `PGDATABASE=aidcp` 仍指向一个已不存在的库。**刻意不改**：改成某个属主库名会让「回落」静默连上
+  一个错误但存在的库，那比响亮失败坏得多。
+- `pg_hba.conf` 里 `host aidcp aidcp <addr> scram-sha-256` 两条规则现在指向不存在的库，**惰性无害**（没有该库可匹配）。
+  新增的 `host aidcp_content,aidcp_automation,aidcp_api aidcp <addr> scram-sha-256` 两条才是生效的。
 
 ### 还没做的收尾
 
-- **`aidcp` 旧库尚未退役**，仍原样留着（这是有意的：它是最干净的回滚点）。确认稳定若干天后再决定处置。
 - **enforce 模式仍未开**（`AIDCP_SCHEMA_GATE` 默认 warn）。三个契约门现在都真的在各自库上判，
   开 enforce 才能把「账本对不上就拒绝启动」变成硬保证。建议观察几天后再翻。
-- **`aidcp_automation` 的账本带着全量 77 行**（它是随表一起拷过去的，`schema_migrations` 登记为 automation 属主），
-  而 content / api 是用 `migrate baseline --owner=` 按自己的范围新建的（20 / 53 行）。
-  三者都能通过契约门；automation 那份多出来的行属过渡残留，`migrate status` 会如实报出，**没有自动删**（删账本行不可逆）。
+- **`aidcp_automation` 的账本带着全量 77 行**（随表一起拷过去的，`schema_migrations` 登记为 automation 属主），
+  而 content / api 是用 `migrate baseline --owner=` 按自己范围新建的（20 / 53 行）。三者都过契约门；
+  automation 那份多出来的行属过渡残留，`migrate status` 会如实报出，**没有自动删**（删账本行不可逆）。
 
 ## 3. 本批里最该知道的六件事（血泪，接手前必看）
 
