@@ -55,6 +55,13 @@
 两端 `.env` 的 `PGDATABASE=aidcp` 与 `pg_hba` 里两条旧规则刻意保留不改：指向不存在的库是惰性且诚实的，
 改成某个属主库名反而会让回落**静默**连上错误的库。
 
+**`AIDCP_SCHEMA_GATE=enforce` 已在两端开启**（同日 16:2x）：账本与本构建对不上即**拒绝启动**，
+防的是「代码回滚、库没回滚 ⇒ 旧代码自建空表继续写、零告警」。开之前先把三个账本做成精确态：
+content 20/20、automation 42/42、api 53/53，零待应用、零多余、零校验和不一致。automation 原有 **35 行多余**
+（`schema_migrations` 属 automation ⇒ 拷表时把整张账本连别家迁移一起带走），已按显式版本清单删除、
+删前备份 `/opt/aidcp/pgbackup/automation-ledger-before-prune-20260725.dump`；删后其最高版本由 0078 变为无歧义的 0077。
+两端启动三门全过、0 错误。回滚 = 把该行改回 `warn` 重启（备份 `.env.bak.pre-enforce-20260725`）。
+
 ---
 
 ## 0. 状态更新（2026-07-24 夜，上一 session 续做 L2）

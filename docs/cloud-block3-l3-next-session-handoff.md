@@ -156,13 +156,39 @@ sudo -u postgres pg_restore -d aidcp /opt/aidcp/pgbackup/aidcp-final-before-drop
 - `pg_hba.conf` 里 `host aidcp aidcp <addr> scram-sha-256` 两条规则现在指向不存在的库，**惰性无害**（没有该库可匹配）。
   新增的 `host aidcp_content,aidcp_automation,aidcp_api aidcp <addr> scram-sha-256` 两条才是生效的。
 
+### enforce 模式已开（两端，2026-07-25 16:2x）
+
+`AIDCP_SCHEMA_GATE=enforce` 已在 dev 与 ol 都生效。含义：启动时任一属主库的迁移账本与本构建对不上，
+进程**拒绝启动**，而不是打一行日志继续跑。
+
+它防的是**回滚场景的静默假成功**：库比代码新时（代码回滚了、库没回滚），旧代码的存储会发现表不在、
+**自己建一张空表、开始往里写**，全程零告警——数据还在，但新代码写的那份没人读了。
+
+**开之前先把三个账本做成了精确态**（这才是 enforce 敢开的依据）：
+
+```
+content     范围 20 条 / 账本 20 行 / 已应用 20 / 待应用 0 / 多余 0
+automation  范围 42 条 / 账本 42 行 / 已应用 42 / 待应用 0 / 多余 0
+api         范围 53 条 / 账本 53 行 / 已应用 53 / 待应用 0 / 多余 0
+```
+
+automation 原本有 **35 行多余**——`schema_migrations` 登记为 automation 属主，所以拷表时把**整张账本**
+（含 content / api 的迁移）一起带了过去。契约门本来就按属主裁剪后再判定，所以带着它也能过；
+但 enforce 的失败后果是拒绝启动，**不该让正确性依赖那道裁剪**。已按显式版本清单删掉，
+删前备份在 `/opt/aidcp/pgbackup/automation-ledger-before-prune-20260725.dump`。
+删完 automation 的账本最高版本从 0078 变成**无歧义的 0077**。
+
+两端启动实测：`schema 契约门（enforce/content|automation|api）` 三条**全部通过**，
+dev 47 / ol 46 条子系统就绪，**0 错误**，health 200。
+
+回滚这一项很轻：把 `.env` 里那行改回 `warn`（或删掉）重启即可，备份在 `.env.bak.pre-enforce-20260725`。
+
 ### 还没做的收尾
 
-- **enforce 模式仍未开**（`AIDCP_SCHEMA_GATE` 默认 warn）。三个契约门现在都真的在各自库上判，
-  开 enforce 才能把「账本对不上就拒绝启动」变成硬保证。建议观察几天后再翻。
-- **`aidcp_automation` 的账本带着全量 77 行**（随表一起拷过去的，`schema_migrations` 登记为 automation 属主），
-  而 content / api 是用 `migrate baseline --owner=` 按自己范围新建的（20 / 53 行）。三者都过契约门；
-  automation 那份多出来的行属过渡残留，`migrate status` 会如实报出，**没有自动删**（删账本行不可逆）。
+- **账本「空洞」仍不致命**：判定只看最高版本，中间缺条目会被算出来并打印，但不影响通过与否。
+  三个库现在实测零空洞，所以今天没差别；要让它成为硬保证，得再把 `holes` 升级为致命。
+- **13 条残留迁移**（头声明为空、计入全部属主）仍在。它们不声明任何对象，所以不会造成缺失判定，
+  但它们让三个属主的范围各自多算了 13 条。补齐这些头声明能让范围更精确。
 
 ## 3. 本批里最该知道的六件事（血泪，接手前必看）
 
