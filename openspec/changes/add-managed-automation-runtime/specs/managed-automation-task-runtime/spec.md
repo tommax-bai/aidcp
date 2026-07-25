@@ -78,7 +78,11 @@ TaskRun and StepRun lifecycle SHALL distinguish `queued`, `running`, `waiting`, 
 
 ### Requirement: Cross-service task nodes MUST exchange typed references
 
-Cross-service nodes SHALL use durable commands/events or narrow internal APIs and save external object references. Automation MUST NOT copy or become the writer of Content candidates/assets, API approvals, personas, or account master data.
+Cross-service nodes SHALL use durable commands/events or narrow internal APIs and save external object references. Automation MUST NOT copy or become the writer of Content candidates/assets, API approvals, personas, or account master data, and MUST NOT obtain them by connecting to another domain's database; every cross-owner read SHALL go through an interface implemented by the owning domain on its own connection. Because no transaction may span two owner databases, any API- or Content-owned fact frozen into an ExecutionPlan is a read snapshot and MUST be revalidated before irreversible dispatch rather than treated as transactionally held.
+
+#### Scenario: Frozen approval and candidate are checked before dispatch
+- **WHEN** a StepRun is about to dispatch an external write whose ExecutionPlan froze an API-owned approval revision and a Content-owned candidate version
+- **THEN** it SHALL re-read both through their owning domains' interfaces and MUST NOT satisfy the check by querying the API or Content database directly
 
 #### Scenario: Creation is requested
 - **WHEN** a creation-request Capability is admitted
@@ -123,6 +127,18 @@ A parent TaskRun or ManagedCycle SHALL derive its summary from child StepRun/Tas
 #### Scenario: Publish is cancelled after dispatch
 - **WHEN** cancellation arrives after a publish Attempt was dispatched
 - **THEN** Task Runtime SHALL retain cancellation requested, continue reconciliation, and MUST NOT rewrite the Attempt as not submitted
+
+### Requirement: Runs MUST terminate as submitted-unknown while a dispatched Attempt is unsettled
+
+A TaskRun that reaches its deadline, budget bound, or cancellation point while any dispatched Attempt has no authoritative platform outcome SHALL terminate with `submitted_unknown` and SHALL remain linked to that unsettled Attempt. It MUST NOT adopt an earlier Attempt's failure reason as the run outcome, MUST NOT be recorded as a clean failure, and MUST NOT redispatch the irreversible action. Customer-visible results for such a run SHALL be derived from the current Ledger outcome rather than the snapshot taken at termination, and parent TaskRun/ManagedCycle summaries SHALL reference the Ledger rather than freeze an unknown child as succeeded or failed.
+
+#### Scenario: Deadline arrives with a dispatched publish outstanding
+- **WHEN** a TaskRun reaches its deadline or budget bound while a publish Attempt is dispatched without an authoritative result, and an earlier Attempt had failed for a benign reason
+- **THEN** the TaskRun SHALL terminate as `submitted_unknown`, MUST NOT render the earlier failure as the run outcome, and MUST NOT retry the publish
+
+#### Scenario: Reconciler settles after the run terminated
+- **WHEN** Reconciler later confirms or disproves the platform write for a terminated `submitted_unknown` TaskRun
+- **THEN** the customer-visible result and its parent cycle summary SHALL follow the updated Ledger outcome while the TaskRun's own terminal record remains unchanged
 
 ### Requirement: High-frequency session events MUST remain distinct from durable task checkpoints
 

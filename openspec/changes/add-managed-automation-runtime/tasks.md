@@ -11,13 +11,13 @@
 
 ## 2. Build the durable runtime foundation
 
-- [ ] 2.1 Add additive migrations for plan/task runtime projections, task revisions, cycles, immutable execution plans, task/step runs, trigger bindings/inbox, capability/task definitions, intents, attempts, receipts, reconciliation work, decision traces, and budget allocations/consumption.
+- [ ] 2.1 Add additive migrations for plan/task runtime projections, task revisions, cycles, immutable execution plans, task/step runs, trigger bindings/inbox, capability/task definitions, intents, attempts, receipts, reconciliation work, decision traces, and budget allocations/consumption — all in the automation owner database, using that database's own migration ledger, with every new table registered in the table-ownership manifest.
 - [ ] 2.2 Add target-first claim/recovery indexes and `(execution_target, idempotency_key)` uniqueness where applicable; make all target values server-injected and disable workers on invalid deployment target.
 - [ ] 2.3 Add legal lifecycle/CAS predicates for TaskRun, StepRun, Intent, and Attempt transitions so stale messages cannot move terminal state backward.
-- [ ] 2.4 Implement typed stores with transaction boundaries, owner checks, pagination/retention hooks, and no cross-domain writes to API/Content-owned tables.
-- [ ] 2.5 Implement Outbox/Inbox publishing and consumption with message-version/schema validation, durable deduplication, aggregate ordering, retry/dead-letter metrics, and correlation propagation.
+- [ ] 2.4 Implement typed stores with transaction boundaries, owner checks, pagination/retention hooks, and no cross-owner reads, writes, row locks, or joint commits against API/Content-owned tables; obtain every cross-owner fact through an interface implemented by the owning domain on its own connection.
+- [ ] 2.5 Implement Outbox/Inbox publishing and consumption with message-version/schema validation, durable deduplication, aggregate ordering, retry/dead-letter metrics, and correlation propagation, reusing the automation domain's existing single-writer outbox plus in-process relay and internal HTTP; do not borrow another domain's outbox and do not introduce a message broker.
 - [ ] 2.6 Add execution-target isolation, duplicate delivery, stale aggregate version, illegal transition, and worker-disabled acceptance tests.
-- [ ] 2.7 Add schema ownership and cross-repository import/DML gates before extracting code from `aidcp-cloud`.
+- [ ] 2.7 Register every new table and module in the existing ownership/lock/split gates rather than adding a parallel gate, and prove cross-owner row locks, writes, and DML violations stay at zero as the tables are added; account-lane mutual exclusion SHALL be proven to hold only within the automation database and MUST NOT be relied on to exclude API- or Content-domain writers.
 
 ## 3. Implement Capability, TaskDefinition, Trigger, Cycle, and Task Runtime modules
 

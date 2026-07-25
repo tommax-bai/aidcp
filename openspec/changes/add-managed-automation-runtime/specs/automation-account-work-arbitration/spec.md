@@ -2,7 +2,11 @@
 
 ### Requirement: Automation MUST serialize conflicting work per authoritative account lane
 
-Account Work Arbiter SHALL create a lane from the API-authoritative account/platform binding and frozen `envKey`, binding revision, and execution target. Work that can conflict on the same platform account SHALL be admitted through this lane before requesting Edge or connector resources. Display names, client-provided IDs, and mutable aliases MUST NOT define the lane.
+Account Work Arbiter SHALL create a lane from the API-authoritative account/platform binding and frozen `envKey`, binding revision, and execution target, obtaining that binding through the owning domain's interface rather than a direct cross-database read. Work that can conflict on the same platform account SHALL be admitted through this lane before requesting Edge or connector resources. Display names, client-provided IDs, and mutable aliases MUST NOT define the lane. Lane exclusion SHALL be enforced only within the automation owner database and MUST NOT be relied on to exclude writers owned by other domains.
+
+#### Scenario: Lane exclusion is asked to cover another domain's writer
+- **WHEN** a design or implementation would depend on the account lane to serialize a write owned by the API or Content domain
+- **THEN** it MUST instead route that write through its single owning writer or an eventually consistent contract, because a database-scoped lock cannot exclude a writer connected to a different owner database
 
 #### Scenario: Browse and publish target the same account
 - **WHEN** a managed browse TaskRun is active and an approved publish TaskRun becomes eligible for the same account
