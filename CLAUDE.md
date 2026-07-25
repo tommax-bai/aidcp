@@ -108,3 +108,72 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **开发并行、集成串行**：合回默认分支前先 `fetch` + rebase 到最新默认分支、解冲突、跑 `test:acceptance` + `typecheck` 再 ff 合并。**push 遇 non-ff 一律 rebase 后重来、绝不 force**（force / 非 ff 仍按 §6 需先确认）；空 diff = 已在远端、可弃（见 memory `concurrent-session-shares-subrepo-worktree`）。
 - **完成即收口**：部署 + 验证通过 → archive 该 change → 删 worktree / 分支。有 worktree 却无对应活跃 change = 孤儿，清掉。
 - 操作手册（开流 / 集成 / fleet 状态命令、helper 脚本）见 `docs/parallel-dev-worktrees.md`。**该手册的命令序列 / 脚本经实战跑通验证后方视为定稿**；未验证前只把本节不变量当 OVERRIDE 法条。
+
+## 8. 云端拆仓不变量（Block④ · 四包七仓期间一律 OVERRIDE）
+
+> `aidcp-cloud` 正在拆成 `aidcp-api` / `aidcp-automation` / `aidcp-content` 三个业务仓 +
+> `aidcp-kernel`（零副作用契约）/ `aidcp-transport`（跨进程运行时原语）两个共享包。
+> **拆仓期间任何触碰 `aidcp-cloud/src/**` 或 `boundaries/**` 的改动都受本节约束**，与是否属于拆仓任务无关。
+> 执行清单见 `docs/cloud-cross-service-coupling-resolution.md`，上位方案见
+> `docs/cloud-composition-root-trisection.md` 与 `docs/cloud-service-decomposition-proposal.md`。
+
+### 8.1 事实源与派生物（弄反了就会静默漂）
+
+- **归属的唯一事实源＝控制仓 `docs/cloud-service-decomposition-proposal.md` §4.7 / §4.6.x**；
+  `aidcp-cloud/boundaries/ownership-rules.json` 是它的机械转写，`module-ownership.json` /
+  `import-exemptions.json` / `table-write-exemptions.json` 是 `npm run boundaries:refresh` 的**生成物**。
+  **MUST NOT 手改生成物**；认为某行判错，走控制仓 change 改 §4.x 再回写规则表。
+- **四个新仓 / 两个包的 `src/` 是派生物，MUST NOT 手工搬文件**：一律用控制仓
+  `scripts/sync-split-repos`（`--check` 对账 / `--apply` 同步 / `--prune` 才删）。
+  手工切一次是搬家，手工切第二次就是猜。
+- **kernel 版本 pin 是派生事实**：三仓 `package.json` 里那条 sha MUST 恒等于 `aidcp-kernel` master 头。
+  **这条漂移尤其阴——npm 装到旧 sha 不报错、编译照过，跑的却是过期契约**；已纳入 `sync-split-repos` 对账。
+- **组装根 `src/server.ts` / `src/index.ts` 永不自动同步进新仓**（那是各仓要手写的 `main()`，
+  自动覆盖等于把主交付物悄悄删掉）。`sync-split-repos` 对它只报不改，改了也不接受。
+
+### 8.2 编辑纪律
+
+- **`boundaries/ownership-rules.json` 与 `kernel-non-members.json` MUST 手工 Edit 追加，绝不脚本整体重序列化。**
+  它们是一行一条的紧凑风格且分组顺序有意义；重序列化会把「语义改 3 处」变成「diff 一千行」，
+  今后每次 review 都看不见真正的改动（`aidcp-cloud@ff7fddf` 已为此回滚过一次）。
+- **新增 kernel 成员必须同时改两处**：`ownership-rules.json` 的 `fileOverrides` + `kernel-non-members.json`
+  的 `kernelRoster.members`（`AC-BOUND-03` 对两者 deepEqual）。`src/kernel/` **没有目录规则**，
+  漏加 fileOverride 会让 `boundaries:refresh` 直接抛错。
+- **定位一律按符号名，行号只作导航。** 段落定位用函数边界，不用内容特征串（撞同名会把整块插错段）。
+- **判「块尾」的判据是「括号配平**且**该行以 `;` 或 `}` 结尾」**——只判配平会被多行泛型骗过。
+
+### 8.3 消边判据（做了不算数的那些）
+
+- **只把属主文件改成 shim / 原位再导出、不 repoint 消费方 ＝ 假消边。** 那条边原样留着，只是换了个马甲；
+  扫描器认的是 import 说明符。**真消边 MUST 把跨属主消费方改指新落点。**
+- **豁免清单是单调棘轮：只许下降。** 新增违规 MUST 当场修掉；确需冻结走 `--raise=<change>:<数量>:<日期>`
+  问责通道并逐条写消除动作。**削减 MUST 在同一提交里删条目并下调 `frozenTotal`**，不留空位给新违规回填。
+- **别抄任何写死的数字**（豁免总数 / kernel 成员数 / 文件计数）：以当场跑一次门禁读到的为准，文档里的都是快照。
+
+### 8.4 kernel / transport 准入
+
+- **kernel 准入的真判据在 `test/acceptance/module-boundary.test.ts` 的 `KERNEL_ADMISSION_CHECKS`**，
+  MUST 抄真正则实跑，不凭记忆用「四条硬禁」。已知坑：`setTimeout(` / `setInterval(` / `new Pool(`
+  **不锚行首**；`const X: ReadonlySet<string> = new Set([...])` 的类型标注**救不了它**；
+  检查只剥注释、**不剥字符串字面量**（错误文案里的 `LlmClient`、带引号的 `https://` 都会命中）；
+  `export * from` 在模块图里就是一条 import 边。
+- **还有第五条不在正则里、无豁免通道：kernel MUST NOT import 任何业务层文件。**
+- **判据是「哪一段能进」，不是「整文件能不能进」**：属主文件在拒入名册上时，只析出纯段、
+  残壳留原处保持原属主并具名再导出（拒入路径 MUST 仍存在，`AC-BOUND-03` 会查）。
+- **kernel 里不放行为类**：现有导出类全是错误类型，判例明写「路由客户端类留 content」。
+  真要共用一个类的能力，把里面**无状态的那段提成函数**，类留原处当薄壳——既不进 kernel，也不复制第二份实现。
+- **`aidcp-transport` 准入＝「三家都可能调用 + 不含任何属主表的 SQL」**（比 kernel 宽、比复制三份严）。
+  它存在的直接理由：那些「服务端注册 + 客户端 + 路径常量」三件套的文件，**复制成两份两端路径会悄悄对不上，
+  且两侧各自编译通过、各自测试通过，只有真跑起来才 404**。
+
+### 8.5 红线的拆仓形态（都属「静默假成功」）
+
+- **跨段前向引用 MUST 经响亮取用闸**（`crossSegment`），MUST NOT 写成裸 `ctx.X?.doSomething()`——
+  单体里恒有、拆完读到 `undefined` 就被 `?.` 静默吞掉，调用方照拿「成功」。
+  `AC-SPLIT-CROSSSEG` 会当场拦；确属「缺席无后果」的，进白名单并写明理由。
+- **一个域绝不直连另一个域的数据库。** 本进程只对本属主库开池，启动期断言两个方向都拦。
+- **跨进程后 `instanceof` 恒 false**：跨边界的错误识别 MUST 改结构化守卫（按 `name` + 具名字段判），
+  否则会静默退化成兜底原因、吞掉真实失败。
+- **依赖 / 引用类审计 MUST 把动态 `import()` 算进去。** 只匹配 `from` 说明符会漏——
+  实例：文字卡渲染的两个依赖是懒加载的，而那条链路**工厂返回 null 即降级**，装漏了不崩不报、
+  只是封面悄悄退回生成式（同类漏检还有耦合清单「103 vs 实测 104」那条内联动态 import）。
