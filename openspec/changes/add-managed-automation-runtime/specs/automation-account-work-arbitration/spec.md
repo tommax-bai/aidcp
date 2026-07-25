@@ -54,10 +54,10 @@ Account Work Arbiter SHALL decide which business work may advance for an account
 
 ### Requirement: Missed schedules MUST follow explicit policy
 
-When `latestStartAt` passes before irreversible dispatch, the Arbiter SHALL apply exactly one declared `missPolicy`: `skip`, `require_reapproval`, or `execute_when_available`. It MUST NOT choose a fallback based on process restart, Edge reconnect, or implementation convenience.
+When `latestStartAt` passes before irreversible dispatch, the Arbiter SHALL apply exactly one declared `missPolicy`: `skip`, `require_reapproval`, or `execute_when_available`. It MUST NOT choose a fallback based on process restart, Edge reconnect, or implementation convenience. `skip` and `execute_when_available` apply only to work blocked on resource or executor availability. When the work's current blocker is a pending human approval decision, window expiry SHALL withdraw only the current execution authorization and leave the content in a re-approvable pending state; it MUST NOT terminate the approval wait as skipped.
 
 #### Scenario: Scheduled publish misses a skip window
-- **WHEN** Edge remains offline until after a publish work item's `latestStartAt` and `missPolicy=skip`
+- **WHEN** an already-approved publish work item is blocked only by Edge being offline until after its `latestStartAt`, and `missPolicy=skip`
 - **THEN** the work SHALL terminate as skipped and MUST NOT publish later
 
 #### Scenario: Approved publish requires reapproval after lateness
@@ -158,7 +158,7 @@ Whenever the system releases or parks a resource in favour of a wait, it SHALL s
 
 ### Requirement: Consecutive external-write failures MUST suspend the account lane
 
-The Arbiter SHALL track consecutive external-write failures per account and, on reaching a configured threshold, MUST suspend admission of further already-authorized irreversible work for that account while preserving each item's authorization, and MUST emit an operator alert. Clearing the suspension SHALL require an explicit human action that is always reachable, so a suspended account can never become undispatchable with no path to recovery. Preemption and other scheduling terminations MUST NOT contribute to this counter.
+The Arbiter SHALL track consecutive external-write failures per account and, on reaching a configured threshold, MUST suspend admission of further already-authorized irreversible work for that account while preserving each item's authorization, and MUST emit an operator alert. Clearing the suspension SHALL require an explicit human action that is always reachable, so a suspended account can never become undispatchable with no path to recovery; this suspension is one of the classes explicitly exempt from automatic suppression self-expiry, and that exemption holds only because the human release path is guaranteed. Preemption and other scheduling terminations MUST NOT contribute to this counter.
 
 #### Scenario: Edge page automation breaks
 - **WHEN** three consecutive publish dispatches for one account fail at the sequence level

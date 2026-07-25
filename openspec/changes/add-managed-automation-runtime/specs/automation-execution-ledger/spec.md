@@ -118,7 +118,7 @@ Pre-dispatch non-start SHALL carry a typed reason derived from the recorded fact
 
 #### Scenario: Native scheduled publish is accepted
 - **WHEN** the platform accepts a scheduled publish whose public object will not exist until its due time
-- **THEN** the Attempt SHALL settle `accepted_pending`; its internal receipt MUST NOT be exposed as a public id or link and MUST NOT consume publish quota, and only a due-time bounded reconciliation observing the public object may confirm it
+- **THEN** the Attempt SHALL settle `accepted_pending`; its internal receipt MUST NOT be exposed as a public id or link and MUST NOT consume publish quota at submission time (its platform-risk consumption is recorded once the effect becomes externally live), and only a due-time bounded reconciliation observing the public object may confirm it
 
 #### Scenario: Follow target is already followed
 - **WHEN** evidence shows the account already follows the target
@@ -138,7 +138,7 @@ Once an Attempt reaches a state evidencing that a real platform action occurred,
 
 ### Requirement: Idempotency and retry preconditions MUST cover attempts, completed work, and residual state
 
-Duplicate suppression SHALL cover attempts, not only successful writes: a target that reached a non-success terminal outcome (approval rejected, validator rejected, failed, timed out) MUST be suppressed from re-selection for a bounded configurable window, and re-selection afterwards MUST be an explicit traced decision. A target with an outstanding `submitted_unknown` Attempt MUST NOT receive a new intent until that Attempt is settled. Idempotency MUST also cover records that already reached terminal success, and the business idempotency key MUST be anchored to the identity of the approved artifact and to platform-stable identifiers; a binding MUST NOT derive a key at a granularity that lets the same approved artifact be authorized twice. Before dispatching a new Attempt for an intent whose previous Attempt was cancelled or preempted after partial composition, the executor SHALL verify that the platform-side authoring surface is in a clean starting state and MUST NOT append onto residual draft state.
+Duplicate suppression SHALL cover attempts, not only successful writes: for a target committed by a run whose submit capability was admitted, a non-success terminal outcome (approval rejected, validator rejected, failed, timed out) MUST suppress that target from re-selection for a bounded configurable window. A rehearsal run whose submit capability was denied creates no Attempt and MUST NOT write such a suppression, so rehearsing cannot consume the production target pool, and re-selection afterwards MUST be an explicit traced decision. A target with an outstanding `submitted_unknown` Attempt MUST NOT receive a new intent until that Attempt is settled. Idempotency MUST also cover records that already reached terminal success, and the business idempotency key MUST be anchored to the identity of the approved artifact and to platform-stable identifiers; a binding MUST NOT derive a key at a granularity that lets the same approved artifact be authorized twice. Before dispatching a new Attempt for an intent whose previous Attempt was cancelled or preempted after partial composition, the executor SHALL verify that the platform-side authoring surface is in a clean starting state and MUST NOT append onto residual draft state.
 
 #### Scenario: The same approved draft is authorized twice
 - **WHEN** an already-published record's identifier is authorized again
