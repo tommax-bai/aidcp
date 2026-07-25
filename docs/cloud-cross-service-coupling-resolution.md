@@ -77,7 +77,22 @@ automation 要 `TriggerOutcome` + `ReferenceNote`（`delegated-task/executors.ts
 
 ---
 
-### Phase 0 — 零台账、零 server.ts（11 条）✅
+### Phase 0 — 零台账、零 server.ts（11 条）✅ **已完成**
+
+> **落地记录（2026-07-25）**：`aidcp-cloud` master `525f483`，已部署 dev、四个属主仓已同步
+> （kernel `4ebe412` / api `b7d5ec2` / automation `1ecde21` / content `138af56`）。
+>
+> **实测净效果：跨边界豁免 96 → 86 条，零新增。** 比清单预估多消一条 —— 收口后
+> `persona-generator` 对 automation 侧那个别名的依赖也随之可以直取 kernel。
+> 口径提醒：清单按 **import 语句**数 11 条，台账按**唯一边**记，11 条语句 = 10 条边。
+>
+> **一处更正（清单的假设不成立）**：P0-4 写「删掉角色名标注 = 丢掉写错就编译红那道闸」，
+> 实测**只对一个角色成立** —— 另两个继承的基类本身就把该字段声明成角色名联合，标注删了基类照样拦。
+> 真正失去防线的是**不继承基类**的那一个。新增的合同夹具 `test/agents/content-role-names.test.ts`
+> 精确补这一处，并**双向验证过**：继承基类的改错 → 基类当场拦；不继承的改错 → 夹具当场拦。
+>
+> 验证：typecheck 0 / acceptance 117·0 / 全量 3324 pass 0 fail 10 skip；`src/server.ts` 零改动；
+> dev 三个契约门全过、零 error、47 项子系统就绪。
 
 全部是「追加进已有 kernel 成员」或「删消费方注解」，不新增 kernel 文件 = **不触发 `AC-BOUND-03` 的花名册 deepEqual**，可最先合、风险最低。
 
