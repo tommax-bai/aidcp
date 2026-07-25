@@ -61,7 +61,8 @@
   **踩过的坑，接手务必知道**：这三个 store 的 `close()` 是 `pool.end()`，而互动域构造被 `try/catch` 包着、
   **失败分支正好会调它们** ⇒ 绑共享池后一次局部失败会 end 掉全域共用的池、升级成进程级瘫痪。
   已加 `ownsPool` 守卫（只 end 自己建的池）+ 回归用例。**给任何 store 补接属主池前，先查它的 `close()` 有没有调用方。**
-- ⛔ **剩这些**（完整表见 cutover-plan §1 callout c；**注意排查盲区**：`grep "new Pool(resolveEnvPgConfig())"` 只命中一种写法，另一种 `new Pool({host: ...DEFAULT_PG_CONFIG})` 绕过它，正确口径是枚举全部 `new Pool(` 与 `new Client(`）：`PgAlertStore`（`alerts`，automation 属主）仍走 HOST-param 自建池，且与已迁到 automation 池的
+- ✅ 也已做（`3f86c6c`）：`alerts` 写端并入 automation 池。**两处构造修法故意不同** —— 启动期 `raiseStandaloneAlert` 那处 `finally` 调 `close()`，故**仍自建专用小池**、只换配置来源；只有常规 `alertStore` 注入共享池（它的 close() 全仓无调用方）。
+- ⛔ **剩这些**（完整表见 cutover-plan §1 callout c；**注意排查盲区**：`grep "new Pool(resolveEnvPgConfig())"` 只命中一种写法，另一种 `new Pool({host: ...DEFAULT_PG_CONFIG})` 绕过它，正确口径是枚举全部 `new Pool(` 与 `new Client(`）：~~`PgAlertStore`~~（`alerts`，automation 属主）仍走 HOST-param 自建池，且与已迁到 automation 池的
   读端（面板读 `alerts`）**已构成一对 split-brain**。它在 `server.ts` 有两处构造、性质不同：
   常规 `alertStore` 可直接注入属主池；启动期 `raiseStandaloneAlert` 那处 `finally` 里调 `store.close()`，
   **必须继续自建池**，只应把配置来源从 HOST-param 换成 `resolveOwnerPgConfig('automation')`。

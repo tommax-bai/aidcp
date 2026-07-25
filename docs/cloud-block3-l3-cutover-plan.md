@@ -46,8 +46,10 @@
   - **这两个方法搬迁前 SQL 层零覆盖**（`offboard-cleanup-grant.test.ts` 只测签票/验签纯函数、`client-auth-server.test.ts` 用内存假 store 测路由契约），即「零语义变化」当时的测试套件根本验不了 —— 随刀补齐。
   - 诚实登记一处**非生产**差异：改动前 consume 对不存在的 offboardId 会在完全不触达端口的情况下返 `not_found`；现在一进门就要端口，未注入时抛具名错。生产组合根恒注入 ⇒ 现网无影响。
 
+- **`alerts` 写端并入 automation 池**（`3f86c6c`，部署 dev + healthcheck 绿）：读端（面板 `listAlerts`）自 `cf32544` 起已在 automation 池，写端两处却仍是裸 HOST-param 自建池 ⇒ 翻转后**写旧库、面板读新库、告警列表永久为空且零报错**。两处修法**故意不同**：常规 `alertStore` 注入 `automationPool`（其 `close()` 全仓无调用方）；启动期 `raiseStandaloneAlert` **仍自建专用小池**、只换配置来源为 `resolveOwnerPgConfig('automation')`——因为它 `finally` 里调 `close()`，注入共享池会 end 掉整个 automation 池（与 `7f5232a` 同形）。dev 实测 `.env` 无 `DATABASE_URL` / 无 owner URL（只核变量名）⇒ 逐字节等价。
+
 **下一步（同样一律走接口，不得直连别人的库）**：
-0. **⛔ 翻转前置的剩余部分**（完整名单 + 两条照抄会出事的修法要点见 §1 callout c 表）：`PgAlertStore` ×2、`PgRiskStore`、`PgRiskCounterOutboxStore`、**`AutomationWriterLock`**（最严重：advisory lock 按库，翻转后**静默双写 `risk_state`**）、`runSchemaContractGate` 的账本 Client。其中 risk 三项属活跃 change `risk-state-cross-process-integrity` 独占范围 ⇒ 待其归档后另起一刀。
+0. **⛔ 翻转前置的剩余部分**（`PgAlertStore` 已于 `3f86c6c` 解掉；完整名单与修法要点见 §1 callout c 表）：剩 `PgRiskStore`、`PgRiskCounterOutboxStore`、**`AutomationWriterLock`**（最严重：advisory lock 按库，翻转后**静默双写 `risk_state`**）、`runSchemaContractGate` 的账本 Client。**前三项属活跃 change `risk-state-cross-process-integrity` 独占范围（§7 单写者纪律）⇒ 待其归档后另起一刀**；账本 Client 须先裁决「账本一份还是每库一份」。
 1. **api `client-user-store.ts` 余下 7 处须监督读**（见 §2.1）：跨库行锁 + 事务内联查，**接口化解决不了**，须最终一致重设计。**用户在场做。**
 2. **automation 侧 api 读**（automation → api 的 `accounts` 等）：多为**写事务内嵌的守卫读**（execution_target 内联 / `EXISTS(accounts)` / `FOR SHARE` 行锁），接口化不干净，需**去规范化**（把 accounts 投影冷备进 automation 库）或移守卫——性质更接近下面的事务批，非纯读。
 3. 再攻 **9 处跨库事务 + 1 处跨库写**（架构级最终一致，改的是风控/环境注销关键路径，**须监督**）。之后才谈建库/拷数据/翻 URL。
@@ -92,7 +94,7 @@ split brain（读端看到空库或陈旧副本，写端的离场 / 授权状态
 > |---|---|---|---|
 > | `PgRiskStore` | `src/risk/pg-risk-store.ts` | automation（`risk_state` / `risk_counters` / `risk_interactions`）| 风控权威态写旧库、面板经已迁的读端口从新库读 ⇒ **面板永远看到空 / 陈旧风控态，零报错** |
 > | `PgRiskCounterOutboxStore` | `src/risk/risk-counter-outbox-store.ts` | automation（`risk_counter_outbox` / `risk_counters`）| 记账 exactly-once 靠唯一索引，与 `PgRiskStore` 的 `risk_counters` **必须同库**；一个翻一个不翻 ⇒ **exactly-once 直接失效** |
-> | `PgAlertStore`（两处构造）| `src/alerts/alert-store.ts` | automation（`alerts`）| 写旧库、面板读新库 ⇒ **后台告警列表永久为空且零报错**（静默假成功）|
+> | ~~`PgAlertStore`（两处构造）~~ **✅ 已解（`3f86c6c`，部署 dev）** | `src/alerts/alert-store.ts` | automation（`alerts`）| ~~写旧库、面板读新库 ⇒ 后台告警列表永久为空且零报错~~ |
 > | **`AutomationWriterLock`** | `src/risk/writer-lock.ts` | automation（无表；`pg_try_advisory_lock` 保护 `risk_state` 单写）| **最隐蔽、最严重**：advisory lock 是**按库**的。锁留在旧共享库、写落到新 automation 库 ⇒ 两个进程各自「抢到同一把锁」却互不排斥 = **静默双写 `risk_state`**，正是这把锁存在的唯一目的 |
 > | `runSchemaContractGate` 的一次性 `Client` | `src/schema/schema-gate.ts` | automation（`schema_migrations`）| 校验的是旧共享库的账本、业务表已分散三库 ⇒ enforce 模式下**假绿** |
 >
