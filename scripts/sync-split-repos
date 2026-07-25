@@ -1,0 +1,228 @@
+#!/usr/bin/env python3
+"""三个属主仓的 src/ 与 aidcp-cloud 的差异对账 / 同步（Block④ 三仓提取 · 批次 1 地基）。
+
+**为什么需要它**：`aidcp-api` / `aidcp-automation` / `aidcp-content` / `aidcp-kernel` 四个仓
+是从 `aidcp-cloud@41f2c73` **手工切**出来的 —— 切得对（本脚本 --check 可当场证明），但**不可复现**：
+没有任何东西记得「哪个文件该在哪个仓」，而 master 在批次 2/3/4 期间还会一直走。
+手工切一次是搬家，手工切第二次就是猜。
+
+**唯一事实源＝`aidcp-cloud` 的 `boundaries/module-ownership.json`**（424 个 src 文件逐条标属主）。
+本脚本只做一件事：把那份清单在指定 ref 上**重放**成四个仓的 src/ 应有内容，与各仓实际内容对账。
+
+三条纪律：
+  ① **只管 `src/`，外加 package.json 里那一条 kernel pin**。migrations / tsconfig / scripts / docs
+     各仓有各自的形态（迁移按属主重切过、依赖各不相同），本脚本一个字都不碰 —— 装作能管会把它们清掉。
+     kernel pin 是例外，因为它**不是各仓的选择而是派生事实**：三个业务仓不内嵌 kernel 副本，
+     那条 sha 必须恒等于 `aidcp-kernel` 的 master 头。手工同步三份 sha 正是本脚本要消灭的那类漂移
+     —— kernel 一改，三个仓的 pin 就同时过期，而没有任何东西会提醒你。
+  ② **组装根 `src/server.ts` / `src/index.ts` 只报不改**，即使带 --apply。批次 2/3/4 要在各仓
+     手写自己的 main()，那正是整个项目的主交付物；自动覆盖等于把它悄悄删掉。
+  ③ **删除要单独开口**（--prune）。多出的文件只报告，不默认删 —— 那可能是某个仓自己新加的东西。
+
+用法：
+    scripts/sync-split-repos                     # 对账（只读，默认 ref=origin/master）
+    scripts/sync-split-repos --ref <sha>         # 对指定 ref 对账
+    scripts/sync-split-repos --apply             # 写入差异（不含组装根、不删多余文件）
+    scripts/sync-split-repos --apply --prune     # additionally 删掉清单里没有的 src 文件
+    scripts/sync-split-repos --repo aidcp-api    # 只处理一个仓
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+
+CODES = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CODES = os.path.dirname(CODES)  # .../codes
+CLOUD = os.path.join(CODES, 'aidcp-cloud')
+MANIFEST = 'boundaries/module-ownership.json'
+
+# 仓 → 它承载的属主层。三个业务仓**不内嵌 kernel 副本**，靠 npm 依赖 aidcp-kernel 取用。
+REPOS = {
+    'aidcp-api': 'api',
+    'aidcp-automation': 'automation',
+    'aidcp-content': 'content',
+    'aidcp-kernel': 'kernel',
+}
+# 组装根：三个业务仓今天各有一份逐字节副本；批次 2/3/4 会各自改写成自己的 main()。只报不改。
+COMPOSITION = {'src/server.ts', 'src/index.ts'}
+KERNEL_REPO = 'aidcp-kernel'
+KERNEL_PIN_RE = re.compile(
+    r'("aidcp-kernel"\s*:\s*"git\+ssh://git@github\.com/[^"#]+#)(?P<sha>[0-9a-f]{7,40})(")'
+)
+
+
+def git(ref_repo: str, *args: str) -> str:
+    return subprocess.run(
+        ['git', '-C', ref_repo, *args], capture_output=True, text=True, check=True
+    ).stdout
+
+
+def load_manifest(ref: str) -> dict[str, str]:
+    raw = git(CLOUD, 'show', f'{ref}:{MANIFEST}')
+    return {e['path']: e['layer'] for e in json.loads(raw)}
+
+
+def rewrite_kernel_imports(text: str, kernel_paths: set[str], src_file: str) -> str:
+    """把解析到 kernel 层文件的**相对** import 改写成 `aidcp-kernel/<src 相对路径>`。
+
+    这正是手工切仓时用过的规则（已与 aidcp-api 现有产物逐行比对确认）：
+        `./kernel/account-identity.js`   → `aidcp-kernel/kernel/account-identity.js`
+        `./deployment-target.js`         → `aidcp-kernel/deployment-target.js`
+    非 kernel 的相对 import 一律不动 —— 跨属主的那些正是要留着让编译器报出来的断裂。
+    """
+
+    def repl(m: re.Match[str]) -> str:
+        quote, spec = m.group('q'), m.group('spec')
+        if not spec.startswith('.'):
+            return m.group(0)
+        target = os.path.normpath(os.path.join(os.path.dirname(src_file), spec))
+        as_ts = target[: -len('.js')] + '.ts' if target.endswith('.js') else target
+        if as_ts not in kernel_paths:
+            return m.group(0)
+        rel = as_ts[len('src/'):]
+        rel = rel[: -len('.ts')] + '.js'
+        return f'{m.group("kw")}{quote}aidcp-kernel/{rel}{quote}'
+
+    return re.sub(
+        r'(?P<kw>\bfrom\s+|\bimport\s+)(?P<q>[\'"])(?P<spec>[^\'"]+)(?P=q)', repl, text
+    )
+
+
+def check_kernel_pin(repo_path: str, kernel_head: str, apply: bool) -> tuple[bool, str]:
+    """三仓 package.json 里的 kernel pin 必须恒等于 aidcp-kernel 的 master 头。
+
+    返回 (是否有漂移, 说明)。这条不属于 src/ 对账，但同属「派生事实」：kernel 一改，
+    三个仓的 pin 同时过期，而 npm 不会报错 —— 它会老老实实装那个旧 sha，
+    于是三个仓编译通过、跑的却是过期契约。**静默用旧契约正是这里的失败形态。**
+    """
+    pkg = os.path.join(repo_path, 'package.json')
+    if not os.path.isfile(pkg):
+        return False, 'package.json 不存在'
+    with open(pkg, encoding='utf8') as fh:
+        text = fh.read()
+    m = KERNEL_PIN_RE.search(text)
+    if not m:
+        return False, ' 未 pin aidcp-kernel（不内嵌副本的仓才需要）'
+    cur = m.group('sha')
+    if kernel_head.startswith(cur) or cur.startswith(kernel_head[:len(cur)]):
+        return False, f' kernel pin 对齐（{cur[:7]}）'
+    if apply:
+        with open(pkg, 'w', encoding='utf8') as fh:
+            fh.write(KERNEL_PIN_RE.sub(lambda mm: mm.group(1) + kernel_head + mm.group(3), text))
+        return True, f' kernel pin {cur[:7]} → {kernel_head[:7]}（已更新，记得 npm install 刷 lock）'
+    return True, f' kernel pin 过期：{cur[:7]} ≠ kernel master {kernel_head[:7]}'
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(add_help=True)
+    ap.add_argument('--ref', default='origin/master', help='aidcp-cloud 的源 ref（默认 origin/master）')
+    ap.add_argument('--apply', action='store_true', help='写入差异（组装根除外）')
+    ap.add_argument('--prune', action='store_true', help='连同删除清单外的 src 文件（需 --apply）')
+    ap.add_argument('--repo', action='append', help='只处理指定仓，可重复')
+    args = ap.parse_args()
+
+    if args.prune and not args.apply:
+        print('ERROR: --prune 需与 --apply 同用', file=sys.stderr)
+        return 2
+    if not os.path.isdir(CLOUD):
+        print(f'ERROR: 找不到 aidcp-cloud：{CLOUD}', file=sys.stderr)
+        return 2
+
+    try:
+        subprocess.run(['git', '-C', CLOUD, 'rev-parse', '--verify', args.ref],
+                       capture_output=True, check=True)
+    except subprocess.CalledProcessError:
+        print(f'ERROR: aidcp-cloud 里没有 ref {args.ref}（先 git fetch？）', file=sys.stderr)
+        return 2
+
+    sha = git(CLOUD, 'rev-parse', '--short', args.ref).strip()
+    own = load_manifest(args.ref)
+    kernel_paths = {p for p, layer in own.items() if layer == 'kernel'}
+    print(f'源: aidcp-cloud@{sha}（{args.ref}）  清单 {len(own)} 个 src 文件')
+    print(f'模式: {"APPLY" + ("+PRUNE" if args.prune else "") if args.apply else "CHECK（只读）"}\n')
+
+    kernel_path = os.path.join(CODES, KERNEL_REPO)
+    kernel_head = ''
+    if os.path.isdir(kernel_path):
+        kernel_head = git(kernel_path, 'rev-parse', 'HEAD').strip()
+        print(f'kernel 头: {kernel_head[:7]}（三仓 pin 应等于它）\n')
+
+    targets = args.repo or list(REPOS)
+    exit_code = 0
+    for repo in targets:
+        layer = REPOS.get(repo)
+        if layer is None:
+            print(f'ERROR: 未知仓 {repo}', file=sys.stderr)
+            return 2
+        path = os.path.join(CODES, repo)
+        if not os.path.isdir(path):
+            print(f'=== {repo} ===\n  SKIP: 本机未 clone（{path}）\n')
+            continue
+
+        expected = {p for p, l in own.items() if l == layer}
+        if layer != 'kernel':
+            expected |= COMPOSITION & set(own)  # 组装根三份副本，只报不改
+        actual = {f for f in git(path, 'ls-files').split() if f.startswith('src/')}
+
+        add, remove = sorted(expected - actual), sorted(actual - expected)
+        changed, comp_changed = [], []
+        for rel in sorted(expected & actual):
+            want = git(CLOUD, 'show', f'{args.ref}:{rel}')
+            if layer != 'kernel':
+                want = rewrite_kernel_imports(want, kernel_paths, rel)
+            with open(os.path.join(path, rel), encoding='utf8') as fh:
+                if fh.read() != want:
+                    (comp_changed if rel in COMPOSITION else changed).append(rel)
+
+        print(f'=== {repo}（属主 {layer}）实际 src {len(actual)} / 应有 {len(expected)} ===')
+        print(f'  新增 {len(add)} · 内容不同 {len(changed)} · 多出 {len(remove)} · 组装根不同 {len(comp_changed)}')
+        if layer != 'kernel' and kernel_head:
+            drifted, note = check_kernel_pin(path, kernel_head, args.apply)
+            print(f'  ·{note}')
+            if drifted and not args.apply:
+                exit_code = 1
+        for rel in add[:10]:
+            print(f'   + {rel}')
+        for rel in changed[:10]:
+            print(f'   ~ {rel}')
+        for rel in remove[:10]:
+            print(f'   ! {rel}（清单里没有；--prune 才会删）')
+        for rel in comp_changed:
+            print(f'   ⊘ {rel}（组装根：只报不改，批次 2/3/4 各仓自己写 main()）')
+        if add or changed or remove or comp_changed:
+            exit_code = 1
+
+        if args.apply:
+            wrote = 0
+            for rel in add + changed:
+                if rel in COMPOSITION:
+                    continue
+                want = git(CLOUD, 'show', f'{args.ref}:{rel}')
+                if layer != 'kernel':
+                    want = rewrite_kernel_imports(want, kernel_paths, rel)
+                dst = os.path.join(path, rel)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                with open(dst, 'w', encoding='utf8') as fh:
+                    fh.write(want)
+                wrote += 1
+            pruned = 0
+            if args.prune:
+                for rel in remove:
+                    os.remove(os.path.join(path, rel))
+                    pruned += 1
+            print(f'  → 写入 {wrote} 个文件' + (f'，删除 {pruned} 个' if args.prune else ''))
+            print('  → 变更留在工作区未提交：请自行 review + commit（本脚本绝不代你提交）')
+        print()
+
+    if exit_code and not args.apply:
+        print('存在差异。--apply 可同步（组装根除外）；组装根的差异须人工判断。')
+    return 0 if args.apply else exit_code
+
+
+if __name__ == '__main__':
+    sys.exit(main())
