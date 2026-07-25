@@ -4,6 +4,21 @@
 > 本文档是「L3 真正怎么切」的权威地图 + 排序 backlog，由一次跨 owner 依赖全量测绘（3 agent 并行扫三 owner + 综合）产出，逐处 `file:line` 核实。
 > **前置**：L2 已 DONE（cloud master `653e910`，部署 dev；per-owner 池已接线、baseline 已做，见 `cloud-block3-db-split-handoff.md` §0）。
 
+## 进展与方法更正（2026-07-25）
+
+**方法更正（重要，简化了跨库读的修法）**：owner-URL 翻转 = **单进程 + 三个池**（server.ts 在同一进程建 api/automation/content 三池，翻转只是让三池指向三库）。因此跨 owner **读不需要 HTTP**——只要在**正确 owner 的池**上跑那条查询即可（关联子查询/跨库 JOIN 拆成两次池查询：先在外表 owner 的池取集合，再在本表 owner 的池用 `id = ANY(...)` 本地判定）。本文档原文多处写「route via transport port / HTTP」是套了 Block² **进程拆分**的需要，对 owner-URL 翻转是过度设计；HTTP 端口只有将来若再做进程拆分才需要。**唯二不因 (P) 简化的**：① 跨库**事务**（一笔 tx 不能跨两个池/库）——4 个 config-mirror bump + 5 个 offboard 联合提交，仍须改最终一致（outbox/2-phase）；② 跨库**写**（interaction_audit_events 双写）仍须收口到单写者。跨 owner **读**不被边界门拦（门只拦写/DDL）。
+
+**已完成**：
+- **step0**（`f8651f0`，部署 dev）：outbox helper 池改绑 automation（见 §1 callout b）。
+- **content 三处运行时跨库读全解**（`e0d353c`，部署 dev，(P) 池注入）：
+  - `curated-content-store.listForClient` created/uncreated：关联 `EXISTS(delegated_tasks)` → **标准半连接改写**（automation 池取该账号已触发的 curatedId/sourceId 引用集，主查询本地 `id = ANY(...)`，排序/COUNT OVER/分页 SQL 结构逐字不变；delegated_tasks 42P01 fail-closed）。**dev 真实数据验证等价**：94 条 publish_post 任务下，新旧「已创作」集 31==31、双向差 0。
+  - `facebook-publish-media-store.assertFacebookAccount`：`accounts.platform` 读走 **api 池**。
+  - `draft-refinement.claimNext`：移除 **vestigial** `EXISTS(publish_log)` 守卫（publish_log 全仓从不 DELETE、任务 record_id 建时即合法 → 恒真、never excluded；移除逐字节等价）。
+  - 组合根注入 automationPool / apiPool 给两个 content store。tsc0 / acc0 / 全量 3194·0。
+  - ⇒ **content 现在 0 处运行时跨库读**，只剩 **4 条跨 owner DDL FK**（facebook-publish-media→accounts、→publish_log ×2；draft→publish_log），**翻转时降**（schema-ensure 建 aidcp_content 空表时须去掉这些 FK；共库期不动）。**content 已 runtime-read flip-ready。**
+
+**下一步**：content 建库+拷数据+dev 端翻 URL 隔离验证（aidcp 零改动、ol 零风险、可逆）；或攻 api↔automation 双 HUB 的读（按 (P) 改右池，含拆关联 JOIN）+ 9 处跨库事务 + 1 处跨库写（架构级最终一致，须监督）。
+
 ## 0. 两条改变全局的已核实事实
 
 1. **账号从不物理删除**（migrations/scripts/src 全仓零 `DELETE FROM accounts`，account-store 不暴露任何 delete）→ 12 条 `ON DELETE CASCADE` 跨域外键**在实践中从不触发**。⇒ **降外键（0076 及新发现的 6 条 DDL FK）行为无影响、account-delete-cascade 接线可推迟到「真加删账号功能」时**。危险窗口基本消失。

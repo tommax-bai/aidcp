@@ -29,7 +29,9 @@
 **L3 进展（2026-07-25，策略已定=owner-URL 整体翻转）：**
 - **完整跨 owner 依赖地图已测绘**（3 agent 并行扫三 owner + 综合，逐处 file:line 核实）：**58 依赖 / 55 raw**，**没有一个 owner 现在能干净翻转**。权威计划 + 逐 owner 修法 + 排序见新文档 **`docs/cloud-block3-l3-cutover-plan.md`**。核心：owner-URL 翻转机械上简单，但拆库前必须先把 55 处 raw 跨库访问路由过传输层（Block² 端口模式），其中 **9 处跨库事务**（4 config-mirror bump + 5 offboard 联合提交）+ 1 处跨库写（interaction_audit_events 双写）**需架构级最终一致重设计**，不是 HTTP 化能解。这是把 Block² 未完的数据层解耦补齐的大工程、多变更、须每步测+部署。
 - **step0 已做（纯字节等价）**：outbox 传输 helper 池改绑——`startRiskCommandConsumer`/`bridgeEventBusToOutbox`/`PanelEventReplay`/`emitRiskCommand` 从 api 的 configMirrorPool 改绑 **automation 池**（event_outbox / 风控命令 outbox 属 automation；ConfigMirrorRefresher 读 api 的 config_mirror_version、保持 api 池）。monolith 下这 4 个 helper 不实例化 → dev/ol 零影响；修掉拆库后读写错库的接线 bug。**cloud master `f8651f0`，测试 tsc0/acc0/全量3194·0，部署 dev 验证通过。**
-- **未做（行为变更 / 架构级 / 须监督）**：55 处跨库读路由、9 处跨库事务重设计、DDL FK 降级、任何实际翻转——用户睡时不对生产数据路径盲改。
+- **方法更正（重要）**：owner-URL 翻转 = 单进程 + 三池，跨库**读不需要 HTTP**，只在正确 owner 的池上跑该查询即可（关联子查询拆两次池查询）。原「route via HTTP 端口」是套 Block² 进程拆分的需要、对本策略过度设计。唯二不因此简化：跨库**事务**（不能跨池）+ 跨库**写**，仍须架构级最终一致。
+- **content 三处运行时跨库读全解（`e0d353c`，部署 dev，(P) 池注入）**：curated listForClient 的 `EXISTS(delegated_tasks)` → 半连接改写（automation 池取触发集 + 本地 `id=ANY`，排序/分页 SQL 不变；**dev 真实数据验证等价 31==31 双向差 0**）；media 的 `accounts.platform` 读走 api 池；draft claimNext 移除 vestigial `EXISTS(publish_log)` 守卫（publish_log 从不删）。⇒ **content 现 0 处运行时跨库读、runtime-read flip-ready**，只剩 4 条跨 owner DDL FK（翻转时降）。tsc0/acc0/全量3194·0。
+- **未做（须监督）**：api↔automation 双 HUB 的读（按 (P) 改右池 + 拆跨库 JOIN）、**9 处跨库事务 + 1 处跨库写**（架构级最终一致）、DDL FK 降级、任何实际翻转（含建库+拷数据+翻 URL）——用户不在时不对生产数据路径盲改。详见 `docs/cloud-block3-l3-cutover-plan.md`。
 
 **L3 剩余工作（破坏性 / 需决策；详见 `docs/cloud-block3-l3-cutover-plan.md`）：**
 - **① cascade 单库验收形态（设计任务，先解再接线）**：naive 单库接线会死循环——relay 读 api outbox 又 emit 到 content/automation，而单库单 `event_outbox` 表 = relay 再读到自己的投递 → 无限重放。需独立 outbox 流（拆库后天然成立）或给 relay 加「带 sourceEventId 的不再 relay」守卫。cascade 单测用的是**每 owner 一个独立内存 outbox 桩**，即假设拆库后拓扑。
