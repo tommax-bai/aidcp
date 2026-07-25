@@ -156,7 +156,33 @@ automation 要 `TriggerOutcome` + `ReferenceNote`（`delegated-task/executors.ts
 
 ---
 
-### Phase 2 — `panel/types.ts` / `panel-server.ts` 契约析出（23 条）🔒📒 **单人串行，一次做完**
+### Phase 2 — `panel/types.ts` / `panel-server.ts` 契约析出（23 条）🔒📒 ✅ **八簇全完 + Phase 1 延后的那条**
+
+> **落地记录（2026-07-26）**：`aidcp-cloud` master `0bbc43b`，已部署 dev、七个仓/包已同步。
+> **跨边界豁免 68 → 39（近腰斩），棘轮 `raises` 仍为空。** 共享层成员 64 → 72。
+> typecheck 0 / acceptance 118·0 / 全量 3328 pass 0 fail 10 skip；`refresh` 幂等（第二次跑新增 0 删除 0）。
+>
+> **P1-1 那条延后的翻转随本批落，结果比预期好得多**：它不但没长出预言的 3 条反向边，
+> **反而多消 6 条**——三个门面翻到 automation 后，它们对配置存储与三个风控模块的引用从跨域变同层。
+> **这 6 条没有任何一份计划提到过。** 同时实测坐实了「必须在 P2-1 之后」：
+> 在未做 P2-1 的基线上单独翻转，棘轮当场拒绝、报出的正是预言的那三条。
+>
+> **三处合并态才暴露的修正**：
+> ① P2-5 与 P2-4 撞车（改同两个文件同一行）→ 验证码形状由 api 侧端口独占，P2-4 删掉两个文件
+>    （留着就是第二份 api 侧副本，**正是漂移闸要防的东西**）；
+> ② 翻转三个门面**只加 fileOverride 会让 `AC-BOUND-01` 当场红**——那三个文件还在「已裁决名册」里，
+>    覆盖与名册重叠即失败，必须同批从名册删掉那三行；
+> ③ 八份计划**每一份**都低估了符号闭包。
+>
+> **红线自证**：`protocol.ts` / `risk-state-machine.ts` / `role-catalog.ts` / `event-bus/types.ts`
+> 四个禁改文件**零改动**；组装根只动 1 增 2 删（删一个面板侧零读点的死字段）。
+>
+> **新增漂移闸的两条性质写进了闸的文件头**：① MUST NOT 用「双向可赋值」那种朴素写法——
+> 它把 `never` 当中间结果传下去而 `never extends true` 恒真，一侧判定失败反而回落成放行；
+> ② **这闸的牙齿在 `typecheck` 不在 `test`**（测试运行器只剥类型不做检查）。第二条我反向验证过。
+>
+> **本轮登记、不修的两处残留**：kernel 内部出现第三份风控枚举（两个 kernel 文件逐字重复，门禁无感，
+> 收口方案已被验证可行）；发布管线 barrel 里 9 个素材池再导出是死代码。
 
 六簇写同两个文件，拆开做必冲突。建议一个 session 独占这两个文件直到收工。
 
@@ -195,7 +221,10 @@ automation 要 `TriggerOutcome` + `ReferenceNote`（`delegated-task/executors.ts
 **P2-6 · 风控词表（5 条，A）📒**
 - 改哪：`src/risk/types.ts`（113 行，**零 import**、无 SQL / HTTP / LLM / 模块级 Set|Map，全批最干净的一块）整文件搬为 `src/kernel/risk-contract.ts`。
 - 形状：`src/risk/index.ts` 的 `export * from './types.js'` 改指 kernel（**barrel 本身留 automation、不进 kernel**——它 `export *` 覆盖 22 个业务模块，连带 24 条 SQL + `risk-state-machine.js`）；四个消费方（`panel/version.ts` / `panel-server.ts` ×2 / `panel-store.ts` / `client-auth-server.ts`）改指 kernel。risk/ 内部 20+ 消费者无感。
-- **`RiskSignalKind` 不要跟着搬**——它定义在 `risk-state-machine.ts`（禁改）；`panel-server` 本来就只用其中三个运营态取值，改成本地声明 `'manual_restrict' | 'manual_freeze' | 'operator_override_recover'`（与它自己那行 ALLOWED 数组同源）。**风控单写域一个字节不碰。**
+- ~~**`RiskSignalKind` 不要跟着搬**——它定义在 `risk-state-machine.ts`（禁改）。~~
+  **更正（2026-07-26 落地时实测）**：`RiskSignalKind` 定义在 `src/risk/types.ts:72`，**不在状态机文件里**。
+  本条原文记错了。它随 `types.ts` 一起进 kernel，**而 `risk-state-machine.ts` 与 `risk-controller.ts` 逐字节未改**
+  ——「风控单写域一个字节不碰」这条不变量**成立且已自证**（落地 commit 里那两个文件零改动）。
 - **核验补的漏项**：`panel/types.ts` 也 import risk barrel，取的是 `RiskController`（类）与 `SessionInteractionBudget`——**两者都不在 `types.ts` 里**，本次提升闭合不了，它们属 P5-1（风控写侧）。别默认「lift types.ts 就把 panel→risk 全清了」。
 - 验证：`typecheck`；`grep -n "from '../risk/index" src/panel/` 只剩 `types.ts` 一处（等 P5-1 清）。
 
@@ -416,7 +445,7 @@ automation 要 `TriggerOutcome` + `ReferenceNote`（`delegated-task/executors.ts
 | `src/comm/protocol.ts` | **0 字节** | P2-4 重抄到 api contracts / P2-1 `operation` 降裸串 / ⛔ 那 3 条维持豁免 | 不改 |
 | `src/event-bus/types.ts` 的 `RoleName` | **0 字节** | P0-4 只改消费方注解；⛔ 3 条正因「不许析出」而维持豁免 | 不改 |
 | `src/config/role-catalog.ts` | **0 字节** | P0-1 的 `ThinkingMode` 从 kernel 派生；P0-4 的合同夹具**只读**它 | 不改 |
-| `src/risk/risk-state-machine.ts` | **0 字节** | P2-6 / P5-1 的 `RiskSignalKind` 一律在 panel 侧本地声明三个运营态取值 | 不改 |
+| `src/risk/risk-state-machine.ts` | **0 字节** | ~~`RiskSignalKind` 在 panel 侧本地声明~~ → 更正：该类型本就在 `risk/types.ts`，随其进 kernel；状态机文件实测零改动 | 不改 |
 
 ---
 
