@@ -67,49 +67,81 @@ AC-OWN   crossLayerWrites: 0  dmlViolations: 0    ddlViolations: 0  exemptions: 
 
 ---
 
-## 2. 只剩一件事：**D5 物理翻转**
+## 1.5 翻转当天暴露的问题与修法
 
-其余全部完成。翻转要按下面的顺序，且有**两个真前提**。
+**这一节是本次最有价值的产出**：下面每一条都只在「真的把 URL 指过去」那一刻才现形，
+前置自检（`0077 --check`）一条都看不见。将来任何环境再做同样的切换都会撞上它们。
 
-### 前提一：把数据拷进三个属主库（一条命令，尚未执行）
+**三个运维缺陷**：
 
-```bash
-ssh -i ~/codes/dev-0722.pem root@121.89.85.150 \
-  'cd /opt/aidcp/cloud && sudo -u postgres bash scripts/db-split/0077_copy_owner_data.sh --all'
-ssh -i ~/codes/dev-0722.pem root@121.89.85.150 \
-  'cd /opt/aidcp/cloud && sudo -u postgres bash scripts/db-split/0078_verify_owner_split.sh --all'
-```
+1. **`pg_hba.conf` 按库名授权。** 老库有 `host aidcp aidcp <addr> scram-sha-256` 两条（dev 一条、ol 一条），
+   三个新库名没有条目 ⇒ 落到通用 `host all all 127.0.0.1/32 ident` ⇒ **`Ident authentication failed`**，
+   服务起来了但端口一个都不监听。修法 = 追加两条同形规则（库名列表用逗号）+ `pg_reload_conf()`。
+   **isales 那条一字未动。** 规则已生效，dev 与 ol 两个地址都覆盖了。
+2. **`DROP SCHEMA public CASCADE; CREATE SCHEMA public;` 丢掉了 schema 授权。** 新建的 `public` 归 `postgres`、
+   ACL 为空，应用角色 USAGE/CREATE 全 false。**后果极具误导性**：没有 USAGE 权限时，明明存在的表报的是
+   **`relation "xxx" does not exist`** —— 一路把人往「拷贝漏了表」上带，而实际是权限。
+   修法 = `GRANT USAGE, CREATE ON SCHEMA public TO PUBLIC`（与源库 ACL 逐字一致，不是放宽）。
+3. **`pg_dump --table` 不带触发器函数。** 恢复会一路跑完表、数据、索引，到 post-data 建触发器那一步才炸——
+   **看上去像已经拷好了**。修法见 `025871f`：拷表前先把 public 下的函数带过去，并在校验器里断言触发器都到位。
 
-`0077` 对源库全程只读（只 `pg_dump` + `SELECT`），目标库是硬白名单的三个空库，`aidcp` / `isales` / `postgres` / `template*` 一律拒绝，目标非空时默认拒绝覆盖。
-`0078` 只读校验：逐表行数对账 + 无外来表 + 无残留跨属主外键，有差异即非零退出并逐条打印。
+另外两处是**校验器自己的 bug**，都已修：`--no-owner` 会让新库的表归 `postgres`（应用写不进去，且只在切换后才暴露，
+`2b65f9b`）；以及两侧排序规则不一致让 `comm` 报出**根本不存在的**差异（`3c3cff2`）。
 
-> **上一 session 未执行的原因**：这条命令被本机的权限闸拦下（非技术问题）。接手时若仍被拦，请用户在会话里用 `!` 前缀直接跑，或在设置里放行。
-
-**拷贝时机**：为拿到干净的行数对账，应先 `systemctl stop aidcp-cloud.service`，拷完校验完再起。当前 dev/ol 均无用户，停机窗口不是问题。
-
-### 前提二：**ol 必须先拿到新代码**（否则两端数据分叉）
-
-**已实测**：ol 上部署的代码**没有属主连接解析器**（`src/transport/pg-owner-connection-resolver.ts` 不存在，全仓 `AIDCP_PG_*_URL` 零命中）。
-⇒ 只给 dev 设 owner URL 会让 **dev 写属主库、ol 继续写 `aidcp`**，而两端今天共享全部业务数据 —— 这是必须避免的分叉。
-
-⇒ 终局形态（与 cutover-plan §3.3 一致）：**dev 与 ol 同设三个 owner URL、指向同一组属主库**，今天的「共享」语义逐字保住。这要求先按红线切一个 `release/<日期>-<范围>` 发布分支、部署 ol。**ol 部署须用户明确要求。**
-
-### 翻转顺序（照抄）
-
-```
-① 停 dev 服务
-② bash scripts/db-split/0077_copy_owner_data.sh --all      # 拷
-③ bash scripts/db-split/0078_verify_owner_split.sh --all   # 校验，必须全等价
-④ dev 的 .env 加三行 AIDCP_PG_{CONTENT,AUTOMATION,API}_URL  # 指向三个属主库
-⑤ 起 dev，看启动日志：三属主契约门应各自连各自的库（不再是「回落同一连接目标」那行）
-⑥ 冒烟：面板取数 / 委托任务认领 / 加群守卫 / 离场查询各走一遍
-⑦ ol：切发布分支 → 部署 → 同设三行 → 重启
-⑧ 回滚 = unset 那三行 + 重启（`aidcp` 全程未被改动，随时可退回）
-```
-
-**回滚成本极低**：整个翻转对旧库 `aidcp` 是**只读**的——数据是拷出去的，旧库一个字节没动。unset + 重启即回到今天。
+还修了一个**每库账本设计的真缺口**（`41f2c73`）：跨属主迁移会进入每个相关属主的范围，而对象核验却要求它声明的
+**全部**对象都在 ⇒ 新建 content 库被要求存在 automation 的 facebook 表 ⇒ baseline 永远拒绝 ⇒ 新库永远没有账本 ⇒
+契约门永远报「账本表不存在」。修法 = 核验收窄到本属主拥有的对象；索引/约束声明不带表名、跨属主时无法归因，
+就**如实打印「本次未核验」并逐条列出**，而不是静默跳过。
 
 ---
+
+## 2. **物理拆库已完成（dev + ol 两端）**
+
+2026-07-25 深夜，两台都已翻到三个属主库，指向**同一组**库 —— 今天的「dev 与 ol 共享同一份数据」语义逐字保住。
+
+**终局实测**（在 dev 机的 PG 上取，它就是这四个库的宿主）：
+
+```
+连接分布：
+  aidcp_api          dev 1   ol 1
+  aidcp_automation   dev 3   ol 2
+  aidcp_content      dev 1   ol 1
+  aidcp（旧共享库）  应用连接 0 条
+
+90 秒写入增量：
+  aidcp              4 提交 / 0 插入 / 0 更新   ← 只剩探测查询，零业务写入
+  aidcp_automation 442 提交 / 0 插入 / 232 更新
+  aidcp_content    124 提交
+  aidcp_api         66 提交
+```
+
+两端的契约门都给出三个**各自独立**的结论（content 0069 / automation 0077 / api 0078，全部通过），
+两端 `does not exist` / `permission denied` / 认证失败**均为 0**。
+
+**ol 的部署走的是发布分支** `release/20260725-db-split`（= master `41f2c73`），部署前已做
+`/opt/aidcp/cloud.bak.20260725-oldbsplit.tar.gz` 与 `.env.bak.20260725-oldbsplit`。
+
+### 回滚（成本极低，随时可退）
+
+整个翻转对旧库 `aidcp` 是**只读**的 —— 数据是拷出去的，旧库一个字节没动，且仍是完整可用的全量副本。
+退回今天只需两步（两台各做一次）：
+
+```bash
+# 注释掉 .env 里那三行 AIDCP_PG_{CONTENT,AUTOMATION,API}_URL
+systemctl restart aidcp-cloud.service
+```
+
+⚠️ **但退回会丢掉翻转之后写进属主库的数据**。翻转已在真实运行，越晚回滚代价越大 ——
+若要回滚，先把三个属主库的增量搬回 `aidcp`。备份：`/opt/aidcp/pgbackup/aidcp-pre-l3-20260725.dump`（翻转前的完整快照）。
+
+### 还没做的收尾
+
+- **`aidcp` 旧库尚未退役**，仍原样留着（这是有意的：它是最干净的回滚点）。确认稳定若干天后再决定处置。
+- **enforce 模式仍未开**（`AIDCP_SCHEMA_GATE` 默认 warn）。三个契约门现在都真的在各自库上判，
+  开 enforce 才能把「账本对不上就拒绝启动」变成硬保证。建议观察几天后再翻。
+- **`aidcp_automation` 的账本带着全量 77 行**（它是随表一起拷过去的，`schema_migrations` 登记为 automation 属主），
+  而 content / api 是用 `migrate baseline --owner=` 按自己的范围新建的（20 / 53 行）。
+  三者都能通过契约门；automation 那份多出来的行属过渡残留，`migrate status` 会如实报出，**没有自动删**（删账本行不可逆）。
 
 ## 3. 本批里最该知道的六件事（血泪，接手前必看）
 

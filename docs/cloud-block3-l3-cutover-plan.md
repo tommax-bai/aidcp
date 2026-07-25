@@ -72,9 +72,10 @@
 | **automation** | 24 | 17 | 3 | 4 | 2 | ~~22~~ **0** ✅ | **HUB**（api 读它 12+ 表）| `accounts` 守卫读改本域投影（`cdb1e4d`）；审计跨库写走 outbox（`09f81d1`）；配置镜像 4 笔跨库事务最终一致（`4a91bd4`）；风控 store + 写者锁归位（`835ab13`） |
 | **api** | 27 | ~~21~~ ~~14~~ ~~8~~ ~~7~~ **0** | ~~1~~ **0** | ~~5~~ **0** | ~~1~~ ~~8~~ ~~13~~ ~~14~~ **17** | ~~26~~ ~~19~~ ~~13~~ ~~12~~ **0** ✅ | **HUB**（owns `accounts`）| 面板 7 读（`cf32544`）+ client-user 真纯读 6（`6796488`）+ cleanup-grant 收回属主域（`7c2f6e3`）+ **余 7 处须监督读与 5 处跨库联合提交全消（`7b316ce`，`OffboardWritePort` 整个删除）** + 反方向互斥收口进 api 窄网关（`09f81d1`） |
 
-**剩余唯一工作 = D5 物理翻转**（拷数据 → 设三个 owner URL → 两端同步）。剧本见
-`docs/cloud-block3-l3-next-session-handoff.md` §2；**两个前提**：拷数据那条命令尚未执行，且 **ol 上部署的代码
-没有属主连接解析器**（已实测），只翻 dev 会造成两端数据分叉。
+**✅ D5 物理翻转已于 2026-07-25 深夜完成（dev + ol 两端）**：两台都指向同一组属主库，旧库 `aidcp` 上应用连接归零、
+业务写入归零。ol 走发布分支 `release/20260725-db-split`（= master `41f2c73`）。终局实测数据与翻转当天暴露的
+三个运维缺陷（`pg_hba` 按库名授权 / 重建 `public` 丢授权导致「表明明在却报 does not exist」/ `pg_dump --table`
+不带触发器函数）见 `docs/cloud-block3-l3-next-session-handoff.md` §1.5 与 §2。
 
 <details><summary>下面是本批之前的原始矩阵（追溯用）</summary>
 
