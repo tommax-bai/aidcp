@@ -98,6 +98,7 @@
 <!-- BLOCKED: 部署由主控串行做，本 session 明确禁止 push / 部署 / 碰 ECS。六批的代码改动在同一个提交 9c9e72b 里交付（无法逐批部署观察），**部署前必须先按 10.3 的新步骤在 dev 上跑 migrate status/up**——存储不再自建表，带着未应用的迁移重启会让对应能力 fail-closed。已登记 backlog 簇 110.3 / 110.5 -->
 - [ ] 5.11 全部批次完成后删除 `AIDCP_SCHEMA_SELF_CREATE` 旋钮与 `test/schema/ddl-parity.test.ts`，并删除 `scripts/run-migration.ts`（保留它等于保留一条无账本旁路）。
 <!-- BLOCKED: 这是过渡期结束后的收尾动作，按 design.md D4「保留一个发布周期后随本 change 的收尾任务删除」。现在删掉旋钮等于取消第四重保险；scripts/run-migration.ts 也要等执行器在真库上跑通（110.1/110.2）之后才能删。已登记 backlog 簇 110.9 -->
+<!-- 2026-07-25 用户裁定：本条第三半「删除 scripts/run-migration.ts」**有意保留、不再执行**。理由=enforce 开启后该旁路的失效模式已从「账本与库静默分叉、零告警」变成「下次启动契约门拒绝启动」，从静默变响亮，留着不再是隐患。记于 docs/cloud-block3-l3-next-session-handoff.md §2「已裁定保持现状」。前两半（删 AIDCP_SCHEMA_SELF_CREATE 旋钮、删 ddl-parity.test.ts）不受此裁定影响，仍待 110.1/110.2。 -->
 
 ## 6. aidcp-cloud — 启动期 schema 契约门
 

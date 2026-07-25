@@ -21,6 +21,27 @@
 
 > **2026-07-11 清账批**（第二次 openspec 分诊清账）：本批归档 **31 个** landed+deployed change，真机验收项按既有簇归并——发布链路 → 簇 3（`publish-select-mode-layout-robust` 5.3）、textcard → 簇 23（`textcard-carousel-form-parity` 6.3）、FB 加群评论 → 簇 32（新增 `facebook-group-join-observe-i18n` / `fb-group-join-wait-render` 两项 i18n + 就绪修复复核，见簇 32 补登）、`/comment` 搜索闭环 → 簇 34/55（`comment-search-command` 12.1，多次已跑通）、FB 评论人审 → 簇 48（`facebook-comment-review-and-targeted-join`）、**FB 公开组放量 → 新簇 59**（`facebook-group-join-and-commenting` 9.1-9.5）。归档后全库 `openspec validate --specs --all --strict` 106 项全绿。**本批刻意未归档（5 个仍活跃，另有门槛）**：① `publish-trigger-and-apply`（§11 统一部署待核）；② `edge-environment-platform-select`（tasks 3.3 明确 gate 在 FB edge driver `facebook-browser-env-and-login` 落 master，当前仅 probes 落地）；③ `humanize-interaction-prompts`（代码已部署 dev，但 tasks 9.4 spec 交织须待 `category-adaptive-images-and-judgment` 先归档）；④ `estimate-token-cost-column` + ⑤ `manual-billing-price-refresh`（代码已 shipped，但 `llm-token-usage-stats` spec delta 应用失败——前者用英文 header MODIFY 中文「console 提供…」需求、后者 MODIFY 一个无人创建的 `Token Usage Cost Estimates` 需求；两者对 cost/billing 需求建模不一致，须 owner 理顺 delta header / 重建模型后再归档）。**已废弃删除（1 个）**：`facebook-scheduled-comment`（2026-07-11 用户决定关为 superseded）——其 target-URL 定向评论设计已被 keyword-in-container 版取代（见归档 `2026-07-09-facebook-scheduled-comment` + `facebook-group-join-and-commenting`）；34/35 核心任务空，change 目录已 `git rm` 删除（内容存 git 历史）。**注**：唯一落地的 task 2.9（云端在握手时持久化 FB 昵称）代码仍在线；其需求已由后续小 change `facebook-nickname-handshake-persist`（2026-07-11 归档）正式补登进 `facebook-identity` capability——剔除了已被 `facebook-nickname-inplace-read`（簇 42）取代的 `/me` 探针描述、按现网「就地读取 → hello 附带 → 云端仅库内空时写、既有不覆盖」校订。至此该行为「代码在线 + 主 spec 有据」齐全。另 `category-adaptive-images-and-judgment`（高风险图产后校验待选视觉模型）、`self-contained-ads-runtime`（dev CLI 解析等代码活 + baked-key 决策）、及 4 个纯提案（`transcribe-textcard-image-text` / `facebook-consent-structural-detect` / `facebook-join-actuation-decouple` / `edge-installer-oss-distribution`）本就在研、非本批对象。
 
+> **2026-07-25 拆库后三处线上缺陷 —— 已实测坐实、用户决定暂不修（"先拆仓""不着急修复"）**。
+> 记在这里是为了**不被后续 session 当成漏查**。三处**同一类根因**：物理拆库后仍有代码拿着 A 域的连接去读 B 域的表。
+> **两道机械门禁看不见这一类**——它们分别扫「跨属主写」与「跨属主行锁」，**跨属主纯读从中间掉下去**；
+> 所以翻转当天「门禁全绿 + 健康检查零错误」是真的，但下面的东西当时已经坏了。
+> ① **入站互动域（微信/视频号）在 dev 与 ol 两端都未启动，自 2026-07-25 拆库翻转起**。
+>    实测：dev `16:19:46` / ol `16:22:09` 均打 `入站 interaction 域未启用: interaction_schema_missing_run_0042`。
+>    根因＝`aidcp-cloud/src/interactions/interaction-store.ts:397` 用 `to_regclass` 在 automation 连接上探
+>    **api 属主**的 `interaction_reply_configs`，探不到即整域关停。**报错文案指向「某条迁移没跑」，方向是错的**；
+>    该残留在 `docs/cloud-block3-l3-next-session-handoff.md` §4 早有登记（标为「最隐蔽的一处」），翻转前未改。
+>    同刀须一起修的另两处：`interaction-store.ts:1403` 的 `EXISTS(accounts)` 守卫未接账号投影；
+>    `src/interactions/reply-config-scope-store.ts:145-147` 是**反方向**同类问题（api 池探 automation 属主表，此前零登记）。
+> ② **风控状态自 2026-07-23 起一次都没成功写入库**。实测：`aidcp_automation` 的 `risk_state`
+>    `max(updated_at)=2026-07-23 00:21:54`（翻转前），且该库中 `accounts` 表**不存在**（`information_schema` 计数 0）。
+>    根因＝`src/risk/pg-risk-store.ts:304`/`:358` 条件写的守卫内联查 **api 属主**的 `accounts`。
+>    失败形态正是本仓头号红线**静默假成功**：内存状态已推进、库里没落、不报错、不驱逐，重启即丢，面板读库恒为陈旧值。
+>    ⚠️ 诚实口径：「最后写入时间停在翻转前」与「表确实不在」是实测；**「每次风控写都在失败」是强推断，未抓到逐次失败日志**。
+> ③ **离场清理有日历硬期限 2026-08-14**（库里第一条 `purge_due_at`），且清理第二步用 automation 连接删
+>    **5 张 api 属主表**（`interaction-store.ts:1869-1870` → `interaction-api-writes.ts:60-72`）⇒ 拆库后必报表不存在，
+>    形成「第一步已提交 / 第三步永不执行」的半删 + 每小时无限重试，外层只打一行告警。**本条未经本人实测，来自审计。**
+> **决定**：以上三处**知情不修**，优先做拆仓（用户 2026-07-25 明确）。恢复处理时从本条起手，勿重新调查。
+
 > **2026-07-25 废弃关闭批（4 个，用户决定）**：为给 `split-classic-client-edge-host`（Edge 仓拆分）腾出「冻结文件集」，
 > 用户决定直接关闭以下 4 个活跃 change，change 目录已 `git rm` 删除（内容全部存 git 历史，可按本条追回）。
 > ① `wechat-customer-api-contract`（0/25）—— 关闭时**未修**的两个已坐实缺陷随之搁置：客户 API 草稿保存走五段路径
