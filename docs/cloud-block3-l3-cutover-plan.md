@@ -27,8 +27,19 @@
   - 边界：新 kernel 文件入花名册（kernel-non-members.kernelRoster + ownership-rules fileOverride）；automation 新文件继承 src/risk/；**跨层 import 边零新增（仍 100）**。tsc0 / acc105·0 / 全量 3195·0。
   - ⇒ **api HUB 的 raw 跨库读从 26 降到 19**（21 读→14 读，已走端口 1→8）；剩 client-user-store 的 14 读（含跨库锁 / api+automation JOIN，须拆两查询）+ 5 tx 未解。
 
+- **api `client-user-store.ts` 的「真纯读」批全解——6/14 处经接口**（`6796488`，部署 dev + healthcheck 绿 + **dev 真实数据等价核对通过**）：
+  - 先对该文件 14 处 automation 读做了**逐处归类**（两路独立测绘 + 一道对抗性复核，结论一致）：**6 处真纯读**（顶层 `this.pool.query`、无行锁、不在事务内）+ **8 处须监督**（事务内 / 带跨库行锁）。本刀**只动前 6 处**，后 8 处原样保留并登记在下面 §2.1。
+  - 新 kernel 端口 **`ClientEnvAutomationReader`**（单条离场记录 / 未清除微信离场记录 / 微信绑定环境键 / 账号→环境键 / 批量风控态），属主实现 **`PgClientEnvAutomationRead`（`src/interactions/`，跑在 automation 池）**——与同目录 `offboard-write-adapter.ts`（离场表单写者）读写配对。SQL 逐字迁来。
+  - 解耦的 4 个方法：`getOffboard`（整条读经端口，归属过滤下推属主侧）；`hasPendingRevocationHold`（原 auth_state JOIN holds 拆两步）；`reconcileRevocationHolds` **候选扫描**（本地按序取 hold + 端口问哪些已绑定 + 本地截断；方法内那条事务内 `FOR UPDATE` 联查仍属须监督批、未动）；`listAllEnvironments`（原横跨两域的巨型聚合拆三步：端口取离场投影 → 本地只聚合 api 属主表 → 端口批量取风控态本地合入）。
+  - **等价性有机械依据**：`interaction_auth_state` 有 `UNIQUE(platform, env_key)` + `PRIMARY KEY(platform, account_id)`、`interaction_offboards` 在未清除态上有 `UNIQUE(platform, env_key)`、`risk_state` 以 `account_id` 为主键 ⇒ 被拆掉的四处 JOIN **全是 1:1**，不放大行数、不改 LIMIT 选中集，「缺行 = null / 无回执」语义逐字保留。
+  - **dev 真实数据核对（新旧双跑 deep-equal）**：`listAllEnvironments` 45==45 **逐字段全等**（其中 4 行真的走了离场回执路径、9 行真的走了风控态合入路径）；`hasPendingRevocationHold` 对全部 5 个微信绑定账号新旧一致；`getOffboard` 取真实记录读回正确且**错配 userId 返 null**（归属闸有效）。⚠️ 撤权 hold 相关路径当前库内**存量为 0**（hold 回执 0 / reconcile 候选 0），真实数据只证了「空集下一致」，**行为覆盖靠单测**，已登记真机 backlog。
+  - 失败方向显式钉死：`hasPendingRevocationHold` 的消费方拿 `false` 当放行条件（互动读/回复/私信闸），故该方法**不 catch 任何错误**——跨域读失败必须抛，吞成 `false` 等于给正被撤权的环境重开互动写。端口未注入时跨域读**当场抛具名错**，绝不假空集。
+  - 组合根按模式接线（monolith/core/automation/content = automation 池本地实现；api 模式 fail-closed）。边界：kernel 新文件入花名册；`src/interactions/` 为逐文件裁决目录，属主实现另加 fileOverride。跨层 import 边**零新增**（仍 100）。tsc0 / acc105·0 / 全量 3204·0（新增 9 用例）。
+  - ⇒ **api HUB raw 跨库读从 19 降到 13**（读 14→8，已走端口 8→13）。
+
 **下一步（同样一律走接口，不得直连别人的库）**：
-1. **api `client-user-store.ts` 的 14 处读**（微信环境 offboard/scope 生命周期）：含 `interaction_auth_state`/`interaction_offboards`/`interaction_runtime_controls`/`risk_state` 的 `FOR UPDATE` **跨库锁** + `api+automation 同查询 JOIN`（须拆两查询）——比面板批难，锁 / JOIN 语义须逐个测。
+0. **⛔ 新发现的翻转前置（byte-equivalent、可先做，优先级高于下面任何一步）**：见 §1 callout c —— **automation 属主表的属主 store 自己没接 automation 池**。`InteractionStore` / `ReplyConfigStore` / `ReplyConfigScopeStore` 在组合根构造时**不传 pool**，各自 `new Pool(resolveEnvPgConfig())` 回落共享库配置。翻 `AIDCP_PG_AUTOMATION_URL` 时属主仍读写旧共享库、而已解耦的读端口读新库 = **split brain**。今天单库下零影响，翻转前必须先修。
+1. **api `client-user-store.ts` 余下 8 处须监督读**（见 §2.1）：跨库行锁 + 事务内联查，**接口化解决不了**，须最终一致重设计。**用户在场做。**
 2. **automation 侧 api 读**（automation → api 的 `accounts` 等）：多为**写事务内嵌的守卫读**（execution_target 内联 / `EXISTS(accounts)` / `FOR SHARE` 行锁），接口化不干净，需**去规范化**（把 accounts 投影冷备进 automation 库）或移守卫——性质更接近下面的事务批，非纯读。
 3. 再攻 **9 处跨库事务 + 1 处跨库写**（架构级最终一致，改的是风控/环境注销关键路径，**须监督**）。之后才谈建库/拷数据/翻 URL。
 
@@ -44,14 +55,25 @@
 |---|---|---|---|---|---|---|---|---|
 | **content** | 7 | 7 | 0 | 0 | 0 | ~~7~~ **0** ✅ | leaf（无人读它）| runtime-read 已全解（`5cbb6b1`），只剩 4 DDL FK 翻转时降 |
 | **automation** | 24 | 17 | 3 | 4 | 2 | **22** | **HUB**（api 读它 12+ 表）| 与 api 互相纠缠 |
-| **api** | 27 | ~~21~~ **14** | 1 | 5 | ~~1~~ **8** | ~~26~~ **19** | **HUB**（owns `accounts`）| 面板 7 读已解（`cf32544`）；剩 client-user 14 读 + 5 tx |
+| **api** | 27 | ~~21~~ ~~14~~ **8** | 1 | 5 | ~~1~~ ~~8~~ **13** | ~~26~~ ~~19~~ **13** | **HUB**（owns `accounts`）| 面板 7 读已解（`cf32544`）+ client-user 真纯读 6 已解（`6796488`）；剩 client-user **8 处须监督读** + 5 tx |
 
-合计 58 依赖 / **55 raw**。全部跑在 local pool，只有 3 处已在端口后（automation `interaction-store.ts:1736/1819`、api `client-user-store.ts:683`，仍传 `this.pool`，翻转时把端口实现切 HTTP 即可）。
+合计 58 依赖 / **49 raw**。全部跑在 local pool，只有 3 处已在端口后（automation `interaction-store.ts:1736/1819`、api `client-user-store.ts:683`，仍传 `this.pool`，翻转时把端口实现切 HTTP 即可）。
 
 **最危险的三类（静默原子性丢失，非简单 HTTP 化能解）**：
 - **4 个 config-mirror 跨库事务**：`quota-config-store.ts:243` / `pacing:181` / `session:276` / `resume:249`，各在 `pool.connect()+BEGIN` 里写自己的 automation 表 + `bumper.bumpInTx(client)` 写 **api 的 `config_mirror_version`** + `COMMIT`，**单物理连接**。注入的 bumper 只切调用点、**切不动原子性**——`config_mirror_version` 一到别的库这笔事务就断。**automation 或 api 任一翻转即触发**。修法：把 bump 移出写事务（异步 outbox / 最终一致的版本信号）或在本地复制版本计数。
 - **1 处 raw 跨库写（真边界违规）**：automation `interaction-store.ts:1839` `INSERT interaction_audit_events`（api 属主）——该表被两个 owner 双写。修法：走写端口（镜像 `:1819` 的 DELETE 端已走的 `InteractionApiPurgePort`）。
 - **5 处 api→automation offboard 联合提交**：`client-user-store.ts:513/619/1519/2151/2233`，经 `OffboardWritePort` 写 automation 表、但与 api 表在**同一 `BEGIN/COMMIT`** 内共提交。端口切调用点干净，**原子性在拆库时断** → 拆成两次独立提交（2-phase / outbox）。
+
+**属主 store 没接属主池（callout c，2026-07-25 新发现，翻转前置、byte-equivalent 可先做）**：
+`InteractionStore`（`src/interactions/interaction-store.ts:302`）/ `ReplyConfigStore` / `ReplyConfigScopeStore`
+在组合根构造时**不传 `pool`**（`server.ts:2617/2621/2622`），故各自 `new Pool(resolveEnvPgConfig())` —— 回落的是
+**共享库配置**，不是 `automationPool`。而它们正是 `interaction_offboards` / `interaction_auth_state` /
+`interaction_runtime_controls` / `interaction_feed` / `interaction_reply_configs` 这些 automation 属主表的**单写者**。
+后果：一旦设 `AIDCP_PG_AUTOMATION_URL`，**属主继续读写旧共享库**，而本批已解耦的读端口读**新 automation 库** ⇒
+split brain（读端看到空库或陈旧副本，写端的离场 / 授权状态改动读端永远看不见）。今天三 URL 全未设 ⇒ 零影响。
+**修法**：组合根把 `automationPool` 传给这三个 store（与 callout b 同形、同为纯字节等价）。**翻 URL 前必须先做。**
+> 排查提示：`grep -rn "new Pool(resolveEnvPgConfig())" src/` 共 8 个文件自建池；其中 5 个在组合根**已被显式注入
+> 属主池**（bot-chat / group-route / approval-policy / persona-auto-fill / client-user-store），只有上述 3 个漏了。
 
 **连接路由地雷（callout b，非表依赖、是接线 bug）**：`event_outbox`/`event_outbox_cursor`/risk 命令 outbox 属 automation，但 `emitRiskCommand`（server.ts:6052）/ `startRiskCommandConsumer`（:2442）/ `bridgeEventBusToOutbox`（:2453）/ `PanelEventReplay`（:6133）在组合根用的是 **api 的 configMirrorPool**。单库字节等价，拆库后读写错库。**修法（纯字节等价、可先做）**：把这 4 个 helper 改绑 automation 池（需把 `automationPool` 挂上 ctx，段间传递）；`ConfigMirrorRefresher`（:2886，读 api 的 `config_mirror_version`）**保持 api 池**。
 
@@ -84,7 +106,56 @@
 
 ### api（HUB，原 26 raw：5 tx + 21 读，全在 2 文件；**面板 7 读已解 → 现 19 raw**）
 - **`client-auth/client-user-store.ts`**（微信环境 offboard/scope 生命周期）：14 处 raw 读 automation 表（含 `interaction_auth_state`/`interaction_offboards`/`interaction_runtime_controls`/`risk_state` 的 `FOR UPDATE` 跨库锁 + `1359/2210/2225/2254` 的 **api+automation 同查询 JOIN**，须拆两查询）；**5 处 offboard 跨库联合提交**（见 §1）；已走端口 `:683`（只写 automation 表、无 api 共写→可干净切 HTTP）。**← 下一批读端口。**
-- ~~**`panel/panel-store.ts`**（只读看板）：**7 处 raw 读**（`400 risk_state`、`422/439/469 risk_counters`、`592 alerts`、`633 interaction_feed`、`634 interaction_target_meta`）~~ **✅ 已解（`cf32544`，部署 dev）**：经 kernel 端口 `PanelAutomationReader`，属主实现 `PgPanelAutomationRead`（automation 池）；`accounts LEFT JOIN risk_state` 拆为「本地 accounts + 端口批量风控态 + 本地合入」；面板自读改 apiPool、与端口分池。见上「已完成」。
+- ~~**`panel/panel-store.ts`**（只读看板）：**7 处 raw 读**（`400 risk_state`、`422/439/469 risk_counters`、`592 alerts`、`633 interaction_feed`、`634 interaction_target_meta`）~~ **✅ 已解（`cf32544`，部署 dev）**
+- 详细分解见新增 **§2.1**（client-user-store 14 处逐处归类 + 已解 6 / 待解 8）。：经 kernel 端口 `PanelAutomationReader`，属主实现 `PgPanelAutomationRead`（automation 池）；`accounts LEFT JOIN risk_state` 拆为「本地 accounts + 端口批量风控态 + 本地合入」；面板自读改 apiPool、与端口分池。见上「已完成」。
+
+### 2.1 `client-auth/client-user-store.ts` 14 处 automation 读 · 逐处归类（2026-07-25 测绘 + 对抗性复核）
+
+> 行号为解耦**前**（cf32544）的坐标，便于与历史文档对齐；已解那 6 处的现状见 `6796488`。
+> 注意 **14 处引用 = 12 条语句**：`1918/1952/1964` 同属 `listAllEnvironments` 那一条巨型聚合。
+
+| # | 行 | 表 | 方法 | 事务内 | 行锁 | 同语句含 api 表 | 归类 |
+|---|---|---|---|---|---|---|---|
+| 1 | 658 | `interaction_offboards` | `getOffboard` | 否 | 无 | 否 | ✅ 已解（纯读） |
+| 2 | 1918 | `interaction_offboards` | `listAllEnvironments`（keys CTE 并集支） | 否 | 无 | 是 | ✅ 已解（拆并集） |
+| 3 | 1952 | `risk_state` | `listAllEnvironments`（经 accounts 链） | 否 | 无 | 是 | ✅ 已解（批量合入） |
+| 4 | 1964 | `interaction_offboards` | `listAllEnvironments`（清理回执 LEFT JOIN） | 否 | 无 | 是 | ✅ 已解（按 envKey 合入） |
+| 5 | 2210 | `interaction_auth_state` | `reconcileRevocationHolds` 候选扫描 | 否 | 无 | 是 | ✅ 已解（拆两步） |
+| 6 | 2254 | `interaction_auth_state` | `hasPendingRevocationHold` | 否 | 无 | 是 | ✅ 已解（拆两步） |
+| 7 | 535 | `interaction_runtime_controls` | `enqueueCleanupHold`（helper，两个调用方都在 tx 内） | **是** | `FOR UPDATE` | 否 | ⛔ 须监督 |
+| 8 | 614 | `interaction_auth_state` | `beginEnvironmentOffboard` | **是** | `FOR UPDATE` | 否 | ⛔ 须监督 |
+| 9 | 719 | `interaction_offboards` | `consumeOffboardCleanupGrant` | **是** | `FOR UPDATE` | 否 | ⛔ 须监督 |
+| 10 | 1359 | `interaction_auth_state` | `withAuthorizedInteractionScope` | **是** | `FOR SHARE OF s,e,a,acc` | 是 | ⛔ 须监督 |
+| 11 | 1511 | `interaction_auth_state` | `updateUser`（停用客户路径） | **是** | `FOR UPDATE` | 否 | ⛔ 须监督 |
+| 12 | 2116 | `interaction_offboards` | `setScope`（离场进行中闸） | **是** | `FOR UPDATE` | 否 | ⛔ 须监督 |
+| 13 | 2143 | `interaction_auth_state` | `setScope`（撤销归属取绑定） | **是** | `FOR UPDATE` | 否 | ⛔ 须监督 |
+| 14 | 2225 | `interaction_auth_state` | `reconcileRevocationHolds` 事务内重取 | **是** | `FOR UPDATE OF h,a` | 是 | ⛔ 须监督 |
+
+**为什么这 8 处「不是更难，而是性质不同」——它们的失效是无声的。** 跨库行锁与本项目已经淘汰过一次的
+库级 advisory lock 同形：两侧连不同库时，**两边各自加锁都会成功、互斥消失、且不产生任何错误**
+（同一教训写在 `aidcp-cloud/src/db/environment-row-lock.ts` 的头注释里，那次是把 advisory lock 换成
+`client_environments` 行锁）。所以「先 HTTP 化再说」对这 8 处是错的方向：必须显式改成最终一致
+（把互斥落到单一属主域内、或用 outbox / 2-phase 表达），并接受语义变化 + 逐条测。
+
+**已识别的具体破坏形态（改之前必须先答的题）**：
+- **`setScope` 的两道闸分居两库**：`2107` 锁 `client_env_revocation_holds`（api）、`2116` 锁
+  `interaction_offboards`（automation），今天同一事务 ⇒「有清理在飞的环境不可改派」是原子的。拆库后两闸各在
+  一库，叠加 `reconcileRevocationHolds` 变成两次独立提交（`2233` 写 automation 离场记录、`2237` 删 api 的 hold），
+  存在**hold 已删、离场记录尚不可见**的窗口 —— `setScope` 会在此窗口内**把一个正在清理的环境改派给新客户**。
+- **离场写口收不住原子性**：`OffboardWritePort`（`client-auth/offboard-write-port.ts`）的每个方法都**接调用方的
+  事务句柄**，实现方 `interactions/offboard-write-adapter.ts` 自己**不持任何连接**。故 `client-user-store` 那些
+  `BEGIN` 出来的 client 是 **api 池**的连接 ⇒ 翻转后 `UPDATE interaction_runtime_controls` /
+  `UPDATE interaction_auth_state` / `INSERT interaction_offboards` / `INSERT interaction_offboard_audit`
+  **全部打到 api 库**。两种结局都坏：表不在 api 库 → 42P01，而 `beginEnvironmentOffboard` / `updateUser` /
+  `setScope` / 两个 grant 方法**都没有缺表分支** ⇒ 客户解绑、停用客户、改派归属直接 500；表若两库都拷了 →
+  写进 api 那份副本、automation 侧派发器永远看不到、边缘永远收不到清理命令 = **静默假成功**。
+- **第 5 张 automation 表**：`interaction_offboard_audit` 也由本文件经上述写口写入（`683` / `733` / `743` 及
+  `enqueueOffboard` / `enqueueProvisionedUnboundOffboard` 内部），此前清单未列。另 adapter 内部还有一处
+  `SELECT 1 FROM interaction_runtime_controls … FOR UPDATE`（`offboard-write-adapter.ts:45`）——同样跑在
+  api 连接上的 automation 读，且带行锁。
+- **读后即取的语义**：`getOffboard` 是 `beginEnvironmentOffboard` 的读回半边，路由端点对「查不到」答 **404
+  not_found**（`client-auth-server.ts:1946`）。离场写一旦变成 automation 侧独立提交，这个轮询会对**已受理**
+  的离场合法地 404，端点目前**没有「已受理、尚未物化」这个词**。改最终一致时须同时给它一个诚实的中间态。
 
 ## 3. 推荐执行顺序
 

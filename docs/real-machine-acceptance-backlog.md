@@ -1994,3 +1994,32 @@ Phase 0（云端）不依赖 UI，可先用 SQL 造态 + 后台仪表盘验（�
 - [ ] 111.8 **（warn → enforce 切换）** 契约门以 `warn` 跑满一个发布周期且覆盖一次 ol 部署后，切 `AIDCP_SCHEMA_GATE=enforce` 并把默认值改为 `enforce`；把实际跑满的**日历天数**记进 tasks.md（design.md「Open Questions」要求这个数字落在 tasks 而不是代码注释里）。
 - [ ] 111.9 **（收尾清账）** 上述各项稳定后，执行 tasks 5.11：删除 `AIDCP_SCHEMA_SELF_CREATE` 旋钮与 33 个存储里的 DDL 常量、删除 `test/schema/ddl-parity.test.ts`、删除 `scripts/run-migration.ts`（保留它等于保留一条无账本旁路）；届时 `test/schema/runtime-ddl-allowlist.json` 的条目才真正变少。
 - [ ] 111.10 **（被 risk 域挡住的那一个）** `src/risk/pg-risk-store.ts` 的自建表未随本批收口（归 change `risk-state-cross-process-integrity` 独占，它刚在该文件落了写者锁与 outbox）。待其稳定后另起一批，按同一范式收口并从允许清单里删掉对应条目。
+
+## 簇 112 — 物理拆库读侧解耦：后台看到的环境列表还是不是同一份真相
+
+### change `block3-l3-client-user-read-port` 真机验收（Cloud `6796488` 已 land + **部署 dev**（2026-07-25）；下列为桩验不了、只能真机看的部分。登记于 2026-07-25）
+
+**前置环境**：dev ECS（`121.89.85.150`）；管理后台可登录（`8088` console → `/api/client-environments`）；
+**关键**：需要一个处于**撤权 hold 状态**的微信视频号环境（即「管理员已撤权、但该环境还没上报过互动授权绑定」），
+以及一条**未清除的离场记录**。dev 当前 hold 存量为 0 —— 本簇多数项要先人为造出这个状态。
+
+**改了什么（一句话）**：后台读环境列表时，原本一条 SQL 同时读了「归自己管的表」和「归自动化那边管的表」；
+现在改成先向自动化那边**要一份投影**、再和自己的表在内存里合起来。数据同一份、页面应当一模一样。
+
+> **已坐实（不必重验）**：dev 真实数据上新旧两法**逐字段全等**——`listAllEnvironments` 45==45（其中 4 行走了
+> 离场回执路径、9 行走了风控态合入路径）；`hasPendingRevocationHold` 对 5 个微信绑定账号全一致；`getOffboard`
+> 读回正确且**错配 userId 返 null**。tsc0 / acceptance 105·0 / 全量 3204·0。
+> **真机仍要验的是 hold 相关路径**——库内存量为 0，等价核对只证了「空集下一致」。
+
+- [ ] 112.1 **（本簇最高价值 · 造出 hold 再看回执）** 造一个「已撤权 + 无微信绑定」的环境 → 后台环境资产页该行 MUST 显示
+  `binding_missing` 清理回执（不含伪造的 accountId）；再让该环境上报一次互动授权 → 等一次撤权对账（60s 定时器）→
+  该行 MUST 变成 `offboard_pending` 回执且 hold 消失。**注**：hold 与离场记录现在分属两次读，切换瞬间该行回执**可能
+  短暂为空**（原单快照下必现其一）——刷新即恢复属预期，**持续为空则是缺陷**。
+- [ ] 112.2 **（撤权对账候选筛选没漏人）** 多造 3 个 hold、只给其中 2 个补上互动授权绑定 → 一轮对账后 MUST 恰好物化那 2 个，
+  第 3 个 hold 原样留着（不得被误删、也不得被误物化成带假 accountId 的离场记录）。
+- [ ] 112.3 **（互动闸没被读改松）** 对一个挂着 hold 的账号：边缘握手拿到的互动运行控制 MUST 全闸关闭（读/回复/私信皆不可）。
+  再**人为制造跨域读失败**（如临时让端口不可用）→ MUST 是**响亮失败 + 闸仍关**，MUST NOT 因读失败被判成「没有 hold、放行」。
+- [ ] 112.4 **（客户侧离场状态查询）** 客户 API `GET /offboarding/:id` 对**自己的**离场记录返回真实 state；对**别人的** id
+  返回 404（归属闸）。dev 上已用脚本证过一次，此项是走真实 HTTP + 客户 JWT 再证一次。
+- [ ] 112.5 **（未注入端口时是响亮的）** 确认 api 模式（`AIDCP_SERVICE=api`）下这些跨域读 reject 具名错
+  `client_env_automation_read_unavailable_in_api_mode`，而不是静默空列表。**该模式当前未部署**，属拆进程时一并验。

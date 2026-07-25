@@ -1,6 +1,7 @@
 # Block③ L3 读侧解耦 · 下一 session 交接（可直接执行）
 
-> 生成于 2026-07-25。**给接手 session 用**：从头读到尾，按本文执行即可。
+> 生成于 2026-07-25，**2026-07-25 晚更新**（client-user-store 真纯读批已做完 + 部署 dev）。
+> **给接手 session 用**：从头读到尾，按本文执行即可。
 > 权威地图 = `docs/cloud-block3-l3-cutover-plan.md`；操作红线全景 = `docs/cloud-block3-db-split-handoff.md`。本文是「立刻能开工」的执行版，与那两份不冲突、只做浓缩 + 下一步落地。
 
 ---
@@ -12,16 +13,18 @@
   - ⚠️ **被撤过的取巧**：曾把别的域的连接池注入消费方、让消费方「在对的池上跑查询」。那物理上分了库，但消费方仍直连别人的库、仍知道别人的表结构 = 反模式，**已撤销**。不要重蹈。
 - **代码位置**：cloud sub-repo 在 `../aidcp-cloud`（默认分支 `master`）。控制仓（本仓）在 `.`（默认分支 `main`）。**接手前先 `ls -d ../aidcp-cloud` 确认存在**。
 - **当前提交指针**（接手时先 `git -C ../aidcp-cloud fetch && git -C ../aidcp-cloud rev-parse --short origin/master` 复核，fleet 活跃可能已推进）：
-  - cloud `master` = **`cf32544`**（面板批已 land）
-  - 控制仓 `main` = **`36734a2`**（文档已更新）
-- **部署现状**：dev 已部署 `cf32544`、healthcheck 绿。**dev 与 ol 连同一台物理 PG**（PG 在 dev 机 `121.89.85.150:5432`，这台 PG **就是生产库**）；当前 `AIDCP_PG_{API,AUTOMATION,CONTENT}_URL` **全未设** ⇒ 三个池都回落共享库 `aidcp` ⇒ **一切接口化改动此刻逐字节等价**（读的是同一份数据，只是换了取数通道）。
+  - cloud `master` = **`6796488`**（面板批 + client-user 真纯读批已 land，均部署 dev）
+  - 控制仓 `main` = 见 `git log`（本文档所在提交）
+- **部署现状**：dev 已部署 `6796488`、healthcheck 绿。**dev 与 ol 连同一台物理 PG**（PG 在 dev 机 `121.89.85.150:5432`，这台 PG **就是生产库**）；当前 `AIDCP_PG_{API,AUTOMATION,CONTENT}_URL` **全未设** ⇒ 三个池都回落共享库 `aidcp` ⇒ **一切接口化改动此刻逐字节等价**（读的是同一份数据，只是换了取数通道）。
 - **已完成的读侧解耦**（都经接口、都部署 dev）：
   1. **content 三处**（`5cbb6b1`）：curated `listForClient` 经 `TriggeredPublishRefsReader`、media `assertFacebookAccount` 经 `AccountPlatformReader`、draft `claimNext` 移除 vestigial 守卫。⇒ content 零跨库直读。
-  2. **api 面板批 7 读**（`cf32544`）：`panel/panel-store.ts` 经新 kernel 端口 `PanelAutomationReader`、属主实现 `src/risk/panel-automation-read.ts`（跑 automation 池）。⇒ api HUB raw 跨库读 **26→19**。
+  2. **api 面板批 7 读**（`cf32544`）：`panel/panel-store.ts` 经新 kernel 端口 `PanelAutomationReader`、属主实现 `src/risk/panel-automation-read.ts`（跑 automation 池）。
+  3. **api `client-user-store.ts` 真纯读批 6 读**（`6796488`）：新 kernel 端口 `ClientEnvAutomationReader`、属主实现 `src/interactions/client-env-automation-read.ts`（跑 automation 池，与同目录 `offboard-write-adapter` 读写配对）。改 `getOffboard` / `hasPendingRevocationHold` / `reconcileRevocationHolds` 候选扫描 / `listAllEnvironments`。**dev 真实数据新旧双跑 deep-equal 45==45 逐字段全等。**
+  ⇒ **api HUB raw 跨库读 26 → 19 → 13**。
 
 ---
 
-## 1. 复用配方（读侧解耦，已跑通两次：content + panel）
+## 1. 复用配方（读侧解耦，已跑通三次：content + panel + client-user 纯读批）
 
 **每处跨域读，照这七步做**：
 
@@ -43,33 +46,31 @@
 
 ---
 
-## 2. 立刻要做的下一批：api `client-user-store.ts` 的读
+## 2. 立刻要做的下一批
 
-**位置**：`src/client-auth/client-user-store.ts`（api 属主；微信环境 offboard/scope 生命周期）。计划 §2 记为「14 处 raw 读 automation 表」。
+`client-user-store.ts` 的**真纯读批已做完**（上面第 3 条）。下面按优先级列出接手 session 该做什么。
 
-**⚠️ 关键真相（接手前必须知道，2026-07-25 实测）**：这个文件**不是干净的只读批**。实测：
-- **23 处 `FOR UPDATE`/`FOR SHARE`**（跨库行锁，在事务内——**接口化解决不了锁语义**）
-- **24 个 `BEGIN`/`COMMIT`**（含 5 处 offboard「一笔事务横跨 api+automation 两库」的联合提交）
-- **88 处 `client.query`（事务内） vs 26 处 `this.pool.query`（顶层）** ⇒ 绝大多数读夹在事务里
-- 读的 automation 表：`risk_state` / `interaction_auth_state` / `interaction_offboards` / `interaction_runtime_controls`（15 处引用）
+### 2A.（推荐先做，纯字节等价、无需用户在场）属主 store 补接属主池
 
-**所以这批分两类，必须分开处理**：
+**这是本轮新发现的翻转前置**，性质与已做过的 step0（outbox helper 改绑）完全同形：
 
-- **(A) 真·纯只读**（顶层 `this.pool.query`、非 `FOR UPDATE`、不在 `BEGIN/COMMIT` 内、且不与 api 表同查询 JOIN）：**可按第 1 节配方干净解耦**。这是本批**能自主做**的部分。
-  - 其中若有 **api+automation 同查询 JOIN**（计划点名 `1359/2210/2225/2254` 一带，行号 fleet 活跃会漂、动前 grep 复核），拆成「本地查 api + 接口取 automation 集 + 本地合入」，**属行为变更、必须有测试覆盖**。
-- **(B) 加锁读 + 联合提交事务**（`FOR UPDATE`/`FOR SHARE` 跨库锁、5 处 offboard 跨库 co-commit）：**这是环境注销关键路径，计划标「须监督」**。跨库锁和跨库事务原子性**接口化解决不了**，要改成最终一致（outbox / 2-phase）并接受语义变化。**不要在用户不在场时盲改**——注销做错会误删/漏删客户环境。**登记进 backlog、留给"用户在场"那一档。**
+- `InteractionStore`（`aidcp-cloud/src/interactions/interaction-store.ts`，构造在 `server.ts` 的 `interactionStore = new InteractionStore({ apiPurge, envLock })`）、`ReplyConfigStore`、`ReplyConfigScopeStore` 三个 store **构造时不传 `pool`**，于是各自 `new Pool(resolveEnvPgConfig())` 回落**共享库**配置。
+- 而它们正是 `interaction_offboards` / `interaction_auth_state` / `interaction_runtime_controls` / `interaction_feed` / `interaction_reply_configs` 这些 **automation 属主表的单写者**。
+- 后果：一旦设 `AIDCP_PG_AUTOMATION_URL`，属主继续读写旧共享库、而已解耦的读端口读新库 ⇒ **split brain**。今天三 URL 全未设 ⇒ 零影响。
+- **修法**：组合根把 `automationPool` 传给这三个 store。改完跑验证四连、部署 dev。**翻 URL 之前必须先做完这一步。**
+- 排查提示：`grep -rn "new Pool(resolveEnvPgConfig())" src/` 共 8 个文件自建池，其中 5 个组合根已显式注入属主池，只有上述 3 个漏了。
 
-**执行决策门**：
-1. 先通读 `client-user-store.ts`，把 14 处 automation 读逐个归入 (A) 或 (B)（带 `file:line` + 是否在事务/是否 `FOR UPDATE`/是否 JOIN api 表）。
-2. **只做 (A)**：按第 1 节配方，属主（automation）加读端口、client-user-store 依赖接口。
-3. **(B) 全部登记**到 `docs/cloud-block3-l3-cutover-plan.md` 的「9 处跨库事务 + 1 处跨库写」批 + `docs/real-machine-acceptance-backlog.md`，写清 `file:line` 与「须用户在场做最终一致重设计」的原因。**绝不静默跳过、也绝不盲改。**
-4. 若通读后发现 (A) 子集**很小或与 (B) 无法干净切分**（很可能），**如实报告并停在 panel 批那个干净节点**，把整个 client-user-store 批连同 automation→api 守卫读一起归到「须监督」档——这也是一个正当的收尾。
+### 2B.（须用户在场）`client-user-store.ts` 余下 8 处 + 跨库事务批
 
-**这批之后**（同属「须监督 / 近事务」，非本次自主范围）：
-- automation → api 的 `accounts` 守卫读（`pg-risk-store` / `interaction-store` / `facebook-group-store` / `delegated-task/store` 里 `execution_target` 内联、`EXISTS(accounts)`、`FOR SHARE` 行锁）——多在写事务内，需**去规范化**（把 accounts 的 platform/group_label/execution_target 投影冷备进 automation 库）或移守卫。
-- 9 处跨库事务（4 config-mirror `writeWithMirrorBump` + 5 offboard co-commit）+ 1 处跨库写（`interaction-store` 双写 api 的 `interaction_audit_events`）→ 架构级最终一致，**须用户在场**。
+逐处清单（行号 + 表 + 方法 + 锁）见 `docs/cloud-block3-l3-cutover-plan.md` **§2.1 表格**。核心认识：
 
----
+- 这 8 处**不是「更难的同类」，是性质不同的一类**：跨库行锁与本项目已经淘汰过一次的库级 advisory lock 同形——**两侧连不同库时两边各自加锁都会成功、互斥消失、且不产生任何错误**（同一教训写在 `src/db/environment-row-lock.ts` 头注释）。所以「先 HTTP 化再说」对它们是错的方向。
+- §2.1 已经写清三个**改之前必须先答的题**：`setScope` 两道闸分居两库叠加 reconcile 两次提交 ⇒ 有把「正在清理的环境改派给新客户」的窗口；`OffboardWritePort` **接调用方事务句柄**、实现方自己不持连接 ⇒ 翻转后离场写全打到 api 库（要么 42P01 直接 500、要么写进副本变静默假成功）；`getOffboard` 的 404 语义在离场写变成独立提交后需要一个「已受理未物化」的中间态。
+- **不要在用户不在场时动这批。**
+
+### 2C. automation → api 的 accounts 守卫读
+
+见 cutover-plan §2 automation 段。多在写事务内，需去规范化（把 accounts 的 platform/group_label/execution_target 投影冷备进 automation 库）或移守卫。
 
 ## 3. 操作命令（照抄）
 
@@ -80,8 +81,8 @@ git -C /Users/baitianxing/codes/aidcp     branch --show-current   # 须 = main
 git -C /Users/baitianxing/codes/aidcp-cloud branch --show-current  # 须 = master
 
 cd /Users/baitianxing/codes/aidcp-cloud
-git worktree add ../aidcp-cloud.wt/block3-l3-client-user-read-port -b block3-l3-client-user-read-port master
-cd ../aidcp-cloud.wt/block3-l3-client-user-read-port
+git worktree add ../aidcp-cloud.wt/block3-l3-<下一批名> -b block3-l3-<下一批名> master
+cd ../aidcp-cloud.wt/block3-l3-<下一批名>
 npm ci    # 每个 worktree 各自装,绝不软链 node_modules
 ```
 
@@ -98,8 +99,8 @@ npm run boundaries:refresh       # 加了新 kernel 文件后跑；再 git diff 
 # 1) 在 worktree 提交后，回 canonical master ff-merge
 cd /Users/baitianxing/codes/aidcp-cloud
 git fetch origin
-git rev-list --left-right --count origin/master...block3-l3-client-user-read-port   # 左=0 才可直接 ff；非 0 先 rebase worktree 分支再重验四连
-git merge --ff-only block3-l3-client-user-read-port
+git rev-list --left-right --count origin/master...block3-l3-<下一批名>   # 左=0 才可直接 ff；非 0 先 rebase worktree 分支再重验四连
+git merge --ff-only block3-l3-<下一批名>
 git push origin master
 
 # 2) 部署 dev（安全序列：clean 快照 → ECS 备份 → rsync → 重启 → healthcheck）
@@ -117,8 +118,8 @@ bash /Users/baitianxing/codes/aidcp/scripts/deploy-target dev --check   # key=~/
 ### 收尾
 ```bash
 cd /Users/baitianxing/codes/aidcp-cloud
-git worktree remove ../aidcp-cloud.wt/block3-l3-client-user-read-port
-git branch -d block3-l3-client-user-read-port
+git worktree remove ../aidcp-cloud.wt/block3-l3-<下一批名>
+git branch -d block3-l3-<下一批名>
 # 更新 docs/cloud-block3-l3-cutover-plan.md + docs/cloud-block3-db-split-handoff.md §0 + memory cloud-decoupling-execution-progress
 # 控制仓 commit+push（main）
 ```
