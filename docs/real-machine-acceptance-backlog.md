@@ -1980,14 +1980,15 @@ Phase 0（云端）不依赖 UI，可先用 SQL 造态 + 后台仪表盘验（�
 
 **改了什么（一句话）**：以前每套云端各按自己内存里的计数放行、各写各的风控状态，合计能放行两倍的量、还会互相盖回；现在用数据库锁保证「每个部署目标只有一个写者」，风控写带属主校验，记账先落库再推进，并周期性与库对账。
 
-- [ ] 110.1 **双 target 同时驱动同一账号被拒**（需 dev + ol 两套云端 + 一个边缘节点）：把一个归属 `ol` 的账号的边缘节点接到 `dev`，确认握手被拒、拒绝码为 `execution_target_mismatch`、客户端界面显示真实归属与处理办法而不是「云端离线」。观察模式下确认不拒绝但有告警。
+- [~] 110.1 ~~**双 target 同时驱动同一账号被拒**：把一个归属 `ol` 的账号的边缘节点接到 `dev`，确认握手被拒、拒绝码为 `execution_target_mismatch`~~ <!-- 2026-07-25 作废：该路径已被 change `risk-target-follows-active-session`（cloud 6b6b542，2026-07-23 已在 master）取代，`execution_target_mismatch` 在 cloud master 的 src 与 test 中均零命中，永远验不过 -->
+- [ ] 110.1b **归属跟随当次连接、先写方作废**（替代 110.1；需 dev + ol 两套云端 + 一个边缘节点）：把一个当前归属 `ol` 的账号的边缘节点接到 `dev`，确认握手**放行**且归属改写为 `dev`；随后 `ol` 侧对该账号的下一次风控写影响 0 行、抛错并驱逐本地控制器（不是静默盖回），`alerts` 出现 `risk_state_not_owned`。
 - [ ] 110.2 **滚动部署的第二实例启动失败**（需 dev ECS）：在 `aidcp-cloud.service` 运行时，从同一目录手工再起一个进程，确认它在有界等待后以非零码退出、`alerts` 表出现 `risk_writer_lock_unavailable`、且**正在跑的那个实例毫发无伤**。
 - [ ] 110.3 **持锁连接断开 → 停止下发互动**（需 dev ECS）：用 `pg_terminate_backend` 掐掉持锁后端，确认进程转入 fail-closed（互动准入一律拒绝、浏览仍放行）、`alerts` 出现 `risk_writer_lock_lost`。
 - [ ] 110.4 **崩溃点补记**（需 dev ECS + 真边缘）：在一次真实互动回执之后、outbox apply 之前 `kill -9` 云端，重启后确认启动日志的回收条数 ≥1、该次动作出现在 `risk_counters` 且**只有一行**。
 - [ ] 110.5 **属主谓词的 SQL 真值**（需真 PostgreSQL）：手工把某账号 `execution_target` 改成另一 target，触发一次风控状态写，确认影响行数为 0 且 `risk_state` 未变（桩只能验证 0 行之后的分支，验证不了 0 行本身）。
 - [ ] 110.6 **`FOR UPDATE SKIP LOCKED` 的多 worker 互斥**（需真 PostgreSQL）：两个 worker 并发认领同一批 outbox 行，确认无重复 apply、`risk_counters` 行数等于 outbox 行数。
 - [ ] 110.7 **迁移 `0061` 在 dev 上的 additive 性**（tasks 1.6，需 dev ECS）：只跑迁移、不改代码，确认 `\d accounts` 有 `execution_target`（全 NULL、**未被回填**）、`\d risk_counters` 有 `outbox_id`、`risk_counter_outbox` 表与两个索引到位，且既有查询零回归。
-- [ ] 110.8 **观察期实测跨 target 争用次数**（tasks 11.6）：`AIDCP_RISK_OWNERSHIP_ENFORCE=false` 观察一段时间后统计 `alerts` 里 `risk_owner_mismatch_observed` 与 `risk_state_not_owned` 的条数；预期 0，非 0 则先查清归属再翻强制。
+- [~] 110.8 ~~**观察期实测跨 target 争用次数**（tasks 11.6）：`AIDCP_RISK_OWNERSHIP_ENFORCE=false` 观察一段时间后统计争用条数再翻强制~~ <!-- 2026-07-25 作废：观察模式已被 cloud 6b6b542 整体删除（`OwnershipMode` 现只剩 'enforce' | 'off'，enforce 为有合法 target 时的默认），不存在「翻开强制」这个动作，也不再产生 risk_owner_mismatch_observed 告警 -->
 
 ## 簇 111 — 迁移账本上线：库到底跑没跑过那些迁移
 

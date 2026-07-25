@@ -110,7 +110,16 @@
 - [x] 11.4 `openspec validate risk-state-cross-process-integrity --strict` 通过。 <!-- 实测：openspec validate risk-state-cross-process-integrity --strict → "Change ... is valid" -->
 - [x] 11.5 部署 dev（观察模式：`AIDCP_RISK_OWNERSHIP_ENFORCE=false`），按 `CLAUDE.md` §5 安全序列走；部署后验证写者锁已持有、outbox 积压为 0、对账偏差为 0、账号归属自证占位符合预期。
   <!-- 2026-07-23 deployed 主控串行执行：备份 cloud.bak.20260722-185821Z.tar.gz + .env.bak.20260722-185821Z → 从 git archive HEAD 干净快照 rsync（--exclude .env/node_modules/.git）→ restart → healthcheck。部署 sha d9c550e（含本 change 全部 5 个提交）。实测四项：① 日志「自动化写者锁已持有（target=dev）」；② `select status,count(*) from risk_counter_outbox` 返回空集（零行、零积压），启动日志「启动回收在途行=0」；③ 对账器已启动、15 分钟内零偏差告警；④ 归属模式 = observe，`accounts.execution_target` 36 行全 NULL（迁移刻意不回填，等运行时首次真实握手自证占位）。零 error 日志。 -->
-- [ ] 11.6 观察期结束后单独提交一次「翻开 `AIDCP_RISK_OWNERSHIP_ENFORCE=true`」的变更，并在 tasks 里记录观察期实测的跨 target 争用次数（预期 0；非 0 则先查清归属再翻）。
-  <!-- BLOCKED: 依赖 11.5 的观察期数据。翻 AIDCP_RISK_OWNERSHIP_ENFORCE=true 须单独提交，且先统计 alerts 里 risk_owner_mismatch_observed / risk_state_not_owned 条数（预期 0）。 -->
+- [~] 11.6 ~~观察期结束后单独提交一次「翻开 `AIDCP_RISK_OWNERSHIP_ENFORCE=true`」的变更~~
+  <!-- 2026-07-25 作废（非未完成）：观察模式已被 change risk-target-follows-active-session（aidcp-cloud 6b6b542，2026-07-23 已在 master）整体删除——src/risk/ownership.ts 的 OwnershipMode 现只剩 'enforce' | 'off'，enforce 是有合法 target 时的默认值，dev 上已实际生效（.env 里根本没有 AIDCP_RISK_OWNERSHIP_ENFORCE）。不存在「翻开强制」这个动作，也不再产生 risk_owner_mismatch_observed 告警、无观察期数据可补。backlog 110.8 同步作废。 -->
+
+> **2026-07-25 归档前范围裁决（用户决定）**：本 change 的 `same-account-parallel-safety` 能力增量已整体删除，
+> 因其两条要求已被 change `risk-target-follows-active-session`（aidcp-cloud `6b6b542`）取代。
+> **受影响的历史条目**：3.1b / 3.2 / 3.3 / 3.5 / 7.4 / 9.1 / 9.2 当时确实按 `execution_target_mismatch`
+> 与「归属为空才占位」实装并已 land，其 sha 是真实历史；但那套行为 2026-07-23 起已从 cloud master 删除，
+> 现网语义是「归属跟随当次活跃连接、先写方的条件写落空即作废」。这些条目保留 `[x]` 作为历史记录，
+> **不得**据此推断现网行为。`docs/risk-control.md` 第 2 条与 backlog 110.1 已同步订正。
+> **仍未登记的缺口**：`risk-target-follows-active-session` 这次设计反转在控制仓没有任何 openspec 登记
+> （全仓 grep 零命中），权威 spec 至今不知道它发生过——需另起一个 change 补登。
 - [x] 11.7 真机验收项（双 target 同时驱动同一账号被拒、滚动部署第二实例启动失败、崩溃点补记）登记进 `docs/real-machine-acceptance-backlog.md`，按共享真机环境归簇。
   <!-- 2026-07-23 主控套用：docs/real-machine-acceptance-backlog.md 新增簇 110（8 项，110.1–110.8）。原稿未指定簇号，主控按套用顺序分配 110（schema-migration 顺延至 111）。 -->

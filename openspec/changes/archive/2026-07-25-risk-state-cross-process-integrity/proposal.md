@@ -33,7 +33,11 @@
 ### Modified Capabilities
 
 - `interaction-risk-gating`: 风控状态写入者全局唯一、计数与库内事实一致、记账经 outbox 跨重启不丢。
-- `same-account-parallel-safety`: 账号归属单一 `executionTarget`，非属主 target 拒绝驱动该账号且不持有可写控制器。
+<!-- 2026-07-25 用户决定移除本条能力增量：`same-account-parallel-safety` 的两条要求（非属主握手以
+     `execution_target_mismatch` 拒绝、归属变更须显式且不得与活跃会话重叠）已被 change
+     `risk-target-follows-active-session`（aidcp-cloud `6b6b542`，2026-07-23 已在 master）整体取代——
+     现网改为「归属跟随当次活跃连接」，该拒绝码在 cloud master 的 src 与 test 中均零命中。
+     增量目录已 git rm，避免归档时把一份已废弃的契约写进权威 spec。本 change 其余两项能力不受影响。 -->
 - `deployment-environments`: 自动化写者每 target 单实例、部署形态禁止滚动 / 蓝绿，后台组件必须登记单实例 / 可多实例分类。
 
 ## Impact
