@@ -44,5 +44,5 @@
   <!-- acceptance 30/30; Edge 2309/2309; Cargo 50/50; typecheck pass -->
 - [x] 5.3 Run `openspec validate restore-native-facebook-behavior-parity --strict` and record repository commits, validation, delivery scope, and deviations in this checklist.
   <!-- strict validation pass; deviation: cargo-clippy unavailable in installed toolchain, non-gating tests/typecheck passed -->
-- [ ] 5.4 Rebase and fast-forward integrate the isolated Edge worktree, commit and push the control change, and rebuild the local Native Page Engine artifact without packaging an installer.
-  <!-- Edge master pushed at 54ae5b2; canonical darwin-arm64 artifact sha256 108aed9b04ffccc446baa3dfe590595ce415b31832ecf094f4a7b80db3dbacb1; control commit pending -->
+- [x] 5.4 Rebase and fast-forward integrate the isolated Edge worktree, commit and push the control change, and rebuild the local Native Page Engine artifact without packaging an installer.
+  <!-- Edge master 54ae5b2; aidcp OpenSpec f7e5e30; canonical darwin-arm64 sha256 108aed9b04ffccc446baa3dfe590595ce415b31832ecf094f4a7b80db3dbacb1; no installer or OL deployment -->
