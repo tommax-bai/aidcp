@@ -6,18 +6,21 @@
 
 ## 进展与方法更正（2026-07-25）
 
-**方法更正（重要，简化了跨库读的修法）**：owner-URL 翻转 = **单进程 + 三个池**（server.ts 在同一进程建 api/automation/content 三池，翻转只是让三池指向三库）。因此跨 owner **读不需要 HTTP**——只要在**正确 owner 的池**上跑那条查询即可（关联子查询/跨库 JOIN 拆成两次池查询：先在外表 owner 的池取集合，再在本表 owner 的池用 `id = ANY(...)` 本地判定）。本文档原文多处写「route via transport port / HTTP」是套了 Block² **进程拆分**的需要，对 owner-URL 翻转是过度设计；HTTP 端口只有将来若再做进程拆分才需要。**唯二不因 (P) 简化的**：① 跨库**事务**（一笔 tx 不能跨两个池/库）——4 个 config-mirror bump + 5 个 offboard 联合提交，仍须改最终一致（outbox/2-phase）；② 跨库**写**（interaction_audit_events 双写）仍须收口到单写者。跨 owner **读**不被边界门拦（门只拦写/DDL）。
+**架构原则（2026-07-25 定，此前一版取巧被撤）**：最终目标是**三个真正独立的服务**（各自进程、各自库、只走接口）。铁律 = **一个域绝不直连另一个域的数据库**。跨域读**一律走「拥有那张表的域」的接口**：接口定义在 **kernel**，**属主域用它自己的连接实现**，消费方只依赖接口、从不碰别人的库/表结构。同进程期接口 = 进程内直调属主域实现（跑在属主池上）；拆进程后同一接口换 HTTP 客户端，接口不变。
+> ⚠️ **被撤的取巧**：曾有一版把 api/automation 的池**直接注入 content**、让 content「在正确的池上跑查询」。那物理上分了库，但 content 仍**直连别人的库、仍知道别人的表结构**——反模式，与「系统间解耦」相悖，已撤销、重做为接口。
+>
+> **唯二不因接口化解决的**（无论同进程/拆进程都要架构级改）：① 跨库**事务**（一笔 tx 不能横跨两个库）——4 个 config-mirror bump + 5 个 offboard 联合提交，须改最终一致（outbox/2-phase）；② 跨库**写**（interaction_audit_events 双写）须收口到单写者的写接口。
 
 **已完成**：
 - **step0**（`f8651f0`，部署 dev）：outbox helper 池改绑 automation（见 §1 callout b）。
-- **content 三处运行时跨库读全解**（`e0d353c`，部署 dev，(P) 池注入）：
-  - `curated-content-store.listForClient` created/uncreated：关联 `EXISTS(delegated_tasks)` → **标准半连接改写**（automation 池取该账号已触发的 curatedId/sourceId 引用集，主查询本地 `id = ANY(...)`，排序/COUNT OVER/分页 SQL 结构逐字不变；delegated_tasks 42P01 fail-closed）。**dev 真实数据验证等价**：94 条 publish_post 任务下，新旧「已创作」集 31==31、双向差 0。
-  - `facebook-publish-media-store.assertFacebookAccount`：`accounts.platform` 读走 **api 池**。
-  - `draft-refinement.claimNext`：移除 **vestigial** `EXISTS(publish_log)` 守卫（publish_log 全仓从不 DELETE、任务 record_id 建时即合法 → 恒真、never excluded；移除逐字节等价）。
-  - 组合根注入 automationPool / apiPool 给两个 content store。tsc0 / acc0 / 全量 3194·0。
-  - ⇒ **content 现在 0 处运行时跨库读**，只剩 **4 条跨 owner DDL FK**（facebook-publish-media→accounts、→publish_log ×2；draft→publish_log），**翻转时降**（schema-ensure 建 aidcp_content 空表时须去掉这些 FK；共库期不动）。**content 已 runtime-read flip-ready。**
+- **content 三处运行时跨库读全解——经接口，content 零跨库直连**（半连接改写 `e0d353c` → 接口重做 `5cbb6b1`，部署 dev）：
+  - `curated-content-store.listForClient` created/uncreated：不再关联 `EXISTS(delegated_tasks)`——经 **kernel 接口 `TriggeredPublishRefsReader`** 向 automation 域要「已触发发帖」的 curatedId/sourceId 引用集（**属主 = `PgDelegatedTaskStore.triggeredPublishRefs`，跑在 automation 自己的池**），主查询本地 `id = ANY(...)`，排序/COUNT OVER/分页 SQL 结构逐字不变。**dev 真实数据验证等价**：94 条 publish_post 任务下新旧「已创作」集 31==31、双向差 0。缺读端口 / delegated_tasks 42P01 → fail-closed。
+  - `facebook-publish-media-store.assertFacebookAccount`：经 **kernel 接口 `AccountPlatformReader`** 向 api 域要平台（**属主 = `PgAccountStore.getPlatformOrNull`，跑在 api 自己的池**，缺账号返 null 保留 account_not_found 区分）。
+  - `draft-refinement.claimNext`：移除 **vestigial** `EXISTS(publish_log)` 守卫（publish_log 全仓从不 DELETE、任务 record_id 建时即合法 → 恒真、never excluded；移除逐字节等价，且直接消除该跨域读）。
+  - 组合根用惰性 thunk 把接口接到属主 store（属主构造在后）。**还减了一条耦合边**（media→platform/index，frozenTotal 101→100）。tsc0 / acc0 / 全量 3194·0。
+  - ⇒ **content 现在 0 处运行时跨库直连、也 0 处跨库直读**（全经接口）。只剩 **4 条跨 owner DDL FK**（facebook-publish-media→accounts、→publish_log ×2；draft→publish_log），**翻转时降**（schema-ensure 建 aidcp_content 空表时须去掉；共库期不动）。**content runtime-read 已解耦。**
 
-**下一步**：content 建库+拷数据+dev 端翻 URL 隔离验证（aidcp 零改动、ol 零风险、可逆）；或攻 api↔automation 双 HUB 的读（按 (P) 改右池，含拆关联 JOIN）+ 9 处跨库事务 + 1 处跨库写（架构级最终一致，须监督）。
+**下一步（同样一律走接口，不得直连别人的库）**：api↔automation 双 HUB 的读——属主域各加读端口、消费方依赖 kernel 接口（含拆跨域关联 JOIN 为「接口取集合 + 本地判定」）；再攻 **9 处跨库事务 + 1 处跨库写**（架构级最终一致，改的是风控/环境注销关键路径，须监督）。之后才谈建库/拷数据/翻 URL。
 
 ## 0. 两条改变全局的已核实事实
 
