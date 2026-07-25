@@ -88,9 +88,41 @@ segDApiServing     5896-6650
 - **可切的依据**：75 个字段里 40 个（53%）只有一个消费方，天然随该服务走；
   `src/server.ts:2139-2213` 那 75 行纯赋值块是现成的切割线。
 
-**代价（必须进排期，不是零成本）**：40 个单消费方里约 17–20 个**不能直接跟着走**——
-属主与消费者反转（某存储 api 在用、却建在 automation 库上）、池别名（`configMirrorPool` 是 `apiPool` 的别名）、
-闭包捕获跨属主对象。这些必须逐个裁决。
+### 4.1 单消费方句柄的实测分类（0d 的执行输入）
+
+segA 赋值 **75 个**字段，按消费方分布实测：
+
+| 消费方 | 个数 |
+| --- | --- |
+| 只 automation（C） | 30 |
+| automation + api（CD） | 21 |
+| 三家都要（BCD） | 9 |
+| 只 api（D） | 5 |
+| 只 content（B） | 5 |
+| content + automation（BC） | 4 |
+| 无人消费（死字段） | 1 → 已删（0a） |
+
+**单消费方共 40 个**（30 C + 5 B + 5 D）。其中**属主与消费者反向的实测是 9 个**
+（原估 17–20，实际更少），这 9 个不能跟着消费方走，必须逐个裁决：
+
+| 字段 | 谁消费 | 却建在 | 性质 |
+| --- | --- | --- | --- |
+| `publishPipelineLogStore` | content | api 池 | 属主反转 |
+| `roleLlm` | content | automation 池 | 属主反转 |
+| `cache` | automation | api 池 | 属主反转 |
+| `planner` | automation | api 池 | 属主反转 |
+| `firstPostOnboardingStore` | automation | api 池 | 属主反转 |
+| `personaAutoFillStore` | automation | api 池 | 属主反转 |
+| `groupRouteStore` | api | automation 池 | 属主反转 |
+| `configMirrorPool` | automation | **api 池的别名** | 池别名 |
+| `mirrorVersionStore` | automation | api 池（经别名） | 池别名 |
+
+其余 31 个单消费方**池与消费方一致或非存储**，可直接下沉。
+另有 26 个双消费方 + 9 个三消费方 = **35 个必须逐个定「归谁 + 另一家怎么拿」**。
+
+> 测法：字段消费方＝各段解构清单 ∪ 段内 `ctx.X` 读点；池＝构造块里的 `pool:` 实参。
+> ⚠️ 这套按段扫描**看不见段函数体外的读点**（`main()` / `startApiInternalApi` 等），
+> 判「无人消费」时必须改用全仓 grep —— 0a 就是这么差点删错的。
 
 ## 5. 还需要第二个共享包 `aidcp-transport`
 
@@ -144,7 +176,10 @@ dev 部署后三个契约门结论全过、零 error、断言未触发。
 
 **批次 0 的五步**：
 
-- **0a** 删死字段（有赋值无读点的）。
+- **0a** ✅ **已完成并合入 `aidcp-cloud` master `1d5ac18`**。死字段只有一个：`postProcessor`
+  （有声明有赋值、**全仓零读点**；segB 内那处用的是同名局部常量，与 ctx 无关）。
+  **同批曾误判 `configMirrorBumpSink` 为死字段** —— 它在 `startApiInternalApi`（`server.ts:811`）
+  有读点，只是那行不在四个段函数体内、按段扫描看不见。**判死字段必须全仓 grep，不能只扫段内。**
 - **0b** 前向引用改显式端口 + 诚实不可用实现（不是空值）。
 - **0c** 面板段资产从自动化段上提（`server.ts:5757-5845` 那一簇；数据全在基础段，是**搬家不是造接口**）。
 - **0d** 基础段 40 个单消费方句柄下沉到消费段；沉不了的三类（属主反转 / 池别名 / 闭包捕获）原地登记。
