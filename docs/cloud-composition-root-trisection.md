@@ -134,7 +134,35 @@ kernel 准入门实测：14 个文件里只有 6 个 CLEAN，**最承重的内�
 
 因此分两层：**kernel 装「零副作用的类型与契约」，`aidcp-transport` 装「有副作用但三家都要的运行时原语」**。
 准入判据＝「三家都可能调用 + 不含任何属主表的 SQL」——比 kernel 宽，比「复制三份」严。
-带 SQL 的（事件 outbox、账号投影存储、风控命令 outbox 写侧）**不进包，随属主走**；发送函数的**签名**可进。
+
+### 5.1 逐文件membership（2026-07-25 实测，14 个文件）
+
+| 文件 | SQL | 服务端 | 客户端 | 判定 |
+| --- | :-: | :-: | :-: | --- |
+| `internal-http.ts` | . | — | Y | **进包**（HTTP 骨架，三家都要；含 `createServer` ⇒ 永不入 kernel） |
+| `config-mirror-bump-http.ts` | . | Y | Y | **进包** |
+| `curated-content-http.ts` | . | Y | Y | **进包** |
+| `delegated-task-http.ts` | . | Y | Y | **进包** |
+| `interaction-store-reader-http.ts` | . | Y | Y | **进包** |
+| `publish-generation-http.ts` | . | Y | Y | **进包** |
+| `publish-status-http.ts` | . | Y | Y | **进包** |
+| `risk-read-http.ts` | . | Y | Y | **进包** |
+| `account-projection-store.ts` | **Y** | . | . | 随属主（automation） |
+| `event-outbox.ts` | **Y** | . | . | 随属主（automation） |
+| `risk-command-outbox.ts` | . | . | . | 随属主（automation）—— 见下前置 |
+| `eventbus-outbox-bridge.ts` | . | . | . | 随属主（automation，依赖 outbox 本体） |
+| `outbox-health.ts` | . | . | . | 随属主（automation，依赖 outbox 本体） |
+| `outbox-notify-listener.ts` | . | . | . | 随属主（automation，**零 import**，但只有 automation 用） |
+
+**进包的判据不是「没有 SQL」，是「同一份契约有两端、而两端会落在不同的仓」**。那 7 个文件各自同时导出
+`registerXxxRoutes(server, impl)`（服务端）与 `XxxHttpClient`（客户端），**中间夹着一张 `XXX_ROUTES` 路径常量表**
+—— 一个仓用服务端、另一个仓用客户端。**复制成两份 = 两端的路径会悄悄对不上**，而且**没有任何机械手段看得见**：
+两侧各自编译通过、各自测试通过，只有真跑起来才 404。这与本仓「两份 `protocol.ts` 必须逐字一致」是同一个问题，
+区别只在协议那边有 `Record<MessageType,true>` 穷举兜着，这边什么都没有。一个包 = 一份定义 = 不可能漂。
+
+**⚠️ 一条真前置：`risk-command-outbox.ts` 现在 import `src/risk/types.ts`（automation）。**
+Phase 2 的 P2-6 会把那个文件整体提进 kernel；**在那之前动传输层，这条会变成包 → 业务层的反向依赖**。
+故 **`aidcp-transport` 必须排在 Phase 2 之后**。（这也是本文原先没写出来的一条顺序约束。）
 
 ## 6. 硬阻断：schema 契约门的判定范围 ✅ 已解（`aidcp-cloud` master `e4558de`，已部署 dev）
 
