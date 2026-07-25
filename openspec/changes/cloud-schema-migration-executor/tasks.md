@@ -98,6 +98,7 @@
 - [ ] 5.10 每批部署 dev 并观察后再进下一批；每批在 tasks 里记录 commit sha 与观察结论。
 <!-- BLOCKED: 部署由主控串行做，本 session 明确禁止 push / 部署 / 碰 ECS。六批的代码改动在同一个提交 9c9e72b 里交付（无法逐批部署观察），**部署前必须先按 10.3 的新步骤在 dev 上跑 migrate status/up**——存储不再自建表，带着未应用的迁移重启会让对应能力 fail-closed。已登记 backlog 簇 110.3 / 110.5 -->
 <!-- 批 5 / risk dev observation 2026-07-25：aidcp-cloud f3f6ed9 已从 clean master 推送并部署；备份 /opt/aidcp/cloud.bak.20260725-190910.tar.gz + .env.bak.20260725-190910。部署前后 migrate status：content 20/20、automation 42/42、api 53/53，待应用均 0；enforce 三属主启动门全部通过。现役拓扑仍为 AIDCP_SERVICE 未设的 monolith（多服务源码已具备、unit 未启用），本修复归 segC automation，未来切独立 automation 进程时同样生效。服务 active、NRestarts=0，8787/8090/8091、panel/public health、三库 SELECT 1、Feishu onReady、writer lock、risk outbox/reconciler 均通过；部署文件 hash 与本地一致；automation 累计 deadlocks 保持修复前 3，重启后 deadlock/risk schema error 日志 0。isales-api/isales-scheduler 保持 active。 -->
+<!-- 批 5 / risk ol observation 2026-07-25：用户明确授权后，既有 release/20260725-db-split 从 41f2c73 严格快进并推送至 aidcp-cloud f3f6ed9；备份 /opt/aidcp/cloud.bak.20260725-191938.tar.gz + .env.bak.20260725-191938。现役拓扑仍仅启用 aidcp-cloud.service monolith，本次未切换多进程。同步前后 migrate status：content 20/20、automation 42/42、api 53/53，待应用均 0；stop→start 后 active、NRestarts=0，8787/8090/8091、panel/public health、三库 SELECT 1、三属主 enforce gate、Feishu onReady、target=ol writer lock、risk outbox/reconciler 均通过。部署 sha/hash 与 release 一致；automation 累计 deadlocks 保持 3，启动后 deadlock/risk schema/unhandled 日志 0。六批逐批观察缺口仍保留，故本项不勾选。 -->
 - [ ] 5.11 全部批次完成后删除 `AIDCP_SCHEMA_SELF_CREATE` 旋钮与 `test/schema/ddl-parity.test.ts`，并删除 `scripts/run-migration.ts`（保留它等于保留一条无账本旁路）。
 <!-- BLOCKED: 这是过渡期结束后的收尾动作，按 design.md D4「保留一个发布周期后随本 change 的收尾任务删除」。现在删掉旋钮等于取消第四重保险；scripts/run-migration.ts 也要等执行器在真库上跑通（110.1/110.2）之后才能删。已登记 backlog 簇 110.9 -->
 <!-- 2026-07-25 用户裁定：本条第三半「删除 scripts/run-migration.ts」**有意保留、不再执行**。理由=enforce 开启后该旁路的失效模式已从「账本与库静默分叉、零告警」变成「下次启动契约门拒绝启动」，从静默变响亮，留着不再是隐患。记于 docs/cloud-block3-l3-next-session-handoff.md §2「已裁定保持现状」。前两半（删 AIDCP_SCHEMA_SELF_CREATE 旋钮、删 ddl-parity.test.ts）不受此裁定影响，仍待 110.1/110.2。 -->
@@ -116,6 +117,7 @@
 - [ ] 6.5 契约门先以只告警模式上线（env `AIDCP_SCHEMA_GATE=warn|enforce`，默认 `warn`），告警模式下 MUST 输出与 `enforce` 完全一致的判定结论与 version 清单，MUST NOT 只打模糊提示。跑满一个发布周期且覆盖一次 ol 部署后切 `enforce` 并把默认值改为 `enforce`。
 <!-- aidcp-cloud aef34a0 实装部分已完成：默认 warn；判定层不接受 mode 参数，结论文本与版本清单在两种模式下逐字一致（由 AC-SCHEMA-NO-SILENT-RECREATE-02 断言） -->
 <!-- BLOCKED: 「跑满一个发布周期且覆盖一次 ol 部署后切 enforce」是 rollout 动作，需真机 + ol 部署。实际跑满的日历天数按 design.md「Open Questions」要求 MUST 记进本 tasks（切换时补写）。已登记 backlog 簇 110.8 -->
+<!-- 2026-07-25 ol 覆盖证据：当前 ol 已配置 AIDCP_SCHEMA_GATE=enforce；f3f6ed9 发布后 content/automation/api 三属主门分别在 0069/0077/0078 账本版本通过。该证据只满足「覆盖一次 ol 部署」，尚未证明 warn 跑满一个发布周期或默认值已切为 enforce，本项继续保留。 -->
 - [x] 6.6 脱库单测：低于/等于/高于三分支、复合序比较（`0002_risk_control` > `0002_bot_chats`）、放行通道只接受具体版本 id、`warn` 与 `enforce` 判定结论一致。
 <!-- aidcp-cloud 9c9e72b test/schema/schema-contract.test.ts（7 例） -->
 - [x] 6.7 回滚场景回归用例：构造「账本含 `0058`、构建只认识到 `0057`」，断言启动被拒且错误为 `schema_ahead_of_code`，并断言此路径下没有任何 `CREATE TABLE` 被执行。这一条是本 change 的核心红线用例，命名 `AC-SCHEMA-NO-SILENT-RECREATE`，进 `npm run test:acceptance`。
@@ -215,6 +217,7 @@
      进程零重启；schema 契约门按 warn 模式如实报出「账本表 schema_migrations 不存在，所需最低版本
      0070_baseline_self_heal_columns」并放行启动（正是设计的诚实降级形态）。
      OL 未部署（需用户明确要求 + 发布分支）。逐批观察项留 backlog 簇 110.3 / 110.5 -->
+<!-- 状态更新 / 2026-07-25：上述「OL 未部署」已由用户明确授权后的批 5 风控热修发布取代；release/20260725-db-split 已快进至 f3f6ed9 并完成 ol 备份、迁移状态核验、stop→start 与健康/死锁观测，详细证据见 §5.10。原始六批未逐批上线的缺口仍存在，因此本项继续不勾选。 -->
 - [x] 11.6 跑 `openspec validate cloud-schema-migration-executor --strict` 并记录输出。
 <!-- 输出：Change 'cloud-schema-migration-executor' is valid -->
 - [x] 11.7 真机验收项（共库 baseline、契约门 `warn→enforce` 切换、每批空库拉起验证）登记进 `docs/real-machine-acceptance-backlog.md`，按共享真机环境聚簇。
