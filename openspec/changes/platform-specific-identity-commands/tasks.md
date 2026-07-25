@@ -29,7 +29,7 @@
 - [x] 4.1 Run Cloud focused acceptance, full tests, and typecheck; record concise evidence.
 - [x] 4.2 Run Edge focused acceptance, full tests, typecheck, Native Rust tests/Clippy, and Native/package-input verification; record the installer and real-account validation boundary.
 - [x] 4.3 Run `openspec validate platform-specific-identity-commands --strict` and update all completed task evidence.
-- [ ] 4.4 Commit, rebase, fast-forward integrate, and push control/Edge/Cloud changes through their eligible default branches without force.
+- [x] 4.4 Commit, rebase, fast-forward integrate, and push control/Edge/Cloud changes through their eligible default branches without force.
 - [ ] 4.5 Deploy the integrated Cloud default branch to DEV only, verify service/listener/health/Feishu/PostgreSQL, and report that installed Edge clients remain unchanged until a separate package/release.
 
-<!-- Validation: aidcp-cloud bbe0052 and aidcp-edge 785244d passed the checks recorded above; control 0a87371 passed strict OpenSpec validation. Integration and DEV delivery remain pending. -->
+<!-- Validation: aidcp-cloud bbe0052 and aidcp-edge 785244d passed the checks recorded above; control 0a87371 passed strict OpenSpec validation. All three feature branches were rebased, fast-forward integrated, and pushed to their eligible defaults without force; DEV delivery remains pending. -->
