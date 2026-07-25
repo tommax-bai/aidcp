@@ -96,7 +96,9 @@
 | `navigation.back` | cloud → edge | 返回上一页（feed / search） |
 | `note.browse_images` | cloud → edge | 浏览笔记图片（`count` 张；DeepReader 决策下发） |
 | `note.scroll_comments` | cloud → edge | 滚动评论区（CommentReviewer 决策下发） |
-| `profile.open` | cloud → edge | 进入作者主页（专用指令，取代 `open_note{type:'profile'}`） |
+| `profile.open` | cloud → edge | 进入普通作者主页；不得承载本人身份采集或 `direct` |
+| `identity.read_current` | cloud → edge | 就地读取会话绑定账号身份；禁止导航，payload 仅含 Cloud 生成的 `captureId` |
+| `identity.read_self_profile` | cloud → edge | 导航到 Edge 会话绑定账号本人主页读取身份；Cloud 不得提供目标账号 ID |
 | `notification.open` | cloud → edge | 导航到通知首页（仅导航；落地后边缘上报 `notification.home`） |
 | `notification.browse_comments` | cloud → edge | 进「评论和@」+ 滚动加载 + 抽取（→ `notification.items`） |
 | `notification.browse_likes` | cloud → edge | 进「赞和收藏」（清未读 + 抽取点赞/收藏发送者 → `notification.items`） |
@@ -110,6 +112,7 @@
 | `page.cards` | edge → cloud | 上报当前可见卡片列表；可选 `listKind`/`listState` 是页面形态与内容状态观察，缺省 `feed/ready`，不扩展 `feed/detail` Surface |
 | `note.detail` | edge → cloud | 上报笔记详情（正文/作者/计数） |
 | `profile.detail` | edge → cloud | 上报作者主页数据（粉丝数/作品数） |
+| `identity.observed` | edge → cloud | 上报与 `captureId` 关联的本人身份观察；独立于普通作者 `profile.detail` |
 | `action.completed` | edge → cloud | 确认某个 action 执行完成（可选 `noteId`=从被点 article DOM 派生的规范 postId、MUST NOT 抄命令 payload；可选 `observation`=独立见证包 {surface?/listKey?/author?/textPreviewHead?/reactionText?/articleIndex?}，供云端归账仲裁逐字段比对选中卡；search 另可携 `activityId/purpose/scope/actuated/searchOutcome/resultCount`；均 optional，旧端缺省按兼容路径处理） |
 | `notification.detected` | edge → cloud | 检测到「消息」有未读（仅信号；`epoch` 每次由无变有 +1，去重用） |
 | `notification.home` | edge → cloud | 通知首页各类未读快照（评论/赞收藏/关注计数，喂分诊） |
@@ -607,10 +610,39 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 { "noteId": "n123", "count": 3, "thinkMs": 700, "dwellMs": 2000 }
 // note.scroll_comments（CommentReviewer 决策）
 { "noteId": "n123", "thinkMs": 700, "dwellMs": 2000 }
-// profile.open（进入作者主页；边缘点详情页作者头像进入，authorId 仅观测/兜底）
-// direct?: boolean — 云端直驱（change account-real-nickname）：true=直接 navi 到 /user/profile/<authorId>、不抓取当前页；缺省/false 维持点头像进入
-{ "authorId": "u456", "reason": "作者值得关注评估", "thinkMs": 800, "direct": false }
+// profile.open（普通作者主页；不得用于本人身份采集）
+{ "authorId": "u456", "reason": "作者值得关注评估", "thinkMs": 800 }
+// identity.read_current（Facebook；只允许当前页读取，禁止导航）
+{ "captureId": "capture-018f..." }
+// identity.read_self_profile（XHS；目标账号由 Edge 会话绑定值注入，Cloud 不传 accountId）
+{ "captureId": "capture-0190..." }
 ```
+
+本人身份采集分三层，禁止再把平台差异塞进通用 `profile.open`：
+
+| 平台 | Cloud 选择 | Edge 握手能力 | 页面副作用 | 完成后恢复 |
+| --- | --- | --- | --- | --- |
+| Xiaohongshu | `identity.read_self_profile` | `identity_read_self_profile_v1` | 只导航到 Edge 当前会话绑定账号的规范本人主页 | `identity.observed.pageEffect=navigated_self_profile` 后返回 feed |
+| Facebook | `identity.read_current` | `identity_read_current_v1` | 当前页读取，Native 执行路径不得调用导航 | 无；Cloud 不发 back / refresh / scroll |
+| WeChat Channels | 不支持 | 无 | 无 | 无 |
+
+Edge 启动握手所需的身份读取是本地 `identity_bootstrap`，不属于 Cloud 可下发消息，也不能与上述运行期命令
+共用 Native kind。两个运行期命令都回：
+
+```jsonc
+{
+  "captureId": "capture-018f...",
+  "accountId": "61591824155856",
+  "nickname": "Gi Vo",                  // 可选；空值不写库
+  "source": "current_page",             // current_page | self_profile
+  "pageEffect": "none"                  // none | navigated_self_profile
+}
+```
+
+Cloud 只接受同时匹配当前连接 `accountId` 与在途 `captureId` 的结果。新 Cloud 连接旧 Edge 时，缺少对应握手能力
+即跳过这次可选二次采集并留可观测日志，绝不回落 `profile.open`；新 Edge 收到遗留
+`profile.open{direct:...}` 必须在 CDP 前以 `legacy_profile_direct_unsupported` 拒绝。平台不支持的身份命令同样
+在 Native adapter 支持矩阵/CDP 前拒绝，不做跨平台 fallback。
 
 `interaction.follow.noteId` 是向后兼容的可选扩展：非 Reels 调用方仍可只携 `authorId`。Facebook
 Reels 执行器仅在会话确处于 Reels 模式、且 `noteId` 与立即重探的规范活动 Reel 完全一致时才允许定位作者区
@@ -636,7 +668,9 @@ Reels 执行器仅在会话确处于 Reels 模式、且 `noteId` 与立即重探
 `scroll→page.scroll`、`open_note→note.open`、`close_note→note.close`、
 `like→interaction.like`、`collect→interaction.collect`、`follow→interaction.follow`、`comment→interaction.comment`、`comment_like→interaction.like_comment`、
 `search→search.execute`、`back→navigation.back`、`browse_images→note.browse_images`、
-`scroll_comments→note.scroll_comments`、`profile_open→profile.open`、`session.end→session.end`。
+`scroll_comments→note.scroll_comments`、`profile_open→profile.open`、
+`identity_read_current→identity.read_current`、`identity_read_self_profile→identity.read_self_profile`、
+`session.end→session.end`。
 Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.join`，edge active-command 白名单必须放行。
 
 ### 3.8 结构化上报（edge → cloud）
