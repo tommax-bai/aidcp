@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""三个属主仓的 src/ 与 aidcp-cloud 的差异对账 / 同步（Block④ 三仓提取 · 批次 1 地基）。
+"""四个属主仓 + 共享传输包的 src/ 与 aidcp-cloud 的差异对账 / 同步（Block④ · 批次 1 地基）。
 
 **为什么需要它**：`aidcp-api` / `aidcp-automation` / `aidcp-content` / `aidcp-kernel` 四个仓
 是从 `aidcp-cloud@41f2c73` **手工切**出来的 —— 切得对（本脚本 --check 可当场证明），但**不可复现**：
@@ -25,6 +25,9 @@
     scripts/sync-split-repos --apply             # 写入差异（不含组装根、不删多余文件）
     scripts/sync-split-repos --apply --prune     # additionally 删掉清单里没有的 src 文件
     scripts/sync-split-repos --repo aidcp-api    # 只处理一个仓
+
+覆盖 6 个目标：四个按属主层切的仓（api / automation / content / kernel）+ 一个**逐文件点名**的
+共享包 `aidcp-transport`（它不是一个属主层，成员在归属清单里仍标 automation，只是同时复制进包供三家共用）。
 """
 
 from __future__ import annotations
@@ -48,6 +51,21 @@ REPOS = {
     'aidcp-content': 'content',
     'aidcp-kernel': 'kernel',
 }
+
+# `aidcp-transport` 不是一个属主层，而是**逐文件点名**的共享包：它的成员在 module-ownership.json 里
+# 仍标 automation（整个 src/transport/ 目录规则如此），只是同时被复制进包供三家共用。
+# 准入判据＝「三家都可能调用 + 不含任何属主表的 SQL」。带 SQL 的与只有一家用的一律不进、随属主走。
+TRANSPORT_MEMBERS = [
+    'src/transport/internal-http.ts',
+    'src/transport/config-mirror-bump-http.ts',
+    'src/transport/curated-content-http.ts',
+    'src/transport/delegated-task-http.ts',
+    'src/transport/interaction-store-reader-http.ts',
+    'src/transport/publish-generation-http.ts',
+    'src/transport/publish-status-http.ts',
+    'src/transport/risk-read-http.ts',
+]
+TRANSPORT_REPO = 'aidcp-transport'
 # 组装根：三个业务仓今天各有一份逐字节副本；批次 2/3/4 会各自改写成自己的 main()。只报不改。
 COMPOSITION = {'src/server.ts', 'src/index.ts'}
 KERNEL_REPO = 'aidcp-kernel'
@@ -219,9 +237,55 @@ def main() -> int:
             print('  → 变更留在工作区未提交：请自行 review + commit（本脚本绝不代你提交）')
         print()
 
+    if (not args.repo) or TRANSPORT_REPO in (args.repo or []):
+        exit_code = sync_transport(args, own, kernel_paths, kernel_head) or exit_code
+
     if exit_code and not args.apply:
         print('存在差异。--apply 可同步（组装根除外）；组装根的差异须人工判断。')
     return 0 if args.apply else exit_code
+
+
+def sync_transport(args, own, kernel_paths, kernel_head) -> int:
+    """共享传输层的对账：逐文件点名（不是按属主层切），其余纪律与三仓一致。"""
+    path = os.path.join(CODES, TRANSPORT_REPO)
+    if not os.path.isdir(path):
+        print(f'=== {TRANSPORT_REPO} ===\n  SKIP: 本机未 clone（{path}）\n')
+        return 0
+    actual = {f for f in git(path, 'ls-files').split() if f.startswith('src/')}
+    expected = set(TRANSPORT_MEMBERS)
+    add, remove, changed = sorted(expected - actual), sorted(actual - expected), []
+    for rel in sorted(expected & actual):
+        want = rewrite_kernel_imports(git(CLOUD, 'show', f'{args.ref}:{rel}'), kernel_paths, rel)
+        with open(os.path.join(path, rel), encoding='utf8') as fh:
+            if fh.read() != want:
+                changed.append(rel)
+    print(f'=== {TRANSPORT_REPO}（逐文件点名 {len(expected)} 个）实际 src {len(actual)} ===')
+    print(f'  新增 {len(add)} · 内容不同 {len(changed)} · 多出 {len(remove)}')
+    if kernel_head:
+        drifted, note = check_kernel_pin(path, kernel_head, args.apply)
+        print(f'  ·{note}')
+        if drifted and not args.apply:
+            return 1
+    for rel in add + changed:
+        print(f'   {"+" if rel in add else "~"} {rel}')
+    for rel in remove:
+        print(f'   ! {rel}（不在点名清单；--prune 才会删）')
+    drift = bool(add or changed or remove)
+    if args.apply:
+        for rel in add + changed:
+            want = rewrite_kernel_imports(git(CLOUD, 'show', f'{args.ref}:{rel}'), kernel_paths, rel)
+            dst = os.path.join(path, rel)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            with open(dst, 'w', encoding='utf8') as fh:
+                fh.write(want)
+        pruned = 0
+        if args.prune:
+            for rel in remove:
+                os.remove(os.path.join(path, rel))
+                pruned += 1
+        print(f'  → 写入 {len(add) + len(changed)} 个文件' + (f'，删除 {pruned} 个' if args.prune else ''))
+    print()
+    return 1 if drift else 0
 
 
 if __name__ == '__main__':
