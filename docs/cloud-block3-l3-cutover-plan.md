@@ -37,7 +37,7 @@
   - 组合根按模式接线（monolith/core/automation/content = automation 池本地实现；api 模式 fail-closed）。边界：kernel 新文件入花名册；`src/interactions/` 为逐文件裁决目录，属主实现另加 fileOverride。跨层 import 边**零新增**（仍 100）。tsc0 / acc105·0 / 全量 3204·0（新增 9 用例）。
   - ⇒ **api HUB raw 跨库读从 19 降到 13**（读 14→8，已走端口 8→13）。
 
-- **互动域属主 store 补接属主池**（`92a2196` + 修 `7f5232a`，部署 dev + healthcheck 绿）：解掉 §1 callout c 的主体。`InteractionStore` / `ReplyConfigStore` / `ReplyConfigScopeStore` 三个构造点显式绑 `automationPool`。**今天逐字节等价且不依赖任何 env 组合**——这三个 store 本就跑在 `resolveEnvPgConfig()` 上，而 `resolveOwnerPgConfig('automation')` 在 owner URL 未设时回落的 `resolveSharedPgConfig` 与它是同一套 env 名 / 同一 DEFAULT 兜底 / 同样 `DATABASE_URL` 优先，故**不存在** L2 那批 HOST-param store「接池后开始认 `DATABASE_URL`」的口径漂移。连接数亦降（三个私有池 → 复用共享池）。
+- **互动域属主 store 补接属主池**（`92a2196` + 修 `7f5232a` + 属主纠正 `b46708b`，部署 dev + healthcheck 绿）：解掉 §1 callout c 的主体。三个构造点显式绑各自**表的**属主池——`InteractionStore` → `automationPool`；**`ReplyConfigStore` / `ReplyConfigScopeStore` → `apiPool`**（它们住在 `src/interactions/` 但碰的表全是 api 属主：`interaction_reply_configs` / `_config_versions` / `_config_scopes` / `_scope_versions` / `_scope_audit` / `reply_templates` / `reply_rules` / `account_reply_profiles` / `interaction_audit_events` / `accounts`）。⚠️ **`92a2196` 曾把这两个也绑成 `automationPool`**——按目录猜属主，等于把同一个 split-brain 反向埋一遍；`b46708b` 已纠正。**教训：目录位置不是属主判据，`boundaries/table-ownership.json` 才是。****今天逐字节等价且不依赖任何 env 组合**——这三个 store 本就跑在 `resolveEnvPgConfig()` 上，而 `resolveOwnerPgConfig('automation')` 在 owner URL 未设时回落的 `resolveSharedPgConfig` 与它是同一套 env 名 / 同一 DEFAULT 兜底 / 同样 `DATABASE_URL` 优先，故**不存在** L2 那批 HOST-param store「接池后开始认 `DATABASE_URL`」的口径漂移。连接数亦降（三个私有池 → 复用共享池）。
   - ⚠️ **同刀发现并修掉一个自己引入的真 bug（`7f5232a`）**：三个 store 的 `close()` 是 `this.pool.end()`，而组合根的互动域构造被 `try/catch` 包着（schema / 迁移未就位时整域降级不启用），**失败分支正好会调这三个 `close()`**。绑共享池之后，那一下会 end 掉被本域十几个 store 共用的 `automationPool`，把一次**局部**子系统失败升级成进程级瘫痪（其余 automation store 全部「Cannot use a pool after calling end」）。修法 = `ownsPool = options.pool === undefined`，`close()` 只 end 自己建的池；加 2 条回归用例钉住。
   - **同类潜在形态仍存在**（已登记、本刀不扩面）：多数被注入属主池的 store 的 `close()` 也会 end 共享池，只是**当前无人调用**（`server.ts` 里 `.close()` 仅三处：`tokenUsageStore` 用专用小池、启动期 `raiseStandaloneAlert` 用自建池、以及本次修的互动域 catch）。将来给任何 store 加 close 调用前先看 `ownsPool`。
 - **「假跨域」的 cleanup-grant 一对收回属主域**（`7c2f6e3`，部署 dev + healthcheck 绿 + dev 只读冒烟通过）：`registerOffboardCleanupGrant` / `consumeOffboardCleanupGrant` 原本由 api 侧 `BEGIN` 出 **api 池**连接、再把句柄递给 automation 写适配器，但这两笔事务碰的表**全是 automation 属主**、一张 api 表都没有 ⇒ 整体收回属主域（新 kernel 端口 `OffboardCleanupGrantOperations`，方法**不接调用方句柄、自成一笔事务**；属主实现 `PgOffboardCleanupGrantOps`，`src/interactions/`，持 automation 池）。`OffboardWritePort` 由 6 方法缩到 3。⇒ **§2.1 的须监督读从 8 降到 7**（第 9 行 `:719` 已解）。
@@ -47,7 +47,7 @@
   - 诚实登记一处**非生产**差异：改动前 consume 对不存在的 offboardId 会在完全不触达端口的情况下返 `not_found`；现在一进门就要端口，未注入时抛具名错。生产组合根恒注入 ⇒ 现网无影响。
 
 **下一步（同样一律走接口，不得直连别人的库）**：
-0. **⛔ 翻转前置的剩余部分**（见 §1 callout c）：`PgAlertStore`（`alerts`，automation 属主）仍走 HOST-param 自建池 —— 且它与已迁到 automation 池的**读端**（`PgPanelAutomationRead` 读 `alerts`）已构成一对 split-brain。`PgRiskStore` / `PgRiskCounterOutboxStore` 同样漏接，但 `src/risk/` 属活跃 change `risk-state-cross-process-integrity` 的独占范围（§7 单写者纪律）⇒ **不并行动，待其归档后另起一刀**。
+0. **⛔ 翻转前置的剩余部分**（完整名单 + 两条照抄会出事的修法要点见 §1 callout c 表）：`PgAlertStore` ×2、`PgRiskStore`、`PgRiskCounterOutboxStore`、**`AutomationWriterLock`**（最严重：advisory lock 按库，翻转后**静默双写 `risk_state`**）、`runSchemaContractGate` 的账本 Client。其中 risk 三项属活跃 change `risk-state-cross-process-integrity` 独占范围 ⇒ 待其归档后另起一刀。
 1. **api `client-user-store.ts` 余下 7 处须监督读**（见 §2.1）：跨库行锁 + 事务内联查，**接口化解决不了**，须最终一致重设计。**用户在场做。**
 2. **automation 侧 api 读**（automation → api 的 `accounts` 等）：多为**写事务内嵌的守卫读**（execution_target 内联 / `EXISTS(accounts)` / `FOR SHARE` 行锁），接口化不干净，需**去规范化**（把 accounts 投影冷备进 automation 库）或移守卫——性质更接近下面的事务批，非纯读。
 3. 再攻 **9 处跨库事务 + 1 处跨库写**（架构级最终一致，改的是风控/环境注销关键路径，**须监督**）。之后才谈建库/拷数据/翻 URL。
@@ -82,8 +82,35 @@
 split brain（读端看到空库或陈旧副本，写端的离场 / 授权状态改动读端永远看不见）。今天三 URL 全未设 ⇒ 零影响。
 **修法**：组合根把 `automationPool` 传给这三个 store（与 callout b 同形、同为纯字节等价）。**✅ 已做（`92a2196` + 修 `7f5232a`，部署 dev）** —— 见上「已完成」。
 > **⛔ 本 callout 尚未全解**：`PgAlertStore`（`alerts`，automation 属主，`server.ts` 两处构造）仍走 HOST-param 自建池；它与已迁到 automation 池的读端（`PgPanelAutomationRead` 读 `alerts`）**已构成一对 split-brain**。注意它有两处构造且性质不同：常规 `alertStore` 可直接注入属主池；启动期 `raiseStandaloneAlert` 那一处**必须继续自建池**（它 `finally` 里调 `store.close()`，注入共享池会把 automationPool end 掉——与上面修掉的那个 bug 同形），只应把它的**配置来源**从 HOST-param 换成 `resolveOwnerPgConfig('automation')`。`PgRiskStore` / `PgRiskCounterOutboxStore` 同样漏接，但 `src/risk/` 属活跃 change `risk-state-cross-process-integrity` 独占范围（§7 单写者纪律）⇒ 待其归档后另起一刀。
-> 排查提示：`grep -rn "new Pool(resolveEnvPgConfig())" src/` 共 8 个文件自建池；其中 5 个在组合根**已被显式注入
-> 属主池**（bot-chat / group-route / approval-policy / persona-auto-fill / client-user-store），只有上述 3 个漏了。
+> ⚠️ **排查方法本身有盲区（务必知道）**：`grep -rn "new Pool(resolveEnvPgConfig())" src/` **只命中自建池的一种写法**。
+> 另一种写法 `new Pool({ host: options.host ?? DEFAULT_PG_CONFIG.host, ... })` 完全绕过该 grep ——
+> `PgRiskStore` / `PgRiskCounterOutboxStore` / `PgAlertStore` 都是这种，因此第一版 callout c 名单**漏了它们**。
+> 正确的排查口径是**枚举 `new Pool(` 与 `new Client(` 全部出现点**，再逐个看组合根有没有注入 pool。
+>
+> **一次全量审计（2026-07-25）后的完整漏接名单**，除上面三个已修的之外还有：
+> | 组件 | 文件 | 属主 | 翻转后的失效形态 |
+> |---|---|---|---|
+> | `PgRiskStore` | `src/risk/pg-risk-store.ts` | automation（`risk_state` / `risk_counters` / `risk_interactions`）| 风控权威态写旧库、面板经已迁的读端口从新库读 ⇒ **面板永远看到空 / 陈旧风控态，零报错** |
+> | `PgRiskCounterOutboxStore` | `src/risk/risk-counter-outbox-store.ts` | automation（`risk_counter_outbox` / `risk_counters`）| 记账 exactly-once 靠唯一索引，与 `PgRiskStore` 的 `risk_counters` **必须同库**；一个翻一个不翻 ⇒ **exactly-once 直接失效** |
+> | `PgAlertStore`（两处构造）| `src/alerts/alert-store.ts` | automation（`alerts`）| 写旧库、面板读新库 ⇒ **后台告警列表永久为空且零报错**（静默假成功）|
+> | **`AutomationWriterLock`** | `src/risk/writer-lock.ts` | automation（无表；`pg_try_advisory_lock` 保护 `risk_state` 单写）| **最隐蔽、最严重**：advisory lock 是**按库**的。锁留在旧共享库、写落到新 automation 库 ⇒ 两个进程各自「抢到同一把锁」却互不排斥 = **静默双写 `risk_state`**，正是这把锁存在的唯一目的 |
+> | `runSchemaContractGate` 的一次性 `Client` | `src/schema/schema-gate.ts` | automation（`schema_migrations`）| 校验的是旧共享库的账本、业务表已分散三库 ⇒ enforce 模式下**假绿** |
+>
+> **两条修法上的要点，照抄会出事**：
+> 1. **`AutomationWriterLock` MUST NOT 注入池**——advisory lock 是会话级的，池回收连接即释放锁（该文件头注释已写明）。
+>    修法是让它的**连接配置**跟随 `resolveOwnerPgConfig('automation')`，而不是给它一个共享池。
+> 2. **`PgAlertStore` 的两处构造性质不同**：常规 `alertStore` 可注入属主池；启动期 `raiseStandaloneAlert`
+>    那一处 `finally` 里调 `store.close()`（= `pool.end()`），**注入共享池会把 automationPool 整个 end 掉**
+>    —— 与 `7f5232a` 修掉的那个 bug 同形。那一处只应把**配置来源**换成 owner resolver、继续自建池。
+> 3. **`src/risk/` 属活跃 change `risk-state-cross-process-integrity` 的独占范围**（§7 热点单写者纪律）⇒
+>    上表的 risk 三项**不与之并行动**，待其归档后另起一刀。
+>
+> **附带发现的耦合点**：`InteractionApiWrites`（`src/interactions/interaction-api-writes.ts`）自身不持池，
+> 方法签名接调用方句柄，写的却是 **api 属主**表（`reply_templates` / `reply_rules` / `account_reply_profiles` /
+> `interaction_reply_config*` / `interaction_audit_events`）。它由 `InteractionStore` 注入调用 ⇒
+> `InteractionStore` 绑 automationPool 之后，这些 api 表的写**确定地**跑在 automation 连接上（此前只是「碰巧同库」）。
+> 翻转时它会响亮失败（表不在 automation 库），属既有的跨库写清单（§2 automation 段 `interaction-store.ts:1839`
+> 同族），**必须与任何 automation 翻转同批解决**。
 
 **连接路由地雷（callout b，非表依赖、是接线 bug）**：`event_outbox`/`event_outbox_cursor`/risk 命令 outbox 属 automation，但 `emitRiskCommand`（server.ts:6052）/ `startRiskCommandConsumer`（:2442）/ `bridgeEventBusToOutbox`（:2453）/ `PanelEventReplay`（:6133）在组合根用的是 **api 的 configMirrorPool**。单库字节等价，拆库后读写错库。**修法（纯字节等价、可先做）**：把这 4 个 helper 改绑 automation 池（需把 `automationPool` 挂上 ctx，段间传递）；`ConfigMirrorRefresher`（:2886，读 api 的 `config_mirror_version`）**保持 api 池**。
 

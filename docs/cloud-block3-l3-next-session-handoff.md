@@ -53,17 +53,26 @@
 
 ### 2A. 属主 store 补接属主池 —— **主体已完成，剩一处**
 
-- ✅ 已做（`92a2196` + 修 `7f5232a`，部署 dev）：`InteractionStore` / `ReplyConfigStore` / `ReplyConfigScopeStore` 绑 `automationPool`。
+- ✅ 已做（`92a2196` + 修 `7f5232a` + 属主纠正 `b46708b`，部署 dev）：三个构造点绑各自**表的**属主池——
+  `InteractionStore`→`automationPool`；**两个 reply-config store→`apiPool`**。
+  ⚠️ **踩过的坑之一**：`92a2196` 曾按「它们都在 `src/interactions/` 目录」把三个一并绑成 automationPool，
+  但那两个 reply-config store 的表**全是 api 属主** ⇒ 等于把同一个 split-brain 反向埋一遍。
+  **目录位置不是属主判据，`boundaries/table-ownership.json` 才是**——补接属主池前逐表查一遍。
   **踩过的坑，接手务必知道**：这三个 store 的 `close()` 是 `pool.end()`，而互动域构造被 `try/catch` 包着、
   **失败分支正好会调它们** ⇒ 绑共享池后一次局部失败会 end 掉全域共用的池、升级成进程级瘫痪。
   已加 `ownsPool` 守卫（只 end 自己建的池）+ 回归用例。**给任何 store 补接属主池前，先查它的 `close()` 有没有调用方。**
-- ⛔ **剩这一处**：`PgAlertStore`（`alerts`，automation 属主）仍走 HOST-param 自建池，且与已迁到 automation 池的
+- ⛔ **剩这些**（完整表见 cutover-plan §1 callout c；**注意排查盲区**：`grep "new Pool(resolveEnvPgConfig())"` 只命中一种写法，另一种 `new Pool({host: ...DEFAULT_PG_CONFIG})` 绕过它，正确口径是枚举全部 `new Pool(` 与 `new Client(`）：`PgAlertStore`（`alerts`，automation 属主）仍走 HOST-param 自建池，且与已迁到 automation 池的
   读端（面板读 `alerts`）**已构成一对 split-brain**。它在 `server.ts` 有两处构造、性质不同：
   常规 `alertStore` 可直接注入属主池；启动期 `raiseStandaloneAlert` 那处 `finally` 里调 `store.close()`，
   **必须继续自建池**，只应把配置来源从 HOST-param 换成 `resolveOwnerPgConfig('automation')`。
   ⚠️ 它是 HOST-param 形态 ⇒ 接池后会开始认 `DATABASE_URL`；dev/ol 均未设（L2 已 SSH 核实），但动前建议再核一次。
-- 🚫 **不要动** `PgRiskStore` / `PgRiskCounterOutboxStore`：同样漏接，但 `src/risk/` 属活跃 change
-  `risk-state-cross-process-integrity`（§7 热点单写者）独占范围。待其归档后另起一刀。
+- 🚫 **不要动** `PgRiskStore` / `PgRiskCounterOutboxStore` / **`AutomationWriterLock`**：同样漏接，但 `src/risk/`
+  属活跃 change `risk-state-cross-process-integrity`（§7 热点单写者）独占范围。待其归档后另起一刀。
+  其中 `AutomationWriterLock` 是**最严重**的一项：advisory lock 按库，翻转后锁留旧库 / 写落新库 ⇒
+  两进程各自「抢到同一把锁」却互不排斥 = **静默双写 `risk_state`**。且它 **MUST NOT 注入池**
+  （会话级锁，池回收连接即释放），只应让连接配置跟随 `resolveOwnerPgConfig('automation')`。
+- 另有 `runSchemaContractGate` 的账本 Client（`schema_migrations` 属 automation）翻转后会**假绿**；
+  但「账本是一份还是每库一份」本身是未裁决的设计题，动它前先定。
 
 ### 2B.（须用户在场）`client-user-store.ts` 余下 7 处 + 跨库事务批
 
