@@ -21,6 +21,30 @@
 
 > **2026-07-11 清账批**（第二次 openspec 分诊清账）：本批归档 **31 个** landed+deployed change，真机验收项按既有簇归并——发布链路 → 簇 3（`publish-select-mode-layout-robust` 5.3）、textcard → 簇 23（`textcard-carousel-form-parity` 6.3）、FB 加群评论 → 簇 32（新增 `facebook-group-join-observe-i18n` / `fb-group-join-wait-render` 两项 i18n + 就绪修复复核，见簇 32 补登）、`/comment` 搜索闭环 → 簇 34/55（`comment-search-command` 12.1，多次已跑通）、FB 评论人审 → 簇 48（`facebook-comment-review-and-targeted-join`）、**FB 公开组放量 → 新簇 59**（`facebook-group-join-and-commenting` 9.1-9.5）。归档后全库 `openspec validate --specs --all --strict` 106 项全绿。**本批刻意未归档（5 个仍活跃，另有门槛）**：① `publish-trigger-and-apply`（§11 统一部署待核）；② `edge-environment-platform-select`（tasks 3.3 明确 gate 在 FB edge driver `facebook-browser-env-and-login` 落 master，当前仅 probes 落地）；③ `humanize-interaction-prompts`（代码已部署 dev，但 tasks 9.4 spec 交织须待 `category-adaptive-images-and-judgment` 先归档）；④ `estimate-token-cost-column` + ⑤ `manual-billing-price-refresh`（代码已 shipped，但 `llm-token-usage-stats` spec delta 应用失败——前者用英文 header MODIFY 中文「console 提供…」需求、后者 MODIFY 一个无人创建的 `Token Usage Cost Estimates` 需求；两者对 cost/billing 需求建模不一致，须 owner 理顺 delta header / 重建模型后再归档）。**已废弃删除（1 个）**：`facebook-scheduled-comment`（2026-07-11 用户决定关为 superseded）——其 target-URL 定向评论设计已被 keyword-in-container 版取代（见归档 `2026-07-09-facebook-scheduled-comment` + `facebook-group-join-and-commenting`）；34/35 核心任务空，change 目录已 `git rm` 删除（内容存 git 历史）。**注**：唯一落地的 task 2.9（云端在握手时持久化 FB 昵称）代码仍在线；其需求已由后续小 change `facebook-nickname-handshake-persist`（2026-07-11 归档）正式补登进 `facebook-identity` capability——剔除了已被 `facebook-nickname-inplace-read`（簇 42）取代的 `/me` 探针描述、按现网「就地读取 → hello 附带 → 云端仅库内空时写、既有不覆盖」校订。至此该行为「代码在线 + 主 spec 有据」齐全。另 `category-adaptive-images-and-judgment`（高风险图产后校验待选视觉模型）、`self-contained-ads-runtime`（dev CLI 解析等代码活 + baked-key 决策）、及 4 个纯提案（`transcribe-textcard-image-text` / `facebook-consent-structural-detect` / `facebook-join-actuation-decouple` / `edge-installer-oss-distribution`）本就在研、非本批对象。
 
+> **2026-07-26 新增 · 簇 60「云端拆仓 Phase 0–4 的真机验收」**（前置环境：dev cloud 已部署对应 sha；
+> 后台可登录；有一个在线边缘节点）。**这一批全部是「逻辑级 + 编译期 + 单测已过、运行时未验」**——
+> 拆仓工作纪律是只读调查 + 沙箱验证，全程没起过 cloud 进程做端到端。以下每条都点名了「为什么单看编译发现不了」：
+>
+> - [ ] **后台「操作兜底区间」PUT 只传下限**（`PUT /api/pacing` 只带 `minMs`）。Phase 2 删掉了该处三个
+>   `as never` 强转（此前接口声明必填、外观却按 `undefined` 判，靠强转糊住）。**改的是实参路径，
+>   编译期两边都过**；要确认只传一个字段时落库与回显仍与改前一致。
+> - [ ] **验证码协助端点走一遍真 incident**（`GET /api/captcha-assist/incident/*`）。Phase 2 把面板对
+>   协助能力的依赖从「直连实现」改成窄端口。**这一处曾被判成「类型借用、照着重抄就行」，
+>   实际是运行时真调五个方法**——按重抄一刀切会编译通过而端点整条静默失效。单测已绿，但要真机确认。
+> - [ ] **Facebook 素材池触发一次 503，看 `reason` 是否保真**。Phase 2 把 `instanceof` 判错改成了
+>   结构化守卫（跨进程后 `instanceof` 恒 false，会静默退化成兜底原因、吞掉真实失败）。
+>   **同批登记一条已知边界**：`structuredClone` 会丢 `reason`，真 RPC 缝落地时必须在传输层显式映射
+>   `{name, reason, message}`。
+> - [ ] **文字卡封面渲染真出图**（content 域）。三仓依赖集重算时发现那两个渲染库是**动态 import 懒加载**的，
+>   静态扫描看不见、差点被当多余依赖删掉。**那条链路工厂返回 null 即降级**——装漏了不崩不报，
+>   只是封面悄悄退回生成式。拆进程后 content 独立安装依赖时必须真出一次图。
+> - [ ] **绑定人设 → 会话就地开跑**、**稿件审批通过 → 真被下发**、**候审推送到客户端左栏**。
+>   批次 0b 把这三处从「读不到就静默跳过」改成「响亮记账」。单体下三者恒有实现（dev 日志实测
+>   `cross_segment_drop` 零次，正确），**但闸的另一支要等真拆进程才走得到**。
+>
+> **已在本轮验掉、不必再验**：管理后台前端对 Phase 2 改动**零影响**（实测：没抄过那几个入参形状；
+> 代码里 `'unavailable'` 的命中都属别的枚举；对素材池端点无按 `reason` 分支的处理）。
+
 > **2026-07-25 拆库后三处线上缺陷 —— 已实测坐实、用户决定暂不修（"先拆仓""不着急修复"）**。
 > 记在这里是为了**不被后续 session 当成漏查**。三处**同一类根因**：物理拆库后仍有代码拿着 A 域的连接去读 B 域的表。
 > **两道机械门禁看不见这一类**——它们分别扫「跨属主写」与「跨属主行锁」，**跨属主纯读从中间掉下去**；
