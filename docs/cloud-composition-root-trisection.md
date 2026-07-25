@@ -218,9 +218,29 @@ dev 部署后三个契约门结论全过、零 error、断言未触发。
   **0d 之前必须重测，不能沿用 0c 之前的清单。**
   过程踩坑：首版用「含某字段名的解构行」定位面板段，撞上更早的同名解构、把整块插进了内容段，
   typecheck 17 错当场暴露。**定位段落必须用段函数边界，不能用内容特征串。**
-- **0d** 基础段单消费方句柄下沉到消费段；沉不了的三类（属主反转 / 池别名 / 闭包捕获）原地登记。
-  **0c 之后重测：可下沉集合 40 → 34**（C 23 / B 5 / D 6），因为 7 个配置 store 变成了双消费方。
-  下沉前**必须重测消费方分布**——段间搬家会改变它。
+- **0d** ✅ **第一批已完成并合入 `aidcp-cloud` master `18a33b7`，已部署 dev**（14 个：automation 8 / content 3 / api 3）。
+  **净效果：segA 赋出字段 75 → 61，`CompositionContext` 112 → 98，segA 1293 → 1108 行。**
+  dev 实测被搬走的三个存储（点赞库 / 优质评论库 / 互动流）均正常初始化，三个契约门全过、零 error。
+
+  **判据三条全中才搬**：① segA 赋值 ② 只有本段读 ③ **segA 自己不再引用它**。
+  第三条最易漏：`delegatedTaskStore` 等在**声明之前**就被惰性回调捕获（**前向引用**），
+  只查「声明之后的引用」会漏掉、搬走即编译报错。整段扫描后 27 个候选里 11 个因此留下；
+  另 2 个依赖 segA 的**局部变量**（非 ctx 字段）一并退回。
+
+  **剩余未下沉 20 个，分三类原地登记**：
+  - **segA 自己仍引用（11）**：`facebookCommentAuditStore` / `accountDisplayNameCandidates` /
+    `accountState` / `delegatedTaskStore` / `getSoul` / `manualCommentAccounts` / `resolvePersona` /
+    `dashscopeApiKey` / `credentialStore` / `approvalPolicyStore` / `groupRouteStore`。
+  - **依赖 segA 局部变量（2）**：`anyImageKeyPresent`（依赖 `arkRuntime`）、
+    `publishApprovalClient`（依赖 `publishApprovalApi`）。
+  - **属主反转 / 池别名（6，见 §4.1 表）**：`cache` / `planner` / `firstPostOnboardingStore` /
+    `personaAutoFillStore` / `configMirrorPool` / `mirrorVersionStore` —— 搬位置解决不了跨库，须走端口。
+
+  **两条工程教训（编译器打回三次换来的）**：
+  1. 块尾判据「括号配平」不够 —— `new Map<…>` 的多行泛型里花括号先配平，会把结尾的 `>();` 落在块外、
+     切出语法错误。判据须是「配平**且**该行以分号结尾」。
+  2. 段内定位不能靠「函数起始 N 行内」或内容特征串：内容段的 ctx 解构既**不靠前**又是**多行写法**，
+     两者分别导致「块插到解构之前」和「同名重复声明」。须整段搜索 + 按行处理多行解构。
 - **0e** ✅ **已完成并合入 `aidcp-cloud` master `f18ba96`**（2026-07-25）。41 个字段改可选、33 处
   逐处收口，新增两个取用闸 `requireSegment`（构造期必须有 → 带字段名与来源段响亮抛错）与
   `unavailableInMode`（请求期才用 → 那条路由诚实失败、其余照常）。
