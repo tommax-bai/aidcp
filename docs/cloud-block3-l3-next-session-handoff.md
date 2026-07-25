@@ -13,14 +13,15 @@
   - ⚠️ **被撤过的取巧**：曾把别的域的连接池注入消费方、让消费方「在对的池上跑查询」。那物理上分了库，但消费方仍直连别人的库、仍知道别人的表结构 = 反模式，**已撤销**。不要重蹈。
 - **代码位置**：cloud sub-repo 在 `../aidcp-cloud`（默认分支 `master`）。控制仓（本仓）在 `.`（默认分支 `main`）。**接手前先 `ls -d ../aidcp-cloud` 确认存在**。
 - **当前提交指针**（接手时先 `git -C ../aidcp-cloud fetch && git -C ../aidcp-cloud rev-parse --short origin/master` 复核，fleet 活跃可能已推进）：
-  - cloud `master` = **`6796488`**（面板批 + client-user 真纯读批已 land，均部署 dev）
+  - cloud `master` = **`7c2f6e3`**（面板批 + client-user 真纯读批 + 属主池补接 + cleanup-grant 收口，均已 land + 部署 dev）
   - 控制仓 `main` = 见 `git log`（本文档所在提交）
-- **部署现状**：dev 已部署 `6796488`、healthcheck 绿。**dev 与 ol 连同一台物理 PG**（PG 在 dev 机 `121.89.85.150:5432`，这台 PG **就是生产库**）；当前 `AIDCP_PG_{API,AUTOMATION,CONTENT}_URL` **全未设** ⇒ 三个池都回落共享库 `aidcp` ⇒ **一切接口化改动此刻逐字节等价**（读的是同一份数据，只是换了取数通道）。
+- **部署现状**：dev 已部署 `7c2f6e3`、healthcheck 绿。**dev 与 ol 连同一台物理 PG**（PG 在 dev 机 `121.89.85.150:5432`，这台 PG **就是生产库**）；当前 `AIDCP_PG_{API,AUTOMATION,CONTENT}_URL` **全未设** ⇒ 三个池都回落共享库 `aidcp` ⇒ **一切接口化改动此刻逐字节等价**（读的是同一份数据，只是换了取数通道）。
 - **已完成的读侧解耦**（都经接口、都部署 dev）：
   1. **content 三处**（`5cbb6b1`）：curated `listForClient` 经 `TriggeredPublishRefsReader`、media `assertFacebookAccount` 经 `AccountPlatformReader`、draft `claimNext` 移除 vestigial 守卫。⇒ content 零跨库直读。
   2. **api 面板批 7 读**（`cf32544`）：`panel/panel-store.ts` 经新 kernel 端口 `PanelAutomationReader`、属主实现 `src/risk/panel-automation-read.ts`（跑 automation 池）。
   3. **api `client-user-store.ts` 真纯读批 6 读**（`6796488`）：新 kernel 端口 `ClientEnvAutomationReader`、属主实现 `src/interactions/client-env-automation-read.ts`（跑 automation 池，与同目录 `offboard-write-adapter` 读写配对）。改 `getOffboard` / `hasPendingRevocationHold` / `reconcileRevocationHolds` 候选扫描 / `listAllEnvironments`。**dev 真实数据新旧双跑 deep-equal 45==45 逐字段全等。**
-  ⇒ **api HUB raw 跨库读 26 → 19 → 13**。
+  4. **互动域属主 store 补接属主池**（`92a2196` + 修 `7f5232a`）+ **cleanup-grant 一对收回属主域**（`7c2f6e3`）。
+  ⇒ **api HUB raw 跨库读 26 → 19 → 13 → 12**；须监督读 8 → 7。
 
 ---
 
@@ -50,17 +51,21 @@
 
 `client-user-store.ts` 的**真纯读批已做完**（上面第 3 条）。下面按优先级列出接手 session 该做什么。
 
-### 2A.（推荐先做，纯字节等价、无需用户在场）属主 store 补接属主池
+### 2A. 属主 store 补接属主池 —— **主体已完成，剩一处**
 
-**这是本轮新发现的翻转前置**，性质与已做过的 step0（outbox helper 改绑）完全同形：
+- ✅ 已做（`92a2196` + 修 `7f5232a`，部署 dev）：`InteractionStore` / `ReplyConfigStore` / `ReplyConfigScopeStore` 绑 `automationPool`。
+  **踩过的坑，接手务必知道**：这三个 store 的 `close()` 是 `pool.end()`，而互动域构造被 `try/catch` 包着、
+  **失败分支正好会调它们** ⇒ 绑共享池后一次局部失败会 end 掉全域共用的池、升级成进程级瘫痪。
+  已加 `ownsPool` 守卫（只 end 自己建的池）+ 回归用例。**给任何 store 补接属主池前，先查它的 `close()` 有没有调用方。**
+- ⛔ **剩这一处**：`PgAlertStore`（`alerts`，automation 属主）仍走 HOST-param 自建池，且与已迁到 automation 池的
+  读端（面板读 `alerts`）**已构成一对 split-brain**。它在 `server.ts` 有两处构造、性质不同：
+  常规 `alertStore` 可直接注入属主池；启动期 `raiseStandaloneAlert` 那处 `finally` 里调 `store.close()`，
+  **必须继续自建池**，只应把配置来源从 HOST-param 换成 `resolveOwnerPgConfig('automation')`。
+  ⚠️ 它是 HOST-param 形态 ⇒ 接池后会开始认 `DATABASE_URL`；dev/ol 均未设（L2 已 SSH 核实），但动前建议再核一次。
+- 🚫 **不要动** `PgRiskStore` / `PgRiskCounterOutboxStore`：同样漏接，但 `src/risk/` 属活跃 change
+  `risk-state-cross-process-integrity`（§7 热点单写者）独占范围。待其归档后另起一刀。
 
-- `InteractionStore`（`aidcp-cloud/src/interactions/interaction-store.ts`，构造在 `server.ts` 的 `interactionStore = new InteractionStore({ apiPurge, envLock })`）、`ReplyConfigStore`、`ReplyConfigScopeStore` 三个 store **构造时不传 `pool`**，于是各自 `new Pool(resolveEnvPgConfig())` 回落**共享库**配置。
-- 而它们正是 `interaction_offboards` / `interaction_auth_state` / `interaction_runtime_controls` / `interaction_feed` / `interaction_reply_configs` 这些 **automation 属主表的单写者**。
-- 后果：一旦设 `AIDCP_PG_AUTOMATION_URL`，属主继续读写旧共享库、而已解耦的读端口读新库 ⇒ **split brain**。今天三 URL 全未设 ⇒ 零影响。
-- **修法**：组合根把 `automationPool` 传给这三个 store。改完跑验证四连、部署 dev。**翻 URL 之前必须先做完这一步。**
-- 排查提示：`grep -rn "new Pool(resolveEnvPgConfig())" src/` 共 8 个文件自建池，其中 5 个组合根已显式注入属主池，只有上述 3 个漏了。
-
-### 2B.（须用户在场）`client-user-store.ts` 余下 8 处 + 跨库事务批
+### 2B.（须用户在场）`client-user-store.ts` 余下 7 处 + 跨库事务批
 
 逐处清单（行号 + 表 + 方法 + 锁）见 `docs/cloud-block3-l3-cutover-plan.md` **§2.1 表格**。核心认识：
 
