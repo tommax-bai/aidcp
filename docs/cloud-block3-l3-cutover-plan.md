@@ -19,8 +19,18 @@
   - `draft-refinement.claimNext`：移除 **vestigial** `EXISTS(publish_log)` 守卫（publish_log 全仓从不 DELETE、任务 record_id 建时即合法 → 恒真、never excluded；移除逐字节等价，且直接消除该跨域读）。
   - 组合根用惰性 thunk 把接口接到属主 store（属主构造在后）。**还减了一条耦合边**（media→platform/index，frozenTotal 101→100）。tsc0 / acc0 / 全量 3194·0。
   - ⇒ **content 现在 0 处运行时跨库直连、也 0 处跨库直读**（全经接口）。只剩 **4 条跨 owner DDL FK**（facebook-publish-media→accounts、→publish_log ×2；draft→publish_log），**翻转时降**（schema-ensure 建 aidcp_content 空表时须去掉；共库期不动）。**content runtime-read 已解耦。**
+- **api HUB 的面板批读全解——经接口，面板零跨库直读**（`cf32544`，部署 dev + healthcheck 绿）：
+  - `panel/panel-store.ts`（api 属主）历史直读 automation 的 risk_counters / risk_state / alerts / interaction_feed / interaction_target_meta（§2 api 列的 7 处 raw 读）。改经 **新 kernel 端口 `PanelAutomationReader`**（今日计数聚合 / 批量风控态 / 告警 / 互动流）取投影，**属主实现 `PgPanelAutomationRead`（`src/risk/`，跑在 automation 池上）**，SQL 从面板逐字迁来。
+  - 原 `accounts LEFT JOIN risk_state` 拆为「本地读 accounts（api 池）+ 端口批量取风控态 + 本地按 accountId 合入」，逐字等价「缺风控行=null」LEFT JOIN 语义；listAlerts/listInteractions 的 42P01 缺表降级保留在面板层。
+  - 面板自己的 api 属主读（accounts/persona_config/publish_log）改用 **apiPool**（server ctx 新增字段），与 automation 端口**分池** ⇒ 面板整体 flip-ready。
+  - 组合根按运行模式接线：monolith/core=automation 池本地实现（现网单进程即此路，逐字节等价）；**api 模式=fail-closed**（HTTP 客户端待 Block② 进程拆分时补，automation 内部读 API 增面板端点），镜像同段 publishStatusLocal 的 api 模式 reject 先例，api 模式未部署 ⇒ 不改现网。
+  - 边界：新 kernel 文件入花名册（kernel-non-members.kernelRoster + ownership-rules fileOverride）；automation 新文件继承 src/risk/；**跨层 import 边零新增（仍 100）**。tsc0 / acc105·0 / 全量 3195·0。
+  - ⇒ **api HUB 的 raw 跨库读从 26 降到 19**（21 读→14 读，已走端口 1→8）；剩 client-user-store 的 14 读（含跨库锁 / api+automation JOIN，须拆两查询）+ 5 tx 未解。
 
-**下一步（同样一律走接口，不得直连别人的库）**：api↔automation 双 HUB 的读——属主域各加读端口、消费方依赖 kernel 接口（含拆跨域关联 JOIN 为「接口取集合 + 本地判定」）；再攻 **9 处跨库事务 + 1 处跨库写**（架构级最终一致，改的是风控/环境注销关键路径，须监督）。之后才谈建库/拷数据/翻 URL。
+**下一步（同样一律走接口，不得直连别人的库）**：
+1. **api `client-user-store.ts` 的 14 处读**（微信环境 offboard/scope 生命周期）：含 `interaction_auth_state`/`interaction_offboards`/`interaction_runtime_controls`/`risk_state` 的 `FOR UPDATE` **跨库锁** + `api+automation 同查询 JOIN`（须拆两查询）——比面板批难，锁 / JOIN 语义须逐个测。
+2. **automation 侧 api 读**（automation → api 的 `accounts` 等）：多为**写事务内嵌的守卫读**（execution_target 内联 / `EXISTS(accounts)` / `FOR SHARE` 行锁），接口化不干净，需**去规范化**（把 accounts 投影冷备进 automation 库）或移守卫——性质更接近下面的事务批，非纯读。
+3. 再攻 **9 处跨库事务 + 1 处跨库写**（架构级最终一致，改的是风控/环境注销关键路径，**须监督**）。之后才谈建库/拷数据/翻 URL。
 
 ## 0. 两条改变全局的已核实事实
 
@@ -32,9 +42,9 @@
 
 | owner | 跨库依赖 | 读 | 写 | 跨库事务 | 已走端口 | **raw(阻塞)** | 角色 | 结论 |
 |---|---|---|---|---|---|---|---|---|
-| **content** | 7 | 7 | 0 | 0 | 0 | **7** | leaf（无人读它）| 修完 7 处即可**最先翻** |
+| **content** | 7 | 7 | 0 | 0 | 0 | ~~7~~ **0** ✅ | leaf（无人读它）| runtime-read 已全解（`5cbb6b1`），只剩 4 DDL FK 翻转时降 |
 | **automation** | 24 | 17 | 3 | 4 | 2 | **22** | **HUB**（api 读它 12+ 表）| 与 api 互相纠缠 |
-| **api** | 27 | 21 | 1 | 5 | 1 | **26** | **HUB**（owns `accounts`）| 与 automation 互相纠缠 |
+| **api** | 27 | ~~21~~ **14** | 1 | 5 | ~~1~~ **8** | ~~26~~ **19** | **HUB**（owns `accounts`）| 面板 7 读已解（`cf32544`）；剩 client-user 14 读 + 5 tx |
 
 合计 58 依赖 / **55 raw**。全部跑在 local pool，只有 3 处已在端口后（automation `interaction-store.ts:1736/1819`、api `client-user-store.ts:683`，仍传 `this.pool`，翻转时把端口实现切 HTTP 即可）。
 
@@ -72,9 +82,9 @@
 - `delegated-task/store.ts:515` → `accounts`（api）：`UPDATE` 认领 CTE 内 `EXISTS(accounts)` → 去规范化/本地守卫。
 - 已走端口：`interaction-store.ts:1736`（`interaction_reply_configs` DELETE 经 `InteractionApiPurgePort`）、`:1819`（`interaction_audit_events` DELETE 经端口）。
 
-### api（HUB，26 raw：5 tx + 21 读，全在 2 文件）
-- **`client-auth/client-user-store.ts`**（微信环境 offboard/scope 生命周期）：14 处 raw 读 automation 表（含 `interaction_auth_state`/`interaction_offboards`/`interaction_runtime_controls`/`risk_state` 的 `FOR UPDATE` 跨库锁 + `1359/2210/2225/2254` 的 **api+automation 同查询 JOIN**，须拆两查询）；**5 处 offboard 跨库联合提交**（见 §1）；已走端口 `:683`（只写 automation 表、无 api 共写→可干净切 HTTP）。
-- **`panel/panel-store.ts`**（只读看板）：**7 处 raw 读**（`400 risk_state`、`422/439/469 risk_counters`、`592 alerts`、`633 interaction_feed`、`634 interaction_target_meta`）→ **最容易的一批**，走 automation 读端口即可。
+### api（HUB，原 26 raw：5 tx + 21 读，全在 2 文件；**面板 7 读已解 → 现 19 raw**）
+- **`client-auth/client-user-store.ts`**（微信环境 offboard/scope 生命周期）：14 处 raw 读 automation 表（含 `interaction_auth_state`/`interaction_offboards`/`interaction_runtime_controls`/`risk_state` 的 `FOR UPDATE` 跨库锁 + `1359/2210/2225/2254` 的 **api+automation 同查询 JOIN**，须拆两查询）；**5 处 offboard 跨库联合提交**（见 §1）；已走端口 `:683`（只写 automation 表、无 api 共写→可干净切 HTTP）。**← 下一批读端口。**
+- ~~**`panel/panel-store.ts`**（只读看板）：**7 处 raw 读**（`400 risk_state`、`422/439/469 risk_counters`、`592 alerts`、`633 interaction_feed`、`634 interaction_target_meta`）~~ **✅ 已解（`cf32544`，部署 dev）**：经 kernel 端口 `PanelAutomationReader`，属主实现 `PgPanelAutomationRead`（automation 池）；`accounts LEFT JOIN risk_state` 拆为「本地 accounts + 端口批量风控态 + 本地合入」；面板自读改 apiPool、与端口分池。见上「已完成」。
 
 ## 3. 推荐执行顺序
 
