@@ -272,7 +272,31 @@ automation 要 `TriggerOutcome` + `ReferenceNote`（`delegated-task/executors.ts
 
 ### Phase 5 — 大件（12 条）
 
-**P5-1 · 面板写风控 → 跨进程（1 条，C）🔒 最贵的一条，需要主线拍板**
+**P5-1 · 面板写风控 → 跨进程（1 条，C）🔒 ✅ 用户已拍板：走异步（2026-07-25）**
+
+> **裁定：取 (a) 异步 outbox 路线。** 即用已建好但从未接线的风控命令 outbox，
+> 后台的两个写接口**降级为「已受理」+ 命令 id**，由 console 轮询真态。
+>
+> **这条裁定带一条不可省的连带要求**：接口的**返回形状必须跟着改**，MUST NOT 保留今天那个
+> 「写后真态」结构（当前态 / 变更前态 / 是否变更）。outbox 是异步 at-least-once，命令入队时
+> 那三个字段**根本还不知道**，照原样返回就是凭空编一个乐观回显 —— 正撞本仓头号红线
+> 「MUST NOT 静默假成功」，而且是最坏的一种：操作员在界面上看到「已改为受限」，
+> 实际命令还在队列里、甚至可能失败，**没有任何地方会告诉他**。
+>
+> 因此本条的完成判据有三项，缺一不可：
+> 1. 云端写接口返回 `{ accepted: true, commandId }`（或等价形态），**不含任何伪造的状态字段**；
+> 2. console 侧改为按 `commandId` 轮询真态，并在**未收敛期间显式显示「处理中」**，
+>    MUST NOT 乐观地先把界面切到目标态；
+> 3. 命令**失败**时 console 要能看见失败原因 —— 异步化最容易丢的就是这一条。
+>
+> 风控状态机本身**一个字节都不碰**（`RiskSignalKind` 按 P2-6 的办法在面板侧本地声明三个运营态取值）。
+> 「账号风控最终状态只由云端单写」这条铁律不受影响：单写者仍是自动化域的风控控制器，
+> 异步化只改变**命令怎么送达它**，不改变谁有权写。
+
+---
+
+<details><summary>原始两条备选（已裁定，留档）</summary>
+
 - 现状：`panel-server` 三个调用点——读 `effectiveQuotas().day`、**写** `getState() + applySignal()`、**写** `setQuotaLevel()`。CLAUDE §2 铁律「账号风控最终状态只由云端 `RiskController` 单写」，拆进程后单写者物理落在 automation，api 侧不能持有该类。
 - 机件已建好但**从没接线**：`src/transport/risk-read-http.ts`（读端口，已被 `server.ts` 使用）、`src/transport/risk-command-outbox.ts`（写命令 outbox，**全仓 grep 除自身外零引用**）。
 - 读侧：`riskRegistry.getController()` 换成注入 kernel 的 `RiskReadPort`。
@@ -280,6 +304,8 @@ automation 要 `TriggerOutcome` + `ReferenceNote`（`delegated-task/executors.ts
   - (a) 接口降级 202 + 命令 id，console 轮询真态；
   - (b) 不用 outbox，照 `risk-read-http.ts` 的手法补 `src/kernel/risk-admin-types.ts`（写端口）+ `src/transport/risk-admin-http.ts`（同步内部 HTTP），保住同步回显。
 - `RiskSignalKind` 按 P2-6 的办法本地声明，**风控状态机不碰**。
+
+</details>
 
 **P5-2 · 4 个 content 角色脱离 `BaseRole`（8 条，B）🔒 本批唯一 effort=大**
 - 为什么不是 A：`base-role.ts` 在 `rejected` 名册；机械上 ③ 命中（**错误提示字符串 `` `${this.roleName} 需要 LlmClient` `` ——门禁只 `stripTsComments`、不剥字符串字面量**，改文案即可消，是次要伤），**真正终局的是第 ⑤ 条**——它 import `event-bus/index.ts` 与 `event-bus/types.ts`，两者都在拒入名册且是终局裁决，而它的整个公开面（`roleName: RoleName` / `eventBus: EventBus` / `emit<K extends keyof RoleEventMap>`）就是由这两者定型的。摘掉这两个 import，这个类就没有存在理由。
