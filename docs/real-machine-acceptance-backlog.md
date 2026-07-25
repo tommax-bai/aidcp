@@ -38,6 +38,14 @@
 > ④ `ol-client-auto-update`（0/17）—— OL 桌面客户端继续无自动更新，用户须回下载页手动取包。
 > **遗留孤儿 worktree（待清，均无未推送提交）**：`aidcp.wt/{wechat-customer-api-contract,wechat-edge-runtime-honesty,ol-client-auto-update}`、
 > `aidcp-cloud.wt/wechat-customer-api-contract`、`aidcp-edge.wt/ol-client-auto-update` 及各自 `codex/<name>` 分支。
+>
+> **①②两处现网缺陷：2026-07-25 用户决定「都先不修，留 backlog」。** 即人工改稿链路 100% 不可达、
+> 视频号「明知没关掉却上报已关闭」两条**在现网继续存在**，不另起 change，等 Edge 拆仓这条主线告一段落
+> 再回头。记录三点以免日后误读：(a) 第二条是踩着 CLAUDE.md §2「MUST NOT 静默假成功」红线的既知违例，
+> 属于**已知并接受**，不是没人发现；(b) 第一条不是「偶发失败」而是路径不匹配导致的**确定性全失败**，
+> 任何「客户改稿偶尔能存上」的现场报告都说明另有其事，别拿它当本条已修的证据；(c) 台账不实项
+> （`wechat-channels-interaction-management` 任务 3.6 标 `[x]` 与现网不符）**同样仍未订正**——重启这条线时
+> 先订正台账再谈修复，否则会从一个错误的「已完成」基线出发。
 
 ---
 
