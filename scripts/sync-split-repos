@@ -294,8 +294,15 @@ def main() -> int:
             pruned = 0
             if args.prune:
                 for rel in remove:
-                    os.remove(os.path.join(path, rel))
-                    pruned += 1
+                    # 「多出」是**对着工作区扫出来的**，但删除是幂等的目标态：文件已不在就算达成。
+                    # 上一轮 --prune 删过、这一轮工作区仍未提交时会再次列出同一条，此时 os.remove 抛
+                    # FileNotFoundError 直接中断整轮——后面几个仓一个都同步不到，且看着像同步跑完了。
+                    # 判据是「文件是否还在」，不是「这一次是不是我删的」。
+                    try:
+                        os.remove(os.path.join(path, rel))
+                        pruned += 1
+                    except FileNotFoundError:
+                        pass
             print(f'  → 写入 {wrote} 个文件' + (f'，删除 {pruned} 个' if args.prune else ''))
             print('  → 变更留在工作区未提交：请自行 review + commit（本脚本绝不代你提交）')
         print()
@@ -397,8 +404,15 @@ def sync_tests(args, own, kernel_paths) -> int:
             pruned = 0
             if args.prune:
                 for rel in remove:
-                    os.remove(os.path.join(path, rel))
-                    pruned += 1
+                    # 「多出」是**对着工作区扫出来的**，但删除是幂等的目标态：文件已不在就算达成。
+                    # 上一轮 --prune 删过、这一轮工作区仍未提交时会再次列出同一条，此时 os.remove 抛
+                    # FileNotFoundError 直接中断整轮——后面几个仓一个都同步不到，且看着像同步跑完了。
+                    # 判据是「文件是否还在」，不是「这一次是不是我删的」。
+                    try:
+                        os.remove(os.path.join(path, rel))
+                        pruned += 1
+                    except FileNotFoundError:
+                        pass
             print(f'    → 写入 {len(add) + len(changed)} 个' + (f'，删除 {pruned} 个' if args.prune else ''))
     print()
     return drift

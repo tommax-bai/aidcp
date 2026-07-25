@@ -21,6 +21,24 @@
 
 > **2026-07-11 清账批**（第二次 openspec 分诊清账）：本批归档 **31 个** landed+deployed change，真机验收项按既有簇归并——发布链路 → 簇 3（`publish-select-mode-layout-robust` 5.3）、textcard → 簇 23（`textcard-carousel-form-parity` 6.3）、FB 加群评论 → 簇 32（新增 `facebook-group-join-observe-i18n` / `fb-group-join-wait-render` 两项 i18n + 就绪修复复核，见簇 32 补登）、`/comment` 搜索闭环 → 簇 34/55（`comment-search-command` 12.1，多次已跑通）、FB 评论人审 → 簇 48（`facebook-comment-review-and-targeted-join`）、**FB 公开组放量 → 新簇 59**（`facebook-group-join-and-commenting` 9.1-9.5）。归档后全库 `openspec validate --specs --all --strict` 106 项全绿。**本批刻意未归档（5 个仍活跃，另有门槛）**：① `publish-trigger-and-apply`（§11 统一部署待核）；② `edge-environment-platform-select`（tasks 3.3 明确 gate 在 FB edge driver `facebook-browser-env-and-login` 落 master，当前仅 probes 落地）；③ `humanize-interaction-prompts`（代码已部署 dev，但 tasks 9.4 spec 交织须待 `category-adaptive-images-and-judgment` 先归档）；④ `estimate-token-cost-column` + ⑤ `manual-billing-price-refresh`（代码已 shipped，但 `llm-token-usage-stats` spec delta 应用失败——前者用英文 header MODIFY 中文「console 提供…」需求、后者 MODIFY 一个无人创建的 `Token Usage Cost Estimates` 需求；两者对 cost/billing 需求建模不一致，须 owner 理顺 delta header / 重建模型后再归档）。**已废弃删除（1 个）**：`facebook-scheduled-comment`（2026-07-11 用户决定关为 superseded）——其 target-URL 定向评论设计已被 keyword-in-container 版取代（见归档 `2026-07-09-facebook-scheduled-comment` + `facebook-group-join-and-commenting`）；34/35 核心任务空，change 目录已 `git rm` 删除（内容存 git 历史）。**注**：唯一落地的 task 2.9（云端在握手时持久化 FB 昵称）代码仍在线；其需求已由后续小 change `facebook-nickname-handshake-persist`（2026-07-11 归档）正式补登进 `facebook-identity` capability——剔除了已被 `facebook-nickname-inplace-read`（簇 42）取代的 `/me` 探针描述、按现网「就地读取 → hello 附带 → 云端仅库内空时写、既有不覆盖」校订。至此该行为「代码在线 + 主 spec 有据」齐全。另 `category-adaptive-images-and-judgment`（高风险图产后校验待选视觉模型）、`self-contained-ads-runtime`（dev CLI 解析等代码活 + baked-key 决策）、及 4 个纯提案（`transcribe-textcard-image-text` / `facebook-consent-structural-detect` / `facebook-join-actuation-decouple` / `edge-installer-oss-distribution`）本就在研、非本批对象。
 
+> **2026-07-26 补 · 簇 60 增补（Phase 5 与一条既存线上缺陷）**
+>
+> - [ ] **⚠️ 不是验收项，是待修缺陷：风控状态机写不进库（dev + ol 双中）。**
+>   `risk_state` 的任何持久化都报 `relation "accounts" does not exist`——`pg-risk-store.ts` 的归属条件写
+>   join 了 api 属主表 `accounts`，而它绑的是 automation 池，物理拆库后必炸。
+>   dev 上 `risk_state` 停更在 2026-07-23，ol 日志 07-25 有同一条错。
+>   **`applySignal` 先改内存态再落库 ⇒ 进程活着时行为对、一重启全丢。**
+>   完整诊断 + 两条候选修法 + 为何未当场修，见 `docs/cloud-composition-root-trisection.md` §0.0.2。
+>   **需用户拍板后再动**（改的是风控单写路径，两条修法在 TOCTOU 与加列回填之间取舍）。
+> - [ ] **面板改风控状态 / 配额档，走一遍完整四态**（P5-1 异步化）。dev 已实测「提交 202 → 回读 failed
+>   带真实原因」与「不存在的 commandId → unknown」两条；**`applied` 那条被上面的缺陷挡住、尚未真跑过**。
+>   缺陷修好后必须补验：console 上要看到「处理中 → 已改为 X」，且 X 是单写者回读的真态。
+> - [ ] **四个内容角色在真会话里仍照常触发**（P5-2 脱离公共基类）。概念抽取 / 笔记精选评估 /
+>   评论精选评估 / 有价值评论归档四个角色改了继承链与事件订阅口。**编译期与单测都覆盖了，
+>   但「订阅真的挂上了」只有真会话能证**——订阅没挂上的表现是角色安静不工作，不报错。
+> - [ ] **发布链路端到端一次**（P5-3 把发布出口角色改判 content，并把飞书卡合同与平台档案挪进共享层）。
+>   审批卡要能发出、卡上的平台显示名要正确（`displayName` 取值点换了文件）。
+
 > **2026-07-26 新增 · 簇 60「云端拆仓 Phase 0–4 的真机验收」**（前置环境：dev cloud 已部署对应 sha；
 > 后台可登录；有一个在线边缘节点）。**这一批全部是「逻辑级 + 编译期 + 单测已过、运行时未验」**——
 > 拆仓工作纪律是只读调查 + 沙箱验证，全程没起过 cloud 进程做端到端。以下每条都点名了「为什么单看编译发现不了」：
