@@ -8,7 +8,7 @@
 ## 2. Validation and delivery
 
 - [x] 2.1 Run the focused test, Bash syntax check, Cloud typecheck, and strict OpenSpec validation.
-- [ ] 2.2 Commit, rebase, fast-forward integrate, and push Cloud and control changes.
+- [x] 2.2 Commit, rebase, fast-forward integrate, and push Cloud and control changes.
 - [ ] 2.3 Deploy the integrated Cloud default branch to DEV with the three-process script and verify content, automation, API, ports, schema, PostgreSQL, Feishu, and unrelated-service isolation.
 
-<!-- Validation: focused deployment contract 1/1, bash syntax and lexical scans, Cloud typecheck, and strict OpenSpec validation passed. DEV deployment remains pending. -->
+<!-- Validation: focused deployment contract 1/1, bash syntax and lexical scans, Cloud typecheck, and strict OpenSpec validation passed. Cloud b4694df and control 1fdb1fd were rebased, fast-forward integrated, and pushed without force. DEV deployment remains pending. -->
