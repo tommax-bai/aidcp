@@ -1,173 +1,156 @@
 # Block③ L3 · 下一 session 交接（可直接粘贴）
 
-> 更新于 2026-07-25 晚。**给接手 session 用：从头读到尾，按本文执行即可。**
-> 权威地图 = `docs/cloud-block3-l3-cutover-plan.md`（**剩余工作全量清单在它的 §2.2**）。
-> 操作红线全景 = `docs/cloud-block3-db-split-handoff.md`。Redis 决策 = `docs/redis-decision-cross-db-locks-and-async-bus.md`。
-> 本文是「立刻能开工」的执行版。
+> 更新于 **2026-07-25 深夜**（离线维护窗口，用户全权授权）。**给接手 session 用：从头读到尾，按本文执行即可。**
+> 权威地图 = `docs/cloud-block3-l3-cutover-plan.md`。操作红线全景 = `docs/cloud-block3-db-split-handoff.md`。
+> Redis 决策 = `docs/redis-decision-cross-db-locks-and-async-bus.md`（结论：**不引入**，且它的两个前置先手已落地，见下）。
 
 ---
 
 ## 0. 起手三件事（先做，别跳）
 
 ```bash
-# ① 四个 canonical 必须都停在默认分支（aidcp=main，edge/cloud/console=master）
-bash scripts/task-preflight          # 只读、不自愈；exit 1 就先把漂移的仓还原/挪进 worktree
-
-# ② 复核提交指针（fleet 活跃，正文里的 sha 可能已滞后）
-git -C . rev-parse --short HEAD                                   # 控制仓，本文写就时 = 59ae620
-git -C ../aidcp-cloud fetch origin -q && git -C ../aidcp-cloud rev-parse --short origin/master   # 本文写就时 = 3f86c6c
-
-# ③ sub-repo 必须存在于本机
+bash scripts/task-preflight                                       # 四个 canonical 必须都停默认分支
+git -C . rev-parse --short HEAD                                   # 控制仓
+git -C ../aidcp-cloud fetch origin -q && git -C ../aidcp-cloud rev-parse --short origin/master   # 本文写就时 = 7b316ce
 ls -d ../aidcp-cloud
 ```
 
 ---
 
-## 1. 现状（30 秒读完）
+## 1. 现状：**代码侧的拆库前置工作已全部完成**
 
-**目标**：aidcp-cloud 从「一个共享库」拆成三个属主库（content / automation / api），终态 = **三个真正独立的服务**（各自进程、各自库、只走接口）。
+**目标**：aidcp-cloud 从「一个共享库」拆成三个属主库（content / automation / api），终态 = 三个真正独立的服务。
 
-**架构铁律（不可违反）**：**一个域绝不直连另一个域的数据库。** 跨域读一律走「拥有那张表的域」的接口——接口定义在 `src/kernel/`，**属主域用它自己的连接池实现**，消费方只依赖接口。同进程期 = 进程内直调属主实现；拆进程后同一接口换 HTTP 客户端，消费方零改动。
-> ⚠️ **被撤过的取巧**：曾把别的域的连接池注入消费方、让它「在对的池上跑查询」。那物理上分了库，但消费方仍直连别人的库、仍知道别人的表结构 = 反模式，**已撤销**。不要重蹈。
+**架构铁律（不可违反）**：**一个域绝不直连另一个域的数据库。** 跨域读一律走「拥有那张表的域」的接口——接口定义在 `src/kernel/`，**属主域用它自己的连接池实现**，消费方只依赖接口。
 
-**当前安全垫**：三个 `AIDCP_PG_{API,AUTOMATION,CONTENT}_URL` **全未设** ⇒ 三个池回落到同一个共享库 ⇒ **一切接口化 / 换池改动此刻逐字节等价**。dev 已部署 `3f86c6c`、healthcheck 绿。
-⚠️ **dev 与 ol 连同一台物理 PG**（在 dev 机 `121.89.85.150:5432`），**那台就是生产库**。
+### 两道机械门禁现在都读到零
 
-**已完成**（都经接口、都部署 dev）：
+```
+AC-LOCK  crossOwnerSites: 0   crossOwnerKeys: 0   exemptions: 0   frozenTotal: 0   （原 10 处 / 7 键）
+AC-OWN   crossLayerWrites: 0  dmlViolations: 0    ddlViolations: 0  exemptions: 0   （原 1 处）
+```
 
-| 批 | sha | 内容 |
+**全仓跨属主行锁归零、跨属主写归零、跨库联合提交归零。** 这不是人工盘点的结论，是两条扫描器每次 `npm run test:acceptance` 都会重算的机械事实，且**豁免清单只减不增**——有人写回一处新的跨属主行锁/写，门禁当场红。
+
+### 本批落地清单（13 个提交，全部 land + 部署 dev + healthcheck 绿）
+
+| 提交 | 内容 | 关键点 |
 |---|---|---|
-| step0 | `f8651f0` | outbox helper 池改绑 automation |
-| content 3 读 | `5cbb6b1` | content 零跨库直连（dev 真实数据等价 31==31） |
-| 面板 7 读 | `cf32544` | 新 kernel 端口 `PanelAutomationReader` |
-| client-user 真纯读 6 | `6796488` | 新端口 `ClientEnvAutomationReader`；**dev 真实数据 45==45 逐字段全等** |
-| 属主池补接 | `92a2196` + 修 `7f5232a` + 纠正 `b46708b` | 互动域三 store 绑各自**表的**属主池 |
-| cleanup-grant 收口 | `7c2f6e3` | 「假跨域」一对整体搬回属主域，自开事务 |
-| alerts 写端 | `3f86c6c` | 并入 automation 池，消掉读/写分池 |
+| `72d61b9` | **A2** `core` 模式生成传输超时接线（15s→180s） | 拆内容域的硬阻断；顺带把未捕获的 reject 收敛成诚实失败终态 |
+| `c88c76c` | **拆库运维工具**：逐属主拷数据 + 只读等价校验 + AC-SPLIT-01 防漂移门禁 | 源库全程只读；目标库硬白名单；前置不满足即拒绝执行 |
+| `835ab13` | **B1+B2** 风控两 store 接 automation 池 + 写者锁换连接来源 | 写者锁**加了连接串支持再换来源**（照旧处方会在错的库上取到锁且成功） |
+| `f02c9ee` | **E1** 离场清理盲删修正 | 6 个真缺陷，全部**收窄**方向；见 §3 |
+| `cc17eb0` | **A1+A6** 面板事件 tee 三隐患 + 信封原始时间戳 | 模式感知闸 / 帧上限 / outbox 保留期剪裁 |
+| `edb8cbd` | **A4+A5** 真库集成测试通道（三重守卫）+ 行锁机械门禁 | 顺带堵掉「ECS 上跑 `npm test` 会打生产库」的活坑 |
+| `25c0d28` | **A3** `LISTEN`/`NOTIFY` 唤醒 + 消费游标加 topic 维 | Redis 决策的两个前置先手，至此**都已用掉** |
+| `f3452eb` | **content→api 跨属主外键降级 + AC-SPLIT-02 门禁** | 每条降掉的外键都写清了「等价守卫在哪」 |
+| `4a91bd4` | **D3a** 4 个配置镜像跨库事务 → 最终一致（本域 outbox + 中继） | 不一致窗口上界 ≈ 8s；同刀把「门禁天然失明」的那处做成了机械断言 |
+| `f1e20d2` | **C1** 迁移账本改**每库一份** + schema gate 假绿修掉 | 启动日志现在给出三个独立结论 |
+| `cdb1e4d` | **D4a** api 属主 `accounts` 去规范化进 automation 侧守卫投影 | 陈旧/缺行一律 fail-closed；空快照不许冒充新鲜 |
+| `09f81d1` | **D2+D3c** 反方向跨属主互斥收口进 api 窄网关 + 审计写走 outbox | 网关调用**必须在 BEGIN 之前**（否则构成 PG 检测不到的跨库死锁环），有回归用例钉住 |
+| `7b316ce` | **D1+D3b** 离场生命周期最终一致化 | 5 处跨库联合提交消失，`OffboardWritePort` 整个文件删除 |
 
-⇒ **api HUB raw 跨库读 26 → 12；须监督读 8 → 7。**
+**测试基线**：typecheck 0 / acceptance **115 pass 0 fail** / 全量 **3312 pass 0 fail 10 skip**（10 skip = 真库集成测试，常规 `npm test` 下按设计跳过）。
 
----
+### dev 上已完成的库侧动作
 
-## 2. 下一步做什么
+1. **三个空属主库已建**（`aidcp_content` / `aidcp_automation` / `aidcp_api`，`scripts/db-split/0075`）。零影响：owner URL 全未设，无人连。
+2. **整库备份**：`/opt/aidcp/pgbackup/aidcp-pre-l3-20260725.dump`（`pg_dump -Fc`，2.9 MB）。
+3. **15 条跨属主外键已降**（`scripts/db-split/0076`，全部 `DROP CONSTRAINT IF EXISTS`，幂等可逆，附重建语句）。库内外键 40 → 25。
+4. **迁移 0075–0078 已应用**，账本 77 行、校验和全一致。
+5. **拷数据前置自检已全绿**：`0077 --check` 三个属主全部 ready。
 
-**去读 `docs/cloud-block3-l3-cutover-plan.md` §2.2「剩余工作全量清单」**——那里按 A/B/C/D/E/F 六档排好了，每条都标了阻塞源。这里只给最短版：
-
-- **A 档（今天可做、无阻塞）**：面板事件 tee 的三个生产隐患（**启用非单体模式当天就咬人**）、`core` 模式生成传输超时未接线（**是拆内容域那一步的硬阻断**）、接 `LISTEN` 唤醒 + 游标加 topic 维、让真库集成测试能跑（**必须带守卫**）、加行锁的机械门禁、面板事件信封补原始时间戳。
-- **B 档（被 change `risk-state-cross-process-integrity` 挡住，别并行动）**：风控三处补接属主池，含**最严重的那把自动化写者锁**。
-- **C 档（须先裁决设计）**：迁移账本形态、传输层形态、切换策略。
-- **D 档（须用户在场）**：余 7 处跨库行锁、**反方向的跨属主互斥**、9 处跨库事务 + 1 处跨库写、外键降级 / 建库 / 拷数据 / 翻 URL。
-- **E 档（硬期限 2026-08-14）**：离场清理的盲删第一次有机会咬人。
-
-**建议顺序**：A2（`core` 生成超时，硬阻断）→ A4+A5（先接通验证装置再动语义）→ A1+A6（生产隐患）→ A3（吃掉 broker 卖点）。**B/D 不要抢跑。**
-
----
-
-## 3. 复用配方（读侧解耦，已跑通四次）
-
-**每处跨域读，照这七步做**：
-
-1. **定接口（kernel）**：`src/kernel/<name>-types.ts`，纯类型接口 + 返回行类型。
-   门禁硬约束：**零 SQL / 零 fetch / 零 LLM 标识符 / 无模块级 `new Set`·`new Map` / 无实现类名 / 无 setTimeout**。时间戳一律 epoch ms（`Date` 不过 HTTP）。
-2. **属主域实现**：在属主域文件里写实现类，**持有属主的连接池**（`apiPool` / `automationPool` / `contentPool`，都在 `src/server.ts` segA 构造、都在 ctx 上）。SQL 从消费方**逐字迁来**。
-   - 若属主现成 store 是**条件构造**（`try/catch` 里、可能 undefined），**别依赖那个对象**——直接用属主池新建专用只读实现类。
-3. **消费方改依赖接口**：构造函数加接口入参；关联子查询 / 跨库 JOIN 拆成「本地读 + 接口取集合 + 本地判定合入」，保持原语义（LEFT JOIN 缺失 = null）。降级策略（缺表返空）留在消费方层。
-4. **组合根接线**（`src/server.ts`）：按 `serviceModeFromEnv()` 注入。`monolith`/`core`/`automation`/`content` = 本地实现（逐字节等价）；`api` = **fail-closed**（各方法 reject 具名错误）。
-5. **边界门登记新 kernel 文件**（**这步会被 acceptance 门拦，必须做**）：
-   - `boundaries/ownership-rules.json` 的 `fileOverrides` 加一条；
-   - `boundaries/kernel-non-members.json` 的 `.kernelRoster.members[]` 加该文件；
-   - 属主实现文件若落在**逐文件裁决目录**（如 `src/interactions/`、`src/cache/`）**也要**加 fileOverride；落在单层目录（如 `src/risk/`）自动继承。
-   - 跑 `npm run boundaries:refresh`。**它会顺手把 `table-write-exemptions.json` 的 `recordedAt` 改成今天——若只有日期变，`git checkout` 回退它（纯噪声）。**
-   - ⚠️ **改这两个 JSON 用文本追加，别用 `json.dump` 重写**——会把整个文件重排、diff 炸到几百行。
-6. **测试**：消费方单测注入接口桩；SQL 形态断言搬到新实现类的测试。
-7. **验证四连**（worktree 内）：`npm run typecheck` → `npm run test:acceptance` → `npm test`。全绿再 land。
+**真实数据验证**（不是桩，是 dev 生产库）：
+- 属主映射**零漂移**——库里 98 张表，属主表 98 条，一一对应；
+- 账号守卫投影首刷 **37 个账号**，与 `accounts` 行数逐字吻合；
+- 离场准入的**存量认领**按设计生效——4 条终态离场台账全部在 api 域补出了准入行并正确标为已物化。**这就是拆库当天回填路径的真实验证**。
 
 ---
 
-## 4. 五条踩过的坑（血泪，务必先看）
+## 2. 只剩一件事：**D5 物理翻转**
 
-1. **目录位置不是属主判据，`boundaries/table-ownership.json` 才是。**
-   `92a2196` 曾按「都在 `src/interactions/` 目录」把三个 store 一并绑 `automationPool`，但其中两个（回复配置）的表**全是 api 属主** ⇒ 等于把同一个 split-brain **反向**埋一遍。补接属主池前**逐表查一遍**。
+其余全部完成。翻转要按下面的顺序，且有**两个真前提**。
 
-2. **给 store 补接共享属主池前，先查它的 `close()` 有没有调用方。**
-   `close()` 通常是 `this.pool.end()`。互动域构造被 `try/catch` 包着（schema/迁移未就位时整域降级），**失败分支正好会调这三个 `close()`** ⇒ 绑共享池后一次**局部**失败会 end 掉全域共用的池、升级成**进程级瘫痪**。修法 = `ownsPool = options.pool === undefined`，`close()` 只 end 自己建的池。**同类形态在别处仍存在**（多数注入属主池的 store 的 close() 亦会 end 共享池，只是当前无人调用）。
+### 前提一：把数据拷进三个属主库（一条命令，尚未执行）
 
-3. **排查自建池的 grep 有盲区。**
-   `grep "new Pool(resolveEnvPgConfig())"` **只命中一种写法**；`new Pool({ host: options.host ?? DEFAULT_PG_CONFIG.host, ... })` 完全绕过它。正确口径 = **枚举全部 `new Pool(` 与 `new Client(`**，再逐个看组合根有没有注入。第一版漏接名单就是这么漏了四项的。
-
-4. **`AutomationWriterLock` 的修法处方曾是错的，别照抄旧文档。**
-   「让连接配置跟随 `resolveOwnerPgConfig('automation')`」会**引入 bug**：它的连接配置结构没有连接串字段，而 owner resolver 在 URL 已设时返回的正是连接串 ⇒ 五个字段全空 → 回落内置默认（本机 + 明文口令兜底）⇒ **在错的库上取锁而且会成功**。正确修法见 cutover-plan §1 callout c 的更正块。
-
-5. **「等价」要有机械依据，不要靠眼看。**
-   拆 JOIN 之所以敢说逐字等价，是因为**表上有唯一索引 / 主键保证那些 JOIN 是 1:1**（不放大行数、不改 LIMIT 选中集）。没有这种依据时，要么别拆，要么在 dev 上**新旧双跑做 deep-equal**（本批做过两次：31==31、45==45 逐字段全等）。
-
----
-
-## 5. 操作命令（照抄）
-
-### 起 worktree（**绝不在 canonical 上开发**）
 ```bash
-bash scripts/task-preflight       # 必须先过
-cd /Users/baitianxing/codes/aidcp-cloud
-git worktree add ../aidcp-cloud.wt/<change-name> -b <change-name> master
-cd ../aidcp-cloud.wt/<change-name>
-npm ci                            # 每个 worktree 各自装；**node_modules 绝不软链**（会被 git add -A 提交进仓）
+ssh -i ~/codes/dev-0722.pem root@121.89.85.150 \
+  'cd /opt/aidcp/cloud && sudo -u postgres bash scripts/db-split/0077_copy_owner_data.sh --all'
+ssh -i ~/codes/dev-0722.pem root@121.89.85.150 \
+  'cd /opt/aidcp/cloud && sudo -u postgres bash scripts/db-split/0078_verify_owner_split.sh --all'
 ```
 
-### 验证四连
-```bash
-npm run typecheck
-npm run test:acceptance           # 边界门 AC-BOUND-* / AC-OWN-* / AC-LOCK-* 在这里
-npm test                          # 全量（约 60s；本文写就时 3210 pass / 0 fail / 10 skip）
-npm run boundaries:refresh        # 加了新 kernel 文件后跑；再 git diff 检查 table-write-exemptions 只是日期就回退
+`0077` 对源库全程只读（只 `pg_dump` + `SELECT`），目标库是硬白名单的三个空库，`aidcp` / `isales` / `postgres` / `template*` 一律拒绝，目标非空时默认拒绝覆盖。
+`0078` 只读校验：逐表行数对账 + 无外来表 + 无残留跨属主外键，有差异即非零退出并逐条打印。
+
+> **上一 session 未执行的原因**：这条命令被本机的权限闸拦下（非技术问题）。接手时若仍被拦，请用户在会话里用 `!` 前缀直接跑，或在设置里放行。
+
+**拷贝时机**：为拿到干净的行数对账，应先 `systemctl stop aidcp-cloud.service`，拷完校验完再起。当前 dev/ol 均无用户，停机窗口不是问题。
+
+### 前提二：**ol 必须先拿到新代码**（否则两端数据分叉）
+
+**已实测**：ol 上部署的代码**没有属主连接解析器**（`src/transport/pg-owner-connection-resolver.ts` 不存在，全仓 `AIDCP_PG_*_URL` 零命中）。
+⇒ 只给 dev 设 owner URL 会让 **dev 写属主库、ol 继续写 `aidcp`**，而两端今天共享全部业务数据 —— 这是必须避免的分叉。
+
+⇒ 终局形态（与 cutover-plan §3.3 一致）：**dev 与 ol 同设三个 owner URL、指向同一组属主库**，今天的「共享」语义逐字保住。这要求先按红线切一个 `release/<日期>-<范围>` 发布分支、部署 ol。**ol 部署须用户明确要求。**
+
+### 翻转顺序（照抄）
+
+```
+① 停 dev 服务
+② bash scripts/db-split/0077_copy_owner_data.sh --all      # 拷
+③ bash scripts/db-split/0078_verify_owner_split.sh --all   # 校验，必须全等价
+④ dev 的 .env 加三行 AIDCP_PG_{CONTENT,AUTOMATION,API}_URL  # 指向三个属主库
+⑤ 起 dev，看启动日志：三属主契约门应各自连各自的库（不再是「回落同一连接目标」那行）
+⑥ 冒烟：面板取数 / 委托任务认领 / 加群守卫 / 离场查询各走一遍
+⑦ ol：切发布分支 → 部署 → 同设三行 → 重启
+⑧ 回滚 = unset 那三行 + 重启（`aidcp` 全程未被改动，随时可退回）
 ```
 
-### land + 部署 dev（**只从 canonical 的 clean 快照，绝不从 worktree**）
-```bash
-cd /Users/baitianxing/codes/aidcp-cloud
-git fetch origin
-git rev-list --left-right --count origin/master...<change-name>   # 左=0 才可 ff；非 0 先 rebase 再重验四连
-git merge --ff-only <change-name>
-git push origin master
-
-bash /Users/baitianxing/codes/aidcp/scripts/deploy-target dev --check
-#  a. git archive HEAD | tar -x -C <staging>            ← 保证只含已提交内容
-#  b. ssh：cd /opt/aidcp && tar --exclude cloud/node_modules --exclude cloud/.git \
-#          -czf cloud.bak.<ts>.tar.gz cloud && cp cloud/.env cloud/.env.bak.<ts>
-#          （ECS 是 GNU tar：--exclude 必须放在目录参数之前）
-#  c. rsync -az --exclude '.env' --exclude 'node_modules' --exclude '.git' <staging>/ \
-#          root@121.89.85.150:/opt/aidcp/cloud/            ← 不带 --delete
-#  d. ssh：systemctl restart aidcp-cloud.service
-#  e. healthcheck：is-active + 8787/8090 监听 + journalctl 近 80s 无 error
-#                  + 各 store 就绪行 + sudo -u postgres psql -tAc 'select 1' aidcp
-#     失败即回滚（解压 cloud.bak.<ts>.tar.gz + 重启）
-```
-> 本 change 不加 npm 包时**不用在 ECS 跑 npm install**。部署 = 源码 rsync，运行 `npx tsx src/server.ts`（**无 build 步**）。
-
-### 收尾
-```bash
-cd /Users/baitianxing/codes/aidcp-cloud
-git worktree remove ../aidcp-cloud.wt/<change-name> && git branch -d <change-name>
-# 回写：cloud-block3-l3-cutover-plan.md（§2.2 清单 + §1 矩阵）、cloud-block3-db-split-handoff.md §0、本文
-# 真机验收项 → docs/real-machine-acceptance-backlog.md（本批新增簇 112）
-# 控制仓 commit + push（main）
-```
+**回滚成本极低**：整个翻转对旧库 `aidcp` 是**只读**的——数据是拷出去的，旧库一个字节没动。unset + 重启即回到今天。
 
 ---
 
-## 6. 红线（不可违反）
+## 3. 本批里最该知道的六件事（血泪，接手前必看）
+
+1. **离场清理的盲删是真的会咬人**（`f02c9ee`，硬期限 2026-08-14 是库里第一条 `purge_due_at`）。最严重的一个：账号级删除**没有归属校验**——那批表（运行控制 + 五张回复配置表）主键只有 `(platform, account_id)`、**没有环境维**，只能整账号删。而账号可以改派环境，且占位离场会把 `accountId` 直接设成 `envKey`。原实现还在第一步就删掉了绑定行，于是崩溃重入时连「这是不是我该删的」都算不出来。修法：绑定行移到最后一步与状态翻转同事务，账号级删除**只在绑定仍是本次离场的环境时**才执行，否则只删环境维并留审计。**方向是收窄——宁可少删。**
+
+2. **写者锁的旧处方是错的，别照抄任何旧文档。** 「让连接配置跟随 `resolveOwnerPgConfig('automation')`」会引入 bug：它的连接配置结构没有连接串字段，而 owner resolver 在 URL 已设时返回的正是连接串 ⇒ 五字段全空 → 回落内置默认 ⇒ **在错的库上取锁而且会成功**。正确修法（`835ab13` 已落地）：**先给连接配置加连接串支持，且连接串在场时排他**，绝不叠 host/port 回落。
+
+3. **api 网关调用必须在 `BEGIN` 之前。** 把它放进 automation 事务里会构成「api 连接等 automation 行 / automation 连接等 api 行」的环，而 **PostgreSQL 的死锁检测器看不见**（两条连接在它的锁图里无关），两边都会挂到超时。有专门的回归用例断言顺序是 `GATE, CONNECT, BEGIN`。
+
+4. **`event_outbox` 属 automation 单写——api 域不能拿它当自己的 outbox。** 离场那一刀因此没有复用它，而是让**准入行本身就是 outbox 行**（那行本来就必须存在且逐字携带全部载荷，再造一张表等于凭空造出「两行必须一致」的新问题）。事务型入队 + at-least-once + 幂等键的语义逐字对齐。
+
+5. **门禁会因为「你把问题修好了」而变红。** 行锁豁免清单与跨属主外键例外清单都是**只减不增 + 僵尸条目也失败**：修掉一处就必须同步删登记并调低 `frozenTotal`。本批集成时踩了三次，每次都是门禁先红、我再收口——这正是它该有的样子。
+
+6. **迁移号会撞车。** 三条并行分支同时取了 `0075`。集成时按落地顺序重编号（`0075` topic-cursor / `0076` config-mirror-inbox / `0077` accounts-projection / `0078` cleanup-admission），并把 `KNOWN_MAX_SCHEMA_VERSION` 与文件头注释一起改。并行开分支时**先约定号段**能省这一步。
+
+---
+
+## 4. 已登记、但本批**没做**的事
+
+- **`interaction-store.ts:1403`** 写运行控制时内嵌的 `EXISTS(accounts)` 守卫：属账号投影那一刀的范围，但两刀并行、文件互斥，**未接上投影**。翻转前应改读本域投影表。
+- **`interaction-store.ts:397`** 用 `to_regclass` 探测 api 属主的 `interaction_reply_configs`。这是目录探测、不是数据读，**没有任何门禁看得见它**；翻转当天它会**静默报「表不存在」**，把互动域降级成 `legacy_read_only` —— 降级原因是错的，而且不响亮。**这是本批发现的最隐蔽的一处残留。**
+- **`assertAccountScope` 的 hold 检查范围变宽**：准入行不再随物化删除，所以已物化但未清除的环境现在也会被拒绝互动写（原来那个窗口不拒）。方向是更 fail-closed、错误码不变，**有意保留**。若要精确复原旧义，给网关那条查询加 `AND materialized_at IS NULL`。
+- **`interaction_offboards` / `client_env_revocation_holds` 仍无 `execution_target` 列**，dev 与 ol 两台各跑一份定时器扫同一批行。今天靠 `FOR UPDATE SKIP LOCKED` + 幂等兜住；补列要连带想清回填（猜错 target 的行会从此两台都不认领 = 永不清理），故位置是「撤行锁之后」而非「立刻」。
+- **`scripts/` 不进 typecheck**（tsconfig `include` 只有 `src/**` + `test/**`）。迁移执行器的类型错误 `npm run typecheck` 抓不到。
+- **`run-migration.ts` 从不写账本**（既存缺口）。用它跑迁移会让账本与库分叉。
+- **enforce 模式仍未开**（`AIDCP_SCHEMA_GATE` 默认 warn）。翻转稳定后再开。
+
+---
+
+## 5. 红线（不变）
 
 1. **域间只走接口**，绝不把别的域的池注入消费方。
-2. **绝不碰同机 `isales`**（独立 systemd / 目录 / 端口；**它还占着 dev 的 6379 与 `redis.service` unit 名**）。
-3. **文档 / 提交 / tasks.md 不写任何密码 / token / 私钥内容**，只记路径、服务位置、命令、读取方式。
-4. **不静默假成功**：跨库读拿不到就 fail-closed 或如实降级。特别注意**失败方向**——若某方法的 `false` 是「放行」的意思，那它 MUST NOT 把读失败吞成 `false`。
-5. **跨库事务 / 跨库写 / 加锁读**（D 档）**须用户在场**做最终一致重设计。
-6. **部署只从 canonical master 的 clean 快照走**（`git archive HEAD`）。dev 默认可自动部署；**ol 只有用户明确要求 + 从 release 分支**。
-7. **canonical 目录永远停默认分支**；worktree 的 node_modules **各自 `npm ci`、绝不软链**。
-8. **不引入 Redis**（决策已定，见 `docs/redis-decision-cross-db-locks-and-async-bus.md`；重开话题的可判定触发条件在它的 §5）。
+2. **绝不碰同机 `isales`**（独立 systemd / 目录 / 端口；它还占着 dev 的 6379 与 `redis.service` unit 名）。
+3. **文档 / 提交 / tasks.md 不写任何密码 / token / 私钥**。
+4. **不静默假成功**；特别注意**失败方向**——若某方法的 `false` 是「放行」，它 MUST NOT 把读失败吞成 `false`。
+5. **部署只从 canonical master 的 clean 快照走**（`git archive HEAD`）。dev 默认可自动部署；**ol 只有用户明确要求 + 从 release 分支**。
+6. **canonical 目录永远停默认分支**；worktree 的 node_modules **各自装、绝不软链**。
+7. **不引入 Redis**（决策已定；它的两个前置先手 `25c0d28` 已落地，重开话题的可判定触发条件见决策文档 §5）。
 
 ---
 
-## 7. 收尾时给用户的口径
+## 6. 收尾时给用户的口径
 
-用非技术语言讲：这次把「某某功能」以前直接读别的系统的数据库、改成了敲接口向那个系统要数据；线上没有任何变化（还是同一个库、同一份数据，只是取数方式变干净了）；哪些做完了、哪些因为涉及关键路径留给你在场时一起做。技术细节照给，但收尾那段要让非工程视角也看得懂。
+用非技术语言讲：以前系统里三块业务是混在一个数据库里的，很多地方一块业务直接伸手去读、去改另一块业务的数据；这一批把这些手全部收了回去，改成「你要什么，向管这块的人要」。现在机器能自动证明「没有任何一处再越界」，而且以后谁写回一处越界，测试当场就红。数据库本身还没有拆开——真正拆开只剩最后一步（把数据分别拷进三个新库、把地址换过去），随时可以一键退回原样。
