@@ -26,13 +26,13 @@ runtime/protocol compatibility、平台/架构和全部资源 SHA-256，并把 C
 
 ### Requirement: 安装后的 Host MUST 随 Classic installer 固定版本
 
-Host 独立发版 SHALL 只产生供 Classic 构建消费的不可变输入。已安装应用中的 Host、Core、Native 与
-AdsPower template 版本 SHALL 由该 Classic installer 固定；运行时 MUST NOT 自行查询 latest、在线
-替换 Host package 或绕过 Classic 签名、公证和回滚链升级。
+Host 独立发版 SHALL 只产生供 Classic 构建消费的不可变输入（一个由 lockfile `sha512` 校验和锁定的
+tarball）。已安装应用中的 Host、Core、Native 与 AdsPower template 版本 SHALL 由该 Classic installer
+固定；运行时 MUST NOT 自行查询 latest、在线替换 Host package 或绕过 Classic 签名、公证和回滚链升级。
 
-#### Scenario: Registry 发布了新 Host
+#### Scenario: 已发布了更新的 Host
 
-- **WHEN** 客户机器仍运行旧 Classic，而 registry 已发布一个更新 Host release
+- **WHEN** 客户机器仍运行旧 Classic，而 Host 仓已发布一个更新的 release
 - **THEN** 已安装应用继续使用并校验 installer 内的旧精确版本，直到客户安装一个明确包含新 Host 的 Classic release
 
 ### Requirement: Host spawn 与 native 资源 MUST 使用真实 Resources 路径

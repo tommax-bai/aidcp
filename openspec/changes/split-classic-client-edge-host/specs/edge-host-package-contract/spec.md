@@ -173,7 +173,7 @@ packaging and rollback.
 
 #### Scenario: A newer Host package is published
 
-- **WHEN** the private registry contains a newer Host version than the one embedded in an installed Classic
+- **WHEN** a newer Host tarball than the one embedded in an installed Classic has been published
 - **THEN** the installed application continues using and verifying its embedded exact version until a new Classic installer is built and installed
 
 ### Requirement: Host shutdown MUST be bounded, explicit and ownership-safe

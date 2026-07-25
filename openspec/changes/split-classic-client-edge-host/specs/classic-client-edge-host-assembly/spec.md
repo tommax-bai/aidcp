@@ -53,28 +53,38 @@ present automation unavailability separately and MUST NOT treat it as loss of cu
 - **WHEN** Host creation fails as `edge_host_artifact_mismatch`
 - **THEN** Classic exposes automation as unavailable with the named failure while retaining the valid customer session and ordinary data access
 
-### Requirement: Classic MUST pin and verify one exact Host release
+### Requirement: Classic MUST pin one exact Host tarball and enforce it by lockfile integrity
 
-Classic `package.json` and lockfile SHALL reference one exact immutable Host version; semver ranges, mutable
-branches, workspace links, symlinked packages and runtime `latest` resolution are forbidden for integration
-and release evidence. Classic build SHALL verify the Host manifest, package provenance, Electron major, Node
-modules ABI, runtime format, AdsPower runtime/protocol compatibility, platform/architecture and asset hashes
-before producing an installer. Classic startup SHALL verify that loaded Host code and staged runtime
-resources still match the embedded manifest.
+Classic SHALL consume the Host release as an immutable packed tarball referenced by an exact URL in
+`package.json`, and its lockfile SHALL record that tarball's `sha512` integrity. Integrity verification at
+install time is the authoritative immutability mechanism; no package registry, registry account or
+server-side overwrite policy SHALL be required for release evidence. Semver ranges, mutable branches or tags,
+workspace links, symlinked packages, `file:` paths outside the build and runtime `latest` resolution are
+forbidden for both integration and release. Development integration SHALL use the same tarball mechanism with
+a locally packed artifact as the source, so that no untested mechanism switch exists between development and
+release. Classic build SHALL verify the Host manifest, package provenance, Electron major, Node modules ABI,
+runtime format, AdsPower runtime/protocol compatibility, platform/architecture and asset hashes before
+producing an installer. Classic startup SHALL verify that loaded Host code and staged runtime resources still
+match the embedded manifest.
 
-#### Scenario: Exact Host version is assembled
+#### Scenario: Exact Host tarball is assembled
 
-- **WHEN** Classic CI installs its lockfile and builds an installer
+- **WHEN** Classic CI installs from its lockfile and builds an installer
 - **THEN** the installer records one exact Host version, Host source commit and manifest hash that can be traced from the installed application
 
-#### Scenario: Dependency uses a semver range
+#### Scenario: The pinned tarball bytes are replaced
 
-- **WHEN** Classic declares `@aidcp/edge-host` with a range or mutable source
+- **WHEN** the artifact behind the pinned Host tarball URL is replaced with different bytes
+- **THEN** the lockfile integrity check fails the install with a non-zero error before any build step runs, and no installer is produced
+
+#### Scenario: Dependency uses a mutable source
+
+- **WHEN** Classic declares `@aidcp/edge-host` with a semver range, branch, tag, workspace link or any source whose bytes are not pinned by a lockfile integrity hash
 - **THEN** dependency validation fails and no release installer is produced
 
-#### Scenario: Installed Host sees a newer registry version
+#### Scenario: A newer Host release exists
 
-- **WHEN** a newer Host release exists but the customer has not installed a new Classic artifact
+- **WHEN** a newer Host release has been published but the customer has not installed a new Classic artifact
 - **THEN** Classic continues using its embedded exact Host version and does not let Host self-update or replace runtime assets
 
 ### Requirement: Classic MUST project Host facts without fabricating success
