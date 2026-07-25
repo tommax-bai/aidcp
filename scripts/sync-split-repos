@@ -136,12 +136,75 @@ def check_kernel_pin(repo_path: str, kernel_head: str, apply: bool) -> tuple[boo
     return True, f' kernel pin 过期：{cur[:7]} ≠ kernel master {kernel_head[:7]}'
 
 
+# ── 测试的归属：**派生的，不是人分配的** ────────────────────────────────────────────────
+# 判据＝这个测试 import 了哪些属主的 src。单属主 → 归那个仓；跨属主 → 留在 aidcp-cloud。
+# 这条规则会**自己变好**：每消掉一条跨服务耦合，就有一批测试从「跨属主」变成「单属主」、
+# 自动变得可派生。不需要有人维护一张测试清单。
+IMPORT_RE = re.compile(r"""(?:from\s+|import\s*\(\s*)['"]([^'"]+)['"]""")
+BIZ_LAYERS = ('api', 'automation', 'content')
+
+
+def _resolve(spec: str, from_file: str) -> str:
+    p = os.path.normpath(os.path.join(os.path.dirname(from_file), spec))
+    return p[: -len('.js')] + '.ts' if p.endswith('.js') else p
+
+
+def classify_tests(own: dict[str, str], ref: str) -> tuple[dict[str, str], dict[str, list[str]]]:
+    """返回 (测试路径 → 归属仓 or None, 归属仓 → 测试清单)。None = 跨属主，留守 aidcp-cloud。"""
+    listing = git(CLOUD, 'ls-tree', '-r', '--name-only', ref).split()
+    tests = [f for f in listing if f.startswith('test/') and f.endswith('.ts')]
+    verdict: dict[str, str] = {}
+    by_repo: dict[str, list[str]] = {}
+    for t in tests:
+        text = git(CLOUD, 'show', f'{ref}:{t}')
+        layers = set()
+        for m in IMPORT_RE.finditer(text):
+            spec = m.group(1)
+            if not spec.startswith('.'):
+                continue
+            layer = own.get(_resolve(spec, t))
+            if layer:
+                layers.add(layer)
+        biz = layers & set(BIZ_LAYERS)
+        if len(biz) == 1:
+            only = next(iter(biz))
+            repo = next(r for r, l in REPOS.items() if l == only)
+        elif not biz and 'kernel' in layers:
+            repo = KERNEL_REPO
+        else:
+            verdict[t] = ''  # 跨属主或与 src 无关：留守
+            continue
+        verdict[t] = repo
+        by_repo.setdefault(repo, []).append(t)
+    return verdict, by_repo
+
+
+def test_local_deps(ref: str, entry: str, seen: set[str]) -> set[str]:
+    """测试自带的 helper / fixture（`test/` 内的相对依赖）必须跟着一起搬，否则搬过去也跑不起来。"""
+    if entry in seen:
+        return seen
+    seen.add(entry)
+    try:
+        text = git(CLOUD, 'show', f'{ref}:{entry}')
+    except subprocess.CalledProcessError:
+        return seen
+    for m in IMPORT_RE.finditer(text):
+        spec = m.group(1)
+        if not spec.startswith('.'):
+            continue
+        dep = _resolve(spec, entry)
+        if dep.startswith('test/'):
+            test_local_deps(ref, dep, seen)
+    return seen
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(add_help=True)
     ap.add_argument('--ref', default='origin/master', help='aidcp-cloud 的源 ref（默认 origin/master）')
     ap.add_argument('--apply', action='store_true', help='写入差异（组装根除外）')
     ap.add_argument('--prune', action='store_true', help='连同删除清单外的 src 文件（需 --apply）')
     ap.add_argument('--repo', action='append', help='只处理指定仓，可重复')
+    ap.add_argument('--tests', action='store_true', help='同时对账 / 同步 test/（归属由 import 派生）')
     args = ap.parse_args()
 
     if args.prune and not args.apply:
@@ -240,6 +303,9 @@ def main() -> int:
     if (not args.repo) or TRANSPORT_REPO in (args.repo or []):
         exit_code = sync_transport(args, own, kernel_paths, kernel_head) or exit_code
 
+    if args.tests:
+        exit_code = sync_tests(args, own, kernel_paths) or exit_code
+
     if exit_code and not args.apply:
         print('存在差异。--apply 可同步（组装根除外）；组装根的差异须人工判断。')
     return 0 if args.apply else exit_code
@@ -286,6 +352,56 @@ def sync_transport(args, own, kernel_paths, kernel_head) -> int:
         print(f'  → 写入 {len(add) + len(changed)} 个文件' + (f'，删除 {pruned} 个' if args.prune else ''))
     print()
     return 1 if drift else 0
+
+
+def sync_tests(args, own, kernel_paths) -> int:
+    """按派生归属对账 / 同步 test/。跨属主的测试**留守 aidcp-cloud**，不强行分配。"""
+    verdict, by_repo = classify_tests(own, args.ref)
+    tracked = set(git(CLOUD, 'ls-tree', '-r', '--name-only', args.ref).split())
+    stay = sum(1 for v in verdict.values() if not v)
+    print(f'=== test/ 归属（由 import 派生，共 {len(verdict)} 个文件）===')
+    for repo in sorted(by_repo):
+        print(f'  {repo:20s} {len(by_repo[repo]):4d}')
+    print(f'  {"（跨属主·留守 cloud）":20s} {stay:4d}  ← 每消掉一条跨服务耦合，这里就自动少几个')
+    drift = 0
+    for repo, entries in sorted(by_repo.items()):
+        path = os.path.join(CODES, repo)
+        if not os.path.isdir(path):
+            continue
+        wanted: set[str] = set()
+        for e in entries:
+            wanted |= test_local_deps(args.ref, e, set())
+        # import 说明符不保证指向真实文件（模板拼接、条件路径等）；只搬 ref 里确实存在的。
+        wanted &= tracked
+        actual = {f for f in git(path, 'ls-files').split() if f.startswith('test/')}
+        add, remove, changed = sorted(wanted - actual), sorted(actual - wanted), []
+        for rel in sorted(wanted & actual):
+            want = git(CLOUD, 'show', f'{args.ref}:{rel}')
+            if repo != KERNEL_REPO:
+                want = rewrite_kernel_imports(want, kernel_paths, rel)
+            with open(os.path.join(path, rel), encoding='utf8') as fh:
+                if fh.read() != want:
+                    changed.append(rel)
+        if add or remove or changed:
+            drift = 1
+        print(f'  {repo}: 新增 {len(add)} · 内容不同 {len(changed)} · 多出 {len(remove)}')
+        if args.apply:
+            for rel in add + changed:
+                want = git(CLOUD, 'show', f'{args.ref}:{rel}')
+                if repo != KERNEL_REPO:
+                    want = rewrite_kernel_imports(want, kernel_paths, rel)
+                dst = os.path.join(path, rel)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                with open(dst, 'w', encoding='utf8') as fh:
+                    fh.write(want)
+            pruned = 0
+            if args.prune:
+                for rel in remove:
+                    os.remove(os.path.join(path, rel))
+                    pruned += 1
+            print(f'    → 写入 {len(add) + len(changed)} 个' + (f'，删除 {pruned} 个' if args.prune else ''))
+    print()
+    return drift
 
 
 if __name__ == '__main__':
