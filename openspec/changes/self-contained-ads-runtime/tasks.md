@@ -49,8 +49,11 @@
 
 ## 7. aidcp-edge — failure taxonomy (edge-bundled-ads-runtime)
 
-- [ ] 7.1 Seat/concurrency: a `browser/start` seat-ceiling rejection inside the core → a **non-crash exit code** that does NOT increment the 5-strike give-up; supervisor classifies it and shows "并发/席位已满：…请错峰或联系管理员扩容". (Not a main.cjs string-matcher.)
-- [ ] 7.2 Kernel download: distinguish stalled/timeout vs errored; disk-full message; partial-file size/sentinel check (don't trust `is_downloaded` blindly) or honest launch-time failure (not a generic core crash). Cancellable download DEFERRED.
+- [~] 7.1 Seat/concurrency: a `browser/start` seat-ceiling rejection inside the core → a **non-crash exit code** that does NOT increment the 5-strike give-up; supervisor classifies it and shows "并发/席位已满：…请错峰或联系管理员扩容". (Not a main.cjs string-matcher.) <!-- 2026-07-25 用户决定砍掉，不实装；spec delta 中对应需求已整条删除，不进权威 spec -->
+- [~] 7.2 Kernel download: distinguish stalled/timeout vs errored; disk-full message; partial-file size/sentinel check (don't trust `is_downloaded` blindly) or honest launch-time failure (not a generic core crash). Cancellable download DEFERRED. <!-- 2026-07-25 用户决定砍掉，不实装；spec delta 中对应需求已整条删除，不进权威 spec -->
+
+> **2026-07-25 范围裁决**：第 7 节整节作废（用户决定）。席位/并发上限与内核下载失败分类从未实装，
+> 与其把未实装行为写进权威 spec，不如不立此条；若共享密钥席位日后成为真实痛点，另起 change 重新建模。
 
 ## 8. aidcp-edge — tests
 
