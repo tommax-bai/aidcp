@@ -2,7 +2,7 @@
 
 ### Requirement: Full-managed authorization MUST be action-scoped and visible
 
-API SHALL expose customer-controlled authorization separately for at least research/read, light interaction, proactive comment, inbound reply, content creation, publish submission, and direct/contact messaging. Automation SHALL normalize each action domain to `disabled`, `require_approval`, `standing_authorized`, or the synchronous-operator `operator_override` class defined below. It MUST NOT infer authorization for one domain from another or from one global full-managed Boolean.
+API SHALL expose customer-controlled authorization separately for at least research/read, light interaction, proactive comment, inbound reply, content creation, publish submission, and direct/contact messaging. Automation SHALL normalize each action domain to exactly one of `disabled`, `require_approval`, or `standing_authorized`; there is no fourth, override, or operator-only tier. It MUST NOT infer authorization for one domain from another or from one global full-managed Boolean.
 
 #### Scenario: Read is authorized but comments require review
 - **WHEN** a plan has standing authorization for research/read and requires approval for proactive comments
@@ -108,33 +108,29 @@ Automation SHALL define separate retention/access policies for third-party conte
 - **WHEN** a customer requests why an action was skipped
 - **THEN** API SHALL return an authorized trace summary without exposing credentials, unrelated customer data, or unrestricted raw platform/private-message payloads
 
-### Requirement: Admission gates MUST be classified, and an absolute prohibition set MUST be unliftable
+### Requirement: Admission gates MUST be classified and an absolute prohibition set MUST be unliftable
 
-Admission gates SHALL be classified as soft pacing gates (session soft budgets, cooldowns, human-likeness throttles) or hard safety gates (RiskController state, platform quota, authorization, target identity, content safety). Authorization SHALL model an explicit `operator_override` class distinct from `standing_authorized`: it MAY skip named soft gates and, where the product has so ruled, specified quota gates, with a recorded operator authorization revision; it MUST NOT skip human approval, content-safety validation, fact recording, or honest non-success reporting, and it MUST NOT be silently downgraded to blocked or deferred. The override signal SHALL be settable only at a synchronous operator entry point and MUST NOT propagate to batched, scheduled, or asynchronous derived work. Policy-Risk SHALL additionally enforce a persona-independent and customer-independent content prohibition set; a prohibited-content match MUST deny regardless of CapabilityScope, standing authorization, approval, exemption, or task parameters, and no configuration path may grant an exception. Where a known exemption exists, it MUST be recorded as an exemption and MUST NOT be documented as full gate coverage.
+Admission gates SHALL be classified as soft pacing gates (session soft budgets, cooldowns, human-likeness throttles) or hard safety gates (RiskController state, platform quota, authorization, target identity, content safety). No authorization level SHALL skip a hard safety gate, and there SHALL be no override class that does so: every action, whatever its trigger path, passes the same live hard gates, and a denial MUST be reported honestly rather than silently downgraded. Policy-Risk SHALL additionally enforce a persona-independent and customer-independent content prohibition set; a prohibited-content match MUST deny regardless of CapabilityScope, standing authorization, approval, exemption, or task parameters, and no configuration path may grant an exception. Where a known exemption exists, it MUST be recorded as an exemption and MUST NOT be documented as full gate coverage.
 
-#### Scenario: Operator commands on a restricted account
-- **WHEN** an operator issues a precise single-shot command for an account whose quota is spent
-- **THEN** the command MAY proceed under `operator_override` while its human-approval and content-safety gates still apply and its consumption is still recorded
-
-#### Scenario: Override is used to drive a batch
-- **WHEN** an operator override is attached to work that fans out into many derived actions
-- **THEN** the override MUST NOT apply to the derived actions
+#### Scenario: Operator command meets an exhausted quota
+- **WHEN** an operator issues a precise single-shot command for an account whose platform quota is spent
+- **THEN** it MUST be denied by the same hard gate as automated work and reported honestly, because this change carries no override class (see `design.md` §24.4 D2)
 
 #### Scenario: Standing authorization meets prohibited content
 - **WHEN** a fully authorized plan encounters content in the global prohibition set
 - **THEN** the action MUST be denied and no configuration may permit it
 
-### Requirement: Authorization MUST be trigger-path scoped and floored by capability minimums
+### Requirement: Authorization MUST be trigger-path and platform scoped
 
-An authorization revision SHALL bind an action domain to a specific trigger path (schedule, manual/operator, inbound event, or Agent intent). Automation MUST NOT apply a standing authorization granted for one trigger path to work created by a different trigger path; unauthorized paths SHALL fall back to `require_approval`. Each CapabilityDefinition MAY declare a minimum approval level for its action; effective authorization SHALL be the stricter of the capability's declared minimum and the customer's authorization, a customer-level standing authorization MUST NOT lower a capability-mandated `require_approval`, and an unsatisfiable combination MUST fail closed. A shared implementation serving several platforms MUST NOT apply one platform's looser authorization to another.
+An authorization revision SHALL bind an action domain to a specific trigger path (schedule, manual/operator, inbound event, or Agent intent). Automation MUST NOT apply a standing authorization granted for one trigger path to work created by a different trigger path; unauthorized paths SHALL fall back to `require_approval`. Approval level is determined by the customer's authorization alone: a CapabilityDefinition MUST NOT impose an approval floor the customer cannot lower (see `design.md` §24.4 D1). A shared implementation serving several platforms MUST NOT apply one platform's authorization to another, and an authorization revision SHALL name the platform it governs.
 
 #### Scenario: Schedule is unattended but manual is not
 - **WHEN** an account's scheduled comments are standing-authorized
 - **THEN** an operator-issued comment for the same action domain MUST still follow its own approval requirement
 
-#### Scenario: Platform is still in restricted rollout
-- **WHEN** a capability declares a minimum of `require_approval` and the customer sets `standing_authorized`
-- **THEN** the effective authorization remains `require_approval`
+#### Scenario: One customer runs two platforms
+- **WHEN** a customer sets `standing_authorized` for publish on one platform
+- **THEN** that authorization MUST NOT admit unattended publishing on another platform absent its own authorization revision
 
 ### Requirement: Missing or unresolvable policy inputs MUST resolve to declared safe defaults
 
