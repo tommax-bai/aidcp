@@ -51,5 +51,5 @@
 
 - [ ] 5.1 FB 评论路径用的是同一条无界逐字循环（`comment-executor.ts`）：云端虽已按长度算等待窗口（18s + 220ms/字，上限 90s），但**边缘侧仍无截止时刻**——长评论同样会留下孤儿打字循环。把 deadline 一并传下去。
 - [ ] 5.2 **edge 生命周期层：给逐字输入接「取消令牌」**（复审存活项 3b.7）。今天的预算是自我计时——云端 WS 断连时边缘 reset 租约、恢复浏览循环，而打字循环仍在有界地跑，两个写者短暂共用同一个 CDP 页面。彻底消灭要让租约 / 连接 epoch 在 `reset()` / `finishActive()` 时自增，逐字循环在每个字符间与 `deadlineAt` 一并检查。属 `edge-task-coordinator` / `main.ts` 热点，单列串行做。
-- [x] 5.3a Facebook 专用 prompt 的正文目标改为「全文 100–500 字（Facebook 最佳阅读区间）」，并补回归断言锁住新文案、排除旧 80–600 提示。 <!-- aidcp-cloud 3d28b48；content-creator 7 pass；acceptance 123 pass；npm test pass；typecheck pass -->
+- [x] 5.3a Facebook 专用 prompt 的正文目标改为「全文 100–500 字（Facebook 最佳阅读区间）」，并补回归断言锁住新文案、排除旧 80–600 提示。 <!-- aidcp-cloud 3d28b48；content-creator 7 pass；acceptance 123 pass；全量 3401 pass / 11 skip；typecheck pass；2026-07-26 部署 dev，备份 cloud.bak.20260726-070444Z.tar.gz + cloud.env.bak.20260726-070444Z；运行时文件哈希与 master 一致，service / 8787 / 8090 / 8091 / PostgreSQL / 三属主 schema 契约门 / 自动化写者锁 / 飞书 onReady / 公网 health 全绿，isales 未受影响 -->
 - [ ] 5.3b 该规则仍是模型软提示，**正文无任何确定性长度校验**（只 clamp 标题）。`content_too_long` 是诚实闸、不是解法——真正该收的是生成侧。
