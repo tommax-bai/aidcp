@@ -51,6 +51,8 @@ Task 6.2 remains open: no inactive AdsPower profile was selected for a real brow
 
 Follow-up evidence (2026-07-26):
 - Edge follow-up commit: `c797ae2` (`codex/add-system-upstream-proxy-chain`).
+- Edge source was fast-forward integrated to `origin/master` at `c797ae2` after 30/30 acceptance tests, the complete Edge test command, `npm run typecheck`, and desktop build-input verification passed.
+- `systemProxyUpstreamEnabled` remains default-off; the standard desktop build stages the pinned architecture-specific GOST resource and fails closed when required build input is absent.
 - Observed regression: changing the visible switch while an environment was stopped left the old persisted mode active, so offline selection reused a double-hop preflight after the UI showed direct mode.
 - The switch now persists its target mode immediately; the main process invalidates stopped-environment preflight/relay evidence before scheduling the next offline preflight.
 - Running child generations resolve their effective mode from the frozen `status.proxyMode` until explicit restart, including browser-absent cold-standby/control-plane states.
