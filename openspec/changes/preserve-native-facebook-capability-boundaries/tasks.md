@@ -1,14 +1,18 @@
 ## 1. Serialize the behavior changes
 
-- [ ] 1.1 Inspect the final Feed Like, Reels Interaction, and Group Join feature commits and record their overlapping files, behavior ownership, validation, and real-account boundaries
-- [ ] 1.2 Rebase, validate, and land Reels Interaction to Edge `master` and control `main` without force
-- [ ] 1.3 Rebase Group Join onto the integrated Reels revision, resolve behavior conflicts, rerun focused validation, and land both repositories
-- [ ] 1.4 Rebase Feed Like onto the integrated Reels/Join revision, retain the Reels-owned path, rerun focused validation, and land both repositories
+- [x] 1.1 Inspect the final Feed Like, Reels Interaction, and Group Join feature commits and record their overlapping files, behavior ownership, validation, and real-account boundaries
+  <!-- All three overlapped engine.rs, facebook.rs, facebook-command-router.js, and focused Native tests. Reels owns active-video Like/Follow, Group Join owns current-group/fresh DOM/timing, and Feed Like owns exact-card DOM/picker choreography. All remained source-only with real-account writes pending. -->
+- [x] 1.2 Rebase, validate, and land Reels Interaction to Edge `master` and control `main` without force
+  <!-- Edge 2228a20+d48c47b; control through 1e323d1. Focused 84/84, acceptance 30/30, full Edge pass, typecheck, Rust lib 51/51, and local Native artifact build passed. -->
+- [x] 1.3 Rebase Group Join onto the integrated Reels revision, resolve behavior conflicts, rerun focused validation, and land both repositories
+  <!-- Edge 938767d; control 75ee1af. Combined focused 74/74, Rust lib 55/55, Join Fake-CDP 2/2, acceptance 30/30, full Edge 2336/2336, and typecheck passed. -->
+- [x] 1.4 Rebase Feed Like onto the integrated Reels/Join revision, retain the Reels-owned path, rerun focused validation, and land both repositories
+  <!-- Edge d02b1bc; control cf4b9aa. Conflicts retained Join lifecycle/timing and all Reels/Feed operations. Combined focused 82/82, Rust lib 55/55, all three write-path Fake-CDP boundaries, typecheck, and full Edge 2344/2344 passed. -->
 
 ## 2. Establish executable capability ownership
 
 - [ ] 2.1 Add a closed Native Facebook command-to-capability ownership table and reject supported commands without exactly one owner
-- [ ] 2.2 Add the behavior-parity ledger covering each supported command's oracle, witness, commit primitive/count, verification, terminal semantics, and deadline
+- [ ] 2.2 Add the behavior-parity ledger covering each supported command's oracle, witness, commit primitive/count, verification, terminal semantics, deadline, and protected commit-window contract
 - [ ] 2.3 Add focused validation that the support table, ownership table, ledger, router dispatch, and behavior tests remain complete and consistent
 
 ## 3. Extract the Native Facebook runtime
@@ -32,7 +36,9 @@
 
 - [ ] 5.1 Verify one absolute command deadline flows from the facade through Native execution and that only Group Join receives the 90-second deadline
 - [ ] 5.2 Add Rust/facade cases proving capability phases use remaining budget, ordinary commands retain 30 seconds, and a slow Join retains its durable verification window
-- [ ] 5.3 Run the legacy Facebook behavior oracles and focused Native Feed, Reels, Join, Comment, Publish, blocker, consent, and unsupported-command parity suites
+- [ ] 5.3 Add a correlated local commit-window request/ack lifecycle and wire Native Facebook Join, Comment, and Publish to the existing Edge `CommitWindowGuard`
+- [ ] 5.4 Prove no write occurs before a matching acknowledgement, the coordinator returns `window_busy` during the established window, and cancellation after expiry remains ambiguous without replay
+- [ ] 5.5 Run the legacy Facebook behavior oracles and focused Native Feed, Reels, Join, Comment, Publish, blocker, consent, and unsupported-command parity suites
 
 ## 6. Validate and deliver
 

@@ -41,6 +41,31 @@ The Edge facade and Native Facebook runtime SHALL use one absolute deadline per 
 - **WHEN** a non-Join Facebook command is executed
 - **THEN** its facade deadline remains 30 seconds and its capability phases are bounded by that same absolute deadline
 
+### Requirement: Irreversible Facebook submits expose a correlated local commit window
+The Native Facebook Group Join, Comment, and Publish capabilities SHALL request the established coordinator-visible commit window immediately before their irreversible submit boundary. The request and acknowledgement SHALL remain inside the supervised local Edge/Native lifecycle protocol and SHALL be correlated to the active session and command. Native MUST NOT actuate the write until the matching host acknowledgement proves that the existing Edge `CommitWindowGuard` is open.
+
+The protected budgets SHALL remain the established fixed values: Group Join `18_500ms`, Comment `20_000ms`, and Publish `20_000ms`. The host SHALL dispose the guard when the correlated command terminates or the Native process exits; the guard's existing time-based expiry SHALL remain the crash-safe upper bound. A lifecycle request or acknowledgement MUST NOT be reported as action success.
+
+#### Scenario: Join commit is protected at the exact boundary
+- **WHEN** Native Group Join reaches its final pre-click cancellation point
+- **THEN** it requests and receives the correlated `fb_join_click` commit window before fresh target revalidation and DOM activation
+- **AND** a higher-priority challenger during the protected interval receives `window_busy` with the remaining budget instead of cancelling the in-flight Join
+
+#### Scenario: Comment and Publish retain their established protection
+- **WHEN** Native Facebook Comment is about to submit Enter or Publish is about to invoke its submit control
+- **THEN** the owning capability obtains the correlated `fb_comment_enter` or `fb_publish_submit` window before the irreversible input
+- **AND** confirmation or command termination closes the window without changing the action receipt semantics
+
+#### Scenario: Commit-window acknowledgement is absent or mismatched
+- **WHEN** the host does not acknowledge the exact active session, command, label, and lifecycle token within the remaining command budget
+- **THEN** Native fails before actuation with a not-started result
+- **AND** it does not fall back to an unprotected DOM, pointer, keyboard, or submit action
+
+#### Scenario: Protected interval expires before verification completes
+- **WHEN** the established commit-window budget expires while the capability still has a bounded verification tail
+- **THEN** the coordinator may cancel the remaining verification
+- **AND** the already-dispatched write is reported ambiguous and is never replayed or flattened to not-started
+
 ### Requirement: Embedded Facebook router sources remain capability-owned and Native-only
 Facebook browser rules SHALL be maintained as capability-owned internal source modules and assembled in an explicit deterministic order into the single encoded Native router artifact. Native build and router tests MUST consume the same source set and order. Production TypeScript, `dist`, ASAR, package resources, and caller inputs MUST NOT contain or supply the source modules, selectors, JavaScript payloads, or a browser-rule fallback.
 
@@ -54,7 +79,7 @@ Facebook browser rules SHALL be maintained as capability-owned internal source m
 - **THEN** every Facebook router source fragment and representative page-rule marker is absent outside the encoded Native artifact
 
 ### Requirement: Supported Facebook behavior has an executable parity ledger
-The Edge repository SHALL maintain a closed behavior-parity ledger for every Native-supported Facebook command. Each entry SHALL identify its capability owner, behavior oracle, canonical target witness, pre-commit gates, commit primitive and maximum dispatch count, verification witness, terminal reason/effect classes, and total deadline. Automated validation MUST fail when a supported command lacks an entry, an entry has no focused externally meaningful regression case, or implementation routing disagrees with the declared owner.
+The Edge repository SHALL maintain a closed behavior-parity ledger for every Native-supported Facebook command. Each entry SHALL identify its capability owner, behavior oracle, canonical target witness, pre-commit gates, commit primitive and maximum dispatch count, verification witness, terminal reason/effect classes, total deadline, and any protected commit-window label/budget. Automated validation MUST fail when a supported command lacks an entry, an entry has no focused externally meaningful regression case, or implementation routing disagrees with the declared owner.
 
 #### Scenario: New supported command lacks parity evidence
 - **WHEN** a Facebook command is added to the Native support table without a complete ledger entry and focused behavior test

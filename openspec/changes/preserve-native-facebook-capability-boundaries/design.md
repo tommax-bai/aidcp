@@ -20,13 +20,14 @@ They overlap the same Rust engine, Facebook adapter, browser router, facade, and
 - Make one capability module own each supported Facebook command from target resolution through terminal classification.
 - Keep action-specific actuation explicit: DOM activation, trusted pointer input, keyboard/text input, and file input are selected by the capability that has real-page evidence.
 - Give each command one absolute deadline whose phase budgets fit inside it.
+- Preserve the established coordinator-visible irreversible commit windows for Facebook Group Join, Comment, and Publish.
 - Separate stable shared Facebook semantics from Feed, Reels, Group Join, Comment, and Publish workflows.
 - Split browser-side router source by capability while producing the same single encoded Native artifact.
 - Add executable ownership and behavior-oracle gates so a later migration cannot silently route a supported command through a generic fallback.
 
 **Non-Goals:**
 
-- No change to the Native process topology, Cloud/Edge protocol, Cloud planning, risk policy, pacing, quotas, or account lifecycle.
+- No change to the Native process topology, Cloud protocol, Cloud planning, risk policy, pacing, quotas, or account lifecycle. The only protocol addition is a correlated local lifecycle handshake between the supervised Native child and its Edge host.
 - No JavaScript page-execution fallback outside the Native artifact.
 - No new retry, compatibility, feature-flag, or timeout configuration.
 - No claim that source tests prove real Facebook write acceptance.
@@ -73,9 +74,9 @@ The Rust adapter is organized around capability state machines rather than proto
 - `feed`: startup, settling, continuation, scrolling, refresh, open/back/search, and card projection;
 - `feed_like`: exact Feed target, React primary commit, scoped picker commit, same-card verification, and Like receipts;
 - `reels`: active-video projection, movement, cards, Like, Follow, author association, and same-Reel verification;
-- `group_join`: current-group scope, readiness, hydration, fresh DOM commit, durable verification, and Join receipts;
-- `comment`: exact editor, text input/readback, submit, same-account acknowledgement, pending/rejected/ambiguous classification;
-- `publish`: composer entry, media, field readback, submit, capture, and reconciliation;
+- `group_join`: current-group scope, readiness, hydration, protected fresh DOM commit, durable verification, and Join receipts;
+- `comment`: exact editor, text input/readback, protected submit, same-account acknowledgement, pending/rejected/ambiguous classification;
+- `publish`: composer entry, media, field readback, protected submit, capture, and reconciliation;
 - `router`: encoded browser-router assembly, bounded DTO decoding, and shared canonical Facebook semantics.
 
 Small modules may share canonical post identity, locale label families, geometry, and bounded evidence types through explicit shared helpers. They must not share a generic "find point and click" Facebook write pipeline.
@@ -107,7 +108,23 @@ The Native session ceiling permits the longest supported Facebook command, but e
 
 Configurable knobs were rejected because the budgets come from observed behavior and adding configuration would hide ownership rather than solve it.
 
-### 6. Assemble one encoded router from capability-owned sources
+### 6. Correlate irreversible commit windows across the Native boundary
+
+The retired Facebook executors opened the existing Edge `CommitWindowGuard` immediately before the irreversible Join, Comment, or Publish submit and closed it after confirmation or the bounded protection interval. The Native cutover removed the executor object that owned this guard, so the coordinator currently sees these writes as preemptible even after Native has crossed the commit boundary.
+
+The supervised local protocol adds a correlated commit-window handshake:
+
+1. the owning Facebook capability reaches its last pre-commit cancellation point;
+2. Native emits a bounded `commit_window_request` containing only session/command correlation, a closed label, and the established budget;
+3. the Edge host validates that the request belongs to the active command, opens the existing `CommitWindowGuard`, and returns `commit_window_ack`;
+4. only after the matching acknowledgement does the capability run its fresh target revalidation and single commit;
+5. the host disposes the guard when the command terminates, the Native process exits, or the declared budget expires automatically.
+
+The established budgets remain capability-owned constants: Join `18_500ms`, Comment `20_000ms`, and Publish `20_000ms`. The request is not a new authorization or a success receipt. Missing, mismatched, duplicate, late, or timed-out acknowledgement fails before the write with `not_started`; it never causes a fallback click. A coordinator challenger arriving after acknowledgement receives the existing `window_busy` result with the guard's remaining budget. Once the protected interval expires, cancellation may stop only the verification tail and the write remains ambiguous rather than replayable.
+
+An unacknowledged fire-and-forget progress event was rejected because Native could click before the host had opened the guard. Opening a 90-second window around the entire Join command was rejected because readiness is safely preemptible and would unnecessarily block higher-priority work.
+
+### 7. Assemble one encoded router from capability-owned sources
 
 Browser-side Facebook sources are split into an explicitly ordered internal source set:
 
@@ -124,7 +141,7 @@ The Native build script assembles and encodes those sources into the existing bi
 
 Keeping one handwritten router file was rejected because unrelated capability edits currently collide and review cannot establish which behavior owns a helper. Shipping independent script files was rejected because it would weaken the Native packaging boundary.
 
-### 7. Make capability ownership and parity executable
+### 8. Make capability ownership and parity executable
 
 A closed Facebook support table maps every Native-supported command to exactly one capability owner. Unsupported Facebook commands still return `capability_unsupported` before router/CDP evaluation.
 
@@ -137,10 +154,11 @@ A behavior-parity ledger records for every supported command:
 - verification witness;
 - terminal reason/effect classes;
 - total deadline.
+- protected commit-window label and budget, when the capability has an irreversible submit boundary.
 
 Tests fail when a supported command has no owner/ledger entry, when a command routes through a generic Facebook fallback, or when browser-router source exists outside the encoded assembly. Behavior tests assert externally meaningful outcomes and phase/reason semantics; string-shape tests alone are insufficient.
 
-### 8. Keep delivery truth separate
+### 9. Keep delivery truth separate
 
 Automated validation establishes source and artifact parity only. The result is not described as real-account verified until controlled DEV acceptance observes the named actions on an authorized account. The development Native artifact may be rebuilt after integration, but no installer or production release is implied.
 
@@ -150,6 +168,7 @@ Automated validation establishes source and artifact parity only. The result is 
 - [Router assembly order creates hidden dependencies] → Use explicit dependency order, prohibit duplicate top-level symbols, and execute the same assembled source in tests and builds.
 - [Concurrent parity branches keep changing shared files] → Do not edit their worktrees; wait for commits, integrate serially, then branch the refactor from the final default revision.
 - [Legacy executors contain obsolete behavior] → Use only behavior backed by current specs, focused tests, or recorded real-page evidence; unsupported commands remain unsupported.
+- [The host cannot acknowledge an irreversible commit window] → Fail before actuation; never click without coordinator protection and never treat a lifecycle request as a business result.
 - [A source-equivalent write still fails on a live cohort] → Preserve honest non-success semantics and keep real-account acceptance open rather than adding an unobserved fallback.
 - [Large refactor hides functional changes] → Separate behavior-integration commits from capability-extraction commits and review diffs with focused parity tests at every step.
 
@@ -159,12 +178,12 @@ Automated validation establishes source and artifact parity only. The result is 
 2. Rebase, validate, and land Reels, Group Join, and Feed Like serially to Edge `master` and control `main`, resolving shared files once per change.
 3. Create the Edge worktree for this change from the integrated `master` revision and install physical dependencies.
 4. Add ownership/ledger tests against the integrated behavior before moving code.
-5. Extract the Facebook runtime and capability modules one at a time, running focused router/Rust/session tests after each move.
+5. Restore the correlated local commit-window handshake, then extract the Facebook runtime and capability modules one at a time while running focused router/Rust/session tests after each move.
 6. Split and assemble router sources, then verify production-dist and desktop build inputs still contain only the encoded Native artifact.
 7. Run acceptance, full Edge tests, typecheck, Cargo fmt/clippy/tests, Native build/verification, and strict OpenSpec validation.
 8. Rebase, fast-forward integrate, push default branches, and rebuild the local development Native artifact. Do not package an installer or claim real-account acceptance.
 
-Rollback is a revert of the refactor commit followed by rebuilding the prior Native artifact. The three parity behavior commits remain independently revertible and there is no data or protocol migration.
+Rollback is a revert of the local lifecycle/refactor commits followed by rebuilding the prior Native artifact. The three parity behavior commits remain independently revertible and there is no data or Cloud protocol migration.
 
 ## Open Questions
 
