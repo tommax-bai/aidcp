@@ -1,20 +1,31 @@
 ## 1. Admission, Inventory and 4a Barrier
 
-- [ ] 1.1 Run control preflight; create isolated worktrees/branches for every owning repo and preserve canonical/unrelated files.
-- [ ] 1.2 Add a machine-readable A1–A6/B1–B5 inventory with current call sites, owner, consumer, fact scope, local shape, freshness tier and derived members.
-- [ ] 1.3 Add a census that rejects unregistered synchronous cross-owner reads and separately rejects side-effect methods in snapshot members.
-- [ ] 1.4 Assert A3 contains only `edgeCount`, `onlineEdgeCount` and `resolveEdgeIdForAccount`; verify 4a owns authenticated/idempotent/result-unknown `resumeEdgesForAccount`.
-- [ ] 1.5 Publish a hotspot ownership map: common envelope/kernel/local runtime MAY proceed in parallel; B1/B2/B4 owner mutations, roster/projection and `server.ts` remain blocked until 4a lands.
+- [x] 1.1 Run control preflight; create isolated worktrees/branches for every owning repo and preserve canonical/unrelated files.
+  <!-- 2026-07-26: preflight PASS. Created codex/split-cloud-api-composition-root-4b worktrees for control, Cloud, kernel, transport, API, automation, Console and Edge from their exact post-3b defaults. Every code worktree has a physical non-symlink node_modules directory. Canonical repos remain on main/master and clean; preserved the control repo's unrelated user report artifacts. -->
+- [x] 1.2 Add a machine-readable A1–A6/B1–B5 inventory with current call sites, owner, consumer, fact scope, local shape, freshness tier and derived members.
+  <!-- 2026-07-26: Cloud boundaries/sync-read-inventory.json pins the 67941e4 pre-4a census and records all eleven groups, twelve remote streams, current declarations/call sites, owner/consumer/scope, local shape and freshness tier. B1/B2/B4 are explicitly provisional until the post-4a census. -->
+- [x] 1.3 Add a census that rejects unregistered synchronous cross-owner reads and separately rejects side-effect methods in snapshot members.
+  <!-- 2026-07-26: test/acceptance/sync-read-inventory.test.ts derives observed methods from machine-readable source regions/receivers/imports, filters asynchronous declarations, compares the result to the inventory and includes a mutation fixture proving an unregistered read-shaped method is rejected. It also rejects side-effect-shaped snapshot members. -->
+- [x] 1.4 Assert A3 contains only `edgeCount`, `onlineEdgeCount` and `resolveEdgeIdForAccount`; verify 4a owns authenticated/idempotent/result-unknown `resumeEdgesForAccount`.
+  <!-- 2026-07-26: the inventory and source-derived census pin A3 to the three pure reads only. The excludedSideEffects record assigns resumeEdgesForAccount to 4a's authenticated target-bound idempotent command with result_unknown; common tests fail if it enters a snapshot. -->
+- [x] 1.5 Publish a hotspot ownership map: common envelope/kernel/local runtime MAY proceed in parallel; B1/B2/B4 owner mutations, roster/projection and `server.ts` remain blocked until 4a lands.
+  <!-- 2026-07-26: Cloud boundaries/composition-root-4b-hotspot-ownership.json pins the 67941e4 base, names 4a as the blocker, permits only contracts/transport/local runtime/inventory in parallel, and reserves server.ts, AccountRosterSourcePort, automation_account_projection and B1/B2/B4 owner mutations to the post-4a 4b single writer. -->
 
 ## 2. Parallel Common Contracts and Runtime
 
-- [ ] 2.1 Define kernel `SyncReadStream`, `factScope`, versioned snapshot envelope, unsigned opaque cursor and exhaustive payload/readiness/health unions.
-- [ ] 2.2 Implement the shared atomic snapshot apply state machine with payload digest, per-instance target cursor, old-cursor rejection and invalid-envelope handling.
-- [ ] 2.3 Implement/test equal-cursor freshness renewal: only a newly fetched, later-`asOf`, digest-identical owner observation renews; historical replay or same-cursor drift does not.
-- [ ] 2.4 Extract an instantiable per-process config-freshness runtime; missing source is stale/not-ready in split mode and explicit local-authority is allowed only in monolith.
-- [ ] 2.5 Implement authenticated internal snapshot route/client primitives with server-injected target, fact-scope validation and no caller-selected target.
+- [x] 2.1 Define kernel `SyncReadStream`, `factScope`, versioned snapshot envelope, unsigned opaque cursor and exhaustive payload/readiness/health unions.
+  <!-- Cloud source: src/kernel/sync-read-snapshot.ts. The closed registry contains twelve remote streams because B5 has four independent streams while the inventory remains eleven groups. -->
+- [x] 2.2 Implement the shared atomic snapshot apply state machine with payload digest, per-instance target cursor, old-cursor rejection and invalid-envelope handling.
+  <!-- AtomicSyncReadMirror validates target/scope/version/complete/cursor/value before replacement, compares unsigned decimal cursors through BigInt, retains last good value on invalid/old input and exposes named health/readiness state. -->
+- [x] 2.3 Implement/test equal-cursor freshness renewal: only a newly fetched, later-`asOf`, digest-identical owner observation renews; historical replay or same-cursor drift does not.
+  <!-- Focused tests cover owner_fetch renewal, replay non-renewal, digest drift invalidation and old-cursor rejection. -->
+- [x] 2.4 Extract an instantiable per-process config-freshness runtime; missing source is stale/not-ready in split mode and explicit local-authority is allowed only in monolith.
+  <!-- PerProcessConfigFreshnessRuntime has no ambient singleton; remote-mirror without a source stays stale, and local-authority construction is rejected for api/automation/content modes. -->
+- [x] 2.5 Implement authenticated internal snapshot route/client primitives with server-injected target, fact-scope validation and no caller-selected target.
+  <!-- src/transport/sync-read-snapshot-http.ts requires a nonempty owner-specific stream allowlist, rejects cross-owner registration and caller target fields, and validates target/scope on both server and client. Common focused/boundary validation: 38/38, typecheck/build PASS, boundary census 487/487 with zero cross-boundary edges. -->
 - [ ] 2.6 If persistence is required, add expand-only tables solely for target-scoped consumer cursor/readiness/health; do not target-partition shared facts, owner versions or projection payloads.
-- [ ] 2.7 Validate common Cloud tests/typecheck, kernel admission/build/dist and transport route/client/auth/target tests before any composition-root wiring.
+- [x] 2.7 Validate common Cloud tests/typecheck, kernel admission/build/dist and transport route/client/auth/target tests before any composition-root wiring.
+  <!-- 2026-07-26: Cloud common/inventory/boundary 38/38, typecheck/build and diff-check PASS; boundary census 487 source = 487 ownership with zero cross-boundary edges. Derived kernel commit 1d7e89bff5f9c9ec93a3ebd25a3c690093667ca2 passed typecheck/build and a 12-stream dist export probe. Derived transport commit 5d332d5 passed typecheck/build/dist route export, pins kernel 1d7e89b exactly, and Cloud loopback tests cover bearer, mandatory owner allowlist, cross-owner rejection, caller-target rejection and server/client target/scope validation. Both commits are pushed on the 4b feature branch; default-branch integration remains a later serial step. -->
 
 ## 3. Automation-to-API Inventory Items
 

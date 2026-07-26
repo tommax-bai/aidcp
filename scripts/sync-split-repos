@@ -112,6 +112,10 @@ TRANSPORT_MEMBERS = [
     'src/transport/facebook-group-ops-http.ts',
     'src/transport/group-route-http.ts',
     'src/transport/alert-resolution-http.ts',
+    # 批次 4b：api/automation 同步读镜像的版本化完整快照 route/client。
+    # 只承载 Bearer、server-injected target、owner stream allowlist 与 envelope 校验；
+    # owner snapshot 生成和 consumer 本地镜像实现仍各自留在属主仓。
+    'src/transport/sync-read-snapshot-http.ts',
 ]
 # 有意**不**进包的同目录文件（判据：只有 automation 一家用，或直接持有属主表 SQL）：
 #   event-outbox.ts / risk-command-outbox.ts / eventbus-outbox-bridge.ts / outbox-health.ts /
