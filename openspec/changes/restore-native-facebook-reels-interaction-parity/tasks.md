@@ -35,6 +35,6 @@
 ## 5. Integration and Runtime Boundary
 
 - [x] 5.1 Rebase and fast-forward integrate the isolated Edge and control branches, record commit and validation evidence, and push without force.
-  <!-- Edge rebased onto origin/master with one additive browse-session test-harness conflict resolved by retaining both view/UI projection and bounded action diagnostics; integrated/pushed commits 2228a20 and d48c47b. Control rebased commits 305138d, d477821, and 078a6ae; strict validation passed before default-branch push. -->
+  <!-- Edge rebased onto origin/master with one additive browse-session test-harness conflict resolved by retaining both view/UI projection and bounded action diagnostics; integrated/pushed commits 2228a20 and d48c47b. Control rebased commits 641f280, 6494061, and 7f72fff; strict validation passed before default-branch push. -->
 - [x] 5.2 Rebuild the local development Native Page Engine artifact without packaging an installer; keep real-account exact-target like/follow acceptance explicitly pending unless separately authorized and observed.
   <!-- Canonical Edge master rebuilt the unsigned darwin-arm64 development artifact; encoded-rule digest ded35464242134c5b74de260c6c478920b15011f9be13d844cfb35c1b028fec2. No installer/signing/notarization or real-account Like/Follow action was performed. -->
