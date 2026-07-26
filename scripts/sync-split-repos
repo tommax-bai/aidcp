@@ -57,10 +57,13 @@ REPOS = {
 # 准入判据＝「三家都可能调用 + 不含任何属主表的 SQL」。带 SQL 的与只有一家用的一律不进、随属主走。
 TRANSPORT_MEMBERS = [
     'src/transport/internal-http.ts',
+    'src/transport/image-model-selection-http.ts',
     'src/transport/config-mirror-bump-http.ts',
     'src/transport/curated-content-http.ts',
     'src/transport/delegated-task-http.ts',
     'src/transport/interaction-store-reader-http.ts',
+    'src/transport/pipeline-log-http.ts',
+    'src/transport/publish-card-exit-http.ts',
     'src/transport/publish-generation-http.ts',
     'src/transport/publish-log-http.ts',
     'src/transport/publish-status-http.ts',
