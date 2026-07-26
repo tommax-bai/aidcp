@@ -26,6 +26,7 @@ Facebook 发帖的正文填写是 **O(正文长度)** 的逐字符输入，却�
 - **边缘自我掐表**：预算耗尽即停止输入、清空编辑器、诚实回报；清不干净则如实标 dirty（绝不谎报干净页）。逐字符的拟人节奏**一个字节不动**。
 - **验收闸换成全文回读**：确认编辑器完整包含终稿正文；额外内容超容差（如打字途中被 typeahead 劫持）亦判失败。
 - **打字前先清空编辑器并校验为空**，斩断脏稿拼接。
+- **Native-only 路径不得丢失同一契约**：Facebook 发布切换到 Rust Native Page Engine 后，`fill_field` 继续逐字符拟人输入，完整透传云端最长 400 秒的单步预算，并为回读和清场预留 8 秒；400 秒只放宽该命令，Facebook Native 会话/重连上限仍为 90 秒，MUST NOT 扩大其它浏览动作的等待面。
 
 **已核实不需要做的**（避免过度设计）：身份监测体在发布期间**不必挂起**——FB 身份从 `c_user` cookie 读取，与编辑器弹层无关，抬预算不会新增其射程；XHS 侧则由 `creator-app` 页面上下文闸豁免。
 
@@ -41,7 +42,7 @@ Facebook 发帖的正文填写是 **O(正文长度)** 的逐字符输入，却�
 ## Impact
 
 - `aidcp-cloud`: `src/publish-agent/fill-budget.ts`（新增）、`src/publish-agent/platform-profile.ts`、`src/publish-agent/command-sequencer.ts`、`src/publish-agent/publish-dispatcher.ts`、`src/publish-agent/prompts.ts`、`src/server.ts`
-- `aidcp-edge`: `src/browse/cdp-util.ts`、`src/facebook/publish-executor.ts`
+- `aidcp-edge`: `src/browse/cdp-util.ts`、`src/facebook/publish-executor.ts`，以及生产 Native-only 路径 `src/native-page-engine/{client,runtime,publish}.ts`、`native/page-engine/src/{engine,protocol,facebook/publish}.rs`
 - **协议不变**：`PublishCommandPayload.timeoutMs` 是既有可选字段，消息类型数仍为 74，`AC-PROTO-*` 不动。
 - **向后兼容**：旧边缘忽略下发的预算、按旧行为跑（不劣化）；新边缘在云端未下发预算时用 25s 兜底（**小于**云端 30s 常数窗口 → 即使对端未升级也是边缘先答，诚实失败而非孤儿执行）。
 - **小红书零回归**：不带预算的指令等待窗口逐字节不变；逐字输入辅助不传截止时刻即行为完全不变（XHS 搜索/评论、FB 评论均不受影响）。

@@ -43,6 +43,12 @@
 - [x] 3b.6 复审后回归：cloud acceptance 50 / npm test 1935 / typecheck；edge acceptance 19 / npm test 1179 / typecheck，全过。
 - [x] 3b.7 复审存活但**不修**的一条（已核实非本 change 引入、不破红线）：预算是**自我计时、不是取消令牌**。云端 WS 断连时边缘会 reset 租约并恢复浏览循环，而打字循环仍在跑（现在**有界**、且全文回读会诚实失败、提交被租约闸挡住 `task_lease_mismatch`）。改动前那条循环**完全无界且每篇必触发**，故本 change 严格改善。彻底消灭需要「租约 / 连接 epoch 取消令牌」，属 edge 生命周期层，见 5.3。
 
+## 3c. Native-only 切换回归
+
+- [x] 3c.1 根因追溯：Native 抽取提交 `073eadc8` 直接继承早期内嵌 router 的整段填写实现，没有以已归档的 TS `FacebookPublishExecutor` 及 `facebook-post-publish` 逐字契约作为行为 oracle；Native 测试只覆盖 owner/mapping 和 navigate/select/submit，未执行 `fill_field` 的真实 CDP 事件序列，故切换时未被闸住。
+- [x] 3c.2 Native Facebook `fill_field` 恢复逐 Unicode 码位拟人输入；透传 Cloud `timeoutMs` 至 400 秒并只放宽该命令的 TypeScript/Rust ceiling（Native session/protocol 仍为 90 秒）；保留审核正文首尾字符，打字前清空校验，预留 8 秒，全文回读有界轮询，失败/取消/CDP 异常统一清场并诚实区分 dirty/composer-gone。
+- [x] 3c.3 Native 定向测试、全量 Rust/Edge 回归、Native 构建与生产边界验证。 <!-- aidcp-edge e2cec6d；Rust 定向 publish 19/19、全量 102/102、clippy -D warnings；Edge 定向 15/15、acceptance 30 pass / 1 gated skip、全量 2429 pass / 1 skip、typecheck；Native release artifact SHA-256 4ee4bf59072b25f5963017df96c34f49f4962f32e38b27a96304fbcf049c8f5f；dist reachable=79 / removed=63、legacy_page_rules=absent、source_maps=absent，desktop build input 验证通过；已集成并推送 origin/master -->
+
 ## 4. 真机验收（登记入 backlog，簇：Facebook dev 环境）
 
 - [ ] 4.1 probe P1（长正文逐字）：dev + tom 分组 FB 环境，用**生产的**逐字逻辑打一篇 400–500 字真实形状正文（含标点、空行、URL、emoji），逐字符 diff 回读、记录实测 ms/char，观察打字途中有无 typeahead / 链接预览抢焦点。产出用于**校准每字 250ms 这个占位常数**，并给出这条路线的 go/no-go。**不提交**。
@@ -55,3 +61,4 @@
 - [ ] 5.2 **edge 生命周期层：给逐字输入接「取消令牌」**（复审存活项 3b.7）。今天的预算是自我计时——云端 WS 断连时边缘 reset 租约、恢复浏览循环，而打字循环仍在有界地跑，两个写者短暂共用同一个 CDP 页面。彻底消灭要让租约 / 连接 epoch 在 `reset()` / `finishActive()` 时自增，逐字循环在每个字符间与 `deadlineAt` 一并检查。属 `edge-task-coordinator` / `main.ts` 热点，单列串行做。
 - [x] 5.3a Facebook 专用 prompt 的正文目标改为「全文 100–350 字（Facebook 最佳阅读区间）」，并补回归断言锁住新文案、排除旧 100–500 与 80–600 提示。 <!-- aidcp-cloud 3d28b48 初次改为 100–500；794cda9 收紧为 100–350。content-creator 7/7；acceptance 123/123；全量 3401 pass / 11 skip；typecheck pass；OpenSpec strict pass。2026-07-26 15:42 CST 部署 dev，备份 cloud.bak.20260726-074153Z.tar.gz + cloud.env.bak.20260726-074153Z；远端 prompt 哈希与 master 一致，service active / NRestarts=0 / 8787 / 8090 / 8091 / PostgreSQL / 三属主 schema 契约门 / 自动化写者锁 / 飞书 onReady / 内外 health 全绿，isales 未触碰 -->
 - [ ] 5.3b 该规则仍是模型软提示，**正文无任何确定性长度校验**（只 clamp 标题）。`content_too_long` 是诚实闸、不是解法——真正该收的是生成侧。
+- [ ] 5.4 Native 同类输入语义另行归属 `native-page-engine-production-cutover`：Facebook 评论仍经 `replace_focused_text` 一次性整段 `Input.insertText`（且评论 deadline 仍见 5.1）；小红书搜索仍一次性写入关键词，违反 `comment-search-command` 的逐字契约；Native 验证码文本仍使用 `Input.insertText`，违反 `captcha-incident-handling` 明确要求的真实 keyDown/keyUp。三者涉及不同提交/取消边界，MUST 拆分修复和验收，不与本次发帖修复混写。
