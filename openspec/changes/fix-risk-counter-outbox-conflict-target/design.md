@@ -40,30 +40,34 @@ The counter insert and outbox status update remain in one transaction. If the ro
 
 ### Test the production index shape with real PostgreSQL
 
-Add a PG-gated integration test using `resolveIntegrationDatabase`, a dedicated `aidcp_test*` database, isolated test tables/schema shape, and `PgRiskCounterOutboxStore`. It SHALL prove:
+Add a PG-gated integration test using `resolveIntegrationDatabase`, a dedicated `aidcp_test*` database, the canonical `0002` + `0061` migration DDL in an isolated schema, and `PgRiskCounterOutboxStore`. It SHALL prove:
 
-1. the first claimed row inserts one counter and becomes `applied`;
-2. a duplicate apply attempt does not insert a second counter;
-3. the test would fail under the old predicate-less query because PostgreSQL itself resolves the conflict target.
+1. PostgreSQL reports the deployed partial-index predicate as `outbox_id IS NOT NULL`;
+2. the first claimed row inserts one counter and becomes `applied`;
+3. a duplicate apply attempt does not insert a second counter;
+4. the test would fail under the old predicate-less query because PostgreSQL itself resolves the conflict target.
 
 Unit/fake tests remain useful for orchestration semantics but are not accepted as proof of index inference.
 
+The full PG channel SHALL run on a migration-complete temporary database. Its integration files share destructive fixtures, so the channel SHALL serialize test files and reset both legacy and topic-scoped event-outbox cursors. A focused contract pass cannot replace a red aggregate.
+
 ## Risks / Trade-offs
 
-- [The PG test is skipped outside the explicit integration channel] → Keep the standard repository skip guard, run unit/typecheck in all environments, and require `npm run test:pg` with a dedicated test database before deployment.
+- [The PG test is skipped outside the explicit integration channel] → Keep the standard repository skip guard, run unit/typecheck in all environments, and require a green full `npm run test:pg` on a migration-complete dedicated database before deployment.
 - [Existing DEV dead letters may include unrelated failures] → Audit by target, failure signature, action, and time window; never bulk-reset all dead rows.
-- [Replay after deployment could double-count rows already represented in `risk_counters`] → Back up first and exclude any dead row whose id already exists as a non-null `risk_counters.outbox_id`.
+- [Replay after deployment could double-count rows already represented in `risk_counters`] → Freeze an immutable exact-id manifest with before-images first and exclude any dead row whose id already exists as a non-null `risk_counters.outbox_id`.
+- [DEV and OL share PostgreSQL] → Every audit, reset, verification, and inverse operation MUST join the exact manifest back to `risk_counter_outbox.execution_target='dev'`. `risk_counters` has no target column, so it MUST be scoped only through those manifest outbox ids. Whole-table restore is forbidden.
 
 ## Migration Plan
 
-1. Validate source with focused unit tests, risk acceptance tests, typecheck, strict OpenSpec validation, and the real PostgreSQL contract test.
+1. Validate source with focused unit tests, risk acceptance tests, typecheck, strict OpenSpec validation, and a green full PostgreSQL aggregate on a migration-complete `aidcp_test*` database.
 2. Integrate both clean worktree commits through the normal default-branch boundary.
-3. Before DEV deployment, back up the Cloud application/env state and PostgreSQL tables involved in the scoped recovery.
-4. Audit DEV `risk_counter_outbox` dead rows by `execution_target='dev'`, the partial-index inference error, and incident window; cross-check `risk_counters.outbox_id` to establish the exact replay set.
-5. Deploy the eligible integrated Cloud revision to DEV and verify service/worker health plus a newly enqueued canary fact.
-6. Reset only the audited replay set from `dead` to retryable state, preserving identifiers and dedupe keys; let the normal worker apply it.
-7. Verify each replayed outbox id is `applied`, appears exactly once in `risk_counters`, and reconciles with account/day totals.
-8. Roll back the code if new applies fail. Do not replay under the old code; if replay validation diverges, stop the worker and restore from the pre-replay backup.
+3. Before any DEV mutation, audit `risk_counter_outbox` read-only by `execution_target='dev'`, the exact partial-index inference error, and the bounded incident window. Exclude every row already represented by `risk_counters.outbox_id`; freeze the resulting outbox ids as an immutable replay manifest.
+4. Capture before-images for only the manifest outbox rows, any `risk_counters` rows whose `outbox_id` is in that manifest, and the affected account/day aggregates. Back up the DEV Cloud application/env state separately. Do not take or plan a whole-table restore of shared risk tables.
+5. Deploy the eligible integrated Cloud revision to DEV, then verify the actual automation owner process, worker health, and one newly enqueued canary fact. Roll back code and stop before replay if the canary does not become exactly one applied counter.
+6. Pause only the DEV risk-counter worker. Revalidate that every manifest id still belongs to `execution_target='dev'`, is still the audited dead row, and has no counter; abort on any drift. Reset only those ids to retryable state, resume the DEV worker, and never stop or mutate OL.
+7. Verify every manifest id becomes `applied`, appears exactly once in `risk_counters`, and reconciles with the frozen account/day before-images plus the manifest action counts.
+8. Code rollback does not broadly restore database tables or erase already verified facts. If replay validation diverges, pause only the DEV worker and apply an inverse operation only to manifest ids using their before-images. If that exact inverse cannot be proved safe, leave the worker paused and stop for operator review; whole-table restore is forbidden.
 
 ## Open Questions
 

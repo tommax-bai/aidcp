@@ -6,7 +6,7 @@
 
 - Make the risk-counter insert conflict target explicitly match the partial unique index predicate while preserving database-enforced exactly-once accounting.
 - Add a PostgreSQL-gated integration test that creates the production index shape and proves first apply, duplicate apply, and outbox status behavior against a real PostgreSQL parser/planner.
-- Retain bounded failure/dead-letter semantics and record an operational recovery sequence: backup, target-scoped DEV audit, deployment, then explicit replay of only audited affected dead letters.
+- Retain bounded failure/dead-letter semantics and record an operational recovery sequence: target-scoped DEV audit, exact outbox-id before-images, deployment/canary, then explicit replay and reconciliation of only that immutable id set.
 
 ## Capabilities
 
@@ -23,4 +23,4 @@ None.
 - Cloud owner: `aidcp-cloud/src/risk/risk-counter-outbox-store.ts` and its PostgreSQL integration tests.
 - Control owner: the `interaction-risk-gating` contract and this change's rollout/recovery tasks.
 - No protocol, Edge, Console, schema shape, or public API change.
-- DEV deployment and dead-letter replay are explicitly deferred until integration; no production data is mutated by this change implementation.
+- DEV deployment and dead-letter replay are explicitly deferred until integration; no production data is mutated by this change implementation, and recovery MUST NOT restore shared DEV/OL tables wholesale.
