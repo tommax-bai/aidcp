@@ -26,7 +26,7 @@
 ## 4. Verification
 
 - [x] 4.1 Run focused Native router/session tests, legacy Reel oracle tests, and Native Cargo tests.
-  <!-- Post-review focused TS: 78 passed. Cargo library: 51 passed. Four Fake-CDP write-boundary cases passed: direct/picker Like and moved/confirmed Follow. Full Cargo still has the pre-existing explore_feed fixture null-field mismatch reproduced on the unchanged default branch. -->
+  <!-- Post-review focused TS: 78 passed before rebase and 84 after rebase. Cargo library: 51 passed. Four Fake-CDP write-boundary cases passed: direct/picker Like and moved/confirmed Follow. Full Cargo still has the pre-existing explore_feed fixture null-field mismatch. An extra full fake_cdp run exposed three unrelated stale fixed-response tests; facebook_initial_scan_resets_a_persisted_reel_to_home_feed was reproduced on the unchanged canonical master. -->
 - [x] 4.2 Run Edge protocol acceptance, full tests, and typecheck with bounded output.
   <!-- Acceptance: 30 passed; post-review typecheck passed. Full suite: 2313/2316 passed under concurrent heavy validation; the 3 unrelated timing failures each passed immediately when rerun alone. A final integrated full-suite run remains part of 5.1. -->
 - [x] 4.3 Run `openspec validate restore-native-facebook-reels-interaction-parity --strict`.
