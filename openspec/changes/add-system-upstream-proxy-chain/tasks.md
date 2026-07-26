@@ -27,12 +27,15 @@
 - [x] 5.1 Add a pinned GOST v3.2.6 macOS x64/arm64 staging script with official SHA-256 verification, executable permissions, license notice, and explicit development override resolution.
 - [x] 5.2 Wire staged architecture resources into Electron packaging/build-input checks and extend packaged trust gates to require and verify the nested executable.
 - [x] 5.3 Add source-level packaging contract tests; do not claim a signed/notarized installer or installed-client delivery without a separately authorized package run.
+- [x] 5.4 Split unsigned staging SHA-256 verification from signed macOS runtime identity verification, ignore packaged GOST overrides, and apply the same signed nested-code rule to Native Page Engine.
+- [x] 5.5 Add an Electron `afterSign` gate plus final release trust checks for the signed App, GOST identity/version/architecture, and Native Page Engine identity/architecture.
 
 ## 6. Validation and closeout
 
 - [x] 6.1 Install physical worktree dependencies, run focused Electron/provider/renderer/packaging tests, full Edge tests required by affected proxy/browser safety contracts, and `npm run typecheck`.
 - [ ] 6.2 Run a development smoke with a newly started inactive AdsPower profile: prove the launch payload includes the loopback override, full-chain Facebook preflight succeeds, and browser-context egress evidence reflects the environment proxy; if AdsPower ignores the override, stop without profile mutation and record the blocker.
 - [x] 6.3 Run `openspec validate add-system-upstream-proxy-chain --strict`, record Edge/control commit SHAs and validation evidence here, commit with explicit pathspecs, and push both `codex/add-system-upstream-proxy-chain` branches.
+- [ ] 6.4 Run focused signed-artifact/runtime/packaging tests, full Edge tests, typecheck, strict OpenSpec validation, then rebuild and locally verify the arm64 OL Developer ID signed package.
 
 <!--
 Implementation evidence (2026-07-26):

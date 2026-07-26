@@ -29,7 +29,7 @@
 
 2. **AIDCP 读取系统配置，再显式生成代理链。** 新的 macOS resolver 通过有界 `scutil --proxy` 读取固定端点，按 SOCKS5、HTTPS web proxy、HTTP web proxy 的顺序选择。HTTPS web proxy 在 macOS/Chromium 语义中仍是 HTTP CONNECT，不能写成 GOST 的 TLS dialer。PAC/WPAD 需要按目标 URL 执行系统 PAC 解析，首版若猜固定值会违背“系统代理”语义，因此明确不支持。
 
-3. **使用固定版本 GOST sidecar，而不是 Proxifier/自研透明代理。** GOST 原生支持多 hop 和 HTTP/SOCKS/TLS 组合，MIT 许可允许随应用交付。Proxifier 是商业 Network Extension，需要额外安装、许可和进程规则，不适合作为产品内依赖；自研 CONNECT/SOCKS 链会重新承担协议、认证、背压和错误处理风险。构建脚本下载固定 v3.2.6 release，校验官方 SHA-256 后解包到架构目录；打包从 `${platform}-${arch}` 资源目录取二进制。开发态允许 `AIDCP_GOST_BINARY`，其次使用已 stage 的构建产物；打包态只信任资源内二进制。
+3. **使用固定版本 GOST sidecar，而不是 Proxifier/自研透明代理。** GOST 原生支持多 hop 和 HTTP/SOCKS/TLS 组合，MIT 许可允许随应用交付。Proxifier 是商业 Network Extension，需要额外安装、许可和进程规则，不适合作为产品内依赖；自研 CONNECT/SOCKS 链会重新承担协议、认证、背压和错误处理风险。构建脚本下载固定 v3.2.6 release，校验官方 SHA-256 后解包到架构目录；打包从 `${platform}-${arch}` 资源目录取二进制。开发态允许 `AIDCP_GOST_BINARY`，其次使用已 stage 的构建产物；打包态忽略外部覆盖并只信任资源内二进制。macOS Developer ID 会向嵌套 Mach-O 写入签名数据，因此开发态/staging/`afterPack` 继续校验签名前完整 SHA-256，签名包运行态改为校验固定资源路径、App 与嵌套二进制的有效 Developer ID 签名、相同且固定的 Team ID、预期 Identifier、目标架构，并仅在上述信任成立后执行 `gost -V` 校验版本。Native Page Engine 使用同一签名产物规则，避免 GOST 修复后被同源签名前哈希校验阻断。
 
 4. **每个正在准备的 profile 使用独立中继进程。** 中继只监听 `127.0.0.1` 随机可用端口，配置包含系统 hop 和该 profile 环境 hop。独立进程让凭据和故障域按环境隔离，首版受浏览器槽位限制，进程数量可控。主进程按 profile 单飞创建并缓存；profile 代理或系统模式改变时作废。应用退出时有界终止全部中继。为避免浏览器尚在使用时断链，普通 Edge 子进程退出不立即杀中继；只有配置作废、确认不再使用或应用退出才回收。
 
@@ -41,14 +41,14 @@
 
 8. **active profile 在双跳模式下 fail closed。** 当前 provider 会接管 AdsPower 已 active 的 profile，但这种浏览器可能由手工入口或旧设置启动，无法证明应用了当前 loopback 参数。首版在存在 override 时拒绝 active 接管，要求关闭重启。若后续能取得可信启动命令行并精确匹配，可另案放宽。
 
-9. **验收分三层。** 单元/契约测试证明解析、配置生成、凭据脱敏、生命周期与启动载荷；开发态集成测试用本地固定系统代理和无账号目标证明 GOST 两跳；AdsPower 真机测试必须从新 inactive profile 启动，并由既有 CDP 出口探测证明最终业务代理出口。打包资源、签名公证和客户安装包另行验收，源码测试不能替代。
+9. **验收分三层。** 单元/契约测试证明解析、配置生成、凭据脱敏、生命周期与启动载荷；开发态集成测试用本地固定系统代理和无账号目标证明 GOST 两跳；AdsPower 真机测试必须从新 inactive profile 启动，并由既有 CDP 出口探测证明最终业务代理出口。打包资源、签名公证和客户安装包另行验收，源码测试不能替代。Electron `afterSign` 必须对每个最终 `.app` 执行嵌套签名身份、架构与版本检查；发行脚本在公证/装订后重复最终信任门禁，防止只通过签名前 `afterPack` 的不可运行产物进入 DMG。
 
 ## Risks / Trade-offs
 
 - [AdsPower 内核或代理扩展覆盖 `--proxy-server`] → 以新 inactive profile 做浏览器级出口验证；未证明前不标完成，不回退持久改 profile。
 - [抢占随机 loopback 端口] → 分配后立即 spawn，并以有界 TCP 就绪探测确认；失败返回稳定错误，不换成 `0.0.0.0`。
 - [Veee 改变本地端口或断开] → 每次新建链重新解析；已建连接失败时不直连，界面显示链路不可用。首版不增加未经观察的后台重试器。
-- [GOST 二进制供应链或打包签名] → 固定 release、架构和 SHA-256；构建缺失即失败；正式包把嵌套二进制纳入 codesign、notarization 和产物检查。
+- [GOST 二进制供应链或打包签名] → 固定 release、架构和签名前 SHA-256；构建缺失即失败；正式包把嵌套二进制纳入 codesign、notarization 和签名后身份/版本检查，不把签名前完整文件哈希错误地用于已签名 Mach-O。
 - [多个 sidecar 增加资源占用] → 首版按 profile/浏览器槽位有界，换取简单隔离；有真实资源证据后再考虑合并为单进程多 service。
 - [本地其他进程访问无认证 relay] → 仅 loopback、随机端口、只在需要时存活；不把端口暴露到 renderer 或 Cloud。若后续威胁模型要求同用户进程隔离，需要原生 socket 身份或本地认证另案。
 

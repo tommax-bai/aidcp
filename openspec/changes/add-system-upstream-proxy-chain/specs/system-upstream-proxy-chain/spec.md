@@ -50,7 +50,7 @@ PAC、自动发现、缺少固定端点、非法 host/port、需要但无法取�
 
 客户端 SHALL 为需要启动的 AdsPower profile 创建受管本地代理中继，其入站只监听随机 loopback 端口，第一跳为解析后的系统代理，第二跳为该 profile 原本保存的环境代理。中继 SHALL 支持现有环境代理的 HTTP、HTTPS 与 SOCKS5 类型，并保持既有类型语义。
 
-环境代理账号密码 MUST 只存在于 AdsPower 精确读取响应、主进程内存和中继私有配置输入中；MUST NOT 出现在进程 argv、renderer IPC、settings、链路状态、日志或错误正文。中继二进制 SHALL 固定版本、校验来源并作为桌面资源交付；开发态可使用显式覆盖路径。
+环境代理账号密码 MUST 只存在于 AdsPower 精确读取响应、主进程内存和中继私有配置输入中；MUST NOT 出现在进程 argv、renderer IPC、settings、链路状态、日志或错误正文。中继二进制 SHALL 固定版本、校验来源并作为桌面资源交付；开发态可使用显式覆盖路径。签名前 staging 和开发态 SHALL 校验固定上游归档及二进制 SHA-256；macOS 签名包运行态 SHALL 忽略外部覆盖，并校验资源内二进制的固定路径、Developer ID 签名、与应用相同且符合产品配置的 Team ID、预期 Identifier、目标架构和固定版本，MUST NOT 用签名前完整文件哈希拒绝已经签名的 Mach-O。
 
 #### Scenario: 两跳中继就绪后才交付
 - **WHEN** 系统代理和环境代理均合法且中继成功监听 loopback
@@ -63,6 +63,18 @@ PAC、自动发现、缺少固定端点、非法 host/port、需要但无法取�
 #### Scenario: 本地入口不可被远程访问
 - **WHEN** 中继处于运行状态
 - **THEN** 它只监听 `127.0.0.1`，不得绑定 `0.0.0.0`、局域网或公网地址
+
+#### Scenario: 签名包验证嵌套中继身份
+- **WHEN** macOS Developer ID 签名改变了资源内 GOST Mach-O 的完整文件哈希
+- **THEN** 客户端先验证应用与 GOST 的有效签名、Team ID、Identifier、资源路径和 arm64/x64 架构，再执行并确认固定 GOST 版本；不得按签名前二进制哈希误报中继不可用
+
+#### Scenario: 打包态外部覆盖不绕过资源信任
+- **WHEN** 已打包客户端进程环境包含 `AIDCP_GOST_BINARY`
+- **THEN** 客户端忽略该覆盖并只解析、验证和执行应用资源目录内的 GOST
+
+#### Scenario: 签名后产物门禁阻止无效嵌套代码
+- **WHEN** Electron 完成 macOS 应用签名
+- **THEN** 构建必须在生成分发包前验证最终 App、GOST 和 Native Page Engine 的签名身份、架构以及 GOST 版本，任一失败即停止出包
 
 #### Scenario: 生命周期回收
 - **WHEN** 应用退出、profile 配置失效或相关浏览器确认关闭且链路不再使用
