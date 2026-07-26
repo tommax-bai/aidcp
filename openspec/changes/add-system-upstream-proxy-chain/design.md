@@ -25,7 +25,7 @@
 
 ## Decisions
 
-1. **设置是机器级显式模式，不是每环境隐藏规则。** 新设置使用布尔值 `systemProxyUpstreamEnabled`，缺省 `false`，放在 AdsPower 浏览器设置中。系统代理是机器级资源，而第二跳仍来自每个 profile；首版不引入环境级覆盖矩阵。开关选择立即持久化，使未启动环境随后的后台预检使用当前可见选择并立即作废旧证据；已经运行的浏览器代际冻结其实际模式，界面继续要求显式重启，避免把持久化目标设置冒充成运行中 Chrome 的热切换。
+1. **设置是机器级显式能力，不是每环境隐藏规则。** 新设置使用布尔值 `systemProxyUpstreamEnabled`，缺省 `false`，放在 AdsPower 浏览器设置中。系统代理是机器级资源，而第二跳仍来自每个 profile；首版不引入环境级覆盖矩阵。开关选择立即持久化，使未启动环境随后的后台预检使用当前可见选择并立即作废旧证据；只有读取到该 profile 已配置环境代理时，开关才对它启用双跳。未配置环境代理不是“双跳缺失”的错误，而是双跳不适用，保持既有无代理启动参数。已经运行的浏览器代际冻结其实际模式，界面继续要求显式重启，避免把持久化目标设置冒充成运行中 Chrome 的热切换。
 
 2. **AIDCP 读取系统配置，再显式生成代理链。** 新的 macOS resolver 通过有界 `scutil --proxy` 读取固定端点，按 SOCKS5、HTTPS web proxy、HTTP web proxy 的顺序选择。HTTPS web proxy 在 macOS/Chromium 语义中仍是 HTTP CONNECT，不能写成 GOST 的 TLS dialer。PAC/WPAD 需要按目标 URL 执行系统 PAC 解析，首版若猜固定值会违背“系统代理”语义，因此明确不支持。
 
@@ -35,7 +35,7 @@
 
 5. **敏感配置从 stdin 进入 GOST。** GOST 以 `-C -` 从 stdin 读取 YAML/JSON，argv 只包含固定参数。主进程不打印配置和 stderr 原文，只投影稳定错误枚举；renderer 只获得 `direct` / `system_then_environment`、准备状态和安全提示。二进制路径和 loopback 端口可以记录，用户名、密码和完整节点 URL 不可以。
 
-6. **预检先建立链，再把本地端点作为唯一代理。** 现有精确 profile reader 继续作为第二跳真源。双跳关闭时控制器保持原行为；打开时 reader 交给 chain manager，成功后返回无认证的本地 HTTP 代理配置，后续现有预检逻辑不再知道第二跳凭据。系统代理/sidecar 的显式配置失败映射为 `unavailable` 并阻止启动；双跳关闭时既有“检测设施 unknown 不阻断”语义保持不变。
+6. **预检先确认第二跳存在，再建立链并把本地端点作为唯一代理。** 现有精确 profile reader 继续作为第二跳真源。双跳关闭时控制器保持原行为；打开且 profile 已配置环境代理时，reader 交给 chain manager，成功后返回无认证的本地 HTTP 代理配置，后续现有预检逻辑不再知道第二跳凭据。profile 明确返回无代理时跳过中继与代理预检，并按既有无代理路径启动；只有适用双跳的 profile 遇到系统代理/sidecar 显式配置失败时才映射为 `unavailable` 并阻止启动。双跳关闭时既有“检测设施 unknown 不阻断”语义保持不变。
 
 7. **主进程把本地端点注入 Edge 子进程，provider 只负责本次启动覆盖。** `spawnEdgeChild` 在成功预检后从 chain manager 取得当前 profile endpoint，注入非敏感 `AIDCP_ADS_PROXY_OVERRIDE`。`selectBrowserProvider` 校验它必须是 `http://127.0.0.1:<port>`，并把 `--proxy-server=<url>` 加入 `browser-profile/start.launch_args`。AdsPower 官方 start API没有临时 proxy object，只提供 `launch_args`；因此不永久调用 profile update。
 

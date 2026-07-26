@@ -16,6 +16,7 @@
 - [x] 3.1 Route double-hop Facebook preflight through the managed loopback endpoint while preserving the existing direct-mode path and unknown-vs-unavailable semantics.
 - [x] 3.2 Invalidate preflight and relay state when the profile proxy or double-hop setting changes; keep the relay alive while its browser may still use it and stop all relays during application shutdown.
 - [x] 3.3 Inject only the prepared loopback endpoint into the matching Edge child and add supervisor/preflight tests proving unavailable system proxy blocks without direct fallback.
+- [x] 3.4 Treat profiles explicitly configured without an environment proxy as outside double-hop applicability: skip relay/preflight/override, preserve the existing no-proxy launch path, and add a regression test.
 
 ## 4. AdsPower provider launch override
 
@@ -68,4 +69,11 @@ Signed nested-artifact follow-up (2026-07-26):
 - Electron `afterSign` and the final macOS release trust gate verify both nested executables. Focused signed-artifact/runtime/packaging tests: 31 passed; complete Edge test command exited 0; `npm run typecheck` passed; strict OpenSpec validation passed.
 - Final arm64-only OL build completed with exit 0 from `release/20260726-ol-current` at `5236653`; mounted DMG verification passed for deep App signature, both nested identities, `aidcpCloudDefaultEnv=ol`, and `aidcpClientAuthUrl=http://123.56.253.183:8088/capi`.
 - Local signed-only DMG: `dist-electron-ol-arm64-signed-20260726-gost-fix/AIDCP-0.3.24-arm64.dmg`, SHA-256 `8509e0952c377dffb7e681e76d36d1feeca58f6464be9e461cf0c28f7b9fedf8`. Notarization was intentionally disabled; `spctl` reports `Unnotarized Developer ID`, so no notarized/Gatekeeper-accepted delivery is claimed.
+
+No-proxy applicability follow-up (2026-07-26):
+- Edge fix commit: `39f3ce5` (`codex/add-system-upstream-proxy-chain`).
+- Observed regression: with the machine-level switch enabled, an AdsPower profile explicitly configured without a proxy was classified as a missing second hop and blocked with `environment_proxy_missing`.
+- The main process now reads profile proxy applicability before preparing the chain. Explicit `noProxy` clears stopped-profile relay state, projects `proxyChainApplicable=false`, skips the Facebook network probe, and launches without `AIDCP_ADS_PROXY_OVERRIDE`. Profiles with a configured proxy continue to fail closed when their required system hop or relay is unavailable.
+- Renderer state no longer reports a restart requirement for a running no-proxy profile and explains that double-hop is not applicable.
+- Focused proxy/provider/lifecycle/fleet suites: 216 passed; renderer suite: 96 passed; complete Edge suite: 2417 passed, 0 failed; `npm run typecheck` passed; strict OpenSpec validation passed.
 -->
