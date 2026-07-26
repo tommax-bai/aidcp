@@ -143,7 +143,7 @@ def pin_pattern(pkg_name: str) -> 're.Pattern[str]':
 # transport 也在内：它承载跨进程路由名，pin 过期的表现是**只有真跑起来才 404**。
 SHARED_PACKAGES = {'aidcp-kernel': KERNEL_REPO, 'aidcp-transport': TRANSPORT_REPO}
 
-# 仓 → 需要整树镜像过去的**非 src 运行时资产**目录（逐字节，含二进制）。
+# 仓 → 需要逐字节镜像过去的运行时资产路径（目录或单文件，含二进制）。
 #
 # 为什么必须在这里管：`src/` 的对账再干净，代码在运行时读的文件没跟过去，一样跑不起来 ——
 # 而且这一类失败**不响**。文字卡渲染出口按 `<仓根>/assets/fonts` 解析字体与度量清单，读不到时工厂
@@ -154,6 +154,9 @@ SHARED_PACKAGES = {'aidcp-kernel': KERNEL_REPO, 'aidcp-transport': TRANSPORT_REP
 # 判据与 TRANSPORT_MEMBERS 同源：**谁在代码里读它，就只给谁**。渲染出口是 content 属主，
 # 故只有 content 需要；api / automation 装了纯属多背 5MB 二进制。
 REPO_ASSETS = {
+    # AccountPersona / editor template 在 API 进程启动时读取；它不是 TS module，不能让
+    # module-ownership 清单把它误报成「多出」后再靠人工复制维持运行。
+    'aidcp-api': ['src/soul/soul.yaml'],
     'aidcp-content': ['assets'],
 }
 
@@ -175,11 +178,11 @@ def git_bytes(ref_repo: str, *args: str) -> bytes:
 
 
 def sync_assets(args, repo: str, path: str) -> int:
-    """镜像 REPO_ASSETS 声明的资产目录。返回差异数（0 = 已一致）。"""
-    dirs = REPO_ASSETS.get(repo)
-    if not dirs:
+    """镜像 REPO_ASSETS 声明的资产路径。返回差异数（0 = 已一致）。"""
+    paths = REPO_ASSETS.get(repo)
+    if not paths:
         return 0
-    listing = git(CLOUD, 'ls-tree', '-r', '--name-only', args.ref, '--', *dirs).split()
+    listing = git(CLOUD, 'ls-tree', '-r', '--name-only', args.ref, '--', *paths).split()
     add, changed = [], []
     for rel in sorted(listing):
         want = git_bytes(CLOUD, 'show', f'{args.ref}:{rel}')
@@ -195,7 +198,7 @@ def sync_assets(args, repo: str, path: str) -> int:
             with open(dst, 'wb') as fh:
                 fh.write(want)
     if add or changed:
-        print(f'  资产（{"/".join(dirs)}）：新增 {len(add)} · 内容不同 {len(changed)}')
+        print(f'  资产（{"/".join(paths)}）：新增 {len(add)} · 内容不同 {len(changed)}')
         for rel in (add + changed)[:10]:
             print(f'   ⊕ {rel}')
     return len(add) + len(changed)
@@ -447,7 +450,16 @@ def main() -> int:
         expected = {p for p, l in own.items() if l == layer}
         if layer != 'kernel':
             expected |= COMPOSITION & set(own)  # 组装根三份副本，只报不改
-        actual = {f for f in git(path, 'ls-files').split() if f.startswith('src/')}
+        asset_paths = REPO_ASSETS.get(repo, [])
+        runtime_assets = (
+            set(git(CLOUD, 'ls-tree', '-r', '--name-only', args.ref, '--', *asset_paths).split())
+            if asset_paths
+            else set()
+        )
+        actual = {
+            f for f in git(path, 'ls-files').split()
+            if f.startswith('src/') and f not in runtime_assets
+        }
 
         add, remove = sorted(expected - actual), sorted(actual - expected)
         changed, comp_changed = [], []

@@ -19,12 +19,14 @@
 把「拆 schema」和「拆库」混为一谈的代价是双向的：以为搬 schema 就得先换掉这些锁 → 做一次完全没必要、
 风险更高的改造；以为拆库跟搬 schema 一样安全 → 悄悄失去全部互斥与引用完整性。
 
-## 1. advisory lock（6 处）
+## 1. advisory lock（8 处）
 
 | 机制 | 位置 file:line | 当前作用域 | 拆 schema 后 | 拆库后 | 拆库替代方案 |
 | --- | --- | --- | --- | --- | --- |
 | `pg_advisory_xact_lock(hashtext(...))`，key 为收件箱批次幂等键 | `aidcp-cloud/src/interactions/interaction-store.ts:430` | 数据库级，事务生命周期 | 仍互斥 | **静默失去互斥** | 对权威表行 `SELECT … FOR UPDATE`，或持久命令 + Inbox 去重 |
 | `pg_advisory_xact_lock(hashtext('interaction-send|<accountId>'))` | `aidcp-cloud/src/interactions/interaction-store.ts:1011` | 同上 | 仍互斥 | **静默失去互斥** | 同上 |
+| `pg_advisory_xact_lock(hashtextextended('offboard-admission-command|<target>|<commandId>',0))` | `aidcp-cloud/src/client-auth/offboard-admission-ledger.ts` | API owner 数据库级，事务生命周期；只串行化同一 command receipt 与 owner-local ledger 副作用 | 仍互斥 | 随 API owner 表迁移后仍在同一 API 库互斥；若错误拆到别库则**静默失去幂等串行化** | 保持锁与 `client_env_admission_command_receipts` 同库；或改为先建 command row 再 `FOR UPDATE` |
+| `pg_advisory_xact_lock(hashtextextended('offboard-admission-capability|<target>|<capability>',0))` | `aidcp-cloud/src/client-auth/offboard-admission-ledger.ts` | API owner 数据库级，事务生命周期；串行化 complete snapshot 的首次 cursor 建立与替换 | 仍互斥 | 随 API owner snapshot/hold 表迁移后仍在同一 API 库互斥；若错误拆到别库则**静默失去 snapshot 顺序** | 保持锁与 `client_env_admission_snapshot_state` 同库；或引入可先占位的 owner row lock |
 | `pg_try_advisory_lock(hashtext('aidcp_automation_writer'), hashtext(<target>))` 风控单写者锁 | `aidcp-cloud/src/risk/writer-lock.ts:143` | 数据库级，**会话**生命周期（专用长连接，MUST NOT 走 pool） | 仍互斥 | **静默失去互斥**（两个自动化进程会同时自认写者） | 对 `risk_state` 权威行 `FOR UPDATE`，或把写者选举挪到进程外协调 |
 | `pg_advisory_unlock(...)` 释放上一条 | `aidcp-cloud/src/risk/writer-lock.ts:205` | 同上 | — | — | 同上 |
 | `pg_try_advisory_lock(<固定 key>)` 迁移执行器整批互斥 | `aidcp-cloud/scripts/migrate.ts:148` | 数据库级，会话生命周期 | 仍互斥 | 拆库后每个库各有自己的账本与锁，**这是正确的**（一个库一条版本序列） | 无需替代 |

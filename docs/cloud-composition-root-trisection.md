@@ -848,8 +848,10 @@ content 侧照同一形态收口即可。）
    **不属于单向面**，与 4a 的账号花名册端口配对后再落；不得把当前 10 方法客户端注入成完整 FB 面板依赖。
 2. **3b · 双向那几条**：风控命令（含 `recoverRestricted`）、审批后下发触发、面板实时事件通道。
    **这三条必须与 automation 侧配对设计**，否则会出现「两侧各写一份、各自编译通过、只有真跑才 404」。
-3. **4a · automation 要的 api 侧 11 条**：发布台账读写（**注意与 content 那条窄写口不是同一条**，
-   它有 10 个方法）、授权台账、互动写入闸、回复策略解析、人设服务、握手回写。
+3. **4a · post-3b API authority scoped closure（20 组 / 55 个 method slots）**：
+   16 组 / 50 槽 automation→API、3 组 / 4 槽 API→automation、1 组 / 1 槽
+   API→content。发布台账本身是 19 个 admitted 方法；owner-local pending scan / preview read、
+   3b approval、chat resolve/bind 与 4b mirror 都不在这 55 槽里。
 4. **4b · 11 条同步读的镜像层**：单独排，别混进「包个 HTTP 客户端」里估。
 
 **每一段仍保持 server-first，但验收证据必须按运行形态拆开**：
