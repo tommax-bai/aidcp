@@ -25,4 +25,5 @@
 
 ## 4. Delivery evidence
 
-- [ ] 4.1 Record Edge and control commit SHAs, validation evidence, deviations, and concurrent-file overlap in this checklist
+- [x] 4.1 Record Edge and control commit SHAs, validation evidence, deviations, and concurrent-file overlap in this checklist
+  <!-- Edge implementation: aidcp-edge 37f56b0. Control artifacts: aidcp fe25835 plus the follow-up evidence commit containing this line. Validations: JS 35/35, Feed Rust 2/2, Rust lib 51/51, typecheck pass, OpenSpec strict pass. Existing baseline-only Native failures are recorded in 3.1. Concurrent Reels parity overlaps native/page-engine/src/engine.rs, native/page-engine/src/facebook-command-router.js, and native/page-engine/src/facebook.rs; integrate Reels first, then reconcile Feed and rerun the combined full boundary. Branches were committed only, not pushed, packaged, deployed, or live-account tested. -->
