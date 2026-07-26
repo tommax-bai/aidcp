@@ -3,7 +3,7 @@
 > 背景：change `facebook-post-publish` 的 task 6.8（edge `4e466ca`）把 FB 正文从「一次性 insertText」
 > 改成逐字输入（编辑器要求），但云端等待窗口仍是与长度无关的常数 30s。实测每字约 150–165ms
 > （拟人节奏 + CDP 往返），正文超过约 175 字必然超时。当前 Facebook 已使用专用 prompt，
-> 正文目标为 100–500 字，但仍无确定性长度校验。该 change 已于 2026-07-14 归档，故本批另开 change 承载修复。
+> 正文目标为 100–350 字，但仍无确定性长度校验。该 change 已于 2026-07-14 归档，故本批另开 change 承载修复。
 >
 > 已核实**不需要**做的：身份监测体在发布期间不必挂起——FB 身份从 `c_user` cookie 读取，与编辑器
 > 弹层无关，抬预算不会新增其射程（XHS 侧则由 `creator-app` 页面上下文闸豁免）。
@@ -51,5 +51,5 @@
 
 - [ ] 5.1 FB 评论路径用的是同一条无界逐字循环（`comment-executor.ts`）：云端虽已按长度算等待窗口（18s + 220ms/字，上限 90s），但**边缘侧仍无截止时刻**——长评论同样会留下孤儿打字循环。把 deadline 一并传下去。
 - [ ] 5.2 **edge 生命周期层：给逐字输入接「取消令牌」**（复审存活项 3b.7）。今天的预算是自我计时——云端 WS 断连时边缘 reset 租约、恢复浏览循环，而打字循环仍在有界地跑，两个写者短暂共用同一个 CDP 页面。彻底消灭要让租约 / 连接 epoch 在 `reset()` / `finishActive()` 时自增，逐字循环在每个字符间与 `deadlineAt` 一并检查。属 `edge-task-coordinator` / `main.ts` 热点，单列串行做。
-- [x] 5.3a Facebook 专用 prompt 的正文目标改为「全文 100–500 字（Facebook 最佳阅读区间）」，并补回归断言锁住新文案、排除旧 80–600 提示。 <!-- aidcp-cloud 3d28b48；content-creator 7 pass；acceptance 123 pass；全量 3401 pass / 11 skip；typecheck pass；2026-07-26 部署 dev，备份 cloud.bak.20260726-070444Z.tar.gz + cloud.env.bak.20260726-070444Z；运行时文件哈希与 master 一致，service / 8787 / 8090 / 8091 / PostgreSQL / 三属主 schema 契约门 / 自动化写者锁 / 飞书 onReady / 公网 health 全绿，isales 未受影响 -->
+- [x] 5.3a Facebook 专用 prompt 的正文目标改为「全文 100–350 字（Facebook 最佳阅读区间）」，并补回归断言锁住新文案、排除旧 100–500 与 80–600 提示。 <!-- aidcp-cloud 3d28b48 初次改为 100–500；794cda9 收紧为 100–350。content-creator 7/7；acceptance 123/123；全量 3401 pass / 11 skip；typecheck pass；OpenSpec strict pass。2026-07-26 15:42 CST 部署 dev，备份 cloud.bak.20260726-074153Z.tar.gz + cloud.env.bak.20260726-074153Z；远端 prompt 哈希与 master 一致，service active / NRestarts=0 / 8787 / 8090 / 8091 / PostgreSQL / 三属主 schema 契约门 / 自动化写者锁 / 飞书 onReady / 内外 health 全绿，isales 未触碰 -->
 - [ ] 5.3b 该规则仍是模型软提示，**正文无任何确定性长度校验**（只 clamp 标题）。`content_too_long` 是诚实闸、不是解法——真正该收的是生成侧。
