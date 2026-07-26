@@ -104,6 +104,14 @@ TRANSPORT_MEMBERS = [
     'src/transport/publish-approval-authority-http.ts',
     'src/transport/publish-approval-decision-http.ts',
     'src/transport/publish-dispatch-trigger-http.ts',
+    # 批次 4a：API authority scoped closure。按能力拆成四个方向模块，paired-command
+    # 承载 API→automation/content 的窄命令；barrel 只导出机械 route inventory。
+    'src/transport/api-direct-http-common.ts',
+    'src/transport/api-account-authority-http.ts',
+    'src/transport/api-publish-interaction-http.ts',
+    'src/transport/api-aux-authority-http.ts',
+    'src/transport/paired-command-http.ts',
+    'src/transport/api-direct-http.ts',
     # 批次 3a：automation owner → api 的第一批单向异步能力。五个成员都同时包含
     # owner route 与 typed client，且不持有属主表 SQL；Facebook 群口刻意不含需要
     # 反向刷新 api 花名册的 importTargets / replaceTargetScopes。
