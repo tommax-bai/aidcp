@@ -1001,3 +1001,91 @@ api/automation/content 的精确 kernel pin 对齐，三组 migration 分别为 
 检查仍以非零退出指出 api/automation/content 的手写 `main()` / 组装根差异；
 这些根本来就不由同步脚本覆盖，
 不能为了“全绿”把它们机械复制，也不能据此声称 api 独立 `main()` 或三进程通信已经验收。
+
+### 10.9 3b 源码、共享包与 DEV 单体已交付：独立 api/automation 仍未验收
+
+3b 收口的是三条各自带状态机的双向接缝，不是再加一组普通 CRUD：
+
+1. **restricted recovery 以 automation 写后真态为准。** api 只提交绑定
+   `commandId + envKey + accountId + executionTarget` 的持久命令并按同一范围回读；
+   automation 单写者串行调用 `RiskController.recoverRestricted()`，先持久化领域
+   `applied`，确认写后 `normal` 后才领取并恢复对应 Edge。消费时已变成 warned/frozen
+   会落稳定 `refused`，Edge 恢复失败与回执未知分别保留为稳定结局，不能把命令已受理写成恢复成功。
+   Edge 对 `202` 只轮询同一 `envKey + commandId`，保持 restricted；仅匹配的
+   `applied + normal` 能清掉本地受限态。
+2. **publish approval 的 authority、trigger 与平台结局分层。** API 是七个授权
+   read/list/void/progress 操作和 decision writer 的物理属主，automation 只能经带内部
+   Bearer 鉴权的版本化 HTTP 端口访问；所有进度写都做同一授权 revision 的 CAS，不把一次
+   dispatch progress 冒充新授权轮次。`decision_recorded` 与 `human_reconfirm` 是两种不同
+   trigger：前者是持久批准后的低延迟唤醒，后者才有人工重批清熔断权。两者的短应答都不代表
+   dispatch、submit 或 publish；事务型 approval outbox 与 target-filtered pending scan
+   继续承担断链和重启补偿。
+3. **panel event 从 automation 主动推到 api。** `panel.event` outbox、既有
+   `panel-event-replay` cursor、轮询与 LISTEN 都留在 automation；handler 逐条 await
+   HTTP ingress，失败不前移 cursor。api 只做本进程 fanout，单个订阅者失败相互隔离，
+   无订阅者时只确认“进程级投递完成”，不声称浏览器已收到。响应丢失允许同一
+   `deliveryId` 重投，因此仍是有序 at-least-once，不是 exactly-once；API source-mode
+   路径不再读取 automation outbox，也不搬入 automation `EventBus`。
+
+事实源已落在 `aidcp-cloud@67941e4`；最终聚焦切片 **148/148**、acceptance **127/127**，
+全量 **3479 total / 3468 pass / 0 fail / 11 skip**，`npm run typecheck` 通过。
+边界 census 为 **485 个 source / 485 个 ownership / 0 条 cross-boundary edge**。
+这些结果证明契约、owner adapter、source-mode 组合根接线、HTTP/outbox/WebSocket loopback
+与单体代码路径；它们**不是**提取仓手写 `main()` 的启动证明。
+
+Edge 源码交付为 `aidcp-edge@c5c2baf`：恢复相关 focused **87/87**、全量
+**2381/2381**、typecheck 通过。此批只交付源码，**未构建 installer，也未验证已安装客户端**；
+因此不能把源码测试写成用户机器已经取得新恢复交互。
+
+共享包与派生消费仓已按 kernel → transport → consumers 串行快进并推送；精确 pin 只写入实际
+导入对应共享包的仓库：
+
+- `aidcp-kernel@94fd279`：risk recovery / approval authority / panel delivery 纯端口；
+  build/typecheck、聚焦测试 **26/26**、派生对账 **91/91** 通过；
+- `aidcp-transport@f9a7276`：对应版本化 route/client、Bearer 鉴权与运行时导出；
+  build/typecheck、dist export **8/8**、派生对账 **37/37** 通过，并精确 pin kernel；
+- `aidcp-api@4b6da8a`：API-owner authority、decision writer、panel ingress/fanout 消费侧；
+  聚焦测试 **79/79**、受管严格 TypeScript slice、源码 **107/107**、migration **53** 通过，
+  并精确 pin kernel/transport；
+- `aidcp-automation@483f9c3`：automation-owner risk/trigger/replay 与本地 transport 副本；
+  聚焦测试 **85/85**、受管严格 TypeScript slice、源码 **208/208**、migration **44** 通过，
+  并精确 pin kernel；
+- `aidcp-content@4a32427`：候审卡出口的内部鉴权 token 接线与精确 transport pin；
+  全量 **444/444**、typecheck/build、源码 **83/83** 通过，并精确 pin kernel/transport。
+
+最终 split-sync 对受管成员、pin 与 migration 均未发现漂移。命令仍以非零码报告手写组合根和
+非受管测试残留：API 有 1 个手写 root、5 个 legacy tests；automation 有 1 个手写 root；
+content 有 2 个手写 roots、1 个 auth test。它们被刻意保留，不是同步遗漏。API 全仓
+typecheck 的 **414** 个错误只落在手写 `src/index.ts` / `src/server.ts`，automation 全仓
+typecheck 的 **370** 行错误及全量测试 **26 fail** 也都落在既有组合根/fixture 缺口；
+3b 受管严格切片均通过，不能据此反向宣称 4a/4b 已完成。
+
+一条已知但**没有被 3b 修掉**的物理键边界必须单列：现有 approval 表与 outbox 仍以全局
+`requestId` 为唯一冲突域。DEV/OL 共库时，若另一 target 先占同一 id，本 target 的冲突读回
+只能查本地 target；本地无行就稳定 fail closed，绝不能复用另一 target 的决定、revision，
+也不能据此发 `human_reconfirm`。把主键/唯一索引改成 target-scoped 需要约束替换，
+属于独立 **contract migration change**，不得混进本批 expand migration 或用兼容分支掩盖。
+
+DEV 已从 clean Cloud `master` 部署并只重启现役 `aidcp-cloud.service`，运行证据如下：
+
+- deployed Cloud SHA：`67941e495ad52c22b08e4a85ef530245b2fac517`；
+- backup：`/opt/aidcp/cloud.bak.20260726-180453.tar.gz` 与
+  `/opt/aidcp/cloud/.env.bak.20260726-180453`；
+- 部署前 automation 账本为 **43** 条、最高 `0079`；同步源码期间，`0080` 已由外部
+  `release-20260726-ol-current` 以 `applied_from_target=ol` 于 2026-07-26 17:53 CST
+  写入共享账本。本次 DEV **没有运行** `migrate up`，只读核对其 checksum 与本构建一致；
+  最终 status 为 content **20**（最高 `0069`）、automation **44**（最高 `0080`）、
+  api **53**（最高 `0078`），三属主 `migrate verify` 均为缺失对象 **0**，启动时
+  enforce schema gate 全部通过；
+- `aidcp-cloud.service` active、`NRestarts=0`，`:8787` 与 `127.0.0.1:8090`
+  正在监听，panel `/api/health` 与客户鉴权 `:8091/health` 均返回 `{"ok":true}`；
+  target=`dev` 的 automation advisory writer lock 恰有 **1** 个持有者，
+  `RiskControllerRegistry` ready，飞书 WSClient `onReady`；
+- 运行进程只有 `AIDCP_DEPLOY_ENV=dev`，没有 `AIDCP_SERVICE`；独立
+  `aidcp-api.service` / `aidcp-automation.service` / `aidcp-content.service`
+  均 `not-found/inactive`，`:8092` / `:8093` / `:8094` 均未监听。
+
+这次 DEV 只验证了现役 **monolith** 零回归，只能证明默认四段同进程路径健康。
+`aidcp-api` / `aidcp-automation` 的手写组合根仍有 4a 完整反向 authority 与 4b 同步镜像缺口；
+只有两进程真实 boot、内部端口真实监听、双方不再连接对方属主数据库，并做过断链积压/恢复补投及
+真实 panel WebSocket 探针后，才能声明独立 api/automation 或三进程运行验收。

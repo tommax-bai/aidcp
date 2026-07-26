@@ -6,7 +6,7 @@
 没有任何东西记得「哪个文件该在哪个仓」，而 master 在批次 2/3/4 期间还会一直走。
 手工切一次是搬家，手工切第二次就是猜。
 
-**唯一事实源＝`aidcp-cloud` 的 `boundaries/module-ownership.json`**（424 个 src 文件逐条标属主）。
+**唯一事实源＝`aidcp-cloud` 的 `boundaries/module-ownership.json`**（src 文件逐条标属主）。
 本脚本只做一件事：把那份清单在指定 ref 上**重放**成四个仓的 src/ 应有内容，与各仓实际内容对账。
 
 三条纪律：
@@ -98,6 +98,12 @@ TRANSPORT_MEMBERS = [
     # 最典型形态，却从落地起就没进过包 —— 因为在此之前两端恰好还在同一个进程里，谁也没被迫去 import 它。
     # 批次 3 测绘时才发现。同族的只读端口 risk-read-http.ts 一直在清单里，这条漏了。
     'src/transport/risk-command-http.ts',
+    # 批次 3b：双向跨进程端口。四者均只含 versioned route/client 与 kernel DTO，
+    # 不持有 owner SQL；事实实现分别留在 API/automation 属主仓。
+    'src/transport/panel-event-delivery-http.ts',
+    'src/transport/publish-approval-authority-http.ts',
+    'src/transport/publish-approval-decision-http.ts',
+    'src/transport/publish-dispatch-trigger-http.ts',
     # 批次 3a：automation owner → api 的第一批单向异步能力。五个成员都同时包含
     # owner route 与 typed client，且不持有属主表 SQL；Facebook 群口刻意不含需要
     # 反向刷新 api 花名册的 importTargets / replaceTargetScopes。
@@ -413,7 +419,12 @@ def main() -> int:
         summary = '，'.join(f'{n} {h[:7]}' for n, h in shared_heads.items())
         print(f'共享包头: {summary}（消费仓 pin 应等于它）\n')
 
-    targets = args.repo or list(REPOS)
+    requested = args.repo or [*REPOS, TRANSPORT_REPO]
+    unknown = [repo for repo in requested if repo not in REPOS and repo != TRANSPORT_REPO]
+    if unknown:
+        print(f'ERROR: 未知仓 {unknown[0]}', file=sys.stderr)
+        return 2
+    targets = [repo for repo in requested if repo in REPOS]
     exit_code = 0
     for repo in targets:
         layer = REPOS.get(repo)
@@ -494,7 +505,8 @@ def main() -> int:
         exit_code = sync_transport(args, own, kernel_paths, shared_heads) or exit_code
 
     if args.tests:
-        exit_code = sync_tests(args, own, kernel_paths) or exit_code
+        selected_test_repos = set(REPOS) if not args.repo else set(args.repo) & set(REPOS)
+        exit_code = sync_tests(args, own, kernel_paths, selected_test_repos) or exit_code
 
     if exit_code and not args.apply:
         print('存在差异。--apply 可同步（组装根除外）；组装根的差异须人工判断。')
@@ -545,7 +557,7 @@ def sync_transport(args, own, kernel_paths, shared_heads) -> int:
     return 1 if drift else 0
 
 
-def sync_tests(args, own, kernel_paths) -> int:
+def sync_tests(args, own, kernel_paths, selected_repos: set[str]) -> int:
     """按派生归属对账 / 同步 test/。跨属主的测试**留守 aidcp-cloud**，不强行分配。"""
     verdict, by_repo = classify_tests(own, args.ref)
     tracked = set(git(CLOUD, 'ls-tree', '-r', '--name-only', args.ref).split())
@@ -556,6 +568,8 @@ def sync_tests(args, own, kernel_paths) -> int:
     print(f'  {"（跨属主·留守 cloud）":20s} {stay:4d}  ← 每消掉一条跨服务耦合，这里就自动少几个')
     drift = 0
     for repo, entries in sorted(by_repo.items()):
+        if repo not in selected_repos:
+            continue
         path = os.path.join(CODES, repo)
         if not os.path.isdir(path):
             continue
