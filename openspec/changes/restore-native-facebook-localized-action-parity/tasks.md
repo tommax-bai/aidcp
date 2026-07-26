@@ -49,6 +49,7 @@
 
 - [x] 7.1 Rebase the Edge worktree onto current `origin/master`, rerun required gates, commit, and fast-forward push to `master` without force.
   <!-- aidcp-edge commit 0439ecf3955315b10189d1b4341b62051a7d1348 was already based on current origin/master, retained the recorded green gates, and fast-forward pushed a6623a4..0439ecf to master without force. -->
-- [ ] 7.2 Record implementation commits, validation, and delivery boundaries; rebase the control worktree onto `origin/main`, commit, and fast-forward push to `main` without force.
+- [x] 7.2 Record implementation commits, validation, and delivery boundaries; rebase the control worktree onto `origin/main`, commit, and fast-forward push to `main` without force.
+  <!-- Edge implementation is 0439ecf3955315b10189d1b4341b62051a7d1348; the rebased control specification commit is 0492abbe1538d1aee51a7ce22ade266e77006fc5. Validation and the unperformed installer/restart/deploy/live-write boundaries are recorded above. This closeout record is pushed with the same fast-forward control integration. -->
 - [x] 7.3 Rebuild and verify the canonical local development Native artifact; report installer, signing, release, runtime restart, and real-account action acceptance separately.
   <!-- Canonical aidcp-edge master fast-forwarded to 0439ecf and rebuilt/verified the unsigned darwin-arm64 local development artifact at sha256 e1c7442eb7bdba1136021b75c1d947783e99ae27a538f263a8fbfd6af951c297. No installer, signing, release, runtime restart, deployment, or live-account write was performed. The pending non-submit live composer probe and real Publish acceptance from active change facebook-composer-open-deadline remain delivery gates and are not satisfied by this source/artifact work. -->
