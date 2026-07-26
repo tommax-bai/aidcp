@@ -21,6 +21,7 @@ Facebook 发帖的正文填写是 **O(正文长度)** 的逐字符输入，却�
 - **云端按正文长度下发单步预算**（`base + 每字 × 字数`，上限硬钳）。复用协议里**早已声明、无人读写**的 `PublishCommandPayload.timeoutMs`——**不改协议、不新增消息类型、不碰主动命令白名单**。
 - **云端等待窗口 = 下发预算 + 兜底余量**；该 timer 从「正常路径」退化成「边缘真的失联」的兜底。**不带预算的指令（小红书全路径）逐字节沿用旧常数窗口**，零回归。
 - **预算上限按发布租约 TTL 收敛**（≤0.4×）：否则边缘会在打字途中单方面过期租约、恢复浏览循环去驱动半写的编辑器。
+- **默认 Facebook 正文硬上限提升为 1520 字**：保持 20s 固定开销与 250ms/字预算不变，将填写预算上限提高到 400s，并将默认发布租约同步提高到 1000s，继续满足预算 ≤ 租约 0.4×。
 - **正文超出可打完的上限 → 诚实 `content_too_long`，绝不截断**、一条指令都不下发。
 - **边缘自我掐表**：预算耗尽即停止输入、清空编辑器、诚实回报；清不干净则如实标 dirty（绝不谎报干净页）。逐字符的拟人节奏**一个字节不动**。
 - **验收闸换成全文回读**：确认编辑器完整包含终稿正文；额外内容超容差（如打字途中被 typeahead 劫持）亦判失败。
@@ -39,7 +40,7 @@ Facebook 发帖的正文填写是 **O(正文长度)** 的逐字符输入，却�
 
 ## Impact
 
-- `aidcp-cloud`: `src/publish-agent/fill-budget.ts`（新增）、`src/publish-agent/platform-profile.ts`、`src/publish-agent/command-sequencer.ts`、`src/publish-agent/prompts.ts`、`src/server.ts`
+- `aidcp-cloud`: `src/publish-agent/fill-budget.ts`（新增）、`src/publish-agent/platform-profile.ts`、`src/publish-agent/command-sequencer.ts`、`src/publish-agent/publish-dispatcher.ts`、`src/publish-agent/prompts.ts`、`src/server.ts`
 - `aidcp-edge`: `src/browse/cdp-util.ts`、`src/facebook/publish-executor.ts`
 - **协议不变**：`PublishCommandPayload.timeoutMs` 是既有可选字段，消息类型数仍为 74，`AC-PROTO-*` 不动。
 - **向后兼容**：旧边缘忽略下发的预算、按旧行为跑（不劣化）；新边缘在云端未下发预算时用 25s 兜底（**小于**云端 30s 常数窗口 → 即使对端未升级也是边缘先答，诚实失败而非孤儿执行）。

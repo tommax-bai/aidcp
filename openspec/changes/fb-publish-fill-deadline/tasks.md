@@ -13,8 +13,9 @@
 - [x] 1.1 新增正文填写预算纯函数（`base + 每字 × 字数`，上限硬钳；字符数按码位计，与边缘 `Array.from` 同口径）。 <!-- aidcp-cloud cf6cd8c src/publish-agent/fill-budget.ts；默认 20s + 250ms/字、上限 240s。250ms/字 与 FB 评论路径既有的 220ms/字（facebook-edge-steps.ts）同源、略保守 -->
 - [x] 1.2 Facebook `fill_field` 随指令下发预算；小红书全路径不带预算。 <!-- aidcp-cloud cf6cd8c src/publish-agent/platform-profile.ts；复用协议既有的 PublishCommandPayload.timeoutMs（早已声明、无人读写）→ 不改协议、不新增 MessageType、不碰主动命令白名单 -->
 - [x] 1.3 等待窗口反转：带预算的指令等「预算 + 兜底余量」（默认 8s），使边缘必定先答；不带预算者逐字节沿用旧常数窗口。 <!-- aidcp-cloud cf6cd8c src/publish-agent/command-sequencer.ts -->
-- [x] 1.4 正文超出预算上限可打完的长度 → 诚实 `content_too_long`，绝不截断、一条指令都不下发。 <!-- aidcp-cloud cf6cd8c src/publish-agent/command-sequencer.ts；默认上限 880 字，远高于管线 200–500 字的设计区间 -->
+- [x] 1.4 正文超出预算上限可打完的长度 → 诚实 `content_too_long`，绝不截断、一条指令都不下发。 <!-- aidcp-cloud cf6cd8c src/publish-agent/command-sequencer.ts；初始默认上限 880 字，远高于管线 200–500 字的设计区间 -->
 - [x] 1.5 预算上限按发布租约 TTL 收敛（≤0.4×），启动时钳回并告警；新增 env `AIDCP_PUBLISH_FILL_BASE_MS` / `_PER_CHAR_MS` / `_MAX_MS` / `AIDCP_PUBLISH_RESULT_SLACK_MS`，默认值逐字节复现今日行为。 <!-- aidcp-cloud cf6cd8c src/server.ts -->
+- [x] 1.6 默认 Facebook 正文硬上限从 880 字提高到 1520 字；保持 20s + 250ms/字不变，将填写预算上限同步提高到 400s、默认发布租约提高到 1000s，继续满足预算 ≤ 租约 0.4×。 <!-- aidcp-cloud 55417a5；定向 46/46、acceptance 144/144、全量 3582 pass / 11 skip、typecheck pass -->
 
 ## 2. aidcp-edge — 自我掐表 + 诚实中止 + 全文验收
 
@@ -30,6 +31,7 @@
 - [x] 3.2 cloud 补五例：预算随长度伸缩并被上限钳 / 上限按租约收敛 / **XHS 指令 MUST NOT 带预算**（反回归）/ 越界诚实失败且零下发 / 带预算者等待窗口叠余量。 <!-- aidcp-cloud cf6cd8c test/publish-agent/fill-budget.test.ts -->
 - [x] 3.3 两仓回归：`test:acceptance` → `npm test` → `typecheck` 全过。 <!-- aidcp-cloud: acceptance 50 pass / npm test 1930 pass / typecheck pass；aidcp-edge: acceptance 19 pass / npm test 1175 pass / typecheck pass -->
 - [x] 3.4 部署 dev（云端，两轮：初版 + 复审补洞版）。edge 为客户端侧改动、无 ECS 部署，需运营 / 客户机重建安装包后生效（按约定本批不出安装包）。 <!-- 2026-07-14 deployed：从 origin/master 干净快照（cf6cd8c，git archive，非脏共享工作区）部署 dev；部署前核实 ECS 上 command-sequencer.ts 的 md5 恰等于 cf6cd8c^（无并发漂移可被覆盖）；备份 /opt/aidcp/cloud.bak.20260714-141047.tar.gz + .env.bak.20260714；无依赖变更故未跑 npm ci。健康：aidcp-cloud.service active，8787/8090/8088 监听，panel /api/health {"ok":true}，公网 8088 /api/health 200，飞书长连接 onReady，无启动错误、无预算钳位告警（600s 租约 > 240s 上限）。未碰同机 isales。 --> <!-- 2026-07-14 15:08 复审补洞版重新部署：origin/master 2944fbf 干净快照（git archive），备份 cloud.bak.20260714-150819.tar.gz；部署后三文件 md5 与 origin/master 逐字节一致；健康：service active，8787/8090/8088 监听，panel /api/health {"ok":true}，飞书长连接已建立，**预算告警 0 条 + 错误 0 条**（配置健全）。注：本次 land 时 canonical cloud checkout 的 master 上有并发 session 未推送的提交、致 land-change 同步主 checkout 未能 ff——部署一律以 origin/master 为准（eligible ref），未把他人未推送 WIP 带上线。 -->
+- [x] 3.5 将 1520 字硬上限变更追加到 OL release 分支并部署：备份、迁移状态、stop-then-start、service/listener/health/PostgreSQL/三属主 schema 契约门/自动化写者锁/飞书验证，且不触碰 `isales`。 <!-- 2026-07-27 07:28 CST，OL release/20260726-ol-current 8de0726；代码备份 /opt/aidcp/cloud.bak.20260727-072810.tar.gz，环境备份 /opt/aidcp/cloud.env.bak.20260727-072810；三属主 pending=0。共享库 API 账本已到 expand 迁移 0081、release 构建认识到 0078，按契约精确设置 AIDCP_ALLOW_SCHEMA_AHEAD=0081_offboard_admission_claims（非通配），启动日志确认只放行 (0078,0081]。stop-then-start 后 service active / NRestarts=0，8787/8090/8091/8088 监听，内外 health 均 {"ok":true} / HTTP 200，三属主 schema gate 通过，自动化写者锁 target=ol，飞书 WSClient onReady，warning 0；远端运行时 maxChars=1520 / fill maxMs=400000 / publishLeaseMs=1000000；#204 无重投日志，未触碰 isales -->
 
 ## 3b. 对抗性复审补洞（5 视角 × 逐条反驳；15 条候选，10 条被反驳，5 条成立）
 
