@@ -481,6 +481,43 @@ Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或
 - `src/publish-agent/` 67 → **73**（§4.6.3 计数相应为 **11 api / 56 content / 6 automation**）；
 - `src/config/` 30 → **34**（§4.6.8 计数相应为 **29 api / 5 automation**）；
 
+
+#### 4.7.1 `src/schema/` 的裁决（2026-07-26 结）：**整族进 `aidcp-transport` 共享包**
+
+**原裁决没有错，只是当时没有这个选项。** 它说的是「含 SQL ⇒ 进不了 kernel」——这一条今天仍然成立、
+不推翻。但那句话写下时 `aidcp-transport` 还不存在；这个包的准入判据是
+**「三家都可能调用 + 不含任何属主表的 SQL」**，比 kernel 宽、比复制三份严，正是为这一类东西留的。
+
+**触发它的是一个硬事实**：批次 2 写 content 的 `main()` 时，内容段的 import 逐条核对下来只差这一样——
+三个内容属主存储都把 `schemaEnsurer` 当**必填注入口**，而实现在 `src/schema/`，content 仓的 `src` 里没有。
+不解决这条，content 进程连启动序列的第一行都写不出来。api / automation 各写自己的 `main()` 时同理。
+
+**逐文件实测（2026-07-26）**：八个文件**零属主表 SQL**。
+
+| 文件 | 属主表 SQL | 行数 |
+| --- | ---: | ---: |
+| `schema-capability.ts` | 0 —— 全族唯一一条 SQL 查的是 `pg_indexes`（PG 系统目录） | — |
+| `schema-gate.ts` | 0 | 375 |
+| `schema-contract.ts` | 0 | 277 |
+| `migration-files.ts` / `-order` / `-owners` / `-plan` | 0 / 0 / 0 / 0 | 48 / 100 / 298 / 209 |
+| `pg-catalog.ts` | 0 | 59 |
+
+它们只做两件事：**读本仓 `migrations/` 目录**、**查 PG 系统目录**。两件都与「谁是哪张业务表的属主」无关。
+
+**判据对表**：
+- 「三家都可能调用」✅ —— 不是「可能」，是**三家都必须**：每个进程启动第一步就要对自己的属主库跑契约门。
+- 「不含任何属主表的 SQL」✅ —— 实测零命中（上表）。
+- 「复制三份会怎样」—— 这一族里 `migration-owners.ts` 持有**按属主分组迁移**的规则，
+  三份副本各自演化就会出现「同一条迁移在 api 仓算 api、在 content 仓算 content」的分叉，
+  而**两侧都编译通过、两侧测试都过**，只有真跑迁移才炸。与「服务端注册 + 客户端 + 路径常量」
+  那类三件套是同一个失败形态，也是这个包存在的直接理由。
+
+**MUST NOT 判 kernel（这条不变）**：`schema-capability.ts` / `pg-catalog.ts` 有 SQL 字面量，
+`AC-BOUND-03` 的 kernel 准入当场不过。**进共享包不等于进 kernel**，两条准入是两回事。
+
+**落地**：`scripts/sync-split-repos` 的 `TRANSPORT_MEMBERS` 加这八行即可，
+归属清单里它们**仍标 automation**（与 `src/transport/*` 现有成员一样——包不是一个属主层）。
+
 > **2026-07-25 两处归属修正后的实测计数**（子仓 `boundaries/module-ownership.json` 现值，随文件增长已超出上面这份快照）：
 > `src/publish-agent/` 共 71 → **10 api / 55 content / 6 automation**（审批闸角色由 api 移入 content，见 §4.6.3 修正注）；
 > `src/config/` 共 36 → **27 api / 9 automation**（三个限频配置门面由 api 移入 automation，见 §4.6.8 补齐注）。
@@ -488,7 +525,7 @@ Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或
 - **新增目录** `src/schema/`（**12 文件**，automation，见下方待裁决）与 `src/db/`（**1 文件** `environment-row-lock.ts` 56 行，api）；
 - `src/` 根文件 +1（`config-mirror-freshness.ts` 95 行，api）。
 
-**待定稿裁决（子仓已按最保守判据暂判并标注，`aidcp-cloud@89c286d`；归档本方案前 MUST 由本表 owner 复核并回写逐格数字）**：① `src/schema/` 整目录暂判 `aidcp-automation`、目录规则 `newFile: adjudicate`——它含 SQL 字面量（`schema-capability.ts` / `pg-catalog.ts`），`AC-BOUND-03` 的 kernel「无 SQL」准入当场不过，故 MUST NOT 判 kernel；消除路径见子仓 `boundaries/`（可选：从 `schema-capability.ts` 析出无 SQL 的纯判定段后判 kernel，一次消除其带来的 21 条 import 豁免）。② `src/config-mirror-freshness.ts`、`src/db/environment-row-lock.ts`、`src/config/mirror-stop-work.ts`、`src/publish-agent/pending-dispatch-watchdog.ts` 四个文件判据两可，已按最保守暂判 api、`basis` 标「待定稿裁决」。子仓侧用 `fileOverride` 而非目录默认层接住，故不会静默落入默认层。
+**待定稿裁决（子仓已按最保守判据暂判并标注，`aidcp-cloud@89c286d`；归档本方案前 MUST 由本表 owner 复核并回写逐格数字）**：① ~~`src/schema/` 整目录暂判 `aidcp-automation`~~ —— **2026-07-26 结掉，见下方「§4.7.1 `src/schema/` 的裁决」**。原文保留供追溯：它含 SQL 字面量（`schema-capability.ts` / `pg-catalog.ts`），`AC-BOUND-03` 的 kernel「无 SQL」准入当场不过，故 MUST NOT 判 kernel；消除路径见子仓 `boundaries/`（可选：从 `schema-capability.ts` 析出无 SQL 的纯判定段后判 kernel，一次消除其带来的 21 条 import 豁免）。② `src/config-mirror-freshness.ts`、`src/db/environment-row-lock.ts`、`src/config/mirror-stop-work.ts`、`src/publish-agent/pending-dispatch-watchdog.ts` 四个文件判据两可，已按最保守暂判 api、`basis` 标「待定稿裁决」。子仓侧用 `fileOverride` 而非目录默认层接住，故不会静默落入默认层。
 
 **kernel 花名册增量（change `lift-shared-contracts-to-kernel`，实测于 `aidcp-cloud@2a1905b`）**：本刀把 4 个**纯共享契约**文件经 `git mv` 抬进 kernel（各自本就是独立文件、满足本节下方「kernel 成员新增」三条通道 + §6.4 准入五条 + AC-BOUND-03 逐条断言），**kernel 花名册 4 → 8**（下方 line 482 的 4 文件 251 行名单相应扩为 8 文件 1186 行）：
 - `src/kernel/soul-types.ts`（119，原 `src/soul/types.ts`，消 16 条跨边界 import）；

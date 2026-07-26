@@ -56,6 +56,20 @@ REPOS = {
 # 仍标 automation（整个 src/transport/ 目录规则如此），只是同时被复制进包供三家共用。
 # 准入判据＝「三家都可能调用 + 不含任何属主表的 SQL」。带 SQL 的与只有一家用的一律不进、随属主走。
 TRANSPORT_MEMBERS = [
+    # schema 基础设施整族（定稿 §4.7.1，2026-07-26 裁决）：三家启动第一步都要对自己的属主库跑契约门，
+    # 而这八个文件零属主表 SQL（全族唯一一条 SQL 查 pg_indexes 系统目录），只读本仓 migrations/ 与 PG 目录。
+    # 复制三份的具体后果：migration-owners.ts 持有「按属主分组迁移」的规则，三份副本各自演化会出现
+    # 同一条迁移在不同仓算不同属主，而两侧都编译通过、测试都过，只有真跑迁移才炸。
+    'src/schema/schema-capability.ts',
+    'src/schema/schema-contract.ts',
+    'src/schema/schema-gate.ts',
+    'src/schema/migration-files.ts',
+    'src/schema/migration-order.ts',
+    'src/schema/migration-owners.ts',
+    'src/schema/migration-plan.ts',
+    'src/schema/pg-catalog.ts',
+    'src/schema/ddl-scan.ts',
+    'src/schema/ddl-objects.ts',
     'src/transport/internal-http.ts',
     'src/transport/image-model-selection-http.ts',
     'src/transport/account-platform-http.ts',
