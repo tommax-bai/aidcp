@@ -1,3 +1,8 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: Facebook automatic browsing is enabled only for dev fleet children`
+- TO: `### Requirement: Facebook automatic browsing follows product lifecycle across environments`
+
 ## MODIFIED Requirements
 
 ### Requirement: Facebook automatic browsing follows product lifecycle across environments

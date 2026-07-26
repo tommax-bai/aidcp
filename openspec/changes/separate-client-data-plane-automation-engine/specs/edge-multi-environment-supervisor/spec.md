@@ -1,3 +1,8 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: 监督器 SHALL 分别监督每环境核心与浏览器执行器`
+- TO: `### Requirement: 监督器 SHALL 分别监督每环境自动化引擎与浏览器执行器`
+
 ## MODIFIED Requirements
 
 ### Requirement: 桌面外壳按环境监督一组独立子进程

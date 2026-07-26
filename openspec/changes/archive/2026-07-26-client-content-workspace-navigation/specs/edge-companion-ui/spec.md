@@ -1,3 +1,8 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: 稿件预览抽屉配图可逐张删除、非乐观、最后一张不可删`
+- TO: `### Requirement: 稿件审核页面配图可逐张删除、非乐观、最后一张不可删`
+
 ## MODIFIED Requirements
 
 ### Requirement: 发布卡纯展示、审批授权走应用内与飞书双通道

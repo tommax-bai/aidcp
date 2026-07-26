@@ -1,3 +1,8 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: Facebook scheduled comments are disabled by default and fail closed`
+- TO: `### Requirement: Facebook scheduled comments are authorized by scoped product controls and fail closed`
+
 ## MODIFIED Requirements
 
 ### Requirement: Facebook scheduled comments are authorized by scoped product controls and fail closed

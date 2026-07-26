@@ -197,30 +197,26 @@ If composition and cleanup logic is refactored into shared helpers, the helper S
 
 ### Requirement: Facebook comments require human review by default
 
-All Facebook comments — whether or not they carry contact info — SHALL pass the human-review gate before edge submit by default. The exceptions are a detail-confirmed structured mandatory rule whose actions include comment and whose `comment_approval` is explicitly `auto_approve`, or an explicit account policy of `auto_approve_all`. Either exception MUST authorize without waiting for a button and SHOULD send a readable best-effort auto-approval notice; notice delivery MUST NOT gate or delay submit. The account-wide exception MUST apply to every comment source, including Feishu `/comment`; a source-specific schedule mode MUST NOT override it back to review. The existing `AIDCP_FB_COMMENT_REVIEW_ALL=false` escape hatch and contact-comment rules remain unchanged for `source_rules` accounts. An unwired approval port, review timeout, or rejection on a `review` path MUST produce an honest non-submitting outcome with no success mark.
+All Facebook comments — whether or not they carry contact info — SHALL pass the Feishu human-review gate before edge submit by default. The exceptions are explicit structured product policy: a detail-confirmed mandatory rule whose actions include comment and whose `comment_approval` is `auto_approve`, or an account/source approval policy that explicitly authorizes automatic approval. An automatic path MUST send the required readable notice before submit according to that policy and MUST fail closed when a mandatory notice is unavailable. A process environment variable MUST NOT disable review or create an automatic-approval exception. An unwired approval port, review timeout, rejection, or failed mandatory notice MUST produce an honest non-submitting outcome with no success mark.
 
 #### Scenario: Non-contact FB comment waits for review by default
-- **WHEN** a `source_rules` account comment has no valid auto-approved mandatory context and review is enabled
-- **THEN** it MUST request approval and MUST NOT submit until approved
+- **WHEN** a Facebook comment has no valid structured automatic-approval policy
+- **THEN** it MUST request Feishu approval and MUST NOT submit until approved
 
-#### Scenario: Structured standing approval submits independently of notice delivery
-- **WHEN** full-detail matching confirms a `source_rules` account rule with comment plus `comment_approval:auto_approve`
-- **THEN** the system MUST authorize immediately and SHOULD send the final-comment notification best-effort
+#### Scenario: Structured standing approval notifies then submits
+- **WHEN** full-detail matching confirms an account rule with comment plus `comment_approval:auto_approve`
+- **THEN** the system MUST send the required final-comment notification first and MAY submit only after that send succeeds
 
-#### Scenario: Account-wide standing approval covers manual comments
-- **WHEN** an `auto_approve_all` account receives an exact Feishu `/comment` command
-- **THEN** the system MUST authorize without waiting for a second button approval; notice failure MUST NOT change that decision
+#### Scenario: Review or auto-approval notification failure is honest no-submit
+- **WHEN** review is unwired/timed out/rejected, or a mandatory auto-approval notice fails
+- **THEN** the run MUST audit a non-success reason, MUST NOT call edge submit, and MUST NOT record the target as commented
 
-#### Scenario: Review failure blocks but auto-approval notice failure does not
-- **WHEN** review is unwired/timed out/rejected, or an auto-approval notice fails
-- **THEN** only the `review` failure MUST block edge submit; an auto-approval notice failure MUST be logged and MUST NOT create an approval fallback
-
-#### Scenario: Shadow never reviews or submits
-- **WHEN** Facebook comment shadow/dry-run mode is active
-- **THEN** the run MUST short-circuit before review/notification and MUST NOT submit
+#### Scenario: Environment cannot disable review
+- **WHEN** an inherited or deployed `AIDCP_FB_COMMENT_REVIEW_ALL=false` is present but no structured account/source policy authorizes automatic approval
+- **THEN** the comment still requires review and the environment value has no effect
 
 #### Scenario: Red-line reversal — implicit auto-post is forbidden
-- **WHEN** an implementation auto-posts because of free-form persona wording, account id, nickname, or a global heuristic rather than a validated structured rule or explicit persisted account policy
+- **WHEN** an implementation auto-posts because of free-form persona wording, account id, nickname, a global heuristic, or an environment variable rather than a validated structured policy
 - **THEN** it MUST be treated as a violation and not merged
 
 ### Requirement: 评论链人设注入对齐互动评估样板

@@ -1,3 +1,8 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: 未绑定账号的环境 SHALL 可见地说明慢启动为何不可用`
+- TO: `### Requirement: 未绑定账号的环境 SHALL 可预设并看懂慢启动`
+
 ## MODIFIED Requirements
 
 ### Requirement: 慢启动状态与开关在今日进展卡内如实呈现

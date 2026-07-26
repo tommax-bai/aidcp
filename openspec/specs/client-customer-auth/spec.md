@@ -468,83 +468,6 @@ interaction list/detail 与 read-controls 成功回包 SHALL 为当前 account/e
 - **THEN** 四者均正常返回该绑定账号的数据
 - **AND** MUST NOT 因边缘离线而拒绝任何一次读
 
-### Requirement: 客户只能为自己环境上已绑定的账号开关慢启动，且不依赖边缘在线
-
-customer-auth SHALL 提供 env-scoped `PUT /environments/:envKey/slow-start`。请求体 MUST 只接受 `enabled`，夹带任何其它键 MUST 整块拒绝且不写入。
-
-**accountId MUST 由云端解析、MUST NOT 由客户端提交**。解析 SHALL 经**持久的环境↔账号绑定**（change `curated-envkey-account-binding` 所建、`env_key` 为 PK ⇒ 一个环境至多一个账号），MUST NOT 接受请求体或查询参数中的账号选择器，**MUST NOT 依赖边缘活会话**。
-
-该路由 MUST NOT 要求该环境的边缘在线：`slow_start_since` 的执行体位于云端配额计算内、经运行时现读生效，边缘对这次写入**没有任何参与**。以边缘在线与否为前置 SHALL 被视为缺陷。
-
-授权 SHALL 在同一 enabled-user 与 env ownership 权威范围内进行：客户 MUST 拥有该 `envKey`，否则 fail-closed。绑定读 SHALL 与 `accounts` 关联校验，悬空绑定 MUST fail-closed，MUST NOT 当作有效目标。
-
-该路由 MUST NOT 修改风控档位、风控终态、账号写总闸或任何其它账号配置——`slow_start_since` 是唯一可被本路由写入的字段。
-
-成功回包 SHALL 返回写后真态与生效后的当日上限。因慢启动的执行体位于云端配额计算内、且开关经运行时现读生效，云端写入成功即为已生效，回包 MUST NOT 引入「已保存 / 待下发边缘」二态——照抄一个不存在的状态同样是不诚实。
-
-#### Scenario: 边缘离线时环境所有者仍能开启慢启动
-
-- **WHEN** 某 `envKey` 的所有者在该环境**边缘未连接**（含从未启动）但存在有效账号绑定时提交 `{ enabled: true }`
-- **THEN** 云端经持久绑定解析出 accountId，写入对齐运营自然日起点的 `slow_start_since`，回包带写后真态与生效后的当日上限
-- **AND** customer-auth MUST NOT 因边缘不在线而拒绝
-
-#### Scenario: 环境未绑定账号时诚实冲突
-
-- **WHEN** 某 `envKey` 没有账号绑定行，或绑定指向的账号在 `accounts` 中不存在
-- **THEN** customer-auth 返回 `409 binding_unknown`，MUST NOT 写入，MUST NOT 猜测任何账号
-
-#### Scenario: 绑定查询失败 MUST NOT 伪装成未绑定
-
-- **WHEN** 绑定读因数据库不可达或表缺失而失败
-- **THEN** customer-auth 返回 `503`，MUST NOT 返回 `binding_unknown`，MUST NOT 把「没查成」表述为「该环境没有绑定账号」
-
-#### Scenario: 请求体夹带账号选择器被拒绝
-
-- **WHEN** 请求体额外携带 `accountId`、`since`、`quotaLevel` 或任何其它键
-- **THEN** customer-auth 返回校验失败且不写入任何字段
-
-#### Scenario: 非所有者请求 fail-closed
-
-- **WHEN** 某已登录客户对不属于自己的 `envKey` 提交请求
-- **THEN** customer-auth fail-closed 拒绝，MUST NOT 写入，MUST NOT 泄露该环境的账号身份
-
-#### Scenario: 关闭慢启动只清起点不动其它
-
-- **WHEN** 环境所有者提交 `{ enabled: false }`
-- **THEN** 云端只清空该账号 `slow_start_since`，其风控档位、风控终态与其它账号配置逐位保持原值
-
-### Requirement: 慢启动状态 SHALL 提供不依赖边缘的 env-scoped 读
-
-customer-auth SHALL 提供 env-scoped `GET /environments/:envKey/slow-start`，在该环境边缘不在线（含从未启动）时也返回该环境的慢启动真态与生效后的当日上限。
-
-该读 SHALL 经与写路由**同一份持久绑定**解析 accountId，SHALL 复用与 `ui.snapshot` 慢启动投影**同一个 controller 产出**（同一 anchor 解析、同一次 clock），MUST NOT 另行推算天数、绑定性或上限。
-
-授权 SHALL 与写路由同口径：客户 MUST 拥有该 `envKey`，否则 fail-closed。回包 MUST NOT 包含 accountId 或任何其它账号身份标识。
-
-环境未绑定账号时，该读 SHALL 返回 `eligible=false` 且 `ineligibleReason=binding_unknown` 的诚实投影；此时 MUST NOT 编造 `state`、`day`、`since` 或 `totalDays`——没有账号即不知平台，任何默认值都是伪造。绑定读失败 MUST 返回 `503`，MUST NOT 降级为 `binding_unknown`，MUST NOT 返回一个看起来正常的空投影。
-
-#### Scenario: 从未启动的环境也能读到慢启动真态
-
-- **WHEN** 某 `envKey` 的所有者读取一个边缘从未连接、但存在有效账号绑定的环境
-- **THEN** customer-auth 返回该账号的慢启动真态与生效后的当日上限
-- **AND** 回包 MUST NOT 包含 accountId
-
-#### Scenario: 未绑定环境返回诚实的不可用投影
-
-- **WHEN** 客户读取一个自己拥有但没有账号绑定的环境
-- **THEN** customer-auth 返回 `eligible=false` 与 `ineligibleReason=binding_unknown`
-- **AND** 回包 MUST NOT 包含 `state`、`day`、`since` 或 `totalDays`
-
-#### Scenario: 读路由不得泄露他人环境
-
-- **WHEN** 某已登录客户读取不属于自己的 `envKey`
-- **THEN** customer-auth fail-closed 拒绝，MUST NOT 泄露该环境的账号身份或慢启动状态
-
-#### Scenario: 读路由的查询失败同样不得伪装
-
-- **WHEN** 绑定读或 controller 取用因数据库不可达而失败
-- **THEN** customer-auth 返回 `503`，MUST NOT 返回 `binding_unknown`，MUST NOT 返回空投影
-
 ### Requirement: 命令定向下发 SHALL 继续以边缘活会话为准
 
 「把命令发给哪台边缘」的解析 SHALL 继续基于活会话（OPEN 且非 stale 的连接），无在线节点时 SHALL 诚实失败、MUST NOT 广播。该在线判据 MUST NOT 因慢启动或精选内容离线洗稿改用持久绑定而被一并摘除。
@@ -1042,4 +965,129 @@ Cloud SHALL 为每个 envKey 至多保留一个 active cleanup hold。hold 或�
 
 - **WHEN** 客户提交未定义排序、任意字段名或排序方向
 - **THEN** 客户鉴权接口返回 `invalid_sort`，不静默回落且不触达精选列表查询
+
+### Requirement: 客户只能为自己的环境开关慢启动，且不依赖账号绑定或边缘在线
+
+customer-auth SHALL 提供 env-scoped `PUT /environments/:envKey/slow-start`。请求体 MUST 只接受 `enabled`，夹带任何其它键 MUST 整块拒绝且不写入。
+
+慢启动配置 SHALL 直接持久化在 `envKey` 对应的环境记录；`accountId` MUST NOT 由客户端提交，也 MUST NOT 作为写入目标选择器。该路由 MUST NOT 依赖环境↔账号绑定、账号是否存在、边缘活会话、浏览器是否运行或环境是否已启动。
+
+授权 SHALL 在同一 enabled-user 与 env ownership 权威范围内进行：客户 MUST 拥有该 `envKey`，否则 fail-closed。写入 SHALL 只修改该环境的 `slow_start_since`；开启时写入对齐运营自然日起点的值，关闭时清空。该路由 MUST NOT 修改当前或历史账号的慢启动字段、风控档位、风控终态、账号写总闸或任何其它账号配置。
+
+成功回包 SHALL 返回写后环境配置真态。有唯一有效当前账号绑定时，回包还 SHALL 返回该账号 controller 依据该环境起点算出的生效状态与当日上限；没有有效绑定时，回包 SHALL 明确标注 `binding_unknown` 且不编造 `binding` 或当日上限。云端环境写入成功即为配置已生效，回包 MUST NOT 引入「已保存 / 待下发边缘」二态；没有账号时 SHALL 表述为当前没有执行对象，而非写入尚未完成。
+
+#### Scenario: 边缘离线且未绑定账号时仍能开启环境慢启动
+
+- **WHEN** 某 `envKey` 的所有者在该环境边缘未连接且没有账号绑定时提交 `{ enabled: true }`
+- **THEN** 云端把该环境的 `slow_start_since` 写为对齐运营自然日的起点，并返回已开启的环境配置态
+- **AND** 回包标注 `eligible=false` 与 `ineligibleReason=binding_unknown`，MUST NOT 返回伪造的 `binding` 或 `dayQuotas`
+
+#### Scenario: 环境换绑后设置不随旧账号离开
+
+- **WHEN** 已开启慢启动的环境从账号 A 换绑为账号 B
+- **THEN** 环境的 `slow_start_since` 逐位保持不变
+- **AND** 下一次配额计算中账号 B 使用该环境起点，账号 A 不再因该环境被 clamp，MUST NOT 要求重启
+
+#### Scenario: 请求体夹带账号选择器被拒绝
+
+- **WHEN** 请求体额外携带 `accountId`、`since`、`quotaLevel` 或任何其它键
+- **THEN** customer-auth 返回校验失败且不写入任何环境或账号字段
+
+#### Scenario: 非所有者请求 fail-closed
+
+- **WHEN** 某已登录客户对不属于自己的 `envKey` 提交请求
+- **THEN** customer-auth fail-closed 拒绝，MUST NOT 写入，MUST NOT 泄露该环境的账号身份或配置
+
+#### Scenario: 环境注册表查询失败 MUST NOT 伪装成未绑定
+
+- **WHEN** ownership 或环境配置写入因数据库不可达或表缺失而失败
+- **THEN** customer-auth 返回 `503`，MUST NOT 返回 `binding_unknown`，MUST NOT 把「没写成」表述为配置已保存
+
+#### Scenario: 关闭慢启动只清环境起点
+
+- **WHEN** 环境所有者提交 `{ enabled: false }`
+- **THEN** 云端只清空该环境的 `slow_start_since`
+- **AND** 当前及历史账号的慢启动旧列、风控档位、风控终态与其它账号配置逐位保持原值
+
+### Requirement: 慢启动状态 SHALL 提供不依赖边缘或账号绑定的 env-scoped 读
+
+customer-auth SHALL 提供 env-scoped `GET /environments/:envKey/slow-start`，在该环境边缘不在线（含从未启动）或尚未绑定账号时也返回该环境的慢启动配置真态。
+
+该读 SHALL 先按 ownership 读取环境自己的 `slow_start_since`。有唯一有效当前账号绑定时，SHALL 复用与 `ui.snapshot` 慢启动投影同一个 controller 产出（同一环境 anchor 解析、同一次 clock），MUST NOT 另行推算绑定性或上限。回包 MUST NOT 包含 accountId 或任何其它账号身份标识。
+
+环境未绑定账号或绑定账号不存在时，该读 SHALL 保留环境配置态：关闭返回 `state=off`；开启返回 `state=active`、`since`、`day` 与 `totalDays`，同时返回 `eligible=false`、`ineligibleReason=binding_unknown`。此时 MUST NOT 编造 `binding`、`dayQuotas` 或“配额已被压低”。ownership/配置读失败 MUST 返回 `503`，MUST NOT 降级为 `binding_unknown`，MUST NOT 返回看起来正常的空投影。
+
+#### Scenario: 从未启动且未绑定的环境也能读到已开启配置
+
+- **WHEN** 某 `envKey` 的所有者读取一个边缘从未连接、没有账号绑定、但环境慢启动已开启的环境
+- **THEN** customer-auth 返回 `state=active`、环境起点与当前天数，并标注 `binding_unknown`
+- **AND** 回包 MUST NOT 包含 accountId、`binding` 或 `dayQuotas`
+
+#### Scenario: 有绑定时返回与实际 clamp 同源的真态
+
+- **WHEN** 某环境存在唯一有效账号绑定且所有者读取慢启动状态
+- **THEN** customer-auth 返回该账号 controller 基于该环境起点得出的慢启动真态与生效后的当日上限
+- **AND** 回包 MUST NOT 包含 accountId
+
+#### Scenario: 读路由不得泄露他人环境
+
+- **WHEN** 某已登录客户读取不属于自己的 `envKey`
+- **THEN** customer-auth fail-closed 拒绝，MUST NOT 泄露该环境的账号身份或慢启动状态
+
+#### Scenario: 读路由的查询失败同样不得伪装
+
+- **WHEN** ownership、环境配置或 controller 取用因数据库不可达而失败
+- **THEN** customer-auth 返回 `503`，MUST NOT 返回 `binding_unknown`，MUST NOT 返回空投影
+
+### Requirement: Customer curated content routes recheck environment ownership
+
+客户鉴权服务 SHALL 提供当前客户已授权环境的精选内容分页、单条详情和参考创作接口。每个请求 MUST 在客户 JWT、撤销和启用态校验后，从数据库重新读取该客户的环境归属，并只以已归属的 `envKey` 作为账号范围；接口 MUST NOT 接受可绕过归属检查的 `accountId`，MUST NOT 暴露内部面板跨账号能力。
+
+#### Scenario: 已归属环境可读取精选内容
+
+- **WHEN** 客户持有效客户令牌，以当前仍归属自己的 `envKey` 请求精选列表或详情
+- **THEN** 服务端只返回该 `envKey` 的客户展示字段和一致分页总数
+
+#### Scenario: 非归属环境被拒绝且不泄漏内容
+
+- **WHEN** 客户以未归属或刚被移除的 `envKey` 请求列表、详情或参考创作
+- **THEN** 服务端拒绝请求，不返回该环境是否存在、精选数量或任意内容字段
+
+#### Scenario: 跨账号单条 id 统一未找到
+
+- **WHEN** 客户提交一个真实存在但属于其他账号的精选内容 id
+- **THEN** 单条接口返回与不存在 id 相同的 404 形状，不泄漏该行存在性
+
+### Requirement: Customer curated DTO is a minimum disclosure projection
+
+客户精选内容响应 SHALL 只包含列表与详情体验所需的显式白名单字段，并保留计数缺失值为 `null`。响应 MUST NOT 包含行所属 `accountId`、内部纳入原因、跨账号统计、删除能力或仅供运营/模型内部使用的诊断字段。
+
+#### Scenario: 客户列表不含运营字段
+
+- **WHEN** 客户请求精选内容列表
+- **THEN** 每一项可包含 id、类型、标题、正文摘要、作者、来源链接、话题、计数、参考图、机器人动作标记与时间，但不包含 `accountId` 或 `admitReason`
+
+#### Scenario: 缺失计数不被编造为零
+
+- **WHEN** 某条精选内容的互动计数未采集
+- **THEN** 对应字段返回 `null`，客户端可以呈现“暂无数据”，不得返回 `0`
+
+### Requirement: Customer reference creation uses server-owned source snapshots
+
+客户参考创作接口 SHALL 只接受精选内容 id、已授权 `envKey` 和布尔值 `useReferenceImages`。服务端 MUST 以 `id + envKey` 回读精选行，验证其为正文非空的图文内容，并以服务端快照构建结构化 `publish_post` 委派任务；客户端提交的来源正文、图片 URL、作者、账号或任务状态 MUST 被禁止或忽略。
+
+#### Scenario: 文字参照任务直接排队
+
+- **WHEN** 客户对可创作图文提交 `useReferenceImages=false`
+- **THEN** 服务端以来源 `edge` 创建结构化委派任务并返回真实排队任务，来源约束显式记录不使用参考图
+
+#### Scenario: 图文参照只使用已存参考图
+
+- **WHEN** 客户提交 `useReferenceImages=true`
+- **THEN** 服务端只复制该精选行已经持久化的参考图与视觉分析到任务快照，不使用客户端提供的任意外部图片
+
+#### Scenario: 不可创作内容被诚实拒绝
+
+- **WHEN** id 对应视频、评论或正文为空的精选行
+- **THEN** 服务端不创建任务并返回稳定拒绝原因，不宣称排队成功
 

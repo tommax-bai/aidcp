@@ -1,3 +1,11 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: 客户只能为自己环境上已绑定的账号开关慢启动，且不依赖边缘在线`
+- TO: `### Requirement: 客户只能为自己的环境开关慢启动，且不依赖账号绑定或边缘在线`
+
+- FROM: `### Requirement: 慢启动状态 SHALL 提供不依赖边缘的 env-scoped 读`
+- TO: `### Requirement: 慢启动状态 SHALL 提供不依赖边缘或账号绑定的 env-scoped 读`
+
 ## MODIFIED Requirements
 
 ### Requirement: 客户只能为自己的环境开关慢启动，且不依赖账号绑定或边缘在线

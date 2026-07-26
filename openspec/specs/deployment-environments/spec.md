@@ -40,8 +40,8 @@ Any cloud, console, or edge release operation MUST name the target before touchi
 #### Scenario: Ol requires explicit user request
 
 - **WHEN** a deployment would target `ol`
-- **THEN** the operator MUST have an explicit user request for `ol` or online deployment
-- **AND** `ol` MUST NOT be selected as an implicit default
+- **THEN** the operation MUST have an explicit user request for `ol` or online deployment
+- **AND** a missing explicit request MUST stop the operation before any remote state is touched
 
 ### Requirement: Ol deployments must come from release branches
 

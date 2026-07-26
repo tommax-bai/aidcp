@@ -1,3 +1,8 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: Group join is disabled by default and fails closed`
+- TO: `### Requirement: Group join is controlled by scoped account automation and fails closed`
+
 ## MODIFIED Requirements
 
 ### Requirement: Group join is controlled by scoped account automation and fails closed

@@ -3,19 +3,19 @@
 ## Purpose
 TBD - created by archiving change facebook-dev-autobrowse-enable. Update Purpose after archive.
 ## Requirements
-### Requirement: Facebook automatic browsing is enabled only for dev fleet children
+### Requirement: Facebook automatic browsing follows product lifecycle across environments
 
-When the desktop edge spawns a core child, it SHALL derive an explicit Facebook browse mode from the normalized platform and resolved cloud environment. A Facebook child targeting `dev` SHALL receive `AIDCP_FB_BROWSE_AUTO=on`. A Facebook child targeting `ol` or a custom endpoint SHALL receive `AIDCP_FB_BROWSE_AUTO=off`. Non-Facebook children SHALL receive `off`. The final assignment MUST occur after environment merging so an inherited shell value cannot weaken this boundary.
+The desktop edge SHALL NOT derive Facebook browse authorization from the resolved Cloud environment or inject `AIDCP_FB_BROWSE_AUTO`. A Facebook core SHALL be capable of the existing browse-and-like loop in `dev`, `ol`, or a custom endpoint only when the platform/account lifecycle asks it to run; normal schedule, pause, identity, capability and risk controls remain authoritative. Non-Facebook cores MUST NOT start Facebook behavior.
 
-#### Scenario: All Facebook profiles start real browse on dev
-- **WHEN** the operator starts one or more Facebook AdsPower profiles while the resolved cloud environment is `dev`
-- **THEN** every spawned Facebook core receives `AIDCP_FB_BROWSE_AUTO=on` and may enter the existing browse-and-like loop subject to its normal risk controls
+#### Scenario: Facebook behavior is environment-neutral
+- **WHEN** otherwise identical active Facebook accounts target `dev` and `ol`
+- **THEN** neither is disabled solely because of the Cloud environment name, and both remain subject to the same scoped lifecycle and safety controls
 
-#### Scenario: Production and custom endpoints remain disabled
-- **WHEN** the operator starts a Facebook AdsPower profile while the resolved cloud environment is `ol` or `custom`
-- **THEN** the spawned core receives `AIDCP_FB_BROWSE_AUTO=off` even if the outer Electron process inherited an enabled browse-mode variable
+#### Scenario: Paused lifecycle still stops browsing
+- **WHEN** Cloud or the desktop lifecycle pauses a Facebook environment
+- **THEN** automatic browsing stops regardless of inherited stale browse-mode environment values
 
 #### Scenario: Non-Facebook profile is unaffected
-- **WHEN** the operator starts a non-Facebook profile while the resolved cloud environment is `dev`
-- **THEN** the spawned core receives `AIDCP_FB_BROWSE_AUTO=off` and its platform behavior is otherwise unchanged
+- **WHEN** the operator starts a non-Facebook profile
+- **THEN** it does not enter the Facebook browse-and-like loop
 

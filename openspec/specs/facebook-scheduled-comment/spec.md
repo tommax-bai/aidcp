@@ -3,27 +3,6 @@
 ## Purpose
 TBD - created by archiving change facebook-scheduled-comment. Update Purpose after archive.
 ## Requirements
-### Requirement: Facebook scheduled comments are disabled by default and fail closed
-
-Facebook scheduled commenting SHALL be controlled by a global kill switch that defaults off. When disabled, missing, invalid, or explicitly false, no UNATTENDED trigger path (the background content schedule, or a plain `/comment <昵称>` command without `--join`) MUST post, record risk/cooldown, or claim work occurred.
-
-The SINGLE exception is a human-authorized manual join-then-comment (`/comment <昵称> --join`), whose comment is PINNED to the account's own just-joined group (from the membership ledger): it MAY compose, submit, and record a comment on that pinned group while the unattended kill switch is off, because the operator's command is the explicit authorization. This exception MUST still enforce every other gate — hard validators, server-confirmed verification, the contact human-review approval lane when `--contact` is present, the per-account risk quota and daily cap, the persona gate, and single-flight — and MUST NOT silently claim success. The exception is scoped ONLY to the group just joined by that command; it MUST NOT enable unattended commenting on operator-configured or other joined containers.
-
-Per-account `accounts.status` and platform matching MUST also gate work.
-
-#### Scenario: Default off prevents posting
-- **WHEN** the cloud process starts without enabling the Facebook comment automation switch
-- **THEN** no Facebook scheduled comment is posted or risk-recorded, even if Facebook accounts and targets exist
-
-#### Scenario: Paused account is skipped
-- **WHEN** a Facebook account has `accounts.status='paused'`
-- **THEN** the scheduled trigger skips it and does not dispatch browse/comment work
-
-#### Scenario: Human-authorized manual join-comment may post while the unattended switch is off
-- **WHEN** the unattended Facebook-comment kill switch is off, an operator issues `/comment <昵称> --join` from a management chat, and the account confirms a join into new group G
-- **THEN** the pinned comment on group G MAY be composed, validated, submitted, and server-verified
-- **AND** a plain `/comment <昵称>` (no `--join`) for the same account still no-ops under the off switch, and no OTHER container becomes eligible for unattended commenting
-
 ### Requirement: Facebook comments trigger through existing comment entry points routed by account platform
 
 Facebook automatic comments SHALL be triggered through the existing schedule-driven comment entry point (per-account comment schedule with its daily cap) and the existing Feishu `/comment` command entry point; a separate Facebook-specific cron MUST NOT be added. Both entry points SHALL resolve the account platform through the account store (`accounts.platform`) and route Facebook accounts to the Facebook targeted-comment pipeline. For each account the pipeline SHALL read an operator-configured keyword list, pick a keyword at random, select a concrete group URL from that account's own joined-group membership ledger, and search ONLY within that selected group, then pick a candidate post from the in-container results (bounded extraction). It MUST NOT perform whole-site Facebook search and MUST NOT comment on posts outside the selected joined group. Missing keywords OR missing eligible joined groups produce an honest no-op result.
@@ -320,4 +299,22 @@ When and only when a manual single-comment task carries the explicit `--feed` sw
 #### Scenario: Facebook default path retains lifecycle evidence
 - **WHEN** a Facebook comment task does not carry the explicit manual `--feed` switch
 - **THEN** Edge MUST keep the existing in-place acknowledgement loop and preserve its confirmed, rejected, pending-approval, and ambiguous outcomes
+
+### Requirement: Facebook scheduled comments are authorized by scoped product controls and fail closed
+
+Facebook scheduled commenting SHALL be authorized by the account's enabled comment schedule, approval mode, platform match and active account state. A plain operator `/comment <昵称>` command is explicit manual intent and SHALL enter the same targeted-comment pipeline independent of the account schedule window. Neither path SHALL require a process-global automatic or shadow environment variable.
+
+Every path MUST still enforce persona, joined-group ownership, deterministic content validators, structured approval policy, active identity/capability, per-account risk quota and daily cap, single-flight, idempotency and server-confirmed verification. Missing or disabled scoped configuration on an unattended schedule MUST produce an honest no-op and MUST NOT claim work occurred.
+
+#### Scenario: Disabled account schedule prevents unattended posting
+- **WHEN** a Facebook account's scheduled comment action is disabled or the account is paused
+- **THEN** no unattended Facebook comment is posted or risk-recorded even if stale auto/shadow environment variables are present
+
+#### Scenario: Enabled schedule needs no global switch
+- **WHEN** a Facebook account has an enabled current comment schedule and satisfies all approval, target, identity, risk and quota gates
+- **THEN** the scheduled targeted-comment pipeline runs without requiring `AIDCP_FB_COMMENT_AUTO`
+
+#### Scenario: Manual command is not silently no-op'd by deployment state
+- **WHEN** an operator issues a valid plain `/comment <昵称>` command for an active Facebook account
+- **THEN** the targeted-comment pipeline returns an honest terminal outcome without consulting a global auto/shadow environment switch
 

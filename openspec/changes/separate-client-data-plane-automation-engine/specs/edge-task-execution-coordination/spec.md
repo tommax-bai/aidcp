@@ -1,3 +1,8 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: 浏览器执行器获取失败 MUST 与核心在线状态分离`
+- TO: `### Requirement: 浏览器执行器获取失败 MUST 与客户端数据面和引擎连接状态分离`
+
 ## MODIFIED Requirements
 
 ### Requirement: 页面任务协调 SHALL 仅接收已分类的 page_automation 操作
