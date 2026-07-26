@@ -52,5 +52,7 @@
   <!-- Edge full suite passed 2350/2350; typecheck, production dist, desktop build-input, Native release build and verification passed. Worktree artifact SHA-256: a7371f10d0898ce96677f70a81faa4dd68a730ecfe2941692f7d007c308e95ad. -->
 - [x] 6.3 Run `openspec validate preserve-native-facebook-capability-boundaries --strict`
   <!-- Strict validation passed after recording the implementation and source/artifact delivery boundary. -->
-- [ ] 6.4 Rebase, record Edge/control commits and validation/deviation evidence, fast-forward integrate, and push default branches without force
-- [ ] 6.5 Rebuild the local development Native artifact and record that installer, signing, deployment, and real-account write acceptance were not performed
+- [x] 6.4 Rebase, record Edge/control commits and validation/deviation evidence, fast-forward integrate, and push default branches without force
+  <!-- Edge `master` through a6623a4 and control `main` through 46e82bc were fast-forward integrated and pushed to origin without force. Rebase retained the concurrently landed identity boundary (fe6023d/9388df2) and control batch 6049398. -->
+- [x] 6.5 Rebuild the local development Native artifact and record that installer, signing, deployment, and real-account write acceptance were not performed
+  <!-- Rebuilt and verified the unsigned canonical Edge artifact at `build/native-page-engine/darwin-arm64/aidcp-page-engine`, SHA-256 56c9d0c5519b65925e928182fb5d2d70e0d6da6ef2b524ccfb2ef8d634d608cb. No installer, signing, deployment, Electron restart, or real-account write acceptance was performed. -->
