@@ -14,6 +14,7 @@
 
 ## 3. Integration and development delivery
 
-- [ ] 3.1 Commit the isolated Edge and control changes with explicit pathspecs, then integrate and push both default branches through the documented fast-forward flow.
+- [x] 3.1 Commit the isolated Edge and control changes with explicit pathspecs, then integrate and push both default branches through the documented fast-forward flow.
+  <!-- aidcp-edge 20245e8 fast-forwarded and pushed to origin/master through land-change; aidcp control commits 7c36246 and 0fa516f fast-forwarded and pushed to origin/main. -->
 - [x] 3.2 Rebuild and verify the canonical local development Native artifact; keep installer, OL deployment, and real-account write acceptance explicitly out of scope.
   <!-- Canonical aidcp-edge master rebuilt and verified darwin-arm64 sha256 95ebc1709249ecac555a10392a1086439f1074aa3639a709e7af3c92dd80ea78. No Edge process remained running, so no resident old binary required restart. No installer/package, OL deployment, or real-account write acceptance was performed. -->
