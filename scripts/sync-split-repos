@@ -62,7 +62,9 @@ TRANSPORT_MEMBERS = [
     'src/transport/delegated-task-http.ts',
     'src/transport/interaction-store-reader-http.ts',
     'src/transport/publish-generation-http.ts',
+    'src/transport/publish-log-http.ts',
     'src/transport/publish-status-http.ts',
+    'src/transport/review-card-delivery-http.ts',
     'src/transport/risk-read-http.ts',
 ]
 TRANSPORT_REPO = 'aidcp-transport'
