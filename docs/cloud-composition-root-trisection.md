@@ -56,7 +56,10 @@
 1. ~~**⚠️ 先看 §0.0.2：风控状态机在 dev 与 ol 上都持久化不了。**~~ **已修并部署 dev**
    （`aidcp-cloud@8d903dd`，2026-07-26）。同批抓到并修掉第二处同形缺陷，
    并加了门禁 `AC-OWN-06` 防第三次。**ol 仍未部署**，需用户明确要求 + 走发布分支。
-2. **批次 2/3/4 三个 `main()`** —— 主交付物。**距离已量化**（见上表）：各仓业务代码断裂只剩 14–15 条，
+2. **批次 2/3/4 三个 `main()`** —— 主交付物。**批次 2（content）的逐条执行清单见 §9**
+   （2026-07-26 用真编译器实测：断裂 100% 只在两个组装根文件里；content 对基础段的依赖恰好 20 个字段，
+   已逐个分好「本地建 / 走端口 / 无需处理」；另揪出两条**同步读**不能包 HTTP、须走本地镜像）。
+   **距离已量化**（见上表）：各仓业务代码断裂只剩 14–15 条，
    写完 `main()` 一次消掉 109–143 条。三仓可并行，但组装根改动期间彼此不冲突（各写各的仓）。
    **注：上表是 Phase 4 时点的旧数。Phase 5 之后 2026-07-26 重测：三个仓的业务代码断裂**
    **已全部归零（0 / 0 / 0），剩余断裂 107 / 107 / 138 全部来自组装根副本**——
@@ -498,3 +501,86 @@ api = 飞书 SDK + pg + ws；automation = pg + ws；content = 对象存储 + pg 
 - advisory lock 按库——写者锁留旧库、写落新库＝静默双写。
 - 跨库事务不能跨库，必须最终一致。
 - **`AIDCP_SERVICE` 绝不能写进共享 `.env`**：一份文件表达不了三个值，且会污染单体回滚路径。
+
+---
+
+## 9. 批次 2（content `main()`）执行清单 —— 2026-07-26 **用真编译器**实测
+
+> 此前所有「距离」数字都来自静态扫描（相对 import 说明符能否解析到本仓文件）。
+> 本节第一次在 `aidcp-content` 里**真的装了依赖、真的跑了 `tsc`**，结论比扫描更强。
+
+### 9.1 先解一个会拦住所有人的环境坑：三个新仓 `npm install` 装不上
+
+`~/.npmrc` 把 **`@types` 整个 scope** 指向公司内网 registry（`npm.zhaopin.com`），本机连不上、
+`ECONNRESET`。`aidcp-cloud` 不受影响是因为它有 `package-lock.json`、resolved URL 全指 npmjs；
+四个新仓**没有 lockfile** ⇒ 每次都去解析 `@types/*` ⇒ 必失败。
+
+**绕法（不动用户全局配置）**：`npm install --userconfig /dev/null`。
+命令行 `--@types:registry=…` 试过**无效**（scope registry 在 userconfig 里优先级更高）。
+content 已按此装好并生成 lockfile 一并提交，另三个仓照做即可。
+
+### 9.2 实测结论：剩余断裂 **100% 只在两个组装根文件里**
+
+`aidcp-content` 全仓 `tsc`：**578 个错误，573 个在 `src/server.ts`、5 个在 `src/index.ts`，
+其余 81 个业务文件一个错都没有。** 交接文档 §2.1 的静态扫描结论（业务代码断裂 0）由此坐实。
+**批次 2 的交付物就是重写这两个文件，没有别的。**
+
+### 9.3 content 对基础段的全部依赖 = 20 个字段（机械算出，非人工清点）
+
+口径：`segBContent` 的 ctx 解构 ∪ 段内 `ctx.X` 读点，减去它自己赋值的两个
+（`imageProvider` / `publishOrchestrator`）。逐个查了构造点与所绑的池：
+
+**A. 本地建，零跨库（8 个）** —— content 池或压根没有池：
+
+`curatedContentStore`（content 池）· `facebookPublishMediaStore`（content 池）·
+`tokenUsageStore`（content 专用小池 max:4）· `llm`（QwenClient，无池）·
+`providerRuntime` · `ossUploader` · `dashscopeApiKey` · `anyImageKeyPresent`（后四者无池）
+
+> `curatedContentStore` 已有一条 automation 出边（`triggeredRefsReader: () => delegatedTaskStore`），
+> `facebookPublishMediaStore` 已有一条 api 出边（`accountPlatformReader`）——两者**都已是端口形态**，
+> 批次 2 只需把实参换成远程实现，不需要改结构。
+
+**B. 必须新开跨进程契约（api 域，7 个）** —— 它们全绑 `apiPool`：
+
+| 字段 | 表 / 属主 | content 实际用到的面 |
+| --- | --- | --- |
+| `publishLogStore` | `publish_log` / api | `init` `insert` `updateStatus` `recordMetadata` `markImagesAttached` |
+| `publishPipelineLogStore` | `publish_pipeline_logs` / api | 一个 best-effort 写 sink（§4.1 已登记的属主反转，就在 segB 里建、绑 apiPool） |
+| `clientUserStore` | api | **只一个方法** `hasEnabledClientApprovalReachability` |
+| `approvalPolicyStore` | api（实为 `PgAccountStore`） | **只一个方法** `getGroupPublishPolicyForAccount` |
+| `botChatStore` | api | 整个对象被交给审批卡接线，**面待收窄**（批次 2 先量它到底调了哪几个方法） |
+| `modelConfigStore` | api 池 | `getCached().imageModel` / `.imageProvider` —— ⚠️ 见 9.4 |
+| `accountDisplayName` | 依赖 api 的账号存储 | `getAccountName` —— ⚠️ 见 9.4 |
+
+**C. 飞书出口（3 个）** —— `messenger` 的三个方法 + `resolveCardChatId` + `writeApprovalDecision`。
+**这条最容易被漏判**：批次 1 重算依赖集时把飞书 SDK 判给了 api，
+`aidcp-content/package.json` 里**确实没有** `@larksuiteoapi/node-sdk`——而 segB 现在直接在用它。
+两者只有一个能成立。**正解是后者：content 绝不装飞书 SDK，卡片出口走端口到 api 进程。**
+（§4.6.2 的「飞书契约缝」已经把 automation 侧改成只交结构化数据、由组装根构卡并发送，
+content 侧照同一形态收口即可。）
+
+**D. 无需处理（2 个）** —— `uiSnapshot` / `triggerPublishDispatchOnApprove` 由自动化段赋值，
+**已经在 `crossSegment` 响亮闸后面**（批次 0b）。content 进程里它们恒缺席，闸会如实记一条
+`cross_segment_drop:` 并点名后果，正是设计意图。**别把它们当成待补的端口。**
+
+### 9.4 ⚠️ 两条是**同步读**，不能包成 HTTP —— 这条会在实装中途炸
+
+- `modelConfigStore.getCached(): ModelConfigValue` —— 同步返回进程内镜像。
+- `accountDisplayName(accountId): string | undefined` —— 同步，底下是账号存储的进程内显示名缓存。
+
+两者都在**热闭包里**被调用（每次取图模型 / 每张卡取账号名）。把它们改成 `await 一次 HTTP`
+不是加个包装，而是**改掉每一个调用点的签名**，且给热路径加了一跳网络。
+**正解是本地镜像 + 刷新器**，与已有的两条判例同形：配置镜像失效通道（`config_mirror_version`
+版本号 + 有界轮询比对）、账号投影表（`automation_account_projection` + `fresh_until` 陈旧即拒）。
+**批次 2 排期时必须把这两条当独立工作项，别混在「包个 HTTP 客户端」里估。**
+
+### 9.5 因此批次 2 的真实形状
+
+不是「裁掉两段就完事」，是**先定义 6 条新的跨进程契约**（发布台账写 / 发布管线日志写 /
+客户可达性读 / 分组稿件策略读 / 卡片出口 / 机器人会话表），再写 `main()`。
+它们要按 §5 的判据进 `aidcp-transport`（一份定义、两端共用），
+**MUST NOT 在两个仓各写一份**——那正是「两端路径悄悄对不上、两边都编译通过、只有真跑才 404」。
+
+**顺序建议**：先在 `aidcp-transport` 落这 6 条三件套 + 在 `aidcp-cloud` 的组装根注册服务端
+（单体下服务端与客户端同进程、逐字节等价、可立刻部署验证），**再**写 content 的 `main()`。
+这样每一条契约在被 content 依赖之前，已经在单体上真跑过一遍。
