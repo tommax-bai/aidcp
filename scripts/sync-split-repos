@@ -129,6 +129,11 @@ TRANSPORT_MEMBERS = [
 TRANSPORT_REPO = 'aidcp-transport'
 # 组装根：三个业务仓今天各有一份逐字节副本；批次 2/3/4 会各自改写成自己的 main()。只报不改。
 COMPOSITION = {'src/server.ts', 'src/index.ts'}
+# 派生仓可把手写入口再拆成仓私有的 composition helper；它没有 Cloud fact-source
+# 对应物，故只登记并排除于受管源码 census，绝不能被 --prune 当成“多出”删除。
+DERIVED_COMPOSITION = {
+    'aidcp-automation': {'src/automation-composition-root.ts'},
+}
 KERNEL_REPO = 'aidcp-kernel'
 
 
@@ -458,7 +463,11 @@ def main() -> int:
         )
         actual = {
             f for f in git(path, 'ls-files').split()
-            if f.startswith('src/') and f not in runtime_assets
+            if (
+                f.startswith('src/')
+                and f not in runtime_assets
+                and f not in DERIVED_COMPOSITION.get(repo, set())
+            )
         }
 
         add, remove = sorted(expected - actual), sorted(actual - expected)
@@ -487,6 +496,9 @@ def main() -> int:
             print(f'   ! {rel}（清单里没有；--prune 才会删）')
         for rel in comp_changed:
             print(f'   ⊘ {rel}（组装根：只报不改，批次 2/3/4 各仓自己写 main()）')
+        for rel in sorted(DERIVED_COMPOSITION.get(repo, set())):
+            if os.path.isfile(os.path.join(path, rel)):
+                print(f'   ⊙ {rel}（派生仓私有组装根：无 Cloud 对应物，只登记不覆盖）')
         asset_diff = sync_assets(args, repo, path)
         mig_diff = check_migrations(path, mig_scopes, layer)
         if add or changed or remove or comp_changed or asset_diff or mig_diff:
