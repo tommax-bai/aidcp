@@ -69,6 +69,8 @@ The established Facebook `select_mode` caller deadline is 40 seconds. The Native
 
 Before the click, loss of the home surface or target remains `not_started`. After the click, target loss or timeout is ambiguous and never retried. The router entry vocabulary is restored from the retired oracle: English variants, zh-CN `写点什么`/`创建帖子`/`分享你的新鲜事`, Vietnamese, and Spanish. One and only one canonical visible entry is required; ranking does not erase ambiguity. Submit restores zh-TW and Spanish forms already present in the oracle.
 
+DEV publish record `195` exposed a second identity problem after the phrase restoration: Facebook renders one accessible `region` named `创建帖子` around one personalized composer `button`. Both nodes matched the entry vocabulary, and the initial Native probe treated the non-actionable region as a second target. Publish target identity is therefore the actionable control, not every matching semantic ancestor. A matching non-actionable container is expanded to its visible actionable descendants whose own label or rendered text matches the retained Publish vocabulary; the descendants are deduplicated by DOM identity with candidates discovered directly. Zero matching actionable descendants contribute no target, exactly one folds the container into that control, and more than one preserves `ambiguous_target`. This rule does not rank away two independent controls or allow a non-actionable container to receive the trusted click.
+
 Keeping the current immediate `navigate_entry` click was rejected because the entry may render late and the stage no longer means navigation. Keeping `select_mode` as a no-op was rejected because it reports progress without opening the editor.
 
 ### Keep Comment lifecycle vocabulary inside Comment

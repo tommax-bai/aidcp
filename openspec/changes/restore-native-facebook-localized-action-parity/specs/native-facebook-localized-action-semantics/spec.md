@@ -74,12 +74,22 @@ The Native Facebook router SHALL maintain the observed zh-CN, zh-TW, English, Sp
 
 ### Requirement: Native Facebook Publish retains the proven localized control families
 
-Publish entry, editor, submit, and submitted-state probes SHALL retain the exact evidence-backed English, zh-CN, zh-TW, Vietnamese, and Spanish label families from the retired Publish executor. Entry matching SHALL include `分享你的新鲜事` inside an otherwise longer accessible label, SHALL exclude comment/reply controls, and SHALL require exactly one canonical visible supported entry without using ranking to discard additional candidates. Submit matching SHALL remain scoped to the open composer and SHALL reject disabled or ambiguous controls. Post-submit verification SHALL confirm either composer closure or one retained submitted-state phrase within a bounded 20-second window capped by the caller's remaining absolute deadline.
+Publish entry, editor, submit, and submitted-state probes SHALL retain the exact evidence-backed English, zh-CN, zh-TW, Vietnamese, and Spanish label families from the retired Publish executor. Entry matching SHALL include `分享你的新鲜事` inside an otherwise longer accessible label, SHALL exclude comment/reply controls, and SHALL require exactly one canonical visible supported entry without using ranking to discard additional candidates. The canonical identity SHALL be a visible actionable control: a matching non-actionable container SHALL contribute only its visible actionable descendants that independently match the retained entry vocabulary, and those descendants SHALL be deduplicated by DOM identity with directly discovered controls. A container with zero matching actionable descendants SHALL contribute no target, while multiple matching descendants or independent controls SHALL remain ambiguous. Submit matching SHALL remain scoped to the open composer and SHALL reject disabled or ambiguous controls. Post-submit verification SHALL confirm either composer closure or one retained submitted-state phrase within a bounded 20-second window capped by the caller's remaining absolute deadline.
 
 #### Scenario: Personalized simplified-Chinese composer entry
 
 - **WHEN** one visible home control has an accessible label such as `Tianxing Bai，分享你的新鲜事吧！`
 - **THEN** the Publish entry probe resolves it as the unique composer entry
+
+#### Scenario: Semantic region wraps one real composer control
+
+- **WHEN** a matching accessible Publish region contains one matching actionable composer control plus unrelated action controls
+- **THEN** the region and its composer control resolve to that one actionable DOM identity
+
+#### Scenario: Semantic region contains multiple composer controls
+
+- **WHEN** a matching non-actionable container contains more than one visible actionable descendant that independently matches the Publish entry vocabulary
+- **THEN** Native returns `ambiguous_target` and clicks none of them
 
 #### Scenario: Retained localized submit control
 
