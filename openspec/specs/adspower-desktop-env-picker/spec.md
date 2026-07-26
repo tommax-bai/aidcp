@@ -105,15 +105,19 @@ TBD - created by archiving change adspower-desktop-env-picker. Update Purpose af
 
 ### Requirement: 桌面外壳「创建环境」程序化建号入口 + 是否配代理提示
 
-`adspower` 模式下，桌面外壳的「创建环境」入口 SHALL 触发 `adspower-environment-provisioning` 的程序化建号流程（而非仅拉起 AdsPower 客户端），运维 SHALL 只需挑一个「整机模板」，MUST NOT 被要求在面板内逐字段手配指纹。触发控件 SHALL 在创建在途时禁用（配合主进程单飞互斥）。**唯一的运营提示 = 「是否配置了代理」**：环境列表 SHALL 对每个环境如实呈现其代理配置状态，无代理（`user_proxy_config.proxy_soft` 为 `no_proxy` / 空）SHALL 给出「未配置代理」提示；该提示为纯提醒、MUST NOT 阻止任何操作（代理由运维手动在 AdsPower 侧配）。桌面外壳 MUST NOT 自动做运行时自检 / 投产硬闸 / 就绪判定——创建成功即如实呈现「已创建」，是否可用由运维登录时自行确认。本地 API 不可达或程序化创建失败时 SHALL 诚实降级（如实说明原因），MUST NOT 谎报已创建（不再提供「打开 AdsPower 手动新建」外链）。环境列表每行 SHALL 提供**删除入口**，其行为按 `adspower-environment-provisioning` 的「删除环境仅经界面逐个二次确认」需求（点两次确认、警示不可恢复）。
+`adspower` 模式下，桌面外壳的「创建环境」入口 SHALL 触发 `adspower-environment-provisioning` 的程序化建号流程（而非仅拉起 AdsPower 客户端），运维 SHALL 只需挑一个「整机模板」，MUST NOT 被要求在面板内逐字段手配指纹。触发控件 SHALL 在创建在途时禁用（配合主进程单飞互斥）。创建与环境列表阶段的运营提示 SHALL 只陈述“是否配置了代理”：环境列表 SHALL 对每个环境如实呈现其代理配置状态，无代理（`user_proxy_config.proxy_soft` 为 `no_proxy` / 空）SHALL 给出“未配置代理”提示；该提示为纯提醒、MUST NOT 阻止任何操作（代理由运维手动在 AdsPower 侧配）。桌面外壳在创建阶段 MUST NOT 做运行时自检、投产硬闸或就绪判定——创建成功即如实呈现“已创建”；当 Facebook 环境真正启动后，系统 SHALL 可按 `proxy-runtime-observability` 对当前浏览器会话生成独立的出口证据和接收流量，MUST NOT 把创建成功或已保存代理配置当作运行时验证成功。本地 API 不可达或程序化创建失败时 SHALL 诚实降级（如实说明原因），MUST NOT 谎报已创建（不再提供“打开 AdsPower 手动新建”外链）。环境列表每行 SHALL 提供**删除入口**，其行为按 `adspower-environment-provisioning` 的“删除环境仅经界面逐个二次确认”需求（点两次确认、警示不可恢复）。
 
 #### Scenario: 挑模板一键程序化创建，不必手配指纹
-- **WHEN** 运维在「创建环境」入口选定一个整机模板并确认
-- **THEN** 桌面外壳触发程序化建号流程，运维无需在面板内逐字段配指纹；创建在途时该控件禁用；成功后如实呈现「已创建」
+- **WHEN** 运维在“创建环境”入口选定一个整机模板并确认
+- **THEN** 桌面外壳触发程序化建号流程，运维无需在面板内逐字段配指纹；创建在途时该控件禁用；成功后如实呈现“已创建”
 
 #### Scenario: 无代理给提示但不拦
 - **WHEN** 环境列表刷新，其中某环境未配置代理（`no_proxy` / 空）
-- **THEN** 该环境如实标「未配置代理」提示，运维仍可对其做任何操作，MUST NOT 因无代理而拦截
+- **THEN** 该环境如实标“未配置代理”提示，运维仍可对其做任何操作，MUST NOT 因无代理而拦截
+
+#### Scenario: 创建态与运行时证据分离
+- **WHEN** 一个 Facebook 环境已创建且保存了代理配置，但尚未启动或当前浏览器探测未形成完整证据
+- **THEN** 环境列表只陈述配置态，运行页 MUST NOT 显示“已验证”；环境启动后由当前浏览器会话独立生成出口状态
 
 #### Scenario: 创建失败诚实降级
 - **WHEN** 本地 API 不可达或 `user/create` 返回错误
@@ -121,7 +125,7 @@ TBD - created by archiving change adspower-desktop-env-picker. Update Purpose af
 
 #### Scenario: 每行删除入口二次确认
 - **WHEN** 运维点击某环境行的删除按钮
-- **THEN** 第一次仅进入「确认删除?」待确认态、第二次才真删；删除后刷新列表
+- **THEN** 第一次仅进入“确认删除?”待确认态、第二次才真删；删除后刷新列表
 
 ### Requirement: 恰好一个环境时自动选中
 
@@ -175,19 +179,23 @@ TBD - created by archiving change adspower-desktop-env-picker. Update Purpose af
 
 ### Requirement: 环境展示名保真于 AdsPower 实时名并随列表刷新同步
 
-写入运行花名册（并经主进程 `syncEnvHandles → fleetSnapshot / status.envName` 投影到左侧环境列表 / fleet rail）的**环境展示名**，SHALL 忠于该环境在 AdsPower `user/list` 返回的名字（`name`，缺则回落 `username`），使**左侧列表**与**「添加环境」面板**对同一环境呈现一致的名字，MUST NOT 让二者因来源不同而长期漂移。
+写入运行花名册（并经主进程 `syncEnvHandles → fleetSnapshot / status.envName` 投影到左侧环境列表 / fleet rail）的**环境展示名**，在没有人工昵称时 SHALL 忠于该环境在 AdsPower `user/list` 返回的名字（`name`，缺则回落 `username`），使**左侧列表**与**「添加环境」面板**对同一环境呈现一致的名字，MUST NOT 让二者因来源不同而长期漂移。存在明确人工来源标记的成员 SHALL 保持人工昵称；实时名仍可在添加面板如实展示，但 MUST NOT 覆盖花名册中的人工昵称。
 
 - **创建路径 MUST NOT 以空名入册**：桌面外壳经程序化创建环境后自动选中该环境时，SHALL 把创建流实际写入 AdsPower 的环境名（`name`，缺省为模板名）经创建返回体带回渲染层并写入花名册，MUST NOT 因返回体漏带名字而以空字符串入册。此保真 SHALL 即时生效、不依赖后续任何列表刷新。
-- **拉列表时以实时名回填花名册**：桌面外壳**成功且完整**地拉取 AdsPower 环境列表时（`user/list` 返回 `ok` 且未截断、且列表非空），SHALL 用实时名回填 / 更新花名册中对应成员的名字：仅覆盖**本次列表在场**、且实时名**非空**、且与花名册现存名**不同**的成员；有回填即落盘一次以令左侧列表随即刷新。名字为纯展示字段，回填 MUST NOT 引入「人工标注优先」之类的例外。
+- **拉列表时以实时名回填非人工成员**：桌面外壳**成功且完整**地拉取 AdsPower 环境列表时（`user/list` 返回 `ok` 且未截断、且列表非空），SHALL 用实时名回填 / 更新花名册中对应成员的名字：仅覆盖**本次列表在场**、实时名**非空**、与花名册现存名**不同**且未标记人工来源的成员；人工成员 MUST 跳过。有回填即落盘一次以令左侧列表随即刷新。
 - **缺数据不自残**：拉取失败 / 截断 / 空列表时 SHALL NOT 回填任何名字（沿用剔孤儿同款守卫 `r.ok && !r.truncated && live.size>0`），MUST NOT 因一次不完整的拉取把在用环境的名字误清或误改；宁可暂留旧名、绝不据缺数据改写。
 
 #### Scenario: 创建环境后左侧列表与面板显示同一真名
-- **WHEN** 运维经「创建环境」建出一个环境并被自动选中，随后创建动作触发的列表刷新拉回该环境
+- **WHEN** 运维经「创建环境」建出一个环境且该成员尚未人工命名，随后创建动作触发的列表刷新拉回该环境
 - **THEN** 左侧环境列表对该环境显示其 AdsPower 环境名（默认为模板名），与「添加环境」面板对同一环境显示的名字一致，MUST NOT 显示「环境 …末4位」这类占位名
 
-#### Scenario: AdsPower 端改名后刷新即同步到左侧列表
-- **WHEN** 某已加入花名册的环境此后在 AdsPower 端被改名，运维再次成功且完整地刷新环境列表
+#### Scenario: AdsPower 端改名后刷新同步非人工成员
+- **WHEN** 某未人工命名、已加入花名册的环境此后在 AdsPower 端被改名，运维再次成功且完整地刷新环境列表
 - **THEN** 桌面外壳用实时名回填该成员的花名册名并落盘，左侧列表随即显示新名，与面板一致
+
+#### Scenario: 人工昵称不被实时名覆盖
+- **WHEN** 已人工命名的环境在 AdsPower 返回另一个实时名
+- **THEN** 添加面板仍如实展示 AdsPower 实时名，但花名册与左栏保持人工昵称且不改来源
 
 #### Scenario: 拉取不完整时绝不误改环境名
 - **WHEN** 环境列表拉取失败、被截断、或返回空列表
@@ -206,4 +214,60 @@ The desktop shell's create-environment panel SHALL expose an OS-family selector 
 - **WHEN** the operator selects Facebook batch creation
 - **THEN** the OS-family selector is hidden
 - **AND** the main process assigns OS families independently for each account
+
+### Requirement: 环境管理 SHALL 区分页面导航与创建主操作
+
+环境管理浮层 SHALL 使用可辨识为导航的“环境 / 新建环境”页签，并在标题下说明浮层可添加已有环境或创建新的独立浏览器环境。新建环境页 SHALL 按平台、浏览器系统、条件创建资料、可选代理和创建回执的纵向顺序呈现，创建按钮 SHALL 位于独立底部动作区且为该页唯一主操作；代理默认 SHALL 明确为无代理且可稍后配置，详细字段 SHALL 按需展开。
+
+#### Scenario: 新建环境页具有单一主操作层级
+- **WHEN** 用户进入“新建环境”页
+- **THEN** 页面依次呈现平台、浏览器系统和可选代理信息
+- **AND** “创建环境”位于底部动作区，不与字段下拉框挤在同一行
+- **AND** 页签视觉不冒充两个并列创建按钮
+
+#### Scenario: 平台条件字段渐进展示
+- **WHEN** 用户选择 Facebook 单个或批量创建
+- **THEN** 页面只展示该模式需要的账号资料、操作系统和代理输入
+- **AND** 小红书与视频号 MUST NOT 承担 Facebook 专属批量字段
+
+#### Scenario: 代理默认简洁且可稍后配置
+- **WHEN** 用户未展开代理设置并保持无代理
+- **THEN** 页面显示“无代理”及“创建后可配置”的说明
+- **AND** MUST NOT 用一组空代理字段干扰首次创建主路径
+
+### Requirement: 创建反馈 SHALL 防止重复提交并保留可恢复上下文
+
+创建请求进行中时，环境管理 SHALL 禁止重复提交和切换/关闭导致的上下文丢失，并显示明确的进行中文案。从权威零花名册发起的首个单环境创建，只有精确环境同时进入设置花名册与 fleet 全量快照后，界面 SHALL 关闭环境管理、选中该环境并回到主界面；创建第二个及后续单环境仍 SHALL 切回环境列表展示真实环境行及其权威离线状态。批量创建、部分失败、失败或任一权威证据未到齐时 SHALL 保留创建页输入和可理解回执，MUST NOT 提前关窗、构造成功环境或清空失败上下文。
+
+#### Scenario: 创建中不允许重复提交
+- **WHEN** 创建请求尚未完成
+- **THEN** 创建按钮显示进行中状态并不可再次提交
+- **AND** 页签、遮罩或关闭动作 MUST NOT 丢失正在执行的创建上下文
+
+#### Scenario: 首个单环境创建完成后直接回到主界面
+- **WHEN** 用户从已确认零花名册创建首个单环境
+- **AND** 回执中的精确环境已同时进入设置花名册与 fleet 全量快照
+- **THEN** 环境管理关闭，主界面选中该真实环境
+- **AND** 未启动环境如实显示为离线并接续启动引导，MUST NOT 显示为运行成功
+
+#### Scenario: 当前账号零环境不受本机历史环境影响
+- **WHEN** 当前账号的权威 fleet 花名册已确认为零
+- **AND** 本机设置仍保留其他账号或历史环境记录
+- **THEN** 用户创建的首个单环境仍按首次创建流程完成权威确认与主界面交接
+- **AND** MUST NOT 因本机历史记录停留在环境管理或跳过启动引导
+
+#### Scenario: 首个环境证据未到齐时不提前关窗
+- **WHEN** 首个单环境创建接口已成功但设置花名册或 fleet 全量快照尚未包含该精确环境
+- **THEN** 环境管理保持打开并展示真实创建回执
+- **AND** MUST NOT 回到零环境主界面、猜测环境 ID 或提前展示启动引导
+
+#### Scenario: 后续单环境仍回到环境列表
+- **WHEN** 已有运行环境的用户成功创建另一个单环境且权威花名册已包含它
+- **THEN** 环境管理切回环境列表并展示新环境
+- **AND** MUST NOT 自动关闭管理窗口或展示首次启动引导
+
+#### Scenario: 失败保留输入和错误
+- **WHEN** 单个、批量或部分创建失败
+- **THEN** 页面保留可安全复用的用户输入并显示可理解错误
+- **AND** MUST NOT 清空失败行上下文、自动切到环境列表或把部分结果表述为全部成功
 

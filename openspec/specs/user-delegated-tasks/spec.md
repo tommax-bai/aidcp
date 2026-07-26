@@ -78,7 +78,7 @@ TBD - created by archiving change user-delegated-tasks-phase-1. Update Purpose a
 
 ### Requirement: 批量和异步委托必须遵守自动化风险额度并保留人审
 
-**精确单次操作员命令**（`source=legacy_command` 且 `targetConstraints.manualSingle=true`，含 `/publish` 与 `/comment`）SHALL 以操作员全权执行——越过风控 status / canDo 与配额闸（发帖侧透传 `operatorOverride=true`，评论侧 `manualOverride=true`），但**发布前 / 评论前的人审 MUST 仍强制**（越权只越风控 / 配额，绝不越人审）。`targetSuccessCount>1`、跨账号、自然语言（`source=feishu`）或结构化（`source ∈ {edge,console,api}`）委托 MUST 使用自动化额度与风险闸（`governed`），MUST NOT 置 `operatorOverride` / 为每次 attempt 传 `manualOverride=true`。RiskController SHALL 继续是账号风险状态唯一写者。公开评论和发布默认 SHALL 使用 `review`，除非既有受控配置明确允许其他模式。
+**精确单次操作员命令**（`source=legacy_command` 且 `targetConstraints.manualSingle=true`，含 `/publish` 与 `/comment`）SHALL 以操作员全权执行——越过风控 status / canDo 与配额闸（发帖侧透传 `operatorOverride=true`，评论侧 `manualOverride=true`）。发布前人审 MUST 仍强制；评论前人审默认强制，但账号显式 `auto_approve_all` 时 MUST 直接授权，飞书 `/comment` 不得再要求第二次按钮审批。免审通知仅作旁路记录，失败 MUST NOT 阻止提交或回退按钮审批。该账号策略只改变评论授权等待，MUST NOT 改变 `manualOverride` 的风控/配额语义。`targetSuccessCount>1`、跨账号、自然语言（`source=feishu`）或结构化（`source ∈ {edge,console,api}`）委托 MUST 使用自动化额度与风险闸（`governed`），MUST NOT 置 `operatorOverride` / 为每次 attempt 传 `manualOverride=true`。RiskController SHALL 继续是账号风险状态唯一写者。公开评论和发布默认 SHALL 使用 `review`，除非既有受控来源配置或账号全局评论策略明确允许免审。
 
 #### Scenario: 批量评论不能循环绕额度
 - **WHEN** 用户确认一个 5 条评论的委托任务
@@ -90,6 +90,11 @@ TBD - created by archiving change user-delegated-tasks-phase-1. Update Purpose a
 - **THEN** 系统越过风控 status/canDo 与配额生成草稿并发出发布人审卡（`operatorOverride=true`）
 - **AND** MUST NOT 因风控/配额把该精确命令 blocked→deferred→静默判失败
 - **AND** 发布前人审 MUST 仍强制，越权 MUST NOT 越过人审
+
+#### Scenario: 精确 /comment 服从账号全局免审
+- **WHEN** 管理群对一个 `auto_approve_all` 账号发送精确 `/comment <昵称>`
+- **THEN** 评论沿用 `manualOverride=true` 越过既有手工风险/配额闸，并按账号全局免审直接继续
+- **AND** MUST NOT 再发送同意/不发按钮卡或等待第二次人审
 
 #### Scenario: 自然语言与结构化发帖不得越风控
 - **WHEN** 委托发帖来自自然语言（`source=feishu`）或结构化入口（edge/console/api）
@@ -206,29 +211,29 @@ Phase 1 SHALL 接入：完成 N 条有效评论、发布一篇稿件、参考今
 
 只有**自然语言**委托入口（`source=feishu`）SHALL 先创建 `awaiting_confirmation` 任务并展示结构化确认摘要——账号 / 数量 / 截止 / 尝试均为从散文**推断**、可能解析错，需人过目；只有带 task id 与当前版本的明确确认才能进入 `queued`。**结构化精确入口**（console 行级动作 / Edge 快捷入口 / api / 旧 slash 命令，即 `source ≠ feishu`）参数已在调用处显式给定、无可推断歧义，SHALL 在创建时直接确认入队（`awaiting_confirmation → queued`），MUST NOT 展示结构化确认卡。
 
-**结构化入口的客户端请求体对 `approvalMode` 不可信**：免审（`auto_approve`）只由账号级授权授予，客户端体 MUST NOT 自带、系统 MUST NOT 原样采信。系统 SHALL 在 HTTP 建草稿边界把客户端体的 `approvalMode` 收口——缺省保持未定（交由按动作的默认，如 `generate_candidates → draft_only`）、`draft_only` 放行、其余（含 `auto_approve` 与任何未来模式）夹成 `review`。**服务端自建 intent**（后台洗稿 / 候选控制已显式传 `review`、飞书 parser 已硬编码 `review`）不经此收口、不受影响。
+**结构化入口的客户端请求体对 `approvalMode` 不可信**：免审（`auto_approve`）只由 Cloud 受控配置授予，客户端体 MUST NOT 自带、系统 MUST NOT 原样采信。系统 SHALL 在 HTTP 建草稿边界把客户端体的 `approvalMode` 收口——缺省保持未定（交由按动作的默认，如 `generate_candidates → draft_only`）、`draft_only` 放行、其余（含 `auto_approve` 与任何未来模式）夹成 `review`。**服务端自建 intent**（后台洗稿 / 候选控制已显式传 `review`、飞书 parser 已硬编码 `review`）不经此收口。评论执行到授权边界时仍 SHALL 读取 Cloud 持久化的账号全局评论策略；显式 `auto_approve_all` 可把有效评论模式覆盖为免审，这不等于采信客户端请求体。
 
-两类入口的人审都不受影响（发布 / 评论仍在下游内容审批处保留人审），昵称重名或找不到仍 fail-closed 拒绝。重复创建（去重命中）MUST 幂等返回当前真态，MUST NOT 重复入队。任务创建时 SHALL 从账号事实源回读平台，调用方自报平台不一致 MUST 拒绝。直接入队 ≠ 已执行：worker 接管前不得有任何一次尝试或平台副作用。
+两类入口的下游授权都不受确认卡差异影响：发布仍保留人审，评论默认保留人审但服从账号全局评论覆盖；昵称重名或找不到仍 fail-closed 拒绝。重复创建（去重命中）MUST 幂等返回当前真态，MUST NOT 重复入队。任务创建时 SHALL 从账号事实源回读平台，调用方自报平台不一致 MUST 拒绝。直接入队 ≠ 已执行：worker 接管前不得有任何一次尝试或平台副作用。
 
 #### Scenario: 客户端体自带 auto_approve 被夹成 review
-
 - **WHEN** 结构化建草稿路由（面板 / 客户端）收到请求体带 `approvalMode:'auto_approve'`
-- **THEN** 系统在创建前把该字段夹成 `review`，任务以必审入队
-- **AND** MUST NOT 让内容以免审绕过下游人审直达平台，即使该账号未开启账号级免审
+- **THEN** 系统在创建前把该字段夹成 `review`，任务以必审来源模式入队
+- **AND** MUST NOT 因客户端自报而让内容免审直达平台
 
-#### Scenario: 结构化精确入口不出确认卡但保留人审
+#### Scenario: 账号策略可在评论授权边界覆盖 review
+- **WHEN** 结构化评论任务的客户端体已被夹成 `review`，但执行时账号权威策略为 `auto_approve_all`
+- **THEN** Cloud 在授权边界解析有效评论模式为免审并旁路发送通知，MUST NOT 把客户端体当作账号策略事实源
 
+#### Scenario: 结构化精确入口不出确认卡但保留下游授权
 - **WHEN** 管理后台对一条精选图文点「洗稿」（`source=console`，服务端自建 intent 传 `review`）
 - **THEN** 系统直接确认入队（状态 `queued`），MUST NOT 展示确认卡
-- **AND** 其 `review` 授权不经客户端收口、保持不变，下游人审仍强制
+- **AND** 其发布 `review` 授权保持不变，下游人审仍强制
 
 #### Scenario: 自然语言委托仍先结构化确认
-
 - **WHEN** 飞书管理群发送自然语言业务目标
 - **THEN** 系统仍先创建 `awaiting_confirmation` 任务并展示结构化确认摘要，明确确认后才 `queued`
 
 #### Scenario: 重复创建幂等、不产生双任务
-
 - **WHEN** 同一结构化精确动作在去重窗口内被重复触发
 - **THEN** 去重命中返回同一 task id 的当前真态，MUST NOT 重复入队或重复执行
 
@@ -362,4 +367,191 @@ Phase 1 SHALL 接入：完成 N 条有效评论、发布一篇稿件、参考今
 - **THEN** 第一条 SHALL 先建立 executing ownership
 - **AND** 第二条 SHALL 观察到该 ownership 后延后
 - **AND** MUST NOT 出现两条都执行或两条都因对称冲突而延后的结果
+
+### Requirement: 同环境并发就绪命令必须由单写者队列确定执行顺序
+
+多个委托子命令 MAY 并发准备，但同一 Edge 环境在任一时刻 MUST 只有一个浏览器写任务持有 active lease。当多个请求同时就绪时，系统 SHALL 先按既有任务优先级选择；同优先级请求 SHALL 按 Edge 实际接收申请的单调顺序 FIFO 执行，MUST NOT 并发操作页面，也 MUST NOT 让同优先级任务彼此抢占。
+
+#### Scenario: 两个人工命令几乎同时到达 Edge
+
+- **WHEN** 同一账号的人工发布与人工评论租约请求几乎同时到达 Edge，且两者优先级均为 `human`
+- **THEN** Edge SHALL 把先收到的请求授予为唯一 active lease
+- **AND** 后收到的请求 SHALL 留在队列中等待前者释放
+- **AND** 两个任务 MUST NOT 同时发送页面命令
+- **AND** 人工发布 MUST NOT 因等待审批而退化成 `automatic` 后被同批人工评论抢占
+
+#### Scenario: 自动候选的人工审批不改变其原调度档位
+
+- **WHEN** 一个非精确手工 `/publish` 来源的自动候选由运营人工审批
+- **THEN** 该候选 SHALL 保持既有 `automatic` Edge 租约优先级
+- **AND** 系统 MUST NOT 仅凭“审批动作由人完成”把所有自动候选提升为 `human`
+
+#### Scenario: 同毫秒时间不依赖文本顺序裁决
+
+- **WHEN** 两个同优先级请求具有相同或不可区分的墙钟时间
+- **THEN** 系统 SHALL 使用 Edge 单调收包序号作为确定性 tiebreaker
+- **AND** MUST NOT 依赖原始分号命令的书写顺序伪造“同时”裁决
+
+### Requirement: 资源等待发生在动作起跑前时不得消耗尝试或失败预算
+
+当执行器能够证明一次延后发生在任何浏览器或平台命令下发之前，系统 SHALL 将其保留为可恢复的排队/延后状态，并 MUST NOT 增加 `attempt_count`、`failure_count` 或 `skipped_count`。资源释放后任务 SHALL 在截止时间内重新竞争执行权；它 MUST NOT 仅因反复等待同一浏览器资源而进入 `max_attempts`。
+
+只有明确标记为“动作未开始”的机器可读结果可以回收临时 attempt。已经发送浏览器命令、进入提交窗口、被抢占或提交结果不明的执行 MUST 保留 attempt 账本并走既有对账/防重复语义。
+
+#### Scenario: 发布占用浏览器时评论排队
+
+- **WHEN** 人工发布持有该账号 Edge lease，而同批人工评论申请执行权
+- **THEN** 评论 SHALL 等待或以机器可读的 pre-start defer 重新排队
+- **AND** 在零浏览器命令下发的等待期间 `attempt_count`、`failure_count` 与 `skipped_count` SHALL 均保持不变
+- **AND** 发布释放后评论 SHALL 在截止时间内自动再次竞争执行权
+
+#### Scenario: 两次 acquire 超时不再产生 max_attempts
+
+- **WHEN** 精确 `/comment` 的两次 Edge acquire 都因另一个合法任务占用而在起跑前超时
+- **THEN** 该评论任务 MUST NOT 因默认 `maxAttempts=2` 进入 `max_attempts` 失败
+- **AND** 任务 SHALL 保持可恢复延后，直到资源可用、用户取消或任务截止
+
+#### Scenario: 已有副作用可能性的 defer 保留 attempt
+
+- **WHEN** 一个任务已发送浏览器命令后被抢占，或提交结果无法确认
+- **THEN** 系统 MUST 保留对应 attempt 账本
+- **AND** MUST NOT 把它回收成“从未开始”后自动重试而制造重复发布或重复评论
+
+#### Scenario: 结构性不可执行仍诚实终止
+
+- **WHEN** 子命令因昵称不存在、平台不支持、人设未绑定或缺少必需联系方式而结构上不可执行
+- **THEN** 系统 SHALL 独立回报不可执行原因并按既有语义终止
+- **AND** MUST NOT 以无限排队掩盖结构性失败
+
+### Requirement: 委托发帖的风控拒绝必须分别展示状态、档位和真实原因
+
+governed 委托发帖在平台动作开始前被风控或配额闸拒绝时，系统 MUST 在已持久化 attempt reason 与用户可见终态回执中分别给出：风控状态 `status`、生效配额档位 `quotaLevel` 与实际拒绝原因。状态和档位 MUST 同时展示稳定英文值及可读中文含义，MUST NOT 再以“风控拒绝（状态 normal）”代替配额原因。
+
+配额拒绝还 MUST 给出命中的 `minute`／`hour`／`day` 窗口、该窗口已用量与生效上限，且这些值 MUST 与同一次 `RiskController.explain()` 判定同源。非 normal 威胁态拒绝 MUST 明确是状态闸，不得伪装成额度已满。未知或历史旧原因 MUST 兼容读取并诚实透传，MUST NOT 猜测补全。
+
+#### Scenario: normal 状态因保守档发布上限为 0 被拒绝
+
+- **WHEN** governed 发帖账号的风控状态为 `normal`、配额档位为 `conservative`，分钟发布已用量为 0 且生效上限为 0
+- **THEN** attempt reason SHALL 结构化携带 `status=normal`、`tier=conservative`、`cause=quota:minute`、`used=0`、`limit=0`
+- **AND** 用户提示 SHALL 明确表达“风控状态 normal（正常）”“配额档位 conservative（保守）”以及“分钟发布配额 0/0，已达到上限”
+- **AND** MUST NOT 只显示“状态 normal”或暗示账号处于平台威胁态
+
+#### Scenario: 非 normal 状态明确显示状态闸与档位
+
+- **WHEN** governed 发帖因 `warned`／`restricted`／`frozen` 状态在配额检查前被拒绝
+- **THEN** 用户提示 SHALL 同时显示该风控状态及中文含义、当前配额档位及中文含义
+- **AND** SHALL 明确说明本次由风控状态闸暂停发帖，MUST NOT 编造成某个配额窗口已满
+
+#### Scenario: 历史旧原因仍可读
+
+- **WHEN** 终态组装读取到部署前持久化的 `risk_status(<status>)` 或 `risk_denied(status=<status>)`
+- **THEN** 系统 SHALL 沿用兼容人话化或原样透传
+- **AND** MUST NOT 因缺少档位／窗口字段而抛错、丢失终态卡或虚构字段
+
+### Requirement: worker 重启必须回收上一进程遗留的执行 claim
+
+Cloud 委托 worker 每次启动时 MUST 在接受新任务前回收数据库中属于已退出进程的 `planning` / `executing` claim，MUST NOT 让它们停留到任务 deadline 才释放 ownership。恢复 MUST 写入可审计事件，并保留原状态与旧 claim 事实。
+
+#### Scenario: executing 在 Cloud 重启后进入对账
+
+- **WHEN** Cloud 在一个委托任务处于 `executing` 时重启
+- **THEN** 新 worker 在领取普通队列任务前 SHALL 清除旧 claim 并把该任务送入 attempt 对账
+- **AND** 该任务 MUST NOT 继续以旧 `executing` 身份占用 ownership
+
+#### Scenario: 当前进程的慢任务不被租约扫描误杀
+
+- **WHEN** 一个真实在跑的生成超过 claim 租约但 Cloud 进程没有重启
+- **THEN** worker MUST NOT 仅因租约时刻已过就在周期 poll 中回收该任务
+
+### Requirement: 中断 attempt 必须按派发证据分流
+
+重启恢复 SHALL 使用持久化 attempt 状态区分是否已经派发。`prepared` 证明零派发时 SHALL 撤销临时账本并归还尝试预算；`dispatched` 且缺少可核验终局时 MUST 走结果未知对账并停止盲重试，MUST NOT 编造干净失败或成功。
+
+#### Scenario: prepared attempt 安全返回队列
+
+- **WHEN** 重启遗留任务只有一个 `prepared` attempt，且没有 `dispatched_at`
+- **THEN** worker SHALL 丢弃该临时 attempt、归还 attemptCount 并允许任务重新排队
+- **AND** MUST NOT 将其描述为已派发或结果未知
+
+#### Scenario: dispatched attempt 无证据时诚实终结
+
+- **WHEN** 重启遗留任务有一个未收敛的 `dispatched` attempt，且执行器无法证明其成功、失败或未动作
+- **THEN** worker SHALL 以 `submitted_result_unknown` 诚实终结该 attempt 与任务
+- **AND** MUST NOT 自动再派发一次相同动作
+
+### Requirement: Explicit publish rejection is a non-alerting delegated cancellation
+
+当委托发帖进入 `waiting_approval` 后，用户通过受支持的审批入口明确取消或驳回对应候选稿时，系统 SHALL 持久化该决定，并在异步对账中把委托任务收敛为用户取消语义。系统 MUST 保留真实进度和未下发证据，MUST NOT 将该操作报告为发布失败或发送委托层失败/部分完成报警。仅有 `needs_review` 状态而没有明确用户决定证据时，系统 MUST 继续按真实异常失败闭合，不得猜测为用户取消。
+
+#### Scenario: User rejects the only pending publish candidate
+
+- **WHEN** 零成功的委托发帖正在等待候选稿审批，且用户明确取消或驳回该候选稿
+- **THEN** 候选稿不向平台下发，委托任务进入 `cancelled`，终态保留用户取消证据，且委托层不发送“发帖任务未成”报警
+
+#### Scenario: User rejects the remaining candidate after earlier success
+
+- **WHEN** 委托任务已有真实发布成功但尚未达到目标，且用户明确取消或驳回当前待审候选稿
+- **THEN** 任务保留真实成功数并按既有诚实终态规则收敛，且委托层不发送失败或部分完成报警
+
+#### Scenario: Needs review without user rejection evidence
+
+- **WHEN** 委托对账读取到候选稿为 `needs_review`，但没有持久化的明确用户取消或驳回证据
+- **THEN** 系统继续按非重试失败处理并保留既有失败报警，不得把异常静默为用户取消
+
+### Requirement: 委托任务必须绑定可信 Cloud 执行目标
+
+每条委托任务 SHALL 持久化 `executionTarget ∈ {dev,ol}`，表示创建和执行该任务的 Cloud 部署目标。该字段 MUST 由服务端当前运行目标注入，MUST NOT 从客户端请求体、自然语言、命令参数、`envKey`、`sourceRef` 或其他用户可控字段派生或覆盖。
+
+业务来源 `source`、来源引用 `sourceRef`、来源会话 `originChatId` 与 Cloud 执行目标是不同概念，系统 MUST NOT 复用其中任一字段替代 `executionTarget`。
+
+#### Scenario: dev 客户端创建精选创作任务
+- **WHEN** dev Cloud 收到已鉴权客户对某环境发起的精选创作请求
+- **THEN** 新任务 SHALL 持久化 `executionTarget=dev`
+- **AND** 请求体即使携带伪造 target 字段也 MUST NOT 改变该值
+
+#### Scenario: Cloud target 缺失时拒绝装配委托能力
+- **WHEN** Cloud 启动时部署目标缺失或不属于 `dev | ol`
+- **THEN** 委托任务创建服务和 worker SHALL fail-closed 不可用并留下明确运行日志
+- **AND** MUST NOT 猜测或默认该进程为 dev
+
+### Requirement: 委托任务的生命周期必须按 Cloud 执行目标隔离
+
+任务创建去重、读取、列表、精选内容“已创作/未创作”投影、确认、暂停、恢复、取消、ownership 判断、worker 领取、启动中断恢复和到期收敛 SHALL 只处理与当前 Cloud `executionTarget` 一致的任务。一个 Cloud worker MUST NOT 领取、恢复、改变或终结另一个 target 的任务，即使两者共享 PostgreSQL、账号 id、动作、截止时间或去重键。任何依赖委托任务数据的旁路投影在 target 缺失时 SHALL fail-closed，不得执行跨目标查询或猜测为 dev。
+
+同一 target 内的活跃任务去重语义 SHALL 保持不变；不同 target 的相同业务请求 MUST NOT 因共享唯一索引互相去重。
+
+#### Scenario: ol worker 观察到 dev 排队任务
+- **WHEN** 共享数据库中存在 `executionTarget=dev` 的 queued 任务，而 ol worker 轮询队列
+- **THEN** ol worker SHALL 跳过该任务且不得写入 claim
+- **AND** dev worker SHALL 仍可按既有优先级领取该任务
+
+#### Scenario: ol 启动不恢复 dev 的执行中任务
+- **WHEN** ol Cloud 重启，而共享数据库中有 `executionTarget=dev` 的 planning 或 executing 任务
+- **THEN** ol 的启动恢复 SHALL 不修改这些任务的状态、claim、attempt 或事件
+
+#### Scenario: 两个 target 的相同请求分别幂等
+- **WHEN** dev 与 ol 对同一账号创建业务字段及业务去重键相同的任务
+- **THEN** 两个 target SHALL 各自保留一条任务
+- **AND** 每个 target 内重复创建仍 SHALL 返回本 target 的同一活跃任务
+
+#### Scenario: dev 控制请求不能改变 ol 任务
+- **WHEN** dev 的任务查询或控制入口收到一个只存在于 `executionTarget=ol` 的 task id
+- **THEN** 系统 SHALL 按本 target 不存在处理
+- **AND** MUST NOT 暴露或修改 ol 任务真态
+
+### Requirement: 历史委托任务必须安全回填为 dev
+
+部署本变更前已存在且没有 Cloud 执行目标的所有委托任务 SHALL 幂等回填为 `dev`。回填 MUST 保留任务 id、账号、业务来源、状态、版本、进度、claim、终态、时间戳、attempt 与事件，不得把历史任务重新排队、重新执行或改写业务结论。
+
+回填完成后 `executionTarget` MUST 非空且只允许 `dev | ol`；新任务写入 MUST 显式提供服务端 target，数据库不得依靠永久默认值把未知来源静默归入 dev。
+
+#### Scenario: 旧任务启动迁移
+- **WHEN** schema 升级发现没有执行目标的历史委托任务
+- **THEN** 系统 SHALL 将这些行的执行目标设为 dev
+- **AND** 迁移前后任务总数、各业务状态计数和 attempt 数量 SHALL 保持一致
+
+#### Scenario: 重复启动迁移幂等
+- **WHEN** 已完成回填的 Cloud 再次启动并执行同一 schema 自愈
+- **THEN** 已有 dev/ol target SHALL 保持不变
+- **AND** MUST NOT 再次改变任务状态、版本、claim 或时间戳
 

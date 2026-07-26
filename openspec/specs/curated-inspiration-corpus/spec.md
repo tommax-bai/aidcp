@@ -124,17 +124,29 @@ TBD - created by archiving change curated-admission-eval-roles. Update Purpose a
 
 ### Requirement: 观测捕获诚实且为采集时刻快照
 
-系统 SHALL 在源帖详情到达云端时按门槛判定是否纳入精选；纳入前 MUST 先确认正文非空。纳入则落详细行（全文、点赞数、收藏数、话题、`counts_captured_at`、纳入原因），不纳入则只保留薄行为记录、详情丢弃。计数 MUST 记为采集时刻的快照（带 `counts_captured_at`），MUST NOT 宣称为实时值。任何缺失字段 MUST 诚实置空（计数落 NULL/0、话题落空数组），MUST NOT 编造；但正文缺失不同于普通可选字段，正文缺失 SHALL 导致不进入精选。
+系统 SHALL 在笔记详情到达云端时按门槛判定是否纳入精选；纳入则落详细行，未纳入则不囤积详情。计数 MUST 记为采集时刻快照，缺失字段 MUST 诚实置空，MUST NOT 编造。
 
-#### Scenario: 过门槛且正文非空源帖落详细行
+对通过共鸣预筛的图片笔记，系统 MAY 按 `textcard-image-transcription` 能力识别并转写其自身的高置信文字卡。成功文字 SHALL 按参考图顺序增补本次 DOM 正文，并以有序逐卡结构随精选行记录；因此 DOM 正文为空的文字卡 MUST 在真实转写后按有效正文参与丰富度评估，MUST NOT 仅因 DOM 为空被丢弃。失败 MUST 保持原正文并诚实记录，MUST NOT 破坏计数快照和缺失置空红线。
 
-- **WHEN** 一篇被浏览源帖的详情到达、正文非空且通过准入门槛
-- **THEN** `curated_content` 写入一行，含全文、点赞数、收藏数、话题、`counts_captured_at`（采集时刻）与纳入原因
+#### Scenario: 过门槛笔记落详细行
+- **WHEN** 一篇详情通过准入门槛
+- **THEN** `curated_content` 写入全文、计数快照、话题、纳入原因和可用的参考图片信息
 
-#### Scenario: 正文缺失不落精选
+#### Scenario: 未过门槛不落精选
+- **WHEN** 一篇详情未通过准入门槛
+- **THEN** 不向 `curated_content` 写入该详情，其薄行为记录照旧由行为账本承载
 
-- **WHEN** 一篇被浏览源帖未取得非空正文
-- **THEN** 不向 `curated_content` 写入该源帖的详细行，MUST NOT 以空串正文补建壳行
+#### Scenario: 计数缺失诚实置空
+- **WHEN** 某计数或话题解析不到
+- **THEN** 对应字段置空或空数组，MUST NOT 以臆造值填充
+
+#### Scenario: 空 DOM 文字卡按真实图中文字评估
+- **WHEN** 一篇文字卡 DOM 正文为空、通过共鸣预筛且至少一张卡转写成功
+- **THEN** 有序转写组成有效正文后参与丰富度评估，通过后逐卡记录与有效正文一并落库
+
+#### Scenario: 转写失败不改变原有诚实语义
+- **WHEN** 文字卡识别或转写失败
+- **THEN** 原 DOM 正文、计数快照和缺失字段语义保持不变，MUST NOT 编造正文或计数
 
 ### Requirement: 准入门槛——相关性叠加共鸣，可配置按账号
 
@@ -331,4 +343,42 @@ TBD - created by archiving change curated-admission-eval-roles. Update Purpose a
 
 - **WHEN** 有实现把 `reference_images` 中的原图 URL 直接下发给发布上传指令作为最终帖子图片
 - **THEN** MUST 视为违规，不予合入；原笔记图片只能作为生成新图的参考，不得直接发布
+
+### Requirement: 精选源帖 SHALL 保存来源发布时间证据
+
+图文或视频源帖进入 `curated_content` 时 SHALL 保存本次详情观测取得的来源发布时间原文、标准时间、精度、解析状态和观测锚。标准时间 MUST 来自统一平台发布时间标准化能力；原文不可解析时 SHALL 保存原文、`unparseable` 与观测锚并把标准时间/精度置空。评论精选 MAY 不带来源发布时间。系统 MUST NOT 用 `first_seen_at`、`updated_at` 或 `counts_captured_at` 回填来源发布时间。
+
+#### Scenario: 模型准入保存可解析发布时间
+
+- **WHEN** 一篇带“3小时前”的源帖通过精选准入
+- **THEN** 精选行保存原文、基于事件观测锚转换的标准时间、`hour` 精度、`parsed` 状态和观测锚
+
+#### Scenario: 不可解析原文仍留证据
+
+- **WHEN** 源帖发布时间原文存在但统一标准化器无法识别
+- **THEN** 精选行保存该原文、`unparseable` 与观测锚，标准时间和精度为空
+
+#### Scenario: 历史与缺失时间不猜测
+
+- **WHEN** 历史精选行没有来源发布时间，或本次详情没有抽到时间文案
+- **THEN** 来源发布时间字段保持为空，不以精选首次发现或更新时间补造
+
+### Requirement: 精选刷新 SHALL 原子维护发布时间证据组
+
+重复观测或机器人收藏补建 SHALL 把发布时间五元组作为一组维护。本次有非空原文证据时 SHALL 用同一观测生成的整组结果替换；本次没有时间证据时 MUST 保留已有整组字段，不得把已知发布时间擦空。机器人收藏在同一次详情观测已缓存正文和发布时间时 SHALL 把两者一并用于补建。
+
+#### Scenario: 无时间的刷新不擦除旧证据
+
+- **WHEN** 精选行已有已解析发布时间，后续详情刷新没有携带 `publishedAtText`
+- **THEN** 既有来源发布时间原文、标准时间、精度、状态和观测锚全部保留
+
+#### Scenario: 新原文原子替换旧证据
+
+- **WHEN** 后续详情带来新的非空发布时间原文
+- **THEN** 五元组全部来自该次新观测，不得混用旧标准时间和新原文
+
+#### Scenario: 收藏补建携带同访问时间证据
+
+- **WHEN** 机器人收藏一篇本次访问已有非空正文和发布时间观测、但尚未进精选的源帖
+- **THEN** 收藏补建行同时保存正文和该次来源发布时间证据
 

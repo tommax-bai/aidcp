@@ -57,7 +57,7 @@ TBD - created by archiving change account-persona-config. Update Purpose after a
 
 ### Requirement: 后台账号人设页受 JWT 守护且写非乐观
 
-账号人设接口（`GET /api/persona`、`GET /api/persona/:accountId`、`PUT /api/persona/:accountId`）MUST 与其它 `/api/*` 一样受 JWT 守护。管理后台 SHALL 提供人设页（`/persona` 路由 + 导航）：列出账号、按账号编辑其人设并保存，回显当前生效值与来源——来源为**已绑定（override）/ 未绑定（none）**两态，**不存在「回落默认」态**；未绑定账号 MUST 以醒目标注提示（该账号会被拒绝运行）。前端 MUST 允许操作员清空编辑器并保存为解绑，保存成功后以服务端返回真态显示「未绑定」；前端 MAY 对非空内容做格式提示，但 MUST NOT 用必填校验阻止显式解绑。写操作 MUST 非乐观——返回服务端写后真态（含生效人设 / 来源 + `updatedBy` + `updatedAt`），并用诚实文案（已保存 / 已解绑 / 人设格式无效无法保存），MUST NOT 返回乐观假态。
+账号人设接口（`GET /api/persona`、`GET /api/persona/:accountId`、`PUT /api/persona/:accountId`）MUST 与其它 `/api/*` 一样受 JWT 守护。管理后台 SHALL 提供人设页（`/persona` 路由 + 导航）：列出账号、按账号编辑其人设并保存，回显当前生效值与来源——来源为**已绑定（override）/ 未绑定（none）**两态，**不存在「回落默认」态**；未绑定账号 MUST 以醒目标注提示（该账号会被拒绝运行）。前端 MUST 允许操作员清空编辑器并保存为解绑，保存成功后以服务端返回真态显示「未绑定」；该后台显式清空操作 MUST 同时清除账号已有的首作新人状态，使账号恢复为下一次成功建立人设时可重新触发新人引导的初始化状态。人设解绑与首作状态复位 MUST 原子完成；任一步失败时数据库与内存镜像 MUST 保持清空前状态，接口 MUST 返回失败而非部分成功。前端 MAY 对非空内容做格式提示，但 MUST NOT 用必填校验阻止显式解绑。写操作 MUST 非乐观——返回服务端写后真态（含生效人设 / 来源 + `updatedBy` + `updatedAt`），并用诚实文案（已保存 / 已解绑 / 人设格式无效无法保存），MUST NOT 返回乐观假态。
 
 #### Scenario: 未鉴权被拒
 
@@ -74,10 +74,17 @@ TBD - created by archiving change account-persona-config. Update Purpose after a
 - **WHEN** 人设页列出一个无人设行的账号
 - **THEN** 该行来源显示「未绑定」红标（而非「回落默认」），提示其任务会被拒绝运行
 
-#### Scenario: 清空编辑器保存为未绑定
+#### Scenario: 清空编辑器保存为未绑定并复位初始化状态
 
 - **WHEN** 操作员在人设页把某账号编辑器内容清空并保存
-- **THEN** 后台调用写接口完成解绑，页面刷新为「未绑定」状态，MUST NOT 在前端提示必填并阻止保存
+- **THEN** 后台原子清除该账号的人设绑定与首作新人状态，页面以服务端真态刷新为「未绑定」
+- **AND** 系统 MUST NOT 在前端提示必填并阻止保存，也 MUST NOT 清理该账号的发布、精选、风控或主数据
+
+#### Scenario: 首作状态复位失败不产生部分解绑
+
+- **WHEN** 后台清空人设时首作新人状态无法删除
+- **THEN** 清空操作整体失败，原人设持久态与内存镜像保持不变
+- **AND** 后台 MUST NOT 显示已解绑或返回部分成功
 
 ### Requirement: 账号人设支持严格校验的结构化强制互动规则
 
@@ -120,4 +127,58 @@ TBD - created by archiving change account-persona-config. Update Purpose after a
 
 - **WHEN** 任一档位经 onboarding 生成并持久化
 - **THEN** 产物不因档位出现 `mandatory_interactions`，普通倾向 MUST NOT 被解释为确定性点赞授权
+
+### Requirement: 客户端人设视图只呈现当前真实人设并复用权威单写
+
+面向客户的环境级人设读取 SHALL 仅在账号存在有效 `persona_config` 时返回当前 soul YAML；同时 SHALL 由 Cloud 解析并返回有界的人设摘要，包括身份名、定位、背景、语气、发言语言、兴趣方向、搜索种子与结构化点赞倾向。未绑定账号 MUST 返回明确 `missing` 且 persona 为空，MUST NOT 把后台编辑器使用的打包起点模板或任何示例人设冒充为当前人设。
+
+客户确认更新 SHALL 复用与 Console 相同的人设单写通道和 soul 校验，写库成功后才刷新内存镜像并触发账号热加载；响应 SHALL 为写后真态，MUST NOT 本地或服务端乐观判成功。客户视图 MUST NOT 暴露内部 `updatedBy` 或账号键。
+
+#### Scenario: 已绑定账号返回可读摘要与完整定义
+
+- **WHEN** 客户读取一个已有合法账号人设的授权环境
+- **THEN** Cloud 返回当前 soul YAML、由同一份 soul 解析出的有界摘要和 `updatedAt`
+- **AND** 客户端无需复制 soul 解析器即可展示当前人设
+
+#### Scenario: 未绑定账号不展示模板假态
+
+- **WHEN** 授权环境已绑定账号但该账号没有人设行
+- **THEN** 客户视图明确返回 `missing` 且不返回打包默认/起点模板作为当前人设
+
+#### Scenario: 客户更新后运行链即时使用新人设
+
+- **WHEN** 客户在停止环境中确认保存一份合法新人设
+- **THEN** 写入成功后后续浏览与发布在账号再次运行时直接读取新人设，无需重启 Cloud
+- **AND** 保存回执只声明人设已更新，MUST NOT 声称浏览器或首作已经启动
+
+### Requirement: Soul 写作语言可选解析、受控写入并热加载
+Soul 类型、YAML loader 与 serializer SHALL 支持可选顶层 `writing_language`，存在时只允许 `zh-CN/en/vi`；缺省时旧人设仍可解析。Facebook 新生成/更新由入口强制存在，非 Facebook 继续缺省。保存成功后运行时 SHALL 从账号热加载 soul 读取，不建立第二份独立语言事实源。
+
+#### Scenario: 旧 soul 无语言仍可加载
+- **WHEN** 加载一份只有 identity/interests 的存量 soul
+- **THEN** loader 正常返回人设且 `writing_language` 缺省，MUST NOT 因 schema 扩展把账号误判为无人设
+
+#### Scenario: 合法语言 round-trip
+- **WHEN** 含 `writing_language: vi` 的 soul 经 serializer 再由 loader 读取
+- **THEN** 结果仍为 `vi`，其它 identity/interests/behavior 字段保持不变
+
+#### Scenario: 非法持久化被拒
+- **WHEN** 面板或 Edge persist 尝试保存 `writing_language: vietnam`
+- **THEN** 现有人设单写通道返回 `persona_invalid` 且不落库、不刷新镜像
+
+### Requirement: 账号全局评论免审覆盖人设规则局部审批模式
+
+结构化 `mandatory_interactions[].comment_approval` SHALL 继续表达 `source_rules` 账号的局部站立授权；当账号显式配置全局评论 `auto_approve_all` 时，Cloud MUST 将该账号所有 mandatory 评论的有效模式解析为 `auto_approve`，即使命中规则写为 `review`。该覆盖 MUST NOT 改写 persona 原文或放宽 mandatory 匹配、详情确认与动作集合；免审通知仅作旁路记录，不参与授权。
+
+#### Scenario: 全局免审覆盖 mandatory review
+- **WHEN** `auto_approve_all` 账号命中一条详情确认且 `comment_approval=review` 的 mandatory 评论规则
+- **THEN** 该评论直接获得授权，MUST NOT 等待按钮审批；旁路通知失败不阻止提交
+
+#### Scenario: 来源规则账号保持 persona 局部模式
+- **WHEN** 账号为 `source_rules`
+- **THEN** mandatory 规则的 `review|auto_approve` 继续逐条决定该来源审批方式，MUST NOT 被改写
+
+#### Scenario: 覆盖不改变规则匹配
+- **WHEN** `auto_approve_all` 账号的帖子未命中任何 mandatory 规则
+- **THEN** 免审只作用于实际由普通评论链产生的候选，MUST NOT 伪造 mandatory 命中或强制生成评论
 

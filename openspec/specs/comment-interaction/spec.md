@@ -34,10 +34,17 @@ TBD - created by archiving change comment-interaction. Update Purpose after arch
 `CommentApprovalGate`（循环内飞书人审）。任一段失败 / 不通过 MUST emit `comment.skipped` 并带如实原因，MUST NOT 伪造文本或伪造通过。
 `CommentComposer` 作为浏览闭环首个自由文本角色，MUST 自己保证：空 / 超长文本如实跳过、做跨笔记近似去重、撰写时避开裸 `@`（编辑器带 `data-tribute` 提及）；并 SHALL 提供**语义弃权出口**——对着笔记确实写不出有真实内容的话时，MUST 返回弃权（`nothing_genuine`）走 `comment.skipped` 分支，MUST NOT 硬凑客套话（客套敷衍正是评论体裁的 AI 味主形态）。
 
+评论撰写前的外部语料召回属于可选 prompt 增强，MUST 设独立短超时；异常、超时或空结果 MUST 按“无参考语料”继续撰写，不得让该 Promise 无界占住评论支线，也不得把可选增强失败伪装成评论成功。
+
 #### Scenario: 评估为是才进入撰写
 
 - **WHEN** `CommentAppraiser` 判定该笔记值得评论且配额/门槛通过
 - **THEN** emit `comment.appraised` 触发 `CommentComposer` 产文本 → `CommentDeAiFlavor` 去 AI 味 / 合规 → `CommentApprovalGate`；评估为否则 emit `comment.skipped`，不进入撰写（不付 LLM 撰写成本）
+
+#### Scenario: 可选语料召回悬空时按空参考继续
+
+- **WHEN** `CommentComposer` 的参考语料召回在短超时内未 resolve / reject
+- **THEN** 系统 MUST 记录稳定超时原因并按空参考继续调用评论撰写模型；MUST NOT 永久停在 `comment.appraised`，MUST NOT 因可选语料缺失伪造模板评论
 
 #### Scenario: 去AI味检测步确定性、改写步失败回退
 
@@ -88,25 +95,29 @@ TBD - created by archiving change comment-interaction. Update Purpose after arch
 
 ### Requirement: 循环内真人审批——暂停态 + 短超时 + 未授权不发
 
-普通评论因必须在详情页打开时发出，审批 SHALL **循环内等待**：`CommentApprovalGate` 下发评论命令前 MUST 经飞书人审授权。等待期间系统 MUST 进入可识别的审批暂停态，并设硬性短超时；超时 / 拒绝 MUST 记审计并 `comment.skipped`。审批使用评论专属 requestId，未获授权 MUST NOT 下发评论命令。
+普通评论默认因必须在详情页打开时发出而**循环内等待**：`CommentApprovalGate` 下发评论命令前 MUST 经人审授权。等待期间系统 MUST 进入可识别的审批暂停态，并设硬性短超时；超时 / 拒绝 MUST 记审计并 `comment.skipped`。审批使用评论专属 requestId，未获有效授权 MUST NOT 下发评论命令。
 
-唯一免逐条审批路径是：本篇携详情确认的结构化 mandatory context，规则 actions 含 comment，且规则显式 `comment_approval: auto_approve`。此时该规则保存本身构成账号级站立授权；`CommentApprovalGate` MUST 在提交前把账号、目标和清洗后的终稿发送到免审通知口，**通知成功后**才 emit `comment.approved`。通知口未接线或发送失败 MUST fail-closed 为 `comment.skipped{reason:'auto_approve_notice_failed'}`，MUST NOT 下发。未配置规则、规则为 `review`、或非规则命中评论继续逐条人审。
+免逐条审批路径有两类：① 本篇携详情确认的结构化 mandatory context，规则 actions 含 comment，且规则显式 `comment_approval: auto_approve`；② 当前账号显式配置全局评论 `auto_approve_all`，后者 MUST 覆盖普通浏览、排期、联系、mandatory、飞书 `/comment` 和结构化委托来源的局部模式。任一免审路径下，`CommentApprovalGate` MUST 直接 emit `comment.approved`，并把账号、目标和清洗后的终稿旁路发送到免审通知口。提交链 MUST NOT 等待通知；通知口未接线或发送失败只记日志，MUST NOT emit `comment.skipped`、MUST NOT 阻止下发、MUST NOT 回退为按钮审批。账号为 `source_rules` 时，未配置规则、规则为 `review`、或非规则命中评论继续逐条人审。
 
 #### Scenario: 普通评论授权后下发、超时则跳过
-- **WHEN** 普通评论的飞书人审在超时窗口内写入授权信号
+- **WHEN** `source_rules` 账号的普通评论人审在超时窗口内写入授权信号
 - **THEN** gate 下发；若未授权 / 被拒则 skip、退出暂停态
 
-#### Scenario: 强制规则免审先通知后授权
-- **WHEN** mandatory comment 的规则显式 `auto_approve` 且免审通知成功
-- **THEN** gate 不等待逐条点击，直接 emit approved；通知内容必须是即将提交的终稿
+#### Scenario: 强制规则免审直接授权并旁路通知
+- **WHEN** `source_rules` 账号的 mandatory comment 规则显式 `auto_approve`
+- **THEN** gate 不等待逐条点击，直接 emit approved；旁路通知内容必须是即将提交的终稿
 
-#### Scenario: 强制规则免审通知失败不裸发
-- **WHEN** 免审通知口未接线或发送失败
-- **THEN** MUST emit `comment.skipped{reason:'auto_approve_notice_failed'}`，不下发 edge 评论
+#### Scenario: 账号全局免审覆盖普通评论
+- **WHEN** 普通浏览评论所属账号显式配置 `auto_approve_all`
+- **THEN** gate 不发送按钮审批卡、不等待点击，直接 emit approved 并继续既有目标复核与提交链
 
-#### Scenario: XHS 与普通 FB 评论仍需逐条审批
-- **WHEN** 评论没有有效的 auto-approved mandatory context
-- **THEN** 它仍走既有人审；MUST NOT 因本功能全局自动直发
+#### Scenario: 免审通知失败不影响全局免审
+- **WHEN** 任一免审路径的通知口未接线或发送失败
+- **THEN** MUST 只记录日志并继续既有提交链，MUST NOT 回退按钮审批或产生 `auto_approve_notice_failed`
+
+#### Scenario: 来源规则账号的 XHS 与普通 FB 评论仍需逐条审批
+- **WHEN** 账号为 `source_rules` 且评论没有有效的 auto-approved mandatory context
+- **THEN** 它仍走既有人审，MUST NOT 被隐式全局自动直发
 
 ### Requirement: 执行端发评论动作——拟人输入 + 发布后校验、绝不假成功
 
@@ -186,26 +197,30 @@ If composition and cleanup logic is refactored into shared helpers, the helper S
 
 ### Requirement: Facebook comments require human review by default
 
-All Facebook comments — whether or not they carry contact info — SHALL pass the Feishu human-review gate before edge submit by default. The only account-persona exception is a detail-confirmed structured mandatory rule whose actions include comment and whose `comment_approval` is explicitly `auto_approve`; that path MUST send a readable auto-approval notice successfully before submit and MUST fail closed when notification is unavailable. The existing `AIDCP_FB_COMMENT_REVIEW_ALL=false` escape hatch and contact-comment rules remain unchanged for scheduled comments. An unwired approval port, review timeout, rejection, or failed mandatory auto-approval notice MUST produce an honest non-submitting outcome with no success mark.
+All Facebook comments — whether or not they carry contact info — SHALL pass the human-review gate before edge submit by default. The exceptions are a detail-confirmed structured mandatory rule whose actions include comment and whose `comment_approval` is explicitly `auto_approve`, or an explicit account policy of `auto_approve_all`. Either exception MUST authorize without waiting for a button and SHOULD send a readable best-effort auto-approval notice; notice delivery MUST NOT gate or delay submit. The account-wide exception MUST apply to every comment source, including Feishu `/comment`; a source-specific schedule mode MUST NOT override it back to review. The existing `AIDCP_FB_COMMENT_REVIEW_ALL=false` escape hatch and contact-comment rules remain unchanged for `source_rules` accounts. An unwired approval port, review timeout, or rejection on a `review` path MUST produce an honest non-submitting outcome with no success mark.
 
 #### Scenario: Non-contact FB comment waits for review by default
-- **WHEN** a Facebook comment has no valid auto-approved mandatory context and review is enabled
-- **THEN** it MUST request Feishu approval and MUST NOT submit until approved
+- **WHEN** a `source_rules` account comment has no valid auto-approved mandatory context and review is enabled
+- **THEN** it MUST request approval and MUST NOT submit until approved
 
-#### Scenario: Structured standing approval notifies then submits
-- **WHEN** full-detail matching confirms an account rule with comment plus `comment_approval:auto_approve`
-- **THEN** the system MUST send the final-comment notification first and MAY submit only after that send succeeds
+#### Scenario: Structured standing approval submits independently of notice delivery
+- **WHEN** full-detail matching confirms a `source_rules` account rule with comment plus `comment_approval:auto_approve`
+- **THEN** the system MUST authorize immediately and SHOULD send the final-comment notification best-effort
 
-#### Scenario: Review or auto-approval notification failure is honest no-submit
-- **WHEN** review is unwired/timed out/rejected, or the mandatory auto-approval notice fails
-- **THEN** the run MUST audit a non-success reason, MUST NOT call edge submit, and MUST NOT record the target as commented
+#### Scenario: Account-wide standing approval covers manual comments
+- **WHEN** an `auto_approve_all` account receives an exact Feishu `/comment` command
+- **THEN** the system MUST authorize without waiting for a second button approval; notice failure MUST NOT change that decision
+
+#### Scenario: Review failure blocks but auto-approval notice failure does not
+- **WHEN** review is unwired/timed out/rejected, or an auto-approval notice fails
+- **THEN** only the `review` failure MUST block edge submit; an auto-approval notice failure MUST be logged and MUST NOT create an approval fallback
 
 #### Scenario: Shadow never reviews or submits
 - **WHEN** Facebook comment shadow/dry-run mode is active
 - **THEN** the run MUST short-circuit before review/notification and MUST NOT submit
 
 #### Scenario: Red-line reversal — implicit auto-post is forbidden
-- **WHEN** an implementation auto-posts because of free-form persona wording, account id, nickname, or a global heuristic rather than a validated structured rule
+- **WHEN** an implementation auto-posts because of free-form persona wording, account id, nickname, or a global heuristic rather than a validated structured rule or explicit persisted account policy
 - **THEN** it MUST be treated as a violation and not merged
 
 ### Requirement: 评论链人设注入对齐互动评估样板
@@ -292,4 +307,19 @@ mandatory comment 在撰写前 MUST 使用带稳定 reason 的硬风控预检。
 #### Scenario: 断线或超时保持未知
 - **WHEN** 评论命令已下发或评论迁移仍在途，但连接断开、会话结束或超过有界回执时间仍无终态
 - **THEN** 系统以同一 requestId 回黄色 `unknown`，说明是否上墙未知、需人工核对；MUST NOT猜成功、MUST NOT补记配额
+
+### Requirement: Facebook 评论撰写与重写保持账号写作语言
+Facebook `CommentComposer`、定向评论撰写器、强制互动评论以及 `CommentDeAiFlavor` 的去 AI 味/撞车重写 SHALL 使用账号 soul 的 `writing_language`。目标帖正文和评论区语言只作语境，MUST NOT 覆盖账号配置；重写结果语言不匹配时 SHALL 回退已验证原文或诚实停止。
+
+#### Scenario: 通用 Facebook composer 使用账号语言
+- **WHEN** Facebook CommentComposer 为 `writing_language=en` 的账号撰写评论
+- **THEN** prompt 明确要求只输出英文，现有“跟随帖子语言”规则不得覆盖它
+
+#### Scenario: 定向 Facebook composer 使用同一规则
+- **WHEN** CommentScheduler 的 Facebook 定向路径为 `writing_language=vi` 的账号撰写评论
+- **THEN** 定向 prompt 同样要求越南语并通过同一语言守卫，MUST NOT 与通用 composer 漂移
+
+#### Scenario: 去 AI 味不切换语言
+- **WHEN** 已验证为中文/英文/越南语的 Facebook 评论触发去 AI 味或撞车重写
+- **THEN** 重写提示要求保持输入语言；若结果不匹配则回退原评论或停止，MUST NOT 把另一语言文本送审/提交
 

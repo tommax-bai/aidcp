@@ -21,6 +21,422 @@
 
 > **2026-07-11 清账批**（第二次 openspec 分诊清账）：本批归档 **31 个** landed+deployed change，真机验收项按既有簇归并——发布链路 → 簇 3（`publish-select-mode-layout-robust` 5.3）、textcard → 簇 23（`textcard-carousel-form-parity` 6.3）、FB 加群评论 → 簇 32（新增 `facebook-group-join-observe-i18n` / `fb-group-join-wait-render` 两项 i18n + 就绪修复复核，见簇 32 补登）、`/comment` 搜索闭环 → 簇 34/55（`comment-search-command` 12.1，多次已跑通）、FB 评论人审 → 簇 48（`facebook-comment-review-and-targeted-join`）、**FB 公开组放量 → 新簇 59**（`facebook-group-join-and-commenting` 9.1-9.5）。归档后全库 `openspec validate --specs --all --strict` 106 项全绿。**本批刻意未归档（5 个仍活跃，另有门槛）**：① `publish-trigger-and-apply`（§11 统一部署待核）；② `edge-environment-platform-select`（tasks 3.3 明确 gate 在 FB edge driver `facebook-browser-env-and-login` 落 master，当前仅 probes 落地）；③ `humanize-interaction-prompts`（代码已部署 dev，但 tasks 9.4 spec 交织须待 `category-adaptive-images-and-judgment` 先归档）；④ `estimate-token-cost-column` + ⑤ `manual-billing-price-refresh`（代码已 shipped，但 `llm-token-usage-stats` spec delta 应用失败——前者用英文 header MODIFY 中文「console 提供…」需求、后者 MODIFY 一个无人创建的 `Token Usage Cost Estimates` 需求；两者对 cost/billing 需求建模不一致，须 owner 理顺 delta header / 重建模型后再归档）。**已废弃删除（1 个）**：`facebook-scheduled-comment`（2026-07-11 用户决定关为 superseded）——其 target-URL 定向评论设计已被 keyword-in-container 版取代（见归档 `2026-07-09-facebook-scheduled-comment` + `facebook-group-join-and-commenting`）；34/35 核心任务空，change 目录已 `git rm` 删除（内容存 git 历史）。**注**：唯一落地的 task 2.9（云端在握手时持久化 FB 昵称）代码仍在线；其需求已由后续小 change `facebook-nickname-handshake-persist`（2026-07-11 归档）正式补登进 `facebook-identity` capability——剔除了已被 `facebook-nickname-inplace-read`（簇 42）取代的 `/me` 探针描述、按现网「就地读取 → hello 附带 → 云端仅库内空时写、既有不覆盖」校订。至此该行为「代码在线 + 主 spec 有据」齐全。另 `category-adaptive-images-and-judgment`（高风险图产后校验待选视觉模型）、`self-contained-ads-runtime`（dev CLI 解析等代码活 + baked-key 决策）、及 4 个纯提案（`transcribe-textcard-image-text` / `facebook-consent-structural-detect` / `facebook-join-actuation-decouple` / `edge-installer-oss-distribution`）本就在研、非本批对象。
 
+> **2026-07-26 · 第五次「分诊清账」批：新簇 100「一次归档 86 个 change 带出的真机项」**
+>
+> **本批口径与前四次一致：代码写完 + 已部署即归档，不等真机。** 但真机项 MUST 在归档前落到这里——
+> change 目录一旦移进 `archive/`，里面那些待验项就再没有人会翻到了（这是第一次清账就定下的解耦约定）。
+>
+> **规模**：101 个 ✓Complete → 归档 **86**、暂缓 **15**（暂缓原因见本节末）。
+> 归档全部经沙箱演练 + 真跑双轮，`failed for header` / `Aborted` 零命中；
+> 全库 `openspec validate --specs --all --strict` = **196 项 0 失败**。
+> 活跃 change 127 → **41**，已合并 spec 124 → **155**。
+>
+> **本簇共 213 条真机项、覆盖 86 个已归档 change 中的 83 个**（另 3 个纯本地流程/文档改动，无真机面）。
+> **这不是一张要逐条跑完的清单**：绝大多数条目落在少数几个共享真机环境上
+> （一台装了客户端的运营机 + 一个在线边缘 + 一次飞书肉眼确认），按环境聚簇一次验一批才是正确用法。
+> **反复出现的三条前置**（出现在大多数条目里，先解掉它们能一次解锁大半）：
+> ① **Edge 安装包未出** —— 边缘侧改动对运营机不可见，客户端内的入口一律未验；
+> ② **gated 真机 E2E 未开** —— `AIDCP_E2E=1` 那条通道本批全程没跑过；
+> ③ **真实平台写操作未做** —— 会产生真实账号状态 / 付费调用的动作（批量建号、人设补齐、真发帖）
+>    一律停在「运营首批」这条边界上，属有意不做，不是遗漏。
+>
+> **`facebook-batch-environment-creation`**
+> - [ ] 未在真实 AdsPower 上跑批量建号（会产生真实凭据/代理的外部环境），运营首批为真机验收边界
+> - [ ] gated 真机 E2E 未开启，未打 Edge 安装包，批量入口需在装机客户端上人工点一遍
+>
+> **`facebook-cloud-auto-persona-fill`**
+> - [ ] 从未对真实 Facebook 账号触发过人设补齐（会产生付费/模型驱动的账号状态），运营首批补齐是真机验收边界
+> - [ ] Edge 侧环境栏「Facebook 筛选 → 人设浮层批量模式」入口未在装机客户端上验证（未出安装包）
+>
+> **`facebook-empty-feed-reels-fallback`**
+> - [ ] 集成后的实现未做第二次真机写操作验证：只有实装前 So La 探针在 Reel 837962452581083 上真点了一次赞（该赞保留）
+> - [ ] 空首页→Reels 兜底切换的完整链路未在真实账号上端到端跑过；越南语「到底」结束卡无稳定数据标记，只能靠结构判定，需真机复核
+> - [ ] 未打 Edge 安装包，边缘改动对运营机不可见
+>
+> **`facebook-environment-restriction-recovery`**
+> - [ ] 从未对真实受限账号执行过 restricted→normal 恢复，operator_override_recover 单写路径真机零跑
+> - [ ] Facebook checkpoint 裸 URL 不再判 captcha 的新分类逻辑未在真实 checkpoint 页面上验证
+> - [ ] Edge 改动源码态：未出安装包，运营机上看不到受限态与恢复按钮，需一次授权发版后人工点验
+>
+> **`facebook-feed-multi-layout-compatibility`**
+> - [ ] 只做了只读 CDP 采样（Tianxing Bai 语义布局 / Mi Xu 轻量布局各 cardCount=1），未在轻量布局上真跑一轮浏览+点赞
+> - [ ] 验证时自动浏览是停的、两个临时 AdsPower 分身已关，需在真实跑车队时复核多布局识别不回退
+> - [ ] 源码态发布、未打安装包
+>
+> **`facebook-feed-unreportable-card-continuation`**
+> - [ ] 真机证据只到只读 CDP（Mi Xu 上确认 watch?v=1547652190157533 可上报、纯图卡正确不上报），未做任何 Facebook 写操作
+> - [ ] 「遇不可上报卡继续滚动而不空等」的续跑行为未在真实运行会话里连续观测
+> - [ ] 无 ECS 部署、无安装包，运营机未加载该行为
+>
+> **`facebook-feed-video-random-like`**
+> - [ ] 实装后的真机探针没跑成：在跑的装机客户端是 0.3.22、源码是 0.3.24 且占着 AdsPower 50325 端口，起第二个控制器有双控风险
+> - [ ] Feed 视频 25% 固定伯努利点赞策略的真实抽签与「确认成功才记账」从未在真机上验证过，只有实装前的布局/控件探针
+> - [ ] Re Su（k1es5ky2）只读验收里生产扫描 cards=[]，未执行任何点赞/评论；越南语中性「Thích」不再当已赞证据的判定需真机复核
+> - [ ] 未打/未装 Edge 安装包
+>
+> **`facebook-feed-video-read-activity`**
+> - [ ] 在跑的开发客户端启动于集成前（2026-07-22 11:30），从未加载该行为；真机验收要等一次可控重启
+> - [ ] 重启前需先处理 canonical aidcp-edge master 上那个本地独有的签名提交 4432206（属他人并发工作，未被改写）
+> - [ ] 「今天做了这些」里每条云端计数的 Feed 视频恰好出现一次、且后续详情阅读不重复计数，需真机连续观察
+>
+> **`facebook-proxy-egress-proof`**
+> - [ ] 浏览器经代理的出口证据从未真机观测：部署时没开任何真实 AdsPower/Facebook 环境，只有自动化测试覆盖，待下次 Facebook 环境启动时观察
+> - [ ] 顶栏 Facebook 代理状态芯片、证据浮层与本次会话接收流量的界面表现未在真实运行页上目视验收
+> - [ ] 冷待机使证据失效、唤醒起新一代、CdpClient 监听跨重连存活这三条只有单测，需真机跑一轮待机-唤醒复核
+> - [ ] 未打 Edge 安装包
+>
+> **`client-engine-command-diagnostics`**
+> - [ ] 在已安装的桌面客户端上连真环境下发一次云端命令，确认开发者详情里的引擎命令诊断按环境隔离、阶段诚实、敏感字段不外泄（tasks.md 明记未做真实平台动作与打包客户端验证）
+>
+> **`client-env-platform-filter`**
+> - [ ] 真机上存在多平台环境时，按平台筛选后点“全部启动”，确认只启动筛选范围内的环境
+> - [ ] 强制确认弹窗走一遍，确认筛选范围在确认前后不被放大
+>
+> **`client-environment-browser-controls`**
+> - [ ] 真 AdsPower 环境下验证“打开浏览器窗口”的可见受理状态，以及抬不动时的诚实告知文案
+> - [ ] 真机验证按当前筛选范围“全部关闭”只关筛选内环境
+>
+> **`client-environment-status-groups`**
+> - [ ] 真机上同时造出暂停与离线两种环境，确认左栏拆成独立分组、需处理项仍排最前、且一行只属一组
+>
+> **`client-platform-home-card-polish`**
+> - [ ] 在已安装客户端里核对 Facebook 与小红书首页卡的视觉层级与能力/状态/操作/指标的真实差异（浏览器样张 760px/430px 已过，客户端内未验）
+>
+> **`client-quota-window-copy`**
+> - [ ] 在已安装客户端里打开展开态计划窗口，确认时间范围、上限措辞与新版布局对普通用户可读
+>
+> **`client-submitted-unconfirmed-publish-card`**
+> - [ ] 真账号发一条稿后在客户端确认“已提交、公开结果未确认”卡按优先级出现，平台确认后正确转终态
+> - [ ] 用真实客户 token 走一次 overview 鉴权 DTO（本轮只用测试覆盖，未用活 token 验证）
+>
+> **`client-xhs-publish-queue`**
+> - [ ] 真机跑一遍小红书发布队列：排队/生成中/待确认/平台确认四阶段与真实生命周期一致
+> - [ ] 真机逐条取消一个仍可取消的委托，验证“已取消”与“取消中”两种收据以及并发 CAS 冲突后的刷新不重试
+> - [ ] 切换环境时确认旧队列页面与请求代次被清除、非小红书环境不展示队列
+> - [ ] 首页发布卡的浏览器视觉检查有一处被浏览器安全策略挡住（data URL 渲染）未完成，需在真客户端里补看
+>
+> **`close-terminal-start-failure`**
+> - [ ] 真机造出“分身被外部占用、不可重起”的终态，点“关闭本机自动化”，确认既不触碰外部会话、也不假称已关闭外部会话
+> - [ ] 确认终态启动失败时重试与关闭两个入口同时可用且语义不混
+>
+> **`facebook-proxy-selection-preflight`**
+> - [ ] 未出 Edge 安装包，运营机上已装客户端仍无代理预检行为，需发版后真机验证
+> - [ ] 真机验证选中离线 Facebook 环境后的预检提示（预检中/可用/不可用/无法确认）在客户端界面正确显示
+> - [ ] 真机验证确认代理失败时启动与冷待机唤醒被拦截、且改代理后预检结果失效重算
+>
+> **`facebook-reels-inline-follow`**
+> - [ ] 未出 Edge 安装包，已装客户端拿不到 Reel 关注执行器，需发版后真机复验
+> - [ ] 真机复跑最终版 Reel 关注：绑定当前 Reel + 唯一作者控件、写后同 Reel 校验、already_followed 与 shadow 分支
+> - [ ] 真机探测遗留：Tianxing Bai 已真实关注 Salon de Comolis 且未自动取关，如需清理要人工处理
+>
+> **`facebook-reels-navigation-fallbacks`**
+> - [ ] 最终版回退顺序（键盘 → 滚轮 → 按钮）只有自动化测试覆盖，真机分身在改完后已关闭，需真机端到端复跑一次
+> - [ ] 部署后云端逐 Reel 计数行为未获真账号确认（So La 未重连），需真机确认「每张呈现的 Reels 卡片只记一次 view、后续同 Reel 详情不重复计数」
+> - [ ] 真机复验首个 Reel 布局下的按钮兜底（上一个禁用、只有一个可用下一个）不会误点页头
+>
+> **`facebook-reels-random-follow`**
+> - [ ] 未出 Edge 安装包，已装客户端缺 facebook_reel_follow_v1 能力声明、云端不会下发 Reel 关注，需发版后真机验收
+> - [ ] 真机验证每个可信 Reel 的 10% 独立关注抽样，且与点赞抽样互不影响
+> - [ ] 真机验证只有平台确认的新关注才计数并出现在「今日进展」与活动流（已关注/影子/失败保持静默）
+> - [ ] 真机确认 Facebook 侧普通主页关注路径仍保持关闭，没有被关注指标顺带打开
+>
+> **`facebook-reels-random-like`**
+> - [ ] 部署证据明确写明未触发任何真实 Facebook 动作，需真机验证 25% Reel 点赞抽样真的按概率发生
+> - [ ] 真机验证同一 Reel 重复上报只抽一次（幂等），以及只有平台确认的点赞才算成功计数
+> - [ ] 真机验证已被概率决策处理过的普通 Reel 不再走大模型互动评估，而强制点赞规则仍优先生效
+>
+> **`facebook-reels-read-activity`**
+> - [ ] 纯 Edge 源码交付未出安装包，需发版后在真机客户端确认每个新 Reel 在「今天做了这些」出现一条「读」活动
+> - [ ] 真机验证同一 Reel 之后被打开时不重复计一次「读」，导航失败时保持静默
+>
+> **`facebook-startup-feed-baseline`**
+> - [ ] 未出安装包、未做真账号验收，需真机验证自动浏览启动/恢复时先导航回 Facebook 首页再做首次扫卡
+> - [ ] 真机验证导航或就绪失败时不会拿残留旧页面上的卡片冒充结果（诚实失败）
+> - [ ] 本机只重建了开发用 Native 二进制，正在跑的 Edge 进程须重启才会加载新引擎
+>
+> **`feishu-semicolon-command-queueing`**
+> - [ ] 真机复跑分号批中的评论子命令直到平台真实写入：上次探测两次都停在审批边界（拒绝/超时），该轮 0 次真实评论
+> - [ ] 真机复验同优先级 FIFO 与零等待预算：需在 dev/ol 共库不再互抢的条件下重跑（上次因 ol 旧运行时抢走任务而作废一轮）
+> - [ ] 部署运维遗留：rsync --delete 曾误删 15 个 .env.bak.*（已从备份恢复），后续同步必须排除 .env.bak.*
+> - [ ] 已产生不可逆真机副作用：Tianxing Bai 已真实发帖（postId pfbid06CTcj…）、真实入群与一次真实评论，写作语言被置为 vi
+>
+> **`fix-native-facebook-feed-probe-age`**
+> - [ ] 未出安装包、未做真账号写入验收，需真机验证真实浏览器计时值下探针可解码、启动与恢复的浏览代次能进入 Feed 流程
+> - [ ] 已知基线偏差待真机/后续处理：契约样例 explore_feed 期望省略可选字段却收到 blockingKind/blockingText 为 null；Rust 1.97 Clippy 报两处既有 collapsible_if
+>
+> **`harden-comment-llm-settlement`**
+> - [ ] 真机跑一次真实评论支线，确认模型超时时诚实跳过/回退、不再钉住浏览（dev 只做了本地模型探针，未触发任何平台评论）
+>
+> **`hide-adspower-startup-and-place-below-client`**
+> - [ ] 重打客户端后目视确认浏览器窗口不再露在客户端右下角、AIDCP 保持在上层
+> - [ ] 真机观察 AdsPower 启动阶段是否还有闪现与抢焦点（本次未构建安装包、未启动目标环境）
+>
+> **`hide-stopped-facebook-runtime-guidance`**
+> - [ ] 客户端出包后目视确认 Facebook 停止态不显示运行价值说明卡，且切换环境后旧卡不残留
+>
+> **`managed-ads-runtime-group-self-proof`**
+> - [ ] 真机用托管 AdsPower 运行时建一次环境，验证残留守护进程先停后起、aidcp 分组自证与失败前置报错（tasks 明记 real-machine 未执行）
+>
+> **`manual-environment-nickname`**
+> - [ ] 真机双击左栏改昵称并重启客户端，确认人工昵称持久化且不被 AdsPower 实时名回填覆盖
+> - [ ] 真机验证登录后自动改名链在人工昵称环境上跳过（未调用真实 AdsPower user/update、未构建安装包）
+>
+> **`native-page-engine-spike`**
+> - [ ] 真机补齐 home 与 login 两个页面态的实况判定对比（根路径重定向到 explore、无安全登录控件，本次只有确定性测试证据）
+> - [ ] Native 产物签名并进 Electron extraResources 的打包验收（本次未构建安装包、未签名、未发布）
+>
+> **`normalize-source-published-time`**
+> - [ ] Edge 客户端真机目视确认灵感库列表与详情显示来源发布时间、未知态不回落成更新时间（本次只推源码、未出安装包）
+>
+> **`offline-account-persona-management`**
+> - [ ] 真机在已停止环境上跑一次人设读取→生成→保存的写入闭环（dev 只做了只读探针，未做任何人设写入或模型生成）
+> - [ ] 客户端人设浮层在停止环境的真态显示与未绑定诚实提示需真机目视（未构建安装包）
+>
+> **`cloud-direct-adspower-environment-delete`**
+> - [ ] 用真实 AdsPower 分身在管理后台跑一次直连删除（成功 / 失败 / 幂等重试）——自动化全程用 fake，从未删过真实 profile
+> - [ ] 在 dev 设置页填入真实 AdsPower API Key，确认下一次删除即时生效、无需重启服务
+>
+> **`comment-feed-fast-return`**
+> - [ ] 真机各跑一条带 --feed 的手动评论（小红书 + Facebook），确认提交后快速回首页、回执为「已提交未确认」且不触发重试
+>
+> **`content-schedule-contact-quick-config`**
+> - [ ] 在 dev 管理后台排期页真实点开「缺联系方式」快捷编辑、保存后确认联系评论门禁解锁
+>
+> **`facebook-account-import-format-recognition`**
+> - [ ] 在真实桌面客户端导入区粘贴六字段竖线格式账号并完成建环境（自动化只用合成数据，且本 change 未出安装包）
+>
+> **`facebook-account-writing-language`**
+> - [ ] 用真实 Facebook 账号按中 / 英 / 越三档写作语言各跑一次真发帖与真评论（自动化明确未做任何真实 Facebook 写入）
+> - [ ] 在桌面客户端人设向导里实操选择写作语言，确认按环境隔离回显、未选择时诚实阻止生成（未出安装包）
+>
+> **`account-activity-content-schedule`**
+> - [ ] 后台三态周历在真实浏览器里编辑账号级活跃/内容覆盖并保存,确认写后回读真态
+> - [ ] 真实账号「恢复全局」后确认立即回到全局掩码行为
+> - [ ] 真实账号在覆盖时段内验证开会话/续场/唤醒/自动内容都按同一账号生效值判定
+>
+> **`admin-environment-lifecycle-management`**
+> - [ ] 用一次性可弃环境走管理后台逐个二次确认真删 AdsPower 分身,并核对幂等回写与审计留痕(需操作员授权)
+> - [ ] 出 Edge 安装包后验证客户端按 installation 身份拉取环境维护责任并收敛删除结果
+> - [ ] 真实浏览器点检后台环境资产页、账号页环境可用性摘要与删除生命周期的诚实状态展示
+>
+> **`admin-persona-clear-resets-onboarding`**
+> - [ ] 用真实账号在后台显式清空人设,确认人设绑定与首作新人状态被原子复位
+> - [ ] 该账号下一次成功建立人设后,确认新人首作引导重新出现且只出现一次
+> - [ ] 确认普通解绑/重复绑定不会重置首作状态
+>
+> **`bind-auto-publish-to-connected-environment`**
+> - [ ] 真实在线环境到点自动发帖,确认执行绑定在已验证连接的 envKey 与本机 target 上
+> - [ ] Cloud 重启后同一小时格不重复发帖(数据库占位真机验证)
+> - [ ] 跨 target(dev/ol)候审与下发确认不会串到另一环境
+>
+> **`bound-comment-subline-timeouts`**
+> - [ ] dev 真机复现语料召回悬空,确认短超时后无引用继续撰写、不报未捕获失败
+> - [ ] 真机复现评论支线总超时,确认以 comment.skipped 收敛并恢复浏览滚动与 idle nudge
+> - [ ] 确认超时后迟到的评估/审批事件不会补发评论
+>
+> **`cancel-publish-queue-tasks`**
+> - [ ] 登录后台在发布队列上真取消一条排队中的发布任务,确认对应任务被精确命中(部署验收时因缺登录态与控制扩展未完成)
+> - [ ] 验证并发/版本冲突时给出可读提示并刷新真态,不重试、不误删失败卡
+> - [ ] 验证已进入不可取消终局的任务给出诚实的安全边界提示
+>
+> **`persona-preference-selection-limit`**
+> - [ ] 新版 Edge 桌面客户端发版后，在真机人设向导上确认第 24 项可选、第 25 项原位红色拒绝且不改变已选集
+> - [ ] 真机确认自定义偏好达上限时保留输入并给出就地提示，取消一项后可继续选择
+>
+> **`polish-client-environment-onboarding`**
+> - [ ] 新版桌面客户端发版后，用真实零环境账号验证全屏 Loading→零环境引导→创建首个环境的完整首启路径
+> - [ ] 真机验证老用户登录不闪现新用户空态（账号环境同步延迟场景）
+> - [ ] 真机验证首个环境创建成功后自动关闭环境管理并在主界面出现一次性启动引导
+>
+> **`publish-risk-quota-denial-message`**
+> - [ ] 真机触发一次真实委托发帖被风控/配额拒绝，确认运营看到的终态提示分别写明风控状态、配额档位与命中的配额窗口
+> - [ ] 真机验证人工精选洗稿越过发布前配额闸但仍强制人审，且平台确认发布后真实计入 publish 计数
+>
+> **`recover-stale-delegated-executions`**
+> - [ ] 下次 Cloud 真实重启时复核启动恢复计数与事件，确认 dispatched attempt 走 submitted_unknown 而非盲重试
+> - [ ] 在 Console 内容页真实页面目视确认 waiting_ownership 等待原因与「预计再次检查」文案
+>
+> **`reduce-wanxiang-reference-image-size`**
+> - [ ] 触发一次真实（计费）万相参考图生成，实测 1K 产物字节体积与边缘下载/上传耗时下降幅度
+>
+> **`reference-aligned-textcard-layout`**
+> - [ ] 跑一次真实长文参考轮播的完整发布，人工目视九张卡的版式、断行与底部留白是否符合参考形态
+> - [ ] 真机确认密度门禁在过疏/溢出时诚实失败，不出现静默裁切
+>
+> **`repair-native-facebook-reels-scroll`**
+> - [ ] 用真实 Facebook 账号在 Reels 面连续前进，确认必须活跃 Reel 身份变更才上报新卡、无假进展高频循环
+> - [ ] 真机确认无法证明移动时返回诚实失败回执而非普通浏览进展
+> - [ ] 真机确认云端下发的 dwellMs 在 Feed 与 Reels 两条路径上都被消费（不再被丢弃）
+> - [ ] 新 Edge 安装包发版后在已安装客户端复验以上行为（本 change 仅交付源码，未出包）
+>
+> **`xhs-newline-ordered-fill`**
+> - [ ] 真机发布写 E2E 一直被 gate（无授权的可弃稿件目标），需运营在 dev 真发一篇多段正文（含连续空行）确认分块尾字不再倒序积累
+> - [ ] dev record #159 修复后只重建了 canonical dist，运行中的客户端进程早于该构建，需正常重启客户端后再跑一次 record 级真机回归
+> - [ ] 90% 语义相似度放行线需在含 URL / emoji / 英文数字的真实稿件上验证不误放行、也不误拒
+>
+> **`suppress-cancelled-publish-alert`**
+> - [ ] dev 只跑了模块 smoke（cancelled_publish_alert=none），真实委托发帖走到等待审批、由人工驳回后收敛为 cancelled 且不发失败报警的端到端链路未在真机验过
+>
+> **`transcribe-textcard-image-text`**
+> - [ ] 文字卡真实图片渲染、人工审批与平台发布的破坏性端到端未执行（dev 只验到转写落库与逐槽映射），已记在 docs/real-machine-acceptance-backlog.md
+>
+> **`unified-account-display-name`**
+> - [ ] dev 上 manualAliasCount 仍为 0：需要升级后的桌面客户端真机保存一次运营别名，验证本地与云端一致确认、清空回落系统昵称
+> - [ ] 本 change 有意不出安装包，Edge 侧行为要等新客户端发版后才在真机生效
+>
+> **`unify-account-configuration-entry`**
+> - [ ] 部署 dev 时浏览器停在 /login 无已登录会话，登录后管理后台账号表统一「配置」列的视觉核对未做，UI 证据目前只有聚焦 DOM 测试
+>
+> **`wechat-ai-polish-auto-send`**
+> - [ ] dev 部署时 writePaused=true、commentsReplyEnabled=false、dmSendTextEnabled=false，真实视频号 AI 自动发送从未触发过一次，自动资格→派发复核→真实发出这条链路仍需真机验收
+>
+> **`wechat-auth-startup-diagnostics`**
+> - [ ] 未出安装包、未部署 Cloud：真机上启动鉴权与浏览器启动原因的单行诊断日志（含脱敏）需要跑一次真实视频号启动才能确认
+>
+> **`wechat-browser-profile-occupied-status`**
+> - [ ] 真实 AdsPower profile 被别处占用的场景从未执行（tasks 明确登记为 backlog 簇 108）：占用拒绝的结构化分类、脱敏提示、客户工作区占用徽标与重试均未在真机验过
+> - [ ] Cloud 侧 PostgreSQL 往返测试为 DB-gated，本地未跑；proposal 声称不新增迁移但实际带了 migration 0039 reason_code TEXT，部署时需确认 dev/ol 两库都已生效
+>
+> **`wechat-channels-env-name-follows-nickname`**
+> - [ ] 未启动「tom白」环境、未真实调用 AdsPower user/update：需真机冷启动一次确认视频号环境名改成真实昵称
+> - [ ] 未验证身份/空昵称/身份不匹配三种情况下确实不触发改名，需真机复现
+> - [ ] 存量视频号环境的渐进改名需在真机下次冷启动后抽查
+>
+> **`wechat-channels-real-runtime-closure`**
+> - [ ] 真机验收结论是 PASS_EMPTY_ONLY：只跑通空评论与空私信读取，非空评论/私信解析全部未验
+> - [ ] 任何平台真实写（评论创建、私信发送）均未派发、未确认，需操作员给一次性可丢弃目标后补验
+> - [ ] 歧义写（响应丢失后的历史核对而不重发）路径未真机验证
+> - [ ] offboard/解绑清理端到端未验证
+> - [ ] 打包版 Edge 客户端下的该链路未验证（本次只跑未打包 dev 客户端）
+>
+> **`wechat-channels-test-data-reset`**
+> - [ ] dev 上只做到「开关报 enabled + 未鉴权请求返回 401」，从未真正执行过一次重置
+> - [ ] 需真机在 Edge 在线时按评论、私信各跑一次「清空 Cloud 副本 + 清本地检查点 + 重新拉取」，确认平台上仅存的一两条真实数据能再次进入收件箱
+> - [ ] 「清空成功但重新拉取未送达」的部分完成态如实回报需真机复现
+> - [ ] PostgreSQL 集成用例本地因未配 AIDCP_INTERACTION_TEST_DATABASE_URL 而跳过，需在隔离库补跑
+> - [ ] Electron 工作区「开发者详情」高风险入口与二次确认需人工目视确认
+>
+> **`wechat-comment-capture-backed-write`**
+> - [ ] 只有一次运营员批准的手动回复被平台确认，之后未再发真实评论
+> - [ ] 需真机再验一次带新生成 clientId + 完整目标评论快照 + interaction referer 的评论真发，并确认 HTTP 201 确认形状
+> - [ ] 缺目标上下文时不发出评论创建请求，需真机复现
+> - [ ] 评论写不可重试（超时/响应丢失保持歧义、不盲重发）需真机验证
+>
+> **`wechat-console-enum-and-ledger`**
+> - [ ] dev Console 已部署且 bundle 内含 wechat_channels 与审计加载更多文案，但平台下拉选项与「视频号」中文显示仍需人工目视确认
+> - [ ] 审计分页翻到底、权限拒绝、加载失败三种状态与切账号中止旧请求需人工在真实数据上点一遍
+> - [ ] 未知 audit action/entity 枚举的原值兜底需等 Cloud 真扩枚举后回看
+>
+> **`wechat-creator-reply-contact-guidance`**
+> - [ ] 部署时未跑任何真实回复或写探针，未改动模板与账号联系方式（pre/post 计数保持 contact_nonblank=9、reply_scopes=0）
+> - [ ] 需真机验证模板显式含 {{support_channel}} 时优先注入账号 contact_info、账号未配则回落 profile 安全 fallback
+> - [ ] 需真机验证 AI 删改导流行时候选回退为确定性模板渲染结果
+> - [ ] 管理端角色提示词预览示例需人工目视核对
+>
+> **`wechat-draft-action-contract-alignment`**
+> - [ ] dev 上验的是修复前现象（PUT /replies/:jobId/draft 返 404、regenerate 返 403），修复后的正确路由与草稿动作需在真机客户端工作区再点一遍
+> - [ ] 真实发送仍 fail-closed，未在真机上验证「写能力开启后发送门禁仍完整」
+> - [ ] Edge 客户端把平台能力拒绝改述为渠道能力问题的文案需人工目视确认
+>
+> **`wechat-env-ownership-revocation`**
+> - [ ] 未对任何真实客户环境执行撤权或重绑，dev 上只做非破坏性核对（撤权保留表存在、一个 assignment-guard 触发器、零 live hold）
+> - [ ] 需真机验证缺 binding 时的 unresolved-cleanup 回执确实阻断该环境重新分配
+> - [ ] 需真机验证归属整批替换、端用户停用、重复撤权与并发授权四种路径的事务与幂等
+> - [ ] Console 上「成功 / Edge 待清理 / 缺 binding 待处置」三种状态与文案需人工目视区分
+> - [ ] Console 首次并行全量跑出三个 jsdom 计时失败（串行复跑绿），后续需留意 flaky
+>
+> **`repair-page-command-state-convergence`**
+> - [ ] Facebook 真机复验：确认导航到 Reels 后首卡晚渲染不会把界面状态退回 Feed
+> - [ ] Facebook 真机复验：Reels 一次性授权在确认前可重试且不重复放大
+> - [ ] 小红书真机复验：AI 搜索输入框的真实输入与结果卡水合（已只读跑过一次 k1e0ero8）
+> - [ ] dev 云端重启后观察浏览闭环不再依赖 240 秒空转看门狗才恢复
+>
+> **`restore-native-facebook-behavior-parity`**
+> - [ ] Facebook 真机验证点赞、关注、评论、加组、发帖五类写动作的目标复核与提交语义（目前只有单测与 Rust 用例覆盖）
+> - [ ] Facebook 真机验证阻断页与同意浮层在动作之前被正确分类并拦下
+> - [ ] Facebook 真机验证 feed 上不可上报卡片的有界续读与诚实枯竭判定
+> - [ ] Facebook 真机验证不确定提交、待审、平台拒绝三类终态不会被重试成不可逆重复动作
+>
+> **`scope-delegated-tasks-by-cloud-target`**
+> - [ ] dev 与 ol 两个云端并行运行一段时间后，核对没有任何跨目标的任务认领、恢复或到期处理
+> - [ ] 核对被幂等回填为 dev 的 124 条历史委托任务的实际归属与业务状态未被改动
+> - [ ] 确认两个云端各自的运行目标配置在重启后仍可验证，缺失时确实拒绝启动 worker
+>
+> **`scoped-approval-and-notification-policy`**
+> - [ ] 账号开启全局免审后真机跑一条普通浏览评论，确认跳过按钮审批但仍过风控、配额、去重与平台确认
+> - [ ] 分组设为仅客户端审核后真机确认无来源会话的待审稿不再发飞书审批卡、且能在客户端稿件队列里审掉
+> - [ ] 客户不可达时真机确认确实回退发送飞书审批卡并输出可观测原因，不产生无人可见的待审稿
+> - [ ] 飞书直接触发的 /publish 真机确认审批卡仍回到来源会话
+> - [ ] 后台账号页全局免审配置与通知路由页分组配置的真机点选与生效态展示
+>
+> **`simplify-running-guidance-flow`**
+> - [ ] 客户端运行态获得感卡片的真机视觉验收：移除三段流程后的垂直节奏、分隔与结果摘要层级
+> - [ ] 窄屏与「减少动态」偏好下的真机视觉验收，确认吉祥物在运行、间隔、完成、首帖状态保持静止
+>
+> **`slow-start-facebook-curve-tooltip`**
+> - [ ] Facebook 环境下真机验收问号帮助图标的鼠标悬浮与键盘聚焦，确认弹出 7 天曲线限额表
+> - [ ] 非 Facebook 环境（小红书或未知平台）真机验收慢启动整行完全隐藏且状态被重置
+> - [ ] 后续云端调整 Facebook 冷启动曲线时，真机复核客户端帮助表数字仍与云端一致
+>
+> **`slow-start-optimistic-feedback`**
+> - [ ] 真机点击慢启动开关，确认立刻出现「正在开启/正在关闭」临时态且重复点击被禁用
+> - [ ] 真机验证云端成功后展示写后真态、失败或超时后回滚到点击前状态并就地显示原因
+> - [ ] 真机验证写入期间收到旧的界面快照时不发生来回跳变
+> - [ ] 真机验证写入过程中切换环境时，临时态与错误提示不串到另一个环境
+>
+> **`sort-client-inspiration-library`**
+> - [ ] 客户端灵感库真机点选四种排序，确认分页不抖动、缺证据内容排在后面
+> - [ ] 真机验证排序状态按环境恢复、切换筛选后回到第一页
+> - [ ] 真机验证排序请求失败时的回退与已确认列表保留
+> - [ ] 窄窗口下排序下拉的换行与键盘操作真机验收（900x720 与 640x720 已过浏览器 QA）
+>
+> **`wechat-group-scoped-reply-config`**
+> - [ ] dev 上两个账号仍解析为 group_config_missing / default_config_missing，需操作员配置真实分组与默认策略后验证生效
+> - [ ] 未执行任何真实平台回复发送，分组策略到实际回复的端到端链路未在真账号上验证
+> - [ ] Console /wechat-strategies 分组策略页与账号行事实列改版需真人在浏览器点检一遍
+>
+> **`wechat-reply-knowledge-document`**
+> - [ ] dev 账号 k1esb68e 联系方式长度仍为 0，真实知识文档 + 联系方式模板需操作员配置后才能验收
+> - [ ] 知识回答质量（无答案时不猜、不泄露整份文档）需在真账号真实咨询上抽检
+> - [ ] 全程未发出任何真实平台回复，AI 候选到发送的闭环未在真机验证
+>
+> **`wechat-reply-settings-simplification`**
+> - [ ] 四态回复处理方式在真实账号上的端到端行为未验证（本次未做任何真实互动预览或发送）
+>
+> **`wechat-send-failure-semantics`**
+> - [ ] 真实写端点 / 真实账号发送授权仍未验收，归属 wechat-channels-interaction-management 的真机项，未获批准不得执行
+> - [ ] 派发前失败 vs 派发后不确定的分类需在 dev 真跑一次超时/断连场景确认落账语义
+> - [ ] 本次未构建也未发布 Edge 安装包，运营机上的实际行为未验证
+>
+> **`wechat-session-drift-recovery`**
+> - [ ] 平台码 300334 的授权上下文漂移需真机浏览器 cookie 漂移场景复现一次恢复链路
+> - [ ] 客户端互动工作区的 closed / 未回报 / login_required 收敛文案需真人在客户端界面核对
+> - [ ] 未构建安装包，运营机上的渲染与轮询表现未验证
+>
+> **`xhs-approval-peak-time-shortcuts`**
+> - [ ] 客户端审批抽屉的「下个热门时段」「下个空闲时段」按钮需真人点击验证只改选择、不触发审批
+> - [ ] 账号级已占用小时的避让需在真实排期数据下验证跳过正确
+> - [ ] 定时稿真实到期发布结果未验证（本 change 不含自动审批/自动发布）
+> - [ ] 未构建 Edge 安装包，运营机上的审批页表现未验证
+>
+>
+> **本批暂缓的 15 个（未归档，仍活跃）**，四类：
+> - **依赖序倒置（6）**：`native-page-engine-platform-cutover` / `browser-slot-cloud-presence` /
+>   `clarify-client-environment-runtime-states` / `remove-cloud-environment-delete` /
+>   `xhs-environment-value-dashboard` / `wechat-dev-write-test-override` / `wechat-sync-timestamp-honesty`
+>   —— 它们的地基需求还只存在于仍活跃的前置 change 的 delta 里，先归档会写出「要求悬空于从未引入的特性之上」的 spec 集。
+>   **`validate` 与 `archive` 都不会报这个错**，只有人能看出来。**base-first**。
+> - **MODIFIED 标题对不上（5）**：`default-client-auth-by-env` / `environment-level-slow-start` /
+>   `client-content-workspace-navigation` / `remove-hidden-product-gates` /
+>   `unify-client-environment-management` / `separate-client-data-plane-automation-engine`
+>   —— 就地改名却没写 `## RENAMED Requirements` 段。修法是补 RENAMED（一处控制仓编辑、零代码改动），
+>   判据见 memory「A2 有意改名」。**这类 `validate --strict` 同样查不出**。
+> - **台账缺 sha（1）**：`dev-ssh-key-permission-portability` —— 实体改动其实已在 `origin/main`
+>   （控制仓 `dc8bf33`），只是 `tasks.md` 没按格式留标注。补标注即可归。
+> - **有一条 MUST 没实装（1）**：`config-mirror-cross-process-invalidation` —— 实装者在 tasks.md 4.10
+>   如实登记「参数镜像陈旧时相关产出 MUST 标注副本时刻」未做、并明写留给主控决定。
+>   **归档等于把一条没有实现的 MUST 静默并入主 spec**，须先拍板（收进 backlog 还是另起 change）。
+
 > **2026-07-26 补 · 簇 60 增补（Phase 5 与一条既存线上缺陷）**
 >
 > - [x] ~~**⚠️ 不是验收项，是待修缺陷：风控状态机写不进库（dev + ol 双中）。**~~

@@ -512,24 +512,24 @@ Console 回复设置抽屉 SHALL 区分 permission denied、配置缺失和普�
 
 ### Requirement: 发布队列展示尚未开跑的发布委托
 
-管理后台内容页的发布队列 SHALL 在活跃稿件摘要旁提供“排队任务”只读列。该列 MUST 展示发布动作族中状态为 `queued`、`planning` 或 `deferred` 的任务，并至少包含账号、动作、状态和任务标识；来源标题有证据时 SHALL 展示。`awaiting_confirmation`、`waiting_approval`、`executing` 与终态任务 MUST NOT 混入该列。页面 MUST NOT 把列表顺序描述为精确队列名次。
+管理后台独立发布队列页 SHALL 在活跃稿件区域之外提供“排队任务”只读区域。该区域 MUST 展示发布动作族中状态为 `queued`、`planning` 或 `deferred` 的任务，并至少包含账号、动作、状态和任务标识；来源标题有证据时 SHALL 展示。`awaiting_confirmation`、`waiting_approval`、`executing` 与终态任务 MUST NOT 混入该区域。页面 MUST NOT 把列表顺序描述为精确队列名次。内容页 SHALL 不再重复渲染该队列区域。
 
 `GET /api/delegated-tasks` SHALL 加性支持按动作族和一个或多个状态过滤，并在服务端过滤后应用 limit，确保仍在排队的任务不会被较新的无关终态记录挤出结果窗口。不带新过滤参数的既有请求 SHALL 保持兼容。
 
-#### Scenario: 排队发布任务显示在独立列
+#### Scenario: 排队发布任务显示在独立区域
 
 - **WHEN** 一个发布类委托处于 `queued` 且尚未产生 orchestrator run
-- **THEN** 内容页在“排队任务”列显示其账号、发布动作、排队状态和任务短标识，活跃稿件区不伪造生成阶段
+- **THEN** 独立发布队列页在“排队任务”区域显示其账号、发布动作、排队状态和任务短标识，活跃稿件区不伪造生成阶段
 
 #### Scenario: 暂缓任务与来源标题诚实可见
 
 - **WHEN** 一个发布类委托处于 `deferred` 且 `sourceConstraints.title` 为非空标题
-- **THEN** 排队任务列显示“暂缓”状态与该来源标题，不把它描述为执行中或已发布
+- **THEN** 排队任务区域显示“暂缓”状态与该来源标题，不把它描述为执行中或已发布
 
 #### Scenario: 已进入生命周期的任务不重复
 
 - **WHEN** 发布类委托进入 `executing` 或 `waiting_approval`
-- **THEN** 该委托不再出现在排队任务列，并由既有发布生命周期投影承担生成中或等待审批的展示
+- **THEN** 该委托不再出现在排队任务区域，并由既有发布生命周期投影承担生成中或等待审批的展示
 
 #### Scenario: 服务端过滤先于窗口限制
 
@@ -539,7 +539,7 @@ Console 回复设置抽屉 SHALL 区分 permission denied、配置缺失和普�
 #### Scenario: 排队任务查询失败不遮蔽活跃稿件
 
 - **WHEN** 排队任务请求失败而发布生命周期请求成功
-- **THEN** 排队任务列明确显示加载失败，活跃稿件、阶段和最近结果仍可查看
+- **THEN** 排队任务区域明确显示加载失败，活跃稿件、阶段和最近结果仍可查看
 
 ### Requirement: 视频号账号限速必须以预设优先并保留高级真值
 
@@ -586,6 +586,7 @@ Console 配额页中同时包含浏览/搜索与互动动作的会话预算分�
 
 - **WHEN** 运营打开配额页查看包含搜索的单场预算
 - **THEN** 页面显示“单场行为预算”，搜索仍作为独立一项展示
+
 ### Requirement: 内容排期目录返回规范化平台与权威自动化动作投影
 
 Cloud `GET /api/content-schedule` SHALL 为每个账号目录行增量返回规范化 `platform` 与服务端权威 `availableActions`。每个可用动作描述 MUST 至少包含稳定动作 id、该平台允许的非关闭模式和服务端日上限；该投影 MUST 来自有真实消费者的平台注册声明，而不是复用仅供指标显示的 `group_join` capability，也不得由 Console 维护第二份平台动作矩阵。旧平台别名 SHALL 按既有规范化规则归一；未知平台 MUST NOT 被伪装成任一已知平台的可配置动作。
@@ -625,3 +626,235 @@ Facebook 群组列表 SHALL 为每个目标返回完整 `accountGroupLabels`，�
 #### Scenario: 小红书行不出现加群
 - **WHEN** 目录包含小红书账号
 - **THEN** 其 `availableActions` 不含 `join_group`，也不返回伪造的加群配置
+
+### Requirement: 内部 Panel 环境删除返回 Cloud 直调后的写后真态
+
+内部 Panel SHALL 通过 JWT 守护的逐环境端点接收完整 envKey 确认和幂等键，并在 Cloud 直接完成 AdsPower 调用与 AIDCP 收口后返回写后真态。成功 SHALL 返回 `state=deleted`；AdsPower 或配置失败 SHALL 返回非成功 HTTP、稳定错误类别和脱敏写后失败状态。端点 MUST NOT 以 202、`waiting_edge`、请求已受理或等待客户端表示未完成调用。
+
+#### Scenario: 直接删除成功返回终态
+- **WHEN** 内部管理员提交合法删除且 AdsPower 与 AIDCP 收口均成功
+- **THEN** Panel 返回 200 和 `state=deleted`，Console 刷新后默认列表不再显示该有效环境
+
+#### Scenario: AdsPower 不可用返回真实失败
+- **WHEN** AdsPower Key 未配置、API 不可达或业务拒绝删除
+- **THEN** Panel 返回可辨认非成功状态且环境仍存在，不返回 waiting_edge 或 deleted
+
+#### Scenario: 客户令牌无法调用内部删除
+- **WHEN** 客户令牌请求内部环境删除端点
+- **THEN** 请求被拒且不会调用 AdsPower
+
+### Requirement: Panel 平台凭据接口展示并保存 AdsPower API Key 状态
+
+现有 `GET /api/config/model` 与 `PUT /api/config/credential` SHALL 将 AdsPower API Key 作为平台凭据目录项处理，GET 只返回标签、来源、配置状态、掩码与 `restartRequired=false`，MUST NOT 返回明文；PUT SHALL 复用服务端加密存储、JWT、允许列表和非乐观写后结果。保存后的 Key SHALL 被下一次 Cloud 删除按需读取，无需重启。
+
+#### Scenario: 设置读取只返回掩码
+- **WHEN** AdsPower API Key 已加密保存在 Cloud
+- **THEN** Panel 配置读返回已配置、服务端密文来源和掩码，不返回明文或 Authorization
+
+#### Scenario: 保存后下一次删除生效
+- **WHEN** 管理员通过凭据端点覆盖保存 AdsPower API Key
+- **THEN** 返回加密保存后的掩码状态，下一次环境删除读取新 Key 且不要求重启 Cloud
+
+#### Scenario: 主加密密钥缺失时拒绝保存
+- **WHEN** Cloud 未配置有效 `AIDCP_CRED_KEY`
+- **THEN** AdsPower Key 写入与其它平台凭据一致被拒，绝不明文落库或假称保存成功
+
+### Requirement: 内部 Panel 提供环境资产投影与账号环境摘要
+
+内部 Panel API SHALL 提供受内部 JWT 保护的环境资产列表，聚合环境生命周期、环境名来源、挂载账号统一显示名、账号风控/档位、分组、端用户归属、installation 观测与删除请求；客户令牌 MUST NOT 访问该跨客户投影。账号列表 SHALL additive 返回有效/删除中/在线环境计数，且所有账号环境摘要与环境列表使用同一生命周期过滤规则。
+
+#### Scenario: 内部管理员读取环境资产
+- **WHEN** 持内部 Panel JWT 请求环境列表
+- **THEN** 返回环境与账号/风险/分组/归属/生命周期投影，并不暴露密钥、凭据、代理密码或客户 key/hash
+
+#### Scenario: 客户令牌无法读取跨客户环境资产
+- **WHEN** 持客户令牌请求内部环境资产端点
+- **THEN** 请求被拒且不返回任何跨客户挂载或归属信息
+
+#### Scenario: 账号摘要与环境生命周期一致
+- **WHEN** 某账号有一个 active、一个 deleting 和一个 deleted 环境
+- **THEN** 账号摘要返回 activeCount=1、deletingCount=1，deleted 环境不计入当前数量
+
+### Requirement: 内部删除 API 只创建异步期望状态
+
+内部 Panel SHALL 提供逐环境删除申请 API，要求完整 envKey 确认并支持幂等请求。成功响应 MUST 返回写后生命周期与 requestId，状态为请求已创建/已存在；该 API MUST NOT 直接声称 AdsPower 已删除。重复未终态请求 MUST 返回同一 active request，已删除环境 MUST 返回同一终态而非重建任务。
+
+#### Scenario: 创建删除申请返回 202 真态
+- **WHEN** 管理员对 active 环境提交匹配 envKey 的确认和新的幂等键
+- **THEN** Cloud 原子创建删除申请、冻结调度并以 202 返回 `waiting_edge` 及 requestId，不返回“已删除”
+
+#### Scenario: 重复提交不产生多条删除责任
+- **WHEN** 同一环境已有未终态删除申请且管理员重试请求
+- **THEN** API 返回现有 requestId/状态，不产生第二个 active 删除申请或第二次 AdsPower 执行责任
+
+### Requirement: 排队任务必须解释有证据的暂缓原因
+
+管理后台内容页显示 `deferred` 发布任务时，除状态与下一次检查时刻外，SHALL 根据 Cloud 已返回的稳定 `currentStep` 展示可读等待原因。页面 MUST NOT 把重试轮询时刻描述为届时一定开始；未知步骤码 MUST NOT 被猜测成具体原因。
+
+#### Scenario: 同源 ownership 占用可见
+
+- **WHEN** 一条发布任务为 `deferred` 且 `currentStep=waiting_ownership`
+- **THEN** 排队卡 SHALL 说明正在等待同一参照稿任务释放
+- **AND** SHALL 把 `nextEligibleAt` 描述为预计再次检查时刻，而非承诺起跑时刻
+
+#### Scenario: 生成槽位暂满可见
+
+- **WHEN** 一条发布任务为 `deferred` 且 `currentStep=waiting_safe_slot`
+- **THEN** 排队卡 SHALL 说明生成槽位暂满、任务仍在排队
+
+#### Scenario: 未知步骤不猜测
+
+- **WHEN** 一条暂缓任务带有 Console 不认识的 `currentStep`
+- **THEN** 页面 SHALL 保留“暂缓”状态与时间事实
+- **AND** MUST NOT 补写未经 Cloud 证实的原因
+
+### Requirement: Panel 账号 DTO 暴露统一显示名和来源
+
+Panel 账号 API SHALL 为每个账号返回 Cloud 统一解析器产生的 `displayName` 与 `displayNameSource`，同时保留 `accountId`、平台昵称、运营标签和运营别名的原始字段供诊断。Console 所有账号名展示和只持有 `accountId` 的 join SHALL 使用 `displayName`，MUST NOT 在页面或共享前端工具中重写别名优先级。
+
+#### Scenario: 管理后台展示客户端人工别名
+- **WHEN** 账号在 Cloud 已有运营别名
+- **THEN** 账号列表、人设、内容、用量、联系方式及其它账号选择/展示位置均显示该别名，并保留同一 `displayNameSource`
+
+#### Scenario: 人工别名清除后后台回落
+- **WHEN** 运营别名被清空且平台昵称存在
+- **THEN** 下一次 Panel 读取返回平台昵称和来源 `platform_nickname`，Console 不保留旧人工名
+
+#### Scenario: 旧服务端兼容边界
+- **WHEN** Console 在发布切换窗口收到尚无 `displayName` 的旧 DTO
+- **THEN** 前端只做兼容性账号 ID 回落并明确不可判断来源，MUST NOT 重新复制完整昵称优先级
+
+### Requirement: Runtime-control updates drive account-scoped Edge delivery
+After a successful CAS update of `interaction_runtime_controls`, the internal API SHALL make the committed account/version available to the account's negotiated online Edge through `interaction.runtime.controls`. The database commit and audit record SHALL remain authoritative; delivery count or socket enqueue MUST NOT be reported as Edge application success.
+
+#### Scenario: CAS update reaches one online Edge
+- **WHEN** an authorized operator updates runtime controls with the current expected version and exactly one negotiated Edge is online for the account
+- **THEN** Cloud commits and audits version `N+1`, pushes a scope-matching `interaction.runtime.controls` payload to that Edge, and returns the committed controls without claiming Edge application
+
+#### Scenario: Edge is offline during update
+- **WHEN** the runtime-control CAS succeeds while no negotiated Edge is online
+- **THEN** Cloud keeps the committed version, records delivery as deferred/zero, and includes the latest fail-closed snapshot in the next negotiated welcome
+
+### Requirement: Downlinked write controls are effective safety projections
+The write booleans delivered to Edge SHALL be false unless the account channel control is enabled, `write_paused=false`, the Cloud global interaction write gate is enabled, offboarding is not pending, and the snapshot scope is valid. Read booleans SHALL also fail closed on provider errors or scope mismatch.
+
+#### Scenario: Account enables replies while global writes remain disabled
+- **WHEN** `comments_reply_enabled=true` for an account but the Cloud global write gate is false
+- **THEN** the Edge snapshot reports comment reply disabled while preserving the stored account setting for administration
+
+#### Scenario: Runtime-control lookup fails during hello
+- **WHEN** Cloud cannot load the account runtime-control row while building welcome
+- **THEN** welcome either carries an explicit all-false scope-matching snapshot or omits negotiation so Edge keeps every interaction capability false
+
+### Requirement: Console 客户环境平台候选必须包含视频号并容忍未来值
+
+Console 的客户环境注册与归属界面 SHALL 把 `wechat_channels` 作为受支持平台候选并显示中文“视频号”，同时继续支持 `xiaohongshu` 与 `facebook`。环境 registry DTO MUST 保持可接收未知字符串；未知未来平台值 MUST 显示原始值并保持可读取，MUST NOT 使页面白屏、擅自回落成其他平台或阻止既有归属加载。
+
+#### Scenario: 管理员手动登记视频号环境
+- **WHEN** 管理员在客户环境归属页手动登记环境并选择“视频号”
+- **THEN** Console 提交稳定 wire 值 `wechat_channels`，保存回读后仍显示“视频号”
+
+#### Scenario: Cloud 返回未来平台值
+- **WHEN** 环境注册表返回当前 Console 尚未认识的平台字符串
+- **THEN** Console 以中性样式显示原始值并保持页面可用，MUST NOT 把它标成视频号、小红书或 Facebook
+
+### Requirement: Console 回复配置审计必须消费完整分页台账
+
+Console SHALL 消费既有 `GET /api/accounts/:accountId/reply-config/audit` 的 opaque `nextCursor`，允许运营按需追加后续页，并明确显示加载中、可继续、已到底、权限拒绝和后续页失败状态。cursor MUST 只作为 opaque 字符串 URL 编码后回传，MUST NOT 由 Console 解析、改写或伪造；后续页失败 MUST 保留已经成功加载的记录并提供重试。
+
+#### Scenario: 审计首屏还有后续页
+- **WHEN** 首屏返回非空 `nextCursor` 且运营点击加载更多
+- **THEN** Console 携该 cursor 请求同一账号的下一页，按服务端顺序追加事件，并以稳定 eventId 去重
+
+#### Scenario: 审计已经加载到底
+- **WHEN** 最近一次成功回包返回 `nextCursor=null`
+- **THEN** Console 显示台账已全部加载且不再提供继续请求入口，MUST NOT 把首屏条数冒充总量统计
+
+#### Scenario: 后续页加载失败
+- **WHEN** 已展示首屏后追加请求返回错误
+- **THEN** Console 保留已展示事件，明确提示后续审计加载失败并允许重试，MUST NOT 清空台账或显示已到底
+
+### Requirement: Console 审计分页必须保持账号隔离和开放枚举回落
+
+Console SHALL 将每次审计首屏与追加请求绑定当前 `accountId`。切换账号、关闭抽屉、重新加载或写后刷新时 MUST 中止旧的追加请求；旧账号或已中止回包 MUST NOT 追加到当前台账。Audit action/entity wire 值 MUST 按开放字符串处理：已知值可显示中文，未知值 MUST 显示原值，MUST NOT 空白、猜测含义或使页面崩溃。
+
+#### Scenario: 加载更多期间切换账号
+- **WHEN** 账号 A 的审计追加请求尚未完成时运营切换到账号 B
+- **THEN** A 请求被中止或其回包被丢弃，B 的台账只包含 B 的事件与 cursor
+
+#### Scenario: Cloud 先增加审计动作枚举
+- **WHEN** Cloud 返回当前 Console 未认识的 audit action 或 entity type
+- **THEN** Console 显示该原始 wire 值与事件其他事实，页面和后续分页保持可用
+
+### Requirement: 管理后台必须只读展示视频号互动权限与有效授权用户
+
+internal panel API SHALL 在有效 panel JWT 之后提供固定六项视频号互动权限的只读概览。每项 MUST 包含稳定 permission key、中文名称、中文说明和当前有效授权用户名；有效授权用户名 MUST 同时存在于后台登录用户与该 permission 的 grants 中。响应 MUST NOT 包含密码、JWT、环境变量原文或已经失效的 actor。Console 设置页 SHALL 展示该概览并明确标记只读，MUST NOT 提供权限新增、删除或编辑动作。
+
+#### Scenario: 设置页展示六项权限与授权用户
+- **WHEN** 已认证后台用户打开设置页
+- **THEN** Console 展示 `interaction.config.view`、`interaction.config.edit`、`interaction.config.publish`、`interaction.config.preview`、`interaction.dm.view_full` 与 `interaction.audit.view` 的名称和说明
+- **AND** 每项展示当前有效授权用户名或明确的空状态
+
+#### Scenario: 失效 actor 与凭据不泄漏
+- **WHEN** grants 配置包含一个不在后台登录用户清单中的 actor
+- **THEN** 权限概览不返回该 actor
+- **AND** 响应不包含任何后台密码、JWT 或环境变量原文
+
+#### Scenario: 权限概览只读
+- **WHEN** 后台用户查看视频号权限设置
+- **THEN** 页面不显示新增、删除、保存或编辑权限的控件
+- **AND** Cloud 不为该能力提供权限变更写端点
+
+#### Scenario: 权限概览故障不遮蔽其他设置
+- **WHEN** 权限概览接口不可用或返回错误
+- **THEN** Console 在权限卡片内诚实显示失败和重试入口
+- **AND** 已加载的模型与凭据设置仍可查看和使用
+
+### Requirement: 视频号回复设置必须以单一处理方式表达管理员意图
+
+管理后台 SHALL 把 `mode`、`generateDrafts` 与 `sendReplies` 表达为一个账号级“回复处理方式”，只提供“不自动处理，仅收取互动”“只生成回复草稿”“人工审核后发送”“低风险模板自动发送”四种互斥选择。Console MUST 将选择确定性映射到冻结 DTO，MUST NOT 让普通管理员保存互相矛盾的自由组合；Cloud API schema 与硬门禁保持不变。
+
+#### Scenario: 四种处理方式写入规范组合
+- **WHEN** 管理员依次选择四种处理方式并保存策略草稿
+- **THEN** Console 分别写入 `draft_only/false/false`、`draft_only/true/false`、`review_before_send/true/true`、`auto_safe/true/true` 的 `mode/generateDrafts/sendReplies` 组合
+
+#### Scenario: 历史非规范组合按不扩权规则加载
+- **WHEN** Cloud 返回生成关闭、发送关闭或仅草稿但发送开启等历史非规范组合
+- **THEN** Console SHALL 显示不扩大当前写权限的处理方式，且未获管理员主动选择更高方式时保存 MUST NOT 把 false 权限静默改为 true
+
+### Requirement: 渠道和规则配置必须只表达参与范围或进一步收紧
+
+评论与私信的 `enabled` SHALL 呈现为“处理该渠道的互动”，并明确它不等于停止收取。渠道自动发送范围 MUST 仅在账号处理方式为低风险自动发送时展示。规则级 `allowAutoSend` SHALL 以“必须人工审核”的收紧语义呈现；启用 AI 润色的规则 MUST 强制人工审核，MUST NOT 向管理员暗示 AI 润色结果可以自动发送。
+
+#### Scenario: 非自动模式不重复询问渠道自动发送
+- **WHEN** 账号处理方式为不自动处理、只生成草稿或人工审核后发送
+- **THEN** 评论和私信区域不展示“允许低风险自动发送”选择，渠道参与开关仍可独立配置
+
+#### Scenario: 规则人工审核语义不提升权限
+- **WHEN** 管理员勾选“此规则必须人工审核”或为规则启用 AI 润色
+- **THEN** Console 写入 `allowAutoSend=false`；取消人工审核只恢复继承上层自动化上限，最终自动发送仍受渠道范围与全部 Cloud 硬门禁约束
+
+### Requirement: 版本化策略、即时运行控制与系统硬门禁必须清晰分区
+
+管理后台 SHALL 把需要保存并发布的回复策略、保存后立即生效的 runtime controls、不可关闭的 Cloud 硬门禁分成可辨识区域。账号写总闸、评论回复与私信文本发送 MUST 保留为即时刹车；Cloud RiskController、身份、capability、幂等和待核验门禁 MUST 保持只读且不可由普通管理员关闭。策略保存与原子发布边界 MUST 保留。
+
+#### Scenario: 即时停写不伪装成策略模式
+- **WHEN** 管理员关闭账号写总闸或某渠道即时写开关
+- **THEN** Console 明确显示这是立即生效的运行控制，读取、草稿和已发布策略保持原语义，真实发送仍被 Cloud 拒绝
+
+#### Scenario: 发布摘要只展示有效用户意图
+- **WHEN** 管理员准备发布回复配置
+- **THEN** 发布确认 SHALL 展示单一回复处理方式、渠道参与/自动范围和当前即时写状态，MUST NOT 再要求分别理解 `mode` 与“允许发送”重复开关
+
+### Requirement: 模拟预览拒绝必须说明链路未运行
+
+无副作用预览 SHALL 与真实发送设置分离。缺少 `interaction.config.preview` 时，Console MUST 明确说明 Cloud 预览链路未运行；私信预览缺少权限时 MUST 同时说明还需要 `interaction.dm.view_full`。权限拒绝 MUST NOT 被呈现为风险评审结果或发送硬门禁结果。
+
+#### Scenario: 评论预览权限不足
+- **WHEN** 评论预览返回 `INTERACTION_PERMISSION_DENIED`
+- **THEN** Console 显示当前后台账号缺少模拟预览权限且本次预览未运行，不展示伪造的规则、模板或风险结果
+
+#### Scenario: 私信预览需要额外原文权限
+- **WHEN** 私信预览返回 `INTERACTION_PERMISSION_DENIED`
+- **THEN** Console 显示私信预览同时需要 `interaction.config.preview` 与 `interaction.dm.view_full`，且本次预览未运行
+

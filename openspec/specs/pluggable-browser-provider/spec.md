@@ -197,17 +197,23 @@ Because a launch switch cannot reach an already-running browser, the edge attach
 - **THEN** edge continues attach and operation normally rather than aborting or reporting a false failure
 
 ### Requirement: Browser window parking keeps driven browser headful
-The edge browser startup path SHALL support browser window parking for both AdsPower and self providers without switching to headless or minimized mode. Parking SHALL preserve the fixed desktop viewport required by the driven web platform and SHALL apply after CDP attach as the authoritative window placement step.
+The edge browser startup path SHALL support browser window parking for both AdsPower and self providers without switching to headless or minimized mode. When Electron supplies a startup staging position, the browser provider SHALL request that best-effort position together with the fixed desktop window size and MUST NOT simultaneously request a maximized startup state. The staging position SHALL be independent from the selected final parking bounds. Parking SHALL preserve the fixed desktop viewport required by the driven web platform and SHALL apply after CDP attach as the authoritative window placement step.
 
 #### Scenario: Parking is applied after CDP attach
 - **WHEN** edge has attached to a driven browser page and a browser parking mode is configured
 - **THEN** edge applies normal-window bounds over CDP for the selected or effective parking mode
 - **AND** the browser remains headful and non-minimized
 
-#### Scenario: AdsPower receives early launch position hint
-- **WHEN** AdsPower provider starts a browser and a parking position is configured
-- **THEN** the provider includes a best-effort launch position hint together with the fixed desktop window size
-- **AND** CDP window placement after attach remains the authoritative correction step
+#### Scenario: Provider receives an off-display startup staging hint
+- **WHEN** Electron knows the local display geometry and starts a driven browser with parking enabled
+- **THEN** the provider includes a best-effort position beyond the right-most known display together with the fixed desktop window size
+- **AND** the provider does not include `--start-maximized` in that launch
+- **AND** the final selected parking bounds are still applied authoritatively after CDP attach
+
+#### Scenario: Standalone launch has no staging geometry
+- **WHEN** a provider is started without an Electron-supplied window position
+- **THEN** it MAY retain the historical maximized fallback needed to defeat a remembered narrow profile
+- **AND** it MUST retain the fixed desktop window-size requirement
 
 ### Requirement: Browser parking verifies page visibility before continuing
 After applying browser parking, edge SHALL verify that the driven page remains visible and keeps a valid desktop viewport. If verification fails, edge SHALL degrade to a recoverable visible placement or stop honestly; it MUST NOT continue automated interaction while `document.hidden` is true or `document.visibilityState` is not `visible`.
@@ -241,4 +247,21 @@ When AIDCP Edge uses the bundled Ads CLI runtime on Windows, the CLI compatibili
 - **WHEN** runtime staging cannot find either the pinned original hook shape or the known patched shape
 - **THEN** staging fails with an actionable compatibility error
 - **AND** the build MUST NOT continue with an unverified hidden-window policy
+
+### Requirement: AdsPower profile 占用拒绝必须结构化且脱敏
+
+AdsPower provider 在 `browser-profile/start` 明确返回目标 profile 被其他邮箱或设备占用、禁止打开时，SHALL 把该结果分类为稳定的 profile 占用错误，MUST NOT 压成无类型内部错误、MUST NOT 回落 self provider、MUST NOT 自动停止或抢占占用方浏览器。原始占用邮箱 MUST NOT 出现在异常 message、Cloud payload 或客户 API；Edge 本地诊断只 MAY 记录脱敏 owner hint。
+
+#### Scenario: 已验证的占用拒绝被窄分类
+
+- **WHEN** `browser-profile/start` 返回非零 code，且 message 符合已验证的 “profile is being used by owner and is not allowed to open” 形状
+- **THEN** provider SHALL 抛出稳定的 profile 占用错误并保留目标 profile id
+- **AND** 错误与安全日志 MUST NOT 包含原始 owner 字符串，只能包含脱敏提示
+- **AND** provider MUST NOT 回落 self、重发 stop 或宣称浏览器已启动
+
+#### Scenario: 非占用启动失败不被误分类
+
+- **WHEN** `browser-profile/start` 因 profile 不存在、内核未就绪、网络错误或未知 message 失败
+- **THEN** provider SHALL 保持既有诚实失败路径
+- **AND** MUST NOT 把该失败标成 profile 被占用
 

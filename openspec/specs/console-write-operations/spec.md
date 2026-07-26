@@ -138,19 +138,29 @@ Web 发布审批 SHALL 与飞书审批调用**同一个** `writeApprovalSignal(r
 
 ### Requirement: 内容排期写入经一等单写通道，UPSERT 前校验账号存在，默认 fail-closed
 
-内容排期的写入——每账号 `PUT /api/content-schedule/:accountId` 与全局 `PUT /api/content-schedule/global`——SHALL 经受 JWT 保护的一等单写通道（内容排期存储的专属方法），MUST NOT 用 raw SQL UPDATE 绕过，MUST NOT 报告乐观成功。每账号写为 UPSERT，且写前 SHALL 先校验 `accounts` 中确有该账号行（无行 → 具名拒 `unknown_account`，绝不为不存在 / 退役账号造幽灵排期行），退役保留账号 `default` SHALL 拒。非法值（掩码非 168 位 '0'/'1'、日上限非非负整数、坏结构）SHALL **整块拒**、绝不部分落库。写后 SHALL 回读真态返回，且拒绝与成功 MUST **可区分**呈现。缺省与非法一律 fail-closed（归「不自动」）。此与本 spec「写只经拥有者对象、诚实非乐观」核心不变量同构。
+内容排期写入——每账号 `PUT /api/content-schedule/:accountId` 与全局拥有端点——SHALL 经 JWT 保护的一等单写通道，MUST NOT raw SQL UPDATE，MUST NOT 报告乐观成功。账号端点 SHALL 接受既有自动化字段及可选 `activeWeekMask`、`contentActiveMask`；两个掩码均只接受合法 168 位 '0'/'1' 或 NULL，NULL 表示清除该层覆盖并恢复继承。一次账号请求中的两个掩码 SHALL 在同一 UPSERT 中整体验证、原子落库并回读真态，任一非法则整块不落库。
 
-#### Scenario: 写后回真态
-- **WHEN** 运营经面板保存某账号或全局的内容排期
-- **THEN** 接口返回从内容排期存储读回的写后真实状态，而非提交即返回的乐观「ok」
+账号 UPSERT 前 SHALL 校验 `accounts` 中存在真实非退役账号；未知或退役账号必须具名拒绝且不得产生幽灵行。只提交掩码不得改变未提交的总开关、动作模式或日上限。列表/回读 SHALL 可区分原始覆盖、继承来源和当前生效值，使 Console 不自行猜测服务端继承结果。
+
+#### Scenario: 两个账号掩码原子写后回真态
+
+- **WHEN** 运营为真实账号一次提交合法活跃掩码和内容掩码
+- **THEN** 单写方法在同一 UPSERT 保存两者并返回回读真态，两个字段不得出现部分成功
+
+#### Scenario: 清空覆盖恢复继承
+
+- **WHEN** 账号请求对两个掩码提交 NULL
+- **THEN** 服务端清空两个覆盖并回读来源为全局，未提交的自动化字段保持原值
 
 #### Scenario: 未知账号拒、不造幽灵行
-- **WHEN** 对一个 `accounts` 中不存在或已退役的账号 PUT 内容排期
-- **THEN** 接口具名拒绝（如 `unknown_account` / 退役拒），绝不 UPSERT 出一条孤儿排期行
 
-#### Scenario: 非法值整块拒
-- **WHEN** 提交的内容掩码非 168 位 '0'/'1'、或日上限为负 / 非整数
-- **THEN** 整块拒绝、绝不部分落库，接口以可区分于成功的方式呈现拒绝
+- **WHEN** 对不存在或退役账号提交账号排期
+- **THEN** 接口具名拒绝并且不得 UPSERT 出孤儿排期行
+
+#### Scenario: 任一非法值整块拒
+
+- **WHEN** 同一请求中的任一掩码非法，或任一其它字段类型/范围非法
+- **THEN** 整个请求拒绝、所有字段保持写前真态，拒绝与成功可区分呈现
 
 ### Requirement: 内容排期评论字段写入与发帖字段严格同构
 

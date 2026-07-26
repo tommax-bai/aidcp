@@ -40,6 +40,8 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 
 活动流 SHALL 覆盖**账号在该平台上真实做过的写动作**，MUST NOT 因某类动作由内部委托路径执行而使其对运营不可见。一个动作**做了但不显示**与**没做**在客户端上 MUST 可区分：凡执行器已对该动作作出终局判断（成功 / 待第三方批准 / 结构性失败），活动流 MUST 如实呈现该判断。
 
+当 Facebook Reel 已被 Edge 证明为新的活动卡片并上报为 `listKind:'reels'` 时，活动流 MUST 同步新增且仅新增一条“读”分类记录。该记录 SHALL 使用“看了/浏览了”的呈现事实措辞，MUST NOT 宣称看完或深度阅读；作者或摘要缺失时 MUST 使用通用人话回退，MUST NOT 暴露 URL 或原始 id。若同一 Reel 随后因 `note.open` 上报详情，客户端 MUST 保留详情数据流但 MUST NOT 再新增第二条“读”记录或第二次本地浏览增量。
+
 #### Scenario: 核心事件映射为人话条目
 - **WHEN** 核心进程产生已映射的动作日志（如点赞成功 / 提取内容 / 评论发布成功）
 - **THEN** 活动流顶部新增一条对应的人话句子并带时间戳，今日计数同步递增
@@ -51,6 +53,25 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 #### Scenario: 未识别日志行不进活动流
 - **WHEN** 核心进程输出映射表未覆盖的日志行
 - **THEN** 该行仅出现在「开发者详情」原始日志中，活动流不展示半截技术行
+
+#### Scenario: 新 Reel 呈现立即形成一条读记录
+- **WHEN** Edge 确认切换到一个新的活动 Reel 并上报单卡 Reels 批次
+- **THEN** “今天做了这些”新增一条“读”分类记录，优先显示实际摘要和作者
+- **AND** 本地浏览回退计数只增加一次
+
+#### Scenario: Reel 元数据缺失时诚实回退
+- **WHEN** 新活动 Reel 缺少作者或摘要
+- **THEN** 活动流显示有界的摘要级或通用“看了一个 Reel”文案
+- **AND** 不显示 Reel URL、noteId 或其它机器标识
+
+#### Scenario: 随后的详情上报不重复读记录
+- **WHEN** 已产生 Reel 呈现记录的同一规范 Reel 随后上报 `note.detail`
+- **THEN** 详情继续送达 Cloud 和内容评估链
+- **AND** 客户端不新增第二条“读”记录、不重复增加本地浏览回退计数
+
+#### Scenario: Reel 未切换时不造读记录
+- **WHEN** Reel 导航失败、活动身份不变或命中已见身份而未上报新单卡批次
+- **THEN** 活动流不新增 Reel “读”记录
 
 ### Requirement: 在场感动效由真实事件驱动、静默时诚实待命
 
@@ -199,7 +220,7 @@ Cloud and edge SHALL keep `ui.snapshot.dailyUsage` optional and backward compati
 - **THEN** the message remains a valid snapshot and the old edge can ignore the extra field without breaking identity, last publish, or publish-card rendering
 
 ### Requirement: Electron Daily Summary Shows Multi-Window Quota Status
-The Electron companion SHALL show plan progress for each cloud-supplied quota window: current session, minute, hour, and day, while keeping the collapsed daily summary focused on today's account totals. User-facing labels SHALL translate those windows into round, current pace, stage, and daily plan concepts while expanded detail preserves exact supplied totals and caps.
+The Electron companion SHALL show plan progress for each cloud-supplied quota window: current session, minute, hour, and day, while keeping the collapsed daily summary focused on today's account totals. Expanded labels SHALL identify those scopes as “本轮计划”, “近 1 分钟”, “近 1 小时”, and “今日计划”. The client MUST NOT describe the session as a rolling “近 N 分钟” window. Expanded detail SHALL preserve exact supplied totals and caps while presenting a cap as a secondary “最多 N” boundary rather than a slash-form completion target.
 
 #### Scenario: Daily card is collapsed by default
 
@@ -210,27 +231,39 @@ The Electron companion SHALL show plan progress for each cloud-supplied quota wi
 #### Scenario: User expands the daily progress card
 
 - **WHEN** the user clicks the daily progress card or its disclosure control
-- **THEN** Electron renders plan detail for each supplied window: current round, current pace, stage, and today
+- **THEN** Electron renders plan detail labeled “本轮计划”, “近 1 分钟”, “近 1 小时”, and “今日计划” for the supplied session, minute, hour, and day windows respectively
 - **AND** each window detail lists as separate action rows exactly those actions for which that window supplies a total or a cap, and no others
-- **AND** each action row shows its supplied total and supplied cap when a cap exists
+- **AND** each capped action row shows its supplied total followed by secondary “最多 N” wording
+- **AND** an uncapped action row shows its supplied total without `/-`, a fabricated cap, or cap progress styling
+
+#### Scenario: Active session has trustworthy timing
+
+- **WHEN** the session window is active and supplies finite `startedAt` and future `expiresAt` timestamps
+- **THEN** the “本轮计划” group shows the remaining round time in its state area
+- **AND** its metadata shows the local start time and expected end time
+- **AND** the client derives both displays from the supplied timestamps rather than hard-coding the configured round duration
 
 #### Scenario: Cloud supplies all quota windows
 
 - **WHEN** `ui.snapshot.dailyUsage.windows` includes `session`, `minute`, `hour`, and `day`
-- **THEN** Electron renders those windows as peer detail groups in the expanded area
+- **THEN** Electron renders those windows as peer detail groups ordered session, minute, hour, and day
+- **AND** the groups use a 2×2 grid at the normal companion width and a one-column grid at the existing narrow breakpoint
 - **AND** it marks completed actions distinctly from near-complete actions without relying on a single worst-action summary as the only visible data
 
 #### Scenario: Any window completes its plan
 
 - **WHEN** any supplied window's `saturated` list is non-empty, or any supplied action total is greater than or equal to that window's supplied cap
-- **THEN** Electron's aggregate progress status identifies completed action plans
-- **AND** the affected action rows use green completion styling without changing global risk, captcha, or engine health states
+- **THEN** Electron's aggregate progress status shows `完成 N 项`, counting every completed supplied action plan
+- **AND** the `完成 N 项` state text uses the completion color
+- **AND** the whole window card and completed row use completion styling only when browsing is complete
+- **AND** when browsing is incomplete, a completed like, favorite, comment, follow, or publish action keeps the card and its action row in the normal visual style without changing global risk, captcha, or engine health states
 - **AND** an available future `releaseAt` is described as the time the action will continue, not as quota release
 
 #### Scenario: Session plan is not active
 
 - **WHEN** the session window is supplied with `active: false`
 - **THEN** Electron MAY show the configured single-session plan as waiting to start, but MUST NOT imply that an active session is currently consuming that plan
+- **AND** it MUST NOT fabricate remaining time or an expected end time
 
 #### Scenario: Window quota metadata is missing
 
@@ -463,27 +496,34 @@ The Electron companion SHALL offer a `primary-screen` parking mode and SHALL mak
 - **AND** the show / re-park commands remain available for that environment
 
 ### Requirement: Environment rail avatar cycles select, show-on-primary, and re-park
-Clicking an environment's rail entry SHALL act as a three-state control for that environment. The first click (on a not-yet-selected environment) selects it and highlights it with a distinct color. On the already-selected environment, the next click raises that environment's driven browser to the primary screen and focuses it; the following click sends the browser back to its parked slot; further clicks continue to toggle between raised and parked. The selected-environment highlight MUST be visually distinct, and the raised state MUST be visually distinguishable from the merely-selected state. The show and re-park actions MUST reuse the existing per-environment control channel and MUST honestly surface failure; a failed action (for example, the browser is not yet ready) MUST NOT advance the toggle phase. Switching to a different environment MUST reset the toggle phase. The persona icon on a rail entry MUST NOT trigger this toggle.
+Clicking an environment's rail entry SHALL act as a three-state control for that environment. The first click (on a not-yet-selected environment) selects it and highlights it with a distinct color. On the already-selected environment, the next click centers that environment's fixed-size driven browser on the AIDCP companion's current outer window bounds and then restores the companion as the foreground window, leaving the driven browser immediately and geometrically behind the client rather than covering it or using an unrelated primary-screen/cascade position; the following click sends the browser back to its parked slot; further clicks continue to toggle between shown-below-client and parked. The selected-environment highlight MUST be visually distinct, and the shown state MUST be visually distinguishable from the merely-selected state. The show and re-park actions MUST reuse the existing per-environment control channel and MUST honestly surface failure; a failed or timed-out action (for example, the browser is not yet ready) MUST NOT advance the toggle phase. Switching to a different environment MUST reset the toggle phase. The persona icon on a rail entry MUST NOT trigger this toggle. Guided login and explicit browser recovery MAY continue to focus the driven browser because they express a different operator intent.
 
 #### Scenario: First click selects with a distinct highlight
 - **WHEN** the operator clicks a rail entry that is not currently selected
 - **THEN** that environment becomes selected and is highlighted with the distinct selected color
 - **AND** no browser show / re-park command is sent
 
-#### Scenario: Second click raises the browser to the primary screen
+#### Scenario: Second click shows the browser below AIDCP
 - **WHEN** the operator clicks the already-selected environment's rail entry and its browser is parked
-- **THEN** the companion requests that environment's browser be moved to the primary screen and focused
-- **AND** the rail entry reflects the raised state
+- **THEN** the companion reads its current window bounds and moves that environment's fixed-size browser to a center-aligned rectangle behind them
+- **AND** an AIDCP window on a secondary display uses that display's coordinate space rather than the primary-screen inspection position
+- **AND** after the browser move completes, the AIDCP companion is restored to the foreground above it
+- **AND** the rail entry reflects the shown state
 
 #### Scenario: Third click re-parks the browser
-- **WHEN** the operator clicks the already-selected environment's rail entry while its browser is raised
+- **WHEN** the operator clicks the already-selected environment's rail entry while its browser is shown below AIDCP
 - **THEN** the companion requests that environment's browser return to its parked slot
-- **AND** the raised state is cleared
+- **AND** the shown state is cleared
 
 #### Scenario: Honest failure does not advance the toggle
-- **WHEN** a show or re-park request fails because the environment's browser is not running/ready
+- **WHEN** a show or re-park request fails or times out because the environment's browser is not running/ready
 - **THEN** the companion surfaces the failure
 - **AND** the toggle phase does not advance
+
+#### Scenario: Guided login still focuses the browser
+- **WHEN** the operator uses the guided login or explicit recovery action because direct browser interaction is required
+- **THEN** the companion MAY leave that driven browser in the foreground
+- **AND** the avatar-specific below-client policy does not change that action
 
 ### Requirement: Companion window permits its own notifications while denying device access
 The Electron companion window permission policy SHALL allow the client's own notifications so operator-facing status can be surfaced, while continuing to deny device-access permissions (geolocation, camera, microphone, and similar) that the local companion UI does not need. This policy governs only the companion window and is independent of the driven fingerprint browser's permission handling.
@@ -676,37 +716,37 @@ The Electron companion SHALL present browser cold standby as standby even when t
 
 发布候审期间界面 SHALL 呈现一张**纯展示**发布卡（白底、四节点旅程、当前节点为全卡唯一琥珀呼吸点，状态由真实发布链路事件驱动）；发布卡本身 MUST NOT 承载任何审批控件（零按钮）。审批授权 SHALL 收拢在**占满主内容区的稿件审核页面**内完成：客户可在页面里查看成品稿件并直接「发布 / 取消」。审核页面 MUST 保留全局标题栏、当前账号、环境入口与真实运行健康状态，并提供返回来源页和关闭回运行首页的应用内导航。
 
-应用内审批与飞书审批 SHALL 为**并行通道**，二者共享同一份 first-writer-wins 审批信号，MUST NOT 各自成局。客户端 SHALL 为纯传输方：权限、版本、先到先得与择时下发的判定**全在云端**，客户端 MUST NOT 本地改写稿件状态后宣称成功；应答 `ok:true` 的语义 SHALL 严格为「决定已受理」，MUST NOT 被呈现为「已发布」。
+应用内审批与飞书审批 SHALL 共享同一份 first-writer-wins 审批信号，MUST NOT 各自成局。默认分组两者为并行通道；分组显式 `client_only`、稿件无飞书来源会话且 Cloud 可证明该账号客户审批归属时，飞书按钮卡 MAY 被抑制，应用内审核页成为唯一主动审批入口。无论是否发送飞书卡，客户端 SHALL 为纯传输方：权限、版本、先到先得与择时下发的判定**全在云端**，客户端 MUST NOT 本地改写稿件状态后宣称成功；应答 `ok:true` 的语义 SHALL 严格为「决定已受理」，MUST NOT 被呈现为「已发布」。客户端稿件列表与详情 SHALL 继续通过环境级 customer-auth HTTP 读取，MUST NOT 依赖浏览引擎或 WebSocket 在线。
 
 稿件审核页面的「发布 / 取消」SHALL 通过既有 `publish.approval_action` 边云 RPC 等待云端权威受理结果，MUST NOT 以创建 `approve_candidate` / `reject_candidate` 异步委托任务的 queued 回执代替审批结果。请求失败或被云端拒绝时，审核页面 SHALL 保持打开并展示可区分的真实原因；只有云端返回 `ok:true` 后才可关闭审核页并投影对应审批决定。
 
 下发给客户的预览 SHALL 只含**洗稿后的成品**（标题 / 正文 / 话题 / 配图 / 版本号），MUST NOT 含原稿的标题 / 作者 / 正文 / 链接。
 
 #### Scenario: 候审时在应用内直接审批
-
 - **WHEN** 核心进入发布候审（内容已生成、等待人审），客户在稿件审核页面点击「发布」或「取消」
 - **THEN** 客户端 SHALL 携带当前环境、稿件 requestId、决定值与内容版本调用既有审批 RPC，并等待云端权威结果
 - **AND** MUST NOT 创建异步委托任务来间接完成本次审核页审批
 
-#### Scenario: 客户端审批受理成功
+#### Scenario: 仅客户端分组仍能独立完成审批
+- **WHEN** Cloud 对可达账号按 `client_only` 抑制了无来源会话稿件的飞书按钮卡
+- **THEN** 客户端仍可经 HTTP 列出并读取该 `pending_approval` 稿件，并经既有审批 RPC 提交决定
+- **AND** MUST NOT 因浏览器、自动化引擎或 WebSocket 离线而隐藏持久稿件数据
 
+#### Scenario: 客户端审批受理成功
 - **WHEN** 云端完成账号归属、版本、待审状态和 first-writer-wins 校验并返回 `ok:true`
 - **THEN** 客户端可关闭审核页并投影「已通过」或「已驳回」
 - **AND** MUST NOT 将该结果表述为平台已经发布
 
 #### Scenario: 客户端审批未受理
-
 - **WHEN** 云端返回版本过期、账号离线、已被另一渠道决定、非待审或连接失败
 - **THEN** 客户端 SHALL 保持审核页打开并展示对应真实原因
 - **AND** MUST NOT 本地改写审批状态、MUST NOT 关闭页面造成已生效假象
 
 #### Scenario: 飞书侧已先行审批
-
 - **WHEN** 同一稿件已在飞书完成审批（审批信号已落）
 - **THEN** 应用内的再次审批 SHALL 被云端以「已审批」诚实拒绝，MUST NOT 二次下发、MUST NOT 在端上伪造成功
 
 #### Scenario: 审核页返回与关闭
-
 - **WHEN** 客户从运行首页或内容页进入稿件审核后点击返回或关闭
 - **THEN** 返回恢复进入审核前的页面状态，关闭回到运行首页，且主窗口与边缘核心继续运行
 
@@ -1117,62 +1157,87 @@ renderer SHALL 将通用可写门禁与 channel send capability 分离。保存�
 
 ### Requirement: 慢启动状态与开关在今日进展卡内如实呈现
 
-客户端 SHALL 在「今日进展」摘要卡内以**常驻脚注行**呈现当前选中环境所属账号的慢启动状态与开关。该行 MUST NOT 位于任何默认收起的折叠区内，MUST NOT 位于会因窗口无数据而整块隐藏的容器内——慢启动正是「启动新号之前」要设置的，在其唯一被需要的时刻不存在即为失败。
+客户端 SHALL 只在当前选中环境的平台明确为 Facebook 时，在「今日进展」摘要卡内以**常驻脚注行**呈现该账号的慢启动状态、开关、规则说明和帮助入口。当前环境为小红书、视频号、未知或其他非 Facebook 平台时，客户端 MUST 隐藏慢启动整行，MUST NOT 展示开关、徽章、说明或帮助入口。
 
-该行 MUST NOT 置于自定义标题栏内。标题栏跟随选中环境而慢启动是账号级属性，且标题栏无窄窗降级、其平台标识不可收缩，新增不可收缩元素会使昵称在最小窗宽下被压至不可读。
+该行 MUST NOT 位于任何默认收起的折叠区内，MUST NOT 位于会因窗口无数据而整块隐藏的容器内。该行 MUST NOT 置于自定义标题栏内。
 
-`ui.snapshot` 的慢启动字段 SHALL 为三态语义，与 `personaBound` 同族：`state` 明确取值时为权威，**字段整体缺省 = 未知（云端还没说）**。客户端 MUST NOT 把未知渲染为「未开启」：任何计时器、宽限窗或超时 MUST NOT 把未知提升为已确认的关闭态。
+`ui.snapshot` 的慢启动字段 SHALL 为三态语义，与 `personaBound` 同族：`state` 明确取值时为权威，**字段整体缺省 = 未知（云端还没说）**。客户端 MUST NOT 把未知渲染为「未开启」：任何计时器、宽限窗或超时 MUST NOT 把未知提升为已确认的关闭态。若当前选中的是已配置但尚未启动 / 尚未连接云端的 Facebook 环境，客户端 SHALL 展示慢启动入口但 MUST 将开关禁用并呈现未知 / 待同步状态，直到云端投影到达。
 
-客户端 MUST NOT 在任何文案中把该账号称为「新账号」或表述其平台年龄——系统只知道该账号连上本云端多少天，不知道它在平台上存在多久。
+客户端 MUST NOT 在任何文案中把该账号称为「新账号」或表述其平台年龄。客户端 MUST NOT 暗示慢启动会使动作变慢、更像真人或改变节奏；慢启动只改每日计划量上限，不进节奏系数。
 
-客户端 MUST NOT 暗示慢启动会使动作变慢、更像真人或改变节奏。慢启动只改每日额度上限，不进节奏系数。
+#### Scenario: Facebook 环境展示慢启动入口
+
+- **WHEN** 当前选中环境明确为 Facebook，且云端已投影慢启动字段
+- **THEN** 客户端在「今日进展」卡内展示慢启动开关、状态、规则说明和问号帮助入口
+
+#### Scenario: 小红书不展示慢启动入口
+
+- **WHEN** 当前选中环境为小红书，即使快照中仍携带慢启动字段
+- **THEN** 慢启动整行 MUST 隐藏，且开关、徽章、规则说明和帮助入口均不可见
 
 #### Scenario: 字段未到时不渲染而非默认关闭
 
-- **WHEN** 客户端已连接云端但尚未收到慢启动字段
+- **WHEN** 当前为已连接云端的 Facebook 环境，但客户端尚未收到慢启动字段
 - **THEN** 该脚注行整行隐藏，MUST NOT 渲染为未勾选的开关，无论经过多久
+
+#### Scenario: Facebook 环境未启动时仍展示慢启动入口
+
+- **WHEN** 当前选中环境为 Facebook，但浏览器 / 边缘环境尚未启动，且客户端尚未收到慢启动字段
+- **THEN** 慢启动整行 MUST 可见
+- **AND** 开关 MUST 禁用并以未知态呈现，MUST NOT 渲染为已确认的「关」
+- **AND** 客户端 MUST 提示启动环境并连接云端后同步慢启动状态
 
 #### Scenario: 开启中显示天数与总天数
 
-- **WHEN** 云端投影 `state=active`、`day=3`、`binding=true`
+- **WHEN** 当前为 Facebook 环境，且云端投影 `state=active`、`day=3`、`binding=true`
 - **THEN** 客户端显示「慢启动 · 第 3/7 天」且开关为勾选态
 
 #### Scenario: 曲线不比档位更严时如实说明
 
-- **WHEN** 云端投影 `state=active`、`day=5`、`binding=false`
+- **WHEN** 当前为 Facebook 环境，且云端投影 `state=active`、`day=5`、`binding=false`
 - **THEN** 客户端 MUST 在徽章上如实标注当前档位已更严、慢启动不额外限制
 - **AND** MUST NOT 表述为「正在压低配额」
 
 #### Scenario: 毕业态显式告知而非静默消失
 
-- **WHEN** 云端投影 `state=graduated`
-- **THEN** 客户端 MUST 显示已完成态并给出上限放开的日期，开关 MUST 仍如实反映库内为开启
-- **AND** 徽章 MUST NOT 静默消失——上限放开的那一刻正是最应被告知的时刻
-- **AND** 客户端 MUST NOT 把库内为开启的账号显示为未勾选
+- **WHEN** 当前为 Facebook 环境，且云端投影 `state=graduated`
+- **THEN** 客户端 MUST 显示已完成态并给出按账号档位运行的日期，开关 MUST 仍如实反映库内为开启
+- **AND** 徽章 MUST NOT 静默消失，客户端 MUST NOT 把库内为开启的账号显示为未勾选
 
-#### Scenario: 不适用时禁用并说明原因
+#### Scenario: Facebook 环境不适用时禁用并说明原因
 
-- **WHEN** 云端投影 `eligible=false`
-- **THEN** 开关禁用，且客户端按 `ineligibleReason` 如实说明原因（平台不支持 / 无法确认该账号平台 / 本构建未启用客户接口 / 本云端已全局停用）
+- **WHEN** 当前为 Facebook 环境，且云端投影 `eligible=false`
+- **THEN** 开关禁用，且客户端按 `ineligibleReason` 如实说明原因
 - **AND** MUST NOT 静默禁用而不给原因
 
 #### Scenario: 断连时降级而非清空
 
-- **WHEN** 云端连接断开，客户端保留着上一次收到的慢启动状态
+- **WHEN** 当前为 Facebook 环境，云端连接断开，客户端保留着上一次收到的慢启动状态
 - **THEN** 客户端 MUST 按既有连接态降级呈现（标注状态可能已过期）并禁用开关
 - **AND** MUST NOT 把「停止更新」渲染成「已关闭」或「未知」
 
-#### Scenario: 开关点击不触发今日进展折叠
+#### Scenario: 开关或帮助入口不触发今日进展折叠
 
-- **WHEN** 用户点击该脚注行内的开关（滑块或其文字标签任一位置）
+- **WHEN** 用户点击该脚注行内的开关、滑块文字或问号帮助入口
 - **THEN** 「今日进展」的展开 / 收起状态 MUST 保持不变
-- **AND** 开关 MUST 恰好切换一次，MUST NOT 因事件冒泡在不同点击位置产生不同的切换次数
+- **AND** 开关 MUST 恰好按用户对开关的单次操作切换一次
 
-#### Scenario: 规则说明常驻可读且说清优先关系
+#### Scenario: 常驻规则说明使用新的短文案
 
-- **WHEN** 该脚注行可见
-- **THEN** 规则说明以常驻小字呈现，MUST 说明每日额度按曲线逐日放开、第 7 天自动恢复，且上限取慢启动曲线与账号档位中更严的一个
-- **AND** MUST NOT 依赖悬浮提示、图标或任何需要额外交互才能看到的载体
+- **WHEN** 慢启动行可见
+- **THEN** 常驻说明 MUST 精确显示“开启后头 7 天按曲线逐日放开量，7天后按账号档位运行。”
+
+#### Scenario: 鼠标悬浮展示 7 天曲线表
+
+- **WHEN** 用户将鼠标移到慢启动旁的问号图标
+- **THEN** 客户端展示标题为“Facebook 慢启动曲线限额”的表格
+- **AND** 表格 MUST 按第 1 至第 7 天分别展示浏览、点赞、评论、关注、发布、加组上限：`20/2/0/1/0/0`、`25/3/0/1/0/0`、`35/6/1/2/0/1`、`40/8/2/2/0/1`、`50/12/3/3/1/2`、`60/15/4/4/1/2`、`70/18/5/5/1/3`
+
+#### Scenario: 键盘聚焦也可查看曲线表
+
+- **WHEN** 键盘用户将焦点移到问号帮助按钮
+- **THEN** 客户端展示与鼠标悬浮相同的 7 天曲线表
+- **AND** 问号按钮 MUST 有可读的无障碍名称
 
 ### Requirement: Cloud MUST NOT supply usage metrics for actions the platform cannot perform
 
@@ -1871,4 +1936,578 @@ Electron SHALL 仅渲染 Cloud 明确供给的 `search` 键。旧 Cloud 未供�
 #### Scenario: 窄主窗口查看工作面板
 - **WHEN** 主窗口缩窄到客户端支持的最小内容宽度
 - **THEN** 控件换行或分栏堆叠，页面无横向滚动，工作过程文字、状态图标和操作按钮均可见可操作
+
+### Requirement: Selected Facebook environment shows an explicit compact restricted recovery row
+
+The Electron companion SHALL render authoritative risk state in the selected environment's context. A selected Facebook environment in `restricted` SHALL be labeled `账号受限` in the title health result, risk detail, and environment rail, and SHALL show one compact row below the existing “今日进展” controls containing only one `解除受限` action button, one `?` help trigger, and inline failure feedback when needed. The UI MUST NOT duplicate the status label inside this row, add a large recovery card, or show the action for `normal`, `warned`, `frozen`, non-Facebook, or unknown risk state.
+
+For a live environment the displayed state SHALL follow the live Cloud snapshot. For a stopped or disconnected environment the client SHALL obtain a fresh customer-auth environment-scoped risk read; it MUST NOT trust a locally initialized `normal` fallback, merge state across environments, or turn a failed read into a normal display.
+
+When the effective state is `restricted`, that state SHALL override the generic `session=resting` presence fallback. The companion MUST NOT describe a risk-triggered pause as a completed browse round or promise the normal automatic-resume countdown.
+
+#### Scenario: Stopped restricted Facebook environment remains visibly restricted
+- **WHEN** the selected Facebook environment is stopped and its environment-scoped Cloud read returns `restricted`
+- **THEN** the companion shows `账号受限` and the compact recovery row for that environment
+- **AND** switching to another environment does not carry the state or button across
+
+#### Scenario: Other states and platforms do not show the action
+- **WHEN** the selected environment is not Facebook or its authoritative state is `normal`, `warned`, `frozen`, or unknown
+- **THEN** the compact recovery row is hidden
+
+#### Scenario: Risk-triggered standby is not presented as completed work
+- **WHEN** the selected environment is `restricted`, its session projection is `resting`, and browse progress is still below quota
+- **THEN** the presence headline says automatic operation is paused because the account is restricted
+- **AND** it does not say the round completed or show the normal auto-resume countdown
+
+#### Scenario: Restricted wording is explicit
+- **WHEN** an environment is `restricted`
+- **THEN** health, risk detail, and rail use `账号受限`
+- **AND** they MUST NOT weaken the state to `节奏已调整` or `已调整节奏`
+
+### Requirement: Recovery interaction reports Cloud write-after truth
+
+Clicking `解除受限` SHALL first show a compact application-owned modal, not a native browser/system confirmation. The modal SHALL identify the selected environment, ask the customer to verify Facebook is usable, and state that the action only resumes AIDCP automation rather than proving Facebook's own block is cleared. After confirmation, the renderer SHALL call a named preload/main IPC with only the selected environment key. While pending, the same button SHALL be disabled; success SHALL consume the Cloud write-after status immediately, while failure SHALL leave `账号受限` visible and show an inline failure message. The renderer MUST NOT locally clear the state before Cloud confirms it and MUST reject a response whose `envKey` does not match the request.
+
+The `?` help panel SHALL explain that Facebook security checks, captcha evidence, or explicit throttle signals can pause automation; the customer should first confirm the account works; and a still-present platform block can stop work again. The UI MUST NOT claim that pressing the button solved the Facebook checkpoint or captcha itself.
+
+#### Scenario: Confirmed recovery updates only the current environment
+- **WHEN** the customer confirms recovery and Cloud returns the same `envKey` with write-after `normal`
+- **THEN** the button enters a pending state until the response, then the restricted row disappears for that environment
+- **AND** other environments remain unchanged
+
+#### Scenario: Cancel does not call Cloud
+- **WHEN** the customer clicks `暂不解除`, closes the modal, or presses Escape
+- **THEN** no recovery IPC is sent and the restricted row remains unchanged
+
+#### Scenario: Confirmation stays scoped to the environment shown
+- **WHEN** the selected environment or its authoritative risk state changes while the modal is open
+- **THEN** confirming the stale modal sends no recovery IPC
+- **AND** the UI re-renders from the current environment's truth
+
+#### Scenario: Recovery failure remains honest
+- **WHEN** Cloud rejects the request or cannot be reached
+- **THEN** the environment remains visibly `账号受限`, the button becomes usable again, and an inline error is shown
+
+### Requirement: Facebook Feed-video presentations appear exactly once in the activity stream
+
+When Edge reports an ordinary Facebook Feed batch containing exactly one `isVideo:true` card with a canonical non-Reel Facebook post identity, the client SHALL add exactly one “读” activity for that presented video. The activity SHALL use truthful “看了” wording with the reported caption and author when present, MUST use a bounded generic fallback when metadata is absent, and MUST NOT expose a URL, noteId, or other machine identifier. The event MAY add one immediate local fallback view, but Cloud customer-auth `dailyUsage` SHALL remain the authoritative total.
+
+The client MUST deduplicate the activity by canonical post identity for the active session. A repeated cards batch or later detail report for an already-projected Feed video SHALL continue through the existing Cloud data path but MUST NOT add another read activity or local fallback view. Non-video, empty, multi-video, malformed-identity, and Reel-shaped Feed batches MUST NOT produce this activity.
+
+#### Scenario: Strict Feed video produces one readable activity
+
+- **WHEN** Edge reports one ordinary Feed video with a canonical post identity, caption, and author
+- **THEN** “今天做了这些” adds one “读” activity using the actual caption and author
+- **AND** the local fallback view increases once until Cloud refreshes the authoritative total
+
+#### Scenario: Missing metadata uses a safe generic fallback
+
+- **WHEN** an otherwise valid Feed-video presentation lacks caption and author metadata
+- **THEN** the activity uses bounded generic “看了一个视频” wording
+- **AND** it exposes no URL, post id, or other machine identifier
+
+#### Scenario: Duplicate presentation and later detail remain idempotent
+
+- **WHEN** the same canonical Feed video is reported again or later produces `note.detail` in the same active session
+- **THEN** the Cloud cards/detail data continues through its existing path
+- **AND** the client adds no second read activity and no second local fallback view
+
+#### Scenario: Unqualified Feed batches remain silent
+
+- **WHEN** a Feed batch has zero or multiple video cards, lacks a canonical post identity, is non-video, or carries a Reel-shaped identity
+- **THEN** the client emits no Feed-video read activity and adds no local fallback view
+
+#### Scenario: Feed video uses the existing read marker
+
+- **WHEN** a `feed_video_view` activity reaches the renderer
+- **THEN** the activity stream displays the existing “读” marker rather than a generic system marker
+
+### Requirement: 开发者详情展示安全且阶段诚实的引擎命令诊断
+
+客户端 SHALL 在“开发者详情”中为当前环境展示 Cloud 主动下发到 Edge 的命令诊断。每条诊断 SHALL 包含接收时间、命令类型、当前可证明阶段、安全摘要和短关联标识，并 MUST 明确区分已收到、已拒绝、已交给执行器及 Edge 接收层能够直接观测的步骤结果。`received` 或 `dispatched` MUST NOT 被表述为命令已经执行成功、业务已经完成或平台已经确认。
+
+命令摘要 MUST 由逐命令字段白名单生成。正文、标题、评论、私信、搜索词、群聊码、Cookie、Token、二维码、截图内容、完整 URL、浏览器调试地址、账号身份字段、任务永久键和原始 payload MUST NOT 进入命令诊断事件、renderer 状态或可见诊断行。文本字段只可展示有界字符数，URL 只可展示是否存在，安全枚举和有界计数可按需展示。未知命令或新增 payload 字段 MUST 默认不展示内容。
+
+诊断 SHALL 仅保存在 Edge 本机内存中，按环境隔离并具有数量与时间双重上限；它 MUST NOT 进入普通活动流、Cloud 数据库或自动化回执。旧客户端状态缺少诊断字段时界面 MUST null-safe 降级。
+
+#### Scenario: 已登记命令显示接收与交付边界
+
+- **WHEN** 当前环境收到一条已登记、通过校验且存在本地处理器的主动命令
+- **THEN** 开发者详情出现该命令，并将阶段更新为“已交给执行器”
+- **AND** 界面明确该阶段不表示执行成功或平台确认
+
+#### Scenario: 非法或未协商命令诚实显示拒绝
+
+- **WHEN** Edge 收到未登记、能力未协商、payload 非法或没有本地处理器的主动命令
+- **THEN** 诊断阶段显示“已拒绝”及固定安全原因，不显示已执行或成功
+- **AND** 诊断行为不得改变原有 fail-closed 路由结果
+
+#### Scenario: 只有可直接观测的步骤才显示结果
+
+- **WHEN** `plan.response` 的顺序步骤在 EdgeClient 内完成并得到逐步结果
+- **THEN** 对应诊断可更新为“步骤已完成”或“步骤失败”
+- **AND** 该结果不得表述为整项业务完成或平台结果已确认
+
+#### Scenario: 异步处理器不猜测终态
+
+- **WHEN** 命令已经交给一个返回 `void` 或自行异步执行的业务处理器
+- **THEN** 诊断停留在“已交给执行器”，直到未来有显式结果事件
+- **AND** 客户端不得依据交付动作自行补造成功或失败
+
+#### Scenario: 敏感 payload 只产生白名单摘要
+
+- **WHEN** 评论、回复、发布、搜索、验证码或导航命令携带文本、账号标识、任务键、图片、坐标或完整 URL
+- **THEN** 命令诊断只展示固定动作说明、允许的枚举、有界数量或文本字符数
+- **AND** renderer 状态和可见诊断行中不存在上述原始内容或完整 payload
+
+#### Scenario: 多环境命令诊断不串号
+
+- **WHEN** 环境 A 与环境 B 同时收到不同命令且用户在二者之间切换
+- **THEN** 开发者详情只展示当前选中环境的命令诊断
+- **AND** 每个环境分别执行最多 50 条且最长 30 分钟的保留规则
+
+#### Scenario: 普通活动流不展示接收噪声
+
+- **WHEN** Edge 收到、拒绝或交付一条引擎命令
+- **THEN** 该接收诊断只出现在开发者详情
+- **AND** “今天做了这些”不得因此新增一条动作成功、失败或处理中记录
+
+#### Scenario: 旧状态安全降级为空态
+
+- **WHEN** renderer 收到不含 `commandDiagnostics` 的旧形状环境状态
+- **THEN** 开发者详情的引擎命令区域显示无记录空态且不抛错、不白屏
+
+### Requirement: 首页状态卡统一层级并保持平台能力真实
+
+Electron 首页的“今日进展”和“内容发布” SHALL 在小红书与 Facebook 环境中使用一致的客户级表面、内层内容卡、状态标签、间距、悬停、键盘焦点和窄窗口响应式语言。视觉一致 MUST NOT 被解释为功能等同：今日进展的可见指标 SHALL 继续完全由当前环境的权威平台投影决定；Facebook 慢启动脚注 SHALL 只在其既有真实条件下显示；平台切换 MUST 清除上一平台的视觉修饰、文案和操作入口。
+
+#### Scenario: Facebook 今日进展使用共享视觉但保留真实指标
+- **WHEN** 客户选择一个 Cloud 投影为 Facebook 的环境
+- **THEN** 今日进展 SHALL 使用共享卡片层级并只呈现该投影实际提供的 Facebook 指标，MUST NOT 补画小红书收藏等不存在的指标
+- **AND** Facebook 慢启动脚注仍 SHALL 按既有环境级真态显示
+
+#### Scenario: 切换平台不残留前一平台状态
+- **WHEN** 客户在小红书与 Facebook 环境之间切换
+- **THEN** 今日进展与内容发布 SHALL 立即切换到当前平台的表面修饰、文案与可用操作，MUST NOT 残留前一平台的 class、队列导航或指标格
+
+### Requirement: Facebook 内容发布卡使用单稿语义而非小红书队列语义
+
+Facebook 环境的内容发布卡 SHALL 使用与小红书队列卡一致的视觉层级，但 MUST 只投影当前环境既有的单稿 `publish / lastPublish / publishPreview` 真态。其阶段 SHALL 表达“准备内容、发布审批、提交平台、发布结果”，并按 pending/reminded、approved、submitted、published 等既有状态推进；页面 MUST NOT 显示小红书队列数量、左右切稿、“查看全部进度”或定时发布能力。稿件查看入口 SHALL 仅在既有可审批稿件能力判定为可用时出现，并继续调用既有审批链路。
+
+#### Scenario: Facebook 待审批内容显示单稿状态
+- **WHEN** 当前 Facebook 环境有一条 `pending` 或 `reminded` 稿件且稿件预览可用
+- **THEN** 内容发布卡 SHALL 显示 Facebook 单稿的待审批状态和“查看内容”入口
+- **AND** “发布审批”为当前阶段，“提交平台”和“发布结果”为未完成阶段
+- **AND** 队列数量、左右切稿和“查看全部进度” MUST NOT 出现
+
+#### Scenario: Facebook 已审批内容等待提交
+- **WHEN** 当前 Facebook 环境的稿件状态为 `approved`
+- **THEN** 内容发布卡 SHALL 将“准备内容”和“发布审批”显示为已完成，将“提交平台”显示为当前阶段，并以无需重复操作的真实文案说明后续处理
+
+#### Scenario: Facebook 已提交但结果未确认
+- **WHEN** 当前 Facebook 环境的稿件状态为 `submitted`
+- **THEN** 内容发布卡 SHALL 显示已提交 Facebook、正在确认公开结果，MUST NOT 将其显示为已发布
+
+#### Scenario: Facebook 空态和窄窗口保持可读
+- **WHEN** 当前 Facebook 环境没有进行中稿件和发布历史，或窗口宽度不超过 430px
+- **THEN** 空态 SHALL 继续按既有规则默认收起并可展开，展开后的平台文案与阶段语义 SHALL 保持正确
+- **AND** 窄窗口中阶段、脚注与合法操作 MUST NOT 横向溢出或被左右轮播控件遮挡
+
+### Requirement: 发布卡显式展示已提交但公开结果未确认
+
+Electron 陪伴界面收到当前环境的 `publish.state = submitted` 时 SHALL 将本次发布显示为独立的“已提交，平台确认中”卡片状态，并 SHALL 以本次稿件的标题、编号与提交时间覆盖发布卡主体；即使同一环境仍保存更早的 `lastPublish`，旧历史也 MUST NOT 盖住本次提交。该状态 MUST NOT 使用“已发布”文案，MUST NOT 把公开结果未确认的稿件写入已发布历史，并 MUST 保留真实 `lastPublish` 供后续失败回退或已确认发布替换。
+
+#### Scenario: 新提交优先于旧的上次发布
+
+- **WHEN** 当前环境已有一条历史 `lastPublish`，随后收到标题、编号和时间齐全的 `publish.state = submitted`
+- **THEN** 发布卡自动展开并显示本次稿件及“已提交，平台确认中”，不继续把旧稿标题作为卡片主体
+- **AND** 卡片 MUST NOT 显示“已发布”或把四个旅程节点全部标为完成
+
+#### Scenario: 没有历史发布时仍展示提交真态
+
+- **WHEN** 当前环境没有 `lastPublish`，但收到 `publish.state = submitted`
+- **THEN** 发布卡显示本次提交而非“还没有发布过内容”空态
+- **AND** 文案说明发布请求已经提交、公开结果仍待确认且无需用户重复操作
+
+#### Scenario: 公开结果确认后转为上次发布
+
+- **WHEN** 同一稿件在 `submitted` 后收到 `publish.state = published`
+- **THEN** 发布卡按既有逻辑转为“上次发布”并以该稿件更新历史态
+- **AND** 只有此时卡片才显示“已发布”并将四个旅程节点全部标为完成
+
+#### Scenario: 新版客户端重启后从客户 HTTP 数据面恢复提交真态
+
+- **GIVEN** 客户端支持 `client_data_plane_automation_engine_v1`，同一环境的云端发布记录仍为 `submitted`，且本地只保存更早的 `lastPublish`
+- **WHEN** 客户端登录、重启或重新选择该环境
+- **THEN** Electron SHALL 通过 customer-auth HTTP 的环境级只读概览恢复当前提交与真实最近发布摘要
+- **AND** 卡片 SHALL 在 HTTP 结果到达后显示当前 `submitted` 稿件，不得继续以本地旧 `lastPublish` 作为当前主体
+- **AND** Renderer、HTTP 请求或响应 MUST NOT 接受或暴露 Cloud `accountId`
+
+#### Scenario: 云端概览尚未确认时不冒充旧状态
+
+- **WHEN** 新版客户端首次读取环境概览仍在进行或失败
+- **THEN** 发布卡 SHALL 显示读取中或暂时不可用，不得把本地旧历史当作已确认的当前云端状态
+- **AND** 已有一次成功概览后刷新失败时 MAY 保留上次确认值，但 SHALL 明确标识为缓存或陈旧数据并有界重试
+
+### Requirement: XHS publish home surface SHALL summarize the current environment queue
+
+Electron 陪伴界面 SHALL 在明确的小红书环境中把原单记录发布区域呈现为“发布进度”摘要。摘要 SHALL 优先展示等待客户确认的内容，并提供进入完整发布队列的入口；仅有系统处理中内容时 SHALL 保持紧凑，无活跃内容时 SHALL 展示最近真实发布或“暂无进行中”。既有稿件审核入口、发布/取消和版本安全语义 MUST 保持不变。
+
+#### Scenario: 待确认稿件自动突出
+
+- **WHEN** 当前环境队列含至少一条 waiting approval 内容
+- **THEN** 首页摘要自动展开最需要处理的一条，显示“确认前不会发布”并提供现有稿件审核入口
+
+#### Scenario: 只有系统处理中的内容
+
+- **WHEN** 当前环境只有 queued、generating 或 submitted 内容且无需客户操作
+- **THEN** 首页显示紧凑数量摘要和“查看全部”，不为每条内容占据运行首页空间
+
+### Requirement: Home status surfaces SHALL prioritize today progress before publish content
+
+Electron 运行首页 SHALL 在 DOM 与视觉顺序中将完整“今日进展”卡放在内容发布卡之前。实现 MUST 保持今日进展的环境控制、展开状态与指标节点完整，保持发布卡的折叠、轮播、审核和队列入口完整，并且 MUST NOT 通过仅改变 CSS 视觉顺序造成辅助技术或键盘顺序不一致。
+
+#### Scenario: 今日进展与待发布卡同时出现
+
+- **WHEN** 当前环境同时展示今日进展和展开或收起的内容发布卡
+- **THEN** 用户先阅读和操作今日进展，再到内容发布卡；“今天做了这些”活动流继续位于两张卡之后
+
+### Requirement: Expanded publish summary SHALL support restrained item switching
+
+Electron 展开态发布摘要 SHALL 在当前环境可展示项超过一条时，提供位于卡片最左和最右的上一条、下一条按钮，并显示当前位置与总数。按钮 SHALL 默认使用弱化颜色，在 hover 与 `focus-visible` 时轻度加深；按钮 SHALL 是原生键盘可达控件并以目标内容标题提供可访问名称。单条、加载、错误与收起态 MUST 隐藏并禁用切换控件。
+
+切换序列 SHALL 先展示待确认 active，再展示其它 active 与尚未开跑 tasks；无进行中内容时 MAY 在 recent 内切换。左右边界 SHALL 循环。HTTP 刷新后若当前稳定身份仍存在 SHALL 保持当前项，消失时 SHALL 回到新的首项；切换环境或平台 MUST 清除选择。切换 MUST NOT 发送写请求、改变任务顺序、跨环境复用索引，或把展示位置描述成精确队列名次。
+
+#### Scenario: 鼠标或键盘切换到下一稿件
+
+- **WHEN** 客户点击右侧按钮，或在该原生按钮上按 Enter / Space
+- **THEN** 卡片更新为下一条内容，位置提示与按钮可访问名称同步更新，完整队列和 Cloud 状态保持不变
+
+#### Scenario: 当前稿件在刷新后仍存在
+
+- **WHEN** 客户正在查看第二条内容且 HTTP 刷新仍返回同一稳定身份，即使列表位置改变
+- **THEN** 卡片继续展示该内容，不因刷新跳回首项；若该身份消失才回到新的首项
+
+#### Scenario: 切换环境或只剩一条内容
+
+- **WHEN** 客户切换账号、平台，或刷新后当前环境只剩一条可展示内容
+- **THEN** 客户端清除旧选择，隐藏且禁用左右按钮，不保留可聚焦的不可见控件
+
+### Requirement: Expanded publish summary SHALL reuse the full queue visual hierarchy
+
+Electron 的 XHS 展开态发布摘要 SHALL 使用与完整发布队列一致的状态徽标、白底细边任务卡、紧凑四阶段轨道和主次按钮层级。摘要 MUST NOT 使用没有真实稿件图片证据的装饰封面。每个有 Cloud 阶段证据的步骤 SHALL 同时显示阶段标签与客户状态文字；尚未开跑的 task SHALL 显示未开始，不得伪造阶段进度。
+
+“查看全部进度” SHALL 是次级原生按钮。“审核稿件” SHALL 是主按钮，且只在当前轮播项自身为 waiting approval 并且审核能力可用时展示。说明文字与操作按钮 SHALL 分区布局。左右切换控件 MUST 留在外层边缘并且不遮挡标题、步骤或操作；窄窗口 SHALL 使用纵向阶段轨道且无横向溢出。非 XHS 与旧单稿回退 MUST NOT 继承 XHS 队列摘要样式。
+
+#### Scenario: 当前轮播项是待确认稿
+
+- **WHEN** 当前 XHS 展开态摘要选中 waiting approval journey
+- **THEN** 内层任务卡显示等待确认徽标、稿件标题、四阶段标签与状态，操作区显示次级“查看全部进度”和主按钮“审核稿件”，且不显示装饰封面
+
+#### Scenario: 切换到创作中或排队任务
+
+- **WHEN** 客户从待确认稿切换到 generating journey 或 queued task
+- **THEN** 标题、状态徽标与阶段文字同步切换；审核主按钮隐藏，完整队列次级入口保留，queued task 的四阶段均显示未开始
+
+#### Scenario: 窄窗口查看重构后的摘要
+
+- **WHEN** XHS 发布摘要在 430px 或更窄的可用宽度展开
+- **THEN** 当前任务信息、纵向四阶段状态、说明与操作按钮完整可读，左右切换不遮挡内容且页面无横向溢出
+
+### Requirement: Publish queue SHALL reuse the in-app content workspace safely
+
+Electron SHALL 在现有主窗口内容工作区页面栈内展示发布队列，不创建新的系统窗口。关闭 SHALL 返回运行首页；打开稿件审核后返回 SHALL 回到队列。环境切换 SHALL 清除取消确认、忙态和旧内容；旧环境迟到回包 MUST NOT 重新打开或覆盖新环境页面。
+
+#### Scenario: 从队列进入稿件审核再返回
+
+- **WHEN** 客户从等待确认的队列项打开稿件审核并完成查看后返回
+- **THEN** 客户回到同一环境发布队列且不丢失当前分区
+
+#### Scenario: 取消确认中切换环境
+
+- **WHEN** 客户正在确认取消环境 A 的任务时切换到环境 B
+- **THEN** 确认态立即关闭，任何 A 的在途回包不得修改 B 的队列或显示成功提示
+
+### Requirement: Renderer SHALL use narrow publish queue IPC only
+
+Renderer SHALL 只通过 preload 暴露的发布队列读取与取消方法操作当前本地 `envId`。Electron main SHALL 解析真实 envKey、持有客户令牌并构造固定路径；renderer MUST NOT 直接访问 customer-auth HTTP、传入任意 URL/鉴权头/`accountId`，或在取消时省略 task version。
+
+#### Scenario: Renderer 发起取消
+
+- **WHEN** 客户确认取消当前队列中的任务
+- **THEN** renderer 只向 preload 提交当前 envId、任务 id 与整数 version，main 将其绑定到该环境的固定客户取消路径
+
+### Requirement: Publish progress rail SHALL read as one connected, non-interactive sequence
+
+发布队列的四阶段步骤条 SHALL 在宽屏将节点和文案按同一四列对齐，并只在相邻圆点外缘之间绘制连接线。第一节点之前与最后节点之后 MUST NOT 出现线段，连接线 MUST NOT 穿过圆点或阶段文案。窄屏 SHALL 改为等价的纵向连接，保持阶段顺序与状态文字可读。步骤项只表达状态，MUST NOT 使用 hover、手型光标或点击反馈暗示可操作性。
+
+#### Scenario: 已确认稿件等待发布
+
+- **WHEN** 前三阶段完成而发布结果尚未开始
+- **THEN** 第三个圆点与第四个圆点之间显示已推进连接，第四个圆点保持待处理样式，轨道首尾无悬空短线且文字不遮挡线段
+
+#### Scenario: 窄屏查看四阶段
+
+- **WHEN** 客户在窄屏窗口查看同一任务
+- **THEN** 四阶段按从上到下排列，连接线只连接相邻圆点，完整标签与状态文字换行可读且页面无横向溢出
+
+### Requirement: 终态自动化失败必须同时保留重试与关闭入口
+
+Electron 伴随窗口在本机自动化意图仍为启动、但引擎已因终态启动失败退出时，SHALL 如实显示失败详情，并同时提供“重试启动”和“关闭自动化”两个可区分动作。“关闭自动化”MUST 结束本机自动化意图、取消本机排队或重试并清除该轮失败；MUST NOT 被路由成打开浏览器、重新登录或其他隐式重试。
+
+#### Scenario: AdsPower 占用终态可关闭本机自动化
+
+- **WHEN** AdsPower 启动被其他设备或窗口占用拒绝，引擎已退出且自动化状态为终态错误
+- **THEN** 客户端 SHALL 显示“启动”用于显式重试，并显示“关闭”用于结束本机自动化
+- **AND** 点击“关闭” SHALL 调用单环境自动化关闭动作，MUST NOT 调用浏览器打开动作
+
+#### Scenario: 已停止环境仍保留浏览器辅助动作
+
+- **WHEN** 环境的本机自动化意图已经为停止且没有终态错误
+- **THEN** 主动作 SHALL 保持“启动”，次动作 MAY 保持既有“浏览器”登录/检查入口
+- **AND** MUST NOT 把普通停止态误呈现为仍需关闭的自动化任务
+
+#### Scenario: 关闭失败终态不牵连其他环境
+
+- **WHEN** 操作者关闭某一个终态错误环境的本机自动化
+- **THEN** 只有该环境的启动意图和失败详情 SHALL 收敛
+- **AND** 其他环境的引擎、浏览器与运行状态 MUST NOT 受影响
+
+#### Scenario: 外部占用关闭文案不冒充远端浏览器已关
+
+- **WHEN** 启动因外部占用被拒后，操作者关闭本机自动化
+- **THEN** 客户端 SHALL 显示本机自动化已关闭且占用端会话未受影响
+- **AND** MUST NOT 用无范围的“已关闭浏览器”覆盖该结论
+
+### Requirement: Facebook Reel follows appear truthfully in activity and today's progress
+
+When Cloud supplies `dailyUsage.follow` for a Facebook account, the client SHALL render the follow total, applicable quota, saturation, and window progress in the existing “今日进展” surface exactly as it renders other supplied actions. The client MUST NOT hide the follow row merely because the selected platform is Facebook. A newly verified Reel follow SHALL also emit one structured local follow activity with one fallback `follows` increment; Cloud daily usage SHALL remain the authoritative total when refreshed.
+
+#### Scenario: Cloud supplies Facebook follow usage
+- **WHEN** a Facebook environment receives daily usage with `follow` totals and quotas
+- **THEN** “今日进展” displays the 关注 item and its real total/quota/window values
+- **AND** the unsupported Facebook 收藏 item remains absent
+
+#### Scenario: New Reel follow is immediately visible
+- **WHEN** the Facebook Reel executor reports `ok:true` for a newly verified follow
+- **THEN** the activity stream adds one human-readable Reel follow entry with a distinct 关注 marker
+- **AND** the local fallback follow total increments once until Cloud refreshes the authoritative total
+
+#### Scenario: No-op and failure do not look successful
+- **WHEN** a Reel follow returns `already_followed`, shadow, no-target, ambiguous-target, state-unchanged, verify-indeterminate, or another failure
+- **THEN** the client adds neither a successful follow activity nor a follow fallback increment
+
+#### Scenario: Edge version lacks Reel follow activity support
+- **WHEN** Cloud daily usage includes Facebook follow but the installed Edge predates structured Reel follow events
+- **THEN** the existing generic daily-usage renderer still displays the authoritative follow total
+- **AND** Cloud does not send automatic follow commands unless that Edge declared `facebook_reel_follow_v1`
+
+### Requirement: 桌面灵感库 SHALL 展示来源发布时间而非精选更新时间
+
+桌面灵感库列表卡片与详情作者副行 SHALL 使用 Cloud 返回的来源发布时间证据。解析成功时 SHALL 按 `minute|hour|day` 精度格式化；不可解析但有原文时 SHALL 展示原文并标明未转换；完全缺失时 SHALL 显示“发布时间未知”。`updatedAt` MAY 继续用于缓存和治理，但 MUST NOT 在原稿发布时间位置显示或被描述为原稿时间。
+
+#### Scenario: 列表展示来源发布日期
+
+- **WHEN** 灵感列表项带日精度标准来源时间
+- **THEN** 作者副行显示该来源日期，不显示精选记录更新时间
+
+#### Scenario: 详情展示不可解析原文
+
+- **WHEN** 灵感详情只带不可解析的来源时间原文
+- **THEN** 作者副行显示原文与未转换标识，不猜测绝对时间
+
+#### Scenario: 旧行显示未知
+
+- **WHEN** 灵感行不带任何来源发布时间字段
+- **THEN** 列表与详情显示“发布时间未知”，不回落到 `updatedAt`
+
+### Requirement: 手动打开账号人设时不依赖环境引擎并展示 Cloud 真态
+
+用户点击环境栏人设图标 SHALL 触发该环境的具名 customer-auth 人设读取，MUST NOT 以 core、浏览器、平台登录或边云 WebSocket 在线作为手动查看前置。读取在途 SHALL 显示明确加载态；只有 Cloud 返回 `configured` 才显示已设置，只有 Cloud 返回 `missing` 才显示未设置。网络失败、服务不可用、归属失败或绑定失败 MUST NOT 被渲染为未设置。
+
+手动读取与草稿状态 SHALL 按环境隔离；切换环境、请求乱序或在线 status 推送 MUST NOT 把 A 的人设、失败、草稿或保存回执显示到 B。自动弹窗仍只由在线 Cloud 权威的 `personaBound === false` 触发，手动离线读取不得把未知状态推断成自动提醒。
+
+#### Scenario: 停止环境可查看当前人设
+
+- **WHEN** 用户点击一个已持久绑定账号但 core 停止的环境的人设图标
+- **THEN** 浮层加载并展示 Cloud 当前人设真态，MUST NOT 显示“请先启动”作为查看前置
+
+#### Scenario: 加载失败不冒充未设置
+
+- **WHEN** 人设读取因网络、服务、归属或绑定冲突失败
+- **THEN** 浮层显示对应失败与重试入口，MUST NOT 显示“未设置”或开放保存成功态
+
+#### Scenario: 从未识别账号诚实引导首次启动
+
+- **WHEN** Cloud 返回 `binding_unknown`
+- **THEN** 浮层说明该环境尚未识别过登录账号，并提供首次启动登录动作
+- **AND** MUST NOT 从环境昵称、平台资料或本地缓存猜测账号
+
+#### Scenario: 多环境请求乱序不串号
+
+- **WHEN** 用户先打开环境 A 人设、再切到 B，随后 A 的读取或生成结果晚到
+- **THEN** B 的浮层不显示 A 的人设、草稿、错误或成功回执
+
+### Requirement: 已设置人设以精简摘要优先并可进入调整流程
+
+已设置账号的人设浮层 SHALL 默认展示简洁摘要，至少包含人设名/定位、语气、内容方向，以及平台适用时的发言语言和点赞倾向；完整 soul YAML SHALL 收在默认折叠的“查看完整定义”内。界面 SHALL 提供一个明确的“调整人设”入口，进入后复用现有选择→生成草稿→预览确认流程，MUST NOT 默认暴露可直接编辑的 YAML 或增加解绑入口。
+
+调整流程 SHALL 尽量预填当前人设中可精确映射的选项；确认按钮与提示 MUST 说明保存会整体替换当前人设。生成草稿不改变已设置徽标；保存请求在第一个 await 前 SHALL 显示在途并禁用重复动作，成功回执后才刷新摘要，失败则保留原摘要和草稿。
+
+#### Scenario: 当前人设摘要优先于泛化绿卡
+
+- **WHEN** Cloud 返回 configured 人设
+- **THEN** 浮层展示该人设的真实姓名/定位、语气与内容方向，而不是只显示“已设置、正在运营”的泛化状态
+
+#### Scenario: 完整定义默认折叠
+
+- **WHEN** 已设置人设浮层首次打开
+- **THEN** 可读摘要直接可见，完整 YAML 只在用户主动展开“查看完整定义”后出现
+
+#### Scenario: 调整生成不覆盖现有人设
+
+- **WHEN** 用户进入调整并生成新草稿但未确认
+- **THEN** 原人设摘要和已设置语义保持，界面明确草稿待确认，MUST NOT 本地翻成已更新
+
+#### Scenario: 保存失败回退并呈现真实原因
+
+- **WHEN** 确认保存被 Cloud 拒绝或网络失败
+- **THEN** 在途状态解除、原人设保持可见、草稿可重试，并显示真实失败原因，MUST NOT 出现成功措辞
+
+### Requirement: Video-channel authorization guidance is actionable and identity-aware
+The Edge client SHALL explain first authorization, successful identity binding, reauthorization, challenge, and identity mismatch using structured interaction auth data. It MUST NOT instruct ordinary users to configure internal account IDs or infer success from a request-accepted response.
+
+#### Scenario: First authorization is required
+- **WHEN** the selected video-channel environment has `status=login_required` and no bound identity projection
+- **THEN** the workspace explains that the opened profile will bind the currently scanned video-channel account, names the selected environment, and offers one explicit action to open the login window
+
+#### Scenario: Reopen request is accepted
+- **WHEN** customer-auth accepts `interaction.auth.reopen` but no later active auth status has arrived
+- **THEN** the workspace displays that the browser-open request was accepted and continues to show authorization pending rather than success
+
+#### Scenario: Finder identity mismatches the binding
+- **WHEN** auth state reports `WECHAT_IDENTITY_MISMATCH`
+- **THEN** the workspace explains that the browser is logged into another video-channel account, keeps historical content readable, disables all writes, and directs the user to switch to the originally bound account
+
+### Requirement: Edge capability copy reflects Cloud-applied account controls
+The workspace SHALL render current comment/DM availability from the effective capabilities reported by Edge after applying the account-scoped Cloud control version. It MUST NOT present a saved Console configuration as proof that the Edge applied it.
+
+#### Scenario: Control is saved while Edge is offline
+- **WHEN** Cloud stores a newer runtime-control version but the selected Edge is offline or has not reported capabilities from that version
+- **THEN** the client distinguishes saved account configuration from current Edge availability and keeps affected actions disabled
+
+### Requirement: Interaction workspace exposes guarded test reset controls
+InteractionWorkspace SHALL show a “测试数据” reset surface only when the current interaction list response reports `testTools.dataResetEnabled=true`. It SHALL offer separate comment and DM actions, explain that the operation deletes only Cloud copies and rereads the platform, and state that it neither deletes platform data nor sends a reply. Each action MUST require entry of the channel-specific confirmation phrase before invoking a named IPC method.
+
+#### Scenario: User confirms comment reset
+- **WHEN** the dev tool is enabled and the user selects comment reset, reads the warning, and enters `重置评论`
+- **THEN** the client sends one current-env comment reset request with a fresh idempotency key and disables both reset buttons while it is pending
+
+#### Scenario: Confirmation text does not match
+- **WHEN** the confirmation phrase is missing or does not exactly match the selected channel
+- **THEN** the client performs no IPC call and keeps the current inbox visible
+
+#### Scenario: Tool is unavailable
+- **WHEN** list data reports the reset tool disabled or unavailable
+- **THEN** the destructive reset controls are not rendered as actionable controls
+
+### Requirement: Reset UI reports accepted, refused, and partial states honestly
+After an accepted reset the workspace SHALL clear only the selected channel from its local list/selection, display “已清空，正在重新拉取”, and refresh from Cloud. It MUST NOT claim that platform data was deleted or that a sample returned until list data proves it. Safety-gate rejection and post-delete dispatch failure SHALL be shown as distinct human-readable states without hiding the currently loaded other-channel data.
+
+#### Scenario: Reset is accepted
+- **WHEN** customer-auth returns accepted for DM reset
+- **THEN** the current DM selection is removed, comment items remain visible where applicable, and the workspace polls the real inbox for reread results
+
+#### Scenario: Cloud cleared but Edge dispatch failed
+- **WHEN** customer-auth returns the partial-completion error
+- **THEN** the workspace says the Cloud DM copy was cleared but automatic reread did not start and offers a retry without claiming success
+
+### Requirement: 慢启动开关必须即时反馈提交过程并以云端真态收敛
+
+客户端 SHALL 在用户拨动账号级慢启动开关后立即显示与目标动作一致的提交中样式，并在云端返回前明确说明正在等待确认。该临时态 MUST 只表达请求在途，MUST NOT 冒充慢启动已经生效，MUST NOT 本地推算天数、绑定状态或计划量。
+
+写入在途期间，客户端 MUST 禁止同一环境重复提交，且 MUST NOT 让旧的 `ui.snapshot` 把目标开关或提交中样式拨回。临时态及错误 MUST 按环境隔离。
+
+#### Scenario: 开启请求立即进入等待确认样式
+
+- **WHEN** 用户在一个可用的 Facebook 环境中将慢启动从关闭拨为开启，且云端请求尚未完成
+- **THEN** 开关 MUST 在同一交互周期显示为目标开启态并被暂时禁用
+- **AND** 同一行 MUST 显示“正在开启”及等待云端确认的可见反馈
+- **AND** 客户端 MUST NOT 在此时显示“第 1/7 天”或任何本地推算的生效计划量
+
+#### Scenario: 关闭请求立即进入等待确认样式
+
+- **WHEN** 用户将慢启动从开启拨为关闭，且云端请求尚未完成
+- **THEN** 开关 MUST 立即显示为目标关闭态并被暂时禁用
+- **AND** 同一行 MUST 显示“正在关闭”及等待云端确认的可见反馈
+
+#### Scenario: 在途旧快照不得覆盖目标样式
+
+- **WHEN** 慢启动写入仍在途，客户端收到该环境写入前的旧 `ui.snapshot`
+- **THEN** 客户端 MUST 保留当前目标开关与提交中样式
+- **AND** 权威快照数据本身 MUST NOT 被本地临时态篡改
+
+#### Scenario: 成功后立即采用写后真态
+
+- **WHEN** 云端成功回包并携带该环境的写后 `slowStart` 真态与 `dayQuotas`
+- **THEN** 客户端 MUST 清除提交中样式，并立即按回执渲染慢启动徽章和当日计划值
+- **AND** 客户端 MUST NOT 等待下一次周期性快照才显示已生效结果
+
+#### Scenario: 失败后恢复原状态并保留原因
+
+- **WHEN** 云端拒绝写入、请求异常或超时
+- **THEN** 客户端 MUST 清除提交中样式并恢复点击前的权威开关与徽章状态
+- **AND** 同一行 MUST 保留可读的失败原因，直至用户再次提交或该环境反馈被明确替换
+
+#### Scenario: 环境切换不串写反馈
+
+- **WHEN** 环境 A 的慢启动请求在途期间用户切换到环境 B
+- **THEN** 环境 B MUST NOT 显示环境 A 的提交中样式、目标开关或失败原因
+- **AND** 环境 A 的回执 MUST NOT 改写环境 B 的状态
+
+### Requirement: 客户灵感库提供清晰且可恢复的服务端排序控件
+
+桌面客户端灵感库 SHALL 在列表工具栏右侧、总数之后提供次级排序下拉，不得把排序放进全局标题栏、单条卡片或伪装成第四个创作状态筛选。控件 SHALL 提供“综合热度”“收藏最多”“点赞最多”和“最近更新”，默认 SHALL 为“综合热度”；菜单 SHALL 解释综合热度为“点赞 + 收藏 × 1.43”，并 SHALL 说明排序依据系统最近一次采集的赞藏数据，不得宣称实时热度。
+
+排序值 SHALL 通过具名 IPC 交给主进程白名单校验，再由 Cloud 在分页前执行；渲染层 MUST NOT 拉取全池后自行排序。排序状态 SHALL 按环境保存：切换排序回到第一页和顶部，切换创作状态保留排序，从详情返回恢复排序、筛选、页码和滚动位置，另一环境不得继承当前环境的列表结果。
+
+#### Scenario: 桌面工具栏区分筛选和排序
+
+- **WHEN** 客户在常规宽度打开灵感库
+- **THEN** “未创作 / 已创作 / 全部”保持在工具栏左侧，总数与安静的次级排序按钮位于右侧，排序不使用主操作实底色
+
+#### Scenario: 最小窗口下工具栏有序换行
+
+- **WHEN** 客户将主窗口缩到支持的最小宽度附近
+- **THEN** 创作状态筛选保持完整可点，总数与排序控件换到独立行且不重叠、不截断卡片内容
+
+#### Scenario: 切换排序请求服务端第一页
+
+- **WHEN** 客户从“综合热度”切换到“收藏最多”
+- **THEN** 客户端以 `sort=collects` 请求当前账号和当前筛选的第一页，将列表滚动位置归零，并且不在当前页本地重排冒充分页结果
+
+#### Scenario: 排序中保留已确认列表
+
+- **WHEN** 当前列表已有内容且新的排序请求尚未返回
+- **THEN** 客户端保留原卡片并显示克制的加载反馈，暂时禁止重复排序，不把列表替换为空池或通用失败态
+
+#### Scenario: 瞬时排序失败恢复原状态
+
+- **WHEN** 新排序请求因普通网络或暂时服务错误失败，且当前客户会话与环境归属仍未被明确否定
+- **THEN** 客户端恢复上一次已确认的排序、页码、滚动位置和卡片，并展示“排序未更新”的真实失败反馈，不渲染其它账号内容
+
+#### Scenario: 身份或归属失败清除缓存内容
+
+- **WHEN** 新排序请求明确回报会话失效、环境撤权、绑定未知、绑定冲突或绑定不可证实
+- **THEN** 客户端不得继续显示先前缓存的灵感卡片，必须清除列表并展示对应具名 fail-closed 状态
+
+#### Scenario: 从详情返回恢复排序上下文
+
+- **WHEN** 客户从已排序列表进入灵感详情后返回
+- **THEN** 客户端恢复进入详情前的排序、筛选、页码和滚动位置，不重置为默认综合热度第一页
+
+#### Scenario: 排序菜单可用键盘操作
+
+- **WHEN** 键盘用户聚焦排序按钮并打开菜单
+- **THEN** 方向键可移动选项，Enter 可选择，Escape 可关闭，按钮和选项具有正确的展开与选中可访问状态
 

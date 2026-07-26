@@ -292,16 +292,19 @@ customer-auth SHALL 提供 env-scoped `PUT /environments/:envKey/interactions/re
 - **THEN** customer-auth 返回版本冲突与当前版本，MUST NOT 用旧快照覆盖管理员修改
 
 ### Requirement: 客户互动投影必须包含回复配置就绪状态
-
-interaction list/detail 与 read-controls 成功回包 SHALL 为当前 account/env 返回只读 `replyConfig` 投影，至少区分 `missing`、`draft_only`、`published` 并给出 current/draft/published version。该投影 MUST NOT 包含模板正文、规则条件、完整私信或 internal permission；查询失败 MUST 显示 unknown/fail-closed，不能伪造默认 published 配置。
+interaction list/detail 与 read-controls 成功回包 SHALL 为当前 account/env 返回只读 `replyConfig` 有效配置投影，至少区分 `missing`、`draft_only`、`published`、`unknown`，给出 current/draft/published version，并加性给出非敏感 `source`：`group` 或 `default` 及可展示的 group label。该投影 MUST 通过与回复工作流相同的 scoped resolver 得到，MUST NOT 读取账号旧策略，MUST NOT 包含 scope opaque ID、模板正文、规则条件、完整私信或 internal permission；查询失败 MUST 显示 unknown/fail-closed，不能伪造默认 published 配置。
 
 #### Scenario: 无发布配置时客户端得到明确阻断
-- **WHEN** 当前账号没有 config head 或只有未发布 draft
-- **THEN** 客户回包分别返回 missing 或 draft_only，客户端可保持收件箱可读并禁用依赖 published 配置的生成/发送流程
+- **WHEN** 当前账号目标 group/default scope 不存在、没有 config head 或只有未发布 draft
+- **THEN** 客户回包分别返回 missing 或 draft_only及其目标 source，客户端可保持收件箱可读并禁用依赖 published 配置的生成/发送流程
 
-#### Scenario: 已发布配置只暴露版本状态
-- **WHEN** 当前账号存在 immutable published 配置
-- **THEN** 客户回包返回 published 与版本号，不返回模板、规则、profile 或审计正文
+#### Scenario: 已发布配置只暴露版本和来源状态
+- **WHEN** 当前账号解析到 immutable published group/default 配置
+- **THEN** 客户回包返回 published、版本号与非敏感 source，不返回 scope ID、模板、规则、profile 或审计正文
+
+#### Scenario: 有组缺配置不伪装成默认已发布
+- **WHEN** 当前账号具有非空 group label 但该组没有 published 配置，同时 default 已发布
+- **THEN** replyConfig 投影仍返回该 group source 的 missing/draft_only 状态，MUST NOT 返回 default published
 
 ### Requirement: 客户读取自助不得打通 internal 配置域
 
@@ -742,4 +745,301 @@ customer-auth SHALL 提供授权环境下的待审稿 PATCH、调整任务创建
 #### Scenario: 环境停止时调整待审稿
 - **WHEN** 客户环境停止但授权、绑定和待审稿版本均有效
 - **THEN** 客户仍可创建 Cloud 调整任务，任务不会自动启动浏览器或执行平台写入
+
+### Requirement: Customer can read authoritative risk state for an owned Facebook environment
+
+The customer-auth API SHALL provide an environment-scoped risk-state read. On every request Cloud MUST authenticate the customer, re-check enabled state and current environment ownership, resolve the persistent environment-to-account binding, and verify the bound account platform is Facebook. The response SHALL contain the requested `envKey` and public risk state only; it MUST NOT expose `accountId`, other environments, signal reasons, or internal controller selectors. Unowned, unbound, contended, unavailable, or non-Facebook environments MUST fail closed with distinguishable errors rather than returning a fabricated `normal` state.
+
+#### Scenario: Stopped owned Facebook environment reads persisted restricted state
+- **WHEN** a customer requests risk state for an owned, uniquely bound Facebook environment whose Edge is offline and whose persisted Cloud state is `restricted`
+- **THEN** Cloud returns that environment's authoritative `restricted` state without requiring a live Edge session
+- **AND** the response does not contain `accountId`
+
+#### Scenario: Risk read cannot cross environment ownership
+- **WHEN** a customer requests risk state for another customer's environment or a contended binding
+- **THEN** Cloud rejects the request and returns no account or risk-state data
+
+#### Scenario: Non-Facebook environment cannot use the Facebook risk surface
+- **WHEN** a customer requests the risk-state route for an owned environment bound to a non-Facebook account
+- **THEN** Cloud rejects the request as unsupported and does not expose or mutate that account's risk state
+
+### Requirement: Customer restricted recovery is environment-scoped and Cloud-authoritative
+
+The customer-auth API SHALL provide a recovery action that accepts only an empty object and an environment key in the route. The client MUST NOT submit `accountId`, risk signal kind, target status, or audit reason. Cloud SHALL resolve those facts after ownership and Facebook-platform validation, generate the audit reason, and serialize the mutation through the bound account's existing `RiskController`.
+
+The action SHALL change `restricted` to `normal` using `operator_override_recover`, clear the associated signal window through the existing state-machine transition, persist the write-after state, and resume Cloud command delivery to currently connected edges for that account. An already-`normal` state SHALL be an idempotent no-op; `warned` and `frozen` MUST be refused without mutation. The response SHALL return the write-after public state, whether it changed, and the actual number of resumed edges, without exposing `accountId`.
+
+#### Scenario: Owner recovers a restricted Facebook environment
+- **WHEN** the authenticated owner confirms recovery for an owned, uniquely bound Facebook environment currently in `restricted`
+- **THEN** Cloud persists `normal`, clears the previous risk signal window, resumes paused Cloud delivery for the account's connected edges, and returns `changed:true` with the real resumed-edge count
+
+#### Scenario: Repeated recovery after success is idempotent
+- **WHEN** the same environment is already `normal` because recovery completed elsewhere
+- **THEN** Cloud returns the unchanged authoritative `normal` state with `changed:false` and MUST NOT create a new risk transition
+
+#### Scenario: Warned or frozen cannot be self-recovered by this route
+- **WHEN** the bound account is `warned` or `frozen`
+- **THEN** Cloud rejects the recovery and leaves the state unchanged
+
+#### Scenario: Client cannot smuggle account or signal selectors
+- **WHEN** a recovery body contains `accountId`, `kind`, `status`, `reason`, or any other key
+- **THEN** Cloud rejects the entire request before mutation
+
+### Requirement: Customer publish queue routes SHALL recheck exact environment ownership
+
+客户鉴权服务 SHALL 提供当前客户已授权环境的发布队列读取和单任务取消路由。每个请求 MUST 在客户 JWT、撤销和启用态校验后，从数据库重新解析路径 `envKey` 的当前归属；取消写还 MUST 读取目标任务并验证其账号与该精确环境解析的账号一致、属于发布动作族且处于允许取消的状态。接口 MUST NOT 接受 `accountId` 作为客户选择器。
+
+#### Scenario: 已归属小红书环境读取队列
+
+- **WHEN** 客户持有效令牌请求自己当前归属的小红书 `envKey` 发布队列
+- **THEN** 服务端只返回该环境绑定账号的客户队列投影和响应时间
+
+#### Scenario: 同一客户其它环境的任务 id 不能被当前环境取消
+
+- **WHEN** 客户在环境 A 的取消路径提交一个属于其环境 B 的真实任务 id
+- **THEN** Cloud 拒绝取消且任务不变，不因两个环境属于同一客户而放宽精确目标校验
+
+#### Scenario: 非小红书或未归属环境被拒绝
+
+- **WHEN** 客户请求非小红书、未归属、已移除或绑定未确认的环境队列
+- **THEN** 服务端拒绝请求且不返回队列数量、任务存在性或账号字段
+
+### Requirement: Customer publish queue DTO SHALL be minimum disclosure
+
+客户发布队列响应 SHALL 只包含首页摘要、客户状态、四阶段状态、可证实进度、客户可见标题/来源、任务取消所需 id/version/cancelRequested 与时间字段。响应 MUST NOT 包含 `accountId`、原始 lifecycle snapshot、stage facts、claim token、模型诊断、内部错误或跨账号数据。
+
+#### Scenario: 客户队列不泄漏内部生命周期
+
+- **WHEN** 内部 journey snapshot 或 delegated task 含账号、角色事实、claim 与诊断字段
+- **THEN** 客户 DTO 只返回显式白名单字段，序列化响应中不存在这些内部字段
+
+### Requirement: Customer queue cancellation SHALL use CAS and truthful receipts
+
+客户队列取消 SHALL 要求请求体只含有效整数 `version`，并复用领域取消方法完成状态转换。版本不一致 MUST 返回冲突且不重试写；立即终态 SHALL 返回 `cancelled` 或 `partially_completed`，安全收口 SHALL 返回 `cancelRequested=true` 的非终态。服务端 MUST NOT 把取消请求已记录描述为工作已停止。
+
+#### Scenario: 排队任务立即取消
+
+- **WHEN** 当前版本的 queued 或 deferred 任务被取消且尚无已完成部分
+- **THEN** Cloud 返回该任务的最小客户终态 `cancelled`，且只改变目标任务
+
+#### Scenario: 规划任务进入安全取消
+
+- **WHEN** 当前版本的 planning 任务接受取消
+- **THEN** Cloud 返回同任务的新版本与 `cancelRequested=true`，状态仍非终态并等待工作器收口
+
+#### Scenario: 陈旧版本不执行取消
+
+- **WHEN** 请求 version 与当前任务版本不一致
+- **THEN** Cloud 返回 409 且任务保持当前状态，不自动按新版本执行取消
+
+### Requirement: 客户灵感库 SHALL 最小披露来源发布时间证据
+
+客户鉴权域的精选列表与详情白名单 DTO SHALL 返回 `sourcePublishedAtText`、`sourcePublishedAt`、`sourcePublishedAtPrecision`、`sourcePublishedAtStatus` 和 `sourcePublishedAtObservedAt`，值均来自账号隔离后的精选行。接口 MUST NOT 为缺失字段生成回落时间，MUST NOT 因增加该字段而直出完整内部行或其它账号数据。
+
+#### Scenario: 列表与详情返回同一来源时间
+
+- **WHEN** 当前授权环境读取一条带已解析来源发布时间的灵感列表项和详情
+- **THEN** 两个 DTO 返回一致的来源时间证据字段，仍只包含客户白名单字段
+
+#### Scenario: 历史行字段诚实为空
+
+- **WHEN** 当前账号的历史精选行没有来源发布时间证据
+- **THEN** 客户 DTO 对应字段为空或省略，不以 `updatedAt` 填充
+
+#### Scenario: 账号隔离不因时间字段减弱
+
+- **WHEN** 客户请求另一账号的精选 id
+- **THEN** 仍返回同形未找到响应，不泄漏其来源发布时间原文或标准时间
+
+### Requirement: 客户可按已授权环境离线读取、生成和保存账号人设
+
+客户鉴权 API SHALL 提供按 `envKey` 定位的单账号人设读取、草稿生成和确认保存接口，且这些接口 MUST NOT 要求目标环境的 core、浏览器或边云 WebSocket 在线。每次请求 SHALL 以当前客户令牌复核客户状态与环境归属，再通过权威持久绑定解析真实 `accountId`；客户端请求体 MUST NOT 接受 `accountId`、客户选择器、环境归属或平台自报字段，响应 MUST 回显 `envKey` 但 MUST NOT 暴露 `accountId`。
+
+绑定解析的 `environment_not_owned`、`binding_unknown`、`binding_conflict` 与 `binding_unavailable` MUST 保持可区分并 fail-closed，MUST NOT 把任一失败伪装成 `missing` 或成功空结果。Cloud SHALL 以账号权威平台校验 Facebook 发言语言，以既有人设应用服务执行生成幂等、soul 校验、持久化和首次绑定引导。
+
+#### Scenario: 停止环境读取已有人设
+
+- **WHEN** 客户按自己拥有、已持久绑定账号且当前 core 停止的环境请求人设
+- **THEN** API 返回该账号当前真实人设、结构化摘要与更新时间，响应回显 `envKey` 且不含 `accountId`
+
+#### Scenario: 未设置与读取失败严格区分
+
+- **WHEN** 已绑定账号确实没有 `persona_config` 行
+- **THEN** API 返回 `state=missing` 且不返回任何默认模板作为当前人设
+- **AND** 绑定未知、绑定冲突或存储不可用 MUST 返回各自失败，MUST NOT 返回 `state=missing`
+
+#### Scenario: 环境未启动仍可生成草稿
+
+- **WHEN** 客户为自己已绑定的停止环境提交有界关键词、有效幂等键和平台允许的发言语言
+- **THEN** Cloud 以绑定账号记账并生成未落库草稿，目标环境无需启动
+- **AND** 同账号同幂等键重试 MUST NOT 重复调用模型或重复记账
+
+#### Scenario: 确认保存走既有单写通道
+
+- **WHEN** 客户为自己已绑定环境确认提交合法非空 soul YAML
+- **THEN** Cloud 经既有账号人设校验与持久化单写通道保存，返回写后真态并即时热加载
+- **AND** 非法、空白或超限内容被诚实拒绝，库与内存镜像保持原状
+
+#### Scenario: 非所有者无法借环境键访问人设
+
+- **WHEN** 客户提交不属于自己的 `envKey` 读取、生成或保存人设
+- **THEN** 三种操作均 fail-closed，不返回人设正文、摘要、账号键或可用于判断他人绑定状态的成功结果
+
+### Requirement: Edge 通过客户鉴权 HTTP 拉取环境维护责任
+
+系统 SHALL 提供客户鉴权 HTTP maintenance poll，使官方 Edge 主进程携带持久化随机 installationId 与本机非敏感 roster 摘要，主动拉取定位给该 installation 的环境删除责任。该能力 MUST NOT 新增 Cloud→Edge WebSocket 删除消息，MUST NOT 把删除加入自动化引擎命令，且维护责任 MUST 与 `/my-environments` 的正常可运行范围分离，使被冻结或已撤权但仍待物理清理的环境不会丢失责任。
+
+#### Scenario: Edge 主动拉取删除责任
+- **WHEN** 管理后台已为当前客户环境创建删除申请，且该 Edge installation 是唯一新鲜承载者
+- **THEN** Edge 的 HTTP poll 返回匹配 requestId/envKey/version 的维护责任，Cloud 不发送任何新增 WS 删除消息
+
+#### Scenario: 正常可见范围移除后责任仍可拉取
+- **WHEN** 环境因删除申请已不再可运行但该客户会话仍承担物理清理
+- **THEN** `/my-environments` 不把环境当正常可运行项，而 maintenance poll 仍按 durable request 返回清理责任
+
+### Requirement: 删除责任按 installation 定位并经 HTTP 幂等收敛
+
+Cloud SHALL 记录最近 installation observation，并仅在一个新鲜 installation 声明承载 envKey 时允许其通过 HTTP claim 删除责任。多个新鲜 installation、无定位或 installation 不匹配 MUST fail closed。Edge SHALL 先持久化 AdsPower 删除结果，再以 requestId/version/installationId 和 Idempotency-Key 经 HTTP 回写；Cloud 只接受匹配 claim 的结果，重复相同结果 MUST 幂等返回同一写后真态。
+
+#### Scenario: 多 installation 承载冲突时不领取
+- **WHEN** 两个新鲜 installation 都声明管理同一 envKey
+- **THEN** Cloud 返回承载冲突并保持等待状态，任何一端都不得执行 AdsPower 删除
+
+#### Scenario: 回执响应丢失后重试
+- **WHEN** Edge 已删除 AdsPower profile 并提交 result，但 HTTP 响应在到达本机前丢失
+- **THEN** Edge 保留本地 outbox 并用相同幂等键重试，Cloud 返回同一终态且不产生第二次生命周期迁移
+
+#### Scenario: 非承载机器的不存在不算删除证明
+- **WHEN** 未匹配 claim 的 installation 回报本机不存在该 envKey
+- **THEN** Cloud 拒绝把它作为 `already_missing` 终态证据并保留原删除申请
+
+### Requirement: 客户可为自有已绑定环境设置或清除账号运营别名
+
+客户鉴权 API SHALL 提供仅接受环境键和运营别名的窄写接口。服务端 MUST 验证 token、该环境当前归属该客户、环境绑定无冲突且已解析到真实账号，才可更新该账号运营别名。非空值 trim 后写入；空值清除。成功回包 SHALL 返回 Cloud 解析后的显示名与来源。
+
+#### Scenario: 自有已绑定环境设置别名
+- **WHEN** 已登录客户为自己归属且已绑定账号的环境提交非空人工昵称
+- **THEN** Cloud 更新绑定账号的运营别名并返回来源 `operator_alias`
+
+#### Scenario: 自有已绑定环境清除别名
+- **WHEN** 已登录客户为自己归属且已绑定账号的环境提交空内容
+- **THEN** Cloud 清除运营别名并返回按平台昵称、运营标签或账号 ID 回落的显示名与来源
+
+#### Scenario: 越权环境拒绝
+- **WHEN** 客户尝试修改不归属自己的环境
+- **THEN** API 以 403 拒绝且不修改任何账号记录
+
+#### Scenario: 环境尚未绑定账号
+- **WHEN** 客户拥有该环境但 Cloud 尚无可信 `envKey → accountId` 绑定
+- **THEN** API 返回可判断的 `account_unbound` 冲突，不猜测账号、不报告成功
+
+### Requirement: Customer interaction scope resolves through the environment binding
+Customer interaction APIs SHALL resolve `envKey` to the authoritative video-channel `interaction_auth_state.account_id` binding on every request. They MUST NOT assume that the external finder ID or customer-provided input is the Cloud logical account ID.
+
+#### Scenario: Authorized environment uses an env-key logical account
+- **WHEN** an enabled customer owns a video-channel environment whose auth binding maps the environment to a logical account derived from that env key
+- **THEN** list, detail, sync, reopen, reply, and offboard operations use the bound account ID and return the same `envKey` without exposing the finder identity as an authorization selector
+
+#### Scenario: Environment ownership exists before identity binding
+- **WHEN** a customer owns a video-channel environment but no authoritative interaction auth binding exists yet
+- **THEN** read APIs return an honest login/binding-required state or scoped not-ready response and MUST NOT fall back to an unrelated account
+
+### Requirement: Customer auth projections preserve control/application uncertainty
+Customer-facing interaction responses SHALL distinguish Cloud-stored runtime controls, Edge-reported effective capabilities, and authorization status. Missing Edge application evidence MUST keep writes disabled.
+
+#### Scenario: Cloud control version exceeds Edge-applied version
+- **WHEN** the stored account control version is newer than the latest Edge auth/capability projection
+- **THEN** the customer response marks the Edge capability state pending/stale and MUST NOT enable send controls
+
+### Requirement: Customer test-data reset route is narrow and idempotent
+customer-auth SHALL expose `POST /environments/:envKey/interactions/test-reset` only when the dev reset capability is enabled. The request MUST require an `Idempotency-Key`, MUST accept exactly `{channel:"comment"|"dm"}`, and MUST execute inside the same enabled-user, authoritative env ownership, and interaction account/platform binding boundary as the inbox APIs. The interaction list response SHALL include only a boolean `testTools.dataResetEnabled` exposure flag and MUST NOT expose deployment credentials or internal feature-flag values.
+
+#### Scenario: Owned dev environment submits valid reset
+- **WHEN** an enabled customer sends a valid channel reset for an environment they currently own with a new idempotency key
+- **THEN** customer-auth returns the current envKey/accountId, selected channel, deletion counts, action request id and an honest accepted status after the reset command is delivered
+
+#### Scenario: Request contains extra scope
+- **WHEN** a reset body includes accountId, wildcard channel, scopeExternalId, or any unknown field
+- **THEN** customer-auth rejects it as validation failure without data deletion
+
+#### Scenario: Idempotent replay
+- **WHEN** the same actor repeats a completed reset request with the same idempotency key and resource scope
+- **THEN** customer-auth returns the stored response without performing a second deletion or dispatch
+
+### Requirement: 内部管理员撤销视频号环境归属必须先收回访问权
+
+内部管理员通过整批替换环境归属移除 `wechat_channels` 环境，或通过停用端用户移除其环境时，Cloud SHALL 在同一事务内写撤权审计、删除 active ownership，并在停用场景写入 disabled。访问撤权 MUST NOT 依赖 interaction account binding 是否已经存在；客户下一次 `/my-environments` 或 interaction 请求 MUST 立即失败关闭。
+
+存在精确 `envKey + accountId + platform` binding 时，Cloud SHALL 创建现有 durable offboard。缺少 binding 时，Cloud SHALL 创建不含虚构 accountId 的 durable cleanup hold，并将成功结果明确报告为“ownership revoked, cleanup binding missing”；MUST NOT 返回整笔失败并保留旧 ownership，也 MUST NOT 声称 Edge 密文、sidecar 或 Cloud interaction 数据已经清理。
+
+#### Scenario: 有 binding 的管理员移除继续进入 offboard
+- **WHEN** 管理员从端用户归属中移除一个存在精确 interaction account binding 的视频号环境
+- **THEN** active ownership 在事务内删除并创建 `admin_revoked` durable offboard，成功响应同时返回撤权后的 scope 与 offboard cleanup receipt
+
+#### Scenario: 缺 binding 的管理员移除仍即时撤权
+- **WHEN** 管理员从端用户归属中移除一个缺少 interaction account binding 的视频号环境
+- **THEN** active ownership 在事务内删除，客户下一次请求即时不可访问，Cloud 创建 env-scoped `binding_missing` cleanup hold，响应不得包含伪造 accountId 或已清理状态
+
+#### Scenario: 停用端用户混合处理多个环境
+- **WHEN** 管理员停用的端用户同时拥有一个已绑定视频号环境和一个缺 binding 视频号环境
+- **THEN** 用户 disabled 与全部 active ownership 在一个事务提交，前者创建 offboard、后者创建 cleanup hold，任一数据库写失败时整笔回滚且不得留下半撤权状态
+
+### Requirement: 未完成的撤权清理必须持续隔离并可自动衔接 offboard
+
+Cloud SHALL 为每个 envKey 至多保留一个 active cleanup hold。hold 或非 purged offboard 存在期间，系统 MUST 阻止该环境重新分配给任何客户，并 MUST 拒绝该 env 的 interaction sync/write 副作用。late auth binding MUST NOT 恢复 ownership 或业务能力；Cloud SHALL 在相同 env advisory lock 下把 hold 转换为使用真实 accountId 的现有 durable offboard，再由既有 Edge cleanup 生命周期处理。
+
+#### Scenario: 清理待定位期间拒绝重新分配
+- **WHEN** 管理员尝试分配一个存在 `binding_missing` cleanup hold 的环境
+- **THEN** 请求返回可识别的 cleanup-in-progress 冲突，active owner 保持为空且不得覆盖 hold
+
+#### Scenario: late binding 只用于定位清理
+- **WHEN** cleanup hold 存在后 Edge 上报该 env 的真实 account binding
+- **THEN** customer ownership 保持为空、interaction sync/write 仍被拒，Cloud 创建精确 offboard 并移除 hold，后续按既有 pending/dispatched/tombstoned/purged 流程推进
+
+#### Scenario: 重复撤权不重复创建清理责任
+- **WHEN** 管理员因响应丢失重试同一归属集合或重复停用已停用用户
+- **THEN** Cloud 不创建第二个 active hold 或 offboard，内部读口仍能返回第一笔真实 cleanup 状态
+
+### Requirement: 内部管理面必须展示撤权与清理的不同真态
+
+内部 scope mutation、端用户停用和全局环境注册表响应 SHALL 暴露最小 cleanup receipt，至少区分 `offboard_pending` 与 `binding_missing`，并提供稳定的 revocation/offboard 标识与 envKey。Console SHALL 将两者分别显示为“归属已撤销，Edge 清理中”和“归属已撤销，清理待定位”，不得统一提示“已清理”或把已成功撤权显示成仍有 ownership。
+
+#### Scenario: 保存归属后显示 binding 缺失真态
+- **WHEN** 运营保存归属变更且 Cloud 返回 `binding_missing` cleanup receipt
+- **THEN** Console 仍刷新并显示环境已从该用户归属移除，同时展示清理待定位警示而非失败回滚或清理完成
+
+#### Scenario: 客户自助删除语义不被放宽
+- **WHEN** 客户对非 completed-provisioning-intent 的缺 binding 环境调用 `DELETE /environments/:envKey`
+- **THEN** 仍按既有契约返回 `offboard_binding_missing` 并保留 active scope，本 change 的管理员撤权 receipt 不得被客户令牌调用或读取
+
+### Requirement: 客户灵感库在账号筛选后按固定热度规则分页排序
+
+客户鉴权精选列表 SHALL 接受 `weighted`、`collects`、`likes` 和 `recent` 四种固定排序，并 SHALL 在有效客户令牌、环境归属解析、账号约束与创作状态筛选之后、`LIMIT/OFFSET` 之前由 Cloud 完成排序。省略排序参数 SHALL 使用 `weighted`；其它值 MUST 以具名无效排序错误拒绝并且不得触达精选查询。请求 MUST NOT 接受任意 SQL 字段、方向或可绕过账号隔离的参数。
+
+`weighted` SHALL 使用 `点赞 × 1 + 收藏 × 1.43`，实现等价值 SHALL 为 `点赞 × 100 + 收藏 × 143`。点赞或收藏任一缺失的内容 MUST 排在两者均有证据的内容之后，缺失 MUST NOT 当作零。`collects` 和 `likes` SHALL 分别按对应计数降序并将该计数缺失的内容置后；`recent` SHALL 保持精选记录最近更新时间降序。所有模式 MUST 使用确定性的次级字段，使相同主排序值的分页顺序稳定。
+
+#### Scenario: 综合热度在分页前计算
+
+- **WHEN** 当前账号筛选后有超过一页的灵感且客户请求 `sort=weighted&limit=12&offset=0`
+- **THEN** Cloud 在完整筛选结果上按 `点赞 × 100 + 收藏 × 143` 降序选择前 12 条，并返回同一筛选范围的真实 total，而不是只对任意 12 条做客户端排序
+
+#### Scenario: 收藏与点赞排序保持账号隔离
+
+- **WHEN** 客户分别请求 `sort=collects` 或 `sort=likes`，且其它账号存在计数更高的内容
+- **THEN** 返回顺序只由当前 `envKey` 绑定账号和当前创作状态筛选中的内容决定，其它账号行不参与排序或总数
+
+#### Scenario: 缺失热度不伪装成零
+
+- **WHEN** 当前筛选同时包含完整赞藏计数、真实零值和缺少任一计数的内容
+- **THEN** 综合排序先排列有完整计数证据的内容，真实零参与公式比较，缺失计数内容置后且响应仍保留 null
+
+#### Scenario: 相同热度分页顺序稳定
+
+- **WHEN** 多条灵感具有相同主排序值并跨越分页边界
+- **THEN** Cloud 使用确定性的次级时间和 id 顺序，使相同数据库快照下重复请求得到相同页序
+
+#### Scenario: 未知排序在查询前被拒绝
+
+- **WHEN** 客户提交未定义排序、任意字段名或排序方向
+- **THEN** 客户鉴权接口返回 `invalid_sort`，不静默回落且不触达精选列表查询
 

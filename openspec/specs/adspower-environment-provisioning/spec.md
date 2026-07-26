@@ -53,19 +53,29 @@ AdsPower API key 与代理账号密码 SHALL 仅在创建 / 改代理批处理�
 
 ### Requirement: 删除环境仅经界面逐个二次确认触发，绝不自动 / 批量
 
-桌面外壳 MAY 提供删除环境（`user/delete`）功能，但 SHALL 仅由运维在界面上**逐个、二次确认**触发：第一次点击仅进入待确认态（如「确认删除?」，短时后自动收回）、**第二次点击才执行**删除。删除前 SHALL 明确警示**不可恢复**（若该环境已登录账号，其登录态 / cookie 一并丢失）。删除 MUST NOT 自动触发、MUST NOT 批量执行、MUST NOT 由本机 ledger / 过期状态驱动。写客户端对 `user/delete` 放行、但对浏览器生命周期（`browser/start|stop|active`）SHALL 仍**直接抛错**（M7 不变）。凭据同建号：只内存持有、日志脱敏。
+桌面外壳 MAY 提供本地删除环境（`user/delete`）功能，但 SHALL 仅由运维在界面上逐个、二次确认触发。管理后台 MAY 作为第二个允许的远程触发源，但同样 SHALL 逐环境展示影响预览并要求完整 envKey 确认；Cloud 只写删除期望状态，官方 Edge 主进程 MUST 通过客户鉴权 HTTP 主动拉取、领取匹配 installation 的责任后才执行。删除前 SHALL 明确警示不可恢复（若该环境已登录账号，其登录态/cookie 一并丢失）。删除 MUST NOT 批量执行，MUST NOT 由本机 ledger、过期、离线或陈旧状态自动触发，MUST NOT 通过 Cloud→Edge WS 删除命令触发。
 
-#### Scenario: 删除需二次确认
-- **WHEN** 运维点击某环境的删除按钮
-- **THEN** 第一次点击仅进入「确认删除?」待确认态、不发任何删除请求；第二次点击才执行 `user/delete`，删前已警示不可恢复
+写客户端对 `user/delete` 放行、但对浏览器生命周期（`browser/start|stop|active`）SHALL 仍直接抛错（M7 不变）。Edge SHALL 在本地执行路径先停止该环境的既有运行 handle；视频号还 MUST 等待既有 offboard 凭证清理达到允许物理删除的终态。AdsPower 返回成功或 claimed 权威 installation 明确返回不存在后，Edge 才可回写成功；其它错误 MUST 原样归为待重试失败。凭据同建号：只内存持有、日志脱敏。
 
-#### Scenario: 绝不自动 / 批量删
-- **WHEN** 任何非「运维逐个二次确认」的路径（自动清理 / 批量 / ledger 驱动）
-- **THEN** MUST NOT 触发删除
+#### Scenario: 本地删除需二次确认
+- **WHEN** 运维在桌面客户端点击某环境的删除按钮
+- **THEN** 第一次点击仅进入“确认删除?”待确认态、不发任何删除请求，第二次点击才执行本地受控删除，删前已警示不可恢复
+
+#### Scenario: 管理后台远程删除需精确确认并由 Edge 拉取
+- **WHEN** 管理员在环境页查看单环境影响预览、输入完整 envKey 并确认
+- **THEN** Cloud 只记录删除期望；匹配 installation 的 Edge 经 HTTP poll/claim 后逐个执行 `user/delete`，不得收到新增 WS 删除命令
+
+#### Scenario: 绝不按本地状态或批量删除
+- **WHEN** 任何批量、自动清理、ledger、过期、离线或未确认路径尝试触发删除
+- **THEN** MUST NOT 调用 `user/delete`
 
 #### Scenario: 写客户端仍禁浏览器生命周期
 - **WHEN** 代码路径尝试经写客户端调用 `browser/start|stop|active`
-- **THEN** 直接抛错、不发出（放宽 `user/delete` 不动 M7 生命周期红线）
+- **THEN** 直接抛错、不发出，放宽远程确认来源不改变 M7 生命周期红线
+
+#### Scenario: AdsPower 失败不回报删除成功
+- **WHEN** `user/delete` 返回环境占用、运行中、限流或其它非“不存在”错误
+- **THEN** Edge 经 HTTP 回写真实失败并保留重试责任，Cloud 与管理后台不得显示已删除
 
 ### Requirement: 代理可在客户端配置：创建可选填、已有环境可增改、无代理如实标注
 
@@ -110,7 +120,7 @@ The desktop shell SHALL include `location='block'` in the `fingerprint_config` s
 
 ① **建号不写死模板名**：创建环境时 SHALL NOT 把整机模板标识（如 `win11-intel`）写作环境名——`user/create` MUST NOT 下发一个等于设备模板 key 的 `name`，交由 AdsPower 默认命名或留空（登录前空窗期的显示名由左栏兜底，见 `edge-fleet-console`）。
 
-② **登录后改名跟随昵称**：当核心读出该环境的真实登录昵称（`account-identity-resolution` 定义的显示名，昵称仅作显示、非账号主键）后，若 AdsPower 环境名与该昵称不一致，桌面外壳 SHALL 经写客户端的改名封装把该环境名改为昵称。
+② **登录后改名跟随昵称**：当核心读出该环境的真实登录昵称（`account-identity-resolution` 定义的显示名，昵称仅作显示、非账号主键）后，若 AdsPower 环境名与该昵称不一致，桌面外壳 SHALL 经写客户端的改名封装把该环境名改为昵称。视频号 SHALL 在冷启动恢复已保存会话或首次扫码绑定后，只有当前会话身份已验证匹配时才把 `identity.displayName` 作为真实平台昵称送入同一改名链；身份未验证、昵称为空或身份不匹配时 MUST NOT 触发改名。
 
 ③ **幂等去抖**：AdsPower 环境名已与昵称一致时 MUST NOT 重复发起 `user/update` 改名。
 
@@ -128,6 +138,14 @@ The desktop shell SHALL include `location='block'` in the `fingerprint_config` s
 - **WHEN** 某环境登录后核心读出真实登录昵称，且当前 AdsPower 环境名与该昵称不一致
 - **THEN** 桌面外壳经改名封装把该环境改名为昵称，下次 `user/list` 读回该环境名即为昵称
 
+#### Scenario: 视频号冷启动验证身份后改名
+- **WHEN** 视频号环境冷启动恢复已保存会话或完成首次扫码绑定，并验证当前会话身份匹配且昵称为“tom白”
+- **THEN** 核心向桌面外壳上报真实身份昵称，桌面外壳沿用既有改名封装把该 AdsPower 环境名更新为“tom白”
+
+#### Scenario: 视频号身份未验证时不改名
+- **WHEN** 视频号环境仍在身份验证、昵称为空或当前会话身份不匹配
+- **THEN** 核心 MUST NOT 发出可驱动环境改名的身份事件，AdsPower 环境名保持不变
+
 #### Scenario: 名字已一致不重复写
 - **WHEN** 某环境的 AdsPower 名已等于其真实昵称，核心再次上报同一昵称
 - **THEN** 桌面外壳 MUST NOT 再发起 `user/update` 改名
@@ -142,16 +160,34 @@ The desktop shell SHALL include `location='block'` in the `fingerprint_config` s
 
 ### Requirement: 幂等与生命周期——以 AdsPower user/list 为账本、预置分组/备注、单飞互斥
 
-本 change 建的所有平台分身 SHALL 归入运营预先创建且名称严格等于 `aidcp` 的 AdsPower 分组。桌面外壳 SHALL 经 `group/list` 解析该预置分组的当前 id，MUST NOT 调用 `group/create`、MUST NOT生成后缀分组、MUST NOT 因分组查询失败或查无分组而继续 `user/create`。查询失败 SHALL 保留真实查询错误；查询成功但未找到 `aidcp` SHALL 提示检查当前 AdsPower 运行时、API key 与分组权限。创建时 SHALL 把「意图账号 / 模板 / 建号机」写进分身 `remark`（随 `user/create` 一次写入、随 `user/list` 读回）。「有哪些分身、各绑什么代理」SHALL 以 AdsPower `user/list` 为**唯一账本**读取，MUST NOT 另建本机 write-ahead 台账（与 AdsPower 自身记录重复，徒增丢失 / 损坏 / 与 AdsPower 走样的同步面）。理由：号一旦登录、edge 一起即经握手把账号↔分身↔机器上报云端（见「握手载荷携带并持久化」需求），该上报已有、不重造；仅「创建后、登录前」空壳期云端不可见，而这段 AdsPower `user/list` 本就记着分身 + 各自代理，是现成账本。代理 SHALL 为**创建时可选项**：表单填了合法代理即随 `user/create` 下发 `user_proxy_config`，不填 SHALL 默认 `no_proxy` 建号（与历史行为逐位等价）；代理输入的归一与校验见「代理可在客户端配置」需求。创建动作在主进程 SHALL **单飞互斥**（同一时刻只一个创建在途，重入诚实返回「进行中」），渲染层触发控件 SHALL 在请求在途时禁用。崩溃后 SHALL 据下次 `user/list` 直接看见已建分身（在预置 `aidcp` 分组、带 `remark`，不丢账）。
+本 change 建的所有平台分身 SHALL 归入运营预先创建且名称严格等于 `aidcp` 的 AdsPower 分组。每次桌面应用会话第一次建立托管 AdsPower 运行时时，桌面外壳 SHALL 先经随包 CLI 自身的 `status`/`stop` 控制路径有界停止其登记的既有 CLI daemon，并确认停止完成后再用当前托管配置启动新 daemon；查询失败、停止失败或停止超时 SHALL 阻止继续创建并给出可操作错误。该受控重置每个成功建立的应用会话 SHALL 至多执行一次，MUST NOT 通过进程名扫描、`pkill` 或任意 PID 猜测去关闭独立 AdsPower 桌面应用或其他进程。
+
+托管运行时建立后，CLI 实际上报的 API base SHALL 是本会话创建路径的单一权威；历史 renderer/settings `apiBase` MUST NOT 覆盖该 base 或把 `group/list`、`user/create` 导向其他端口。桌面外壳 SHALL 经该权威 base 的 `group/list` 解析预置分组当前 id，并以名称严格等于 `aidcp` 作为任何 `user/create` 前的自证。桌面外壳 MUST NOT 调用 `group/create`、MUST NOT生成后缀分组、MUST NOT 因分组查询失败或查无分组而继续 `user/create`。查询失败 SHALL 保留真实查询错误；查询成功但新建立的当前运行时仍未找到 `aidcp` SHALL 明确提示当前运行时账号/权限空间缺少该预置分组，不得把它表述成已经创建成功。
+
+创建时 SHALL 把「意图账号 / 模板 / 建号机」写进分身 `remark`（随 `user/create` 一次写入、随 `user/list` 读回）。「有哪些分身、各绑什么代理」SHALL 以 AdsPower `user/list` 为**唯一账本**读取，MUST NOT 另建本机 write-ahead 台账（与 AdsPower 自身记录重复，徒增丢失 / 损坏 / 与 AdsPower 走样的同步面）。理由：号一旦登录、edge 一起即经握手把账号↔分身↔机器上报云端（见「握手载荷携带并持久化」需求），该上报已有、不重造；仅「创建后、登录前」空壳期云端不可见，而这段 AdsPower `user/list` 本就记着分身 + 各自代理，是现成账本。代理 SHALL 为**创建时可选项**：表单填了合法代理即随 `user/create` 下发 `user_proxy_config`，不填 SHALL 默认 `no_proxy` 建号（与历史行为逐位等价）；代理输入的归一与校验见「代理可在客户端配置」需求。创建动作在主进程 SHALL **单飞互斥**（同一时刻只一个创建在途，重入诚实返回「进行中」），渲染层触发控件 SHALL 在请求在途时禁用。崩溃后 SHALL 据下次 `user/list` 直接看见已建分身（在预置 `aidcp` 分组、带 `remark`，不丢账）。
+
+#### Scenario: 既有 CLI daemon 在新会话中被有界重置
+- **WHEN** 新桌面应用会话第一次建立托管 AdsPower 运行时，且随包 CLI 的 `status` 发现已登记 daemon
+- **THEN** 桌面外壳先调用该 CLI 的 `stop` 并确认 daemon 已停止，再用当前托管配置启动新 daemon
+- **AND** 本次成功建立的应用会话后续确保运行时时不重复停止该 daemon
+
+#### Scenario: 已登记 daemon 无法停止时停止创建
+- **WHEN** 首次托管运行时建立中的 CLI `stop` 失败，或有界确认后 daemon 仍在运行
+- **THEN** 桌面外壳诚实提示 CLI daemon 无法停止及原始原因，并且不调用 `group/list`、`group/create` 或 `user/create`
+
+#### Scenario: 独立 AdsPower 桌面占用默认端口时使用托管实际端口
+- **WHEN** 独立 AdsPower 桌面或其他进程占用 `50325`，随包 CLI 启动后实际上报另一端口，且历史表单仍保存 `50325`
+- **THEN** 创建路径以 CLI 实际上报端口为权威调用 `group/list` 与 `user/create`
+- **AND** 桌面外壳不关闭独立 AdsPower 桌面，也不把创建请求发往历史表单端口
 
 #### Scenario: 所有平台的新环境进入同一个预置分组
 - **WHEN** 运维选择任一受支持平台并创建新环境
-- **THEN** 桌面外壳解析名称严格等于 `aidcp` 的现有分组 id，并把该 id 传给 `user/create`
+- **THEN** 桌面外壳在当前托管运行时解析名称严格等于 `aidcp` 的现有分组 id，并把该 id 传给 `user/create`
 - **AND** 桌面外壳不调用 `group/create`
 
-#### Scenario: 预置分组不可用时停止创建
-- **WHEN** `group/list` 查询失败，或查询成功但当前运行时看不到名称严格等于 `aidcp` 的分组
-- **THEN** 桌面外壳诚实报告查询错误或预置分组缺失/权限错误，并且不调用 `group/create` 或 `user/create`
+#### Scenario: 新建立运行时仍缺少预置分组时停止创建
+- **WHEN** 当前托管运行时已重新建立且 `group/list` 查询成功，但仍看不到名称严格等于 `aidcp` 的分组
+- **THEN** 桌面外壳明确报告当前运行时账号/权限空间缺少预置分组，并且不调用 `group/create` 或 `user/create`
 
 #### Scenario: 崩溃后据 user/list 不丢账
 - **WHEN** `user/create` 已成功建出分身但紧接着进程崩溃 / 关窗
@@ -219,25 +255,35 @@ Facebook batch creation SHALL assign each planned account an OS family independe
 
 ### Requirement: Facebook 单建与批量建环境兼容六字段竖线账号记录
 
-桌面外壳 SHALL 在 Facebook“单个新建”和“批量新建”共用的主进程账号解析入口中，同时接受既有 `email----password----2FA----cookie` 与 `uid|password|cookie|access_token|email|timestamp` 行格式；每个非空行 SHALL 独立识别格式，因此同批次 MAY 混用两种格式。六字段格式 SHALL 使用 email 作为 AdsPower `username`、使用 password 与 cookie，并 MUST NOT 把 access token 当作 `fakey`。UID、access token 与 timestamp MUST NOT 进入解析后的创建计划、AdsPower 请求、设置、日志或 UI 回执。输入框 SHALL 明示两种受支持格式。
+桌面外壳 SHALL 在 Facebook“单个新建”和“批量新建”共用的主进程账号解析入口中，通过可扩展的确定性规则同时接受既有 `email----password----2FA----cookie`、既有 `uid|password|cookie|access_token|email|timestamp` 与 `uid|password|2FA|email|cookie|access_token` 行格式；每个非空行 SHALL 独立运行适用规则，因此同批次 MUST 能混用受支持格式。解析器 MUST 仅在恰好一个规则完成必需字段与语义校验时接受该行；零个或多个规则通过时 MUST 按安全行号拒绝，不得按规则顺序猜测。
 
-六字段格式的 Cookie 区段 MAY 自身包含 `|`；解析器 SHALL 从记录两端定位固定字段并完整保留中间 Cookie，MUST NOT 以简单固定六段切分导致 Cookie 截断。当 Cookie 中的 `c_user` 可读取时，解析器 SHALL 在任何 `user/create` 前校验其与首字段 UID 一致；不一致、缺少必需的 UID/email/password/cookie、或字段边界非法时 SHALL 仅以安全行号和字段原因拒绝。批量输入任一行失败时 SHALL 保持既有整批预校验语义，不创建任何环境，不回显原始凭据。
+两种 UID 竖线格式 SHALL 使用 email 作为 AdsPower `username`、使用 password 与 Cookie；含 2FA 的格式 SHALL 仅把经 Base32 特征校验的 2FA 映射为 `fakey`，MUST NOT 把 Access Token 当作 `fakey`。UID、Access Token、timestamp 与其他无关字段 MUST NOT 进入解析后的创建计划、AdsPower 请求、设置、日志或 UI 回执。输入框 SHALL 明示自动识别的受支持格式以及 Token 不会导入或保存，不得宣称兼容任意未知格式。
 
-#### Scenario: 单个新建接受六字段导出记录且丢弃无关敏感字段
+两种竖线格式的 Cookie 区段 MAY 自身包含 `|`；各规则 SHALL 从记录两端定位其固定字段并完整保留中间 Cookie，MUST NOT 以简单固定段数切分导致 Cookie 截断。Cookie 中的 `c_user` 可读取时，解析器 SHALL 在任何 `user/create` 前校验其与 UID 一致；不一致、缺少必需字段、字段特征非法、边界非法、未知格式或歧义格式时 SHALL 仅以安全行号和字段原因拒绝。批量输入任一行失败时 SHALL 保持整批预校验语义，不创建任何环境，不回显原始凭据。
+
+#### Scenario: 单个新建接受既有六字段导出记录且丢弃无关敏感字段
 - **WHEN** 运维在 Facebook“单个新建”粘贴一条合法 `uid|password|cookie|access_token|email|timestamp` 记录，且 Cookie `c_user` 与 UID 一致
-- **THEN** 主进程生成只含 email 登录名、password、规范化 Cookie 与既有 Facebook 配置的账号导入对象，创建请求不含 UID、access token、timestamp 或由 access token 映射的 `fakey`
+- **THEN** 主进程生成只含 email 登录名、password、规范化 Cookie 与既有 Facebook 配置的账号导入对象，创建请求不含 UID、Access Token、timestamp 或由 Access Token 映射的 `fakey`
 
-#### Scenario: 批量新建兼容两种格式且仍整批预校验
-- **WHEN** 运维在 Facebook“批量新建”中同时粘贴合法旧格式行与合法六字段竖线行
-- **THEN** 主进程在第一条 `user/create` 前完成全部行解析，按原顺序形成创建计划，两种行后续沿用相同模板、代理、串行创建和回执规则
+#### Scenario: 自动识别 UID 密码 2FA 邮箱 Cookie Token 格式
+- **WHEN** 运维粘贴一条合法 `uid|password|2FA|email|cookie|access_token` 记录，2FA 符合 Base32 特征且 Cookie `c_user` 与 UID 一致
+- **THEN** 主进程将 email、password、2FA 与完整 Cookie 分别映射为 `username`、`password`、`fakey` 与规范化 Cookie，并丢弃 UID 与 Access Token
 
-#### Scenario: Cookie 内嵌竖线不破坏六字段边界
-- **WHEN** 六字段记录的 Cookie 某个值包含一个或多个 `|`
-- **THEN** 解析器完整保留 Cookie 内容，并仍从右侧正确识别 access token、email 与 timestamp
+#### Scenario: 批量新建混用三种受支持格式
+- **WHEN** Facebook 批量输入同时包含合法四字段行、既有六字段竖线行与含 2FA 的六字段竖线行
+- **THEN** 主进程在第一条 `user/create` 前完成全部行的唯一规则识别，按原顺序形成创建计划，并沿用相同模板、代理、串行创建和回执规则
+
+#### Scenario: Cookie 内嵌竖线不破坏任一竖线规则边界
+- **WHEN** 任一受支持竖线记录的 Cookie 值包含一个或多个 `|`
+- **THEN** 对应规则从两端定位固定字段并完整保留 Cookie，且不会把 Cookie 片段、Access Token、时间戳或 2FA 互相错配
 
 #### Scenario: UID 与 Cookie 身份错配时安全拒绝整批
-- **WHEN** 单条或批量任一六字段记录的首字段 UID 与可读取的 Cookie `c_user` 不一致
-- **THEN** 主进程在任何 `user/create` 前按安全行号拒绝，错误、日志与 UI 不包含 UID、密码、Cookie、access token 或邮箱原文
+- **WHEN** 单条或批量任一 UID 记录的 UID 与可读取 Cookie `c_user` 不一致
+- **THEN** 主进程在任何 `user/create` 前按安全行号拒绝，错误、日志与 UI 不包含 UID、密码、2FA、Cookie、Access Token 或邮箱原文
+
+#### Scenario: 未知或歧义格式失败关闭
+- **WHEN** 一行账号资料没有任何规则通过，或有多个规则同时通过
+- **THEN** 主进程按安全行号拒绝整批且不创建环境，不猜测密码或其他敏感字段的角色
 
 ### Requirement: Facebook 单建与批量建环境默认开启环境级慢启动
 
@@ -267,4 +313,68 @@ Facebook batch creation SHALL assign each planned account an OS family independe
 - **WHEN** Ads CLI / SunBrowser 环境已创建，但 Cloud 归属完成失败
 - **THEN** 客户端说明该环境尚未完成权威归属且慢启动未确认
 - **AND** 不自动删除已经创建的环境
+
+### Requirement: Facebook 新建环境提供显式批量模式且平台门禁双层生效
+
+桌面外壳 SHALL 仅在新建环境的平台为 Facebook 时展示“单个新建 / 批量新建”方式。批量模式 SHALL 隐藏环境模板选择并接受多行 Facebook 账号资料，一行对应一个待创建环境，每行沿用既有 `email----password----2FA----cookie` 格式；其他平台 MUST NOT 展示批量入口，主进程也 MUST 拒绝任何非 Facebook 的批量创建请求，不能只依赖渲染层隐藏。
+
+#### Scenario: Facebook 展示并进入批量模式
+- **WHEN** 运维在新建环境中选择 Facebook 并切换到“批量新建”
+- **THEN** 客户端展示多行账号与批量代理输入、隐藏环境模板选择，并把显式批量意图交给主进程
+
+#### Scenario: 其他平台无批量能力
+- **WHEN** 当前平台不是 Facebook，或调用方绕过界面直接提交非 Facebook 批量请求
+- **THEN** 界面不展示批量入口且主进程诚实拒绝该请求，不发出 `user/create`
+
+### Requirement: 批量账号和代理在写入前完成整批校验且凭据不泄露
+
+批量模式 SHALL 忽略空白行并在第一条 `user/create` 前解析、校验全部非空账号行。代理类型 SHALL 只选择一次，允许 `http`/`https`/`socks5` 或显式 `no_proxy`；实际代理类型下每条代理资料 SHALL 独占一行，支持 `host:port`、`host:port:username:password` 以及等价的 `----` 分隔形式，并复用统一代理归一层校验 host、port 与可选账密。选择实际代理类型但列表为空、任一账号/代理行非法、或批次数超过剩余账号容量时 SHALL 整批拒绝且不创建任何环境。账号、2FA、cookie 与代理账密 MUST 仅在内存持有，错误、日志和 UI 回执 MUST NOT 回显原始敏感行。
+
+#### Scenario: 合法多行输入在创建前形成计划
+- **WHEN** 运维粘贴多条合法 Facebook 账号资料，选择一种代理类型并粘贴多条合法代理
+- **THEN** 主进程在任何写请求前完成所有行校验并形成不落盘的内存创建计划
+
+#### Scenario: 后置坏行不会产生部分预校验写入
+- **WHEN** 账号或代理列表的任一后置行格式非法
+- **THEN** 主进程以安全行号说明拒绝原因，不调用任何 `user/create`，且回执不包含该行原文或凭据
+
+#### Scenario: 批次超过剩余账号容量时整批拒绝
+- **WHEN** 已挂载账号数加本批账号数超过当前账号上限
+- **THEN** 主进程在创建前拒绝整批并说明剩余容量，不创建任何环境
+
+### Requirement: 每个批量账号随机分配完整模板并按轮次循环分配代理
+
+批量模式 MUST 忽略调用方提供的单个模板值，并为每个账号从当前合法 `DEVICE_TEMPLATES` 清单中独立随机选择一个完整模板 key；随机单位 MUST 是整套模板，MUST NOT 独立随机拼装 OS、UA、字体、CPU、GPU 或 renderer 字段。若有 `P` 条代理，第 `i` 个账号 SHALL 使用第 `i mod P` 条代理，使第一轮依序使用全部代理后才从第一条开始第二轮；同一代理 MAY 在后续轮次对应多个账号。选择 `no_proxy` 时所有账号 SHALL 显式使用无代理配置。
+
+#### Scenario: 五个账号轮询两条代理
+- **WHEN** 批量计划包含 5 个账号和按顺序粘贴的代理 A、B
+- **THEN** 账号 1-5 的代理依次为 A、B、A、B、A，第二次使用 A 只发生在第一轮 A、B 都已分配之后
+
+#### Scenario: 每个账号只取得合法整套模板
+- **WHEN** 主进程为批量账号生成创建计划
+- **THEN** 每个账号独立取得 `DEVICE_TEMPLATES` 中的一个完整模板 key，渲染层模板值不影响结果，现有一致性护栏仍逐项生效
+
+### Requirement: 批量创建保持串行单飞并诚实呈现部分成功
+
+批量创建 SHALL 继续受主进程单飞互斥和 AdsPower 串行限速约束，并对每个计划项分别执行创建意图签发、`user/create`、客户归属确认与花名册权威回读。某一项失败时系统 SHALL 立即停止后续创建，返回失败序号、已创建的安全摘要和真实 `createdCount`；客户端 SHALL 刷新列表并保留账号/代理输入以便核对。全部成功后客户端 SHALL 显示真实创建数量并清空一次性输入。系统 MUST NOT 为模拟事务回滚而自动或批量删除已经创建的环境，也 MUST NOT 把“已创建”与“已完成客户归属/加入花名册”合并成同一成功状态。
+
+#### Scenario: 第三项失败保留前两项真相
+- **WHEN** 前两个环境已由 AdsPower 成功创建而第三项创建失败
+- **THEN** 系统停止第四项及后续项，回执说明已创建 2 个及第三项失败，刷新列表、保留输入，且不自动删除前两个环境
+
+#### Scenario: 全批成功后清空一次性输入
+- **WHEN** 所有计划项均创建成功且各自归属结果已返回
+- **THEN** 客户端显示真实总数、分别保留归属/花名册状态语义，并清空本次账号与代理文本
+
+### Requirement: 环境创建不隐式触发人设设置
+
+桌面外壳 SHALL 让 Facebook 单个/批量环境创建只负责创建与客户归属，MUST NOT 展示“创建后补齐人设”开关、批次人设语言或在创建结果后提交人设运行。客户需要批量设置人设时 SHALL 从环境栏 Facebook 筛选入口显式进入并人工确认一份人设。
+
+#### Scenario: Facebook 批量创建环境
+- **WHEN** 客户导入账号资料并批量创建 Facebook 环境
+- **THEN** Edge 只创建与归属环境，不提交人设内容、补齐意图或独立语言字段
+
+#### Scenario: 部分创建或创建失败
+- **WHEN** Facebook 批量创建只完成部分环境或中途失败
+- **THEN** 创建回执只表达真实环境结果，不夹带人设补齐受理、失败或等待绑定状态
 

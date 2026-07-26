@@ -5,39 +5,41 @@ TBD - created by archiving change edge-persona-keyword-generation. Update Purpos
 ## Requirements
 ### Requirement: 客户端 onboarding 关键词向导经边缘发起的 WS 请求触发云端生成
 
-Electron 客户端 SHALL 在客户已登录、环境归属与账号绑定已由 Cloud 权威解析后提供人设向导：客户按维度选择关键词——**垂类（枚举快捷选 + 「自定义」自由文本兜底长尾，单选）、兴趣（少量高频标签多选 + 自由文本兜底长尾）、语气（枚举单选）**；并在“语气调性”面板下提供**点赞倾向（正常 / 喜欢 / 更喜欢，单选，默认正常）**。点赞倾向 MUST 有真实输出映射：客户端 SHALL 以受控标记随 `keywordSelections` 发送，云端 SHALL 在生成兴趣关键词前剥离该标记，并把档位写入人设 `behavior_guidelines.like_affinity` 与匹配账号兴趣的 `like_principle`；MUST NOT 把内部标记当作兴趣词或原样写入身份文案。除该有明确映射的点赞倾向外，客户端 MUST NOT 提供对生成产物零影响的互动偏好输入。
+Electron 客户端 SHALL 提供按维度选择关键词的人设向导——垂类（枚举快捷选 + 自定义自由文本）、兴趣（快捷标签多选 + 自由文本）、语气（枚举单选）与点赞倾向（正常 / 喜欢 / 更喜欢，默认正常）。点赞倾向 MUST 有真实输出映射：客户端 SHALL 以受控标记随 `keywordSelections` 发送，云端 SHALL 在生成兴趣关键词前剥离该标记，并把档位写入 `behavior_guidelines.like_affinity` 与匹配账号兴趣的 `like_principle`；MUST NOT 把内部标记写入身份或兴趣。除有明确映射的选择外，客户端 MUST NOT 提供对生成产物零影响的输入。
 
-点击生成 SHALL 由 Electron 主进程经 customer-auth 窄接口发起；请求只携带 `envKey`、关键词勾选（含自由文本项与受控点赞倾向标记）及 idempotency key，Cloud MUST 从客户会话逐请求校验环境归属并解析权威 `accountId`，MUST NOT 采信 renderer 或请求体自报账号。生成 MUST NOT 要求环境浏览器已启动、页面登录态在线、CDP 可用、浏览器槽位可用或 Edge 活 WS 会话存在。云端 MUST 对 `keywordSelections` 做轻量输入校验（单项长度上限 + 条数上限），超限诚实拒绝、绝不把超长/超量文本原样喂进生成 prompt。旧客户端仍经 Edge WS 发起时 SHALL 保持原协议兼容，且两条传输 MUST 复用同一生成领域方法、校验、幂等和记账。
+新版 Electron SHALL 经客户鉴权的环境级 HTTP 请求触发生成，主进程只提交由目标环境解析的 `envKey`、关键词、可选发言语言与 idempotency key；Cloud SHALL 由客户归属与持久绑定解析 `accountId`，请求体 MUST NOT 自报账号。旧版 Edge MAY 继续经运行中 core 发起 `persona.generate` WebSocket 请求，Cloud SHALL 从握手 session 取账号。两种入口 MUST 调用同一人设应用服务、共享按 `(accountId,idempotencyKey)` 的生成幂等、平台校验、输入上限、模型记账与失败语义。
 
-#### Scenario: 浏览器关闭时触发生成
+HTTP 草稿生成 SHALL 使用足以覆盖 180 秒模型天花板的显式长超时；WebSocket 兼容入口继续使用 `timeoutMs ≥ 185s`。生成触发只要求 Cloud 能权威解析一个已存在账号，MUST NOT 要求目标环境此刻在线；无法解析持久绑定时 MUST 诚实拒绝且不调用模型。
 
-- **WHEN** 客户已登录且环境归属/绑定可信，在浏览器关闭、CDP 缺席或槽位为零时选定关键词与点赞倾向并点击生成
-- **THEN** Electron 主进程经 customer-auth 请求携 `envKey`、关键词、受控标记与 idempotency key，Cloud 解析权威账号后生成，MUST NOT 启动浏览器或等待槽位
+#### Scenario: 停止环境通过客户鉴权触发生成
+
+- **WHEN** 客户为自己拥有且已持久绑定账号的停止环境选定关键词与点赞倾向并点击生成
+- **THEN** Electron 经具名 HTTP 桥提交 `envKey` 与受控输入，Cloud 解析绑定账号并生成草稿，MUST NOT 要求 core 在线
+
+#### Scenario: 旧版运行中客户端继续兼容
+
+- **WHEN** 旧版 Edge 在握手后发送 `persona.generate` WebSocket 请求
+- **THEN** Cloud 仍从 session 账号处理并返回兼容响应，与 HTTP 入口使用相同生成规则
 
 #### Scenario: 默认正常并在预览中可核对
 
-- **WHEN** 客户首次打开人设初始化向导且未主动调整点赞倾向
+- **WHEN** 客户首次打开人设向导且未主动调整点赞倾向
 - **THEN** “正常”档被选中，预览摘要显示“点赞倾向：正常”，生成的人设以 `like_affinity=normal` 持久化
 
 #### Scenario: 点赞倾向标记不污染人设兴趣
 
-- **WHEN** 云端收到 `like_affinity:like_more` 或 `like_affinity:like_most` 受控标记
-- **THEN** 生成器在构造身份/兴趣 prompt 前移除该标记，并只把其映射到 `behavior_guidelines`，MUST NOT 把内部 token 写入 identity、interests 或 seed keywords
+- **WHEN** Cloud 收到 `like_affinity:like_more` 或 `like_affinity:like_most` 受控标记
+- **THEN** 生成器在构造身份/兴趣 prompt 前移除该标记，并只把其映射到 `behavior_guidelines`，MUST NOT 写入 identity、interests 或 seed keywords
 
-#### Scenario: 旧客户端无标记保持兼容
+#### Scenario: 绑定身份未知不触发付费生成
 
-- **WHEN** 旧客户端的 `persona.generate` 请求没有点赞倾向标记
-- **THEN** 云端按 `normal` 处理并生成合法人设，MUST NOT 因字段缺失拒绝请求
-
-#### Scenario: 绑定未确立不触发
-
-- **WHEN** 客户未登录、环境不属于该客户或 Cloud 无法权威解析账号绑定
-- **THEN** 向导 MUST NOT 发起可落库的生成请求，仅可本地暂存选择，并 SHALL 显示可区分的客户鉴权/绑定拒因而非引导启动浏览器
+- **WHEN** 环境从未成功握手、绑定冲突、环境不归当前客户或账号行不存在
+- **THEN** 客户 HTTP 入口 fail-closed 且不调用模型；旧 WS 入口仍要求握手 session 具有账号
 
 #### Scenario: 超长或超量输入被诚实拒绝
 
-- **WHEN** `keywordSelections` 某项超单项长度上限或总条数超上限（含经自由文本注入的超量内容）
-- **THEN** 云端诚实拒绝该次生成、MUST NOT 把超长/超量文本原样喂进 prompt，客户端显示真实失败原因
+- **WHEN** `keywordSelections` 某项超单项长度上限或总条数超上限
+- **THEN** Cloud 诚实拒绝并且绝不把超限内容喂进 prompt，Edge 透传失败原因
 
 ### Requirement: 云端生成经 JSON 序列化校验，生成失败硬 fail-closed 绝不回落默认人设
 
@@ -69,22 +71,34 @@ Electron 客户端 SHALL 在客户已登录、环境归属与账号绑定已由 
 
 ### Requirement: 草稿经客户确认后走现有已校验写入通道落库，边缘不本地判成功
 
-客户确认草稿后 SHALL 由边缘发起 `persona.persist` 请求，携确认后的 soul YAML；云端 MUST 复用现有人设单写通道（`loadSoulFromValue` 校验 + 外键守护 + 写库成功才刷内存镜像 + 绑定即热加载唤醒在线节点 + 诚实回执），MUST NOT 新造绕过校验的写路径。边缘 MUST 仅透传云端诚实 `reason`、MUST NOT 本地判定成功。落库前的账号身份 MUST 取握手绑定 `accountId`。
+客户确认草稿后，新版 Electron SHALL 经客户鉴权环境级 HTTP 请求提交目标 `envKey` 与确认后的 soul YAML；Cloud MUST 复核当前客户归属并解析持久绑定账号。旧版 Edge MAY 继续发送 `persona.persist` WebSocket 请求，Cloud 从握手 session 取账号。两种入口 MUST 复用同一人设应用服务与现有人设单写通道（soul 校验 + 外键守护 + 写库成功才刷内存镜像 + 绑定即热加载唤醒在线节点 + 首次绑定引导 + 诚实回执），MUST NOT 新造绕过校验的写路径。
 
-#### Scenario: 确认落库并绑定
+Edge MUST 在请求发出前展示保存中状态，仅在 Cloud 成功回执后显示已保存/已更新；失败时 MUST 保留原人设与草稿并呈现真实 `reason`，MUST NOT 本地判成功。HTTP 保存不要求目标环境在线，成功回执只代表人设已持久化与热加载，MUST NOT 冒充浏览器已启动或首作已完成。
 
-- **WHEN** 客户点击确认，soul YAML 经现有写入通道校验通过
-- **THEN** 云端落 `persona_config`、刷镜像、绑定即唤醒该账号在线节点，回成功回执；边缘据真回执刷新，不乐观假成功
+#### Scenario: 停止环境确认落库并绑定
+
+- **WHEN** 客户在停止环境中确认合法草稿
+- **THEN** Cloud 解析绑定账号、落 `persona_config`、刷新镜像并返回成功真态，目标 core 无需在线
+
+#### Scenario: 保存失败保留原人设
+
+- **WHEN** 归属/绑定在确认前变化，或 soul 非法、持久化失败
+- **THEN** Edge 显示真实失败并保留原人设与可重试草稿，MUST NOT 显示成功
+
+#### Scenario: 旧版 WebSocket 保存继续兼容
+
+- **WHEN** 旧版 Edge 经 `persona.persist` 提交确认草稿
+- **THEN** Cloud 继续从 session 账号调用同一单写服务并返回兼容回执
 
 #### Scenario: 账号行缺失优雅回诚实失败
 
-- **WHEN** `persona.persist` 命中外键守护（`accounts` 行因握手期 `ensureAccount` 尽力而为失败而缺失），回 `unknown_account`
-- **THEN** 边缘按诚实失败处理、MUST NOT 判成功，向导可重驱使账号行落定后重试；付费 `generate` 前 SHOULD 先确认账号行到位
+- **WHEN** 任一入口命中账号外键守护或权威绑定无法解析
+- **THEN** Cloud 返回可区分的诚实失败、不落库、不刷镜像，向导可在账号身份落定后重试
 
 #### Scenario: 空或非法人设被拒不落库
 
-- **WHEN** 确认提交的 soul 为空 / 结构非法
-- **THEN** 云端回 `persona_required` / `persona_invalid`，MUST NOT 落库、MUST NOT 刷镜像
+- **WHEN** 确认提交的 soul 为空、超限或结构非法
+- **THEN** Cloud 诚实拒绝，MUST NOT 落库、MUST NOT 刷镜像
 
 ### Requirement: 大模型与密钥留云端，边缘只做交互
 
@@ -118,15 +132,6 @@ Electron 客户端 SHALL 在客户已登录、环境归属与账号绑定已由 
 - **WHEN** 运行协议漂移哨兵（AC-PROTO）
 - **THEN** edge 与 cloud 两份 `protocol.ts` 的 `MessageType` 穷举一致、校验通过
 
-### Requirement: 适用范围仅新号 onboarding 一次性
-
-本能力 SHALL 仅用于新号 onboarding（该账号首次绑定人设）。老号事后重建人设 MUST NOT 由本期能力承载（留待后续变更，届时须配套一次性令牌 / 配额等防重复触发设计）。
-
-#### Scenario: 仅新号首次绑定走此流程
-
-- **WHEN** 一个从未绑过人设的新号在 onboarding 触发向导
-- **THEN** 允许生成 + 确认落库；对已绑人设的老号，本期不提供经此流程的重建入口
-
 ### Requirement: 云端下发已绑人设信号，边缘按 onboarding 三态渲染
 
 Cloud SHALL 在客户鉴权环境状态中返回该环境绑定解析状态及账号“是否已绑人设”的权威结果。客户端 SHALL 按“绑定待解析 / 已解析且已绑 / 已解析且未绑”三态渲染；该真态来自客户拥有环境与账号绑定的服务端解析，MUST NOT 依赖浏览器、CDP、页面登录态或 Edge WS hello。为了避免 stale-true 泄漏，环境切换、客户切换或归属刷新时客户端 MUST 先清除上一账号投影，待目标环境的新权威响应重建。
@@ -153,25 +158,6 @@ Cloud SHALL 在客户鉴权环境状态中返回该环境绑定解析状态及�
 - **WHEN** Cloud 已验证环境归属和账号绑定并确认该账号未绑人设
 - **THEN** 客户端显示“未设置”并启用向导，浏览器关闭或槽位已满不得改变该判定
 
-### Requirement: 生成 gate 判据不放宽但引导透明
-
-新客户端的人设生成 gate SHALL 为“客户会话有效、环境归属通过、账号绑定已权威解析且 Cloud 请求通道可用”；判据 MUST NOT 包含 core 子进程存在、页面 `auth === logged in`、Edge WS 已连接、浏览器已启动、CDP 或槽位。未满足时客户端 MUST 禁止提交并分别显示客户登录、环境归属、绑定解析或 Cloud 可用性的真实前置，MUST NOT 提示“请先启动浏览器”。旧客户端在兼容窗口仍 MAY 使用既有 `auth && cloud` gate。
-
-#### Scenario: 客户未登录时分态引导
-
-- **WHEN** 客户会话无效
-- **THEN** 生成按钮 disabled，提示客户登录，不得引导打开平台浏览器扫码
-
-#### Scenario: 绑定已解析且 Cloud 可用时不看浏览器状态
-
-- **WHEN** 客户会话有效、环境归属和绑定可信且 Cloud 请求通道可用，但浏览器关闭、CDP 缺席或 Edge WS 重连中
-- **THEN** 生成按钮可用，提交不进入浏览器调度链
-
-#### Scenario: Cloud 请求不可用时诚实失败
-
-- **WHEN** 客户鉴权有效但 Cloud 人设接口不可达
-- **THEN** 客户端显示 Cloud 请求失败/可重试状态，MUST NOT 把失败改写为“浏览器未启动”
-
 ### Requirement: 人设向导使用吉祥物功能色并保留多平台身份
 
 Edge 客户端账号人设向导 SHALL 使用 AIDCP 吉祥物色系建立局部视觉层级：青绿蓝作为通用功能交互色，金黄作为待确认/待更新状态色，珊瑚色可作为小红书平台点缀。选择项文字 SHALL 与区块标题形成可辨层级，MUST NOT 依赖过重字重表达选中状态；选中状态 SHALL 主要由指示器、边框、浅底和文字颜色共同表达。
@@ -194,4 +180,98 @@ Edge 客户端账号人设向导 SHALL 使用 AIDCP 吉祥物色系建立局部�
 
 - **WHEN** 未选内容项或自定义入口在任一受支持系统字体栈下渲染
 - **THEN** 加号由几何线条居中绘制，不依赖 `+` 字符的字形基线
+
+### Requirement: 已绑账号可查看当前人设并经确认流程整体调整
+
+人设向导 SHALL 同时支持首次绑定与已绑账号调整。已绑账号打开时 SHALL 先看到当前真实人设摘要和完整定义入口；点击调整后 MAY 以当前人设可精确反向映射的语气、语言、内容标签与点赞倾向预填选择，并生成一份新的完整草稿。确认动作 SHALL 明示会整体替换当前人设；只生成或预览 MUST NOT 修改现有人设。
+
+#### Scenario: 已绑账号生成新草稿不影响当前人设
+
+- **WHEN** 客户为已绑账号点击调整并生成一份新草稿但尚未确认
+- **THEN** 当前 `persona_config` 与运行时人设保持不变，界面同时保留当前摘要与待确认草稿语义
+
+#### Scenario: 确认后整体替换
+
+- **WHEN** 客户核对新草稿后点击确认且 Cloud 保存成功
+- **THEN** 账号人设整体替换为新 soul，后续运行即时使用新人设
+
+### Requirement: 人设向导仅为 Facebook 显示受控发言语言
+Electron 人设向导 SHALL 在“语气调性”下为当前平台明确为 Facebook 的环境显示“发言语言”单选，提供中文、英文、越南语；小红书与视频号 MUST NOT 显示该设置或发送其值。语言选择 SHALL 独立于自由关键词和点赞倾向，MUST NOT 编码进 `keywordSelections`。
+
+#### Scenario: Facebook 环境要求选择语言
+- **WHEN** 用户打开 Facebook 环境的人设初始化或更新向导
+- **THEN** 向导显示中文/英文/越南语单选，未选择时禁止生成并给出明确提示
+
+#### Scenario: 小红书不显示或发送语言
+- **WHEN** 用户打开小红书环境的人设向导并生成草稿
+- **THEN** 向导不显示发言语言，`persona.generate` 不携带 `writingLanguage`，现有关键词行为保持不变
+
+#### Scenario: 切换环境不串语言选择
+- **WHEN** 用户从一个已选越南语的 Facebook 环境切换到另一个环境
+- **THEN** 向导从目标环境的 Cloud 权威快照回显或显示待选择，MUST NOT 沿用上一环境的越南语 DOM 状态
+
+### Requirement: persona 请求以独立字段传递并回显写作语言
+Edge 与 Cloud 的 `persona.generate` 请求 SHALL 以独立 `writingLanguage` 字段传递 Facebook 选择；Cloud 生成器 SHALL 在模型结果通过后确定性写入 soul。Cloud UI snapshot SHALL 以可选 `personaWritingLanguage` 回显账号真态，Edge MUST NOT 本地推断已保存值。
+
+#### Scenario: 生成结果确定性包含语言
+- **WHEN** Cloud 收到合法 Facebook `writingLanguage=en` 并成功生成人设
+- **THEN** 返回的 soul 草稿包含 `writing_language: en`，该值不是模型自由输出
+
+#### Scenario: 存量缺字段回显待补充
+- **WHEN** Cloud 读取到已绑定但无 `writing_language` 的 Facebook 人设
+- **THEN** snapshot 显式投影缺失状态，Edge 显示语言待补充，MUST NOT 默认勾选中文
+
+### Requirement: 内容偏好最多选择二十四项并在超限点击处原位反馈
+
+Electron 人设向导 SHALL 把用户可见的内容偏好限制为最多 24 个，并在内容偏好标题常驻展示 `已选 n/24`。该业务计数 MUST 只包含内容偏好区域内已选的预设与自定义项，MUST NOT 把语气、发言语言、点赞倾向或内部派生分类名计入客户的 24 个名额。
+
+当已经选择 24 个内容偏好后，客户点击第 25 个未选项时，客户端 MUST 保持原 24 个选择不变、MUST NOT 短暂提交或激活第 25 项；被点击的项 SHALL 原位显示可感知的红色拒绝态，内容偏好区域 SHALL 同时给出“最多选择 24 个内容偏好，请先取消一个再选择”的可访问文本提示。反馈 MUST NOT 只依赖颜色。任一已选项 SHALL 始终允许取消；取消后提示 SHALL 收敛并立即允许选择其他项。
+
+#### Scenario: 第二十四个内容偏好正常选中
+
+- **WHEN** 客户当前已选 23 个内容偏好并点击一个未选项
+- **THEN** 该项正常选中，计数显示 `已选 24/24`，客户端不显示超限错误
+
+#### Scenario: 第二十五次选择在触发项原位拒绝
+
+- **WHEN** 客户已经选择 24 个内容偏好并点击另一个未选项
+- **THEN** 已选集合仍为原 24 项，被点击项不进入选中态但显示短暂红色拒绝态，内容偏好区域显示“最多选择 24 个内容偏好，请先取消一个再选择”的文本提示
+
+#### Scenario: 取消后可以替换选择
+
+- **WHEN** 客户在超限反馈后取消任一已选内容偏好，再点击此前被拒绝的项
+- **THEN** 计数先降为 `已选 23/24` 并清除超限提示，随后新项正常选中且计数恢复为 `已选 24/24`
+
+#### Scenario: 语气语言和点赞倾向不占内容偏好名额
+
+- **WHEN** 客户已选择语气、发言语言或点赞倾向，并已选择 23 个内容偏好
+- **THEN** 客户仍可再选择一个内容偏好达到 `已选 24/24`，这些单选设置不减少内容偏好额度
+
+### Requirement: 自定义内容偏好与预设项共用上限且超限不丢输入
+
+自定义内容偏好 SHALL 与预设内容偏好共用 24 项业务上限。达到上限后确认一个新的自定义偏好时，客户端 MUST NOT 创建或激活该项、MUST NOT 清空客户输入；输入区域 SHALL 显示与预设第 25 项一致的红色拒绝态和可访问文本提示，并保留焦点或把焦点落回可修改的输入控件。取消既有内容偏好后，客户 SHALL 能以保留的输入再次确认。
+
+#### Scenario: 满额时新增自定义偏好保留输入
+
+- **WHEN** 客户已选择 24 个内容偏好，在任一分类输入新的自定义偏好并确认
+- **THEN** 新项不创建，原输入文本保持不变，输入区域显示红色拒绝态与最多 24 个的文本提示
+
+#### Scenario: 腾出名额后确认保留的自定义偏好
+
+- **WHEN** 客户在自定义偏好被拒后取消一个既有偏好，并再次确认保留的自定义输入
+- **THEN** 自定义项成功创建并选中，输入框清空，计数回到 `已选 24/24`
+
+### Requirement: 用户选择上限与传输安全上限分层且两条生成入口一致
+
+系统 SHALL 保留 `keywordSelections` 的单项长度与总条数纵深防御，但传输条数上限 MUST 足以容纳 24 个用户可见内容偏好及其派生分类名、语气和点赞倾向。Electron 主进程、Cloud customer-auth 生成领域服务与旧 WS 兼容入口 MUST 使用一致的 64 条传输上限和 40 字单项上限。一个包含不超过 24 个可见内容偏好的正常客户端请求 MUST NOT 仅因内部派生分类标签而被拒绝；超过传输安全边界的畸形或旧客户端请求 MUST 在调用模型前以具体容量原因诚实拒绝。
+
+#### Scenario: 二十四个跨分类偏好展开后仍可生成
+
+- **WHEN** 客户选择 24 个分属不同分类的内容偏好，renderer 将它们连同分类名、语气和点赞倾向展开为不超过 64 条 `keywordSelections`
+- **THEN** Electron 主进程与 Cloud 均受理该结构并进入正常生成链路，MUST NOT 返回 `invalid_request` 或 `input_too_large`
+
+#### Scenario: 超过传输安全边界在模型前被拒绝
+
+- **WHEN** 畸形或旧客户端提交超过 64 条 `keywordSelections`，或任一项超过 40 字
+- **THEN** Electron 或 Cloud 在模型调用前以 `input_too_large` 类具体原因拒绝，MUST NOT 调用人设生成模型，MUST NOT 把错误塌成无法行动的通用参数提示
 

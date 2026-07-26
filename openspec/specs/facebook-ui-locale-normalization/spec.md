@@ -31,3 +31,54 @@ FB 互动号的浏览器**界面 chrome 语言**（按钮 / 菜单 / 系统级 U
 - **WHEN** 试图经受限写客户端 `user/update` 改一个存量环境的指纹语言字段
 - **THEN** 该写口结构性只接受 `{ user_id, user_proxy_config }` 两键、拒绝透传 `fingerprint_config`，存量号指纹语言改不动；MUST NOT 静默改写指纹、MUST NOT 假成功
 
+### Requirement: Existing Vietnamese Facebook sessions use bounded exact post-action labels
+
+While en-US remains the normative interface locale for provisioned Facebook environments, Edge SHALL support the exact verified Vietnamese post-level controls needed by existing localized sessions: neutral like `Thích`, selected/unlike `Gỡ Thích` and `Bỏ thích`, reacted word `Thích`, and comment `Viết bình luận`. The shared localized-control classifier MUST combine exact labels with their same-card structure. A neutral/selected candidate MUST share a bounded post action bar with exactly one supported post-level comment control and MUST NOT be inside a reaction-summary toolbar. Numeric text rendered inside an otherwise exact action control MUST NOT by itself demote the control. Numeric reaction summaries such as `Thích: 27K người`, and reaction-word controls inside a summary toolbar, MUST remain distinct from the neutral like toggle and MUST NOT be clicked as the action target. Scan identity, action location, and post-action verification MUST use the same classification semantics. Missing or structurally ambiguous controls MUST continue to fail closed.
+
+#### Scenario: Vietnamese neutral like is clicked and verified
+- **WHEN** one exact target card contains neutral `Thích` and the same card changes to `Gỡ Thích` after the click
+- **THEN** Edge confirms the existing like success for that card
+
+#### Scenario: Vietnamese reaction count is not the toggle
+- **WHEN** a card contains both `Thích` and a numeric summary `Thích: 27K người`
+- **THEN** Edge targets only the post-level neutral control and may parse the numeric summary as a count
+
+#### Scenario: Vietnamese neutral action may render its count inside the button
+- **WHEN** the same-card post action bar contains one control with exact label `Thích` and visible text `866`, beside one `Viết bình luận` control, while a separate summary toolbar exposes `Thích: 825 người`
+- **THEN** Edge classifies the exact action-bar control as the unique neutral like target, keeps the summary distinct, and permits the strict video card identity
+
+#### Scenario: Shared structural semantics apply across supported locales
+- **WHEN** the equivalent post-action and summary layout uses a supported Chinese, English, Spanish, or Vietnamese neutral label
+- **THEN** the same shared classifier distinguishes the action from the summary without a locale-specific DOM-order fallback
+
+#### Scenario: Numeric reaction word without unique action structure is ambiguous
+- **WHEN** an exact reaction word with numeric text is not uniquely bound to a post-level comment control or is inside a reaction-summary toolbar
+- **THEN** Edge does not use it as the like target or as the strict video action witness
+
+#### Scenario: Vietnamese comment control anchors the post action boundary
+- **WHEN** a lightweight video card contains `Viết bình luận` beside its like control
+- **THEN** Edge may use it as the same-card action-boundary witness without interpreting caption text as a control
+
+#### Scenario: Verbose Vietnamese accessibility labels recover the strict Feed card root
+- **WHEN** a lightweight video card exposes visible `Thích` / `Bình luận` actions with accessibility labels `Bày tỏ cảm xúc Thích về bài viết của <author>` and `Bình luận về bài viết của <author>`
+- **THEN** the shared classifier recognizes exactly one same-bar like/comment pair, permits the strict card root and video identity, and does not match the caption or reaction summary
+
+#### Scenario: Reels reuses vocabulary but retains active-video proof
+- **WHEN** a supported localized like or unlike word appears on the dedicated Reels surface
+- **THEN** the Reels reader may reuse the normalized locale vocabulary but still requires the active Reel identity, constrained action geometry, and post-action selected-state proof rather than a Feed card selector
+
+#### Scenario: Unknown localized state fails closed
+- **WHEN** a localized card lacks every supported neutral/selected/comment witness or exposes multiple matching controls
+- **THEN** Edge returns no target or ambiguous target and does not click by DOM order
+
+### Requirement: 浏览器界面 locale 与账号写作语言保持正交
+Facebook 浏览器界面 SHALL 继续固定规范 `en-US`；账号 soul 的 `writing_language` 只约束 Cloud 生成的公开帖子/评论文本。改变写作语言 MUST NOT 修改 AdsPower 指纹语言、启动参数、cookie locale、Facebook 账号 UI 语言、代理、时区或 DOM 识别词表。
+
+#### Scenario: 越南语写作账号仍使用英文界面
+- **WHEN** Facebook 账号配置 `writing_language=vi`
+- **THEN** 该账号生成越南语公开文本，但浏览器界面仍按既有规范使用 en-US，Edge 继续以英文 UI 结构识别按钮
+
+#### Scenario: 改写作语言不触碰指纹
+- **WHEN** 用户在人设向导把写作语言从中文改为英文
+- **THEN** 系统只更新 Cloud 账号 soul，MUST NOT 调用 AdsPower `user/update` 改 fingerprint_config 或改变 cookie/UI locale
+

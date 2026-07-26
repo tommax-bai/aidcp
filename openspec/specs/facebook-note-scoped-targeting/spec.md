@@ -5,7 +5,11 @@ TBD - created by archiving change facebook-note-scoped-targeting. Update Purpose
 ## Requirements
 ### Requirement: Facebook post identity is a canonical post id, not a URL
 
-Facebook note-scoped targeting MUST key on a canonical post identity `fb:<postId>` derived from the card-header canonical link, where postId is taken from `posts/<id>`, `permalink/<id>`, `story_fbid`, `multi_permalinks`, the `pfbid` path segment, or the video id (`videos/<id>`, `reel/<id>`, `watch?v=`). Derivation MUST apply a post-permalink **shape whitelist** — a href that is not shaped like a post permalink (author profile links such as `/people/<slug>/pfbid…/`, photo links, group/page home links) MUST NOT derive an identity, because such links appear **before** the timestamp permalink in card-header DOM order and would otherwise define the card's identity as the author's. Derivation MUST also exclude `comment_id` / `reply_comment_id` links, links inside a nested `[role="article"]` (comment) subtree, and links inside share/attachment subtrees. Derivation that cannot produce a post id MUST return a null sentinel, never an empty string, so that a malformed href never compares equal to another and re-selects an arbitrary card. All matching, deduplication, and locating across the like and comment executors MUST use this one identity, replacing any divergent URL-pathname key. The identity MUST NOT be qualified by a container (group/page) segment: Facebook post ids are already globally unique, while a container derived from a page vanity slug in one link form and from a numeric page id in another would give the **same post two identities** and turn a legitimate command into a deterministic `no_target`.
+Facebook note-scoped targeting MUST key on a canonical post identity `fb:<postId>` derived from the card-header canonical link or, only for a strict lightweight video card with no usable permalink, from its unique numeric `data-video-id`. Link-derived postId is taken from `posts/<id>`, `permalink/<id>`, `story_fbid`, `multi_permalinks`, the `pfbid` path segment, or the video id (`videos/<id>`, `reel/<id>`, `watch?v=`). Derivation MUST apply a post-permalink **shape whitelist** — a href that is not shaped like a post permalink (author profile links such as `/people/<slug>/pfbid…/`, photo links, group/page home links) MUST NOT derive an identity, because such links appear **before** the timestamp permalink in card-header DOM order and would otherwise define the card's identity as the author's. Derivation MUST also exclude `comment_id` / `reply_comment_id` links, links inside a nested `[role="article"]` (comment) subtree, and links inside share/attachment subtrees.
+
+The `data-video-id` fallback SHALL be valid only when the same card boundary contains exactly one numeric video id, exactly one video, publisher or story-message evidence, and one post-level like/comment action boundary. If an explicit canonical link exists, it SHALL win only when its canonical post id agrees with the video id; multiple ids or disagreement MUST return the null sentinel. A valid fallback SHALL expose the existing navigable noteId as `https://www.facebook.com/watch?v=<video-id>`. Feed scanning, deduplication, inline reading, like/comment target resolution, exclusive-region checks, and post-action verification MUST use this same identity helper.
+
+Derivation that cannot produce a post id MUST return a null sentinel, never an empty string, so that a malformed href never compares equal to another and re-selects an arbitrary card. All matching, deduplication, and locating across the like and comment executors MUST use this one identity, replacing any divergent URL-pathname key. The identity MUST NOT be qualified by a container (group/page) segment: Facebook post ids are already globally unique, while a container derived from a page vanity slug in one link form and from a numeric page id in another would give the **same post two identities** and turn a legitimate command into a deterministic `no_target`.
 
 #### Scenario: Two same-group multi_permalinks posts do not collide
 
@@ -30,6 +34,18 @@ Facebook note-scoped targeting MUST key on a canonical post identity `fb:<postId
 - **WHEN** the only permalink-shaped href on a card is `javascript:` / a fragment / otherwise unparseable
 - **THEN** canonical id derivation returns the null sentinel
 - **AND** the command resolves to `no_target` while the DOM-first card is left untouched
+
+#### Scenario: Strict video id supplies the missing permalink identity
+- **WHEN** a lightweight card has no canonical post link but has one video id `1632570071375207`, one video, author/caption, and one post action boundary
+- **THEN** scanning and action resolution use canonical identity `fb:1632570071375207` and navigable noteId `https://www.facebook.com/watch?v=1632570071375207`
+
+#### Scenario: Explicit and data-derived video identities disagree
+- **WHEN** a lightweight card carries `/watch?v=111` but its unique `data-video-id` is `222`
+- **THEN** the card identity is the null sentinel, no action target resolves, and neither adjacent card is touched
+
+#### Scenario: Adjacent lightweight video cards remain isolated
+- **WHEN** two adjacent lightweight video cards each have their own author, caption, action boundary, and distinct video id
+- **THEN** a command for one id resolves only inside that card and verification MUST NOT consume the other card's selected state
 
 ### Requirement: Note-scoped actions resolve exactly one target article and never fall back to DOM order
 
@@ -114,4 +130,18 @@ Before locating the reaction control, the edge MUST bring the target article int
 #### Scenario: 浮层落在折叠线以下时先把 react 控件滚进视口
 - **WHEN** 目标是长帖、其 Like 按钮/浮层落在可视视口以下
 - **THEN** 边缘先把帖级 react 控件滚进视口再开浮层点击；若浮层「赞」项坐标仍越出视口，MUST 回 `state_unchanged`，MUST NOT 对屏外坐标空点、MUST NOT 假成功
+
+### Requirement: Reel follow commands carry and enforce canonical note identity
+
+`interaction.follow` MAY carry an optional `noteId` for Reel execution. When the Facebook session is in Reels mode, `noteId` MUST be present and MUST resolve to the canonical `https://www.facebook.com/reel/<id>` identity currently reported by the active Reel reader. The Edge MUST re-check this identity immediately before acting and MUST NOT treat `authorId`, current DOM order, or a generic Follow label as a substitute. Existing non-Reel follow callers that use `authorId` remain wire-compatible.
+
+#### Scenario: Delayed follow command cannot hit the next Reel
+- **WHEN** Cloud sends a follow command for Reel A but Reel B is active when Edge reaches the command
+- **THEN** Edge returns `no_target` and performs zero clicks
+- **AND** Reel B's author is not followed
+
+#### Scenario: Existing profile follow payload remains compatible
+- **WHEN** a non-Facebook-Reels caller sends the existing `interaction.follow` payload with `authorId` and no `noteId`
+- **THEN** protocol decoding remains valid
+- **AND** the existing non-Reel execution path is unchanged
 
