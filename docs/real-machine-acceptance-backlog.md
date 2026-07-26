@@ -440,10 +440,13 @@
 > **2026-07-26 补 · 簇 60 增补（Phase 5 与一条既存线上缺陷）**
 >
 > - [x] ~~**⚠️ 不是验收项，是待修缺陷：风控状态机写不进库（dev + ol 双中）。**~~
->   **2026-07-26 已修，dev 已部署验证**（`aidcp-cloud@8d903dd`）。用户选定候选 ①（走已有窄读口）。
+>   **2026-07-26 已修，dev 与 ol 均已部署验证**（dev `aidcp-cloud@8d903dd`；
+>   ol 走发布分支 `release/20260726-cloud-risk-ownership` @ `ae8eb06`，11:24 上线、零 error）。用户选定候选 ①（走已有窄读口）。
 >   真机证据：dev 上 `risk_state` 07:55:48 写入成功（上次成功 07-23），
 >   积压的面板命令回读 `state=applied`。原始诊断见 `docs/cloud-composition-root-trisection.md` §0.0.2。
->   **⚠️ ol 未部署** —— ol 上这条缺陷仍在，需用户明确要求后从发布分支上。
+>   ol 上原有的那条 `[captcha] applySignal 失败: relation "accounts" does not exist`（07-25 19:53）
+>   在新版重启后不再出现。**同批修的第二处（互动运行控制行播种守卫）在 ol 上同样零跑**——
+>   ol 的互动域是否启用需单独确认，验收项见上一条。
 > - [x] ~~**面板改风控状态 / 配额档，走一遍完整四态**（P5-1 异步化）~~ **`applied` 已在 dev 真跑过**：
 >   缺陷修复后那条积压命令自己走完，`risk_command_outcome` 回读 `applied`（账号 `63e2ff05…`，
 >   `setQuotaLevel` → `normal/conservative`）。**console 上的「处理中 → 已改为 X」文案仍未肉眼看过**，
