@@ -4,7 +4,7 @@ Facebook 发帖的正文填写是 **O(正文长度)** 的逐字符输入，却�
 
 - 上一批把 FB 正文从「一次性 `Input.insertText`」改成逐字输入（edge `4e466ca`，编辑器要求），实测每字约 150–165ms（拟人节奏 + CDP 往返）。
 - 云端 `fill_field` 的等待窗口是常数 30s（只有传图放宽到 60s），无 env 旋钮。**约 175 字即中位数超时，200 字几乎必爆。**
-- 而内容管线**完全不区分平台**：FB 正文走的是小红书形状的 prompt（「正文 200–500 字」），且**正文没有任何长度 clamp**。设计产出区间整段落在爆的那一侧。
+- 当前内容管线已为 Facebook 使用专用 prompt，并将正文目标明确为「全文 100–500 字（Facebook 最佳阅读区间）」；但该要求仍是模型软提示，**正文没有任何确定性长度校验**。执行侧的 `content_too_long` 只能诚实拒绝，不能替代生成侧合同。
 
 后果**不止「发不出去」**，而是三重错位：
 
@@ -39,7 +39,7 @@ Facebook 发帖的正文填写是 **O(正文长度)** 的逐字符输入，却�
 
 ## Impact
 
-- `aidcp-cloud`: `src/publish-agent/fill-budget.ts`（新增）、`src/publish-agent/platform-profile.ts`、`src/publish-agent/command-sequencer.ts`、`src/server.ts`
+- `aidcp-cloud`: `src/publish-agent/fill-budget.ts`（新增）、`src/publish-agent/platform-profile.ts`、`src/publish-agent/command-sequencer.ts`、`src/publish-agent/prompts.ts`、`src/server.ts`
 - `aidcp-edge`: `src/browse/cdp-util.ts`、`src/facebook/publish-executor.ts`
 - **协议不变**：`PublishCommandPayload.timeoutMs` 是既有可选字段，消息类型数仍为 74，`AC-PROTO-*` 不动。
 - **向后兼容**：旧边缘忽略下发的预算、按旧行为跑（不劣化）；新边缘在云端未下发预算时用 25s 兜底（**小于**云端 30s 常数窗口 → 即使对端未升级也是边缘先答，诚实失败而非孤儿执行）。
