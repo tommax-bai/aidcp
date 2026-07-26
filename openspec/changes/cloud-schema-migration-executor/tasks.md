@@ -218,6 +218,15 @@
      0070_baseline_self_heal_columns」并放行启动（正是设计的诚实降级形态）。
      OL 未部署（需用户明确要求 + 发布分支）。逐批观察项留 backlog 簇 110.3 / 110.5 -->
 <!-- 状态更新 / 2026-07-25：上述「OL 未部署」已由用户明确授权后的批 5 风控热修发布取代；release/20260725-db-split 已快进至 f3f6ed9 并完成 ol 备份、迁移状态核验、stop→start 与健康/死锁观测，详细证据见 §5.10。原始六批未逐批上线的缺口仍存在，因此本项继续不勾选。 -->
+<!-- 状态更新 / 2026-07-26：用户明确授权当前版本上线。Cloud 67941e4 与 Console bee7391 从各自已验证 master 切并推送
+     release/20260726-ol-current；Cloud 验收 127/127、全量 3468/3468（另 11 skipped）、typecheck 通过，
+     Console 268/268（另 1 skipped）与 release-worktree build 通过。OL 备份位于
+     /opt/aidcp/backups/release-20260726-ol-current-20260726-174954；三属主专属库 status 仅 automation
+     待 0080_restricted_recovery_outcome，审阅为 expand、目标表 1 行且非法旧状态 0，备份后 39ms 应用，
+     复查 content 20/20、automation 44/44、api 53/53，pending=0。仅重启 aidcp-cloud.service（保持 monolith，
+     未切三进程）：active、NRestarts=0、:8787/:8090/:8091、三路 enforce schema gate、target=ol writer lock、
+     RiskControllerRegistry、Feishu WS、三库 select 1 均通过；Console 发布工件哈希一致且 IP:8088 返回 200。
+     本次覆盖 OL 运行验证，但不补做原始六批逐批 dev 观察，因此任务仍不勾选。 -->
 - [x] 11.6 跑 `openspec validate cloud-schema-migration-executor --strict` 并记录输出。
 <!-- 输出：Change 'cloud-schema-migration-executor' is valid -->
 - [x] 11.7 真机验收项（共库 baseline、契约门 `warn→enforce` 切换、每批空库拉起验证）登记进 `docs/real-machine-acceptance-backlog.md`，按共享真机环境聚簇。
