@@ -119,6 +119,11 @@ REPO_ASSETS = {
     'aidcp-content': ['assets'],
 }
 
+# 迁移覆盖对账所需：把 `aidcp-cloud/migrations` 按属主推导成「每个仓应有哪些迁移」，与实际目录比对。
+# **只报不改**（与组装根同待遇）：搬迁移是有后果的操作，且「多出来的」可能是那个仓自己加的，
+# 自动删/自动拷都可能踩坏一个库的账本。这里只负责让偏差**可见**。
+MIGRATIONS_DIR = 'migrations'
+
 
 def git(ref_repo: str, *args: str) -> str:
     return subprocess.run(
@@ -156,6 +161,67 @@ def sync_assets(args, repo: str, path: str) -> int:
         for rel in (add + changed)[:10]:
             print(f'   ⊕ {rel}')
     return len(add) + len(changed)
+
+
+def migration_owner_scopes(ref: str) -> dict[str, set[str]]:
+    """每个属主该有哪些迁移 —— **调用共享包的权威实现算，绝不在这里复刻规则。**
+
+    本函数最初写成了一份 Python 复刻（按 `-- aidcp:objects=` 头自己解析、自己判属主），
+    结果与权威实现**当场差了 1 条**：`index:` / `constraint:` 声明在 PG 里不带表名，
+    权威实现因此**有意**让「只声明了索引的迁移」落进残留分支（计入全部属主，MUST NOT 猜），
+    而复刻版把索引名当成了表名去查属主、查不到就丢掉 —— 于是那条迁移从某个属主的范围里静默消失。
+
+    这正是本脚本 TRANSPORT_MEMBERS 注释里写的那句话，只不过是在本脚本自己身上应验的：
+    「同一条迁移在不同仓算不同属主，而两侧都编译通过、测试都过，只有真跑迁移才炸。」
+    所以这里跑 `tsx` 直接 import `aidcp-cloud/src/schema/`，一份规则、一个结果。
+    """
+    script = os.path.join(CLOUD, '.sync-migration-scopes.mts')
+    body = """
+import { loadMigrationFiles } from './src/schema/migration-files.js';
+import { loadMigrationOwnerScopes } from './src/schema/migration-owners.js';
+import { buildOwnerScopes } from './src/schema/schema-gate.js';
+const files = await loadMigrationFiles(process.argv[2]);
+const nameOf = new Map(files.map((f) => [f.name.replace(/\\.sql$/, ''), f.name]));
+const { index } = await loadMigrationOwnerScopes(() => Promise.resolve(files));
+const scopes = buildOwnerScopes(index);
+const out = { _residue: index.residue };
+for (const owner of ['api', 'automation', 'content'])
+  out[owner] = scopes[owner].known.map((v) => nameOf.get(v) ?? `${v}.sql`);
+console.log(JSON.stringify(out));
+"""
+    with open(script, 'w', encoding='utf8') as fh:
+        fh.write(body)
+    try:
+        raw = subprocess.run(
+            ['npx', 'tsx', script, os.path.join(CLOUD, MIGRATIONS_DIR)],
+            cwd=CLOUD, capture_output=True, text=True, check=True,
+        ).stdout.strip().splitlines()[-1]
+    except subprocess.CalledProcessError as err:
+        print(f'  ⚠ 迁移覆盖对账跳过（权威实现跑不起来）：{(err.stderr or "").strip()[:200]}')
+        return {}
+    finally:
+        os.path.exists(script) and os.remove(script)
+    return {k: set(v) for k, v in json.loads(raw).items()}
+
+
+def check_migrations(path: str, scopes: dict[str, set[str]], layer: str) -> int:
+    """对账某个仓的 migrations/ 是否等于它按属主该有的那一组。只报不改。"""
+    want = scopes.get(layer)
+    if want is None:
+        return 0
+    mig_path = os.path.join(path, MIGRATIONS_DIR)
+    have = ({n for n in os.listdir(mig_path) if n.endswith('.sql')}
+            if os.path.isdir(mig_path) else set())
+    missing, extra = sorted(want - have), sorted(have - want)
+    if not missing and not extra:
+        print(f'  · 迁移覆盖对齐（{len(have)} 条）')
+        return 0
+    print(f'  ⚠ 迁移覆盖：应有 {len(want)} 实有 {len(have)} · 缺 {len(missing)} · 多 {len(extra)}（只报不改）')
+    for n in missing[:10]:
+        print(f'   ✗ 缺 {n} —— 该仓的库会永远缺这张表，而契约门只看最高版本、未必报')
+    for n in extra[:10]:
+        print(f'   ? 多 {n}（可能是该仓自己加的，不自动删）')
+    return 1
 
 
 def load_manifest(ref: str) -> dict[str, str]:
@@ -306,7 +372,11 @@ def main() -> int:
     sha = git(CLOUD, 'rev-parse', '--short', args.ref).strip()
     own = load_manifest(args.ref)
     kernel_paths = {p for p, layer in own.items() if layer == 'kernel'}
+    mig_scopes = migration_owner_scopes(args.ref)
     print(f'源: aidcp-cloud@{sha}（{args.ref}）  清单 {len(own)} 个 src 文件')
+    residue = mig_scopes.get('_residue', set())
+    if residue:
+        print(f'迁移残留 {len(residue)} 条（头声明为空 ⇒ 按安全方向计入全部属主）')
     print(f'模式: {"APPLY" + ("+PRUNE" if args.prune else "") if args.apply else "CHECK（只读）"}\n')
 
     # 共享包的 master 头：消费仓的 pin 都得等于它（漂了是静默用旧契约，见 check_package_pin）。
@@ -363,7 +433,8 @@ def main() -> int:
         for rel in comp_changed:
             print(f'   ⊘ {rel}（组装根：只报不改，批次 2/3/4 各仓自己写 main()）')
         asset_diff = sync_assets(args, repo, path)
-        if add or changed or remove or comp_changed or asset_diff:
+        mig_diff = check_migrations(path, mig_scopes, layer)
+        if add or changed or remove or comp_changed or asset_diff or mig_diff:
             exit_code = 1
 
         if args.apply:
