@@ -25,6 +25,7 @@
     scripts/sync-split-repos --apply             # 写入差异（不含组装根、不删多余文件）
     scripts/sync-split-repos --apply --prune     # additionally 删掉清单里没有的 src 文件
     scripts/sync-split-repos --repo aidcp-api    # 只处理一个仓
+    AIDCP_CODES_ROOT=/abs/path/to/codes scripts/sync-split-repos  # 从 aidcp 隔离 worktree 运行
 
 覆盖 6 个目标：四个按属主层切的仓（api / automation / content / kernel）+ 一个**逐文件点名**的
 共享包 `aidcp-transport`（它不是一个属主层，成员在归属清单里仍标 automation，只是同时复制进包供三家共用）。
@@ -39,8 +40,14 @@ import re
 import subprocess
 import sys
 
-CODES = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CODES = os.path.dirname(CODES)  # .../codes
+# 隔离 worktree 下脚本位于 .../codes/aidcp.wt/<change>/scripts；仅按 __file__ 回退两层会误把
+# .../codes/aidcp.wt 当成仓库父目录。显式根只影响路径解析，不改变 ref、成员或同步判据。
+CODES = os.environ.get('AIDCP_CODES_ROOT')
+if not CODES:
+    CODES = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    CODES = os.path.dirname(CODES)  # .../codes
+else:
+    CODES = os.path.abspath(CODES)
 CLOUD = os.path.join(CODES, 'aidcp-cloud')
 MANIFEST = 'boundaries/module-ownership.json'
 
@@ -91,6 +98,14 @@ TRANSPORT_MEMBERS = [
     # 最典型形态，却从落地起就没进过包 —— 因为在此之前两端恰好还在同一个进程里，谁也没被迫去 import 它。
     # 批次 3 测绘时才发现。同族的只读端口 risk-read-http.ts 一直在清单里，这条漏了。
     'src/transport/risk-command-http.ts',
+    # 批次 3a：automation owner → api 的第一批单向异步能力。五个成员都同时包含
+    # owner route 与 typed client，且不持有属主表 SQL；Facebook 群口刻意不含需要
+    # 反向刷新 api 花名册的 importTargets / replaceTargetScopes。
+    'src/transport/panel-automation-http.ts',
+    'src/transport/panel-config-http.ts',
+    'src/transport/facebook-group-ops-http.ts',
+    'src/transport/group-route-http.ts',
+    'src/transport/alert-resolution-http.ts',
 ]
 # 有意**不**进包的同目录文件（判据：只有 automation 一家用，或直接持有属主表 SQL）：
 #   event-outbox.ts / risk-command-outbox.ts / eventbus-outbox-bridge.ts / outbox-health.ts /

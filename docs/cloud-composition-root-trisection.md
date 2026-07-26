@@ -842,15 +842,19 @@ content 侧照同一形态收口即可。）
 
 **MUST NOT 按「照批次 2 再做两遍」估这件事。** 建议切成四段，每段自成一个可验收单元：
 
-1. **3a · api 单向可用的那部分**：先落 api 要的 17 条里**不依赖 automation 回头调 api** 的那些
-   （面板投影、四类限频配置读写、FB 群运营面、群路由、告警勾销）。这些在单体上就能逐条部署验证。
+1. **3a · api 单向可用的那部分**：落五个契约簇、28 个异步方法：
+   面板投影 6 个、四类限频配置读写 8 个、FB 群运营事实 10 个、群路由 3 个、告警勾销 1 个。
+   其中 FB `importTargets` / `replaceTargetScopes` 会在 scope 判否前反向刷新 api 账号花名册，
+   **不属于单向面**，与 4a 的账号花名册端口配对后再落；不得把当前 10 方法客户端注入成完整 FB 面板依赖。
 2. **3b · 双向那几条**：风控命令（含 `recoverRestricted`）、审批后下发触发、面板实时事件通道。
    **这三条必须与 automation 侧配对设计**，否则会出现「两侧各写一份、各自编译通过、只有真跑才 404」。
 3. **4a · automation 要的 api 侧 11 条**：发布台账读写（**注意与 content 那条窄写口不是同一条**，
    它有 10 个方法）、授权台账、互动写入闸、回复策略解析、人设服务、握手回写。
 4. **4b · 11 条同步读的镜像层**：单独排，别混进「包个 HTTP 客户端」里估。
 
-**每一段的收尾都照批次 2**：在单体组装根注册服务端 → 部署 dev 验证 → 才轮到消费方接客户端。
+**每一段仍保持 server-first，但验收证据必须按运行形态拆开**：
+直接 loopback HTTP 契约测试证明 route/client；部署 dev 单体只证明现网零回归，且按既有红线不启动
+automation 内部监听器；只有独立 api/automation 进程都启动后，才能声明真实跨进程通信。
 
 ### 10.5 一条已经能确定的边界纪律
 
@@ -880,8 +884,9 @@ content 侧照同一形态收口即可。）
    读不到的后果是 content 每张审批卡**静默落默认群**。原分类把整组九条 route 写成
    「零跨属主取数、最省事的一段」，与它自己在别处承认的传递性缺口直接矛盾。
 2. **四类限频配置的面板外观本身就是 automation 属主**，api 仓里连 `createQuotaConfigPanel`
-   等四个工厂都 import 不到。工作量不是「给已有 api 外观补一条数据端口」，
-   而是**外观的归属得先裁决**（搬进 api / 提进共享层 / 整块走端口）。
+   等四个工厂都 import 不到。**3a 已裁决并落地**：四个 facade 整体留在 automation，
+   kernel 的四个窄接口统一改为显式 `Promise<T>`，api 的异步面板 handler 经 HTTP 等待 owner 真态；
+   不用 `T | Promise<T>` 掩盖漏 `await`，也不为人工面板读另造轮询镜像。
 3. **`roleConfigPanel` 的三个注入指向 content 属主模块**（封面形态的模型/厂商解析、思考参数构造）。
    它们确实是纯函数 + env 读，但「纯不纯」与「本仓有没有这个文件」无关 ——
    这是一项必须做的处置决定（提 kernel / 就地内联），不是可以略过的注脚。
@@ -941,5 +946,58 @@ content 侧照同一形态收口即可。）
 **同批还发现并补掉一条**：`risk-command-http.ts`（风控写命令三件套）从落地起就没进过共享包，
 而它的 server 在 automation、client 在 api，是最典型该共用一份定义的形态。
 漏的原因是**在此之前两端恰好还在同一个进程里，没有任何东西被迫跨仓 import 它**。
-已补进 `TRANSPORT_MEMBERS`（28 个成员），并同批写下同目录里**有意不进包**的六个文件及判据
+已补进 `TRANSPORT_MEMBERS`（**当时**为 28 个成员；3a 发布五个新成员后为 33 个），
+并同批写下同目录里**有意不进包**的六个文件及判据
 （outbox 家族与账号投影是 automation 私有，「在 `src/transport/` 目录下」不是准入判据）。
+
+### 10.8 3a 已交付：**五个契约簇可用，不等于三进程已上线**（2026-07-26）
+
+本批按上面的修订范围交付 28 个方法：
+
+| 契约成员 | 方法数 | 交付边界 |
+| --- | ---: | --- |
+| `panel-automation-http.ts` | 6 | 今日动作、点赞浏览、批量风控态、告警、互动投影；失败不染成零/空 |
+| `panel-config-http.ts` | 8 | quota / pacing / session / resume 各读写一条；校验、落库、写后真态都留在 automation facade |
+| `facebook-group-ops-http.ts` | 10 | 列表、筛选、启停、进度、分配、回收、scope 计数与最近排期结果；`Map` 显式按 entries 往返 |
+| `group-route-http.ts` | 3 | `getRoute` / `listRoutes` / `setRoute`；合法未配置 `null` 与 owner/transport 失败分开 |
+| `alert-resolution-http.ts` | 1 | 只勾销告警并返回真实 `0 | 1`；不迁移风控态、不恢复 Edge |
+
+**明确未交付**：FB `importTargets` / `replaceTargetScopes`、`weekActiveMask()`、边缘在场与其他同步镜像、
+风控命令/审批后触发/实时事件通道，以及 automation 反向读取 api 的 4a 能力。尤其不能用这批部分
+Facebook 端口冒充完整面板依赖。
+
+交付版本已按 kernel → transport → api/automation/content 的依赖顺序快进并推送：
+
+- `aidcp-cloud@5b35d0a`：事实源、五组 route/client、单体注册与直接 HTTP 契约测试；
+- `aidcp-kernel@f7bceaf`：四个异步配置端口与 FB 群运营窄端口；
+- `aidcp-transport@b754bc8`：33 个逐文件成员，五个新增成员的构建产物与导出可解析；
+- `aidcp-api@72858c9`：精确 kernel/transport pin、await-safe 面板 handler 与客户端契约测试；
+- `aidcp-automation@7c7848f`：精确 kernel pin、owner facade 与本地 transport 副本；
+- `aidcp-content@c023f70`：精确 kernel/transport pin。
+
+验证边界如下：
+
+- `aidcp-cloud`：五组 focused transport/server 测试 27 通过；acceptance 123/123；
+  全量 3401 通过、0 失败、11 跳过；typecheck 通过；
+  `AC-BOUND crossBoundaryEdges=0`，`AC-OWN crossLayerWrites=0 / crossLayerReads=0`。
+- `aidcp-transport`：build/typecheck 与五个运行时导出探针通过；
+  `aidcp-content`：438/438 与全量 typecheck 通过。
+- `aidcp-api` 的 3a focused 24/24 与严格切片 typecheck 通过；全量仍为 404/409 通过，
+  5 个失败都来自提取仓既缺的 `src/soul/soul.yaml`，全量 typecheck 仍被未重写的单体组装根阻断。
+- `aidcp-automation` 的 owner/transport focused 62/62 与严格切片 typecheck 通过；
+  全量为 1597/1626 通过、26 个既有 migration/boundary fixture 失败、3 跳过，
+  全量 typecheck 同样被未重写的单体组装根阻断。两仓红项均未被写成绿色，也不是 3a 新增回归。
+
+DEV 部署的是干净 `aidcp-cloud@5b35d0a` 单体：备份
+`/opt/aidcp/cloud.bak.20260726-142613.tar.gz` 后只重启 `aidcp-cloud.service`；
+content 20/20、automation 43/43、api 53/53 migration 均无 pending；`:8787` / `:8090` 正常，
+`/api/health` 返回 `{"ok":true}`，schema gate、DEV writer lock、RiskControllerRegistry、panel 与
+Feishu WebSocket 均就绪。**`:8093` 按单体红线保持关闭**；五组 route/client 的可达证据来自
+21 个直接 loopback HTTP 契约测试，不是 ECS 上不存在的 automation listener。
+
+最终七仓派生对账以 `aidcp-cloud@5b35d0a` 为 ref：api 105、automation 203、content 83、
+kernel 90、transport 33 个受管源文件均零差异；api/content 的精确 transport pin 与
+api/automation/content 的精确 kernel pin 对齐，三组 migration 分别为 53/43/20。
+检查仍以非零退出指出 api/automation/content 的手写 `main()` / 组装根差异；
+这些根本来就不由同步脚本覆盖，
+不能为了“全绿”把它们机械复制，也不能据此声称 api 独立 `main()` 或三进程通信已经验收。
