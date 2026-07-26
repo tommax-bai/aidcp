@@ -1,0 +1,780 @@
+{
+  "api": {
+    "repo": "/Users/baitianxing/codes/aidcp-api",
+    "errorCount": 385,
+    "localBuild": [
+      {
+        "name": "apiPool（本进程唯一属主池）+ 契约门收窄",
+        "what": "只 new 一个 pg.Pool(resolveOwnerPgConfig('api'), max:30)；configMirrorPool 就是它的别名。MUST 删掉 automationPool / contentPool / tokenUsagePool 三行；pgOwnersForProcess() 收窄成 ['api']，runSchemaContractGate({owners:['api']}) 随之只判一个属主，assertOwnerPoolsMatchProcessOwners 会当场抓漏改。",
+        "evidence": "aidcp-cloud/src/server.ts:1060 (gate) / :1075 apiPool / :1076-1077 另两池 / :1081 断言 / :1086 configMirrorPool 别名 / :1088 tokenUsagePool / :6125 pgOwnersForProcess"
+      },
+      {
+        "name": "MirrorVersionStore + PgConfigMirrorBumpSink",
+        "what": "config_mirror_version 是 api 属主表。api 取 sink 的**本地**分支（new PgConfigMirrorBumpSink({pool:apiPool,versionStore})），同时把它注册成 HTTP route 供 automation 投递。MUST NOT 建 ConfigMirrorBumpRelay / OutboxMirrorVersionBumper——那是生产方（automation）侧。",
+        "evidence": "aidcp-cloud/src/server.ts:1089 / :1097-1110 / :1115-1133 (relay，属 automation) / :889 注册 route"
+      },
+      {
+        "name": "六个 api 属主配置存储",
+        "what": "ModelConfigStore / CredentialStore / RoleConfigStore / CategoryConfigStore / HotLeadConfigStore / PersonaStore，全绑 configMirrorPool(=apiPool) + mirrorVersionBumper=mirrorVersionStore，schemaEnsurer=ensureCapabilitySchema（来自 aidcp-transport/schema）。",
+        "evidence": "aidcp-cloud/src/server.ts:1143 / :1147 / :1156 / :1161 / :1182 / :2106"
+      },
+      {
+        "name": "ContentScheduleStore",
+        "what": "api 属主，绑 configMirrorPool。⚠ 两个注入参数是跨属主且**同步**：globalActiveWeekMask ← sessionConfigStore.weekActiveMask()（automation），scheduledAutomationCatalog ← SCHEDULED_AUTOMATION_CATALOG_READER（automation，且**必填**）。见 syncReads。",
+        "evidence": "aidcp-cloud/src/server.ts:1194-1205；aidcp-api/src/config/content-schedule-store.ts:298 (必填) / :310 (同步签名)"
+      },
+      {
+        "name": "FacebookGroupJoinAutomationStore / FacebookCommentConfigStore",
+        "what": "两个每账号 FB 配置表，api 属主、绑 configMirrorPool。面板 facebookCommentConfig 与 contentSchedule.setJoinGroupAutomation 直接用。",
+        "evidence": "aidcp-cloud/src/server.ts:1206 / :1212；消费点 :6561-6578 / :6592-6596"
+      },
+      {
+        "name": "ClientUserStore",
+        "what": "绑 apiPool。三个 automation 侧注入口在 api 模式已是 fail-closed reject 桩（clientEnvAutomationRead / offboardCleanupGrantOps / offboardMaterialization）——照抄那三个分支即可，但要意识到它们让「环境注销 / 微信授权绑定 / 风控态投影」在 api 进程里恒不可用。",
+        "evidence": "aidcp-cloud/src/server.ts:1268-1298 (三个 api 分支) / :1299 构造"
+      },
+      {
+        "name": "BotChatStore",
+        "what": "bot_chats 是 api 属主表，绑 apiPool。面板 botChats 列表 + publishCardExit.getDefaultChat + 卡片落点解析都用它。",
+        "evidence": "aidcp-cloud/src/server.ts:1531；boundaries/table-ownership.json bot_chats=api"
+      },
+      {
+        "name": "PublishLogStore（含 init 上移）",
+        "what": "绑 apiPool。init 已由批次 2 从内容段上移到属主段，api 的 main() 里 MUST 保留这次 init。它同时是 ctx.publishLogWriter（供 publish-log HTTP route 服务 content）。",
+        "evidence": "aidcp-cloud/src/server.ts:1550-1569 / :2234-2235"
+      },
+      {
+        "name": "PublishPipelineLogStore",
+        "what": "publish_pipeline_logs 属 api，绑 apiPool，无需 init。它就是 ctx.pipelineLogSink，供 pipeline-log HTTP route。",
+        "evidence": "aidcp-cloud/src/server.ts:1575-1582 / :2236"
+      },
+      {
+        "name": "发布授权持久链（PublishApprovalStore + 内部窄接口 + 写出口）",
+        "what": "PublishApprovalStore(apiPool, executionTarget) → createInProcessPublishApprovalApi → createPublishApprovalClient；resolveApprovalEnvKey（publishLogStore + clientUserStore.envKeyForAccount，纯 api）；createApprovalWriteOutlet + writeApprovalDecision。deploymentTarget 缺失时 MUST 保留那条 error 并让写一律失败。",
+        "evidence": "aidcp-cloud/src/server.ts:1588-1613 / :1622-1633 / :1634-1645 / :1655-1666"
+      },
+      {
+        "name": "readPublishApproval / readLiveContentVersion",
+        "what": "单体里在 segC，但闭包里只读 publishApprovalClient 与 publishLogStore —— **纯 api，可就地建**，不需要跨进程口。面板 publishDraft.hasDecision / liveVersion 与客户端 environmentOverview 都靠它们。",
+        "evidence": "aidcp-cloud/src/server.ts:4002-4008 / :4021-4028；消费点 :6518-6519 / :6896"
+      },
+      {
+        "name": "NotificationContactStore",
+        "what": "notification_event / notification_contact_meta，api 属主，绑 apiPool。面板 notificationContact 读写。",
+        "evidence": "aidcp-cloud/src/server.ts:1703-1716 / :6680"
+      },
+      {
+        "name": "PgAccountStore + AccountStateManager + 两个显示名解析器",
+        "what": "accounts 属 api。accountStore(apiPool) → accountState.init() → accountDisplayName / accountDisplayNameCandidates。accountState 供 commandFace 的 pause/resume/getStatus。MUST NOT 顺手把 PgAccountProjectionStore 搬过来（automation 的守卫投影，见 permanentlyAbsent）。",
+        "evidence": "aidcp-cloud/src/server.ts:1803-1814 / :1924-1932 / :1839-1854 (投影，不搬)"
+      },
+      {
+        "name": "ApprovalPolicyStore",
+        "what": "绑 apiPool。面板 approvalPolicies + 候审卡投递判定都用；投递判定还要 clientUserStore.hasEnabledClientApprovalReachability。",
+        "evidence": "aidcp-cloud/src/server.ts:1871-1874"
+      },
+      {
+        "name": "resolveReviewCardDelivery（候审卡投递判定）",
+        "what": "闭包只读 approvalPolicyStore + clientUserStore，两张表都是 api 属主 ⇒ 纯本地。fail-open 是它的语义不是兜底：判不出来一律 send:true，每个 catch 都要带各自 reason，MUST NOT 归一。",
+        "evidence": "aidcp-cloud/src/server.ts:1899-1921；route 注册 :894-896"
+      },
+      {
+        "name": "publishCardExit（六方法卡片出口）",
+        "what": "sendApprovalCard / sendCommandResult / uploadImageFromUrl / getDefaultChat / resolveCardChatId / writeApprovalSignal。实现全在 api：FeishuMessenger + buildPublishApprovalCard/buildCommandResultCard + botChatStore + writeApprovalDecision + withAccountName。⚠ 唯一传递性缺口是 resolveCardChatId → groupRouteStore（automation），见 newContractsNeeded。",
+        "evidence": "aidcp-cloud/src/server.ts:2267-2280 / :2202 messenger / :2067-2077 resolveCardChatId"
+      },
+      {
+        "name": "imageModelSelection（取源侧）",
+        "what": "{ current: () => modelConfigStore.getCached() 的两字段 }，纯 api。api 只提供 route，本进程自己不需要镜像。",
+        "evidence": "aidcp-cloud/src/server.ts:2260-2265；route :906-908"
+      },
+      {
+        "name": "角色模型解析四层回落 + roleModelSelectionSource",
+        "what": "resolveSelection / resolveModelForRole / resolveTempForRole / resolveThinkingForRole → roleModelSelection → roleModelSelectionSource（按 ROLE_CATALOG 全量预解析）。读的三张配置表与角色目录全是 api。",
+        "evidence": "aidcp-cloud/src/server.ts:1398-1431 / :1439-1459；ROLE_CATALOG/categoryOf 来自 src/config/role-catalog.ts（api）:440"
+      },
+      {
+        "name": "providerSecretReader / accountPlatformReader",
+        "what": "分别是 credentialStore.getSecretForRuntime 与 accountStore.getPlatformOrNull 的单方法包装，供 content 经 HTTP 取。accountStore 未就绪时 MUST 走「不注册路由 + 告警」那一支，绝不注册一条注定 500 的路由。",
+        "evidence": "aidcp-cloud/src/server.ts:1461-1463 / :2311-2313；route :912 / :915-916"
+      },
+      {
+        "name": "PersonaAutoFillStore / FirstPostOnboardingStore / createPersonaResolver / createPersonaPanel",
+        "what": "四者都绑 apiPool 或 configMirrorPool。personaPanel 的两个回调（onBound→runtimes、onChanged→uiSnapshot）已在 crossSegment 响亮闸后面，api 进程里会各记一条 cross_segment_drop —— 但后果重（绑了人设不开跑 / 客户端绑定态断链），批次 4 要接实，别当无害。",
+        "evidence": "aidcp-cloud/src/server.ts:2119-2127 / :2130-2141 / :2168-2175 / :2180-2199"
+      },
+      {
+        "name": "面板/客户鉴权层的 api 自有件",
+        "what": "PgPanelStore({pool:apiPool, automation:panelAutomationRead})、TokenRevocationStore（面板与客户端各一份、绝不共用）、LoginRateLimiter、DataGateway、parsePanelUsers、readApprovalDispatchProjection、buildPublishLifecycle、projectClientPublishQueue / projectClientEnvironmentSchedule、buildFacebookGroupJoinAutomationCatalogViewFailClosed。全在 aidcp-api/src 里已就位。",
+        "evidence": "aidcp-cloud/src/server.ts:6471 / :6458 与 :6863 / :6864 / :6415-6439 / :6355 / :6329-6352 / :6947 / :6961 / :6924 / :6569"
+      },
+      {
+        "name": "六个 api 属主的面板外观",
+        "what": "roleConfigPanel / categoryConfigPanel / hotLeadConfigPanel（+ personaPanel）来自 api 的 *-facade.ts。⚠ roleConfigPanel 的 getVisionModel/getVisionProvider 指向 content 的 resolveCoverFormModel/Provider，thinkingOnAvailable 指向 content 的 buildThinkingParams —— 都是纯函数/env 读，见 risks。",
+        "evidence": "aidcp-cloud/src/server.ts:6284-6297 / :6299-6305 / :6313；resolveCoverForm* 在 src/publish-agent/cover-form-sensor.ts:254-259（content）"
+      },
+      {
+        "name": "startApiInternalApi 的 9 条 route（127.0.0.1:8094）",
+        "what": "InternalHttpServer + registerConfigMirrorBumpRoutes / ReviewCardDelivery / PublishLog / PipelineLog / PublishCardExit / ImageModelSelection / RoleModelSelection / ProviderSecret / AccountPlatform。九个被注册对象**全部**由上面这些本地件提供，零跨属主取数 —— 这是 api main() 里最省事的一段。",
+        "evidence": "aidcp-cloud/src/server.ts:881-922；DEFAULT_API_INTERNAL_API_PORT=8094 见 :415"
+      }
+    ],
+    "existingPorts": [
+      {
+        "name": "config-mirror-bump（配置镜像失效信号落地）",
+        "transportFile": "aidcp-transport/src/transport/config-mirror-bump-http.ts",
+        "direction": "server",
+        "evidence": "aidcp-cloud/src/server.ts:889 registerConfigMirrorBumpRoutes(httpServer, sink)；客户端侧 :1108 ConfigMirrorBumpHttpClient（automation 用）"
+      },
+      {
+        "name": "review-card-delivery（候审卡投递判定）",
+        "transportFile": "aidcp-transport/src/transport/review-card-delivery-http.ts",
+        "direction": "server",
+        "evidence": "aidcp-cloud/src/server.ts:894-896；判定实现 :1899"
+      },
+      {
+        "name": "publish-log（发布台账窄写四方法）",
+        "transportFile": "aidcp-transport/src/transport/publish-log-http.ts",
+        "direction": "server",
+        "evidence": "aidcp-cloud/src/server.ts:900 registerPublishLogRoutes(httpServer, ctx.publishLogWriter)"
+      },
+      {
+        "name": "pipeline-log（发布管线角色执行日志 sink）",
+        "transportFile": "aidcp-transport/src/transport/pipeline-log-http.ts",
+        "direction": "server",
+        "evidence": "aidcp-cloud/src/server.ts:902"
+      },
+      {
+        "name": "publish-card-exit（发卡/发通知/传图/默认群/落点解析/免审授权写）",
+        "transportFile": "aidcp-transport/src/transport/publish-card-exit-http.ts",
+        "direction": "server",
+        "evidence": "aidcp-cloud/src/server.ts:904；实现 :2269-2280"
+      },
+      {
+        "name": "image-model-selection（图片模型选择取源）",
+        "transportFile": "aidcp-transport/src/transport/image-model-selection-http.ts",
+        "direction": "server",
+        "evidence": "aidcp-cloud/src/server.ts:906-908"
+      },
+      {
+        "name": "role-model-selection（角色模型解析取源）",
+        "transportFile": "aidcp-transport/src/transport/role-model-selection-http.ts",
+        "direction": "server",
+        "evidence": "aidcp-cloud/src/server.ts:911"
+      },
+      {
+        "name": "provider-secret（厂商密钥窄读）",
+        "transportFile": "aidcp-transport/src/transport/provider-secret-http.ts",
+        "direction": "server",
+        "evidence": "aidcp-cloud/src/server.ts:912"
+      },
+      {
+        "name": "account-platform（账号平台窄读）",
+        "transportFile": "aidcp-transport/src/transport/account-platform-http.ts",
+        "direction": "server",
+        "evidence": "aidcp-cloud/src/server.ts:915-916"
+      },
+      {
+        "name": "risk-read（风控只读投影 getState/effectiveQuotas/slowStartView）",
+        "transportFile": "aidcp-transport/src/transport/risk-read-http.ts",
+        "direction": "client",
+        "evidence": "aidcp-cloud/src/server.ts:6364-6366 新 RiskReadHttpClient(new InternalHttpClient(automationBaseUrl))；base URL 解析 :6360-6361（AIDCP_AUTOMATION_URL，缺省 127.0.0.1:8093）"
+      },
+      {
+        "name": "delegated-task（委托任务读写窄面）",
+        "transportFile": "aidcp-transport/src/transport/delegated-task-http.ts",
+        "direction": "client",
+        "evidence": "消费点 aidcp-cloud/src/server.ts:6477 / :6872 / :6940-6945（DataGateway.delegatedTaskService）；注意 :6415-6439 现有 remote 只给了 curated/publishStatus，delegatedTaskService 的 remote thunk **要在 api main() 里补上**（指向 automation）"
+      },
+      {
+        "name": "interaction-store-reader（收件箱读 + 运行控制写 + 请求账本）",
+        "transportFile": "aidcp-transport/src/transport/interaction-store-reader-http.ts",
+        "direction": "client",
+        "evidence": "api 侧消费者已是端口形态：aidcp-api/src/interactions/interaction-internal-api.ts:145 / interaction-customer-api.ts:182 都收 InteractionStoreReaderPort；DataGateway 亦有 interactionReader 槽（aidcp-api/src/gateway/data-gateway.ts:51/62），remote thunk 同样要补"
+      },
+      {
+        "name": "curated-content（精选库窄读）",
+        "transportFile": "aidcp-transport/src/transport/curated-content-http.ts",
+        "direction": "client",
+        "evidence": "aidcp-cloud/src/server.ts:6434 CuratedContentHttpClient(new InternalHttpClient(gatewayBaseUrl))；api 模式强制 gatewayMode='http'（:6413）。注意面板那条 curatedContent 走的是**更宽**的 PanelCuratedContent，不在本端口内（:6712-6714）"
+      },
+      {
+        "name": "publish-status（发布队列状态读）",
+        "transportFile": "aidcp-transport/src/transport/publish-status-http.ts",
+        "direction": "client",
+        "evidence": "aidcp-cloud/src/server.ts:6435 PublishStatusHttpClient；本地分支在 api 模式回落 reject 具名错误 :6425"
+      }
+    ],
+    "newContractsNeeded": [
+      {
+        "name": "risk-command（风控写命令：提交 + 回读结局）",
+        "owner": "automation",
+        "surface": "RiskCommandPort：submitSignal / submitQuotaLevel / outcomeOf。契约三件套已在单体里写好（RiskCommandHttpClient + registerRiskCommandRoutes + ROUTES），**只是没进 aidcp-transport**，本仓 node_modules 里没有它。",
+        "failureSemantics": "提交失败**原样抛**——回一个 202 而命令从未落库正是红线形态；outcomeOf 的 unknown 与 processing MUST 分开渲染（查无此命令 vs 还没轮到）。对端根本没起时同样抛，绝不返回 processing。",
+        "evidence": "aidcp-cloud/src/transport/risk-command-http.ts（存在）vs aidcp-transport/src/transport/ 无此文件；消费点 aidcp-cloud/src/server.ts:6383-6390；契约文档 aidcp-cloud/src/kernel/risk-command-types.ts"
+      },
+      {
+        "name": "risk-command 的 recoverRestricted 提交口（端口缺一个方法）",
+        "owner": "automation",
+        "surface": "在 RiskCommandPort 上补一个「提交解除受限」；api 侧只回读到的观测态 + changed:false。",
+        "failureSemantics": "fail-closed：无合法 deploymentTarget 不落命令（现行 :7013 已是这个语义，MUST 保留）；提交失败原样抛。**绝不**在 api 侧伪造状态迁移——现行注释 :7009-7013 已把这条钉死。",
+        "evidence": "aidcp-cloud/src/server.ts:7006-7039；其中 :7021 `emitRiskCommand(ctx.automationPool, …)` 在 mode==='api' 分支里**直写 automation 库**——物理拆库后必炸，且 RiskCommandPort 里没有对应方法（src/kernel/risk-command-types.ts 只有三个方法）"
+      },
+      {
+        "name": "panel-automation-read（面板对 automation 域的只读投影）",
+        "owner": "automation",
+        "surface": "PanelAutomationReader 六方法：todayActionTotals / todayActionTotalsByAccount / todayLikeViewTotal / riskStateProjection / listAlerts / listInteractions。kernel 端口已存在（kernel/panel-automation-types.ts），缺的是 HTTP 三件套。",
+        "failureSemantics": "**原样抛**。面板首页的今日动作数 / 告警 / 互动读不到时必须显示错误，回 0 会让运营看到「今天一条都没干」而以为系统在闲着——那是另一种静默假成功。",
+        "evidence": "aidcp-cloud/src/server.ts:6396-6406（api 模式六个方法全是 reject 桩，注释明写「HTTP 客户端待 Block② 补」）；本地实现 src/risk/panel-automation-read.ts 属 automation"
+      },
+      {
+        "name": "四类限频配置的面板读写（quota / pacing / session / resume）",
+        "owner": "automation",
+        "surface": "四个面板外观真正要的窄面：读生效值视图 + 写（非法整块拒 + 写后回真态）。另加 sessionConfigStore.weekActiveMask()（同步，见 syncReads）。",
+        "failureSemantics": "写**原样抛**（面板显示「保存成功」而库里没变，是本仓头号红线）；读失败保留上一份好值 + warn，从未取到过才回代码默认——四个 store 本身「缺行/非法回落写死默认，绝不 brick」的语义只适用于**本进程能读到库**的情形，跨进程读不到不能复用它。",
+        "evidence": "aidcp-cloud/src/server.ts:1166-1191（四个 store 全绑 automationPool）；面板消费点 :6307 / :6309 / :6311 / :6315；docs/cloud-composition-root-trisection.md §0.0「P1-1 三个限频配置门面翻转有意延后」"
+      },
+      {
+        "name": "Facebook 群目标 / 分配台账 / 加群审计（面板运营面）",
+        "owner": "automation",
+        "surface": "importTargets / listTargets / listFacets / setEnabled / replaceTargetScopes / accountProgress / listAssignments / reclaimStaleAssignments（群目标+成员）+ scopedTargetCountForAccount + latestScheduledResult（加群自动化视图用）。",
+        "failureSemantics": "写（导入 / 启停 / 改 scope / 回收租约）**原样抛**；两个只读（scope 计数、最近一次排期结果）已经跑在 buildFacebookGroupJoinAutomationCatalogViewFailClosed 里，按 fail-closed 处理即可。",
+        "evidence": "aidcp-cloud/src/server.ts:1231-1257（三个 store 全绑 automationPool）；面板消费点 :6597-6607 / :6574-6575"
+      },
+      {
+        "name": "群路由解析（group_route）",
+        "owner": "automation",
+        "surface": "最窄形态只要两件事：按 accountId 解析团队群、以及面板的「全量映射 + 按团队键 upsert/清除」。",
+        "failureSemantics": "读失败**回落默认群链**（现行 resolveChatIdForAccount / resolveCardTarget 的既有语义就是这个，且带 config-gap 诊断日志）；写原样抛。**这条是 api 服务给 content 的 publish-card-exit 的传递依赖**——漏掉它，content 发出的每张审批卡都会静默落到默认群。另一条更省的路：把 group_route 归属改判给 api（其余卡片路由件 bot_chats / feishu/chat-target.ts 都已是 api），但那要走控制仓 §4.x 的 change，不能在实装途中顺手改。",
+        "evidence": "aidcp-cloud/src/server.ts:1720-1728（GroupRouteStore 绑 automationPool）/ :2054-2077（两个解析入口注入它）/ :2274（publishCardExit.resolveCardChatId）/ :6683（面板 notificationRoutes）；boundaries/table-ownership.json group_route=automation，判据是「写入方 src/cache/group-route-store.ts 属 automation（§4.7 目录规则）」"
+      },
+      {
+        "name": "收件箱的三条写侧端口（回复预览 / 回复工作流写 / 发送编排）",
+        "owner": "automation",
+        "surface": "ReplyPreviewBuilderPort.buildPreview；ReplyWorkflowWritePort.generate/approve/edit；InteractionSendPort（入队 / 下发 / 请求同步 / 重开授权 / 浏览器控制）。接口已由 Phase 4 在 api 侧定义好，缺的是 HTTP 三件套。",
+        "failureSemantics": "**原样抛**。回复「生成/批准/编辑」返回成功而对端没收到，等于客户以为消息发出去了。",
+        "evidence": "aidcp-api/src/interactions/interaction-automation-ports.ts（三个端口定义）；构造点 aidcp-cloud/src/server.ts:4260-4299（legacyInteractionInternalApi / scopeInteractionInternalApi / interactionCustomerApi 全都要它们）"
+      },
+      {
+        "name": "边缘在场与唤醒（edge presence）",
+        "owner": "automation",
+        "surface": "edgeCount() / onlineEdgeCount() / resolveEdgeIdForAccount(accountId) / resumeEdgesForAccount(accountId)。四个都是**同步**签名，见 syncReads——正解是「异步取源 + 本地镜像」，不是逐个包 HTTP。",
+        "failureSemantics": "镜像陈旧即拒（照 automation_account_projection 的 fresh_until 判例）：读不到 MUST 表现为「不知道」，绝不回 0/null 冒充「不在线」。D5 活体佐证（客户端不可逆写）判据就是 resolveEdgeIdForAccount==='ads-'+envKey，把「不知道」洗成「不在线」会让不可逆写被静默拒绝，反过来洗成在线则是越权放行。",
+        "evidence": "aidcp-api/src/panel/types.ts:174（edgeServer 非可选）/ panel-server.ts:749；aidcp-api/src/client-auth/client-auth-server.ts:126 / :141 / :493 / :1212；消费点 aidcp-cloud/src/server.ts:3761 / :4761 / :6468 / :6805 / :6983 / :7058 / :7070"
+      },
+      {
+        "name": "审批后下发触发 / 拒绝通知 / 预览重推（发布下发面）",
+        "owner": "automation",
+        "surface": "triggerPublishDispatchOnApprove(requestId)、notifyPublishRejected(requestId)、refreshPublishPreview(recordId)、preflightApprovePublish(requestId)、publishDispatcher.getInFlightRecordIds()。",
+        "failureSemantics": "下发触发失败**原样抛**——这是 content 那两条 cross_segment_drop 里后果最重的一条的 api 镜像（稿件记了「已批准」却永远发不出去）。预览重推是 best-effort、可吵闹放过。preflight 读不到边缘归属时按现行语义返 ok:true+仅 accountId（受理但等恢复），MUST NOT 改成拒绝。",
+        "evidence": "aidcp-cloud/src/server.ts:4714-4720 / :4722-4743 / :4745-4767 / :4776-4789；面板消费点 :6478 / :6488-6489 / :6521 / :6955 / :6973"
+      },
+      {
+        "name": "精选内容的面板宽面（PanelCuratedContent）",
+        "owner": "content",
+        "surface": "listForPanel / facets / delete / clear（比 transport 里那条窄 CuratedContentReader 宽），外加 curatedActions.createPostFromNote 要的 publishScheduler.tryBeginRewrite 触发。",
+        "failureSemantics": "读**原样抛**；删除 / 清空是写，**原样抛**。触发类回执沿用既有三态（triggered:false + 机器原因码），域内拒绝绝不染绿。",
+        "evidence": "aidcp-cloud/src/server.ts:6710-6714（注释明写「不经 dataGateway 收口，保留直连」）/ :6718-6795（curatedActions）；CuratedContentStore 绑 contentPool :1735-1748"
+      },
+      {
+        "name": "Facebook 发帖素材池（面板运营面）",
+        "owner": "content",
+        "surface": "listForAccount / uploadFiles / reorder / updateSet（删除走 updateSet status:'deleted'）+ releaseReservation（拒绝发布时释放）。",
+        "failureSemantics": "**原样抛**。上传回成功而图没进池，运营会以为素材已就位并照此排期。",
+        "evidence": "aidcp-cloud/src/server.ts:2079-2100（绑 contentPool）；面板消费点 :6581-6590；释放点 :4731-4739"
+      },
+      {
+        "name": "token 用量查询 + 账单价刷新",
+        "owner": "content",
+        "surface": "tokenUsage.usage(query) 与 billingPriceRefresh.refresh()。后者构造要 credentials（api）+ tokenUsage（content），拆开后属主侧持有两边中的哪一边要先定。",
+        "failureSemantics": "**原样抛**。成本面板回空会被读成「这段时间没花钱」。",
+        "evidence": "aidcp-cloud/src/server.ts:1467（TokenUsageStore 绑 content 专用小池 max:4）/ :6324-6328 / :6677-6678"
+      },
+      {
+        "name": "稿件调整台账（draftRefinements）",
+        "owner": "content",
+        "surface": "客户鉴权 API 的 draftRefinements 注入面。",
+        "failureSemantics": "**原样抛**。",
+        "evidence": "aidcp-cloud/src/server.ts:1668-1689（绑 contentPool）；消费点 :6980"
+      },
+      {
+        "name": "模型探活（probeModel）",
+        "owner": "content",
+        "surface": "probe(provider, model) → { ok } | { ok:false, reason:'provider_key_missing'|'model_unavailable' }。api 现在为这一件事就地 new 了整个 QwenClient。",
+        "failureSemantics": "两种原因**必须逐一可分**且绝不落库（现行 :6272-6280 / :6630-6633 的分类逻辑要原样保留）。另一条更省的路（§8.4 判例形态）：把 llm/providers.ts 里的静态端点表与两个 resolve* 提成纯函数进 kernel，api 自建一个最小 chat 客户端——但那要先定归属。",
+        "evidence": "aidcp-cloud/src/server.ts:1489-1519（QwenClient）/ :6267-6280 / :6626-6633；TEXT_PROVIDERS / resolveProviderBaseUrl / resolveProviderEnvKey 在 src/llm/providers.ts:41/47/56（content）；ProviderKeyMissingError / buildThinkingParams 在 src/llm/qwen.ts:79/336（content）"
+      },
+      {
+        "name": "人设生成（AccountPersonaService.generate）",
+        "owner": "content",
+        "surface": "PersonaGenerator 那一次生成调用。get/persist 是 api 自己的（personaPanel + personaStore），只有 generate 跨域。",
+        "failureSemantics": "**原样抛**——生成不出人设必须让操作员当场看见，绝不回一份默认/占位人设（memory 里「空人设静默停号」与 persona-bound 三态不变量都指着这条）。",
+        "evidence": "aidcp-cloud/src/server.ts:4037（personaGenerator）/ :4053-4061（AccountPersonaService）；PersonaGenerator 在 src/agents/persona-generator.ts（content）；面板/客户端消费点 :7061-7063"
+      },
+      {
+        "name": "面板实时事件通道（automation 事件 → api 的面板 WS）",
+        "owner": "automation",
+        "surface": "现在是 api 直连 automation 的 event_outbox 轮询 + LISTEN。拆库后要么改成 automation 主动推、要么给 outbox 开一条读 route。另需一个本进程扇出实现（EventBus 是 automation 属主模块，api 仓里没有；面板 WS 只要 kernel 的 EventFanoutPort.onAny，但回放器要 emitRaw）。",
+        "failureSemantics": "通道断只降级到「面板没有实时事件」，MUST 吵闹（现行 wireOutboxNotifyWakeups 的 warn 要保留），MUST NOT 让面板安静地显示成「系统很闲」。",
+        "evidence": "aidcp-cloud/src/server.ts:7103-7124（PanelEventReplay({pool: ctx.automationPool}) 就在 mode==='api' 分支里，是第二处直连 automation 库）；EventBus 构造 :1796，模块 src/event-bus/index.ts 属 automation；端口 aidcp-kernel/src/kernel/event-fanout-port.ts"
+      },
+      {
+        "name": "告警勾销 / 验证码协助（两条小面）",
+        "owner": "automation",
+        "surface": "AlertResolutionPort（kernel 已有接口）；PanelCaptchaAssist（api 侧已有 src/panel/captcha-assist-port.ts）。",
+        "failureSemantics": "告警勾销写**原样抛**。验证码协助沿用现行「isAvailable() 为假就不注入 ⇒ 路由自然 503」的语义即可，但 isAvailable 是同步的（见 syncReads）。",
+        "evidence": "aidcp-cloud/src/server.ts:3598-3600（PgAlertStore 绑 automationPool）/ :6798；:3914（CaptchaAssistService，src/comm/captcha-assist.ts 属 automation）/ :6608"
+      }
+    ],
+    "permanentlyAbsent": [
+      {
+        "name": "PgAnchorCache（ctx.cache）",
+        "whyNoContract": "唯一消费者是 automation 的消息处理器（DefaultMessageHandler），面板段一个字都不读——segD 的 ctx 解构里没有它。",
+        "consequence": "无。api 进程从不处理边缘协议消息，锚点缓存对它没有任何用途。",
+        "evidence": "aidcp-cloud/src/server.ts:1521-1529 构造 / :2205 赋值；:6210 segD 解构里无 cache；消费点 :4106（segC 的 handler）"
+      },
+      {
+        "name": "SimplePlanner（ctx.planner）",
+        "whyNoContract": "v1 兼容路径的规划器，只喂 segC 的消息处理器。",
+        "consequence": "无。",
+        "evidence": "aidcp-cloud/src/server.ts:1520 / :2229 / :4104"
+      },
+      {
+        "name": "ConceptStore",
+        "whyNoContract": "概念池只喂 automation 的搜索角色；面板不读。",
+        "consequence": "无。",
+        "evidence": "aidcp-cloud/src/server.ts:1760-1775 / :2288；segD 无消费点"
+      },
+      {
+        "name": "ossUploader（ObjectStore）+ createCuratedReferenceImageRelocator",
+        "whyNoContract": "只被 CuratedContentStore 与 FacebookPublishMediaStore 用，两者都归 content 且都要走端口离开本进程。注意它是**动态 import**，靠匹配 from 说明符的依赖审计会漏掉这条边。",
+        "consequence": "无。api 不落任何图片对象。",
+        "evidence": "aidcp-cloud/src/server.ts:1352-1379（:1365 是 `await import('./storage/oss-client-factory.js')`）/ :1744 / :2093"
+      },
+      {
+        "name": "dashscopeApiKey / providerRuntime / anyImageKeyPresent",
+        "whyNoContract": "三者只服务内容段的生成管线与本进程的 QwenClient。若模型探活改走端口，providerRuntime 也一并没有消费者。",
+        "consequence": "无（前提是探活走端口）。若探活留在本地，则 providerRuntime 要跟着留。",
+        "evidence": "aidcp-cloud/src/server.ts:1345-1347 / :1384-1392 / :1782 / :2213 / :2231 / :2286；segB 解构 :2322-2324"
+      },
+      {
+        "name": "FacebookCommentAuditStore",
+        "whyNoContract": "segA 建、segC 用；segD 的 ctx 解构里没有它。",
+        "consequence": "无。",
+        "evidence": "aidcp-cloud/src/server.ts:1217-1224 / :2216；:6210 解构无此项"
+      },
+      {
+        "name": "PgAccountProjectionStore（automation 的账号守卫投影）",
+        "whyNoContract": "它的唯一消费者是 FacebookGroupTargetStore 的 refreshAccountProjection thunk，而那个存储本身要整体走端口离开 api 进程。api 模式下花名册来源本就已是 reject 桩。",
+        "consequence": "无。但**别顺手把 :1234 那行 thunk 一起搬过来**——它捕获的是一个 api 进程里永远为 undefined 的前向声明。",
+        "evidence": "aidcp-cloud/src/server.ts:1228 前向声明 / :1234 thunk / :1824-1837 api 模式 reject 桩 / :1839-1854 构造"
+      },
+      {
+        "name": "ConfigMirrorBumpRelay + OutboxMirrorVersionBumper",
+        "whyNoContract": "api 是失效信号的**落地端**（sink），不是生产方。中继与事务型入队器跑在 automation 那一侧、绑 automationPool。",
+        "consequence": "无。api 起的是 config-mirror-bump 的 route（server 侧），方向正好相反；建了反而会在 api 进程里开一条永远没人入队的 outbox 消费循环。",
+        "evidence": "aidcp-cloud/src/server.ts:1115-1139 / :1342；sink 的本地分支 :1110；route :889"
+      },
+      {
+        "name": "FirstPostOnboardingCoordinator",
+        "whyNoContract": "编排件属 content（src/onboarding/first-post-onboarding-coordinator.ts），api 仓里没有这个文件；它在 segA 里唯一的接线点是 CuratedContentStore.onSourceAdmitted，而精选库要离开 api 进程。",
+        "consequence": "首作自动链的**驱动**不在 api（api 只保留 first_post_onboarding 这张属主表与它的存储）。api 侧的 armFirstBind 入口本就带「精选入口与参照创作调度器都就绪才承诺」的守卫，缺了会诚实返回 false。",
+        "evidence": "aidcp-cloud/src/server.ts:1694 前向声明 / :1745 被精选库捕获 / :2142-2159 构造；:4042-4052 armFirstBind 守卫；tsc 报 './onboarding/first-post-onboarding-coordinator.js' 缺失"
+      },
+      {
+        "name": "getSoul / resolvePersona 的取值口 / manualCommentAccounts",
+        "whyNoContract": "三者只喂 automation 的角色与浏览闭环。面板走的是 personaPanel + personaStore，不经 getSoul。",
+        "consequence": "无。",
+        "evidence": "aidcp-cloud/src/server.ts:1793 / :2168-2175 / :2295 / :2297 / :2315；:6210 解构里无这三项"
+      },
+      {
+        "name": "边-云 WebSocket 服务端（8787）与飞书入站接收",
+        "whyNoContract": "ws-server.ts 属 automation；飞书入站 handler / ws-receiver 亦在 segC。api 只做飞书**出站**（FeishuMessenger + 卡片构造）。",
+        "consequence": "api 进程不监听 8787。但 AIDCP_PORT 的值仍要读出来当作面板 / 客户鉴权自检的 forbiddenPorts 之一——那是「别绑到这个端口上」的声明，不是「我要监听它」。",
+        "evidence": "aidcp-cloud/src/server.ts:1047 port 读取 / :6815 与 :7081 forbiddenPorts；src/comm/ws-server.ts 属 automation"
+      }
+    ],
+    "syncReads": [
+      {
+        "name": "sessionConfigStore.weekActiveMask()（全局活跃周掩码）",
+        "callSites": "注入 ContentScheduleStore 的 globalActiveWeekMask，签名 `() => string | null`，被 listCatalog() / effectiveScheduleFor() 同步调用；这两条又分别喂面板 contentSchedule 与客户端 environmentSchedule。包不成 HTTP：改异步要改掉 ContentScheduleStore 的内部读路径。正解＝本地镜像 + 刷新器（照 config_mirror_version 版本号 + 有界轮询比对那条判例）。",
+        "evidence": "aidcp-cloud/src/server.ts:1204 注入；aidcp-api/src/config/content-schedule-store.ts:310 / :418 / :434 / :559；实现 aidcp-cloud/src/config/session-config-store.ts:263（automation 属主）"
+      },
+      {
+        "name": "ScheduledAutomationCatalogReader（排期自动化目录）三方法",
+        "callSites": "ContentScheduleStore 的 **必填** 构造参数，三个方法 normalizeForCatalog / availableActions / declarationsFor 全同步，被 :708 与 :903 就地调。底下是一张**编译期静态表**（平台能力声明），不碰库、不发网络——所以正解不是 HTTP 也不是投影表，而是把这张表提进共享层（kernel 已有该端口的类型定义）。",
+        "evidence": "aidcp-api/src/config/content-schedule-store.ts:298（必填）/ :428 / :708 / :903；唯一实装 aidcp-cloud/src/platform/registry.ts:430（automation）；端口 aidcp-cloud/src/kernel/platform-types.ts:198-205；注入点 aidcp-cloud/src/server.ts:1195"
+      },
+      {
+        "name": "边缘在场四读 edgeCount / onlineEdgeCount / resolveEdgeIdForAccount / resumeEdgesForAccount",
+        "callSites": "panel-server 渲染首页时同步取 edgesOnline；client-auth 的 D5 活体佐证同步取 resolveEdgeIdForAccount；environmentRisk.resumeEdgesForAccount 与 commandFace.account.resumeEdgesForAccount 同步返 number；preflightApprovePublish 与两个 onOffboardCreated 也同步取 edgeId。全部是 `(): number` / `(accountId): string|null` 形状——包 HTTP 要改掉每个调用点签名。正解＝本地镜像 + 陈旧即拒。",
+        "evidence": "aidcp-api/src/panel/types.ts:174；aidcp-api/src/panel/panel-server.ts:749；aidcp-api/src/client-auth/client-auth-server.ts:126 / :141 / :493 / :1212；aidcp-cloud/src/server.ts:3761 / :4761 / :6468 / :6805 / :6983 / :7058 / :7070"
+      },
+      {
+        "name": "publishDispatcher.getInFlightRecordIds(): number[]",
+        "callSites": "客户端发布队列的 buildPublishLifecycle 同步传入，用来标「在途」。面板 deps 里声明为可选，缺了 lifecycle 就少一层在途标记（不是错误，但会让「已批准·下发中」看起来像「已批准·没动静」）。同步 ⇒ 镜像或降级，不包 HTTP。",
+        "evidence": "aidcp-api/src/panel/types.ts:180；aidcp-cloud/src/server.ts:6955；实现 src/publish-agent/publish-dispatcher.ts（automation）"
+      },
+      {
+        "name": "captchaAssist.isAvailable()",
+        "callSites": "面板 deps 装配时同步判一次，决定注不注入 captchaAssist。同步布尔 ⇒ 用「装配期取一次异步可用性、之后本地持有」即可，别改成每次请求同步问。",
+        "evidence": "aidcp-cloud/src/server.ts:6608；实现 src/comm/captcha-assist.ts:152（automation）"
+      },
+      {
+        "name": "configMirrorRefresher.health()",
+        "callSites": "面板 configMirrorHealth 是一个同步返回投影的 thunk（:6664）。模块本身属 api（src/config/mirror-refresher.ts），但实例在 segC 建、注册的是 automation 侧的镜像集合。要么 api 自建一个只注册本域镜像的刷新器（本地建），要么把 automation 那份的健康投影做成镜像 —— 两条路差别很大，先定它到底该报谁的健康。",
+        "evidence": "aidcp-cloud/src/server.ts:3640 构造（segC）/ :6092 赋值 / :6664 同步调用；模块归属 boundaries/module-ownership.json src/config/mirror-refresher.ts=api"
+      }
+    ],
+    "risks": [
+      "**本仓的 src/server.ts 是过期副本，不能拿它当底稿改。** 6649 行 vs 单体 7131 行，落后到 Phase 2/4/5 之前：没有 risk-command-http / publish-card-exit / review-card-delivery / image-model-selection 这十条契约的接线，也没有 crossSegment / requireSegment 两道闸。实测：把 aidcp-cloud/src/server.ts 原样放进本仓再编译，src/server.ts 的错误从 385 涨到 442、TS2307 从 107 涨到 141——**过期副本会让你少看见 34 条真实缺口**。真理源只有 aidcp-cloud/src/server.ts（sync-split-repos 对组装根只报 ⊘ 不改，所以它永远不会自己追上）。",
+      "**api 进程里还有两处直连 automation 库的残留，且都恰好只在 mode==='api' 分支里跑**：`emitRiskCommand(ctx.automationPool, …)`（server.ts:7021，客户端「解除受限」）与 `PanelEventReplay({ pool: ctx.automationPool })`（server.ts:7103-7106，面板事件回放）。物理拆库后必炸，而 AC-OWN-06（无跨属主表读）**无豁免通道**。写 main() 时这两处不能照抄。",
+      "**面板 deps 里十个字段是非可选的**（publishLogStore / botChatStore / eventBus / edgeServer / panelStore / publishStatus / writeApprovalSignal / commandActions / riskCommands / riskRead，aidcp-api/src/panel/types.ts:170-250）。批次 0e 明说「改成 deps 侧可选 + 逐路由 503 属批次 3」——所以本批要动 panel/types.ts。**改完类型只是一半**：panel-server.ts 里每个用点都要补守卫，否则从「启动就抛」退化成「启动成功后逐条路由炸 TypeError」，那更难查。",
+      "**schema 契约门的 migrations 基准路径必须显式传。** 共享包装进 node_modules 之后，它内部那个「往上两级找 migrations/」的默认基准会指向包自己（包里没有 migrations/），撞上空目录守卫抛错。照 content 的 main() 传两个绝对路径：`<仓根>/migrations` 与 `<仓根>/boundaries/table-ownership.json`。本仓两者都在（migrations 53 个、boundaries/ 11 个文件全份）。",
+      "**建池集合与契约门判定范围是同一件事，改一处必须改另一处。** pgOwnersForProcess() 收窄成 ['api'] 之后，assertOwnerPoolsMatchProcessOwners（server.ts:1081）会在启动期把两侧钉死；漏改的那一侧会当场 owner_pool_scope_mismatch 拒绝启动（这是设计，不是 bug）。",
+      "**EventBus 本身是 automation 属主模块，本仓没有。** 面板 WS 只要 kernel 的 EventFanoutPort.onAny（aidcp-api/src/panel/panel-ws.ts:14/25/142），但面板事件回放要 emitRaw。api 进程需要一个本地扇出实现或把最小扇出提进共享层——**不能直接搬 automation 的总线**，那会把编排侧的 emit 写能力一起搬进 BFF。",
+      "**两处前向引用，抄的时候最容易连累。** ① accountProjectionStore：:1228 先 let 声明、:1839 才赋值，而 :1234 的 thunk 在声明之前就被 FacebookGroupTargetStore 捕获了；② firstPostCoordinator：:1694 声明、:2142 赋值，:1745 被 CuratedContentStore 捕获。api 两条链都不建，但 thunk 那一行长得像普通参数，很容易被顺手带过去，带过去就是一个永远为 undefined 的捕获。",
+      "**依赖审计要把动态 import 算进去。** ossUploader 走的是 `await import('./storage/oss-client-factory.js')`（server.ts:1365），只匹配 from 说明符的扫描看不见它。同类漏检在耦合清单上已经中过一次（103 vs 实测 104）。",
+      "**风控单写不变量在进程边界上必须物理成立。** api 侧任何「解除受限 / 施加信号 / 改配额档」都只能是「提交命令 + 回读结局」，绝不能回一个推断出来的 state——server.ts:7009-7013 的注释已经把这条写死了，改写它就是造红线里那种绿色的假成功。同理 risk-command 的 outcomeOf 四态里 unknown 与 processing MUST 分开渲染。",
+      "**publish-card-exit 是 api 服务给 content 的，它的传递依赖漏一条就静默走偏。** 六个方法里 resolveCardChatId 落在 groupRouteStore（automation）上；漏掉这条，content 发出的每张审批卡都会「成功」地落进默认群，没有异常、没有日志差异。这正是批次 2 教训里「只看构造实参会漏、必须看闭包里读了谁」的同一形态。",
+      "**DataGateway 在 api 模式要四条 remote thunk，现在只写了两条。** :6431-6438 只给了 curatedContentReader / publishStatusReader（指 content），delegatedTaskService 与 interactionReader 还留在 local——而 api 进程里这两个 local 实例根本不会被构造。两者的 base URL 不同（automation 8093 vs content 8092），thunk 是逐端口的，各自 new 一个 InternalHttpClient 即可。",
+      "**api 不监听 8787，但仍要读 AIDCP_PORT。** :1047 读出来的 port 在 :6815 / :7081 只用作面板与客户鉴权自检的 forbiddenPorts——那是「别绑到这个端口上」的声明。把它当成「要监听」会在同机与 automation 撞端口；把它删掉则会让自检失去一道保护。",
+      "**本批能自证的边界只到「启动序列走到第一个缺席依赖处如实停下」。** 「三个进程真的能互相说上话」是批次 5 的事——本机没有 api 库、也不该起 cloud。别在部署 + soak 之前声称跨进程往返已被验证。"
+    ]
+  },
+  "automation": {
+    "repo": "aidcp-automation",
+    "errorCount": 361,
+    "localBuild": [
+      {
+        "name": "属主池 + schema 契约门（owners:['automation']）",
+        "what": "`new pg.Pool({...resolveOwnerPgConfig('automation'), max:30})` 一个池；契约门 MUST 跑在任何 init() 之前、MUST NOT 包 try/catch。本仓 `src/schema/` 与 `boundaries/table-ownership.json` + `migrations/`（43 个）都在，**按本地相对路径 import，不需要 aidcp-transport 依赖**（content 必须走包是因为 schema/transport 目录判给 automation、content 的 src 里没有）",
+        "evidence": "aidcp-cloud/src/server.ts:1060, 1076；aidcp-automation/src/schema/schema-gate.ts、boundaries/table-ownership.json、migrations/"
+      },
+      {
+        "name": "EventBus + PgAnchorCache + 四个 automation 缓存/账本存储",
+        "what": "EventBus 无参；PgAnchorCache 绑 automationPool；LikedNoteStore / ValuableCommentStore / InteractionFeedStore / GroupRouteStore 各 init 失败留 undefined 并降级",
+        "evidence": "aidcp-cloud/src/server.ts:1796（EventBus）, 1521（PgAnchorCache）, 2694 / 2712 / 2729（三个 store）, 1722（GroupRouteStore）"
+      },
+      {
+        "name": "风控全家（单写者，红线）",
+        "what": "PgRiskStore（automationPool + ownershipMode + ownershipReader）→ RiskControllerRegistry（quotaConfigStore 作 QuotaProvider、nurtureProvider、mirrorStale、interactionBlockedProvider）→ RiskAccounting → PgRiskCommandService → InteractionGuardRegistry / ActionCooldownGate / PacingSaturationAlerter。**applySignal / setQuotaLevel / recoverRestricted 三个方法只许出现在 startRiskCommandConsumer 的 apply 回调里那一处**",
+        "evidence": "aidcp-cloud/src/server.ts:2939, 2986, 3049, 3054-3095（apply 回调 3058-3074）, 5040, 5052"
+      },
+      {
+        "name": "四个 automation 属主配置 store + 失效信号出队侧",
+        "what": "QuotaConfigStore / PacingConfigStore / SessionConfigStore / ResumeConfigStore 全绑 automationPool、bumper 用 `OutboxMirrorVersionBumper`（非 mirrorVersionStore）；配 ConfigMirrorBumpRelay（automationPool + sink）。target 非法则整条通道不启动并吵闹 warn",
+        "evidence": "aidcp-cloud/src/server.ts:1166, 1172, 1177, 1188, 1115-1139；aidcp-automation/src/config/mirror-bump-outbox.ts:81, 150"
+      },
+      {
+        "name": "Facebook 评论/加群四存储 + FacebookGroupJoinScheduler",
+        "what": "FacebookCommentAuditStore / FacebookGroupTargetStore（refreshAccountProjection 回调指向本地投影）/ FacebookGroupMembershipStore / FacebookGroupJoinAuditStore，全 automationPool",
+        "evidence": "aidcp-cloud/src/server.ts:1217, 1231, 1242, 1250, 5555"
+      },
+      {
+        "name": "委托任务控制面（store + service + worker）",
+        "what": "PgDelegatedTaskStore（automationPool, executionTarget）+ DelegatedTaskService（listAccounts / prepareTarget / validateTarget 三个回调**里面读的是 api 的账号存储与发布台账、content 的精选库** —— 见 syncReads/newContracts）+ DelegatedTaskWorker",
+        "evidence": "aidcp-cloud/src/server.ts:1939, 1950, 5900-6015"
+      },
+      {
+        "name": "边-云 WebSocket 服务端（8787）",
+        "what": "DefaultMessageHandler + EdgeCloudServer + CommandBridge + protocol；canPushToEdge 三态闸、onClose / onEdgeRegistered 钩子。这是本进程的对外主口",
+        "evidence": "aidcp-cloud/src/server.ts:4102, 4145；aidcp-automation/src/comm/ws-server.ts"
+      },
+      {
+        "name": "边缘运行时控制层",
+        "what": "CaptchaCoordinator / CaptchaAssistService / EdgeTaskLeaseClient / CommandSequencer / browser-standby / preemption / UiSnapshotService",
+        "evidence": "aidcp-cloud/src/server.ts:3914, 3946, 3975, 4569（UiSnapshotService）"
+      },
+      {
+        "name": "ConnectionRuntimeRegistry + RoleDispatcher（37 角色）+ previewDispatcher",
+        "what": "buildDispatcher 工厂 + runtimes 注册表。**dispatcher 的 roleFactories 里那 4 个 content 角色本进程构不出**（见 newContractsNeeded / permanentlyAbsent）",
+        "evidence": "aidcp-cloud/src/server.ts:5107（buildDispatcher）, 5311（ctx.runtimes）, 5375（previewDispatcher）, 109-124（CONTENT_ROLE_FACTORIES）"
+      },
+      {
+        "name": "互动域（automation 那一半）",
+        "what": "InteractionStore（automationPool + apiPurge + authGate + accountPlatform）/ InteractionInboxService / InteractionSendOrchestrator / ReplyWorkflow / InteractionMetrics / InteractionOffboardingService / interactionRuntimeControls",
+        "evidence": "aidcp-cloud/src/server.ts:3231, 3274, 3301, 3309, 4228, 4239, 4090"
+      },
+      {
+        "name": "CommentScheduler + 评论任务链",
+        "what": "comment-agent 全套（含 gated-auto-comment / facebook-edge-steps）",
+        "evidence": "aidcp-cloud/src/server.ts:5410"
+      },
+      {
+        "name": "PublishDispatcher + ScheduledPublishReconciler + PublishApproved Inbox 泵",
+        "what": "下发段留 automation（属主是 automation）。但它俩的 `store:` 实参是 api 的发布台账、`readApproval` 是 api 的授权存储 —— 见 newContractsNeeded",
+        "evidence": "aidcp-cloud/src/server.ts:4612, 4700, 4871-4898"
+      },
+      {
+        "name": "outbox 全套 + 账号守卫投影",
+        "what": "event-outbox / risk-command-outbox consumer / eventbus-outbox-bridge / outbox-notify-listener / outbox-health / OutboxRetentionPruner / 互动审计中继；PgAccountProjectionStore（automationPool，source=花名册端口）",
+        "evidence": "aidcp-cloud/src/server.ts:3054, 3078, 3088, 3107, 3340-3366, 1839；aidcp-automation/src/transport/account-projection-store.ts:97"
+      },
+      {
+        "name": "api 侧要调的三个 automation 属主端口的实现（本进程建 + 注册路由）",
+        "what": "PgClientEnvAutomationRead / PgOffboardCleanupGrantOps / PgOffboardMaterializationOps —— 三个文件属主都是 automation、都在本仓 src 里，绑 automationPool 自开事务",
+        "evidence": "aidcp-cloud/src/server.ts:1268-1298；aidcp-automation/src/interactions/client-env-automation-read.ts、offboard-cleanup-grant-ops.ts、offboard-write-adapter.ts"
+      },
+      {
+        "name": "planner / alerts / hot-lead / platform",
+        "what": "SimplePlanner（吃 llm）、PgAlertStore（automationPool，同时是 riskAlertSink 与 config_mirror_stale 告警落点）、hot-lead-detector、platform registry",
+        "evidence": "aidcp-cloud/src/server.ts:1520, 3590-3630, 3408"
+      },
+      {
+        "name": "startAutomationReadApi：InternalHttpServer + 三组路由",
+        "what": "registerRiskReadRoutes（registry 缺则不注册）+ registerTriggeredPublishRefsRoutes + registerRiskCommandRoutes（target 非法则不注册）。默认端口 AIDCP_AUTOMATION_PORT / 8091",
+        "evidence": "aidcp-cloud/src/server.ts:935-960"
+      }
+    ],
+    "existingPorts": [
+      {
+        "name": "配置镜像失效信号（automation → api）",
+        "transportFile": "aidcp-automation/src/transport/config-mirror-bump-http.ts（ConfigMirrorBumpHttpClient）",
+        "direction": "client",
+        "evidence": "aidcp-cloud/src/server.ts:1097-1110 已按 `serviceModeFromEnv()==='automation'` 分叉接好；未配 AIDCP_API_URL 时注入 UnavailableConfigMirrorBumpSink 一律抛错，outbox 原地堆积不静默丢"
+      },
+      {
+        "name": "风控只读投影（api → automation）",
+        "transportFile": "aidcp-automation/src/transport/risk-read-http.ts（registerRiskReadRoutes）",
+        "direction": "server",
+        "evidence": "aidcp-cloud/src/server.ts:941-948"
+      },
+      {
+        "name": "风控写命令（api → automation，提交+回读，不碰 RiskController）",
+        "transportFile": "aidcp-automation/src/transport/risk-command-http.ts（registerRiskCommandRoutes）",
+        "direction": "server",
+        "evidence": "aidcp-cloud/src/server.ts:953-955。⚠️ 该文件**不在 scripts/sync-split-repos 的 TRANSPORT_MEMBERS 里**，api 侧拿不到 RiskCommandHttpClient（见 risks）"
+      },
+      {
+        "name": "参照稿触发去重（content → automation）",
+        "transportFile": "aidcp-automation/src/transport/triggered-publish-refs-http.ts",
+        "direction": "server",
+        "evidence": "aidcp-cloud/src/server.ts:951；content 侧客户端已接线（aidcp-content/src/server.ts:301）"
+      },
+      {
+        "name": "委托任务服务（api → automation）",
+        "transportFile": "aidcp-automation/src/transport/delegated-task-http.ts（registerDelegatedTaskRoutes / DelegatedTaskServicePort）",
+        "direction": "server",
+        "evidence": "文件头自述「server 侧跑在托管该服务的进程里」；DelegatedTaskService 构造在 aidcp-cloud/src/server.ts:1950。这条覆盖飞书 /delegate 的全部控制动作（createFromText/get/pause/resume/cancel）"
+      },
+      {
+        "name": "收件箱读侧（api 面板 → automation）",
+        "transportFile": "aidcp-automation/src/transport/interaction-store-reader-http.ts",
+        "direction": "server",
+        "evidence": "ctx.interactionStore 在 aidcp-cloud/src/server.ts:3399 挂出供 segD 组网关；本进程注册这条 route 即可"
+      },
+      {
+        "name": "发布生成触发（automation → content，同步 kick + 分段 long-poll）",
+        "transportFile": "aidcp-automation/src/transport/publish-generation-http.ts（PublishGenerationHttpClient）",
+        "direction": "client",
+        "evidence": "aidcp-cloud/src/server.ts:5588-5595。⚠️ 单次调用超时必须取 INTERNAL_HTTP_TIMEOUT_CEILING_MS(180s)，默认 15s 会让每段 poll 确定性失败"
+      },
+      {
+        "name": "精选内容只读（automation → content）",
+        "transportFile": "aidcp-automation/src/transport/curated-content-http.ts（CuratedContentHttpClient）",
+        "direction": "client",
+        "evidence": "只覆盖 listForClient / getOneForAccount 两个读（src/transport/curated-content-http.ts:20-49）。委托任务 prepareTarget/validateTarget 用的 getOneForAccount 已覆盖；`markBotAction` 是写、**不在路由表里**，见 newContractsNeeded"
+      },
+      {
+        "name": "账号平台窄读（automation → api）",
+        "transportFile": "aidcp-automation/src/transport/account-platform-http.ts（AccountPlatformHttpClient）",
+        "direction": "client",
+        "evidence": "合同已存在（server 在 api、见 aidcp-cloud/src/server.ts:915）。可直接喂 InteractionStore 的 accountPlatform 实参（server.ts:3281）与 `accountStore.getPlatformOrNull` 那类点位；`getPlatform`（有兜底默认）也可由它加一层包"
+      }
+    ],
+    "newContractsNeeded": [
+      {
+        "name": "账号花名册取源（AccountRosterSourcePort.listAccountIdentities）",
+        "owner": "api",
+        "surface": "`listAccountIdentities(): Promise<readonly AccountIdentityProjectionRow[]>` —— kernel 端口已存在（aidcp-kernel/kernel/account-projection-types.js:41），只缺 HTTP 三件套",
+        "failureSemantics": "**原样抛**。读不到就是「这次没读到」：投影刷新算失败、fresh_until 不推进、加群/委托认领守卫到期即拒。MUST NOT 返空数组冒充「一个账号都没有」——单体里那行注释已经写死了这条",
+        "evidence": "aidcp-cloud/src/server.ts:1824-1837（注释明写「拆进程后 automation 侧要改走内部 HTTP 取花名册，客户端留到 Block② 补」）+ 1839 PgAccountProjectionStore 的 source 实参"
+      },
+      {
+        "name": "发布台账读写（自动化用的那 10 个方法，与 content 那 4 个不是同一条口）",
+        "owner": "api",
+        "surface": "loadForDispatch / editDraft / rejectPendingApproval / pendingApprovalForAccount / pendingPublishPreviewForAccount / lastPublishedForAccount / countPendingForAccount / countPendingAutonomousForAccount / countPublishedTodayForAccount / countPublishedSinceForAccount。全 async",
+        "failureSemantics": "**一律原样抛**，与 content 侧 publish-log-http 同向。下发段读不到草稿时若吞成 null，PublishDispatcher 会把它当「草稿不存在」→ 作废授权、退回待审，等于用一次网络抖动烧掉一次人工批准",
+        "evidence": "aidcp-cloud/src/server.ts:4613, 4822, 4920, 5900；现有 aidcp-automation/src/transport/publish-log-http.ts:18-22 只有 insert/updateStatus/recordMetadata/markImagesAttached 四条"
+      },
+      {
+        "name": "发布授权台账（PublishApprovalStore 的下发段面）",
+        "owner": "api",
+        "surface": "claimApprovedCommands / markDispatching / markConsumed / releaseToPending / setBlockedReason / readActive / listStalePendingDispatch。全 async",
+        "failureSemantics": "**原样抛**。claimApprovedCommands 失败＝本轮不消费（已有 warn+跳过的既定语义，照搬）；markConsumed / markDispatching 失败绝不能吞——吞掉会让同一条授权被反复认领重发",
+        "evidence": "aidcp-cloud/src/server.ts:4624-4641, 4875, 4910-4911"
+      },
+      {
+        "name": "授权读/作废客户端（publishApprovalClient）",
+        "owner": "api",
+        "surface": "readApproval / voidApproval / listPendingDispatch(target, _, 'publish')",
+        "failureSemantics": "**原样抛**。readApproval 读不到 MUST NOT 退化成 approved=false —— 那是「以为没批准」的静默假成功，稿子会被当未授权退回；PublishDispatcher 上游已有 fail-closed 分支，需要能区分「查过没有」与「没查成」",
+        "evidence": "aidcp-cloud/src/server.ts:1613, 4002-4020, 4620-4653"
+      },
+      {
+        "name": "授权写决定（writeApprovalDecision）",
+        "owner": "api",
+        "surface": "`(requestId, approved, payload, {decidedBy, decidedVia}) => Promise<{written, alreadyDecided?}>`。现有 publish-card-exit 端口里的 `writeApprovalSignal` 是它的窄化版（decidedVia 写死 schedule_auto_approve），automation 需要带完整 context 的那一版",
+        "failureSemantics": "**原样抛**。单体里未接线就抛 `approval_outlet_unavailable`，跨进程照旧；吞掉＝稿子既不候审也不下发",
+        "evidence": "aidcp-cloud/src/server.ts:1655-1666, 6028-6029, 4837-4841"
+      },
+      {
+        "name": "互动写入闸（InteractionAuthGate）",
+        "owner": "api",
+        "surface": "authorizeAuthStateWrite / checkAccountScope，两个都是 async；kernel 类型已在 aidcp-kernel/kernel/interaction-auth-gate-types.js",
+        "failureSemantics": "**fail-closed（原样抛，调用方按拒绝处理）**。这道闸判定与环境级行锁跑在 api 本地事务里、发一张带有效期的条件写回执；问不到 / 被拒 / 回执过期一律不落登录态",
+        "evidence": "aidcp-cloud/src/server.ts:3257-3263（PgInteractionAuthGate 绑 apiPool，本进程不该持有那个池）"
+      },
+      {
+        "name": "互动配置面审计落地（InteractionApiWrites.insertAuditEvent）",
+        "owner": "api",
+        "surface": "`insertAuditEvent(record)` 一个方法。今天签名是 `(apiPool, record)` —— 跨进程版必须把池参数去掉",
+        "failureSemantics": "**原样抛**。这是 outbox 中继的 handler，抛错就让游标停在该条之前、每轮如实报一次可见堵塞。MUST NOT 静默跳过（单体注释已明写此纪律）",
+        "evidence": "aidcp-cloud/src/server.ts:3340-3352（handler 体第 3349 行直接把 apiPool 递进去）"
+      },
+      {
+        "name": "回复策略解析（ReplyConfigResolver 的三个读）",
+        "owner": "api",
+        "surface": "resolve(accountId) / getPublished(accountId) / getSnapshotForJob(accountId, scopeId, version)。**全部 async**（src/interactions/reply-config-resolver.ts:47/51/55），所以可以直接包 HTTP，不需要镜像",
+        "failureSemantics": "**原样抛**。解析不出策略时回复工作流本就 fail-closed（不发）；吞成 null 会让「配置没读到」看起来像「这个账号没配自动回复」",
+        "evidence": "aidcp-cloud/src/server.ts:3289-3294（两个 store 绑 apiPool）, 3301-3324（ReplyWorkflow / InteractionInboxService 的 configs 实参）"
+      },
+      {
+        "name": "账号人设服务（AccountPersonaPort）",
+        "owner": "api",
+        "surface": "generate / persist 两个 async 方法 —— **kernel 端口已存在**（aidcp-kernel/kernel/persona-ports.js 的 AccountPersonaPort），只缺 HTTP 三件套",
+        "failureSemantics": "**原样抛**。它的消费者是边-云 handler 的 persona.generate/persist 命令（本进程真消费者），失败必须让客户端看到具名失败，绝不回「已保存」",
+        "evidence": "aidcp-cloud/src/server.ts:4053-4061（AccountPersonaService）→ 4120（handler 的 personaService 实参）"
+      },
+      {
+        "name": "稿件编辑/删图/客户端审批三个处理器（api 属主实现，被本进程的边缘 WS 调用）",
+        "owner": "api",
+        "surface": "handlePublishDraftImageRemove(payload, session) 与 handlePublishApprovalAction(payload, session)。协议 72→74 那两条客户端内审批消息由 handler 直接路由到它们",
+        "failureSemantics": "**原样抛**（协议层已按信封 id 应答，失败即回具名 result）。MUST NOT 在跨进程外面包 catch 抹平成「已处理」",
+        "evidence": "aidcp-cloud/src/server.ts:4122-4123（handler 实参）, 4821, 4830, 4860-4864"
+      },
+      {
+        "name": "环境花名册握手回写（EnvironmentRegistryPort）+ 人设自动补齐通知",
+        "owner": "api",
+        "surface": "registerHandshakeEnvironment(observation) 一个 async 方法；紧随其后的 personaAutoFill.notifyEnvironmentBound(envKey) 是 fire-and-forget 通知",
+        "failureSemantics": "**吵闹放过**。单体里就是 `.catch(warn)`（握手已回 welcome，结构上不能因登记失败拒掉一次握手）。但 MUST NOT 静默——登记不上表现为「环境删了还在 / 环境一直不出现在待分配池」",
+        "evidence": "aidcp-cloud/src/server.ts:2971-2974（端口声明）, 4210-4223（唯一调用点）"
+      },
+      {
+        "name": "卡片/通知出口（automation 版，publish-card-exit 的超集）",
+        "owner": "api",
+        "surface": "sendText(chatId, text) / sendCard(chatId, CardData) / sendApprovalCard / sendAlertCard + resolveCardChatId + resolveAccountChatId + botChatStore.setDefault。结构化载荷 kernel 已有（feishu-card-contract / comment-approval-notice / mandatory-comment-notice / delegated-task-types），automation 只交数据、api 侧构卡",
+        "failureSemantics": "**分两档，别抄成一档**：评论人审卡 / 稿件审批卡 = **原样抛**（发不出去等于没人审，调用方要如实记账）；下发段运维通知 / 巡视摘要 / 结果卡 = **吵闹放过**（单体里就是 `.catch(()=>{})`，但要留一行 warn）。看门狗那条 notify 特殊：无可用群 MUST 抛（单体注释明写「静默 return 会被计成已送达」）",
+        "evidence": "aidcp-cloud/src/server.ts:4687, 4929-4935, 4956, 4986, 5010, 5275, 5538, 5991, 3763（setDefault）；现有 publish-card-exit-http 只覆盖 sendApprovalCard/sendCommandResult/uploadImageFromUrl/getDefaultChat/resolveCardChatId/writeApprovalSignal"
+      },
+      {
+        "name": "内容排期与承接类 automation 事实的**反向**读（api 是客户端）",
+        "owner": "automation（本进程做 server）",
+        "surface": "ContentScheduler / PublishScheduler / commandFace 全在 api，它们要的自动化事实：onlineAccountIdentities / runtimeForAccount / onlineEdgeCount / resumeEdgesForAccount / isEdgePaused / startAll·endAll(dispatch 开关) / commentScheduler.triggerManual / delegatedOwnershipBusy / riskStatus（已有 risk-read）",
+        "failureSemantics": "**原样抛**。api 侧 commandFace 的每个 action 都已有「未就绪→回黄/红回执」的分支，跨进程失败照那条走；MUST NOT 把「问不到自动化」渲染成绿色回执（单体注释红线：触发动作成功 ≠ 发帖成功）",
+        "evidence": "aidcp-cloud/src/server.ts:3755-3898（commandFace 的注入面就是这张清单）, 5638-5663（ContentScheduler 的六个自动化回调）, 3893（onlineEdgeCount）"
+      },
+      {
+        "name": "精选库写：markBotAction",
+        "owner": "content",
+        "surface": "`markBotAction(...)` 一个写方法",
+        "failureSemantics": "**吵闹放过**。它是浏览闭环里的「已互动」标记，写不上只会让同一条精选被重复选中；但静默吞会让「重复推同一条」看起来像选材算法有问题",
+        "evidence": "aidcp-cloud/src/server.ts:2686 解构 + segC 内 8 处引用（唯一方法调用是 markBotAction）；现有 curated-content-http 路由表只有两条读"
+      },
+      {
+        "name": "四个 content 属主角色类的构造（roleFactories）",
+        "owner": "content",
+        "surface": "concept_extractor / curated_note_evaluator / curated_comment_evaluator / valuable_comment_archivist。dispatcher 靠组合根注入工厂，工厂缺失但依赖已注入时**直接抛**（role-dispatcher.ts:1460-1463）",
+        "failureSemantics": "两条路二选一，都不能静默：① 不注入对应依赖（conceptStore / curatedStore / archive），角色就不注册 —— 但那样概念池、精选准入、优质评论语料库**全部停止生长**，且 `valuable_comment_archivist` 写的是 automation 自己的表（valuable_comments），停它等于自废本域账本；② 开一条「送 note/comment 过去、content 侧评估并落库」的口。建议 ② + 启动期一行自证说明本次走的是哪条",
+        "evidence": "aidcp-cloud/src/server.ts:109-124（CONTENT_ROLE_FACTORIES）, 5179-5195（dispatcher 的 archive / conceptStore / curatedStore / textCardTranscriber 实参）；aidcp-automation/src/orchestrator/role-dispatcher.ts:1460"
+      },
+      {
+        "name": "文本模型出口（TextCompletionPort / ChatLlmClient）",
+        "owner": "content（按 module-ownership.json）／**待裁决**",
+        "surface": "`complete(prompt, {role, accountId, timeoutMs})` + `chat(...)`。kernel 已有 TextCompletionPort（aidcp-kernel/kernel/llm-contract.js），automation 的 37 个角色全经 BaseRole 吃它，签名**是 async**，所以技术上包得成 HTTP",
+        "failureSemantics": "**原样抛**。角色层已有「模型调用失败→本步失败」的既有语义。但这条口在每个角色每一步的热路径上：定稿 §4.7 那一行写的是「automation 保留自己的版本化客户端副本」，而 boundaries/module-ownership.json 把 src/llm/ 四个文件全判给 content ⇒ 本仓 src 里没有 llm/。**两者只有一个成立，MUST 先走控制仓 change 裁决，别在 main() 里临时选一个**",
+        "evidence": "aidcp-cloud/src/server.ts:1489（QwenClient）, 4105（handler 的 llm 实参）, 3297（ReplyAiService）, 4038（PersonaGenerator）；docs/cloud-service-decomposition-proposal.md:469；aidcp-automation/src/agents/base-role.ts:18"
+      }
+    ],
+    "permanentlyAbsent": [
+      {
+        "name": "飞书入站平面：lark.WSClient + FeishuWsReceiver + CommandRouter + createCommandFace + FeishuBotChatEventHandler + createBotChatsProvider",
+        "whyNoContract": "`src/feishu/**` 15 个文件全判 api。本进程里这四样的消费者**只有它们自己**——收到事件→路由→调 action。真正需要跨进程的是**反方向**（api 收到命令后调本进程执行），已登记在 newContractsNeeded 的最后一条反向端口里。为入站平面开契约等于把飞书长连接搬两份",
+        "consequence": "本进程不接收任何飞书事件、不发起长连接。启动日志 MUST 有一行明说「飞书事件由 api 进程接收」，否则运维会照单体经验去日志里找『飞书长连接已建立』，找不到就以为进程坏了",
+        "evidence": "aidcp-cloud/src/server.ts:2690, 3755, 3901, 3905, 6023, 6042-6058"
+      },
+      {
+        "name": "PublishScheduler / SchedulerOrchestrator / ContentScheduler",
+        "whyNoContract": "两个类都判 api（src/publish-agent/publish-scheduler.ts、src/orchestrator/content-scheduler.ts），且本进程里它们的**全部消费者也都是 api 代码**：commandFace.publish、firstPostCoordinator.beginRewrite、personaFirstPostOnboarding.armFirstBind、ContentScheduler.triggerPost。整簇一起搬去 api，automation 侧一个消费者都不剩",
+        "consequence": "本进程不再有『发帖触发器』这个概念。ctx.publishScheduler 的那 4 个前向引用连同 `requireSegment(ctx.publishOrchestrator)` 那一段一并不写；`ctx.publishOrchestrator`（content 段）在本进程恒缺席这件事也随之消失，不用为它留闸",
+        "evidence": "aidcp-cloud/src/server.ts:5588-5632（PublishScheduler + publishGenerationPort 的 requireSegment 在 5600）, 5638（ContentScheduler）, 3823-3828, 2142-2150"
+      },
+      {
+        "name": "DraftRefinementWorker + DraftRefinementStore + PersonaGenerator",
+        "whyNoContract": "三者都判 content（draft-refinement.ts / draft-refinement-worker.ts / persona-generator.ts）。worker 是自泵的，本进程零消费者；PersonaGenerator 的唯一消费者是 AccountPersonaService（api）。⚠️ 批次 2 的 content main() 里也**没有**这个 worker —— 它是一件无主遗留，不是 automation 的活",
+        "consequence": "稿件调整（客户端改稿重洗）在三进程形态下没人跑。必须当场登记为遗留项，绝不假装本进程负责",
+        "evidence": "aidcp-cloud/src/server.ts:1668-1689（store）, 4791-4817（worker）, 4037-4041（PersonaGenerator）；aidcp-content/src/server.ts 全文无 DraftRefinementWorker"
+      },
+      {
+        "name": "视觉链路三件（OpenAiCompatVisionClient ×2 + createCoverFormSensor + createTextCardTranscriber）",
+        "whyNoContract": "全判 content。它们在本进程的唯一去处是 curated_note_evaluator 的 textCardTranscriber 实参与 admissionFormSensor —— 而那个角色本身就是 content 属主、在本进程构不出。消费者一并消失，为它开口是纯亏（与批次 2『候审预览读』同一判据）",
+        "consequence": "文字卡 OCR / 封面形态感知在 automation 进程恒不生效。两者都由 env 旗标默认关，所以现网零变化；但**注入一个必然拒绝的实现而不是删掉**，万一哪天可达性假设被改坏要当场响亮失败",
+        "evidence": "aidcp-cloud/src/server.ts:5064-5105（旗标 5064 / vision 5078 / transcriber 5098）, 5194-5195（唯一去处）"
+      },
+      {
+        "name": "segD 面板层专供品：parsePanelUsers / buildInteractionPermissionOverview / createRolePromptProvider / DataGateway / InteractionCustomerApi / interaction-internal-api / PgPanelStore",
+        "whyNoContract": "全判 api，且在本进程里只是被赋到 ctx 上等 segD 取（server.ts:6094-6101, 6110）。本进程既不跑 segD，这些对象**造出来给谁用都没有**",
+        "consequence": "不构造即可，无后果。但 `ctx.interactionStore`（3399）与 riskRegistry 那类**是 automation 的实体**，要改成注册成读路由供 api 取，别一起漏掉",
+        "evidence": "aidcp-cloud/src/server.ts:4242-4244, 4260-4285, 6067-6082, 3397, 6094-6101"
+      },
+      {
+        "name": "api 属主的三张配置镜像（modelConfigStore / roleConfigStore / categoryConfigStore）",
+        "whyNoContract": "本进程对它们的引用**只有 refreshFromAuthority 一处**——是 ConfigMirrorRefresher 的 reloader，不是业务读。业务读全在 content（取模型）与 api（后台）。本进程不建它们，那三条 reloader 也就不该存在",
+        "consequence": "本进程的镜像刷新器只管自己那 4 个 automation 镜像；其余 11 个 key 的重载由属主进程各自负责。⚠️ 但 `config_mirror_version` 版本表是 api 属主 —— 见 risks 第一条",
+        "evidence": "aidcp-cloud/src/server.ts:1143, 1156, 1161（构造）, 3651-3653（segC 内唯一引用）"
+      }
+    ],
+    "syncReads": [
+      {
+        "name": "人设解析：getSoul(accountId) / resolvePersona(accountId) / personaStore.bindingFor(accountId) / getForAccount(accountId)",
+        "callSites": "**全同步**（persona-store.ts:137 `bindingFor(): PersonaBinding`、:162 `getForAccount(): string|null`；server.ts:2169 `getSoul(): Soul` 直接 throw）。调用点在 RoleDispatcher 每次派发、CommentScheduler.runTask、UiSnapshot 推送、DefaultMessageHandler 启动闸、previewDispatcher —— segC 内 getSoul 13 处、personaStore 8 处。包成 await 要改掉每一个角色的构造签名（BaseRole 的 `getSoul?: () => Soul` 就是同步契约）",
+        "evidence": "aidcp-cloud/src/server.ts:2168-2175, 5129, 5288, 6077-6078；aidcp-automation/src/agents/base-role.ts:34；aidcp-cloud/src/config/persona-store.ts:137,162。正解：异步取源（api 侧一次性预解析全部已登记账号，照抄 role-model-selection 的『属主侧预解析再送』范式）+ 本地镜像同步查表。**三态『未知≠否』MUST 保住**：镜像没取到过 MUST 返 unknown，绝不压成 unbound"
+      },
+      {
+        "name": "环境自动化出口闸：clientUserStore.automationGateForEdgeId(edgeId)",
+        "callSites": "同步（client-user-store.ts:911 `: EnvironmentAutomationGate`）。调用点是 EdgeCloudServer 的 `canPushToEdge` —— **每一次向边缘推送都过一遍**，全车队最热的一条路径。同族还有 slowStartSinceFor(accountId)（:991，同步，喂风控 nurtureProvider）",
+        "evidence": "aidcp-cloud/src/server.ts:4157-4169（canPushToEdge）, 2963（slowStartSinceFor）；aidcp-cloud/src/client-auth/client-user-store.ts:911,991。正解：一张 client_environments 的本地投影（automation 已有 automation_account_projection 的先例，加 fresh_until 陈旧即拒）"
+      },
+      {
+        "name": "配置镜像新鲜度与停手闸：isMirrorStale / hasStaleGateMirror / platformActionHalt / noteMirrorStaleRefusal / allowsTransportWhenGateUnknown",
+        "callSites": "全是同步模块函数，且读的是 **ambient 模块级单例**（由 ConfigMirrorRefresher 安装）。调用点：ConfigMirrorGatePort 适配器（handler / dispatcher / 风控三处共用）+ canPushToEdge 的 unknown 分支",
+        "evidence": "aidcp-cloud/src/server.ts:2978-2983, 4162-4167；aidcp-cloud/src/config-mirror-freshness.ts（文件头自述 ambient 槽位留 api 属主）、src/config/mirror-stop-work.ts:28-102。类型已在 kernel（config-mirror-bump-types），**实现体必须在本进程里有一份** —— 与 schema 整族同形，判据也同（三家都调、零属主表 SQL）"
+      },
+      {
+        "name": "账号显示身份：accountDisplayName / accountDisplayNameCandidates / accountStore.getNickname / platformFor / createdAtFor；账号暂停态 accountState.getStatus",
+        "callSites": "全同步（account-store.ts:437/465/469/576/581、account-state.ts:103）。调用点：ReplyWorkflow.accountNameFor、通知/告警/结果卡文案（segC 内 accountDisplayName 15 处）、风控 nurtureProvider、dispatcher 的 getNickname、CommandFace 的昵称解析",
+        "evidence": "aidcp-cloud/src/server.ts:1927-1932, 2960-2964, 4667, 4928, 5306-5307, 5998。**先别急着做镜像**：批次 2 判例说过，展示名在卡片契约里本就是可选、属主侧构卡时自己解析更新鲜 ⇒ 走卡片出口那条口的部分可以整段不传。剩下的 platformFor/createdAtFor/getNickname/getStatus 才是真镜像（现有 automation_account_projection 只有 account_id/platform/group_label 三列，要扩）"
+      },
+      {
+        "name": "api 属主的四张业务配置镜像同步读：contentScheduleStore.effectiveScheduleFor / effectiveActiveWeekMaskFor、hotLeadConfigStore.getGateConfig、facebookCommentConfigStore.effectiveConfigFor / getForAccount、facebookGroupJoinAutomationStore.getForAccount",
+        "callSites": "全同步（content-schedule-store.ts:564,579；hot-lead-config-store.ts:135；facebook-comment-config-store.ts:226,241；facebook-group-join-automation-store.ts:176）。调用点在 dispatcher 的联系方式评论闸、hot-lead 闸、FB 评论调度、加群调度 —— 都在浏览闭环内",
+        "evidence": "aidcp-cloud/src/server.ts:5199-5254, 5300, 3016；同族的 async 方法（claimAutoPostHourCell / countContactAttemptsToday / recordContactCommentAttempt / listCatalog / resolveContainerName）可以直接包 HTTP，**别把同步那半和异步那半混成一条口估工作量**"
+      }
+    ],
+    "risks": [
+      "**ConfigMirrorRefresher 本身读的是 api 属主表 `config_mirror_version`** —— 单体在 server.ts:3636-3639 已把这条明写成未解项（『拆库后跑在 automation 进程里的这份刷新器会变成读别人的库；要么把版本读收成端口、要么按属主各存一张版本表』）。它同时是 config-mirror-freshness 那个 ambient 事实源的**唯一安装点**，所以停手闸、canPushToEdge 的 unknown 分支、风控的 mirrorStale 全挂在它下面。这是写 main() 前必须先裁决的一件事，不是接线细节。",
+      "**risk-command-http.ts 不在 scripts/sync-split-repos 的 TRANSPORT_MEMBERS 里**（列表最后一条是 risk-read-http）。automation 侧注册路由用本仓副本没问题，但 api 侧拿不到 RiskCommandHttpClient ⇒ 面板的风控写会 404。这正是 §8.4 点名的形态：两侧各自编译通过、只有真跑才 404。同批要核的还有 config-mirror-bump-http（在名单里 ✅）。",
+      "**automation 是 src/schema/ 与 src/transport/ 的属主**，所以它 import 的是本地相对路径、不装 aidcp-transport 包；content 装包。同一份代码两个取用路径 ⇒ 谁改了本仓副本而没跑 sync-split-repos，漂移**不会在本仓的构建里现形**（content 那边才会）。写 main() 时 MUST NOT 顺手改 src/transport/* 或 src/schema/*，要改先走同步脚本。",
+      "`src/kernel/interaction-types.js` 在 TS2307 清单里但属主是 **kernel** —— 它不该从本仓 src 解析，要改成 `aidcp-kernel/kernel/interaction-types.js`。同类的还有 server.ts:4245 那个内联 `import('./kernel/interaction-types.js')` 动态类型引用，静态扫 from 说明符看不见它。",
+      "**动态 import 必须算进依赖盘点**：segA 的 `await import('./storage/oss-client-factory.js')`（server.ts:1365）就是内联动态的。automation 不需要 OSS，但同一手法在别处出现时静态扫描一样会漏——这条已经害过两次（文字卡两个懒加载依赖、耦合清单 103 vs 实测 104）。",
+      "**PublishDispatcher 留在本进程，但它的 store 是 api 的**。它的 fail-closed 分支（读不到草稿 / 读不到授权 → 作废授权、退回待审、烧掉一次人工批准）在单体里几乎不可能触发；拆进程后新增了『对端没起 / 端口没配 / 超时』一整类失败，而那些失败在实现体之外、实现体的 try/catch 够不着。这一条与批次 2『投递判定 fail-open』是**相反方向**，抄错就是每次网络抖动烧一张已批稿。",
+      "**跨进程后 instanceof 恒 false**：segC 里至少有 `CuratedContentUnavailableError`（server.ts:1991, 2027）靠 instanceof 区分『这行不存在』与『存储不可用』，两条分支回给运营的话术完全不同。跨到 content 进程后必须改结构化守卫（按 name + 具名字段判），否则会静默退化成兜底原因。",
+      "**风控单写不变量的物理形态**：三个写方法只许出现在 startRiskCommandConsumer 的 apply 回调（server.ts:3058-3074）。写 main() 时 startAutomationReadApi 注册的 risk-command 路由**只落 outbox 行**、risk-read 只查投影，两者都不得直接碰 RiskController。target 非法时 MUST 不注册该路由（宁可 404，也绝不受理一条没人应用的命令）。",
+      "**init() 的归属**：批次 2 的判例是『init() 不进端口，属主自己探测自己的 schema』。本进程对 publishLogStore / publishApprovalStore / clientUserStore / personaStore 一律不 init；反过来，本进程新建的 automation 存储（riskStore / interactionStore / 各 FB store）的 init 都要留在本进程，别跟着端口一起搬走。",
+      "**assets/ 与 REPO_ASSETS**：sync-split-repos 只给 content 发字体资产。automation 目前不需要（文字卡渲染整条链已判恒缺席），但如果最终把 textCardTranscriber 拉回本进程，字体缺失是**静默降级**（工厂返回 null、封面悄悄退回生成式），不崩不报。",
+      "**四个 canonical checkout 都必须停在默认分支**才能跑 scripts/new-change / spawn-change（task-preflight 是 fleet 全局的，任一仓漂移会拦下全部四仓）。本次盘点没有动任何工作区，但真开工前先跑一次自检。",
+      "`npm install` 在本仓可能失败：~/.npmrc 把 @types 整个 scope 指向内网 registry。automation 已有 package-lock.json 且 node_modules 已装好（本次 tsc 实跑通过），但重装时用 `npm install --userconfig /dev/null`；命令行 `--@types:registry=…` 实测无效。"
+    ]
+  }
+}
