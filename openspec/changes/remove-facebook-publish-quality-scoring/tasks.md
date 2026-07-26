@@ -19,6 +19,9 @@
 
 - [x] 3.1 Commit in the isolated Cloud worktree, integrate with the ff-only helper, push Cloud master, and record the owning commit plus validation evidence here.
 <!-- aidcp-cloud cc55c52; land-change rebased onto origin/master, reran acceptance/full/typecheck, ff-pushed master, and synchronized the clean canonical checkout. -->
-- [ ] 3.2 Commit and push the OpenSpec artifacts in control main.
-- [ ] 3.3 Deploy the clean Cloud master to DEV after backup and migration-status checks; verify source hash, service/listeners, schema gates, automation writer lock, Feishu connection, PostgreSQL, and internal/public health.
-- [ ] 3.4 Verify the deployed runtime exposes the Facebook `not_applicable → manual_review` branch and no quality-model call sites on that branch; do not approve or submit a real Facebook post as part of this change.
+- [x] 3.2 Commit and push the OpenSpec artifacts in control main.
+<!-- aidcp 6e3598f pushed the validated proposal/design/spec/tasks artifacts to origin/main; this deployment closeout is a follow-up main commit. -->
+- [x] 3.3 Deploy the clean Cloud master to DEV after backup and migration-status checks; verify source hash, service/listeners, schema gates, automation writer lock, Feishu connection, PostgreSQL, and internal/public health.
+<!-- DEV 2026-07-26 16:14 CST: clean aidcp-cloud master cc55c52; backups /opt/aidcp/backups/cloud.20260726-161420.tar.gz and cloud.env.20260726-161420; all three owner ledgers checksum-clean with 0 pending; changed-source digest 58447be14f6f363505a9c9606568edbe7b8835616c8dbb1fedcdde62b22a7a29 matched. aidcp-cloud active/NRestarts=0; 8787/8090/8091/8088 listening; local/public health 200; three PostgreSQL SELECT 1 passed; enforce schema gates, dev writer lock, and Feishu WS onReady passed; four unrelated isales services remained active. No package change, migration, or npm install. -->
+- [x] 3.4 Verify the deployed runtime exposes the Facebook `not_applicable → manual_review` branch and no quality-model call sites on that branch; do not approve or submit a real Facebook post as part of this change.
+<!-- Deployed-source Facebook tests passed for QualityScorer zero-call/not_applicable, Gatekeeper zero-call/manual_review, and full pipeline pending_approval with null score (4 selected pass, 0 fail). No approval or real Facebook submit was performed. -->

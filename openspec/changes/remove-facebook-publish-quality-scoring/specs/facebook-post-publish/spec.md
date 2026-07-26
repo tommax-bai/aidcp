@@ -28,4 +28,3 @@ Facebook 发布 SHALL NOT 调用内容质量评分 LLM，也 SHALL NOT 用固定
 
 - **WHEN** 发布平台为 `xiaohongshu`
 - **THEN** 系统 SHALL 继续调用既有质量评分与 Gatekeeper，沿用原分数、降级公式、阈值和动作语义
-

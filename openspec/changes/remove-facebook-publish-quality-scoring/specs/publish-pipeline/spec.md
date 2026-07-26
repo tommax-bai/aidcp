@@ -137,4 +137,3 @@ Gatekeeper LLM，必须确定性返回 `needsApproval=true`、`recommendedAction
 
 - **WHEN** 非 Facebook admission 收到 `qualityStatus!='scored'` 或 `qualityScore=null`
 - **THEN** 系统 SHALL 诚实拒绝该候选，MUST NOT 自动发布或回落高分
-
