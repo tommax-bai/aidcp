@@ -8,6 +8,7 @@
 - [x] 2.1 Project eligible single-card Reels and unique Feed videos into structured activity events with `statsDelta.views=1`.
 - [x] 2.2 Retain session-lifetime canonical projection witnesses and suppress only the matching later local `note_open`, while continuing to report detail data to Cloud.
 - [x] 2.3 Add focused Native session parity tests for success, deduplication, malformed/ambiguous batches, later detail, and unchanged ordinary Feed behavior.
+- [x] 2.4 Fail closed on non-Facebook, reserved-route, and non-Reel identities; lock canonical aliases and session lifecycle with focused tests.
 
 ## 3. Validation and delivery evidence
 
@@ -18,12 +19,14 @@
 <!-- implementation-evidence
 edge_repo=/Users/baitianxing/codes/aidcp-edge.wt/restore-native-facebook-view-activity
 edge_commit=b188f7d821b917fa5a1dba52213999742e0d7a28
+edge_review_commit=0c22d7cd80049cfa848bb171b52dbc78ff25ff14
 control_repo=/Users/baitianxing/codes/aidcp.wt/restore-native-facebook-view-activity
 control_commit=this-change-metadata-commit
-native_session_test=17_pass
+native_session_test=18_pass
 legacy_facebook_session_test=54_pass
-post_identity_test=11_pass
+post_identity_test=12_pass
 protocol_acceptance_test=23_pass
+edge_acceptance_test=30_pass
 edge_typecheck=pass
 openspec_strict_validation=pass
 deployment=not_performed

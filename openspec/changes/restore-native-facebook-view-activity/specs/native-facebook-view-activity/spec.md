@@ -2,7 +2,7 @@
 
 ### Requirement: Native Facebook projects proven Reel presentation once
 
-The Native Facebook browse session SHALL project exactly one `reel_view` companion activity with `statsDelta.views=1` when a `page_cards` result reports `listKind:'reels'`, exactly one card, and a canonical Facebook post identity. The sentence SHALL use only reported title and author metadata with the existing bounded human-readable fallback. The session MUST NOT project activity from scroll intent, an unchanged or repeated canonical identity, an empty batch, a multi-card Reels batch, or an uncanonical identity.
+The Native Facebook browse session SHALL project exactly one `reel_view` companion activity with `statsDelta.views=1` when a `page_cards` result reports `listKind:'reels'`, exactly one card, and an exact HTTPS `www.facebook.com/reel/<id>` identity with no query or fragment. Reserved discovery-route values such as `hashtag`, `audio`, `music`, or `topics` are not Reel identities. The sentence SHALL use only reported title and author metadata with the existing bounded human-readable fallback. The session MUST NOT project activity from scroll intent, an unchanged or repeated canonical identity, an empty batch, a multi-card Reels batch, or an uncanonical identity.
 
 #### Scenario: New single-card Reel becomes one read activity
 - **WHEN** Native reports a single-card Reels batch for a canonical Reel not previously projected in the session

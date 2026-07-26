@@ -5,7 +5,8 @@ Facebook Native-only browsing reports Feed/Reels cards to Cloud, but its Edge se
 ## What Changes
 
 - Restore one truthful desktop read activity and one local fallback `views` increment for each newly reported single-card Reel.
-- Restore the same projection for a Feed batch only when it contains exactly one card and that card is classified as video.
+- Reject non-Facebook, reserved-route, and non-Reel identities before projecting a Reel view.
+- Restore the same projection for a Feed batch when it contains exactly one card classified as video; other non-video cards may coexist.
 - Deduplicate projected card identities for the lifetime of the Native Facebook browse session.
 - Continue reporting later `note_detail` data to Cloud while suppressing its duplicate local read activity and fallback increment when the same canonical item was already projected from cards.
 - Preserve ordinary multi-card and non-video Feed semantics.
@@ -23,6 +24,8 @@ None.
 
 ## Impact
 
+- `aidcp-edge/src/facebook/post-identity.ts`
+- `aidcp-edge/src/facebook/facebook-session.ts`
 - `aidcp-edge/src/native-page-engine/browse-session.ts`
-- Focused Native browse-session tests in `aidcp-edge`
+- Focused Facebook identity, legacy session, and Native browse-session tests in `aidcp-edge`
 - Edge companion activity and local fallback statistics only; no Cloud protocol, risk counter, browser command, selector, packaging, or deployment changes

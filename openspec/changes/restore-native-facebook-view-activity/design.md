@@ -29,11 +29,13 @@ For Reels, eligibility requires `listKind === 'reels'`, exactly one reported car
 
 Alternative rejected: project every Feed card. Ordinary Feed cards historically count only after a real detail read, and expanding this change would invent a new browsing contract.
 
-### Share the existing formatters and Feed-video identity boundary
+### Share the existing formatters and strict video identity boundaries
 
 Native will reuse `facebookReelViewUiText`, `facebookFeedVideoViewUiText`, and `facebookReadUiText` rather than maintain a second set of clipping and fallback rules. The strict Feed-video identity helper will move to the shared Facebook identity module so legacy and Native adapters use one fail-closed implementation.
 
-Alternative rejected: accept any canonical post with `isVideo:true`. The existing rule intentionally rejects Reel identities, non-Facebook hosts, fragments, and malformed query shapes.
+Reel presentation will use a dedicated strict identity helper rather than the general post-targeting helper. It accepts only an exact HTTPS `www.facebook.com/reel/<id>` identity with no query or fragment and rejects Facebook discovery routes such as `hashtag`, `audio`, `music`, or `topics`.
+
+Alternative rejected: accept any canonical post with `isVideo:true` or trust `listKind:'reels'` without validating the supplied identity. The boundaries intentionally reject non-Facebook hosts, wrong surface shapes, fragments, reserved discovery routes, and malformed query shapes.
 
 ### Keep session-lifetime projection witnesses separate from Cloud delivery
 
