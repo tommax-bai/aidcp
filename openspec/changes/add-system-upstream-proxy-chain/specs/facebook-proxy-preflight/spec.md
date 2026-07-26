@@ -1,13 +1,13 @@
 ## MODIFIED Requirements
 
 ### Requirement: 离线 Facebook 环境选择 SHALL 预热代理检测
-客户端 SHALL 在用户选中浏览器未运行的 Facebook AdsPower 环境后，于 Electron 主进程后台使用该 profile 已保存的代理配置执行一次有界代理检测；系统前置代理模式开启时，客户端 SHALL 先准备“系统代理 → 环境代理”的受管中继，并经该中继执行检测。检测 MUST NOT 启动浏览器、占用浏览器槽位或阻塞环境选择；非 Facebook、无代理配置或浏览器已运行的环境 MUST NOT 触发该检测。
+客户端 SHALL 在用户选中浏览器未运行的 Facebook AdsPower 环境后，于 Electron 主进程后台使用 AIDCP 加密保存的原环境代理执行一次有界代理检测；既有环境尚无权威记录时 SHALL 先从 AdsPower 精确读取并加密引导，MUST NOT 把受管 loopback 当成原环境代理。系统前置代理模式开启时，客户端 SHALL 先准备“系统代理 → 环境代理”的受管中继，并经该中继执行检测。检测 MUST NOT 启动浏览器、占用浏览器槽位或阻塞环境选择；非 Facebook、无代理配置或浏览器已运行的环境 MUST NOT 触发该检测。
 
 检测 SHALL 只发起不含 Cookie、账号、环境标识或业务正文的无身份 Facebook 连通请求。代理密码 MUST NOT 进入 renderer IPC、日志、设置文件或检测结果。
 
 #### Scenario: 选择离线认证代理环境
 - **WHEN** 用户选中一个浏览器未运行且保存了认证代理的 Facebook 环境
-- **THEN** 主进程读取该 profile 的完整配置并后台检测一次，界面选择立即完成，浏览器保持关闭且不占槽位
+- **THEN** 主进程读取或引导该 profile 的加密原环境代理权威并后台检测一次，界面选择立即完成，浏览器保持关闭且不占槽位
 
 #### Scenario: 双跳选择预热完整链路
 - **WHEN** 用户开启系统前置代理模式并选中符合条件的离线 Facebook 环境
@@ -18,8 +18,8 @@
 - **THEN** 客户端只为最终稳定选中的合格环境发起检测，同一环境已有检测在途时 MUST NOT 重复发起
 
 #### Scenario: 密码不越过主进程边界
-- **WHEN** 主进程用 AdsPower 返回的代理账号密码执行单跳检测或准备双跳中继
-- **THEN** fleet 快照、renderer IPC、日志和本机 settings 均不包含代理密码
+- **WHEN** 主进程用 AdsPower 首次返回或本地解密的代理账号密码执行单跳检测或准备双跳中继
+- **THEN** fleet 快照、renderer IPC、日志、本机 settings、子进程 argv 和环境变量均不包含代理密码
 
 ### Requirement: 启动与唤醒 SHALL 复用短时预检结果
 客户端 SHALL 按环境在内存中短时复用最近一次确定的预检结果。手动启动或冷待机唤醒遇新鲜成功结果 SHALL 直接继续；结果缺失、过期或正在检测时 SHALL 复用同一在途检测或补做一次，不得建立轮询。新鲜确定失败 SHALL 停止本次浏览器启动或唤醒并如实显示代理原因。

@@ -14,7 +14,7 @@
 
 #### Scenario: 未配置环境代理时双跳不适用
 - **WHEN** 用户开启系统前置代理模式，但待启动 profile 明确配置为无代理
-- **THEN** 客户端不解析系统代理、不创建本地中继、不注入浏览器代理覆盖，并按既有无代理路径继续启动
+- **THEN** 客户端不保存代理权威、不解析系统代理、不创建本地中继、不更新 AdsPower profile，并按既有无代理路径继续启动
 
 #### Scenario: 未启动环境立即采用当前开关
 - **WHEN** 用户修改系统前置代理开关且目标环境的浏览器代际尚未启动
@@ -25,8 +25,34 @@
 - **THEN** 客户端持久化目标选择但保持该代际的实际代理模式与中继生命周期不变，并明确要求重启后应用
 
 #### Scenario: 旧浏览器代际不冒充双跳
-- **WHEN** AdsPower profile 已由其他入口打开或当前代际没有应用受管本地代理覆盖
+- **WHEN** AdsPower profile 已由其他入口打开或当前代际没有经过启动前 profile 同步及读回
 - **THEN** 客户端拒绝把该浏览器作为双跳环境接管，并提示关闭后重新启动
+
+### Requirement: 原环境代理 SHALL 加密保存并按启动代际同步
+
+客户端 SHALL 把用户为环境配置的代理作为 AIDCP 权威，并按 AdsPower `user_id` 使用 Electron `safeStorage` 加密保存。创建环境时 SHALL 仍将用户输入代理直接传给 AdsPower；只有创建成功后的浏览器启动阶段才根据系统前置开关选择写入原环境代理或 GOST loopback。客户端内修改代理 SHALL 同步更新权威；明确无代理 SHALL 删除该环境权威并跳过后续限制。
+
+每次实际启动新浏览器代际前，包括冷待机唤醒，客户端 SHALL 更新 AdsPower profile 并精确读回验证，之后才允许 `browser-profile/start`。关闭后恢复原代理只是尽力兜底；异常退出留下的配置 SHALL 由下一次启动前同步纠正。凭据 MUST NOT 出现在 renderer、通用 settings、argv、环境变量或日志。
+
+#### Scenario: 创建环境保留用户代理
+- **WHEN** 用户创建一个配置了代理的 AdsPower 环境
+- **THEN** 创建请求使用用户输入的代理，创建成功后客户端加密保存同一规范化原环境代理，不在创建阶段替换为 GOST
+
+#### Scenario: 启动时按开关同步
+- **WHEN** 已配置代理的 inactive 环境将启动新浏览器代际
+- **THEN** 开启系统前置模式时写入该环境受管 GOST loopback，关闭时写入加密原环境代理；读回不一致则不启动
+
+#### Scenario: 关闭后尽力恢复
+- **WHEN** 已配置代理环境的浏览器已确认关闭
+- **THEN** 客户端尽力写回并验证原环境代理；失败不推翻关闭事实，下一次启动前仍重新同步
+
+#### Scenario: 异常退出后下一次启动纠偏
+- **WHEN** 上一进程异常退出导致 AdsPower profile 暂留 GOST loopback
+- **THEN** 下一次启动不信任该暂留值，而是按加密权威和当前开关重新写入并读回
+
+#### Scenario: 无代理环境完全跳过
+- **WHEN** 创建、编辑或精确读取确认环境未配置代理
+- **THEN** 客户端不保存代理权威、不更新或恢复 profile、不进入双跳检测或 active-profile 限制
 
 ### Requirement: macOS 系统代理解析 SHALL 有限且诚实
 
@@ -52,9 +78,9 @@ PAC、自动发现、缺少固定端点、非法 host/port、需要但无法取�
 
 ### Requirement: 受管本地中继 SHALL 安全组成两跳链路
 
-客户端 SHALL 为需要启动的 AdsPower profile 创建受管本地代理中继，其入站只监听随机 loopback 端口，第一跳为解析后的系统代理，第二跳为该 profile 原本保存的环境代理。中继 SHALL 支持现有环境代理的 HTTP、HTTPS 与 SOCKS5 类型，并保持既有类型语义。
+客户端 SHALL 为需要启动的 AdsPower profile 创建受管本地代理中继，其入站只监听随机 loopback 端口，第一跳为解析后的系统代理，第二跳为 AIDCP 加密权威中的原环境代理。中继 SHALL 支持现有环境代理的 HTTP、HTTPS 与 SOCKS5 类型，并保持既有类型语义。
 
-环境代理账号密码 MUST 只存在于 AdsPower 精确读取响应、主进程内存和中继私有配置输入中；MUST NOT 出现在进程 argv、renderer IPC、settings、链路状态、日志或错误正文。中继二进制 SHALL 固定版本、校验来源并作为桌面资源交付；开发态可使用显式覆盖路径。签名前 staging 和开发态 SHALL 校验固定上游归档及二进制 SHA-256；macOS 签名包运行态 SHALL 忽略外部覆盖，并校验资源内二进制的固定路径、Developer ID 签名、与应用相同且符合产品配置的 Team ID、预期 Identifier、目标架构和固定版本，MUST NOT 用签名前完整文件哈希拒绝已经签名的 Mach-O。
+环境代理账号密码 MUST 只存在于 AdsPower 首次精确读取响应、`safeStorage` 加密记录、受控内存、私有 pipe 和中继私有配置输入中；MUST NOT 出现在进程 argv/环境变量、renderer IPC、settings、链路状态、日志或错误正文。中继二进制 SHALL 固定版本、校验来源并作为桌面资源交付；开发态可使用显式覆盖路径。签名前 staging 和开发态 SHALL 校验固定上游归档及二进制 SHA-256；macOS 签名包运行态 SHALL 忽略外部覆盖，并校验资源内二进制的固定路径、Developer ID 签名、与应用相同且符合产品配置的 Team ID、预期 Identifier、目标架构和固定版本，MUST NOT 用签名前完整文件哈希拒绝已经签名的 Mach-O。
 
 #### Scenario: 两跳中继就绪后才交付
 - **WHEN** 系统代理和环境代理均合法且中继成功监听 loopback
@@ -90,7 +116,7 @@ PAC、自动发现、缺少固定端点、非法 host/port、需要但无法取�
 
 #### Scenario: 预检与浏览器使用同一入口
 - **WHEN** 双跳模式下为某环境完成启动前预检并随后启动浏览器
-- **THEN** 两者均使用该环境同一受管 loopback 端点，环境代理凭据不再由浏览器直接持有
+- **THEN** 预检使用该端点，浏览器启动前把 profile 同步为同一端点并读回；浏览器不直接持有原环境代理凭据
 
 #### Scenario: 预检成功不冒充浏览器出口
 - **WHEN** 完整代理链预检成功但浏览器尚未取得出口证据

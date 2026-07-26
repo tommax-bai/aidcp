@@ -18,10 +18,14 @@
 - [x] 3.3 Inject only the prepared loopback endpoint into the matching Edge child and add supervisor/preflight tests proving unavailable system proxy blocks without direct fallback.
 - [x] 3.4 Treat profiles explicitly configured without an environment proxy as outside double-hop applicability: skip relay/preflight/override, preserve the existing no-proxy launch path, and add a regression test.
 
-## 4. AdsPower provider launch override
+## 4. AdsPower provider launch authority
 
 - [x] 4.1 Validate `AIDCP_ADS_PROXY_OVERRIDE` as an HTTP loopback URL, add `--proxy-server` only to inactive-profile `browser-profile/start`, and reject active-profile takeover when an override is required.
 - [x] 4.2 Add provider tests for valid override payload, direct-mode zero regression, invalid/non-loopback rejection, and active-profile fail-closed behavior.
+- [x] 4.3 Replace the rejected launch-argument design with an encrypted per-profile original-proxy authority; preserve user proxy input during create/edit, bootstrap existing profiles, remove authority for explicit no-proxy, and keep credentials out of projections, settings, argv, env, and logs.
+- [x] 4.4 Deliver the original and generation-target proxy to the Edge child through a private anonymous pipe; remove `AIDCP_ADS_PROXY_OVERRIDE` and all `--proxy-server` injection.
+- [x] 4.5 Before every inactive AdsPower launch, including cold-standby wake, update the profile proxy through the constrained API, read it back exactly, and fail closed before `browser-profile/start` on mismatch; configured-proxy active profiles remain non-adoptable.
+- [x] 4.6 After confirmed browser close, best-effort restore and verify the original environment proxy; add crash-left-loopback, next-start correction, restore-failure honesty, and no-proxy zero-update tests.
 
 ## 5. Reproducible GOST desktop resource
 
@@ -34,9 +38,10 @@
 ## 6. Validation and closeout
 
 - [x] 6.1 Install physical worktree dependencies, run focused Electron/provider/renderer/packaging tests, full Edge tests required by affected proxy/browser safety contracts, and `npm run typecheck`.
-- [ ] 6.2 Run a development smoke with a newly started inactive AdsPower profile: prove the launch payload includes the loopback override, full-chain Facebook preflight succeeds, and browser-context egress evidence reflects the environment proxy; if AdsPower ignores the override, stop without profile mutation and record the blocker.
+- [x] 6.2 Run a reversible development smoke with a newly started inactive AdsPower profile: prove startup updates and reads back the profile to the GOST loopback without `--proxy-server`, full-chain Facebook preflight succeeds, browser-context egress reflects the environment proxy, and confirmed close restores the original proxy exactly.
 - [x] 6.3 Run `openspec validate add-system-upstream-proxy-chain --strict`, record Edge/control commit SHAs and validation evidence here, commit with explicit pathspecs, and push both `codex/add-system-upstream-proxy-chain` branches.
 - [x] 6.4 Run focused signed-artifact/runtime/packaging tests, full Edge tests, typecheck, strict OpenSpec validation, then rebuild and locally verify the arm64 OL Developer ID signed package.
+- [ ] 6.5 Re-run the focused, acceptance, complete Edge, typecheck, build-input, and strict OpenSpec gates for the profile-authority pivot; record the new SHAs and integrate the source and contract updates without claiming a new installer.
 
 <!--
 Implementation evidence (2026-07-26):

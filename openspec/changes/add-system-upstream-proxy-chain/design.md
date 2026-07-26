@@ -2,7 +2,7 @@
 
 当前 Electron 主进程会精确读取 AdsPower profile 保存的代理，并在浏览器启动前用 `https-proxy-agent` / `socks-proxy-agent` 直接请求 Facebook。通过后才 spawn Edge 核心；核心中的 `AdsPowerProvider` 再调用 `browser-profile/start`，让 AdsPower 浏览器使用 profile 自身代理。macOS“系统代理”只是应用层配置，Node Agent 和 AdsPower 已显式代理连接都不会自动把它作为上游，所以客户即使开启 Veee Global Mode，两个直接连接仍可能被网络复位。
 
-首版只解决已观察到的 macOS 固定本地系统代理场景。它必须同时改变预检和浏览器数据面，又不能持久改写 AdsPower profile、泄露第二跳凭据或在失败时退回真实本机出口。
+首版只解决已观察到的 macOS 固定本地系统代理场景。真机验证证明 `browser-profile/start.launch_args` 的 `--proxy-server` 会与 AdsPower 自身代理扩展形成两套代理权威：独立预检可成功，但浏览器仍可能 `ERR_CONNECTION_RESET`。因此浏览器数据面必须只由 AdsPower profile 代理配置决定；AIDCP 在每次启动前受控改写并读回验证，同时用加密台账保留用户原环境代理用于直接模式、下次启动纠偏和关闭后恢复。
 
 ## Goals / Non-Goals
 
@@ -11,15 +11,15 @@
 - 提供默认关闭、可理解、需要重启生效的全局双跳开关。
 - 在 macOS 把固定 HTTP CONNECT/SOCKS5 系统代理与每个 profile 的 HTTP/HTTPS/SOCKS5 环境代理组成完整链路。
 - 让 Facebook 预检和 AdsPower 新浏览器代际使用同一 loopback 中继。
-- 保持环境代理凭据仅在主进程和中继私有配置内短暂存在。
+- 保持环境代理凭据只存在于 `safeStorage` 加密台账、受控内存、一次性私有管道和中继 stdin，不进入参数、环境变量、renderer 或日志。
 - 以浏览器实际出口证据验证最终结果，诚实区分配置、链路和浏览器证据。
 - 为开发态和打包态提供来源固定、可校验的 GOST v3 sidecar 解析路径。
 
 **Non-Goals:**
 
 - 首版不支持 PAC/WPAD、系统代理认证、Windows/Linux 或任意 Network Extension/TUN。
-- 不改变 AdsPower profile 的持久代理配置，不提供崩溃后恢复这种持久改写所需的台账。
 - 不支持运行中浏览器热切换代理，也不接管无法证明启动参数的既有 active profile。
+- 不把浏览器关闭后的恢复当作唯一一致性手段；崩溃或恢复失败由下一次启动前同步纠正。
 - 不改变 Cloud、协议 v2、数据库、风险状态或出口回显端点。
 - 不把源码完成等同于签名安装包或客户真机验收。
 
@@ -35,17 +35,21 @@
 
 5. **敏感配置从 stdin 进入 GOST。** GOST 以 `-C -` 从 stdin 读取 YAML/JSON，argv 只包含固定参数。主进程不打印配置和 stderr 原文，只投影稳定错误枚举；renderer 只获得 `direct` / `system_then_environment`、准备状态和安全提示。二进制路径和 loopback 端口可以记录，用户名、密码和完整节点 URL 不可以。
 
-6. **预检先确认第二跳存在，再建立链并把本地端点作为唯一代理。** 现有精确 profile reader 继续作为第二跳真源。双跳关闭时控制器保持原行为；打开且 profile 已配置环境代理时，reader 交给 chain manager，成功后返回无认证的本地 HTTP 代理配置，后续现有预检逻辑不再知道第二跳凭据。profile 明确返回无代理时跳过中继与代理预检，并按既有无代理路径启动；只有适用双跳的 profile 遇到系统代理/sidecar 显式配置失败时才映射为 `unavailable` 并阻止启动。双跳关闭时既有“检测设施 unknown 不阻断”语义保持不变。
+6. **用户输入的环境代理是 AIDCP 权威，AdsPower profile 是浏览器代际的执行副本。** 创建环境仍以用户输入的代理调用 AdsPower；创建成功后按 `user_id` 将规范化原环境代理写入 Electron `safeStorage` 加密台账。既有环境首次使用时，从 AdsPower 精确读取并加密引导该权威。客户端内单个或批量修改代理时同步更新 AdsPower 和加密权威；明确 `no_proxy` 时删除台账项。通用环境列表、renderer、settings、argv、环境变量和日志均不得包含密码。台账不可解密、缺失且当前 profile 已是 AIDCP 受管 loopback，或写入失败时必须诚实阻断受影响代理环境，不得猜测原代理。
 
-7. **主进程把本地端点注入 Edge 子进程，provider 只负责本次启动覆盖。** `spawnEdgeChild` 在成功预检后从 chain manager 取得当前 profile endpoint，注入非敏感 `AIDCP_ADS_PROXY_OVERRIDE`。`selectBrowserProvider` 校验它必须是 `http://127.0.0.1:<port>`，并把 `--proxy-server=<url>` 加入 `browser-profile/start.launch_args`。AdsPower 官方 start API没有临时 proxy object，只提供 `launch_args`；因此不永久调用 profile update。
+7. **每次实际启动前同步 profile，并以读回结果作为启动闸门。** Electron 主进程通过匿名私有 pipe 把原环境代理与本代际目标代理交给 Edge 子进程；凭据不进入 env/argv。`AdsPowerProvider.launch()` 在每次 inactive `browser-profile/start` 前调用受限 V1 `user/update`，双跳模式写入无认证 GOST loopback，直接模式写回原环境代理；随后通过精确读取验证代理类型、host、port 与认证字段一致，成功后才调用 V2 start。冷待机唤醒会再次经过同一 `launch()`，因此同样按当时冻结的浏览器代际模式同步。provider 不再注入 `--proxy-server`，确保 AdsPower profile/代理扩展是唯一权威。
 
-8. **active profile 在双跳模式下 fail closed。** 当前 provider 会接管 AdsPower 已 active 的 profile，但这种浏览器可能由手工入口或旧设置启动，无法证明应用了当前 loopback 参数。首版在存在 override 时拒绝 active 接管，要求关闭重启。若后续能取得可信启动命令行并精确匹配，可另案放宽。
+8. **关闭后恢复是兜底，启动前同步是一致性保证。** `killAndConfirmDead()` 只有在确认浏览器调试端点已连续变暗后，才尽力把 profile 恢复为加密权威中的原环境代理并读回确认；恢复失败被安全记录但不把“浏览器已关闭”改成失败。应用崩溃、强制退出或 AdsPower 更新失败可能暂时留下 loopback，下一次启动仍必须先按当前开关覆盖并验证，因而不依赖关闭回调恢复。未配置代理时不更新、不恢复、不阻断。
 
-9. **验收分三层。** 单元/契约测试证明解析、配置生成、凭据脱敏、生命周期与启动载荷；开发态集成测试用本地固定系统代理和无账号目标证明 GOST 两跳；AdsPower 真机测试必须从新 inactive profile 启动，并由既有 CDP 出口探测证明最终业务代理出口。打包资源、签名公证和客户安装包另行验收，源码测试不能替代。Electron `afterSign` 必须对每个最终 `.app` 执行嵌套签名身份、架构与版本检查；发行脚本在公证/装订后重复最终信任门禁，防止只通过签名前 `afterPack` 的不可运行产物进入 DMG。
+9. **active profile 在受管代理模式下 fail closed。** 已 active 的浏览器可能由手工入口、旧版本或旧开关启动，无法证明当前 profile 更新属于该浏览器代际。只要环境配置了受管代理权威，provider 就拒绝接管并要求关闭重启；明确无代理的环境继续保持既有 active 接管行为。
+
+10. **验收分三层。** 单元/契约测试证明解析、加密权威、配置生成、凭据脱敏、每代际同步、读回闸门、关闭恢复与冷待机生命周期；开发态集成测试用本地固定系统代理和无账号目标证明 GOST 两跳；AdsPower 真机测试必须从新 inactive profile 启动，并由既有 CDP 出口探测证明最终业务代理出口。打包资源、签名公证和客户安装包另行验收，源码测试不能替代。Electron `afterSign` 必须对每个最终 `.app` 执行嵌套签名身份、架构与版本检查；发行脚本在公证/装订后重复最终信任门禁，防止只通过签名前 `afterPack` 的不可运行产物进入 DMG。
 
 ## Risks / Trade-offs
 
-- [AdsPower 内核或代理扩展覆盖 `--proxy-server`] → 以新 inactive profile 做浏览器级出口验证；未证明前不标完成，不回退持久改 profile。
+- [更新成功但启动前配置被外部修改] → `user/update` 后立即精确读回；不一致则不调用 start。浏览器出口仍由 CDP 证据独立确认。
+- [应用崩溃留下 loopback] → 原环境代理独立加密保存；下一次每代际启动按当前开关重写。已 active profile 不接管，关闭恢复只作额外兜底。
+- [代理密码在跨进程或持久化时泄露] → `safeStorage` 加密台账与匿名 pipe；禁止 env/argv/settings/renderer/log 投影，并用契约测试检查。
 - [抢占随机 loopback 端口] → 分配后立即 spawn，并以有界 TCP 就绪探测确认；失败返回稳定错误，不换成 `0.0.0.0`。
 - [Veee 改变本地端口或断开] → 每次新建链重新解析；已建连接失败时不直连，界面显示链路不可用。首版不增加未经观察的后台重试器。
 - [GOST 二进制供应链或打包签名] → 固定 release、架构和签名前 SHA-256；构建缺失即失败；正式包把嵌套二进制纳入 codesign、notarization 和签名后身份/版本检查，不把签名前完整文件哈希错误地用于已签名 Mach-O。
@@ -55,10 +59,11 @@
 ## Migration Plan
 
 1. 合入设置与解析/中继代码，但开关默认关闭，现有环境零迁移。
-2. 在开发态显式 stage GOST，并用测试 profile 验证 `--proxy-server`、完整预检和浏览器出口。
-3. 验证通过后才把 GOST 资源 staging 接入桌面构建；源代码和打包产物分别记录验证。
-4. 回滚时关闭开关即可恢复直接环境代理；移除代码时无需恢复 AdsPower profile 或迁移数据，因为首版不写其持久代理。
+2. 对既有已配置代理的 profile，在首次受管启动前从 AdsPower 精确读取一次原配置并写入加密台账；新建和客户端内编辑则直接以用户输入更新台账。
+3. 在开发态显式 stage GOST，用测试 profile 验证完整预检、启动前 profile 更新/读回、浏览器出口以及关闭恢复。
+4. 验证通过后才把 GOST 资源 staging 接入桌面构建；源代码和打包产物分别记录验证。
+5. 回滚或关闭开关时，每次启动前都会写回原环境代理；关闭浏览器也尽力恢复。移除功能前先用台账批量审计仍为受管 loopback 的 profile，不以盲写替代精确目标确认。
 
 ## Open Questions
 
-- AdsPower 当前随包内核及其代理扩展是否始终尊重 API `launch_args` 传入的 `--proxy-server`？这是首版真机验收门，若失败则本 change 暂停，持久 profile 改写必须另行设计事务与崩溃恢复后才能采用。
+- 无。真机验证已否定双权威 `launch_args` 方案，并证明 inactive profile 经受限 `user/update` 改为 GOST loopback 后，新浏览器代际能够使用该链路；实现仍需用自动读回、浏览器出口和恢复证据完成验收。
