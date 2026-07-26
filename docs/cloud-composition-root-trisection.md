@@ -519,11 +519,23 @@ api = 飞书 SDK + pg + ws；automation = pg + ws；content = 对象存储 + pg 
 命令行 `--@types:registry=…` 试过**无效**（scope registry 在 userconfig 里优先级更高）。
 content 已按此装好并生成 lockfile 一并提交，另三个仓照做即可。
 
-### 9.2 实测结论：剩余断裂 **100% 只在两个组装根文件里**
+### 9.2 实测结论：剩余断裂 **100% 只在两个组装根文件里**（三仓都是）
 
-`aidcp-content` 全仓 `tsc`：**578 个错误，573 个在 `src/server.ts`、5 个在 `src/index.ts`，
-其余 81 个业务文件一个错都没有。** 交接文档 §2.1 的静态扫描结论（业务代码断裂 0）由此坐实。
-**批次 2 的交付物就是重写这两个文件，没有别的。**
+三仓各自 `npm install` + `tsc` 全跑一遍：
+
+| 仓 | 总错误 | `src/server.ts` | `src/index.ts` | **业务代码** | 其他 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `aidcp-content` | 578 | 573 | 5 | **0** | — |
+| `aidcp-api` | 391 | 385 | 6 | **0** | — |
+| `aidcp-automation` | 372 | 361 | 5 | **0** | 6（见下） |
+| `aidcp-transport` | **0** | — | — | — | 已可独立编译 |
+
+交接文档 §2.1 的静态扫描结论（业务代码断裂 0）由此**被真编译器坐实**，三仓皆然。
+**批次 2/3/4 的交付物各自就是重写那两个文件，没有别的。**
+
+automation 那 6 个在两个 test helper 里（`role-factories.ts` 5 条指向 content 属主模块、
+`interaction-store-test-deps.ts` 1 条指向 api 属主模块），**是既存的跨属主留守项、与本次无关**——
+`sync-split-repos` 的「跨属主·留守 cloud 96 个」统计的就是这类，随耦合消除自动减少。
 
 ### 9.3 content 对基础段的全部依赖 = 20 个字段（机械算出，非人工清点）
 
