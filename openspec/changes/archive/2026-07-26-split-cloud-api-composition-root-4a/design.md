@@ -18,53 +18,64 @@ recovery 与 panel event push。DEV 仍是 monolith，独立 `aidcp-api` / `aidc
   不能整体变成一个 API route；编排必须移到 automation，网络两侧只保留 owner-local primitives；
 - `AccountPersonaService.generate` 属 API authority，但依赖 content-owned `PersonaGenerator`；
   API 必须调用 content port，不能复制角色/LLM；
+- `PublishDispatcher`、`ScheduledPublishReconciler` 与 scheduler 是 publish log 的 automation-owned
+  传递消费者；只盘点 server 直接调用会漏掉 9 个方法。`pendingPublishPreviewForRecord` 则只应由 API
+  owner 本地读取，再经 API→automation UI command 推送；
 - 同步 persona/config/account/edge-state 读取属于 4b 镜像，不能为了消 typecheck 临时包 HTTP；
-- 飞书入站、面板层与调度器归属已经裁决，不应把没有 automation 消费者的 API 对象复制进该进程。
+- 飞书入站、面板层的归属已经裁决，不应把没有 automation 消费者的 API 对象复制进该进程；
+- PersonaGenerator 以外的 Facebook media、其它 role factories、通用 LLM、TokenUsage 与 curated
+  content write 虽不进入 4a 方法面，仍会阻塞 full root；必须进 blocker ledger，不能写成已排除即已闭合。
 
 ## Goals / Non-Goals
 
 **Goals:**
 
 - 给所有确认仍由 automation 真消费者发起的 API-owned 异步 authority/command 建立窄端口。
-- 独立 automation 组合根不构造 API owner store、不打开 API owner pool、不接收 API store 实例。
+- D1 准入的 automation 消费者只装窄 HTTP client，不直接构造/接收 API owner store 或 pool；
+  root 其余未迁移构造必须留在 D7 blocker ledger，4a 不据此声称独立 automation 已可启动。
 - 保留 owner 事务、target、鉴权、版本/CAS、三态结果、at-least-once 与 unknown-result 语义。
 - 完成 AccountRoster 反向取源，并配对开放 Facebook scope import/replace 的完整 3a 面板操作。
 - 以最窄 target-bound command 让 API 请求 automation 恢复账号名下暂停 Edge，返回真实恢复数，
   并保持账号状态恢复与 Edge 恢复的部分成功真相。
 - 让 Facebook 两条 scope 写同样成为受鉴权、target-bound、可判 result-unknown 的 automation commands。
+- 让 API owner 本地生成 publish preview/state 更新，再经受鉴权、target-bound、可去重的
+  `applyPublishUiUpdate` command 投递 automation UI projection；automation 不跨 owner 回读单条 record。
 - 把 offboard reconcile 改为 automation 编排 API admission ledger 与本地 offboard owner primitives，
   保持 at-least-once、CAS receipt 与无跨网事务。
 - 让 API 通过受鉴权的 content `PersonaGeneratorPort` 完成生成人设，persist 继续由 API owner 提交。
-- 形成可机械核对的逐方法 inventory、共享包同步、聚焦测试和分层运行证据。
+- 形成可机械核对的逐方法 scoped inventory、独立 root blocker ledger、共享包同步、聚焦测试和分层运行证据。
 
 **Non-Goals:**
 
 - 不重做 3b 已交付的 approval authority 七方法、decision writer、dispatch trigger 或 panel push。
 - 不处理 `getSoul`/persona binding、账号显示身份/暂停态、environment gate、四张业务配置同步读、
   config freshness ambient 状态等 4b 镜像。
-- 除 Edge resume/Facebook scope 写命令外，不处理 API→automation 的排期/边缘在场读等反向端口；
+- 除 Edge resume/Facebook scope/Publish UI update 写命令外，不处理 API→automation 的排期/边缘在场读等反向端口；
   不恢复 `listAccountAutomationCatalog` mega-route，目录继续按 3a 决议在 API 本地由窄 automation
   facts 组装。
-- 除 API→content `PersonaGeneratorPort.generate` 外，不处理跨 content 的 Facebook media、其它角色工厂、
-  通用 LLM、TokenUsage 或 curated write。
+- API→content 只在本 change 实现 `PersonaGeneratorPort.generate`；Facebook media、其它角色工厂、
+  通用 LLM、TokenUsage 与 curated write 仍是显式 independent-root blocker，不得因不进入 4a 方法面而
+  从 ledger 消失。
 - 不改变 protocol v2、Edge/Console 外部 DTO，不制作 installer，不部署 OL。
-- 本 change 的源码完成不等于三进程已部署；若 4b 未完成，独立启动验收继续保持未交付。
+- 本 change 的源码完成不等于三进程已部署；4b mirror 或 content-owner blocker 任一未清零时，
+  独立启动验收继续保持未交付。
 
 ## Decisions
 
 ### D1. 以 3b 后逐方法账为准，不保留“11 条”历史计数
 
-4a 的实现清单为 **19 个方法簇、45 个 method slots**：automation→API 主体 16 簇/41 slots、
-API→automation 配对命令 2 簇/3 slots、API→content 生成依赖 1 簇/1 slot。表中每一项都必须在
-实现前以当前调用点和 owner map 再做一次
-source guard；若调用点已随并行变更移回 API，则删除该端口而不是保留无消费者 route。
+4a 的 scoped 实现清单为 **20 个方法簇、55 个 method slots**：automation→API 主体 16 簇/50 slots、
+API→automation 配对命令 3 簇/4 slots、API→content 生成依赖 1 簇/1 slot。该数字只证明 API authority
+scoped closure，不代表 full composition root 闭合。表中每一项都必须由 source-derived consumer
+census 与 owner map 同时导出；若调用点已随并行变更移回 owner 本地，则删除该端口而不是保留无消费者
+route。独立 root 还必须通过 D7 blocker ledger 门禁，两道门不得互相替代。
 
-| 方法组 | 4a 方法面 | owner / automation 真消费者 |
+| 方法组 | 4a 方法面 | owner → admitted consumer |
 | --- | --- | --- |
 | Account roster source | `listAccountIdentities` | API accounts → automation account projection / FB scope guard |
 | Account ownership | `getExecutionTarget`, `resolveExecutionTarget`, `setExecutionTarget` | API accounts → automation handshake/risk ownership；无 automation 消费者的兼容 `claimExecutionTarget` 不开放 |
 | Account runtime authority | `ensureAccount`, `getPlatformOrNull`, `getContactInfo`, `recordNickname` | API accounts → connection runtime, reply/comment workflow；`recordNickname` 在 owner 内比较并幂等写，避免跨网同步 get-then-set |
-| Publish log for automation | `loadForDispatch`, `editDraft`, `rejectPendingApproval`, `pendingApprovalForAccount`, `pendingPublishPreviewForAccount`, `lastPublishedForAccount`, `countPendingForAccount`, `countPendingAutonomousForAccount`, `countPublishedTodayForAccount`, `countPublishedSinceForAccount` | API publish log → dispatcher/UI snapshot/delegated executor |
+| Publish log for automation | `loadForDispatch`, `updateStatus`, `updatePostId`, `markScheduled`, `markImagesAttached`, `listDueScheduled`, `deferScheduledReconcile`, `confirmScheduledPublished`, `getMostRecentPublishTime`, `recentPublishedContents`, `editDraft`, `rejectPendingApproval`, `pendingApprovalForAccount`, `pendingPublishPreviewForAccount`, `lastPublishedForAccount`, `countPendingForAccount`, `countPendingAutonomousForAccount`, `countPublishedTodayForAccount`, `countPublishedSinceForAccount` | API publish log → automation dispatcher/scheduled reconciler/scheduler/UI account snapshot/delegated executor；传递消费者 9 方法必须计入 |
 | Edge publish commands | `removeDraftImage`, `decidePublishApproval` | automation-owned Edge WS → API-owned handler；wire payload/result 复用 API-local contract，不导入 automation protocol |
 | Interaction auth gate | `authorizeAuthStateWrite`, `checkAccountScope` | API transaction/row locks → automation interaction writes |
 | Interaction API writes | `insertAuditEvent`, `purgeReplyConfigForAccount`, `purgeExpiredAuditEvents` | API tables → automation outbox/retention/offboard；HTTP 方法不得接收调用方 PG client |
@@ -79,6 +90,7 @@ source guard；若调用点已随并行变更移回 API，则删除该端口而�
 | API notification exit | typed `deliver` command union | API Feishu/card builders/chat routing → automation notices；chat resolve/bind 均留 API 本地 |
 | Edge resume command | `resumeEdgesForAccount` | API command face → automation `WsServer.pausedEdges`；写命令返回首次应用的真实 resumed count |
 | Facebook scope commands | `importTargets`, `replaceTargetScopes` | API panel → automation owner writes；AccountRoster refresh 是其嵌套反向读 |
+| Publish UI update command | `applyPublishUiUpdate` | API owner local preview/state producer → automation UI projection；stable commandId、owner receipt，禁止 automation 回读 record preview |
 | Persona generator | `generate` | API AccountPersonaService → content-owned PersonaGenerator/LLM |
 
 `InteractionApiWrites` 的两个 purge 现有接口携带 `Queryable`，这在物理拆库后会把 automation
@@ -93,10 +105,13 @@ source guard；若调用点已随并行变更移回 API，则删除该端口而�
 - 4b：任何同步 `getSoul`/persona/config/account/edge-state getter；`resumeEdgesForAccount` 是写副作用，
   不在此列；
 - 3a/API 本地：`listAccountAutomationCatalog`；
-- content owner：除本 change 明列的 PersonaGenerator 外，Facebook publish media、其它 role
-  factories、通用 LLM、TokenUsage、curated content write；
 - API 本地：`resolveCardChatId`、`resolveAccountChatId`、`bindBotChat` 与兼容
-  `claimExecutionTarget`，automation 没有消费者，不开 HTTP。
+  `claimExecutionTarget`，automation 没有消费者，不开 HTTP；
+- publish owner 本地：`listPendingApprovalIds` 由 3b authenticated pending-dispatch scan 取代，
+  `pendingPublishPreviewForRecord` 只用于 API 本地生成 preview/update；两者不进入 automation→API port。
+
+PersonaGenerator 之外的 content-owner 依赖不是本表的 4a slots，但必须出现在 D7 blocker ledger；“未进
+scoped 方法账”不等于“full root 已消除”。
 
 ### D2. 端口按 owner transaction/失败语义拆组，不造 API mega-client
 
@@ -134,8 +149,8 @@ API server 在解析业务参数前验证：
 3. 本地 `AIDCP_DEPLOY_ENV` 合法且与 envelope target 一致；
 4. 方法级输入。
 
-automation→API 的 4a authority 使用 `AIDCP_API_INTERNAL_TOKEN`；API→automation 的 Edge resume
-与 Facebook scope commands 使用同方向的 `AIDCP_AUTOMATION_INTERNAL_TOKEN`，但按 capability
+automation→API 的 4a authority 使用 `AIDCP_API_INTERNAL_TOKEN`；API→automation 的 Edge resume、
+Facebook scope 与 Publish UI update commands 使用同方向的 `AIDCP_AUTOMATION_INTERNAL_TOKEN`，但按 capability
 分别注册窄 route；API→content persona generation 使用 `AIDCP_CONTENT_INTERNAL_TOKEN`。三者都不扩大
 3b `AIDCP_PUBLISH_APPROVAL_INTERNAL_TOKEN` 的权力边界。独立 api/automation/content 模式缺
 URL、target 或 token
@@ -154,7 +169,7 @@ post-side-effect response loss 分开。只有以下情况可重放：
 - `editDraft` 等以 expected content version 做 CAS，重试能返回相同结果或稳定 conflict。
 
 否则 client 返回/抛 `*_result_unknown`，调用方保持待核验状态并停止不可逆后继动作。不得因 timeout
-自动重试 nickname、environment、notification 或 publish mutation，也不得把 unknown 映射为
+自动重试 nickname、environment、notification、Publish UI update 或 publish mutation，也不得把 unknown 映射为
 `ok:false` 后触发补偿性删除/作废。
 
 3b approval revision CAS 保持原端口与 token；4a 的 publish log/Edge command 复用 content version，
@@ -204,21 +219,28 @@ automation 不导入飞书 SDK、card builders、`BotChatStore` 或 API messenge
 已有 content `PublishCardExitPort` 保持独立，不因字段相似合并：其 write approval signal 已受 3b token
 保护，消费方、权限与失败后果均不同。
 
-### D7. 4b 同步镜像是硬边界
+### D7. scoped census 与 independent-root blocker ledger 是两道独立门禁
 
-任何同步 consumer 不改成 `T | Promise<T>`，也不在热路径临时调用 HTTP。4a 完成后 automation root
-若仍因下列依赖不能 boot，必须原样记录为 4b blocker：
+第一道门是 source-derived scoped census：从当前 source consumer、owner map 与 service-mode guard
+机械导出 D1 的 20 组/55 slots，并证明每个 admitted route/client/adapter 都有真实 consumer。它只回答
+“4a 承诺的 API authority surface 是否闭合”，不能回答“独立 root 是否可 boot”。
 
-- persona binding/soul；
-- account display/platform-age/pause 与 environment automation gate；
-- content schedule/hot lead/Facebook config/join config 同步 view；
-- config mirror freshness ambient state；
-- API 所需的 week mask、edge presence/in-flight/captcha 等反方向镜像。
+第二道门是 independent-root blocker ledger：对 api/automation/content hand-written roots 做完整
+source scan，逐项保留未解决依赖及 owner/direction/consumer/失败证据。以下 blocker 任一存在，full root
+均保持未闭合：
 
-Edge resume 与 Facebook scope writes 是副作用命令，不能从镜像推导或由 API 本地执行，故属于
-4a paired commands；这不代表其余 edge presence/Facebook read 也进入 4a。
+- **4b mirror blockers**：persona binding/soul；account display/platform-age/pause 与 environment
+  automation gate；content schedule/hot lead/Facebook config/join config 同步 view；config mirror
+  freshness ambient state；API 所需的 week mask、edge presence/in-flight/captcha 等反方向镜像；
+- **content-owner blockers**：除本 change 明列的 PersonaGenerator 外，Facebook publish media、其它
+  role factories、通用 LLM、TokenUsage 与 curated content write。
 
-这保证 4a 可以独立验收 route/client，又不冒充组合根已经完整。
+任何同步 consumer 不改成 `T | Promise<T>`，也不在热路径临时调用 HTTP。Edge resume、Facebook scope
+writes 与 Publish UI update 是副作用命令，不能从镜像推导或由错误 owner 本地执行，故属于 4a paired
+commands；这不代表其余 edge presence/Facebook read 或 content authority 进入 4a。
+
+scoped census 全绿时可以验收 4a route/client；blocker ledger 未清零时只能记录 scoped closure，MUST NOT
+写成 full root closure、独立 typecheck/boot 或三进程可运行。
 
 ### D8. Edge resume 是独立命令，不是 3b restricted recovery 的别名
 
@@ -280,7 +302,24 @@ seed；生成后响应丢失为 `persona_generation_result_unknown`，API 不自
 改写为 `generation_failed`。content 可在当前进程生命周期复用同 idempotency receipt，但不声称跨重启
 durable exactly-once。
 
-### D11. server-first、派生同步与验收分层
+### D11. Publish UI preview 由 API owner 本地生成并单向推送
+
+`pendingPublishPreviewForRecord` 的 record owner 与查询实现都在 API；automation 不应为刷新 UI
+projection 反向逐条读取。API 在 owner-local publish mutation 后读取该 preview，整形成
+`PublishUiUpdate`，再以 versioned、target-bound、`AIDCP_AUTOMATION_INTERNAL_TOKEN`
+Bearer-authenticated `applyPublishUiUpdate(commandId, accountId, update)` command 推送 automation。
+
+automation receiver 只更新本地 UI projection，并按 `target + commandId` 保存当前进程原 receipt；同
+commandId 同 payload 返回 duplicate，同 id 异 payload返回 collision。API 查询不到 owner record 是明确
+业务结果；owner preview 查询失败时不发 command。automation 可能已应用但 ack 丢失时，API 报
+`publish_ui_update_result_unknown`，不得改为“未应用”、自动重试或回退到 automation→API
+`pendingPublishPreviewForRecord` route。该 UI command 不改变 publish log/approval authority，也不作为
+发布成功的终态证据。
+
+`listPendingApprovalIds` 同样不开放：automation dispatcher 的 pending scan 继续走 3b
+authenticated `listPendingDispatch`，避免重建第二条 approval scan 权威链。
+
+### D12. server-first、派生同步与验收分层
 
 实施顺序：
 
@@ -288,14 +327,16 @@ durable exactly-once。
    transport 与 direct
    loopback tests；
 2. API internal server 注册 automation→API routes；automation internal server 注册 Edge resume/
-   Facebook commands；content internal server 注册 persona generator；automation service-mode 对 API
-   authority 只装 client，source guard 证明没有 API owner pool/store；
+   Facebook/Publish UI update commands；content internal server 注册 persona generator；automation service-mode 中
+   D1 准入的 API authority 消费者只装 client，source guard 证明这些消费者没有 API owner pool/store
+   reachability；root 其余构造继续由 D7 blocker ledger 明示；
 3. 同步 kernel/transport 及真实消费仓，精确 pin，`aidcp-automation` 继续用本地 transport；
 4. 运行 Cloud acceptance/full/typecheck/boundary，再运行各派生仓 focused/full-where-available/typecheck；
 5. DEV monolith 只证明零回归、现有 listener/health/schema/Feishu/PostgreSQL；不额外打开任何独立
    internal listener；
-6. 只有 4b 也闭合且独立 api/automation/content units 真启动后，才验收端口互通、断链/恢复与无跨
-   owner pool。
+6. source-derived scoped census 与 independent-root blocker ledger 分别验收；只有 4b mirror 与
+   content-owner blockers 都清零、且独立 api/automation/content units 真启动后，才验收端口互通、
+   断链/恢复与无跨 owner pool。
 
 ## Risks / Trade-offs
 
@@ -316,18 +357,20 @@ durable exactly-once。
   content 只按同 idempotency key 返回当前进程可证明的 receipt。
 - [notification union 漏掉一种卡，运行时静默不发] → 从当前调用点生成穷举 kind 清单，API switch 用
   `never` exhaustiveness，未识别 kind 返回稳定拒绝。
-- [4a 测试通过被误写为三进程完成] → tasks 与文档强制分开 source、loopback、DEV monolith 与独立 units
-  四类证据；4b 未闭合时不启动切换。
+- [4a scoped tests 通过被误写为 full root/三进程完成] → tasks 与文档强制分开 source-derived census、
+  blocker ledger、loopback、DEV monolith 与独立 units 五类证据；4b 或 content blocker 未闭合时不启动切换。
 
 ## Migration Plan
 
-1. 建立 Cloud/kernel/transport/API/automation/content/control 隔离 worktree，重跑 preflight 与 3b 后 inventory guard。
+1. 建立 Cloud/kernel/transport/API/automation/content/control 隔离 worktree，重跑 preflight、
+   source-derived 3b 后 scoped census 与 independent-root blocker ledger。
 2. server-first 实现 4a contracts、owner adapters、HTTP 与 Facebook pair；先跑 direct/focused，再跑 Cloud
    acceptance/full/typecheck/boundary。
 3. 同步共享包和派生仓，更新精确 pin；分别验证，不用 hand-written root 的既有 4b 错误冒充 4a 失败或成功。
 4. 串行 rebase/fast-forward 默认分支并推送。若 runtime 行为改变且门禁全绿，仅部署 DEV monolith；
    备份、checksum sync、只重启 aidcp-cloud unit，验证现役服务。
-5. 更新 §10 与 tasks，记录每组方法、repo SHA、测试、DEV 和尚未做的独立进程证据。
+5. 更新 §10 与 tasks，记录 20 组/55 slots、repo SHA、测试、DEV、未清零 blocker ledger 和尚未做的
+   独立进程证据。
 
 回滚按 consumer pin → transport/kernel → Cloud owner routes 的逆序执行。新增 routes/DTO 无破坏性 schema
 删除；若确需 command dedupe inbox，只允许 additive migration，并保证旧 monolith 可忽略。任何 token
@@ -335,5 +378,6 @@ durable exactly-once。
 
 ## Open Questions
 
-无阻塞问题。实现期允许根据最终 consumer census 删除无消费者方法，但新增方法必须先回写本 design 的
-inventory 与 spec；不得用“让 root 先编过”为理由把 4b 同步镜像或 content owner 依赖混入 4a。
+无阻塞问题。实现期允许根据最终 source-derived consumer census 删除无消费者方法，但新增方法必须先回写
+本 design 的 inventory 与 spec；不得用“让 root 先编过”为理由把 4b 同步镜像临时包 HTTP，也不得把
+PersonaGenerator 之外的 content-owner blockers 从 independent-root ledger 隐去。

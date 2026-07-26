@@ -848,8 +848,10 @@ content 侧照同一形态收口即可。）
    **不属于单向面**，与 4a 的账号花名册端口配对后再落；不得把当前 10 方法客户端注入成完整 FB 面板依赖。
 2. **3b · 双向那几条**：风控命令（含 `recoverRestricted`）、审批后下发触发、面板实时事件通道。
    **这三条必须与 automation 侧配对设计**，否则会出现「两侧各写一份、各自编译通过、只有真跑才 404」。
-3. **4a · automation 要的 api 侧 11 条**：发布台账读写（**注意与 content 那条窄写口不是同一条**，
-   它有 10 个方法）、授权台账、互动写入闸、回复策略解析、人设服务、握手回写。
+3. **4a · post-3b API authority scoped closure（20 组 / 55 个 method slots）**：
+   16 组 / 50 槽 automation→API、3 组 / 4 槽 API→automation、1 组 / 1 槽
+   API→content。发布台账本身是 19 个 admitted 方法；owner-local pending scan / preview read、
+   3b approval、chat resolve/bind 与 4b mirror 都不在这 55 槽里。
 4. **4b · 11 条同步读的镜像层**：单独排，别混进「包个 HTTP 客户端」里估。
 
 **每一段仍保持 server-first，但验收证据必须按运行形态拆开**：
@@ -1089,3 +1091,95 @@ DEV 已从 clean Cloud `master` 部署并只重启现役 `aidcp-cloud.service`�
 `aidcp-api` / `aidcp-automation` 的手写组合根仍有 4a 完整反向 authority 与 4b 同步镜像缺口；
 只有两进程真实 boot、内部端口真实监听、双方不再连接对方属主数据库，并做过断链积压/恢复补投及
 真实 panel WebSocket 探针后，才能声明独立 api/automation 或三进程运行验收。
+
+### 10.10 4a 已交付：**20 组 / 55 槽的 scoped authority 闭合，不等于独立进程已上线**
+
+4a 不是旧测绘里笼统的“API 侧 11 条”。最终口径由 production AST consumer 反推，
+并由一份独立 blocker ledger 交叉检查：
+
+| 方向 | 契约组 | method slots | 物理含义 |
+| --- | ---: | ---: | --- |
+| automation → API | 16 | 50 | 账号花名册/归属/运行态、19 方法发布台账、发布命令、互动授权与写入、回复策略、人设、握手、评论审批策略、通知联系人、首作进度、配置命令、offboard admission ledger、结构化通知 |
+| API → automation | 3 | 4 | Edge resume、Facebook import/replace scope、Publish UI update |
+| API → content | 1 | 1 | PersonaGenerator |
+| **合计** | **20** | **55** | source-derived consumer 55 个，另有 2 个已审阅 owner-local alternate |
+
+这 55 槽**明确不含** API owner-local 的 `listPendingApprovalIds` /
+`pendingPublishPreviewForRecord`、`claimExecutionTarget`、chat resolve/bind、3b approval
+authority，也不含 4b 的同步读镜像。Cloud `composition-root:census` 在
+`aidcp-cloud@b94f6ad` 得到 **20/55/55**；独立 root ledger 仍有 **51** 个预期 blocker：
+14 个 4b mirror、4 个 operator command、7 个 content dependency、26 个组合根构造。
+`composition-root:require-empty` 因此按设计非零退出；4a 的 acceptance 不使用 require-empty，
+更不会把非空 ledger 改写成“全 root 已完成”。
+
+交付机制中最容易被“HTTP 已通”掩盖的边界如下：
+
+1. **API owner 写与跨进程通知分开。** 发布 edit/reject 的 CAS 与精确结果先在 API owner
+   提交；Publish UI command 是之后的一次可观察、无自动重试投递。投递失败只 warn，
+   不回滚 owner 写，也不把确定 owner 结果污染成 unknown。最终 API 组合只发送一次 preview；
+   automation receiver 按 `(accountId, recordId)` 的 `factVersion` 拒绝迟到旧事实并返回
+   `stale`，不把 stale 当 applied。
+2. **Edge resume 是独立的 4a 命令，不绕过 3b restricted recovery。** API 先写账号 active
+   真态，再用稳定 commandId 调 automation；回执保留真实 resumed count、duplicate/collision
+   与 response-loss `result_unknown`，不自动重发。3b 只有匹配的 restricted recovery
+   `applied + normal` 才能清 Edge 受限态，两条链不互相冒充。
+3. **Facebook scope 两个写口是真 command，不是 3a reader 的扩权。** API panel 的
+   `importTargets` / `replaceTargetScopes` 走 target-bound、Bearer、commandId receipt；
+   列表/筛选等读仍走 3a `FacebookGroupOps`。owner transaction 内没有跨网等待。
+4. **offboard 由 automation 编排、API 只持 admission ledger。** automation 先取完整 active
+   snapshot，再经 API owner reconcile/claim，逐条在 automation owner 本地物化，最后以
+   claim token + revision 回写 receipt；任一 unknown/stale/collision 都停在真实 partial
+   progress。完整快照只释放 `materialized_at <= observedAt` 且本 target、快照缺席的 hold，
+   因此读取快照后才并发物化的 hold 不会被旧快照误删并提前开放改派。0081 保持 expand：
+   旧 NULL target 具名阻断，运行时不猜 dev/ol，物理 `SET NOT NULL` 留给 D6 contract change。
+5. **Feishu 只在 API 构卡、路由、收发；automation 只 `deliver` 结构化 union。**
+   no-chat、owner reject、send 后回执未知都保真；业务侧通知失败 warn-and-continue，
+   不把通知当业务写的提交条件。
+6. **PersonaGenerator 只在 content。** API 只发 target/version/Bearer/idempotency 命令并在
+   API owner 持久化；content 使用自己的 Soul codec 生成，ACK 丢失不触发自动再生成。
+
+默认分支按 kernel → transport → consumers → Cloud 串行快进并推送：
+
+- `aidcp-kernel@bb132db`：20-group pure contract export；build/typecheck/export probe 通过；
+- `aidcp-transport@874d556`：6 个 4a transport member，28/28、build/typecheck/export 通过；
+- `aidcp-api@4a0f560`：独立 API root、真实 4a owner 与 3b approval 保持接线；
+  focused 5/5、API/offboard 14/14、acceptance 3/3、全量 457/457、typecheck/build/package 通过，
+  独立终审 P0/P1/P2=0；
+- `aidcp-automation@f21bd74`：可加载的 automation-only factory，16 个 API client group、
+  3 个 receiver、owner-local offboard 与 deliver-only；focused 19/19、typecheck/build/dist
+  export/package 与边界 219/219（unresolved=0、forbidden=0）通过。其 executable 仍对
+  **20 项派生 readiness blocker** fail closed；全量 **1725 total / 1699 pass / 23 fail /
+  3 skip**，23 项均为具名的既有派生 schema/migration/frozen-fixture blocker，未写成全绿；
+- `aidcp-content@e9744fe`：content-owned persona codec/receiver，focused 9/9、
+  acceptance 12/12、全量 455/455、typecheck/build/package 通过；
+- `aidcp-cloud@b94f6ad`：focused 42/42 + offboard/expand 59/59 + persona/codec 34/34，
+  acceptance 144/144，全量 **3593 total / 3582 pass / 0 fail / 11 skip**，typecheck 通过，
+  source/ownership **502/502**、cross-boundary edge 0，独立终审 P0/P1/P2=0。
+
+最终 split-sync 从 landed Cloud SHA 对账：API 111、automation 218、content 85、kernel 92、
+transport 43 个受管 source 全部零漂移；migration 为 API 54 / automation 44 / content 20，
+kernel/transport pins 精确一致。非零输出只剩各仓手写 root 与派生测试适配：
+API 2 roots + 7 tests，automation 2 roots + 1 个已声明的私有 composition helper +
+7 adapted/1 extra tests，content 2 roots + 3 tests。`src/soul/soul.yaml` 现作为 API 必需
+运行资产逐字节对账，不能再被“只扫 TS”的 census 漏掉。
+
+DEV 部署的是干净 `aidcp-cloud@b94f6ad` **monolith**：
+
+- backup：`/opt/aidcp/cloud.bak.20260727-030000.tar.gz` 与
+  `/opt/aidcp/cloud/.env.bak.20260727-030000`；
+- 部署前 `client_env_revocation_holds` 为 0 行；migration status 只有 API expand
+  `0081_offboard_admission_claims` pending。0081 用 18ms 应用；最终 content 20/20、
+  automation 44/44、API 54/54，三属主 pending=0，verify 缺失对象=0；
+- 只对 `aidcp-cloud.service` 做 stop→start；服务 active/running、`NRestarts=0`，
+  `:8787`、`127.0.0.1:8090`、`:8091` 正常，两个 health endpoint 均 `{"ok":true}`，
+  三个 owner PostgreSQL `SELECT 1` 均通过；
+- enforce schema gate 三属主全部通过；target=`dev` 的 automation writer lock 恰有 1 个持有者，
+  `RiskControllerRegistry` ready，Feishu `WSClient onReady`，启动后无 error/fatal/failed 日志；
+- 运行进程只有 `AIDCP_DEPLOY_ENV=dev`，没有 `AIDCP_SERVICE`。独立 api/automation/content
+  units 均 not-found/inactive，`:8092` / `:8093` / `:8094` 均未监听。
+
+因此这次 ECS 证据只证明现役单体在 4a 源码与迁移下零回归。API root 虽已可编译测试，
+automation root 也已从“模块解析即失败”收口为可加载 factory，但 4b mirrors、operator/content
+依赖与 production runtime composition 尚未闭合；没有两进程真实 boot、断链积压/恢复、
+真实 panel WebSocket 探针，也没有 Edge installer 或真实账号验证。上述项目仍是 4b/后续批次，
+不得从本节的 source/loopback/DEV monolith 证据外推。

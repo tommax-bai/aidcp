@@ -104,6 +104,14 @@ TRANSPORT_MEMBERS = [
     'src/transport/publish-approval-authority-http.ts',
     'src/transport/publish-approval-decision-http.ts',
     'src/transport/publish-dispatch-trigger-http.ts',
+    # 批次 4a：API authority scoped closure。按能力拆成四个方向模块，paired-command
+    # 承载 API→automation/content 的窄命令；barrel 只导出机械 route inventory。
+    'src/transport/api-direct-http-common.ts',
+    'src/transport/api-account-authority-http.ts',
+    'src/transport/api-publish-interaction-http.ts',
+    'src/transport/api-aux-authority-http.ts',
+    'src/transport/paired-command-http.ts',
+    'src/transport/api-direct-http.ts',
     # 批次 3a：automation owner → api 的第一批单向异步能力。五个成员都同时包含
     # owner route 与 typed client，且不持有属主表 SQL；Facebook 群口刻意不含需要
     # 反向刷新 api 花名册的 importTargets / replaceTargetScopes。
@@ -125,6 +133,11 @@ TRANSPORT_MEMBERS = [
 TRANSPORT_REPO = 'aidcp-transport'
 # 组装根：三个业务仓今天各有一份逐字节副本；批次 2/3/4 会各自改写成自己的 main()。只报不改。
 COMPOSITION = {'src/server.ts', 'src/index.ts'}
+# 派生仓可把手写入口再拆成仓私有的 composition helper；它没有 Cloud fact-source
+# 对应物，故只登记并排除于受管源码 census，绝不能被 --prune 当成“多出”删除。
+DERIVED_COMPOSITION = {
+    'aidcp-automation': {'src/automation-composition-root.ts'},
+}
 KERNEL_REPO = 'aidcp-kernel'
 
 
@@ -139,7 +152,7 @@ def pin_pattern(pkg_name: str) -> 're.Pattern[str]':
 # transport 也在内：它承载跨进程路由名，pin 过期的表现是**只有真跑起来才 404**。
 SHARED_PACKAGES = {'aidcp-kernel': KERNEL_REPO, 'aidcp-transport': TRANSPORT_REPO}
 
-# 仓 → 需要整树镜像过去的**非 src 运行时资产**目录（逐字节，含二进制）。
+# 仓 → 需要逐字节镜像过去的运行时资产路径（目录或单文件，含二进制）。
 #
 # 为什么必须在这里管：`src/` 的对账再干净，代码在运行时读的文件没跟过去，一样跑不起来 ——
 # 而且这一类失败**不响**。文字卡渲染出口按 `<仓根>/assets/fonts` 解析字体与度量清单，读不到时工厂
@@ -150,6 +163,9 @@ SHARED_PACKAGES = {'aidcp-kernel': KERNEL_REPO, 'aidcp-transport': TRANSPORT_REP
 # 判据与 TRANSPORT_MEMBERS 同源：**谁在代码里读它，就只给谁**。渲染出口是 content 属主，
 # 故只有 content 需要；api / automation 装了纯属多背 5MB 二进制。
 REPO_ASSETS = {
+    # AccountPersona / editor template 在 API 进程启动时读取；它不是 TS module，不能让
+    # module-ownership 清单把它误报成「多出」后再靠人工复制维持运行。
+    'aidcp-api': ['src/soul/soul.yaml'],
     'aidcp-content': ['assets'],
 }
 
@@ -171,11 +187,11 @@ def git_bytes(ref_repo: str, *args: str) -> bytes:
 
 
 def sync_assets(args, repo: str, path: str) -> int:
-    """镜像 REPO_ASSETS 声明的资产目录。返回差异数（0 = 已一致）。"""
-    dirs = REPO_ASSETS.get(repo)
-    if not dirs:
+    """镜像 REPO_ASSETS 声明的资产路径。返回差异数（0 = 已一致）。"""
+    paths = REPO_ASSETS.get(repo)
+    if not paths:
         return 0
-    listing = git(CLOUD, 'ls-tree', '-r', '--name-only', args.ref, '--', *dirs).split()
+    listing = git(CLOUD, 'ls-tree', '-r', '--name-only', args.ref, '--', *paths).split()
     add, changed = [], []
     for rel in sorted(listing):
         want = git_bytes(CLOUD, 'show', f'{args.ref}:{rel}')
@@ -191,7 +207,7 @@ def sync_assets(args, repo: str, path: str) -> int:
             with open(dst, 'wb') as fh:
                 fh.write(want)
     if add or changed:
-        print(f'  资产（{"/".join(dirs)}）：新增 {len(add)} · 内容不同 {len(changed)}')
+        print(f'  资产（{"/".join(paths)}）：新增 {len(add)} · 内容不同 {len(changed)}')
         for rel in (add + changed)[:10]:
             print(f'   ⊕ {rel}')
     return len(add) + len(changed)
@@ -443,7 +459,20 @@ def main() -> int:
         expected = {p for p, l in own.items() if l == layer}
         if layer != 'kernel':
             expected |= COMPOSITION & set(own)  # 组装根三份副本，只报不改
-        actual = {f for f in git(path, 'ls-files').split() if f.startswith('src/')}
+        asset_paths = REPO_ASSETS.get(repo, [])
+        runtime_assets = (
+            set(git(CLOUD, 'ls-tree', '-r', '--name-only', args.ref, '--', *asset_paths).split())
+            if asset_paths
+            else set()
+        )
+        actual = {
+            f for f in git(path, 'ls-files').split()
+            if (
+                f.startswith('src/')
+                and f not in runtime_assets
+                and f not in DERIVED_COMPOSITION.get(repo, set())
+            )
+        }
 
         add, remove = sorted(expected - actual), sorted(actual - expected)
         changed, comp_changed = [], []
@@ -471,6 +500,9 @@ def main() -> int:
             print(f'   ! {rel}（清单里没有；--prune 才会删）')
         for rel in comp_changed:
             print(f'   ⊘ {rel}（组装根：只报不改，批次 2/3/4 各仓自己写 main()）')
+        for rel in sorted(DERIVED_COMPOSITION.get(repo, set())):
+            if os.path.isfile(os.path.join(path, rel)):
+                print(f'   ⊙ {rel}（派生仓私有组装根：无 Cloud 对应物，只登记不覆盖）')
         asset_diff = sync_assets(args, repo, path)
         mig_diff = check_migrations(path, mig_scopes, layer)
         if add or changed or remove or comp_changed or asset_diff or mig_diff:

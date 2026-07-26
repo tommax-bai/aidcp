@@ -8,6 +8,10 @@
 
 - 重新逐调用点盘点 3b 后仍由 automation 真消费者调用的 API authority/command，只为自然异步的调用建立
   versioned internal HTTP port；API 保持 owner store、事务、校验与业务拒绝的唯一实现方。
+- 把 `PublishDispatcher`、`ScheduledPublishReconciler` 与 scheduler 的传递消费者纳入 publish-log
+  事实账：该组为 19 方法，而不是只统计 server 直接调用的 10 方法；API 本地
+  `listPendingApprovalIds` / `pendingPublishPreviewForRecord` 不开放。稿件预览由 API owner 本地读取后，
+  通过 API→automation `applyPublishUiUpdate` command 推送，automation 不反向逐条查询 API record。
 - 补齐账号花名册取源，并在同一 change 把 Facebook `importTargets` / `replaceTargetScopes` 加回 3a
   刻意留空的运营面：scope 判否前可反向刷新 automation 本地账号投影，刷新失败、空结果或陈旧结果不得
   伪装成“无账号”或产生部分 scope 写。
@@ -31,9 +35,12 @@
   数据库连接或本地复制 owner 实现。
 - 读失败保持“未读成”而不是空/null/default；带副作用请求保留 CAS/幂等键与
   `result_unknown`，不得把响应丢失冒充失败、成功或安全重试。
-- 明确排除 4b 的同步热路径镜像，以及除 Edge resume/Facebook scope commands 外的
-  API→automation、除 PersonaGenerator 外的 content 端口；源码、
-  DEV monolith 与独立进程运行证据继续分层记录。
+- 采用两道独立门禁：source-derived scoped census 证明本 change 的 **20 组/55 slots**
+  （automation→API 16/50、API→automation 3/4、API→content 1/1）闭合；independent-root
+  blocker ledger 则持续枚举 4b 同步镜像以及 PersonaGenerator 之外的 content-owner 依赖。4a 只证明
+  API authority scoped closure，不能把 scoped census 通过写成 full root 闭合或独立 boot。
+- 源码、DEV monolith 与独立进程运行证据继续分层记录；blocker ledger 未清零且独立 units 未实际启动前，
+  不声明三进程互通。
 
 ## Capabilities
 
@@ -55,3 +62,5 @@
   仓更新精确 package pin。`aidcp-automation` 继续使用本地 transport 源码，不安装第二份 transport。
 - Control：`sync-split-repos` 成员清单、边界/属主门禁、§10 的 3b 后精确方法账与交付证据。
 - 不改 Edge/Console 外部 DTO，不制作 Edge installer，不部署 OL，不在本 change 启动或声称完成三进程拓扑。
+  4a 的交付边界是 API authority scoped closure；full root 仍受 4b mirror 与 content-owner blocker
+  ledger 约束。
