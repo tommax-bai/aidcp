@@ -41,7 +41,7 @@
 - [x] 6.2 Run a reversible development smoke with a newly started inactive AdsPower profile: prove startup updates and reads back the profile to the GOST loopback without `--proxy-server`, full-chain Facebook preflight succeeds, browser-context egress reflects the environment proxy, and confirmed close restores the original proxy exactly.
 - [x] 6.3 Run `openspec validate add-system-upstream-proxy-chain --strict`, record Edge/control commit SHAs and validation evidence here, commit with explicit pathspecs, and push both `codex/add-system-upstream-proxy-chain` branches.
 - [x] 6.4 Run focused signed-artifact/runtime/packaging tests, full Edge tests, typecheck, strict OpenSpec validation, then rebuild and locally verify the arm64 OL Developer ID signed package.
-- [ ] 6.5 Re-run the focused, acceptance, complete Edge, typecheck, build-input, and strict OpenSpec gates for the profile-authority pivot; record the new SHAs and integrate the source and contract updates without claiming a new installer.
+- [x] 6.5 Re-run the focused, acceptance, complete Edge, typecheck, build-input, and strict OpenSpec gates for the profile-authority pivot; record the new SHAs and integrate the source and contract updates without claiming a new installer.
 
 <!--
 Implementation evidence (2026-07-26):
@@ -81,4 +81,14 @@ No-proxy applicability follow-up (2026-07-26):
 - The main process now reads profile proxy applicability before preparing the chain. Explicit `noProxy` clears stopped-profile relay state, projects `proxyChainApplicable=false`, skips the Facebook network probe, and launches without `AIDCP_ADS_PROXY_OVERRIDE`. Profiles with a configured proxy continue to fail closed when their required system hop or relay is unavailable.
 - Renderer state no longer reports a restart requirement for a running no-proxy profile and explains that double-hop is not applicable.
 - Focused proxy/provider/lifecycle/fleet suites: 216 passed; renderer suite: 96 passed; complete Edge suite: 2417 passed, 0 failed; `npm run typecheck` passed; strict OpenSpec validation passed.
+
+Profile-authority pivot follow-up (2026-07-26):
+- Edge implementation commit: `893a146`, pushed to `codex/add-system-upstream-proxy-chain`, fast-forwarded to `origin/master`, and validated from the same source tree.
+- Control contract commit: `1c4b9ac` (`codex/add-system-upstream-proxy-chain`).
+- Environment creation still writes the user's submitted proxy directly. AIDCP separately retains the original configured proxy in a per-profile `safeStorage`-encrypted authority; explicit no-proxy removes the authority and skips all update/readback restrictions.
+- Every configured-proxy browser generation now receives its authority through an anonymous pipe, updates AdsPower through `user/update`, reads back the exact route before `browser-profile/start`, and never injects `--proxy-server`. Direct mode writes the original proxy; double-hop mode writes the managed GOST loopback. Active configured-proxy profiles remain non-adoptable.
+- Confirmed close best-effort restores and reads back the original proxy; crash-left-loopback is corrected by the next launch rewrite. Original proxy credentials do not enter renderer projections, settings, argv, inherited environment variables, or logs.
+- Provider tests: 35 passed; focused Electron lifecycle/security tests: 99 passed; all Electron tests: 914 passed; acceptance tests: 30 passed; complete Edge suite: 2430 passed, 0 failed. `npm run typecheck`, `node --check` for the changed CommonJS modules, `npm run build:dist`, and `npm run verify:desktop-build-input` passed.
+- Reversible live smoke started an inactive real profile and proved loopback readback, full-chain Facebook HTTP 200, an interactive browser Facebook page, browser egress equal to the GOST relay egress, confirmed browser close, and exact original-proxy restoration. The temporary smoke script, AdsPower daemon, SunBrowser, and GOST process were removed/stopped afterward.
+- `openspec validate add-system-upstream-proxy-chain --strict` passed. No new installer was built, signed, notarized, published, installed, or customer-tested for this pivot.
 -->
