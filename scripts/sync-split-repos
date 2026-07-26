@@ -87,7 +87,16 @@ TRANSPORT_MEMBERS = [
     'src/transport/publish-status-http.ts',
     'src/transport/review-card-delivery-http.ts',
     'src/transport/risk-read-http.ts',
+    # 风控写命令：**两端分处两个进程**（server 跑 automation、client 跑 api），是本清单存在的
+    # 最典型形态，却从落地起就没进过包 —— 因为在此之前两端恰好还在同一个进程里，谁也没被迫去 import 它。
+    # 批次 3 测绘时才发现。同族的只读端口 risk-read-http.ts 一直在清单里，这条漏了。
+    'src/transport/risk-command-http.ts',
 ]
+# 有意**不**进包的同目录文件（判据：只有 automation 一家用，或直接持有属主表 SQL）：
+#   event-outbox.ts / risk-command-outbox.ts / eventbus-outbox-bridge.ts / outbox-health.ts /
+#   outbox-notify-listener.ts / account-projection-store.ts
+# 它们是 automation 的私有实现（outbox 表是 automation 属主、账号投影写 automation 库），
+# 进包会让另外两家能直接 import 别人的表。**「在 src/transport/ 目录下」不是准入判据。**
 TRANSPORT_REPO = 'aidcp-transport'
 # 组装根：三个业务仓今天各有一份逐字节副本；批次 2/3/4 会各自改写成自己的 main()。只报不改。
 COMPOSITION = {'src/server.ts', 'src/index.ts'}

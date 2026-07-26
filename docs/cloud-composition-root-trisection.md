@@ -848,3 +848,61 @@ content 侧照同一形态收口即可。）
 一个进程里出现两份（`schema-capability` 的一次性告警旗标会打两遍）。
 `aidcp-api` 与 `aidcp-content` 没有本地副本，用包。
 **两端一致由消费方的 pin 对账保证**（已实装，见 §9.7.3 第 4 条）。
+
+### 10.6 对抗性复核结论：**两份分类都判「需要修订」**（同批完成）
+
+复核逐条实测（真编译器 + `module-ownership.json` + `git blame`），合计找出
+**判错 10 条 · 整个漏掉 18 条**。完整证据在 `docs/data/batch34-composition-root-survey.json`
+的 `verdicts` 段。**在按 §10.4 动手之前必须先吸收这一节 —— 否则会照着一份错的分类写代码。**
+
+**先记一条方法论：复核自己也会错，MUST 逐条验，别照单全收。**
+它最严厉的一条是「委托任务执行链的启动守卫没有 else、没有 warn ⇒ /delegate 收得下、
+存得住、永远不执行」。**证据是错的** —— `server.ts:6019` 就是
+`} else if (delegatedTaskService) { console.warn(...) }`，拆开后那条 warn 会打。
+但**结论方向仍然成立且重要**：告警只在启动时响一次，之后每条委托任务照常被接收、落库、
+永不执行，收任务那一侧没有任何提示。这是一条真的需要处置的缺口，只是形态不是「完全静默」。
+
+#### api 侧要改的三条判错
+
+1. **`publish-card-exit` 那条 route 不是「零跨属主」。** 它的 `resolveCardChatId` 传递到
+   `groupRouteStore`（automation 属主）。而这条 route 是**服务给 content 的** ——
+   读不到的后果是 content 每张审批卡**静默落默认群**。原分类把整组九条 route 写成
+   「零跨属主取数、最省事的一段」，与它自己在别处承认的传递性缺口直接矛盾。
+2. **四类限频配置的面板外观本身就是 automation 属主**，api 仓里连 `createQuotaConfigPanel`
+   等四个工厂都 import 不到。工作量不是「给已有 api 外观补一条数据端口」，
+   而是**外观的归属得先裁决**（搬进 api / 提进共享层 / 整块走端口）。
+3. **`roleConfigPanel` 的三个注入指向 content 属主模块**（封面形态的模型/厂商解析、思考参数构造）。
+   它们确实是纯函数 + env 读，但「纯不纯」与「本仓有没有这个文件」无关 ——
+   这是一项必须做的处置决定（提 kernel / 就地内联），不是可以略过的注脚。
+
+#### automation 侧要改的四条判错（另三条略，见 JSON）
+
+1. **`PublishDispatcher` 漏了第三个跨属主实参 `FacebookPublishMediaStore`（content 属主 + content 池）**，
+   而它在构造里是 **optional** —— 漏传**不会编译失败、不会报错**，只是 FB 发帖素材的
+   预留释放 / 标记已用 / 隔离三个写**全部静默消失**（预留泄漏 + 图片可能被重复选用）。
+   **这正是「传递性检查必须做」那条纪律的又一个实例，而且是 optional 参数这种最难发现的形态。**
+2. **`ReplyWorkflow` 的第三个实参 `ReplyAiService` 是 content 属主的具体类**，不是 LLM 客户端本身 ——
+   就算模型出口那条口裁决走 HTTP，这个类仍然是本仓没有的东西。
+3. **三张 api 配置镜像被误判成「恒缺席」**：只对自动化段成立，对本仓 `main()` 不成立 ——
+   角色→模型的解析闭包在基础段、**三张都同步读**，还要 api 的分类目录。
+   **而 `aidcp-transport` 里已有现成解法**（`role-model-selection-http.ts` 自带轮询镜像），
+   批次 2 的 content 就是这么接的。**把一个已有契约当成了恒缺席。**
+4. **委托任务端口的方法面不含 `createFromText`**（路由表只有 7 条，kernel 接口也只有 7 个方法），
+   而飞书 `/delegate` 的自由文本入口调的正是它 —— 拆开后飞书入站在 api、服务在 automation，
+   这恰恰是必须跨的一条，且是带意图解析的重活，**不能让 api 侧自己拼 intent 绕过去**。
+
+#### 一条结构性发现（比上面任何一条都重要）
+
+**委托任务的执行器同时需要评论调度器（automation）与发帖调度器（api 属主）。**
+两者拆到两个进程后，那条 `if` 恒不成立。这不是「补一个端口」能解决的 ——
+**它要求先裁决发帖调度器的归属**（留 automation / 搬 api / 拆成两半），
+而那个裁决会连带影响：发布生成触发口的客户端该装在哪、`likedStore.recentSince` 与
+同步风控视图这两项 automation 事实怎么给到 api 侧。**这是批次 3/4 的第一个必须由人拍板的岔口。**
+
+#### 修订后的真实工作量
+
+原测绘 33 条新契约；复核补出 **18 条漏项**，其中至少 6 条是真新契约
+（`getAccountCommentMode` / `appendEvents` / 首作进度读 / `TokenUsageStore.add` /
+`listAccountAutomationCatalog` 反向读 / `rolePromptProvider`），另有 2 条是
+**已有契约没被认出来**（厂商密钥窄读、角色模型解析镜像），可直接省掉。
+**结论：按「40 条上下的新契约 + 11 条同步读镜像」排期，不要按 33 条。**
