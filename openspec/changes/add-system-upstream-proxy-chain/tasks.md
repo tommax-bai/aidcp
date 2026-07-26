@@ -35,7 +35,7 @@
 - [x] 6.1 Install physical worktree dependencies, run focused Electron/provider/renderer/packaging tests, full Edge tests required by affected proxy/browser safety contracts, and `npm run typecheck`.
 - [ ] 6.2 Run a development smoke with a newly started inactive AdsPower profile: prove the launch payload includes the loopback override, full-chain Facebook preflight succeeds, and browser-context egress evidence reflects the environment proxy; if AdsPower ignores the override, stop without profile mutation and record the blocker.
 - [x] 6.3 Run `openspec validate add-system-upstream-proxy-chain --strict`, record Edge/control commit SHAs and validation evidence here, commit with explicit pathspecs, and push both `codex/add-system-upstream-proxy-chain` branches.
-- [ ] 6.4 Run focused signed-artifact/runtime/packaging tests, full Edge tests, typecheck, strict OpenSpec validation, then rebuild and locally verify the arm64 OL Developer ID signed package.
+- [x] 6.4 Run focused signed-artifact/runtime/packaging tests, full Edge tests, typecheck, strict OpenSpec validation, then rebuild and locally verify the arm64 OL Developer ID signed package.
 
 <!--
 Implementation evidence (2026-07-26):
@@ -60,4 +60,12 @@ Follow-up evidence (2026-07-26):
 - The switch now persists its target mode immediately; the main process invalidates stopped-environment preflight/relay evidence before scheduling the next offline preflight.
 - Running child generations resolve their effective mode from the frozen `status.proxyMode` until explicit restart, including browser-absent cold-standby/control-plane states.
 - Renderer + system proxy contract tests: 88 passed; focused lifecycle/fleet/preflight/runtime tests: 43 passed; Electron main/renderer syntax checks and `npm run typecheck`: passed.
+
+Signed nested-artifact follow-up (2026-07-26):
+- Edge fix commit: `5236653`, pushed to `codex/add-system-upstream-proxy-chain`, fast-forwarded to `origin/master`, and fast-forwarded to `release/20260726-ol-current`.
+- Root cause reproduced on the previously installed Developer ID app: signing changed GOST SHA-256 from manifest `ca290005...` to `98efe662...` and Native Page Engine from manifest `b2fc532d...` to `e024e7bb...`; both old runtime hash verifiers failed while `codesign` and Team ID `DK3BYZ9K32` were valid.
+- Development/staging and `afterPack` retain pre-sign SHA-256 validation. Packaged macOS runtime now ignores `AIDCP_GOST_BINARY`, verifies fixed resource containment, App and nested Developer ID identities, Team ID, Identifier and architecture, then checks GOST v3.2.6 only after signature trust. Native Page Engine uses the same packaged signature rule.
+- Electron `afterSign` and the final macOS release trust gate verify both nested executables. Focused signed-artifact/runtime/packaging tests: 31 passed; complete Edge test command exited 0; `npm run typecheck` passed; strict OpenSpec validation passed.
+- Final arm64-only OL build completed with exit 0 from `release/20260726-ol-current` at `5236653`; mounted DMG verification passed for deep App signature, both nested identities, `aidcpCloudDefaultEnv=ol`, and `aidcpClientAuthUrl=http://123.56.253.183:8088/capi`.
+- Local signed-only DMG: `dist-electron-ol-arm64-signed-20260726-gost-fix/AIDCP-0.3.24-arm64.dmg`, SHA-256 `8509e0952c377dffb7e681e76d36d1feeca58f6464be9e461cf0c28f7b9fedf8`. Notarization was intentionally disabled; `spctl` reports `Unnotarized Developer ID`, so no notarized/Gatekeeper-accepted delivery is claimed.
 -->
