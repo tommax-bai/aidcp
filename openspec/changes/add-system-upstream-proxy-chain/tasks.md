@@ -31,16 +31,18 @@
 
 - [x] 6.1 Install physical worktree dependencies, run focused Electron/provider/renderer/packaging tests, full Edge tests required by affected proxy/browser safety contracts, and `npm run typecheck`.
 - [ ] 6.2 Run a development smoke with a newly started inactive AdsPower profile: prove the launch payload includes the loopback override, full-chain Facebook preflight succeeds, and browser-context egress evidence reflects the environment proxy; if AdsPower ignores the override, stop without profile mutation and record the blocker.
-- [ ] 6.3 Run `openspec validate add-system-upstream-proxy-chain --strict`, record Edge/control commit SHAs and validation evidence here, commit with explicit pathspecs, and push both `codex/add-system-upstream-proxy-chain` branches.
+- [x] 6.3 Run `openspec validate add-system-upstream-proxy-chain --strict`, record Edge/control commit SHAs and validation evidence here, commit with explicit pathspecs, and push both `codex/add-system-upstream-proxy-chain` branches.
 
 <!--
 Implementation evidence (2026-07-26):
 - Edge repo commit: 3820cfa (`codex/add-system-upstream-proxy-chain`), pushed to origin.
+- Control OpenSpec artifact commit: 2b3f134 (`codex/add-system-upstream-proxy-chain`).
 - Physical `npm ci --prefer-offline` completed in the Edge worktree.
 - Focused proxy/provider/renderer/packaging suites passed, including a real GOST process integration carrying HTTP first-hop -> authenticated SOCKS5 second-hop traffic.
 - `npm test`: 2408 passed, 0 failed; `npm run typecheck`: passed.
 - `npm run build:dist`: passed (`reachable=79`, `removed=63`, legacy rules/source maps absent).
 - `npm run verify:desktop-build-input`: passed.
+- `openspec validate add-system-upstream-proxy-chain --strict`: passed after rebasing the control branch onto current `origin/main`.
 - GOST v3.2.6 arm64 and x64 archives staged with pinned SHA-256 verification; arm64 `gost -V` and generated-config readiness smoke passed.
 - Current development Mac system proxy resolved as fixed SOCKS5 loopback via the new resolver.
 
