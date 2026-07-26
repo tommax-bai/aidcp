@@ -9,6 +9,7 @@
 - [x] 2.1 Add default-off `systemProxyUpstreamEnabled` settings normalization and persistence without storing resolved endpoints or proxy credentials.
 - [x] 2.2 Add the AdsPower settings switch, direct/double-hop explanatory copy, restart-required dirty behavior, and renderer regression coverage.
 - [x] 2.3 Project safe chain preparation state and stable failure copy without exposing host credentials, raw sidecar output, or claiming browser egress.
+- [x] 2.4 Persist the visible proxy-chain selection immediately for offline preflight, freeze the effective mode of running browser generations until restart, invalidate stale offline evidence, and add renderer/contract regressions.
 
 ## 3. Preflight and supervisor integration
 
@@ -47,4 +48,11 @@ Implementation evidence (2026-07-26):
 - Current development Mac system proxy resolved as fixed SOCKS5 loopback via the new resolver.
 
 Task 6.2 remains open: no inactive AdsPower profile was selected for a real browser launch, so `launch_args` browser adoption, Facebook preflight through the customer's environment proxy, and CDP browser-context egress are not claimed. No AdsPower profile was persistently modified. No installer was built, signed, notarized, published, installed, or customer-tested.
+
+Follow-up evidence (2026-07-26):
+- Edge follow-up commit: `c797ae2` (`codex/add-system-upstream-proxy-chain`).
+- Observed regression: changing the visible switch while an environment was stopped left the old persisted mode active, so offline selection reused a double-hop preflight after the UI showed direct mode.
+- The switch now persists its target mode immediately; the main process invalidates stopped-environment preflight/relay evidence before scheduling the next offline preflight.
+- Running child generations resolve their effective mode from the frozen `status.proxyMode` until explicit restart, including browser-absent cold-standby/control-plane states.
+- Renderer + system proxy contract tests: 88 passed; focused lifecycle/fleet/preflight/runtime tests: 43 passed; Electron main/renderer syntax checks and `npm run typecheck`: passed.
 -->

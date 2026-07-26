@@ -25,7 +25,7 @@
 
 ## Decisions
 
-1. **设置是机器级显式模式，不是每环境隐藏规则。** 新设置使用布尔值 `systemProxyUpstreamEnabled`，缺省 `false`，放在 AdsPower 浏览器设置中。系统代理是机器级资源，而第二跳仍来自每个 profile；首版不引入环境级覆盖矩阵。保存沿用现有 dirty/restart 语义，避免对运行中 Chrome 宣称热生效。
+1. **设置是机器级显式模式，不是每环境隐藏规则。** 新设置使用布尔值 `systemProxyUpstreamEnabled`，缺省 `false`，放在 AdsPower 浏览器设置中。系统代理是机器级资源，而第二跳仍来自每个 profile；首版不引入环境级覆盖矩阵。开关选择立即持久化，使未启动环境随后的后台预检使用当前可见选择并立即作废旧证据；已经运行的浏览器代际冻结其实际模式，界面继续要求显式重启，避免把持久化目标设置冒充成运行中 Chrome 的热切换。
 
 2. **AIDCP 读取系统配置，再显式生成代理链。** 新的 macOS resolver 通过有界 `scutil --proxy` 读取固定端点，按 SOCKS5、HTTPS web proxy、HTTP web proxy 的顺序选择。HTTPS web proxy 在 macOS/Chromium 语义中仍是 HTTP CONNECT，不能写成 GOST 的 TLS dialer。PAC/WPAD 需要按目标 URL 执行系统 PAC 解析，首版若猜固定值会违背“系统代理”语义，因此明确不支持。
 
