@@ -47,7 +47,7 @@
 ## 6. Validate and deliver
 
 - [x] 6.1 Run Cargo format, clippy, library/full tests, focused Edge tests, and protocol acceptance with bounded evidence
-  <!-- Edge 1597795, 6ef9139, and 724ec4f. Cargo format/check and clippy `-D warnings` passed; Rust full tests passed 83/83; focused Edge router/boundary parity passed 55/55; protocol acceptance passed 30/30. -->
+  <!-- Edge 746fdcd, 073eadc, and a6623a4 after rebase onto the independently landed identity-dist boundary. Cargo format/check and clippy `-D warnings` passed; Rust full tests passed 83/83; focused Edge router/boundary parity passed 55/55; protocol acceptance passed 30/30. -->
 - [x] 6.2 Run the full Edge suite, typecheck, Native build/verification, production dist build, and desktop build-input verification
   <!-- Edge full suite passed 2350/2350; typecheck, production dist, desktop build-input, Native release build and verification passed. Worktree artifact SHA-256: a7371f10d0898ce96677f70a81faa4dd68a730ecfe2941692f7d007c308e95ad. -->
 - [x] 6.3 Run `openspec validate preserve-native-facebook-capability-boundaries --strict`

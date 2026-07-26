@@ -79,7 +79,7 @@ The Rust adapter is organized around capability state machines rather than proto
 - `publish`: composer entry, media, field readback, protected submit, capture, and reconciliation;
 - `router`: encoded browser-router assembly, bounded DTO decoding, and shared canonical Facebook semantics.
 
-Small modules may share canonical post identity, locale label families, geometry, and bounded evidence types through explicit shared helpers. The Native facade imports canonical post-id normalization only from a DOM-free module; retired browser-injection helpers remain behavior oracles and cannot become production-facade dependencies. Capability modules must not share a generic "find point and click" Facebook write pipeline.
+Small modules may share canonical post identity, locale label families, geometry, and bounded evidence types through explicit shared helpers. The Native facade imports canonical post-id normalization only from the DOM-free `post-identity-core` module established by the concurrent identity-boundary change; retired browser-injection helpers remain behavior oracles and cannot become production-facade dependencies. Capability modules must not share a generic "find point and click" Facebook write pipeline.
 
 Splitting only by command enum or by read/write was rejected because Feed and Reels use different target witnesses and actuation despite sharing command names.
 
