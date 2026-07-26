@@ -17,7 +17,7 @@
 ## 3. Validate the owning repositories
 
 - [x] 3.1 Run focused TypeScript router tests and Native Rust tests
-  <!-- Edge 37f56b0: `tsx --test ...facebook-feed-like-parity.test.ts ...facebook-router-contract.test.ts` 35/35 passed; `cargo test --test facebook_feed_like` 2/2 passed; `cargo test --lib` 51/51 passed. Extra full-Native probes exposed existing baseline failures outside this change: `fake_cdp` initial-scan/note-open cases fail unchanged at the pre-change HEAD (reproduced from a clean git archive), and `contract_fixtures` expects omitted XHS null blocking fields. -->
+  <!-- Before integration, focused Feed/router 35/35, Feed Rust 2/2, and Rust lib 51/51 passed. After rebasing onto integrated Reels and Group Join, combined Native/router/host 82/82, Rust lib 55/55, Feed Rust 2/2, Reels Like 2/2, Reels Follow 2/2, Group Join 2/2, cargo fmt check, typecheck, and full Edge 2344/2344 passed. Extra full-Native probes had exposed existing baseline failures outside this change: `fake_cdp` initial-scan/note-open cases fail unchanged at the pre-change HEAD, and `contract_fixtures` expects omitted XHS null blocking fields. -->
 - [x] 3.2 Run Edge typecheck and record the explicitly unperformed installer, deployment, and live-account gates
   <!-- Edge 37f56b0: `npm run typecheck` passed. No installer/package build, deployment, running desktop replacement, or real-account Facebook acceptance was performed or claimed. -->
 - [x] 3.3 Run `openspec validate restore-native-facebook-feed-like-parity --strict`
@@ -26,4 +26,4 @@
 ## 4. Delivery evidence
 
 - [x] 4.1 Record Edge and control commit SHAs, validation evidence, deviations, and concurrent-file overlap in this checklist
-  <!-- Edge implementation: aidcp-edge 37f56b0. Control artifacts: aidcp fe25835 plus the follow-up evidence commit containing this line. Validations: JS 35/35, Feed Rust 2/2, Rust lib 51/51, typecheck pass, OpenSpec strict pass. Existing baseline-only Native failures are recorded in 3.1. Concurrent Reels parity overlaps native/page-engine/src/engine.rs, native/page-engine/src/facebook-command-router.js, and native/page-engine/src/facebook.rs; integrate Reels first, then reconcile Feed and rerun the combined full boundary. Branches were committed only, not pushed, packaged, deployed, or live-account tested. -->
+  <!-- Edge implementation was rebased after Reels and Group Join, then fast-forward integrated/pushed as d02b1bce25931fb0fd7f849ef7c1d69ef531544c. Control artifacts were rebased as 29386c7 and 062f89c before this integration evidence update. Conflicts retained the Join timing/cancellation path, all Reels commit/verify operations, the Feed-specific operations, and their shared blocker allowlist. No package, deployment, running-client replacement, or live-account Like was performed. -->
