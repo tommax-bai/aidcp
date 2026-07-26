@@ -32,13 +32,13 @@ The existing TypeScript Reel executor and its tests remain the behavior oracle. 
 
 ### 1. Bind Reel controls by active-video identity and geometry, not DOM ancestry alone
 
-The router will keep `activeReel()` as the canonical identity authority, then derive a bounded Reel interaction region from visible controls spatially associated with that video and its nearby author/action rail. A candidate remains eligible only when the active Reel canonical identity matches the command. Multiple equally valid candidates return `ambiguous_target`; absence returns the existing control-not-found reason.
+The router will keep `activeReel()` as the canonical identity authority, then derive a bounded Reel interaction region from visible controls spatially associated with that video and its nearby author/action rail. Reel like controls additionally retain the established action-rail size and right-side geometry invariants and reject controls inside comment, reply, or sharing context. A candidate remains eligible only when the active Reel canonical identity matches the command. Multiple equally valid candidates return `ambiguous_target`; absence returns the existing control-not-found reason.
 
 Using only a wider ancestor was rejected because it can admit controls for adjacent Reels. Falling back to the first document control was rejected because it violates exact-target guarantees.
 
 ### 2. Port semantic label families, not old TypeScript classes
 
-The embedded router will encode the established neutral-like, selected-like, follow, and following label families, including author-qualified and Vietnamese variants. It will retain structural and numeric-count exclusions. This keeps the Native boundary self-contained while preserving proven platform semantics.
+The embedded router will encode the established neutral-like, selected-like, follow, and following label families, including author-qualified and Vietnamese variants. It will retain structural and numeric-count exclusions. A selected like requires an explicit `aria-pressed`/`aria-checked`, unlike label, or the established bounded reacted label/text transition; generic CSS classes such as `active` or `selected` are not platform confirmation. The non-Reel Feed probe retains its prior selector and state behavior rather than inheriting these Reel-only semantics. This keeps the Native boundary self-contained while preserving proven platform semantics without expanding another surface.
 
 ### 3. Restore the two-stage Reel like commit contract
 
@@ -50,7 +50,7 @@ Keeping the current stale-point primary path was rejected because React hydratio
 
 ### 4. Follow remains a single trusted write with same-Reel verification
 
-The follow probe will return one author-bound visible follow control or an already-following witness for the active canonical Reel. Rust dispatches one trusted pointer click and polls the same probe. Movement or loss after dispatch yields an ambiguous effect, while pre-dispatch absence or ambiguity remains not-started.
+The follow probe will return one author-qualified visible follow control or an already-following witness for the active canonical Reel only when the author suffix has one nearby visible text witness. The probe returns canonical note identity, video key, and author. Rust re-runs that probe immediately before dispatch, compares all three identities, dispatches one trusted pointer click, and polls the same probe. Movement or loss after dispatch yields an ambiguous effect, while pre-dispatch absence, ambiguity, or identity movement remains not-started.
 
 ### 5. Preserve terminal reason at the local facade boundary
 
@@ -59,6 +59,8 @@ The follow probe will return one author-bound visible follow control or an alrea
 ## Risks / Trade-offs
 
 - [Spatial association may vary across Facebook cohorts] → Reuse the legacy geometry invariants, require visibility and uniqueness, and fail honestly rather than widen to a first-match fallback.
+- [A nearby comment Like can resemble the Reel control] → Require the bounded right-side action rail and reject comment, reply, and share contexts before any primary activation.
+- [Generic React CSS state can look selected] → Accept only explicit accessibility or label/text witnesses already established by the behavior oracle.
 - [In-page primary activation and trusted picker activation use different event semantics] → Keep them as explicit one-shot stages and test both direct-toggle and picker layouts.
 - [A control can move after probing] → Freshly resolve at the write boundary and re-probe the same canonical Reel before reporting success.
 - [Additional diagnostics could expose page data] → Log only bounded enum-like action/reason/effect tokens.

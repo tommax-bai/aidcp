@@ -2,9 +2,9 @@
 
 ### Requirement: Native Reel interactions preserve exact-target platform semantics
 
-For a Facebook like or follow command targeting a canonical Reel, the Native-only Edge runtime MUST freshly resolve the uniquely active video and MUST bind every eligible control and post-condition to that same canonical Reel. Control resolution MUST support the established multilingual neutral/reacted and follow/following label families, including author-qualified accessible labels, while excluding reaction counts, unrelated post controls, and controls associated with another visible Reel. The runtime MUST NOT restrict resolution to the video's nearest DOM parent when the action rail or author CTA is rendered in a structurally separate sibling branch, and MUST NOT fall back to the first matching control in document order.
+For a Facebook like or follow command targeting a canonical Reel, the Native-only Edge runtime MUST freshly resolve the uniquely active video and MUST bind every eligible control and post-condition to that same canonical Reel. Control resolution MUST support the established multilingual neutral/reacted and follow/following label families, including author-qualified accessible labels, while excluding reaction counts, comment/reply/share controls, unrelated post controls, and controls associated with another visible Reel. Reel like resolution MUST retain the established bounded action-rail size and right-side geometry invariants. The runtime MUST NOT restrict resolution to the video's nearest DOM parent when the action rail or author CTA is rendered in a structurally separate sibling branch, and MUST NOT fall back to the first matching control in document order.
 
-Before a like write, Native MUST freshly resolve and activate the supported primary React control at most once. If that activation opens a reaction picker, Native MAY dispatch at most one trusted pointer commit to a unique visible Like item inside a unique visible multi-reaction picker associated with the same active Reel. Success MUST require a positive selected-state witness on the same Reel. Follow MUST dispatch at most one trusted pointer click to the unique author-bound Follow control and MUST require the same Reel to expose an established following-state witness.
+Before a like write, Native MUST freshly resolve and activate the supported primary React control at most once. If that activation opens a reaction picker, Native MAY dispatch at most one trusted pointer commit to a unique visible Like item inside a unique visible multi-reaction picker associated with the same active Reel. Success MUST require an explicit selected-state witness on the same Reel: `aria-pressed`/`aria-checked`, an unlike label, or the established bounded reacted label/text transition. Generic CSS class names MUST NOT prove selection. These Reel-only semantics MUST NOT change the existing Feed target/state classifier. Follow MUST require a non-empty author suffix with exactly one nearby visible author witness, MUST freshly re-resolve and compare canonical note identity, video key, and author immediately before dispatch, MUST dispatch at most one trusted pointer click, and MUST require the same three identities to expose an established following-state witness.
 
 Pre-dispatch target/control absence or ambiguity MUST remain not-started. Movement, target loss, or unproven state after dispatch MUST remain ambiguous and MUST NOT be displayed, budgeted, or recorded as a successful interaction.
 
@@ -31,6 +31,22 @@ Pre-dispatch target/control absence or ambiguity MUST remain not-started. Moveme
 - **WHEN** the canonical active Reel, active video identity, or bound control is lost or changes after like or follow actuation
 - **THEN** Native returns an ambiguous non-success result without another primary click
 - **AND** the interaction is not counted or displayed as successful
+
+#### Scenario: Nearby discussion control resembles the Reel Like control
+
+- **WHEN** a comment, reply, or sharing region contains the only visible neutral Like label near the active Reel
+- **THEN** Native excludes that control and dispatches zero clicks
+- **AND** the command remains not-started rather than targeting the discussion control
+
+#### Scenario: Generic CSS class resembles selected state
+
+- **WHEN** a neutral Reel Like control has a generic class such as `active` or `selected` without an explicit selected-state witness
+- **THEN** Native does not report the Reel as already liked or confirmed
+
+#### Scenario: Follow author changes before dispatch
+
+- **WHEN** the fresh pre-dispatch Follow probe has a different canonical Reel, video key, or author from the initial probe
+- **THEN** Native dispatches zero pointer writes and returns a not-started non-success result
 
 ### Requirement: Native Facebook action receipts retain bounded terminal diagnostics
 
