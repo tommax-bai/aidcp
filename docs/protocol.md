@@ -84,7 +84,7 @@
 
 | type | 方向 | 用途 |
 | --- | --- | --- |
-| `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll；Facebook 首页显式空态或有界续滚后仍有物理卡但不可可靠上报时，Cloud 可下发 `empty_feed_reels_fallback` 单次授权进入 Reels；可选 `dwellMs`） |
+| `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll；Facebook Native 有界续滚耗尽但未形成终止证据时，Cloud 以 `feed_continuation_unconfirmed` 走现有浏览闸继续普通 Feed；仅首页显式空态、物理卡不可可靠上报或诚实 `feed_exhausted` 时，Cloud 可下发 `empty_feed_reels_fallback` 授权进入 Reels；可选 `dwellMs`） |
 | `feed.refresh` | cloud → edge | 主 feed 浏览深度到阈值后，点右下「刷新」按钮回到顶部换出全新一批（`reason`: feed_refresh；可选 `thinkMs`；边缘诚实回执 `action.completed{action:'refresh'}`，非 feed 页 / 无按钮 / 点后未换新批均如实失败，绝不假成功） |
 | `pacing.update` | cloud → edge | 会话中途风控档位变化推送新 `tempo`（payload `{tempo}`）；边缘刷新兜底节奏（最小间隔 + 停留兜底）、**不重置**操作间隔锚点、不入队/不唤醒会话（change pacing-fallback-hardening） |
 | `interaction.like` | cloud → edge | 点赞指定笔记 |
@@ -775,6 +775,11 @@ Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有
   "observation": { "mainCtaText": "Join group", "modalText": null }
 }
 ```
+
+Facebook 普通 Feed 滚动只有在稳定显式终止标记或“完整窗口内高度不增长 + 近底部 + 连续确认”
+成立时才回 `feed_exhausted`。单命令轮次耗尽但证据不足时回
+`action.completed{action:"scroll",ok:false,reason:"feed_continuation_unconfirmed"}`；Cloud 仅据此继续普通
+Feed 滚动，不授权 Reels。
 
 search 回执的计数边界是 `actuated=true`，而不是 `ok=true`：`results_ready`、`no_results` 和 `failed_after_submit` 都说明平台已接收一次搜索尝试，应各记一笔；`not_submitted` 必须是 `actuated=false`，不得扣 search 风控配额或把概念标成已搜。Cloud 按连接内 `activityId` 有界去重，重复/矛盾终态只消费第一次；search 事实进入独立内部事件，不进入点赞、收藏、评论等互动 feed。
 
