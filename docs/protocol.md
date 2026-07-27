@@ -776,10 +776,12 @@ Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有
 }
 ```
 
-Facebook 普通 Feed 滚动只有在稳定显式终止标记或“完整窗口内高度不增长 + 近底部 + 连续确认”
-成立时才回 `feed_exhausted`。单命令轮次耗尽但证据不足时回
+Facebook Native `page.scroll` 在输入前先将已绑定的精确 Facebook target 置前，避免后台 AdsPower
+tab 的 CDP 滚轮调用悬而不返。普通 Feed 只有在 canonical 首页近底部的显式终止标记连续稳定出现时才回
+`feed_exhausted`；“完整窗口内高度不增长 + 近底部”只算非终态观察，因为 Facebook 可能显示
+没有 Feed-scoped loading 语义的骨架卡。该完整稳定窗口结束后立即回
 `action.completed{action:"scroll",ok:false,reason:"feed_continuation_unconfirmed"}`；Cloud 仅据此继续普通
-Feed 滚动，不授权 Reels。
+Feed 滚动，不授权 Reels。尚未形成稳定底部候选的轮次仍受单命令轮次上限约束。
 
 search 回执的计数边界是 `actuated=true`，而不是 `ok=true`：`results_ready`、`no_results` 和 `failed_after_submit` 都说明平台已接收一次搜索尝试，应各记一笔；`not_submitted` 必须是 `actuated=false`，不得扣 search 风控配额或把概念标成已搜。Cloud 按连接内 `activityId` 有界去重，重复/矛盾终态只消费第一次；search 事实进入独立内部事件，不进入点赞、收藏、评论等互动 feed。
 
