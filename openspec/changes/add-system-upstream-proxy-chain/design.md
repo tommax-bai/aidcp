@@ -29,7 +29,7 @@
 
 2. **AIDCP 读取系统配置，再显式生成代理链。** 新的 macOS resolver 通过有界 `scutil --proxy` 读取固定端点，按 SOCKS5、HTTPS web proxy、HTTP web proxy 的顺序选择。HTTPS web proxy 在 macOS/Chromium 语义中仍是 HTTP CONNECT，不能写成 GOST 的 TLS dialer。PAC/WPAD 需要按目标 URL 执行系统 PAC 解析，首版若猜固定值会违背“系统代理”语义，因此明确不支持。
 
-3. **使用固定版本 GOST sidecar，而不是 Proxifier/自研透明代理。** GOST 原生支持多 hop 和 HTTP/SOCKS/TLS 组合，MIT 许可允许随应用交付。Proxifier 是商业 Network Extension，需要额外安装、许可和进程规则，不适合作为产品内依赖；自研 CONNECT/SOCKS 链会重新承担协议、认证、背压和错误处理风险。构建脚本下载固定 v3.2.6 release，校验官方 SHA-256 后解包到架构目录；打包从 `${platform}-${arch}` 资源目录取二进制。开发态允许 `AIDCP_GOST_BINARY`，其次使用已 stage 的构建产物；打包态忽略外部覆盖并只信任资源内二进制。macOS Developer ID 会向嵌套 Mach-O 写入签名数据，因此开发态/staging/`afterPack` 继续校验签名前完整 SHA-256，签名包运行态改为校验固定资源路径、App 与嵌套二进制的有效 Developer ID 签名、相同且固定的 Team ID、预期 Identifier、目标架构，并仅在上述信任成立后执行 `gost -V` 校验版本。Native Page Engine 使用同一签名产物规则，避免 GOST 修复后被同源签名前哈希校验阻断。
+3. **使用固定版本 GOST sidecar，并分离发行门禁与安装态可用性。** GOST 原生支持多 hop 和 HTTP/SOCKS/TLS 组合，MIT 许可允许随应用交付。Proxifier 是商业 Network Extension，需要额外安装、许可和进程规则，不适合作为产品内依赖；自研 CONNECT/SOCKS 链会重新承担协议、认证、背压和错误处理风险。构建脚本下载固定 v3.2.6 release，校验官方 SHA-256 后解包到架构目录；打包从 `${platform}-${arch}` 资源目录取二进制。开发态允许 `AIDCP_GOST_BINARY`，其次使用已 stage 的构建产物；打包态忽略外部覆盖并只解析资源内二进制。macOS Developer ID 会向嵌套 Mach-O 写入签名数据，因此开发态/staging/`afterPack` 继续校验签名前完整 SHA-256，Electron `afterSign` 和最终发行检查继续严格校验 App 与嵌套二进制的 Developer ID、Team ID、Identifier、架构以及 GOST 版本。安装后的客户端不再调用 `codesign`、不比较 Team ID/Identifier，也不在启动前执行 `gost -V`；它只验证固定资源目录内的兼容清单、可执行文件和目标架构，再以 GOST 进程真实启动及 loopback 就绪探测作为可用性证据。Native Page Engine 同样在运行时只做兼容清单、可执行性和架构检查，以子进程启动结果诚实失败。这样客户机器对外层 App 的 ad-hoc 重签不会误伤仍可运行的嵌套产物，同时发行过程仍阻止错误签名或错误架构进入 DMG。
 
 4. **每个正在准备的 profile 使用独立中继进程。** 中继只监听 `127.0.0.1` 随机可用端口，配置包含系统 hop 和该 profile 环境 hop。独立进程让凭据和故障域按环境隔离，首版受浏览器槽位限制，进程数量可控。主进程按 profile 单飞创建并缓存；profile 代理或系统模式改变时作废。应用退出时有界终止全部中继。为避免浏览器尚在使用时断链，普通 Edge 子进程退出不立即杀中继；只有配置作废、确认不再使用或应用退出才回收。
 
@@ -43,7 +43,7 @@
 
 9. **active profile 在受管代理模式下 fail closed。** 已 active 的浏览器可能由手工入口、旧版本或旧开关启动，无法证明当前 profile 更新属于该浏览器代际。只要环境配置了受管代理权威，provider 就拒绝接管并要求关闭重启；明确无代理的环境继续保持既有 active 接管行为。
 
-10. **验收分三层。** 单元/契约测试证明解析、加密权威、配置生成、凭据脱敏、每代际同步、读回闸门、关闭恢复与冷待机生命周期；开发态集成测试用本地固定系统代理和无账号目标证明 GOST 两跳；AdsPower 真机测试必须从新 inactive profile 启动，并由既有 CDP 出口探测证明最终业务代理出口。打包资源、签名公证和客户安装包另行验收，源码测试不能替代。Electron `afterSign` 必须对每个最终 `.app` 执行嵌套签名身份、架构与版本检查；发行脚本在公证/装订后重复最终信任门禁，防止只通过签名前 `afterPack` 的不可运行产物进入 DMG。
+10. **验收分三层。** 单元/契约测试证明解析、加密权威、配置生成、凭据脱敏、每代际同步、读回闸门、关闭恢复与冷待机生命周期；开发态集成测试用本地固定系统代理和无账号目标证明 GOST 两跳；AdsPower 真机测试必须从新 inactive profile 启动，并由既有 CDP 出口探测证明最终业务代理出口。打包资源、签名公证和客户安装包另行验收，源码测试不能替代。Electron `afterSign` 必须对每个最终 `.app` 执行嵌套签名身份、架构与版本检查；发行脚本在公证/装订后重复最终信任门禁，防止只通过签名前 `afterPack` 的不可运行产物进入 DMG。安装态另做一项可逆验收：对临时 App 副本执行外层 ad-hoc 重签，确认运行时解析仍接受固定包内 GOST/Native，同时严格发行验证器继续拒绝该副本。
 
 ## Risks / Trade-offs
 
@@ -53,6 +53,7 @@
 - [抢占随机 loopback 端口] → 分配后立即 spawn，并以有界 TCP 就绪探测确认；失败返回稳定错误，不换成 `0.0.0.0`。
 - [Veee 改变本地端口或断开] → 每次新建链重新解析；已建连接失败时不直连，界面显示链路不可用。首版不增加未经观察的后台重试器。
 - [GOST 二进制供应链或打包签名] → 固定 release、架构和签名前 SHA-256；构建缺失即失败；正式包把嵌套二进制纳入 codesign、notarization 和签名后身份/版本检查，不把签名前完整文件哈希错误地用于已签名 Mach-O。
+- [安装后外层 App 被 ad-hoc 重签导致 Team ID 变为 `not set`] → 不把客户端运行时 `codesign` 输出当成 sidecar 可用性条件；发行阶段仍严格验证原始分发物，安装态按固定资源、清单、可执行性、架构和真实启动结果判断。
 - [多个 sidecar 增加资源占用] → 首版按 profile/浏览器槽位有界，换取简单隔离；有真实资源证据后再考虑合并为单进程多 service。
 - [本地其他进程访问无认证 relay] → 仅 loopback、随机端口、只在需要时存活；不把端口暴露到 renderer 或 Cloud。若后续威胁模型要求同用户进程隔离，需要原生 socket 身份或本地认证另案。
 

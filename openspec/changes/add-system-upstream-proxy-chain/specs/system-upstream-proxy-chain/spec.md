@@ -80,7 +80,7 @@ PAC、自动发现、缺少固定端点、非法 host/port、需要但无法取�
 
 客户端 SHALL 为需要启动的 AdsPower profile 创建受管本地代理中继，其入站只监听随机 loopback 端口，第一跳为解析后的系统代理，第二跳为 AIDCP 加密权威中的原环境代理。中继 SHALL 支持现有环境代理的 HTTP、HTTPS 与 SOCKS5 类型，并保持既有类型语义。
 
-环境代理账号密码 MUST 只存在于 AdsPower 首次精确读取响应、`safeStorage` 加密记录、受控内存、私有 pipe 和中继私有配置输入中；MUST NOT 出现在进程 argv/环境变量、renderer IPC、settings、链路状态、日志或错误正文。中继二进制 SHALL 固定版本、校验来源并作为桌面资源交付；开发态可使用显式覆盖路径。签名前 staging 和开发态 SHALL 校验固定上游归档及二进制 SHA-256；macOS 签名包运行态 SHALL 忽略外部覆盖，并校验资源内二进制的固定路径、Developer ID 签名、与应用相同且符合产品配置的 Team ID、预期 Identifier、目标架构和固定版本，MUST NOT 用签名前完整文件哈希拒绝已经签名的 Mach-O。
+环境代理账号密码 MUST 只存在于 AdsPower 首次精确读取响应、`safeStorage` 加密记录、受控内存、私有 pipe 和中继私有配置输入中；MUST NOT 出现在进程 argv/环境变量、renderer IPC、settings、链路状态、日志或错误正文。中继二进制 SHALL 固定版本、校验来源并作为桌面资源交付；开发态可使用显式覆盖路径。签名前 staging 和开发态 SHALL 校验固定上游归档及二进制 SHA-256；Electron `afterSign` 和最终发行产物门禁 SHALL 校验资源内 App、GOST 和 Native Page Engine 的 Developer ID、Team ID、Identifier、目标架构以及 GOST 固定版本。macOS 签名包运行态 SHALL 忽略外部覆盖，只验证固定资源目录内的兼容清单、可执行文件和目标架构，MUST NOT 因外层 App 的 Team ID 缺失、签名输出差异或签名前完整文件哈希拒绝启动；运行可用性 SHALL 由 GOST 实际进程启动和 loopback 就绪结果决定。
 
 #### Scenario: 两跳中继就绪后才交付
 - **WHEN** 系统代理和环境代理均合法且中继成功监听 loopback
@@ -94,9 +94,17 @@ PAC、自动发现、缺少固定端点、非法 host/port、需要但无法取�
 - **WHEN** 中继处于运行状态
 - **THEN** 它只监听 `127.0.0.1`，不得绑定 `0.0.0.0`、局域网或公网地址
 
-#### Scenario: 签名包验证嵌套中继身份
+#### Scenario: 发行门禁验证嵌套中继身份
 - **WHEN** macOS Developer ID 签名改变了资源内 GOST Mach-O 的完整文件哈希
-- **THEN** 客户端先验证应用与 GOST 的有效签名、Team ID、Identifier、资源路径和 arm64/x64 架构，再执行并确认固定 GOST 版本；不得按签名前二进制哈希误报中继不可用
+- **THEN** `afterSign` 和最终发行验证器检查应用与 GOST 的有效签名、Team ID、Identifier、资源路径和 arm64/x64 架构并确认固定 GOST 版本；不得按签名前二进制哈希拒绝有效签名产物
+
+#### Scenario: 安装态外层 App 被 ad-hoc 重签
+- **WHEN** 客户机器对外层 `AIDCP.app` 做 ad-hoc 重签，使其 Team ID 显示为 `not set`，而固定资源内 GOST 清单、可执行性和架构仍兼容
+- **THEN** 客户端不调用运行时 `codesign` 或启动前版本探针阻断中继，而是尝试启动 GOST，并按进程退出或 loopback 就绪结果如实判定可用性
+
+#### Scenario: 安装态嵌套资源不可运行
+- **WHEN** 固定包内 GOST 缺失、不可执行、清单不兼容、架构错误、启动即退出或未在有界时间内监听
+- **THEN** 客户端如实返回中继不可用，MUST NOT 因放宽签名自检而把未启动的代理链报告为可用
 
 #### Scenario: 打包态外部覆盖不绕过资源信任
 - **WHEN** 已打包客户端进程环境包含 `AIDCP_GOST_BINARY`

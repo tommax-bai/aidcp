@@ -43,6 +43,13 @@
 - [x] 6.4 Run focused signed-artifact/runtime/packaging tests, full Edge tests, typecheck, strict OpenSpec validation, then rebuild and locally verify the arm64 OL Developer ID signed package.
 - [x] 6.5 Re-run the focused, acceptance, complete Edge, typecheck, build-input, and strict OpenSpec gates for the profile-authority pivot; record the new SHAs and integrate the source and contract updates without claiming a new installer.
 
+## 7. Installed-runtime compatibility and arm64 OL package
+
+- [x] 7.1 Separate strict signed-artifact release verification from relaxed installed-runtime GOST and Native Page Engine resolution; retain fixed packaged paths, compatible manifests, executable bits, architecture checks, ignored packaged overrides, and honest process/readiness failures.
+- [x] 7.2 Add regressions proving installed runtime resolution accepts an ad-hoc re-signed outer App without invoking `codesign` or a GOST version subprocess, while `afterSign` and final release verification remain strict.
+- [x] 7.3 Bump Edge to 0.3.25; run focused Electron artifact/packaging/lifecycle tests, the complete Edge suite, typecheck, desktop build-input verification, and strict OpenSpec validation; commit, push, and fast-forward source/contracts into the default branches.
+- [ ] 7.4 Create an explicit OL arm64 release branch, build a Developer ID signed DMG with IP-based customer-auth URL, verify the mounted payload and a reversible ad-hoc outer-App re-sign runtime smoke, and record the local artifact path/SHA without claiming notarization or upload.
+
 <!--
 Implementation evidence (2026-07-26):
 - Edge repo commit: 3820cfa (`codex/add-system-upstream-proxy-chain`), pushed to origin.
@@ -91,4 +98,10 @@ Profile-authority pivot follow-up (2026-07-26):
 - Provider tests: 35 passed; focused Electron lifecycle/security tests: 99 passed; all Electron tests: 914 passed; acceptance tests: 30 passed; complete Edge suite: 2430 passed, 0 failed. `npm run typecheck`, `node --check` for the changed CommonJS modules, `npm run build:dist`, and `npm run verify:desktop-build-input` passed.
 - Reversible live smoke started an inactive real profile and proved loopback readback, full-chain Facebook HTTP 200, an interactive browser Facebook page, browser egress equal to the GOST relay egress, confirmed browser close, and exact original-proxy restoration. The temporary smoke script, AdsPower daemon, SunBrowser, and GOST process were removed/stopped afterward.
 - `openspec validate add-system-upstream-proxy-chain --strict` passed. No new installer was built, signed, notarized, published, installed, or customer-tested for this pivot.
+
+Installed-runtime compatibility follow-up (2026-07-27):
+- Edge implementation commit: `a744852`, pushed to `codex/add-system-upstream-proxy-chain` and fast-forwarded to `origin/master`.
+- Installed macOS runtime resolution now ignores packaged GOST overrides but no longer invokes `codesign`, compares Team ID/Identifier, or runs `gost -V` before launch. It retains fixed packaged resources, compatible manifests, executable bits and target architecture; actual GOST process/readiness and Native child startup remain the availability evidence.
+- Electron `afterSign` and final release verification remain strict for App/GOST/Native Developer ID identity, Team ID, Identifier, architecture and GOST version.
+- Focused runtime/artifact/packaging/lifecycle tests: 24 passed; complete Edge suite: 2447 passed, 0 failed; `npm run typecheck`, `npm run build:dist`, `npm run verify:desktop-build-input`, and strict OpenSpec validation passed.
 -->
