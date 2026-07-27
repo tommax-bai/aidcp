@@ -4,10 +4,10 @@ The original environment proxy is currently retained only in an Edge `userData`-
 
 ## What Changes
 
-- Make AIDCP Cloud the sole durable authority for every AdsPower profile's explicit `configured` or `no_proxy` state, including proxy type, host, port, username, and password stored as plain PostgreSQL fields per the accepted product decision.
+- Make AIDCP Cloud the sole durable authority for every configured AdsPower proxy and persist explicit `no_proxy` for new/edited environments. A legacy profile that AdsPower itself reports as `no_proxy` bypasses proxy-authority checks because there is no original route to preserve.
 - Save proxy authority when Edge completes environment creation and whenever an inactive environment's proxy is edited; reject launch when a configured environment has no usable Cloud authority.
 - Fetch one exact Cloud proxy revision before preflight/start, freeze it for that browser generation, and use it to choose direct environment proxy or system-proxy → GOST → environment-proxy routing.
-- Stop treating the mutable AdsPower profile as a source for the original proxy. Continue reading it only to verify values Edge has just written.
+- Stop treating the mutable AdsPower profile as a source for the original proxy. Continue reading it to verify values Edge has just written and to recognize the credential-free `no_proxy` applicability state only.
 - Treat Edge `safeStorage` records as migration/cache inputs only. Allow one-time upload of a valid non-loopback local authority, but never import a loopback from AdsPower as the original proxy.
 - Add revision/CAS and environment ownership checks so multiple installations cannot silently overwrite each other's proxy authority.
 - Keep proxy credentials out of environment lists, ordinary status projections, logs, errors, argv, and renderer-wide IPC despite plaintext-at-rest storage.

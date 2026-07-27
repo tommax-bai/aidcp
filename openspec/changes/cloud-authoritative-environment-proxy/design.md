@@ -8,7 +8,7 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
 
 **Goals:**
 
-- Make Cloud the only durable authority for `configured` versus `no_proxy` and the complete original proxy configuration of each AdsPower profile.
+- Make Cloud the only durable authority for every configured proxy and the complete original proxy configuration. Persist explicit `no_proxy` on AIDCP writes, while allowing a legacy AdsPower profile that is itself explicitly `no_proxy` to bypass the proxy subsystem without a Cloud row.
 - Keep environment creation, proxy editing, preflight, AdsPower synchronization, and close restoration consistent with one explicit Cloud revision.
 - Support machine/userData switching without importing an ephemeral AdsPower loopback as the original proxy.
 - Give legacy valid Edge-local authorities a bounded one-time Cloud migration path.
@@ -19,7 +19,7 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
 
 - Encrypt proxy authority columns at rest; plaintext storage is an explicit accepted decision.
 - Add proxy authority to `/my-environments`, general environment lists, fleet snapshots, logs, errors, or Console list pages.
-- Treat AdsPower's current profile value as original-proxy authority.
+- Treat AdsPower's current configured profile value as original-proxy authority. The only permitted runtime classification is the credential-free fact that AdsPower explicitly reports `no_proxy`.
 - Add automatic proxy-provider discovery, credential rotation, cross-customer sharing, or a new retry worker.
 - Permit two installations to edit one authority without revision conflict detection.
 
@@ -35,7 +35,7 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
    - `source = provisioning | edge_edit | local_migration | admin`
    - `updated_by`, `updated_at`
 
-   Checks require all route fields for `configured` and require them to be null for `no_proxy`. Missing row means `uninitialized`, never `no_proxy`. A separate table keeps broad `client_environments` queries credential-free and makes accidental `SELECT *` disclosure less likely.
+   Checks require all route fields for `configured` and require them to be null for `no_proxy`. Missing row means `uninitialized` for a profile that AdsPower reports as proxy-configured; it does not force a legacy AdsPower `no_proxy` profile into the proxy subsystem. A separate table keeps broad `client_environments` queries credential-free and makes accidental `SELECT *` disclosure less likely.
 
 2. **Keep plaintext at rest but narrow every projection.**
 
@@ -55,7 +55,7 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
 
 5. **Cloud-first proxy editing with truthful partial state.**
 
-   Editing is allowed only for an inactive, owned environment. Electron first reads the exact Cloud authority, submits the normalized new value with its revision, and only after Cloud success updates AdsPower. If AdsPower fails, Cloud remains authoritative and the receipt says Cloud saved / AdsPower pending; the next start will apply Cloud. Rolling Cloud back was rejected because a failed compensating write could lose the user's newest intent.
+   Editing is allowed only for an inactive, owned environment. Authority read failure never removes that repair entry: Electron opens a blank configured-proxy form with a warning and never projects malformed route or credential fields. When a malformed response still binds the exact environment and carries a valid positive revision, a repaired value may replace it using that revision; an unavailable authority or unusable revision keeps the editor open but makes save fail honestly. For a valid current authority, Electron submits the normalized new value with its revision. Only after Cloud success does it update AdsPower. If AdsPower fails, Cloud remains authoritative and the receipt says Cloud saved / AdsPower pending; the next start will apply Cloud. Rolling Cloud back was rejected because a failed compensating write could lose the user's newest intent.
 
 6. **Read and freeze one Cloud snapshot for preflight and launch.**
 
@@ -66,19 +66,19 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
    - the private anonymous pipe delivered to the Edge core;
    - best-effort close restoration for that browser generation.
 
-   AdsPower is read only after an AIDCP write to verify the complete route. It is never read to reconstruct the original.
+   AdsPower is read after an AIDCP write to verify the complete route. Before proxy-authority resolution it may also be read only to recognize explicit `no_proxy`; configured host, port, username, and password are never imported as the original.
 
 7. **Fail closed on missing or unavailable Cloud authority.**
 
-   For configured profiles, Cloud 404, authentication failure, timeout, malformed response, or ownership denial blocks preflight/start with a stable safe reason. There is no fallback to AdsPower current state. Explicit Cloud `no_proxy` skips preflight, GOST, profile update, active-profile proxy restriction, and restore as before.
+   AdsPower explicit `no_proxy` skips Cloud authority resolution, preflight, GOST, profile update, active-profile proxy restriction, and restore. For profiles AdsPower reports as proxy-configured, Cloud 404, authentication failure, timeout, malformed response, or ownership denial blocks preflight/start with a stable safe reason. There is no configured-route fallback to AdsPower current state. Explicit Cloud `no_proxy` also skips the proxy subsystem, including the partial-edit case where AdsPower has not yet adopted it.
 
 8. **Use Edge local records only for bounded migration/cache.**
 
-   When Cloud returns uninitialized, Edge may upload an existing decryptable local `safeStorage` authority using create-only CAS. Loopback/localhost targets are never migratable. Missing, corrupt, or loopback local authority requires the user to re-save the original proxy. After Cloud acknowledges a revision, Edge may refresh its encrypted cache, but startup still requires an exact Cloud read and never treats the cache as a runtime fallback.
+   When a proxy-configured profile's Cloud authority is uninitialized, Edge may upload an existing decryptable local `safeStorage` authority using create-only CAS. Loopback/localhost targets are never migratable. Missing, corrupt, or loopback local authority requires the user to re-save the original proxy. AdsPower explicit `no_proxy` needs no local migration. After Cloud acknowledges a configured revision, Edge may refresh its encrypted cache, but configured startup still requires an exact Cloud read and never treats the cache as a runtime fallback.
 
 9. **Keep UI truth tied to Cloud authority and browser evidence.**
 
-   Environment proxy summaries come from Cloud-safe type/host/port fields. Exact editor reads may include username/password for the selected owned environment. Runtime status separately reports Cloud authority revision, chain preparation, preflight, and browser egress. A successful preflight does not become browser verification.
+   Environment proxy summaries for configured profiles come from Cloud-safe type/host/port fields. AdsPower explicit `no_proxy` stays a local credential-free summary and exact editor result, so it cannot be replaced by an “authority uninitialized” error. Exact valid configured editor reads may include username/password for the selected owned environment. Missing, unavailable, or malformed configured reads open a blank repair form rather than blocking the editor; malformed fields are never reflected. Runtime status separately reports Cloud authority revision, chain preparation, preflight, and browser egress. A successful preflight does not become browser verification.
 
 ## Risks / Trade-offs
 
@@ -87,6 +87,7 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
 - [Cloud edit succeeds but AdsPower update fails] → Keep Cloud authoritative, report partial application, and invalidate preflight. A configured proxy is reconciled from Cloud at the next start; explicit `no_proxy` still obeys the product rule that no-proxy startup does not mutate AdsPower, so the user must retry the failed edit sync before relying on that profile.
 - [Two machines edit concurrently] → Require revision CAS and return a safe conflict; refresh before retry.
 - [Cloud temporarily unavailable] → Block configured-proxy starts rather than use a stale local value; this trades availability for cross-machine authority correctness.
+- [Cloud authority cannot be read for editing] → Preserve the owned inactive environment's editor as a blank repair surface. Save only when Cloud can accept a create or revision-bound replacement; never turn an unavailable or malformed value into an unversioned overwrite.
 - [Legacy local record contains a stale GOST loopback] → Reject all loopback migration and require explicit re-entry.
 - [Credentials leak through broad projections] → Separate table, exact DTOs, structural tests, and log/error redaction.
 
@@ -95,8 +96,9 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
 1. Add and migrate the Cloud authority table and exact owned-environment APIs in DEV; do not enable Edge Cloud-only reads before the migration and health checks pass.
 2. Extend provisioning completion and Edge create/edit flows, initially retaining the local encrypted record as a migration/cache copy.
 3. For each existing environment on first selected preflight/start:
-   - Cloud row exists: use it.
-   - Cloud row missing and local authority is valid/non-loopback: upload with create-only CAS.
+   - AdsPower explicitly reports `no_proxy`: bypass proxy-authority resolution.
+   - AdsPower reports a configured proxy and a Cloud row exists: use it.
+   - Proxy-configured profile has no Cloud row and local authority is valid/non-loopback: upload with create-only CAS.
    - local authority missing/corrupt/loopback: block and require explicit proxy save.
 4. Switch preflight/start/restore to frozen Cloud revisions and remove the AdsPower-current bootstrap path.
 5. Validate creation, edit partial failure, machine/userData switching, revision conflict, no-proxy, GOST double-hop, browser egress, and close restoration against DEV.

@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Proxy preflight SHALL bind one Cloud authority revision
-For an environment with a configured proxy, Edge SHALL fetch the exact Cloud proxy authority before preflight and freeze its revision and configuration for the resulting startup attempt. The local system-upstream switch SHALL choose either the original Cloud proxy or a GOST loopback whose second hop is that same original proxy. Environments with explicit `no_proxy` SHALL skip proxy preflight and proxy mutation.
+For an environment AdsPower reports as proxy-configured, Edge SHALL fetch the exact Cloud proxy authority before preflight and freeze its revision and configuration for the resulting startup attempt. The local system-upstream switch SHALL choose either the original Cloud proxy or a GOST loopback whose second hop is that same original proxy. Environments AdsPower or Cloud explicitly report as `no_proxy` SHALL skip Cloud proxy-authority resolution, proxy preflight, and proxy mutation.
 
 #### Scenario: Direct mode tests the Cloud original proxy
 - **WHEN** the environment has a configured Cloud proxy and system-upstream mode is disabled
@@ -13,7 +13,7 @@ For an environment with a configured proxy, Edge SHALL fetch the exact Cloud pro
 - **AND** preflight SHALL test the generated loopback endpoint
 
 #### Scenario: No-proxy environment bypasses proxy gates
-- **WHEN** Cloud authority is explicit `no_proxy`
+- **WHEN** AdsPower or Cloud authority is explicit `no_proxy`
 - **THEN** Edge SHALL not require a second hop, start GOST, or block startup on proxy preflight
 
 #### Scenario: Cloud is unavailable

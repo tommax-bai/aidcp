@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Cloud SHALL own the durable environment proxy authority
-Cloud SHALL persist exactly one proxy-authority record for each managed environment. The record SHALL distinguish `configured` from explicit `no_proxy`; a missing record SHALL mean uninitialized rather than direct connection. For `configured`, Cloud SHALL persist proxy type, host, port, username, and password in PostgreSQL plaintext as an explicitly accepted product tradeoff.
+Cloud SHALL persist exactly one proxy-authority record for each managed environment created or edited through AIDCP. The record SHALL distinguish `configured` from explicit `no_proxy`. For `configured`, Cloud SHALL persist proxy type, host, port, username, and password in PostgreSQL plaintext as an explicitly accepted product tradeoff. A legacy environment with no row SHALL be uninitialized only when AdsPower reports a configured proxy; AdsPower explicit `no_proxy` SHALL bypass proxy-authority requirements because no original route exists.
 
 #### Scenario: Configured proxy survives a machine change
 - **WHEN** an owned environment has a configured Cloud proxy authority and the customer signs in from another Edge installation
@@ -12,10 +12,15 @@ Cloud SHALL persist exactly one proxy-authority record for each managed environm
 - **THEN** Cloud SHALL persist `no_proxy` for that environment
 - **AND** Edge SHALL not treat the environment as missing proxy authority
 
-#### Scenario: Missing authority fails closed
-- **WHEN** an environment has no Cloud proxy-authority record
+#### Scenario: Configured proxy with missing authority fails closed
+- **WHEN** AdsPower reports a configured proxy and the environment has no Cloud proxy-authority record
 - **THEN** proxy detection and managed browser startup SHALL report the authority as uninitialized
-- **AND** they SHALL NOT infer the original proxy from the current AdsPower profile
+- **AND** they SHALL NOT import any configured route field from the current AdsPower profile
+
+#### Scenario: Legacy AdsPower no-proxy bypasses authority
+- **WHEN** AdsPower reports explicit `no_proxy` for a legacy environment without a Cloud authority row
+- **THEN** Edge SHALL skip Cloud proxy-authority resolution and all proxy gates
+- **AND** the proxy editor SHALL open as no-proxy instead of reporting an unknown read error
 
 ### Requirement: Proxy authority access SHALL be exact, owned, revisioned, and minimum-disclosure
 Customer-authenticated proxy-authority reads and writes SHALL address one exact owned environment. Writes SHALL use optimistic revision comparison, and successful responses SHALL return the new revision. Broad environment list/status projections, logs, errors, command arguments, and telemetry SHALL NOT expose the proxy username or password.
@@ -32,6 +37,22 @@ Customer-authenticated proxy-authority reads and writes SHALL address one exact 
 - **WHEN** a client writes with an `expectedRevision` that differs from the current Cloud revision
 - **THEN** Cloud SHALL reject the stale write
 - **AND** SHALL preserve the newer authority unchanged
+
+#### Scenario: Proxy editor remains available for repair
+- **WHEN** an owned inactive environment's exact authority is missing, unavailable, or malformed
+- **THEN** Edge SHALL open a blank proxy editor with a repair warning instead of blocking the editing entry
+- **AND** Edge SHALL NOT reflect malformed route or credential fields into the form
+- **AND** configured proxy detection and startup SHALL remain blocked until a valid authority is saved
+
+#### Scenario: Malformed authority with a valid revision can be replaced
+- **WHEN** a malformed authority response still identifies the exact environment and carries a valid positive revision
+- **THEN** Edge SHALL submit the user's valid replacement with that revision
+- **AND** Cloud SHALL apply the normal revision comparison before replacing the malformed authority
+
+#### Scenario: Unversioned repair does not bypass Cloud concurrency
+- **WHEN** the current authority is unavailable or malformed without a usable revision
+- **THEN** the proxy editor SHALL remain open
+- **AND** saving SHALL fail honestly rather than perform an unversioned overwrite
 
 #### Scenario: Credentials stay out of broad projections
 - **WHEN** Cloud returns environment rosters, status, runtime diagnostics, or operational logs
@@ -54,7 +75,7 @@ Completing a provisioning intent SHALL require the proxy-authority state supplie
 - **AND** SHALL reject a mismatching retry
 
 ### Requirement: Local proxy authority SHALL only be a bounded migration source or cache
-Edge MAY use its existing safeStorage-backed authority as a bounded migration source when Cloud has no authority, and MAY cache a Cloud response locally. Migration SHALL require a structurally valid original proxy and SHALL reject loopback hosts and known AIDCP/GOST runtime endpoints. AdsPower's current `user_proxy_config` SHALL never be a migration source.
+Edge MAY use its existing safeStorage-backed authority as a bounded migration source when a proxy-configured profile has no Cloud authority, and MAY cache a Cloud response locally. Migration SHALL require a structurally valid original proxy and SHALL reject loopback hosts and known AIDCP/GOST runtime endpoints. AdsPower's configured `user_proxy_config` SHALL never be a migration source; Edge MAY inspect only whether it is explicitly `no_proxy`.
 
 #### Scenario: Valid legacy authority migrates once
 - **WHEN** Cloud authority is uninitialized and the local safeStorage record contains a valid non-loopback original proxy
