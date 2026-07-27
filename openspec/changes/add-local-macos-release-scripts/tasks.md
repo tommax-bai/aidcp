@@ -15,5 +15,6 @@
 ## 3. Integration
 
 - [x] 3.1 Commit and push the Edge implementation branch, fast-forward it into `master`, and push `master`
-- [ ] 3.2 Commit and push the control OpenSpec artifacts with final Edge commit and validation evidence
+- [x] 3.2 Commit and push the control OpenSpec artifacts with final Edge commit and validation evidence
 <!-- Edge branch codex/add-local-macos-release-scripts and master both point to pushed implementation commit 23351cd. -->
+<!-- Control OpenSpec artifacts and strict-validation evidence were committed and pushed in aidcp f05dd5d; this follow-up records final task completion. -->
