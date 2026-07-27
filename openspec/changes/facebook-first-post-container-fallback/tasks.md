@@ -23,4 +23,6 @@
 - [x] 4.2 Run focused Cloud edge-step/scheduler tests, Cloud acceptance/full tests, and Cloud typecheck.
   <!-- aidcp-cloud 21ab6ff: focused 133/133; acceptance 154/154; full 3733 pass, 11 expected skips; typecheck pass. -->
 - [x] 4.3 Run `openspec validate facebook-first-post-container-fallback --strict`, review scoped diffs, and record repository commits plus validation evidence.
-  <!-- aidcp 9ac7f12: strict OpenSpec validation and scoped diff review pass. Source-only closeout: no installer packaging, DEV/OL deployment, or real-account write by task boundary. -->
+  <!-- aidcp 9ac7f12: strict OpenSpec validation and scoped diff review pass. No installer packaging, OL deployment, or real-account write. -->
+- [x] 4.4 Deploy Cloud commit `21ab6ff` to DEV after explicit user authorization and verify the runtime.
+  <!-- DEV 2026-07-28: backup /opt/aidcp/backups/cloud-20260727T182028Z-pre-21ab6ff.tgz; remote focused tests 133/133; schema gates content/automation/api pass; writer lock held; 8787/8090/8091 listening; panel health ok; Feishu WS ready; Gi Vo Edge reconnected. -->
