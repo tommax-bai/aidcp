@@ -22,6 +22,7 @@ The current router therefore returns zero `PageCard` candidates before it ever p
 - Keep context extraction, editor focus/fill, pre-commit recheck, submit, and acknowledgement scoped to the same rendered container.
 - Give Cloud a strict opaque target reference for approval, deterministic dedup, and the subsequent `interaction.comment`.
 - Preserve honest failures and all existing lease, approval, validation, risk, quota, and server-confirmation gates.
+- Require real Native CDP pointer input plus same-target post-action validation when a comment action must hydrate the editor.
 
 **Non-Goals:**
 
@@ -69,11 +70,19 @@ Alternative considered: re-run “first post” selection immediately before sub
 
 ### 3. Container discovery is based on a unique comment boundary
 
-On the group discussion stream, Edge orders eligible visible comment controls/editors by document position. For each, it finds the smallest containing post boundary that has post evidence (author plus body or media), stays inside the group main/feed scope, and does not contain a second peer comment editor. If a comment action must be activated to hydrate its editor, Edge may click only that action and then re-evaluate the same candidate boundary.
+On the group discussion stream, Edge orders eligible visible comment controls/editors by document position. For each, it finds the smallest containing post boundary that has post evidence (author plus body or media), stays inside the group main/feed scope, and does not contain a second peer comment editor. If a comment action must be activated to hydrate its editor, the page router returns only the unique action coordinates. Native dispatches a real CDP mouse move/press/release sequence and then re-evaluates the same candidate boundary.
 
 The first uniquely commentable boundary is eligible. Duplicate evidence, multiple peer editors in one boundary, missing post evidence, or a boundary that expands to the whole page is an honest non-selection. The probe never chooses a later boundary after one has been selected and later fails.
 
-### 4. The existing protocol messages carry the opaque reference
+### 4. DOM click is not authoritative actuation
+
+For controls whose activation advances a workflow, exposes an input surface, or can lead to a platform write, browser-side JavaScript is limited to read-only target discovery. Returning successfully from `HTMLElement.click()` does not prove that Facebook accepted a trusted user gesture; React/custom controls have repeatedly ignored that path in live environments.
+
+The router therefore returns a freshly measured, uniquely scoped point target. Native performs `Input.dispatchMouseEvent` in the order `mouseMoved → mousePressed → mouseReleased`, at most once for the selected comment action, and then requires exactly one eligible editor under the same bound target. Missing coordinates, ambiguity, target movement, dispatch failure, or absent post-state remains `editor_not_found`, `ambiguous_target`, or `target_context_mismatch`; none may fall back to DOM click or another post.
+
+This is also recorded as a repository-wide architecture invariant because the same failure class has occurred in other custom browser controls.
+
+### 5. The existing protocol messages carry the opaque reference
 
 No new message type is introduced:
 
@@ -83,7 +92,7 @@ No new message type is introduced:
 
 Both Edge and Cloud protocol comments/documentation describe the additional first-post-only form. Runtime validation remains narrower than the shared `string` wire type.
 
-### 5. Post-submit verification remains scoped and honest
+### 6. Post-submit verification remains scoped and honest
 
 For an in-place target, comment acknowledgement scans only descendants of the bound root and still requires the existing own-account plus server acknowledgement evidence. A cleared editor, optimistic row, or count change remains insufficient. If the bound root disappears after Enter, the result is ambiguous/non-success according to the existing lifecycle; it is never promoted to confirmed.
 
@@ -93,14 +102,16 @@ For an in-place target, comment acknowledgement scans only descendants of the bo
 - **[A post edit changes the deterministic evidence]** → the reference changes on a later run and per-post dedup may not match; group coverage and normal server verification still apply, and no weaker identity is fabricated.
 - **[Two rendered posts produce identical normalized evidence]** → the probe reports an ambiguous target and submits nothing.
 - **[Localized markup changes remove the unique editor boundary]** → focused router fixtures cover current Chinese, English, and Vietnamese labels; unknown markup fails honestly rather than selecting the document's first editor.
+- **[Synthetic DOM click reports success without a trusted activation]** → workflow-gating controls are point probes only; Native owns CDP input and the editor post-state is mandatory.
 
 ## Migration Plan
 
 1. Add the OpenSpec/protocol contract and red tests for a commentable post with no canonical link.
 2. Implement and validate the Edge page-local target registry and in-place read/comment path.
 3. Update Cloud first-post correlation and target plumbing, retaining canonical-only checks elsewhere.
-4. Run focused Edge/Cloud tests, Native Rust tests/clippy, and both repository typechecks.
-5. Integrate source only after validation. Per the current task boundary, do not package, deploy, or perform a real-account write.
+4. Replace comment-editor hydration by DOM click with a unique point probe, Native CDP mouse actuation, and same-target editor validation.
+5. Run focused Edge/Cloud tests, Native Rust tests/clippy, and both repository typechecks.
+6. Integrate source only after validation. Per the current task boundary, do not package, deploy, or perform a real-account write.
 
 Rollback is a normal source revert: canonical permalink first-post targeting remains an independent path, and no persisted schema is added.
 

@@ -26,8 +26,8 @@ Read on demand:
 - Cloud `RiskController` is the single writer of final account risk state.
 - DEV and OL share PostgreSQL long-term. Durable async work scanned, claimed, retried, or recovered by background code stores server-injected `execution_target=dev|ol`; all lifecycle reads/writes filter the local target. Missing/invalid `AIDCP_DEPLOY_ENV` disables that worker. Shared business data/config is excluded.
 - Never fake success; report missing/ambiguous targets, bad pages/data, movement, and counts honestly.
-- Add cooldowns, retries, fallbacks, compatibility branches, or knobs only for an observed failure or explicit contract; state why a simpler path fails and keep them observable/testable. Fail closed only at safety-sensitive irreversible writes; never turn unknown/failure into success.
-- DOM-first locating keeps post-action validation, bounded retry/escalation, and cache promotion only after repeated success.
+- Cooldowns, retries, fallbacks, compatibility branches, and knobs require observed failures/contracts and observability. Fail closed at irreversible writes; never promote unknown/failure to success.
+- DOM-first locating keeps bounded retries and checks. DOM `click()` is not proof: progress/write controls require a fresh target, Native CDP mouse events, and verified post-state; cache after repeated success.
 - Protocol v2 changes stay synchronized across cloud/edge types, cloud command mapping, edge active-command routing, and `docs/protocol.md`.
 - Prefer the current event-driven v2 browse loop; do not revive deleted legacy planner/card-filter paths.
 

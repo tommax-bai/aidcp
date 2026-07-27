@@ -26,3 +26,12 @@
   <!-- aidcp 9ac7f12: strict OpenSpec validation and scoped diff review pass. No installer packaging, OL deployment, or real-account write. -->
 - [x] 4.4 Deploy Cloud commit `21ab6ff` to DEV after explicit user authorization and verify the runtime.
   <!-- DEV 2026-07-28: backup /opt/aidcp/backups/cloud-20260727T182028Z-pre-21ab6ff.tgz; remote focused tests 133/133; schema gates content/automation/api pass; writer lock held; 8787/8090/8091 listening; panel health ok; Feishu WS ready; Gi Vo Edge reconnected. -->
+
+## 5. Trusted comment-editor activation regression
+
+- [x] 5.1 Add router and fake-CDP regression coverage proving editor hydration uses one Native mouse move/press/release sequence and never DOM `click()`.
+- [x] 5.2 Implement a same-target comment-action point probe and Native CDP click with bounded editor post-state validation.
+- [x] 5.3 Record the repository-wide real-input invariant in `AGENTS.md` and `docs/architecture.md`.
+  <!-- aidcp-edge 8f5bae9: router fixture covers the Vietnamese primary action plus avatar/GIF/sticker decoys; fake CDP proves one mouseMoved/mousePressed/mouseReleased sequence and same-target editor post-state. -->
+- [x] 5.4 Run focused Edge router/Native tests, full Native validation, Edge acceptance/full tests and typecheck; then strict OpenSpec validation, scoped review, commit, and push.
+  <!-- Validation 2026-07-28: router 76/76; focused fake CDP 1/1; full cargo test pass; cargo fmt/clippy pass; Edge acceptance 30/30; Edge full 2485 pass, 1 gated skip; typecheck pass; strict OpenSpec and scoped diff review pass. aidcp-edge 8f5bae9 integrated and pushed to master. No installer packaging, deployment, or real-account write. -->

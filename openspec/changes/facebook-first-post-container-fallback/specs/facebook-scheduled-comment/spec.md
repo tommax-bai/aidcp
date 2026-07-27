@@ -8,6 +8,8 @@ The target reference MUST be deterministic from normalized same-container eviden
 
 Canonical-permalink and in-place targets MUST NOT silently fall back to each other after selection. The first-post path MUST NOT switch to keyword search, reselect by document order before submit, or advance to a later post because the selected target is deduped or its binding is lost.
 
+When a uniquely associated comment action must be activated before the editor exists, the page router SHALL return a fresh point target and MUST NOT call DOM `click()` as actuation. Native SHALL dispatch real CDP mouse move/press/release events at most once, then require exactly one eligible editor under the same selected target. Dispatch completion without that editor post-state is not success.
+
 #### Scenario: Visible commentable first post has no canonical permalink
 - **WHEN** the group discussion stream hydrates a first eligible post with uniquely bound context and comment editor
 - **AND** every rendered story/timestamp link lacks a canonical group-post permalink
@@ -28,6 +30,17 @@ Canonical-permalink and in-place targets MUST NOT silently fall back to each oth
 - **WHEN** Cloud returns the approved comment with the Edge-issued first-post target reference
 - **THEN** Edge resolves the originally bound container, verifies its normalized evidence is unchanged, and requires exactly one eligible editor inside that boundary before typing
 - **AND** it never uses an editor from another post or the document root
+
+#### Scenario: Comment editor requires a trusted pointer activation
+- **WHEN** the selected first post has exactly one eligible comment action but no hydrated editor
+- **THEN** Edge returns that action's fresh coordinates without invoking DOM `click()`
+- **AND** Native dispatches `mouseMoved`, `mousePressed`, and `mouseReleased` through CDP
+- **AND** the workflow proceeds only after the same target exposes exactly one eligible editor
+
+#### Scenario: Real click does not hydrate the selected editor
+- **WHEN** Native dispatches the bounded pointer activation but the same target does not expose a unique eligible editor
+- **THEN** Edge reports an honest non-submit outcome
+- **AND** it does not repeat the click, invoke DOM `click()`, or select another post
 
 #### Scenario: Bound container is replaced during approval
 - **WHEN** Facebook detaches, recycles, or materially changes the bound post container before submit
