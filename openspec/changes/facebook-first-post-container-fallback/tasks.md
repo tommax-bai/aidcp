@@ -22,5 +22,5 @@
   <!-- aidcp-edge d3fe159: router 75/75; Native cargo test + fmt + clippy; acceptance 30/30; full 2484 pass, 1 gated skip; typecheck pass. -->
 - [x] 4.2 Run focused Cloud edge-step/scheduler tests, Cloud acceptance/full tests, and Cloud typecheck.
   <!-- aidcp-cloud 21ab6ff: focused 133/133; acceptance 154/154; full 3733 pass, 11 expected skips; typecheck pass. -->
-- [ ] 4.3 Run `openspec validate facebook-first-post-container-fallback --strict`, review scoped diffs, and record repository commits plus validation evidence.
-  <!-- Source-only closeout: no installer packaging, DEV/OL deployment, or real-account write by task boundary. -->
+- [x] 4.3 Run `openspec validate facebook-first-post-container-fallback --strict`, review scoped diffs, and record repository commits plus validation evidence.
+  <!-- aidcp 9ac7f12: strict OpenSpec validation and scoped diff review pass. Source-only closeout: no installer packaging, DEV/OL deployment, or real-account write by task boundary. -->
