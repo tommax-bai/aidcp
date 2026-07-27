@@ -26,8 +26,15 @@
   <!-- aidcp-edge 372936c: encoded Native probe and typed projections cover every listed state; fixture/unit tests include search_result_ai compatibility, query redaction, login precedence, notification, creator publish, error, and unknown behavior. -->
 - [ ] 3.2 Port DOM-first locating with visibility, geometry, ambiguity rejection, bounded retry/escalation, post-action validation, and cache promotion only after repeated success.
 - [ ] 3.3 Implement Native pointer, wheel, keyboard, text, and file-input primitives with current humanization bounds and cancellation-safe atomic actions.
+  <!-- Partial 2026-07-27, aidcp-edge acfd9e4: shared text input now preserves per-Unicode-scalar pacing, cancellation, and deadlines; captcha text uses bounded real keyDown/keyUp pairs with Shift cleanup. The broader pointer/wheel/file primitive task remains open. -->
 - [x] 3.4 Define bounded structured models for feed cards, search results, note details, profiles, notifications, interaction receipts, and publish receipts.
   <!-- aidcp-edge 804aadc: deny-unknown Rust command/result types cover the complete frozen command manifest; card/note/profile/notification/action/publish projections apply explicit text/list/URL/ID bounds. cargo test and clippy -D warnings passed. Command behavior remains sections 4-6. -->
+- [x] 3.5 Restore Native Facebook comment and Xiaohongshu search text entry to one humanized `Input.insertText` call per Unicode scalar, with pre-submit cancellation/deadline checks, exact readback, and cleanup before any failed commit.
+  <!-- aidcp-edge acfd9e4: Facebook comment includes approved group-code suffix, a Cloud-equivalent length-aware ceiling, commit-window cleanup, and no Enter after pre-submit failure; Xiaohongshu search preserves pointer focus, a 700 ms submit floor, and Enter text '\r'. -->
+- [x] 3.6 Replace Native captcha text `Input.insertText` with validated visible-ASCII real keyDown/keyUp pairs, real Shift wrapping, bounded dwell/RTT compensation, and best-effort key release after dispatch failure.
+  <!-- aidcp-edge acfd9e4: captcha text is 1..24 visible ASCII, produces zero Input.insertText calls, and reports post-point/type failures no earlier than dispatched. -->
+- [x] 3.7 Add fake-CDP event-sequence regressions for Native Facebook comment, Xiaohongshu search, and captcha text input.
+  <!-- aidcp-edge acfd9e4: tests assert per-scalar input, zero captcha insertText, Shift/key release, deadline cleanup/no Enter, and commit-window rejection cleanup/no Enter; full Rust 111/111 and focused TypeScript 33/33 passed. -->
 
 ## 4. Browse, search, note, profile, and notification commands
 
