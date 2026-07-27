@@ -8,6 +8,8 @@ cloud SHALL 按正文长度算出 Facebook `fill_field` 的执行预算，随指
 
 预算上限 MUST 严格小于边缘发布租约 TTL（安全比例 0.4），否则边缘会在打字途中单方面过期租约、恢复浏览循环去驱动半写的编辑器。
 
+默认配置 SHALL 使用 20 秒固定开销、每字 250 毫秒和 400 秒预算上限，因此 Facebook 正文逐字输入硬上限为 1520 字；默认发布租约 SHALL 为 1000 秒，使填写预算继续不超过租约的 0.4。
+
 edge SHALL 按下发预算自我掐表：预算耗尽即停止输入、清空编辑器、诚实回报，MUST NOT 继续写入已被上游放弃的编辑器；清场失败 MUST 如实上报，MUST NOT 谎报干净页。云端未下发预算时，edge SHALL 使用**小于**云端常数窗口的兜底预算，使旧云端配新边缘时仍是边缘先答。
 
 逐字符的拟人化键盘节奏 MUST NOT 因本要求而改变。
@@ -26,6 +28,11 @@ edge SHALL 按下发预算自我掐表：预算耗尽即停止输入、清空编
 - **WHEN** 正文长度超出预算上限所能容纳的字符数
 - **THEN** cloud SHALL 诚实 `failed`（`content_too_long`）
 - **AND** MUST NOT 截断正文，MUST NOT 下发任何指令
+
+#### Scenario: 默认 1520 字边界
+- **WHEN** Facebook 正文按默认配置包含 1520 个 Unicode 码位
+- **THEN** cloud SHALL 允许进入命令序列，并为正文填写下发 400 秒预算
+- **AND** 1521 个 Unicode 码位 SHALL 以 `content_too_long` 在零下发状态诚实失败
 
 #### Scenario: 小红书路径不受影响
 - **WHEN** 发布平台为小红书
