@@ -600,7 +600,7 @@ Console 的全部数据与指令经 `aidcp-api`。`aidcp-api` 不可用时，Con
 
 | 数据 | 权威仓库/服务 | 其他服务如何使用 |
 | --- | --- | --- |
-| 客户、环境归属和账号绑定（`client_users`、`client_env_scope`） | `aidcp-api` | 授权 HTTP 或版本化快照 |
+| 客户、环境归属和账号绑定（`client_users`、`client_env_scope`、`client_environment_proxy_authorities`） | `aidcp-api` | 授权 HTTP 或版本化快照；环境原始代理权威仅由 api 持久化与写入 |
 | `client_environments`（环境花名册与绑定事实） | `aidcp-api` **单写** | 自动化握手 MUST 改为经 api 的窄内部接口回写，MUST NOT 直写该表 |
 | 账号主数据（`accounts`，含 `execution_target` 归属列） | `aidcp-api` **单写** | 被 26 处外键指向的核心表（§5.4.5）。`aidcp-automation` 在握手路径上占位 / 改写归属 target MUST 经 api 的窄内部接口完成，MUST NOT 直写该表（形态与上一行 `client_environments` 相同）；风控侧只以 `accounts.execution_target` 为**只读**属主谓词。change `risk-state-cross-process-integrity` 的归属占位任务 MUST 按本行落地，或在 `AC-OWN-*` 的豁免清单里为该写入留一条具名条目并挂消除 change |
 | 人设、写作语言（`persona_config`、`soul_*`） | `aidcp-api` | 判定路径 MUST 取本地只读副本（版本 + 失效通知 + 有界陈旧上限，见 §11.4 要求二与 §6.1 通信表末行）。**MUST NOT 用构造期快照**：浏览会话不是任务、没有创建时刻，而 controller 一旦建成永不驱逐（`aidcp-cloud/src/risk/types.ts:38-40`），构造期快照会让后台改动到重启前零生效且零日志。**MUST NOT 在判定路径上做跨服务同步请求**：该取值口的契约写死为「同步、零 IO、永不抛」（`src/risk/types.ts:21-40`），形态上就满足不了 |

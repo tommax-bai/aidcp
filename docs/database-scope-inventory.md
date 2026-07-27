@@ -58,7 +58,12 @@
 
 `accounts` 21 · `client_users` 4 · `publish_log` 3 · `interaction_reply_config_scopes` 3 ·
 `delegated_tasks` 2 · `facebook_group_target` 2 · `account_facebook_publish_image` 2 ·
-`account_facebook_publish_image_set` 1 · `client_environments` 1 · `persona_auto_fill_runs` 1。
+`account_facebook_publish_image_set` 1 · `client_environments` 2 · `persona_auto_fill_runs` 1。
+
+新增的第二条 `client_environments` 外键来自
+`client_environment_proxy_authorities.env_key`。两张表同属 `aidcp-api`，物理拆库时 MUST
+保持同库迁移；若未来分离代理权威存储，则改为写前验证环境存在、删除环境时发送幂等清理命令，
+读侧对孤儿代理记录 fail-closed，不能把缺失环境当成可用代理。
 
 **指向 `accounts(account_id)` 合计 27 处**（迁移 21 + 源码 6）。design.md 记 26（迁移 19 + 源码 7）：
 差额来自 ① 本 change 第 3 节补齐的迁移把两条既有外键写进了迁移目录；② 源码那 7 处里有一处
