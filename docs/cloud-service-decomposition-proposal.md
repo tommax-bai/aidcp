@@ -535,6 +535,8 @@ Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或
 
 源目录逐格随之下调（归档整表重算时并入）：`src/soul/` 7→6、`src/interactions/` −1、`src/agents/`（api 段）2→1、`src/publish-agent/` −1；分层计数 **api 104→102 / automation 166→165 / content 80→79 / kernel 4→8**（合计文件数不变，均为搬迁非新增）。**跨边界 import 台账 `frozenTotal` 266 → 233**（净减 33 = 16+9+6+2）。均行为零变更（纯类型/纯函数搬迁 + import 路径重写）。已 land origin/master + 部署 dev（`2a1905b`）。下一刀 `extract-schema-capability-contract` 析出 `schema-capability.ts` 无 SQL 纯判定段（消 ~20 条）。
 
+**Facebook 规则模式归属增量（change `facebook-rule-mode-cadence`）**：`src/config/facebook-rule-mode-store.ts` 只持账号规则开关、平台校验、审计回读与镜像失效，归 `aidcp-api`；`src/orchestrator/facebook-rule-mode-runtime-store.ts` 只持 target-scoped 浏览事实、进度、批次与动作终态，归 `aidcp-automation`；`src/orchestrator/facebook-rule-mode.ts` 是 automation 浏览闭环内的有效模式仲裁与卡片选择。两侧共享的固定规则定义、纯 DTO 与结果 union 已析出为独立 `src/kernel/facebook-rule-mode-types.ts`：零 import、零 SQL、零 HTTP、零 LLM、零进程内活状态，按本节 kernel 新增唯一通道纳入花名册。组合根只负责把 config/runtime 两个只读视图汇合，不新增跨属主数据库读写。
+
 **跨边界 import 与表写入基线（`AC-BOUND` 度量物，`aidcp-cloud@89c286d`）**：首批 seed 实测 **295 条**跨边界 import + **12 条**跨层表写入；`involvingContent` = **117**。方向分解：`api→automation` 101 / `automation→api` 77 / `api→content` 34 / `automation→content` 28 / `content→automation` 32 / `content→api` 23。复核命令（在 `aidcp-cloud` 内跑，只读）：`npm run boundaries:census`。
 
 `src/cache/` 逐文件切分（该目录是唯一按文件而非按语义分组切开的目录）：
