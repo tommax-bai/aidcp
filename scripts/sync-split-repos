@@ -124,6 +124,9 @@ TRANSPORT_MEMBERS = [
     # 只承载 Bearer、server-injected target、owner stream allowlist 与 envelope 校验；
     # owner snapshot 生成和 consumer 本地镜像实现仍各自留在属主仓。
     'src/transport/sync-read-snapshot-http.ts',
+    # A3-A6 runtime changed 仅作轮询加速：automation outbox relay 与 API ingress
+    # 共用闭合 signal/ACK 传输；outbox SQL/consumer 仍只留 automation 属主仓。
+    'src/transport/sync-read-changed-http.ts',
 ]
 # 有意**不**进包的同目录文件（判据：只有 automation 一家用，或直接持有属主表 SQL）：
 #   event-outbox.ts / risk-command-outbox.ts / eventbus-outbox-bridge.ts / outbox-health.ts /
@@ -305,6 +308,29 @@ def rewrite_kernel_imports(text: str, kernel_paths: set[str], src_file: str) -> 
     )
 
 
+def rewrite_repo_source(
+    repo: str,
+    text: str,
+    kernel_paths: set[str],
+    src_file: str,
+) -> str:
+    """Apply the reproducible, reviewed source adaptations for one derived repo."""
+    text = rewrite_kernel_imports(text, kernel_paths, src_file)
+    if repo == 'aidcp-automation' and src_file == 'src/schema/schema-contract.ts':
+        source = "export const REQUIRED_SCHEMA_VERSION = '0076_config_mirror_bump_inbox';"
+        derived = (
+            '// The derived automation checkout does not ship API-owned migration 0076.\n'
+            '// Its highest required local prerequisite is the target-scoped outbox cursor.\n'
+            "export const REQUIRED_SCHEMA_VERSION = '0075_event_outbox_topic_cursor';"
+        )
+        if source not in text:
+            raise RuntimeError(
+                'schema-contract derived rewrite lost its reviewed source marker'
+            )
+        text = text.replace(source, derived, 1)
+    return text
+
+
 def check_package_pin(repo_path: str, pkg_name: str, head: str, apply: bool) -> tuple[bool, str]:
     """消费仓 package.json 里对某个共享包的 pin，必须恒等于那个包 master 的头。
 
@@ -339,6 +365,9 @@ def check_package_pin(repo_path: str, pkg_name: str, head: str, apply: bool) -> 
 # 这条规则会**自己变好**：每消掉一条跨服务耦合，就有一批测试从「跨属主」变成「单属主」、
 # 自动变得可派生。不需要有人维护一张测试清单。
 IMPORT_RE = re.compile(r"""(?:from\s+|import\s*\(\s*)['"]([^'"]+)['"]""")
+FIXTURE_DIR_RE = re.compile(
+    r"""new\s+URL\(\s*['"]([^'"]+/)['"]\s*,\s*import\.meta\.url\s*\)"""
+)
 BIZ_LAYERS = ('api', 'automation', 'content')
 
 
@@ -350,19 +379,30 @@ def _resolve(spec: str, from_file: str) -> str:
 def classify_tests(own: dict[str, str], ref: str) -> tuple[dict[str, str], dict[str, list[str]]]:
     """返回 (测试路径 → 归属仓 or None, 归属仓 → 测试清单)。None = 跨属主，留守 aidcp-cloud。"""
     listing = git(CLOUD, 'ls-tree', '-r', '--name-only', ref).split()
+    tracked = set(listing)
     tests = [f for f in listing if f.startswith('test/') and f.endswith('.ts')]
     verdict: dict[str, str] = {}
     by_repo: dict[str, list[str]] = {}
     for t in tests:
-        text = git(CLOUD, 'show', f'{ref}:{t}')
+        entry_text = git(CLOUD, 'show', f'{ref}:{t}')
+        if 'aidcp:test-owner=cloud' in entry_text:
+            verdict[t] = ''
+            continue
         layers = set()
-        for m in IMPORT_RE.finditer(text):
-            spec = m.group(1)
-            if not spec.startswith('.'):
+        # Test helpers can import owner source that the entry itself never
+        # mentions. Classify the complete local-test dependency closure so a
+        # helper cannot smuggle API/content modules into a derived repo.
+        for dep in test_local_deps(ref, t, set(), tracked):
+            if not dep.endswith('.ts'):
                 continue
-            layer = own.get(_resolve(spec, t))
-            if layer:
-                layers.add(layer)
+            text = git(CLOUD, 'show', f'{ref}:{dep}')
+            for m in IMPORT_RE.finditer(text):
+                spec = m.group(1)
+                if not spec.startswith('.'):
+                    continue
+                layer = own.get(_resolve(spec, dep))
+                if layer:
+                    layers.add(layer)
         biz = layers & set(BIZ_LAYERS)
         if len(biz) == 1:
             only = next(iter(biz))
@@ -377,7 +417,7 @@ def classify_tests(own: dict[str, str], ref: str) -> tuple[dict[str, str], dict[
     return verdict, by_repo
 
 
-def test_local_deps(ref: str, entry: str, seen: set[str]) -> set[str]:
+def test_local_deps(ref: str, entry: str, seen: set[str], tracked: set[str]) -> set[str]:
     """测试自带的 helper / fixture（`test/` 内的相对依赖）必须跟着一起搬，否则搬过去也跑不起来。"""
     if entry in seen:
         return seen
@@ -392,7 +432,16 @@ def test_local_deps(ref: str, entry: str, seen: set[str]) -> set[str]:
             continue
         dep = _resolve(spec, entry)
         if dep.startswith('test/'):
-            test_local_deps(ref, dep, seen)
+            test_local_deps(ref, dep, seen, tracked)
+    # Some frozen contracts are loaded by filename at runtime, so no static
+    # import can enumerate them. A literal fixture directory is still a closed,
+    # reviewable dependency: include every tracked file beneath that directory.
+    for match in FIXTURE_DIR_RE.finditer(text):
+        prefix = os.path.normpath(
+            os.path.join(os.path.dirname(entry), match.group(1))
+        ).rstrip('/') + '/'
+        if prefix.startswith('test/fixtures/'):
+            seen.update(path for path in tracked if path.startswith(prefix))
     return seen
 
 
@@ -407,6 +456,12 @@ def main() -> int:
 
     if args.prune and not args.apply:
         print('ERROR: --prune 需与 --apply 同用', file=sys.stderr)
+        return 2
+    if args.prune and args.tests:
+        print(
+            'ERROR: --prune 只允许处理 src/；不得与 --tests 同用，派生私有测试必须显式保留',
+            file=sys.stderr,
+        )
         return 2
     if not os.path.isdir(CLOUD):
         print(f'ERROR: 找不到 aidcp-cloud：{CLOUD}', file=sys.stderr)
@@ -479,7 +534,7 @@ def main() -> int:
         for rel in sorted(expected & actual):
             want = git(CLOUD, 'show', f'{args.ref}:{rel}')
             if layer != 'kernel':
-                want = rewrite_kernel_imports(want, kernel_paths, rel)
+                want = rewrite_repo_source(repo, want, kernel_paths, rel)
             with open(os.path.join(path, rel), encoding='utf8') as fh:
                 if fh.read() != want:
                     (comp_changed if rel in COMPOSITION else changed).append(rel)
@@ -515,7 +570,7 @@ def main() -> int:
                     continue
                 want = git(CLOUD, 'show', f'{args.ref}:{rel}')
                 if layer != 'kernel':
-                    want = rewrite_kernel_imports(want, kernel_paths, rel)
+                    want = rewrite_repo_source(repo, want, kernel_paths, rel)
                 dst = os.path.join(path, rel)
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
                 with open(dst, 'w', encoding='utf8') as fh:
@@ -611,12 +666,26 @@ def sync_tests(args, own, kernel_paths, selected_repos: set[str]) -> int:
             continue
         wanted: set[str] = set()
         for e in entries:
-            wanted |= test_local_deps(args.ref, e, set())
+            wanted |= test_local_deps(args.ref, e, set(), tracked)
         # import 说明符不保证指向真实文件（模板拼接、条件路径等）；只搬 ref 里确实存在的。
         wanted &= tracked
         actual = {f for f in git(path, 'ls-files').split() if f.startswith('test/')}
-        add, remove, changed = sorted(wanted - actual), sorted(actual - wanted), []
-        for rel in sorted(wanted & actual):
+        derived_private = {
+            rel for rel in actual
+            if os.path.isfile(os.path.join(path, rel))
+            and 'aidcp:test-owner=derived' in open(
+                os.path.join(path, rel), encoding='utf8'
+            ).read()
+        }
+        actual = {rel for rel in actual if os.path.isfile(os.path.join(path, rel))}
+        wanted -= derived_private
+        synced_actual = actual - derived_private
+        add, remove, changed = (
+            sorted(wanted - synced_actual),
+            sorted(synced_actual - wanted),
+            [],
+        )
+        for rel in sorted(wanted & synced_actual):
             want = git(CLOUD, 'show', f'{args.ref}:{rel}')
             if repo != KERNEL_REPO:
                 want = rewrite_kernel_imports(want, kernel_paths, rel)
@@ -625,7 +694,10 @@ def sync_tests(args, own, kernel_paths, selected_repos: set[str]) -> int:
                     changed.append(rel)
         if add or remove or changed:
             drift = 1
-        print(f'  {repo}: 新增 {len(add)} · 内容不同 {len(changed)} · 多出 {len(remove)}')
+        print(
+            f'  {repo}: 新增 {len(add)} · 内容不同 {len(changed)} · 多出 {len(remove)}'
+            f' · 派生私有 {len(derived_private)}'
+        )
         if args.apply:
             for rel in add + changed:
                 want = git(CLOUD, 'show', f'{args.ref}:{rel}')

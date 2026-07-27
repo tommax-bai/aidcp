@@ -1183,3 +1183,43 @@ automation root 也已从“模块解析即失败”收口为可加载 factory�
 依赖与 production runtime composition 尚未闭合；没有两进程真实 boot、断链积压/恢复、
 真实 panel WebSocket 探针，也没有 Edge installer 或真实账号验证。上述项目仍是 4b/后续批次，
 不得从本节的 source/loopback/DEV monolith 证据外推。
+
+### 10.11 4b 实施检查点：**同步读已契约化，运行拓扑仍是 DEV 单体**
+
+4b 已实现 A（automation → API）与 B（API → automation）两向同步读的 source contract：
+owner 生成带 generation / freshness 的完整快照，consumer 用本地 mirror 与 target-scoped
+checkpoint 恢复和推进；缺失、歧义、陈旧与 owner 不可达均保持显式状态。Cloud monolith
+没有保留另一套“单体直读即可”的语义分支，而是以 local-authority 方式经过同一套
+snapshot / mirror / checkpoint 合同；B4 账号投影也由 owner 完整快照替换并推进 target
+checkpoint，不再靠跨属主数据库读取维持热路径。
+
+独立 `aidcp-api` / `aidcp-automation` 的手写 composition roots 已接入 owner snapshot route、
+consumer checkpoint restore、首次全量装载、周期刷新、readiness 与 stop 生命周期。
+这证明两侧具备独立组装形状，**尚不等于拆分运行态已经可启动**：Automation 仍显式列出
+12 个 future blockers（4 个 operator-command、7 个 content-owner、1 个 production-runtime
+composition），API 继承的 Feishu owner WebSocket 也没有可关闭的 lifecycle handle。
+这些条件没有用默认值、外来数据库 pool 或单体分支掩盖，因此 4b 的 DEV split bootstrap
+如实记为 `not_started`，没有两进程 boot、内部端口往返、跨进程 soak、断链恢复或
+target-isolation 运行证据。
+
+runtime `sync_read_changed` outbox 只承担低延迟加速：通知丢失、重复或进程重启都不能成为
+正确性的前提。持久 generation、consumer checkpoint 与周期性 **full snapshot** 才承担
+最终收敛；同 generation 可去重，但不能把不同 generation 的连续变化合并成一个假事实。
+
+本批次默认分支落点为 Kernel `0cb83d0`、Transport `ec9dd3d`、API `8fd1879`、
+Automation `b54595a`、Content `c5a90c3`、Console `32bc318`、Edge `a33602d` 与
+Cloud `05d6c5a`。最终以 Cloud `05d6c5a` 重跑受管 source/test 派生同步，增、改、多出
+均为零；只剩脚本明确只报告不覆盖的各仓 `index.ts` / `server.ts`、Automation 私有
+composition root 与派生仓私有测试。Cloud 全量测试为 3684 total / 3673 pass /
+0 fail / 11 skip，source-owner census 为 515/515、非法边为零。
+
+Console / Edge 已按闭合 DTO 消费新证据形状，UI 保留 missing / ambiguous / stale 与真实零值的
+区别，并完成源码级 focused、typecheck / build 验证。该证据不包含 Edge installer，
+也没有已安装客户端或真实账号结果；因此不能从源码/UI 测试外推客户环境已获得 4b 行为。
+
+DEV 已从干净 Cloud `05d6c5a` 以 stop-then-start 更新 `aidcp-cloud` **monolith**：
+0082–0087 expand migrations 已应用，三属主 schema gate、自动化单写者锁、4b 首次镜像
+屏障、`:8787`、Panel `:8090` 与 Client Auth `:8091` 均通过；所有 split units
+保持 inactive / disabled，split `:8092` 未监听。Feishu 长连接与 `Dev.A` 身份通过，
+但实际发信仍如实返回既有群成员关系错误 `230002`；当时没有 Edge 连接或真实账号验收。
+部署前备份位于 `/opt/aidcp/backups/4b-05d6c5a-20260726`。OL 明确不在 4b 范围内。
