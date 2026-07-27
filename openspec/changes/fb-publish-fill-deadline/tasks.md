@@ -23,7 +23,7 @@
 - [x] 2.2 正文填写按下发预算自我掐表；预算耗尽即停手、清场、诚实回报（清不干净则标 dirty）。云端未下发预算时用 25s 兜底（小于云端 30s 常数窗口 → 即使对端未升级也是边缘先答）。 <!-- aidcp-edge 4162339 src/facebook/publish-executor.ts -->
 - [x] 2.3 验收闸从「前 20 字前缀」换成**全文回读包含**；额外内容超容差（typeahead 劫持）亦判失败。 <!-- aidcp-edge 4162339；红线：插入调用没报错 ≠ 文本进去了 -->
 - [x] 2.4 打字前先清空编辑器并校验为空，清不干净则诚实 `composer_not_clean`、绝不在残稿之上追加。 <!-- aidcp-edge 4162339；composer 复用已存在编辑区 + 光标处追加，是脏稿拼接的根因 -->
-- [x] 2.5 修正聚焦守卫的恒真返回；聚焦改为尽力而为，以全文回读为唯一判据。 <!-- aidcp-edge 4162339 -->
+- [x] 2.5 修正旧 TypeScript executor 聚焦守卫的恒真返回；当时以全文回读作为最终成功判据。 <!-- aidcp-edge 4162339；该历史任务没有覆盖后来的 Native 精确焦点前置条件，已由 6.1–6.5 补齐 -->
 
 ## 3. 测试与回归
 
@@ -63,3 +63,11 @@
 - [ ] 5.3b 该规则仍是模型软提示，**正文无任何确定性长度校验**（只 clamp 标题）。`content_too_long` 是诚实闸、不是解法——真正该收的是生成侧。
 - [x] 5.4 Native 同类输入语义归属 `native-page-engine-production-cutover`：Facebook 评论和小红书搜索恢复逐 Unicode 码位拟人输入；Native 验证码改为真实 keyDown/keyUp 与 Shift 配对，三条路径均补取消/截止/回读/清场和 CDP 事件序列回归。
   <!-- aidcp-edge 745b754；Rust 111/111、clippy -D warnings；Native 定向 TypeScript 33/33、群聊码预算回归 21/21、typecheck；Edge acceptance 30 pass / 1 gated skip、集成后全量 2432 pass / 1 skip；Native release artifact SHA-256 caa9407f31355714de19b9da1230463986b1ab83d7e0cb63fbb1962e16c4f77c；dist reachable=79 / removed=63、legacy_page_rules=absent、source_maps=absent，desktop build input 验证通过。源码已集成并推送 origin/master，未打包安装器、未做真账号提交。 -->
+
+## 6. Native 目标焦点与选区补迁移
+
+- [x] 6.1 对所有 Rust 文本输入调用链做闭包审计：Facebook 发帖、Facebook 评论、小红书搜索、验证码；确认不存在第五条 `Input.insertText` 调用链，并逐条对照 TypeScript 的焦点、选区、清场和回读机制。 <!-- aidcp-edge 5e66ef4；其余 XHS router 写入均对精确元素直接 focus + setter + readback，不依赖当前焦点，未做无依据改写 -->
+- [x] 6.2 Facebook 发帖/评论在字符派发前必须把焦点绑定到本次精确编辑器，编辑器内建立选区后再清空；焦点不属于该编辑器时零字符失败，失败清场也必须重新绑定同一目标，禁止清空任意 `activeElement`。 <!-- aidcp-edge 5e66ef4 -->
+- [x] 6.3 小红书搜索恢复 TypeScript 的可见实例选择、程序化 `focus()` 与目标身份回读；验证码恢复 `editable` / `opaque` / `none` 焦点分级，`none` 零字符失败，editable 使用字段内选区清空，opaque 只允许尽力清场并诚实保留不可回读语义。 <!-- aidcp-edge 5e66ef4 -->
+- [x] 6.4 Fake CDP 必须建模焦点归属：未聚焦目标时 `Input.insertText` 不得修改目标值；补四条路径的错误焦点、目标消失、清场重绑定、逐字/真实键事件序列回归。 <!-- aidcp-edge 5e66ef4 -->
+- [x] 6.5 完成 Rust 定向/全量测试、clippy、Edge 定向/acceptance/全量/typecheck、Native 构建和生产输入边界验证；记录未打包安装器、未做真实账号写入的交付边界。 <!-- aidcp-edge 5e66ef4 已集成并推送 origin/master；Rust 115/115、clippy -D warnings；Native TypeScript 定向 136/136；Edge acceptance 30 pass / 1 gated suite、全量 2435 pass / 1 skip、typecheck；Native release artifact darwin-arm64 SHA-256 27f24a32e338b04ea13be71a2109c8a75cc4ed895466f3e26ba9027a3c020cb3；dist reachable=79 / removed=63、legacy_page_rules=absent、source_maps=absent，desktop build input 与 Native artifact 验证通过。canonical dev source artifact 已重建；未重启在途 Edge/Native 进程、未打包安装器、未做真实账号写入。 -->

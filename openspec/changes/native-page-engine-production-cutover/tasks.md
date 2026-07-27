@@ -35,6 +35,8 @@
   <!-- aidcp-edge 745b754: captcha text is 1..24 visible ASCII, produces zero Input.insertText calls, and reports post-point/type failures no earlier than dispatched. -->
 - [x] 3.7 Add fake-CDP event-sequence regressions for Native Facebook comment, Xiaohongshu search, and captcha text input.
   <!-- aidcp-edge 745b754: tests assert per-scalar input, zero captcha insertText, Shift/key release, deadline cleanup/no Enter, commit-window rejection cleanup/no Enter, and group-code-aware comment timing; full Rust 111/111 and focused TypeScript passed. -->
+- [x] 3.8 Bind every Native text sequence to its exact target before clearing or typing: Facebook publish/comment require exact editor focus and editor-local selection, Xiaohongshu search requires the visible input instance plus active-target verification, and captcha text requires the frozen `editable` / `opaque` / `none` focus tiers. Fake CDP tests must reject writes to an unfocused target.
+  <!-- aidcp-edge 5e66ef4: all four Native text paths now fail with zero character dispatch when focus cannot be proven; fake CDP models focus ownership instead of auto-appending every input event. Rust 115/115, Native focused TypeScript 136/136, Edge full 2435 pass / 1 skip, and production boundary checks passed. -->
 
 ## 4. Browse, search, note, profile, and notification commands
 
