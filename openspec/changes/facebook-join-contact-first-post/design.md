@@ -11,6 +11,8 @@ A read-only probe against the Tianxing Bai AdsPower profile established two runt
 1. the first hydrated top-level group-feed post can expose a stable group-post permalink and a comment affordance without using Facebook search;
 2. after opening that permalink, document-order extraction can read a background feed post while the target post is open in a dialog. Existing canonical target helpers already resolve the correct article for write targeting, so read extraction must reuse that identity boundary.
 
+The Gi Vo real-account regression probe established a third runtime fact: a hydrated group-feed timestamp anchor can render with a DOM `href` that is only the group root plus an opaque fragment, while Facebook's own React link/story props on that same anchor still carry the canonical `/groups/<group>/posts/<post>` URL. The card can simultaneously expose a working post-level comment editor. Treating DOM `href` as the only permalink witness therefore produces a false `no_candidates`.
+
 The join `observation_only` incident, including alias-versus-numeric group identity, is owned by another task and is not changed here.
 
 ## Goals / Non-Goals
@@ -71,15 +73,23 @@ The Edge selector scans the visible group feed in DOM/feed order and accepts the
 - exposes a canonical Facebook group-post permalink;
 - exposes a post-level comment control or a visible post-level comment editor.
 
+The permalink witness MAY be either the anchor's canonical DOM `href` or a canonical URL explicitly present in Facebook's React link/story data for that same rendered anchor. React inspection MUST be bounded, tied back to the exact DOM anchor/card, and accept only URL shapes that derive a canonical Facebook group-post identity. It MUST NOT decode opaque fragments, infer IDs from text, or synthesize a permalink. If both witnesses are absent or ambiguous, the card is ineligible and selection remains fail-closed.
+
+Because Facebook can initially stop the group page at the cover/composer while feed cards remain unhydrated, Edge MAY use the existing bounded feed scroll/probe budget to bring the first feed cards into the rendered viewport. This is hydration of the same first-post mode, not a fallback to search or a different targeting strategy. Selection remains DOM/feed ordered across the hydrated cards.
+
 It does not skip an already-commented first post to choose a later post. Cloud may read the first post and then reject it through existing dedupe; that terminal result remains honest and no second post is substituted.
 
 ### 4. Read and write share the canonical target root
 
 After permalink navigation, Edge derives the canonical post ID and resolves the exact article through the existing `FB_TARGET_HELPERS_JS` three-stage resolver. Caption extraction, nested-comment sampling, editor readiness, input targeting, and post-submit verification all use that same target boundary.
 
+When Facebook renders the post-level comment editor through a DOM portal outside the target card subtree, Edge MAY bind it through the target card's exclusive rendered bounds only if the editor center is covered by exactly one physical post card and that card is the canonical target. A center covered by another card, multiple cards, or multiple candidate editors is ambiguous and MUST fail closed. This is not a document-first or nearest-editor fallback.
+
 Zero or multiple matching targets returns `target_context_mismatch`; the task does not compose, approve, or submit. Document-order `top[0]`, first-dialog, and document-first-editor fallbacks are forbidden.
 
 Cloud still correlates `note.detail.noteId` by canonical post identity for explicit URL opens. For first-post selection, Edge returns the selected canonical permalink as `noteId`, and Cloud requires it to derive a valid Facebook post identity before accepting it.
+
+Equivalent canonical group-post URL forms remain equivalent at this boundary. In particular, `/groups/<group>/posts/<post>`, `/groups/<group>/permalink/<post>`, and `/groups/<group>?multi_permalinks=<post>` are accepted when they derive a stable post identity; page posts, Reels, empty `multi_permalinks`, and unknown URL shapes are rejected.
 
 ### 5. Facebook scheduled contact comment reuses the existing join-comment orchestrator
 
@@ -108,6 +118,7 @@ The keyword editor no longer treats an empty list as an error or shows an empty-
 - [First visible post can be pinned/admin content] → This is intentional “first eligible post” semantics; no ranking or search fallback is added.
 - [First post was already commented] → Existing dedupe stops the run; it does not silently move to a second post.
 - [Facebook DOM changes remove permalink or comment affordance] → Bounded selection returns `no_candidates`; no guessed target or write occurs.
+- [Facebook hides the canonical permalink behind React link/story props] → A bounded, anchor-scoped React read may recover only an explicit canonical group-post URL; shape drift or ambiguity still returns `no_candidates`.
 - [Detail page contains background feed plus multiple dialogs] → Canonical identity resolution, not DOM order or first dialog, binds the read context.
 - [Facebook scheduled contact comment now consumes both join and comment activity] → Existing join and comment risk gates remain in force; the content scheduler keeps account single-flight and cross-scheduler exclusion.
 - [Other task changes join code concurrently] → This change does not edit join executor, join membership recognition, or join scope logic; integration must still rebase and rerun tests before landing.

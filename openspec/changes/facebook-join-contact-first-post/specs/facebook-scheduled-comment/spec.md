@@ -15,6 +15,12 @@ The two paths MUST NOT silently fall back to each other. A configured-keyword se
 - **WHEN** a Facebook comment run has no configured keywords
 - **THEN** Cloud dispatches no `search.execute`, and Edge selects and opens the first hydrated top-level group post with a stable permalink and post-level comment affordance
 
+#### Scenario: Obfuscated timestamp href uses Facebook's explicit canonical story URL
+- **WHEN** a hydrated top-level group post has a post-level comment affordance but its rendered timestamp `href` is only the group root plus an opaque fragment
+- **AND** Facebook's React link/story data for that same rendered anchor explicitly contains a canonical group-post permalink
+- **THEN** Edge MAY use that explicit canonical permalink for the candidate
+- **AND** it MUST NOT infer or synthesize a post ID from the opaque fragment, text, or feed order
+
 #### Scenario: First post already deduped does not advance to the second post
 - **WHEN** empty-keyword mode selects the first eligible post and the account has already commented on that permalink
 - **THEN** the run ends with an honest dedupe/no-strong-candidate outcome
@@ -29,6 +35,11 @@ When the container is invalid, the group feed cannot be opened, the page is bloc
 #### Scenario: First-post read returns the selected permalink as detail identity
 - **WHEN** the first eligible group post is successfully selected and opened
 - **THEN** Edge emits `note.detail` whose `noteId` is that post's canonical navigable permalink and whose content belongs to the same post
+
+#### Scenario: Cloud accepts an equivalent multi-permalink identity
+- **WHEN** Edge returns `https://www.facebook.com/groups/<group>?multi_permalinks=<post>` for the selected first post
+- **THEN** Cloud accepts it as a canonical group-post permalink when `<post>` derives a stable Facebook post identity
+- **AND** Cloud continues to reject non-group posts, empty identities, and unknown URL shapes
 
 #### Scenario: No eligible feed post is an honest non-submit
 - **WHEN** no top-level post with a stable group-post permalink and comment affordance hydrates within the bounded selection window
