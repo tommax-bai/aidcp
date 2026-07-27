@@ -48,7 +48,7 @@
 - [x] 7.1 Separate strict signed-artifact release verification from relaxed installed-runtime GOST and Native Page Engine resolution; retain fixed packaged paths, compatible manifests, executable bits, architecture checks, ignored packaged overrides, and honest process/readiness failures.
 - [x] 7.2 Add regressions proving installed runtime resolution accepts an ad-hoc re-signed outer App without invoking `codesign` or a GOST version subprocess, while `afterSign` and final release verification remain strict.
 - [x] 7.3 Bump Edge to 0.3.25; run focused Electron artifact/packaging/lifecycle tests, the complete Edge suite, typecheck, desktop build-input verification, and strict OpenSpec validation; commit, push, and fast-forward source/contracts into the default branches.
-- [ ] 7.4 Create an explicit OL arm64 release branch, build a Developer ID signed DMG with IP-based customer-auth URL, verify the mounted payload and a reversible ad-hoc outer-App re-sign runtime smoke, and record the local artifact path/SHA without claiming notarization or upload.
+- [x] 7.4 Create an explicit OL arm64 release branch, build a Developer ID signed DMG with IP-based customer-auth URL, verify the mounted payload and a reversible ad-hoc outer-App re-sign runtime smoke, and record the local artifact path/SHA without claiming notarization or upload.
 
 <!--
 Implementation evidence (2026-07-26):
@@ -104,4 +104,7 @@ Installed-runtime compatibility follow-up (2026-07-27):
 - Installed macOS runtime resolution now ignores packaged GOST overrides but no longer invokes `codesign`, compares Team ID/Identifier, or runs `gost -V` before launch. It retains fixed packaged resources, compatible manifests, executable bits and target architecture; actual GOST process/readiness and Native child startup remain the availability evidence.
 - Electron `afterSign` and final release verification remain strict for App/GOST/Native Developer ID identity, Team ID, Identifier, architecture and GOST version.
 - Focused runtime/artifact/packaging/lifecycle tests: 24 passed; complete Edge suite: 2447 passed, 0 failed; `npm run typecheck`, `npm run build:dist`, `npm run verify:desktop-build-input`, and strict OpenSpec validation passed.
+- OL package branch `release/20260727-ol-arm64-runtime-lite` was created and pushed from `a744852`. The mounted arm64 payload passed deep App and strict nested-artifact verification with version `0.3.25`, `aidcpCloudDefaultEnv=ol`, and `aidcpClientAuthUrl=http://123.56.253.183:8088/capi`.
+- A temporary App copy was outer-only ad-hoc re-signed to `TeamIdentifier=not set`: the strict release verifier rejected it as expected, while installed-runtime resolution returned `gost=true` and `native=true`. The temporary copy was moved to Trash after the reversible smoke.
+- Local Developer ID signed-only DMG: `/Users/baitianxing/codes/aidcp-edge.wt/release-20260727-ol-arm64-runtime-lite/dist-electron-ol-arm64-signed-20260727-runtime-lite/AIDCP-0.3.25-arm64.dmg`, SHA-256 `424f8195976dfbf5839ca49d81f17fef73ecbd6708ff0057b92cdc7ba66ef3f2`. Notarization was explicitly disabled; no upload, deployment, installation, or customer-machine verification is claimed.
 -->
