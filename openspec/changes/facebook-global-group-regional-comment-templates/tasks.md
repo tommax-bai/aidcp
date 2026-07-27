@@ -1,10 +1,10 @@
 ## 1. aidcp-cloud — 范围模型与版本化数据迁移
 
 - [x] 1.1 在 Cloud kernel / panel DTO 中增加 `accountScopeMode=global|restricted`，保持旧 `accountGroupLabels` 请求按 restricted 兼容，并为矛盾范围提供具名整块拒绝。 <!-- aidcp-cloud 0137429；focused/full/typecheck 通过。 -->
-- [x] 1.2 增加版本化 PostgreSQL migration：为 `facebook_group_target` 添加范围模式、创建区域通用模板权威表，并在事务内把迁移开始时全部现存群目标设为 global、保留共享库中供未升级 OL 使用的休眠映射并回读断言；为账号评论配置增加 `comment_mode_configured`，历史行标记为显式方案；同步 schema capability/DDL parity 元数据。 <!-- aidcp-cloud 0137429；0089/0090 expand migration、ownership/schema 门测试通过；共享库兼容映射为复核后偏差。 -->
+- [x] 1.2 增加版本化 PostgreSQL migration：为 `facebook_group_target` 添加范围模式、创建区域通用模板权威表，并在事务内把迁移开始时全部现存群目标设为 global、保留共享库中供未升级 OL 使用的休眠映射并回读断言；为账号评论配置增加 `comment_mode_configured`，历史行标记为显式方案；同步推进该 sync-read payload 的 API owner cursor 及 schema capability/DDL parity 元数据。 <!-- aidcp-cloud 0137429 + 545099b；0089/0090/0091 expand migration、ownership/schema 门测试通过；0091 修复 DEV 首启发现的 same_cursor_payload_drift，不改业务行。 -->
 - [x] 1.3 改造群目标 import、list、facets、批量范围写及真态回读，覆盖 global、restricted 多标签、restricted 空范围和未携带范围四种语义。 <!-- aidcp-cloud 0137429；store/panel/transport 测试通过。 -->
 - [x] 1.4 改造候选计数、`nextJoinCandidate`、`claimNext` 与执行前重验，使 global 接受有分组/未分组的 Facebook 账号，同时保留投影新鲜度、平台、启用态、gating 和一群一账号锁。 <!-- aidcp-cloud 0137429；候选 SQL/锁/陈旧投影回归通过。 -->
-- [x] 1.5 添加 store/migration 回归测试，证明 global 并发只认领一个账号、restricted 不回退、陈旧投影 fail-closed、迁移不改 membership/目标业务字段且失败整事务回滚。 <!-- aidcp-cloud 0137429；focused 185/185、full 3694 pass + 11 gated skip。 -->
+- [x] 1.5 添加 store/migration 回归测试，证明 global 并发只认领一个账号、restricted 不回退、陈旧投影 fail-closed、迁移不改 membership/目标业务字段且失败整事务回滚，并证明 payload 变形同步推进 cursor。 <!-- aidcp-cloud 0137429 + 545099b；focused 185/185，修复后 schema 22/22、full 3695 pass + 11 gated skip。 -->
 
 ## 2. aidcp-cloud — 区域通用模板与评论解析
 
@@ -23,9 +23,9 @@
 
 ## 4. 验证、集成与 DEV 交付
 
-- [x] 4.1 在各 owning repo 的同名隔离 worktree 安装物理依赖，运行 Cloud 相关 acceptance/focused tests、完整测试和 typecheck；运行 Console focused/full tests、typecheck 和 production build。 <!-- Cloud 0137429：3705 total/3694 pass/11 gated skip；Console a369544：284 total/283 pass/1 skip；两仓 typecheck 与 Console build 通过。 -->
-- [x] 4.2 更新本任务完成项的 repo、commit SHA、验证与偏差注释，并运行 `openspec validate facebook-global-group-regional-comment-templates --strict`。 <!-- 2026-07-27 strict validate 通过；共享库映射兼容与主干空关键词首帖语义已回写 design/spec。 -->
-- [ ] 4.3 将 Cloud/Console 分支分别 rebase 到最新默认分支，串行 fast-forward 集成并推送；控制仓 OpenSpec 记录同步提交并推送 main。
-- [ ] 4.4 DEV 部署前运行 `scripts/deploy-target dev --check`、只读统计现存目标/范围/membership 并完成数据库与应用备份；禁止触碰 OL 和无关 `isales` 服务。
-- [ ] 4.5 部署 Cloud migration/runtime 与 Console 静态资源到 DEV，核验 migration ledger、全部迁移前目标为 global、兼容映射逐行未变、membership/关键字段计数不变，以及 service/listener/health/Feishu/PostgreSQL/页面资源。
-- [ ] 4.6 用 DEV 只读 API/数据库证明已分组与未分组 Facebook 账号均能获得 global 候选计数、restricted 仍按标签限制、区域模板读写真态可见；未经单独真实账号写验收授权，不执行真实加群或真实评论。
+- [x] 4.1 在各 owning repo 的同名隔离 worktree 安装物理依赖，运行 Cloud 相关 acceptance/focused tests、完整测试和 typecheck；运行 Console focused/full tests、typecheck 和 production build。 <!-- Cloud 545099b：3706 total/3695 pass/11 gated skip；Console a369544：284 total/283 pass/1 skip；两仓 typecheck 与 Console build 通过。 -->
+- [x] 4.2 更新本任务完成项的 repo、commit SHA、验证与偏差注释，并运行 `openspec validate facebook-global-group-regional-comment-templates --strict`。 <!-- 2026-07-27 strict validate 通过；共享库映射兼容、主干空关键词首帖语义及 sync-read cursor 修复已回写 design/tasks。 -->
+- [x] 4.3 将 Cloud/Console 分支分别 rebase 到最新默认分支，串行 fast-forward 集成并推送；控制仓 OpenSpec 记录同步提交并推送 main。 <!-- Cloud master 545099b、Console master a369544 已推送；control main 先行提案 573f8c，本次 closeout 同步提交。 -->
+- [x] 4.4 DEV 部署前运行 `scripts/deploy-target dev --check`、只读统计现存目标/范围/membership 并完成数据库与应用备份；禁止触碰 OL 和无关 `isales` 服务。 <!-- deploy-target dev --check 通过；迁移前 targets=1864、memberships=79、scopes=3728；DEV 备份 /opt/aidcp/backups/20260727-213451-facebook-global-group-regional-comment-templates 含 api/automation PG 与 Cloud/Console。 -->
+- [x] 4.5 部署 Cloud migration/runtime 与 Console 静态资源到 DEV，核验 migration ledger、全部迁移前目标为 global、兼容映射逐行未变、membership/关键字段计数不变，以及 service/listener/health/Feishu/PostgreSQL/页面资源。 <!-- DEV 0089/0090 后首启发现并拒绝 same_cursor_payload_drift；补 0091 后 api ledger=0091、automation=0089，targets/global=1864/1864、memberships=79、scopes=3728，三组迁移均 pending=0；service active，8787/8090/8088、内外 health、两属主 PG、Feishu onReady、Console asset index-CYJiozTo.js 均通过。OL/isales 未触碰。 -->
+- [x] 4.6 用 DEV 只读 API/数据库证明已分组与未分组 Facebook 账号均能获得 global 候选计数、restricted 仍按标签限制、区域模板读写真态可见；未经单独真实账号写验收授权，不执行真实加群或真实评论。 <!-- Panel API global=1864/unscoped=0、模板目录真态为空；grouped/ungrouped 均有 1785 个当前 global 候选，按休眠映射同口径计算 restricted 分别为 1864/0；account projection/comment config checkpoints 均 ready+fresh。无运营模板内容，故未伪造成功模板写；不存在区域的 PUT 以 region_not_found 拒绝且行数仍 0，成功写由 API/store 自动测试覆盖。未执行真实 Facebook 写。 -->

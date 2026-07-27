@@ -81,6 +81,8 @@ Panel API 提供列表读和单区域整组替换写，写请求的区域必须�
 
 “是否显式配置”由独立的持久化 `comment_mode_configured` 表达，不能用模板数组是否为空反推生成方案。版本化迁移把现有已持久化 `generated|template` 行标记为显式选择；新建配置仅在写请求明确携带 `commentMode` 时把该状态置为 true。缺行或未显式写方案的读模型改为模板默认。新实现移除选群前的 `empty_template` 早退，把模板缺失判断移动到已知 `group_url` 之后；该显式状态也随既有 Cloud 内部 sync-read 快照传播，避免拆分进程丢失方案权威。
 
+`comment_mode_configured` 会改变 `facebook_comment_config` 的完整 sync-read payload；对应 API owner 的 `config_mirror_version` 必须由版本化迁移单调推进。字段迁移与 cursor 推进分别记入 0090/0091：这样已经保存旧 payload digest 的 target-local consumer 会在更大的 cursor 上接收新快照，而不是在同一 cursor 上触发 `same_cursor_payload_drift`。该修复只推进共享配置版本，不改配置业务行，也不合并 dev/ol 的 consumer checkpoint。
+
 若目标无区域、区域无通用模板或解析后列表为空，记录稳定的 `missing_group_region|regional_template_missing` 非提交原因；不得回退 generated、其它区域或任意模板。选出的通用模板继续经过与账号模板相同的正文校验、审批、联系方式分离注入和平台确认。
 
 ### 6. 当前群目标通过版本化迁移一次性设为全局
@@ -100,11 +102,12 @@ Cloud 版本化迁移在一个事务内：
 - [区域模板配置存在但目标区域为空/拼写漂移] → 配置只接受现有 facet 区域；运行时严格按目标行查找并给出具名 no-op，不跨区域猜测。
 - [把模板缺失判断后移会多一次目标查询] → 只在本来要执行的 Facebook 评论尝试中按 canonical group URL 单行读取，频率远低于浏览热路径；不加缓存和失效机制。
 - [DEV 与未升级 OL 共享群目录] → 数据迁移保留旧标签映射供 OL 旧代码兼容使用；新 DEV 以范围模式为权威并忽略这些映射。OL 仍须单独授权升级，不能借 DEV 交付改动 OL 运行时。
+- [sync-read payload 增字段但 cursor 不变] → 0091 在 API owner 库单调推进 `facebook_comment_config` 镜像版本；部署验收必须看到新 checkpoint `ready` 且 fresh，禁止清空 checkpoint 或把 payload 漂移降级为成功。
 
 ## Migration Plan
 
 1. 先合入兼容读写：Cloud 能读 `account_scope_mode` 和 `comment_mode_configured`、Console 能展示三态、区域模板 API/运行时及内部 sync-read 已就绪；严格测试后再执行数据迁移。
-2. 在 DEV 部署前运行目标检查和数据库备份；由版本化 schema migration 增列/建表、把执行时现存目标设为 global，并把历史账号评论配置行标记为已有显式方案。
+2. 在 DEV 部署前运行目标检查和数据库备份；由版本化 schema migration 增列/建表、把执行时现存目标设为 global、把历史账号评论配置行标记为已有显式方案，并推进该 sync-read payload 的 API owner cursor。
 3. 重启文档指定的 AIDCP 服务，核验 migration ledger、目标/映射/membership 对账、Panel API、Console 静态资源和健康检查。
 4. 用只读查询验证任意已分组与未分组 Facebook 账号都能看到 global 候选计数；不执行真实加群/评论，除非另有真实账号写验收授权。
 5. 若任一断言失败，停止后续写入，回滚应用版本并按备份恢复数据库；不得继续到 OL。
