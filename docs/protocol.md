@@ -75,7 +75,7 @@
 | `note.ack` | cloud → edge | 确认收到笔记，异步处理中 |
 | `browse.next` | cloud → edge | 滚动/滑到下一条笔记 |
 | `browse.scroll` | cloud → edge | 在当前页面滚动 |
-| `note.open` | cloud → edge | 打开一条笔记（可选 `surface`:'feed'\|'detail' 就地读/进详情；可选 `purpose`:'read'\|'navigate'，navigate=只带浏览器到详情供评论迁移、MUST NOT 上报 note.detail；change platform-browse-protocol，均 optional、缺省=今天） |
+| `note.open` | cloud → edge | 打开一条笔记（可选 `surface`:'feed'\|'detail'、`purpose`:'read'\|'navigate'；Facebook 还可用 `url` 直达，或用 `selection:'first_commentable_group_post'` + `container` 选择群讨论流首条稳定可评论帖） |
 | `note.close` | cloud → edge | 关闭当前笔记 |
 | `search.execute` | cloud → edge | 执行一次关键词搜索；协商 `search_activity_receipt_v1` 时携稳定 `activityId` 与 purpose/scope，Edge 回诚实提交边界和结果终态 |
 | `session.end` | cloud → edge | 结束本次浏览会话 |
@@ -542,6 +542,14 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 // url?（change facebook-scheduled-comment，可选）：完整 permalink 直驱打开（Facebook 定向评论候选帖直达详情页），
 //   非空时边缘按此链接直接导航、不依赖 feed 卡片索引/noteId；缺省=走原有 index/noteId 卡片定位（小红书旧行为）。
 { "url": "https://www.facebook.com/groups/123/posts/456" }
+// selection/container?（change facebook-join-contact-first-post，可选）：不配置搜索关键词时，
+//   Cloud 不发 search.execute，而发下面的选择请求。Edge 打开群讨论流，选择第一条同时具备稳定群帖 permalink
+//   与评论入口的顶层帖子，再进入该 permalink 读取正文/评论，并以实际 permalink 回 note.detail.noteId。
+//   首帖不合格或已去重时不得顺延第二帖、不得回退搜索；旧的 url/index/noteId 行为保持不变。
+{
+  "selection": "first_commentable_group_post",
+  "container": "https://www.facebook.com/groups/123"
+}
 ```
 
 **`note.close`**（cloud → edge）：`{ "reason": "..." }`（可选）
