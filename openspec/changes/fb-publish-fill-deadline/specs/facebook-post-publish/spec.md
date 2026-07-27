@@ -51,6 +51,19 @@ edge SHALL 按下发预算自我掐表：预算耗尽即停止输入、清空编
 “坐标点击已完成”或“某个当前焦点的文本恰好为空”当作目标编辑器已聚焦。编辑器焦点不能确认时，
 edge SHALL 诚实回报未开始并保持零字符派发。最终成功判据仍是目标编辑器的全文回读。
 
+Facebook 在选择图片后可能保留旧 composer 并新建一代携带图片的前台 composer。edge SHALL 将文件
+输入、图片预览、正文编辑器和提交按钮绑定到同一代前台 composer，MUST NOT 用 DOM 顺序中的第一个
+dialog 作为目标。存在多个可见 composer 时，只有唯一位于最上层且包含唯一可见编辑器的 composer
+可以成为当前目标；无法唯一确立时 SHALL 以 `ambiguous_target` 停手。
+
+上传成功必须由当前 composer 内与本次文件名一致的新增 `blob:` 图片预览证明。页面头像、既有网络
+图片、其他 dialog 或旧 composer 内的图片 MUST NOT 作为上传成功证据。上传引发 composer 换代时，
+edge SHALL 在上传确认后重新绑定新一代前台 composer，再开始正文清场与输入。
+
+逐字输入期间，edge SHALL 在每个字符派发前确认 `document.activeElement` 仍是本次绑定的编辑器。
+焦点或目标身份漂移时 SHALL 在下一个字符前停止并回报 `composer_focus_lost`，MUST NOT 把剩余正文
+继续写入任意当前焦点。失败清场只能作用于仍可确认的同一编辑器；目标归属不明时 MUST 如实标记脏页。
+
 #### Scenario: 编辑器吞掉正文主体
 - **WHEN** 编辑器只接受了正文的前若干字符，其余被静默丢弃
 - **THEN** edge SHALL 回报 `content_not_accepted` 并清空编辑器
@@ -65,3 +78,13 @@ edge SHALL 诚实回报未开始并保持零字符派发。最终成功判据仍
 - **WHEN** edge 已点击编辑器坐标，但 `document.activeElement` 仍不是本次唯一定位到的编辑器
 - **THEN** edge SHALL 对该编辑器执行有界的程序化聚焦并重新确认目标身份
 - **AND** 仍不能确认时 SHALL 零字符失败，MUST NOT 向错误焦点逐字输入
+
+#### Scenario: 图片上传换代后旧 composer 仍留在 DOM
+- **WHEN** 上传图片后 Facebook 保留旧 composer，并新建携带本次图片预览的前台 composer
+- **THEN** edge SHALL 在新 composer 的编辑器内填写正文，旧 composer 保持不变
+- **AND** 头像或旧 composer 的图片 MUST NOT 提前确认上传成功
+
+#### Scenario: 逐字输入中途焦点漂移
+- **WHEN** 已输入正文前缀后，页面把焦点移到另一个 composer 或页面控件
+- **THEN** edge SHALL 在派发下一个字符前停止并回报 `composer_focus_lost`
+- **AND** 剩余正文 MUST NOT 写入新焦点，失败结果的外层 `reasonCode` MUST NOT 为 `confirmed`
