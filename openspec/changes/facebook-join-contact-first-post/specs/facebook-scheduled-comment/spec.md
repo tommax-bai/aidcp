@@ -45,6 +45,21 @@ When the container is invalid, the group feed cannot be opened, the page is bloc
 - **WHEN** no top-level post with a stable group-post permalink and comment affordance hydrates within the bounded selection window
 - **THEN** Edge returns an explicit open failure and Cloud does not compose, approve, or submit a comment
 
+#### Scenario: First post starts below the initial viewport
+- **WHEN** the canonical target group is open but its first feed cards begin below the cover/composer and outside the initial viewport
+- **THEN** Edge performs a fixed bounded sequence of same-container downward scroll-and-probe rounds
+- **AND** it opens the first eligible hydrated card without navigating home, searching, changing groups, or substituting a later targeting mode
+
+#### Scenario: Native decoding preserves first-post intent
+- **WHEN** Cloud sends `note.open` with `selection=first_commentable_group_post` and a canonical group container
+- **THEN** every active Edge command-mapping and decoding layer preserves both fields and routes the bounded first-post operation
+- **AND** the request MUST NOT degrade into a generic current-page `note.open`
+
+#### Scenario: First-post failures remain distinguishable
+- **WHEN** first-post opening ends because no candidate hydrated, the selected post has no uniquely bound comment editor, target context mismatches, or Cloud times out waiting for detail
+- **THEN** the result and user-facing receipt preserve the corresponding reason
+- **AND** Cloud MUST NOT report all of those outcomes as “群内未找到合适的可评论帖子”
+
 ## MODIFIED Requirements
 
 ### Requirement: A pinned just-joined group is a valid comment container with keywords from account config

@@ -13,6 +13,8 @@ A read-only probe against the Tianxing Bai AdsPower profile established two runt
 
 The Gi Vo real-account regression probe established a third runtime fact: a hydrated group-feed timestamp anchor can render with a DOM `href` that is only the group root plus an opaque fragment, while Facebook's own React link/story props on that same anchor still carry the canonical `/groups/<group>/posts/<post>` URL. The card can simultaneously expose a working post-level comment editor. Treating DOM `href` as the only permalink witness therefore produces a false `no_candidates`.
 
+The later Gi Vo Cloud-orchestrated runs established a fourth fact. The group page completed loading with a 1066px viewport, while its first two post cards started around 1951px and 2249px and neither was visible. The legacy JavaScript handler already understood `selection: first_commentable_group_post`, but the Native command mapper and Rust `NoteOpenParams` dropped `selection/container`. Native therefore performed an ordinary current-page detail read instead of the bounded first-post hydration defined here. Cloud waited for a canonical `note.detail` and then collapsed the timeout into the same user message as `no_candidates`.
+
 The join `observation_only` incident, including alias-versus-numeric group identity, is owned by another task and is not changed here.
 
 ## Goals / Non-Goals
@@ -45,6 +47,8 @@ Cloud will send `note.open` with an optional Facebook-only selection request:
 
 Edge navigates the group discussion stream, selects the first hydrated top-level post with a canonical group-post permalink and an observable post-level comment affordance, then opens that permalink and emits the normal `note.detail`. This is a read/open operation, not a search, so no `search.execute` or search activity receipt is produced.
 
+The active Native path MUST preserve both optional fields across TypeScript-to-Rust decoding and route this discriminator before the generic Facebook `note.open` path. Dropping unknown optional fields is not compatible behavior here because it silently changes the targeting mode.
+
 Alternative considered: call `search.execute` with an empty keyword. Rejected because it would misreport a non-search as a search, conflicts with the command’s non-empty keyword contract, and would keep the exact step the product is removing.
 
 Alternative considered: add a new protocol message plus a new result event. Rejected as unnecessary protocol surface because `note.open` already owns target navigation and detail delivery.
@@ -76,6 +80,8 @@ The Edge selector scans the visible group feed in DOM/feed order and accepts the
 The permalink witness MAY be either the anchor's canonical DOM `href` or a canonical URL explicitly present in Facebook's React link/story data for that same rendered anchor. React inspection MUST be bounded, tied back to the exact DOM anchor/card, and accept only URL shapes that derive a canonical Facebook group-post identity. It MUST NOT decode opaque fragments, infer IDs from text, or synthesize a permalink. If both witnesses are absent or ambiguous, the card is ineligible and selection remains fail-closed.
 
 Because Facebook can initially stop the group page at the cover/composer while feed cards remain unhydrated, Edge MAY use the existing bounded feed scroll/probe budget to bring the first feed cards into the rendered viewport. This is hydration of the same first-post mode, not a fallback to search or a different targeting strategy. Selection remains DOM/feed ordered across the hydrated cards.
+
+The Native implementation performs an immediate probe followed by a fixed, bounded number of viewport-relative downward scrolls on the exact canonical group container. Each round re-probes rendered cards and stops on the first eligible card, bottom/no-movement evidence, or the fixed bound. It never navigates home between rounds, never changes groups, and never promotes a later post after the first eligible candidate fails target/editor validation.
 
 It does not skip an already-commented first post to choose a later post. Cloud may read the first post and then reject it through existing dedupe; that terminal result remains honest and no second post is substituted.
 
@@ -118,6 +124,7 @@ The keyword editor no longer treats an empty list as an error or shows an empty-
 - [First visible post can be pinned/admin content] → This is intentional “first eligible post” semantics; no ranking or search fallback is added.
 - [First post was already commented] → Existing dedupe stops the run; it does not silently move to a second post.
 - [Facebook DOM changes remove permalink or comment affordance] → Bounded selection returns `no_candidates`; no guessed target or write occurs.
+- [Group cover/composer consumes the initial viewport] → Native performs bounded same-container viewport scrolling and reports `no_candidates` only after the probe budget is exhausted; timeout and editor-readiness failures retain distinct user-visible reasons.
 - [Facebook hides the canonical permalink behind React link/story props] → A bounded, anchor-scoped React read may recover only an explicit canonical group-post URL; shape drift or ambiguity still returns `no_candidates`.
 - [Detail page contains background feed plus multiple dialogs] → Canonical identity resolution, not DOM order or first dialog, binds the read context.
 - [Facebook scheduled contact comment now consumes both join and comment activity] → Existing join and comment risk gates remain in force; the content scheduler keeps account single-flight and cross-scheduler exclusion.
