@@ -94,6 +94,14 @@ The real vanity-plus-numeric-members fixture and a main-level recommendation `/m
 
 The Edge worktree produces source commits and a locally built Native binary for focused and real read-only validation. Integration lands through the default Edge branch after rebase and tests. Updating `/Applications/AIDCP.app`, building an installer, signing, notarizing, or releasing remains a separate explicitly authorized operation.
 
+### 8. Normalize the Rust action-receipt null shape at the existing TypeScript bridge
+
+The post-integration `Tianxing Bai` run exposed a separate transport defect after the Native group-join repair was already active. The observation-only phase correctly returned `reason=observation_only` with a structured `groupObservation`, but Rust's derived serializer also emitted the unrelated generic `observation` option as JSON `null`. The TypeScript bridge only promoted `groupObservation` when `observation === undefined`, then deleted `groupObservation`. Cloud therefore received `observation=null`, treated the observation phase as missing evidence, and never issued the intended second `group_join(click=true)` command.
+
+The repair belongs at the existing Edge normalization boundary: treat `null` and `undefined` as absent only for choosing the group-specific observation, preserve any non-null generic observation unchanged, then remove the internal `groupObservation` alias as before. This is a shape normalization for the concrete Rust payload, not a new Cloud fallback, retry, success inference, or Facebook selector rule.
+
+The regression fixture must use the exact serialized shape: `observation: null` together with a bounded `groupObservation` object. It must assert that the forwarded `action.completed` contains that object as `observation` and no `groupObservation` field. Existing action receipts with a non-null generic observation must remain unchanged.
+
 ## Risks / Trade-offs
 
 - [A field path includes untrusted map keys] → Limit diagnostics to strict typed structures, cap the path length, and test that raw values/text never appear.
@@ -102,6 +110,7 @@ The Edge worktree produces source commits and a locally built Native binary for 
 - [The header ancestor expands into recommendations] → Require unique target-heading ownership and keep foreign-reference and suggestion exclusions as narrowing guards; run all existing adversarial scope tests.
 - [The already-joined live page no longer exercises the pre-join CTA] → Use it only for decode and positive member-scope readback; rely on existing fake-CDP actuation tests and do not perform another real join.
 - [Source validation is mistaken for delivered-client validation] → Record binary hashes and explicitly state that the installed AIDCP artifact is unchanged.
+- [Normalizing null hides an intentional empty observation] → Apply the promotion only when a non-null `groupObservation` exists; otherwise retain the original receipt and let Cloud fail closed.
 
 ## Migration Plan
 
@@ -112,6 +121,7 @@ The Edge worktree produces source commits and a locally built Native binary for 
 5. Implement the observed field-contract repair, effect-intent correction, and narrow header scope repair.
 6. Run focused router/client/Rust/fake-CDP tests, Rust formatting/lints, Edge acceptance/full/typecheck, and strict OpenSpec validation.
 7. Rebase and fast-forward integrate/push the control and Edge changes. Do not package or install.
+8. Add the captured Rust JSON-null action-receipt fixture, repair the existing TypeScript normalization boundary, rerun Edge gates, and record source/runtime delivery separately.
 
 Rollback is a normal revert of the two source commits; no data or deployment migration is involved.
 
@@ -119,3 +129,4 @@ Rollback is a normal revert of the two source commits; no data or deployment mig
 
 - Resolved: there is no incompatible typed field. The failure is the readiness `join_probe` throwing when `commentEditor` receives the transient null `document.body`; the fixed boundary is the nullable editor root.
 - Resolved: the target heading and `已加入` are siblings under a compact header ancestor; a target-owned numeric `/members` link was incorrectly treated as foreign to the vanity URL. The numeric alias is admitted only inside a non-main unique-heading ancestor with no third group identity.
+- Resolved: the post-repair `observation_only` terminal was caused by `observation:null` suppressing promotion of the non-null `groupObservation` at the Edge TypeScript action-receipt bridge; it was not a Facebook language, selector, or first-post failure.

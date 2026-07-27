@@ -10,6 +10,7 @@ The same real group page also exposed a separate bounded-scope false negative: a
 - Preserve the existing stable error code and effect-phase honesty while making pre-actuation versus post-actuation failures observable.
 - Use the diagnostic build against the already-open `Tianxing Bai` Facebook group page to determine whether the failure is a wrapper, typed-field, or evaluated-router exception before changing its contract.
 - Repair only the result-production/decoding fault demonstrated by that real capture and add a regression fixture for the observed shape or exception condition.
+- Preserve the structured group observation when Rust serializes the generic `observation` field as `null` and the group-specific `groupObservation` field as an object, so the Cloud observe-then-click scheduler receives the evidence required to continue.
 - Extend current-group scope resolution to include the real group-header action region so a positive `已加入` member control is recognized, while recommendation and unrelated group controls remain out of scope and never become join targets.
 - Validate source, Native binary, focused/full Edge suites, and the exact real browser read path separately. Do not package, inject, sign, install, or claim an updated desktop client as part of this change.
 
@@ -28,6 +29,7 @@ None.
 
 - Edge Native Rust adapter and protocol error records under `aidcp-edge/native/page-engine`.
 - Edge TypeScript Native client/logging surfaces that consume bounded Native failures.
+- Edge TypeScript Native action-receipt normalization between the Rust IPC result and the Edge-Cloud `action.completed` payload.
 - Embedded Facebook group-join router and its router/Rust fake-CDP regression fixtures.
 - One small Rust dependency may be added if needed to report Serde field paths without exposing raw values.
 - No Cloud, Console, database, deployment, OL, installer, signing, or packaging behavior changes.

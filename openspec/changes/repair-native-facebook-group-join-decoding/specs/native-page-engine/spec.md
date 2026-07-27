@@ -44,3 +44,22 @@ A Native Facebook `group_join` command whose `click` parameter is false SHALL be
 
 - **WHEN** `group_join(click=true)` fails and the engine cannot prove whether actuation occurred
 - **THEN** it remains ambiguous and MUST NOT be reclassified as not started by the observation-only rule
+
+### Requirement: Group-join action receipts SHALL preserve the structured observation across the Native bridge
+
+When the Rust Native Page Engine returns a group-join action receipt, the Edge TypeScript bridge SHALL forward the group-specific structured observation as the `action.completed.observation` witness even when the serialized generic observation field is JSON `null`. The bridge MUST preserve an existing non-null generic observation, MUST remove the internal group-specific alias before sending the Edge-Cloud payload, and MUST NOT infer success, membership, or actuation from the normalization.
+
+#### Scenario: Rust null option does not discard the group observation
+
+- **WHEN** a Native action receipt contains `observation: null` and a non-null `groupObservation` object
+- **THEN** Edge forwards that object as `action.completed.observation` and omits `groupObservation`
+
+#### Scenario: Existing generic observation remains authoritative
+
+- **WHEN** a Native action receipt contains both a non-null generic observation and a group-specific observation
+- **THEN** Edge preserves the generic observation as-is and does not replace it
+
+#### Scenario: Both observation forms are absent
+
+- **WHEN** a Native action receipt has neither a non-null generic observation nor a non-null group observation
+- **THEN** Edge does not fabricate evidence and Cloud remains able to fail closed
