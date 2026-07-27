@@ -75,7 +75,7 @@
 | `note.ack` | cloud → edge | 确认收到笔记，异步处理中 |
 | `browse.next` | cloud → edge | 滚动/滑到下一条笔记 |
 | `browse.scroll` | cloud → edge | 在当前页面滚动 |
-| `note.open` | cloud → edge | 打开一条笔记（可选 `surface`:'feed'\|'detail'、`purpose`:'read'\|'navigate'；Facebook 还可用 `url` 直达，或用 `selection:'first_commentable_group_post'` + `container` 选择群讨论流首条稳定可评论帖） |
+| `note.open` | cloud → edge | 打开一条笔记（可选 `surface`:'feed'\|'detail'、`purpose`:'read'\|'navigate'；Facebook 还可用 `url` 直达，或用 `selection:'first_commentable_group_post'` + `container` 选择群讨论流首条可评论帖；无 permalink 时可保持同页容器绑定） |
 | `note.close` | cloud → edge | 关闭当前笔记 |
 | `search.execute` | cloud → edge | 执行一次关键词搜索；协商 `search_activity_receipt_v1` 时携稳定 `activityId` 与 purpose/scope，Edge 回诚实提交边界和结果终态 |
 | `session.end` | cloud → edge | 结束本次浏览会话 |
@@ -542,9 +542,12 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 // url?（change facebook-scheduled-comment，可选）：完整 permalink 直驱打开（Facebook 定向评论候选帖直达详情页），
 //   非空时边缘按此链接直接导航、不依赖 feed 卡片索引/noteId；缺省=走原有 index/noteId 卡片定位（小红书旧行为）。
 { "url": "https://www.facebook.com/groups/123/posts/456" }
-// selection/container?（change facebook-join-contact-first-post，可选）：不配置搜索关键词时，
-//   Cloud 不发 search.execute，而发下面的选择请求。Edge 打开群讨论流，选择第一条同时具备稳定群帖 permalink
-//   与评论入口的顶层帖子，再进入该 permalink 读取正文/评论，并以实际 permalink 回 note.detail.noteId。
+// selection/container?（changes facebook-join-contact-first-post,
+//   facebook-first-post-container-fallback，可选）：不配置搜索关键词时，Cloud 不发 search.execute，
+//   而发下面的选择请求。Edge 打开群讨论流，选择第一条可唯一绑定的可评论帖子：
+//   有稳定群帖 permalink 时进入详情并以 permalink 回 note.detail.noteId；没有 permalink 时留在群讨论流，
+//   以严格的 aidcp:facebook-group-feed-post:v1:<sha256> targetRef 回 note.detail.noteId，并把后续
+//   interaction.comment 绑定到同一 live DOM 容器。targetRef 不是 Facebook post id/permalink，不得拼 URL。
 //   首帖不合格或已去重时不得顺延第二帖、不得回退搜索；旧的 url/index/noteId 行为保持不变。
 {
   "selection": "first_commentable_group_post",
@@ -603,7 +606,7 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 // interaction.follow
 { "authorId": "u456", "reason": "持续优质", "thinkMs": 900 } // 既有主页关注：authorId 可选
 { "noteId": "https://www.facebook.com/reel/1964804494173822", "reason": "明确关注当前 Reel 作者", "thinkMs": 900 } // Facebook Reels：noteId 必填并绑定当前活动 Reel；不以 DOM 顺序或“当前页”兜底
-// interaction.comment
+// interaction.comment（noteId 通常为 canonical id；Facebook 无 permalink 首帖可原样回传 Edge 签发的严格 targetRef）
 { "noteId": "n123", "text": "今天的分享很有启发", "thinkMs": 900, "groupChatCode": "...", "fastReturnToFeed": true } // text 必填；groupChatCode 可选=账号「联系方式」；fastReturnToFeed 仅手工 --feed 置 true：提交后 500ms 直回首页、结果保持未确认
 // 注（change generalize-contact-info）：本字段承载的概念已正名为「联系方式」，内部变量为 contactInfo；wire 字段名保留 groupChatCode 作历史兼容（Method A），物理改名属后续协调步骤。
 // group.join（Facebook 加群；click 缺省/false=只观察不点击，true=cloud 已判定可点后才点击一次）
@@ -717,6 +720,8 @@ Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有
 ```jsonc
 {
   "noteId": "n123", "title": "周末好去处", "content": "完整正文…",
+                                               // Facebook 无 permalink 首帖可为严格同页 targetRef；
+                                               // 它只用于当前 keep-open 链路的关联/提交，不得当作 permalink 展示。
   "mediaType": "image_text",                      // 可选：image_text / video；缺省按 image_text 兼容老边端
   "author": "小张", "authorId": "u456",       // author / authorId 可选
   "likeCount": 1234, "collectCount": 200,
