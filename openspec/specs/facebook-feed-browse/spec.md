@@ -7,7 +7,9 @@ TBD - created by archiving change facebook-feed-inline-browse. Update Purpose af
 
 The Facebook list reader MUST make navigation idempotent. A ready Facebook home MUST remain in place even when it has no hydrated cards or feed container, while search and group lists MUST retain their existing list-container readiness rule. Every path MUST still run login, checkpoint, consent, captcha, and blocking-overlay checks. Card scanning MUST report only newly appeared top-level hydrated cards keyed by a session-level canonical-id cursor. A zero-card home MUST NOT be treated as exhausted or empty unless the explicit loading-aware empty-state contract in `facebook-feed-continuity` confirms it.
 
-When the Edge reports an explicitly confirmed empty Facebook home through the existing optional `page.cards` observation fields, or honestly reports `feed_exhausted` after a non-empty Facebook list has yielded real cards and bounded navigation has found no unseen card, the Cloud SHALL authorize the fallback by sending the existing scroll command with the deployed `empty_feed_reels_fallback` compatibility reason. Only that Cloud authorization MAY switch the Edge session to Reels. The authorization SHALL be idempotent per active session. Loading, unknown layout, navigation error, login/checkpoint/consent/captcha, search, or group states MUST NOT trigger the fallback. Non-Facebook `feed_exhausted` behavior SHALL remain the existing refresh path. Once Reels cards are reported, the existing evaluation, read, interaction authorization, pacing, and risk-accounting loop SHALL continue unchanged.
+When the Edge reports an explicitly confirmed empty Facebook home through the existing optional `page.cards` observation fields, or honestly reports `feed_exhausted` after a non-empty Facebook list has yielded real cards and bounded navigation has found no unseen card, the Cloud SHALL authorize the fallback by sending the existing scroll command with the deployed `empty_feed_reels_fallback` compatibility reason. Only that Cloud authorization MAY switch the Edge session to Reels. The authorization SHALL be idempotent per active session. Loading, unknown layout, navigation error, login/checkpoint/consent/captcha, search, or group states MUST NOT trigger the fallback. Non-Facebook `feed_exhausted` behavior SHALL remain the existing refresh path.
+
+Once Facebook Feed or Reels cards are reported, the Cloud-selected mode SHALL own evaluation. Persona mode SHALL continue the existing persona evaluation, read and interaction authorization loop. Facebook rule mode SHALL instead select the first unseen structurally eligible content in reported order without Soul relevance, mandatory-rule or interaction-preference evaluation, while retaining canonical identity, non-persona prohibited-content safety, pacing, read evidence, per-action risk admission and risk accounting.
 
 #### Scenario: Scrolling does not reload the same first cards
 - **WHEN** the account scrolls a ready Facebook list URL with no blocking state
@@ -33,10 +35,15 @@ When the Edge reports an explicitly confirmed empty Facebook home through the ex
 - **AND WHEN** a non-Facebook session reports `feed_exhausted`
 - **THEN** Cloud retains the existing refresh behavior and MUST NOT authorize Facebook Reels
 
-#### Scenario: Existing evaluation and risk chain continues on Reels
-- **WHEN** Edge reports an active Reel as a normal card and Cloud later authorizes a like
-- **THEN** content evaluation and pacing run through the existing browse loop
+#### Scenario: Persona mode retains existing evaluation on Reels
+- **WHEN** Edge reports an active Reel and Cloud selected persona mode
+- **THEN** content evaluation and pacing run through the existing persona browse loop
 - **AND** only a platform-confirmed like receipt is recorded by the existing RiskController path
+
+#### Scenario: Rule mode bypasses persona evaluation on Feed and Reels
+- **WHEN** Edge reports an unseen safe Facebook Feed or Reel content and Cloud selected rule mode
+- **THEN** Cloud may advance the deterministic rule browse path without invoking persona relevance or interaction appraisers
+- **AND** any later like remains subject to the existing risk and confirmed-receipt path
 
 #### Scenario: Exhausted non-empty list is reported honestly
 - **WHEN** a list has previously yielded cards and bounded continued navigation surfaces no unseen card
