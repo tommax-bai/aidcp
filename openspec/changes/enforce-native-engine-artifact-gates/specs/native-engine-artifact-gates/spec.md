@@ -25,6 +25,14 @@ The ordered source manifest that the Native engine build reads SHALL be the sing
 
 Every gate whose contract is "this content MUST NOT appear here" SHALL be accompanied by a mechanical self-test that plants the forbidden content in the corpus the gate inspects and asserts that the gate rejects it. A gate without such a self-test MUST NOT be counted as coverage in any completion claim. A gate whose inspected location cannot be produced by any supported build MUST be re-anchored to the corpus that can actually carry the leak, or removed; it MUST NOT be left in place reporting a pass.
 
+Such a gate SHALL run **before** any step of the same pipeline that deletes, rewrites, or otherwise mutates the corpus it inspects. A gate ordered after such a step MUST be treated as absent regardless of the assertions it carries, because the mutation can remove the very evidence the gate exists to find.
+
+#### Scenario: A pruning step precedes the gate
+
+- **WHEN** a build step that deletes unreferenced files runs before the gate that scans for forbidden files
+- **THEN** the gate is treated as absent and the ordering fails the gate suite
+- **AND** the pass it would have reported MUST NOT be accepted as evidence, because the deletion removed the planted violation before the gate looked
+
 #### Scenario: Gate is exercised against planted content
 
 - **WHEN** the mechanical gate suite runs

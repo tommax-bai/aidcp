@@ -8,7 +8,9 @@
 - **清单只做正向断言，不做反向对账。** `build.rs:131-161` 逐条断言条目唯一、不含路径分隔符、按词典序递增、集合非空，但从不列目录看有没有未登记的文件。新增一个分片却忘记登记，构建照过、二进制里没有它、运行时静默走缺失逻辑。
 - **拼接不插分隔符。** `build.rs:155` 直接 `source.extend(...)`，TypeScript 侧复刻实现 `test/native-page-engine/facebook-router-source.ts:22-24` 同样 `join('')`。当前 11 个分片末字节实测都是 `0a`，所以没翻车；但一旦某片尾随换行被去掉、且该片最后一行以行注释结尾，下一片首行就会被吞掉——结果仍是合法脚本，只是某个常量或函数凭空消失，跑到那条路径才报未定义。构建期四条断言与 TypeScript 复刻都不覆盖这一层。（说明：本 change 不主张"分片里现在已经存在行注释"——实测 11 个分片里 `^\s*//` 命中为 0，这是一条潜在缺口而非已发生故障。）
 - **开发态"校验通过"与源码无关。** `scripts/ensure-native-page-engine-dev.mjs:19-28` 的逻辑是"`--verify` 成功即返回 verified、不重建"；而 `scripts/build-native-page-engine.mjs:72-113` 的 `verify()` 只读 staged 二进制、它自己写的 `.sha256`、它自己写的 `manifest.json`、`Cargo.toml` 的 version、`command-manifest.json` 的摘要——没有任何一项来自 Rust 源码或页面规则源码。二进制哈希与 `.sha256` 是同一次构建同时写的、必然自洽；能力摘要只反映命令清单，改实现不动它；`Cargo.toml` 的 version 自迁移起未变。三条逃生口同时失效，闸门报"已校验"、事实是"与源码无关"——这是"静默假成功"红线在构建闸上的形态。
-- **明文哨兵是单向判定。** `build-native-page-engine.mjs:41-51` 列 9 条特征串，只在二进制里"找到"时报警，从不校验这些串当前是否还存在于会进生产编译的源码里。实测 `Input.dispatch` 与 `Page.navigate` 只出现在 `native/page-engine/src/facebook/publish_tests.rs`，而该文件由 `native/page-engine/src/facebook/publish.rs:892` 经 `#[path]` 挂在 `#[cfg(test)]` 下——release 构建里不存在，这两条哨兵已经是空哨。失活的表现形式是"扫描通过"，与真的没泄漏无法区分。
+- **明文哨兵是单向判定。** `build-native-page-engine.mjs:41-51` 列 9 条特征串，只在二进制里"找到"时报警，从不校验这些串当前是否还存在于会进生产编译的源码里。失活的表现形式是"扫描通过"，与真的没泄漏无法区分。
+
+  **【实装实测订正】** 提案期把 `Input.dispatch` 与 `Page.navigate` 断为"空哨"，依据是它们只出现在 `native/page-engine/src/facebook/publish_tests.rs`（该文件由 `src/facebook/publish.rs:892` 经 `#[path]` 挂在 `#[cfg(test)]` 下、不进 release）。实装期实测：**引擎的 CDP 层是刻意分域存放方法名的**——域与方法名不以整串形式出现在 release 语料里，因此这两条哨兵**本就不该按整串匹配去判存活**。它们不是"已失效"，而是"形态不同"：属于结构类哨兵，不构成"覆盖被放弃"。据此哨兵集合按 live / 结构两类分别处置（见 D3 订正）。
 - **Rust 侧完全不在自动流程里。** `package.json` 全表 cargo 零命中；`.github/workflows/` 只有一个手动触发的出包流水线 `build-desktop.yml`，全文无 `npm test` / `cargo test` / clippy / typecheck；控制仓集成闸 `scripts/land-change:38-42` 只跑 `test:acceptance` + `npm test` + `typecheck`。工具链版本钉死只写在 `native/page-engine/rust-toolchain.toml`，rustup 只有在当前目录位于 crate 内才解析得到它——于是"装的工具链没有 cargo-clippy"这类偏差反复出现在各条 change 的验收记录里。
 - **跨语言契约夹具只有单侧回放。** `native/page-engine/tests/contract_fixtures.rs:29-53` 回放 `tests/fixtures/page-probe-contracts.json`，并断言夹具头部的 `sourceContract` 恰为 `src/native-page-engine/client.ts#NativePageProbeResult`——也就是说这份夹具自称"以 TypeScript 那个类型为准"。实测 `test/` / `src/` / `scripts/` 里对该夹具文件与 `contract_fixtures` 的引用为零：TypeScript 侧既不加载它、也没有任何断言保证那个类型仍存在或仍与夹具期望一致。于是改 TypeScript 类型不会让任何东西变红（Rust 只比字符串路径，不比字段），而 Rust 侧的这条断言还会一直绿着，制造"两端已对齐"的错觉。这与本项目已经吃过两次的"手工双份契约 + 零路径级测试"是同一形态。
 - **混淆强度需要如实记账。** 密钥是编译期写死的 11 字节（`build.rs:7-9`），另有三份运行时副本（`src/xhs.rs:23`、`src/facebook.rs:39`、`src/probe.rs:8`），四处无单一来源。本机在两个已构建产物里各命中一处该字面量（`build/native-page-engine/darwin-arm64/aidcp-page-engine` 偏移 1837753、`darwin-x64` 偏移 1908273）。也就是说拿到一份安装包、定位这 11 个字节并对二进制按 11 个相位逐段异或，即可还原全部页面规则明文，不需要访问仓库、也不需要已知明文攻击。
@@ -67,6 +69,8 @@
 
 每道"不许出现"的闸门配一条测试：在一份临时语料里植入被禁内容、跑该闸门、断言它拒绝。没有这条自测的闸门不计入覆盖。
 
+**【实装实测补充 · 次序与断言同等重要，须写死】** 自测只能证明闸门"会拒绝"，证明不了它"来得及看见"。实测原实现把分片闸放在剪枝步骤**之后**：植入的分片先被剪枝当孤儿删掉，闸门随后扫到干净语料、报通过——**泄漏路径原样留着，痕迹被同一次构建擦掉**，这是"静默假成功"在构建闸上的形态，且比空转闸更难发现（空转闸至少不会主动销毁证据）。因此判据加一条：**任何否定式闸门 MUST 在同一流水线中会改写被检语料的步骤之前执行**；次序错的闸门按"不存在"处理，不论它带了多少断言。已把闸门移到剪枝之前并补回归用例，同时写进 `specs/native-engine-artifact-gates/spec.md`。
+
 **被否决的替代：只用断言脚本文本包含某些字符串来证明闸门存在**（现状 `test/native-page-engine/build-contract.test.ts:38,43` 就是这种，只断言脚本源码里出现 `manifest.json` 与 `forbiddenCleartextMarkers`）。这类断言在闸门指向不存在的位置时同样全绿——它证明的是"代码里写了这段话"，不是"这段话会判定"。本 change 的两条空转闸门在这类断言下已经绿了很久。
 
 ### D3. 明文哨兵改成双向：既查产物里没有，也查源码里还有
@@ -74,6 +78,8 @@
 哨兵集合每条都必须能在"会进入 release 编译的页面规则源码"里定位到；只落在 `#[cfg(test)]` 编译单元或已删除标识符上的哨兵，判为失效并使构建失败。
 
 **被否决的替代：把失效哨兵直接删掉。** 那会把覆盖归零这件事变成一次静默的减法。要求"失效即失败"逼着改动者当场选：要么把哨兵重新指到一个活的特征，要么显式记录这条覆盖被放弃。
+
+**【实装实测订正 · 出路是三条不是两条】** 原文只给了"改指活特征 / 显式放弃"两条出路，前提是"整串匹配不到就等于失活"。实测该前提对分域存放的 CDP 方法名不成立（见 Context 对应条）。因此存活校验按两类执行：**live 类**必须能在会进 release 编译的源码里定位到，定位不到即失败；**结构类**（因分域存放而不以整串出现）显式登记、附理由、排除在整串存活校验之外，MUST NOT 静默删除、也 MUST NOT 计为"覆盖被放弃"。新增哨兵时必须归入其中一类，未归类即失败。
 
 ### D4. 校验面加入源码摘要，且开发态"verified"必须由它决定
 
@@ -94,6 +100,8 @@
 新增 npm 脚本封装 `cargo fmt --check` / `clippy` / `test`，脚本内部按 crate 目录解析钉死的工具链（复用现有 `resolveCargoBinary` 那条 rustup 解析路径的思路）；工具链或组件缺失时失败退出，MUST NOT 记为"跳过"。控制仓集成闸补上调用。
 
 **被否决的替代：只在 CI 出包流水线里加 Rust 步骤。** 那条流水线是手动触发的发版动作，跑不到日常改动上；而 Rust 改动恰恰是日常的。
+
+**【实装实测补充 · "钉死版本"有两处会被盖掉，提案只点了一处】** 提案（task 6.6）只点名出包 shell 脚本里 `--profile minimal` + `export RUSTUP_TOOLCHAIN` 会绕开 `rust-toolchain.toml` 的组件声明。实测**同形态的第二处在 CI 出包工作流里、且后果更重**：两个作业用的工具链 action 会导出环境变量、直接盖掉钉死版本——它决定的是真正发出去的安装包用哪个编译器编的，而本地怎么钉都管不到它。已改为按 `rust-toolchain.toml` 的声明显式安装该 channel 并带上静态检查与格式化组件。判据据此收紧：**任何安装或选择工具链的位置，MUST 以 `rust-toolchain.toml` 为唯一事实源，MUST NOT 以环境变量或 action 参数覆盖**。
 
 **被否决的替代：要求开发者手工在 crate 目录里敲 cargo。** 这就是现状，各条 change 的验收记录已经显示覆盖随手工调用方式漂移。
 
