@@ -1,0 +1,180 @@
+## Context
+
+### 迁移形态与本 change 的位置
+
+2026-07 边缘把浏览器页面智能从 TypeScript 迁到 Rust 的 Native Page Engine，小红书 07-22 切生产（`aidcp-edge` 317cd47）、Facebook 与微信 07-23 跟进（4f04e9c），随后二十余个修复提交。明确决定是不双跑、不比对、不回退，回滚手段只有装包回滚。迁移主 change 是控制仓 `native-page-engine-production-cutover`（当前 42/51），其中 3.2「定位三闸移植」与 3.3「输入原语按当前拟人化边界实现」至今未勾；3.3 只挂了两条 partial 注记（07-27 文本、07-28 滚轮），并明写指针与文件输入覆盖仍开口。本 change 就是这两条任务的规格承接。
+
+迁移的公开动机是防反编译。但上述缺口削弱的是反检测——这两件事在本系统里是同一层防御的两面，规格层必须把这个矛盾摆明，否则"迁移已完成"的结论会掩盖一个持续暴露的指纹面。
+
+### 已在代码里坐实的现状
+
+**时间指令在 Native 侧无消费点。**
+
+- `aidcp-edge/native/page-engine/src` 下动作前犹豫与离页停留两个字段共 28 处命中，全部是 `command.rs` 的结构体字段声明（15 处）、`command.rs:937` / `engine.rs:630`/`:1630`/`:1652` / `facebook/runtime.rs:128` / `facebook/feed.rs:177`/`:244`/`:274` 的填 `None`（8 处），以及 `input.rs` 里同名但语义无关的按键驻留局部变量（5 处，`input.rs:154/156/159/496/515` 属按键节奏，非云端时长）。没有任何一处读取命令上的时间字段。
+- TypeScript 侧只有一个消费点：`src/native-page-engine/browse-session.ts:264` 的 Facebook 翻页停留，且只对首页翻页这一条命令生效。
+- `src/native-page-engine/command-mapper.ts:53-69` 把动作前犹豫字段转发给 16 条命令（刷新 feed、开帖、点赞、收藏、关注、评论、评论点赞、看图、滚评论、看主页、通知巡视五条、加群），把离页停留字段转发给 5 条（feed 翻页、关帖、返回、看图、滚评论），除 Facebook feed 翻页的停留外无一被读。
+- 节奏兜底通道在 Native 会话上断在最后一米，而不是断在宿主：宿主已把 welcome 快照、重连快照、唤醒快照三处都接进会话的快照应用入口（`src/main.ts:588`、`:732`、`:1422`），但 `browse-session.ts:213` 的那个入口是空方法体，两个参数都以下划线前缀声明为未使用、注释写"节奏由云端拥有"；此外常规运行路径下会话中途的节奏更新命令在 `browse-session.ts:121` 直接 return，连不到那个入口。**因此实装只需改 `browse-session.ts` 两处，不必碰 `main.ts`**（该文件归并行 change `restore-native-xiaohongshu-session-guards`）。
+- 对照退役实现：`git show 317cd47^:src/browse/browse-session.ts` L509-L560 有动作前犹豫、详情页停留兜底、feed 翻页停留三段接线，且**只对本地采样兜底乘风控档位、对云端已下发的值只叠抖动**（L527 注释明写"云端按内容算，已烘入 tempo"）。**注意：退役的 Facebook 会话不是可照搬的样板**——`git show 4f04e9c^:src/facebook/facebook-session.ts` L722 的 `jitterAround(thinkMs * this.tempo, 0.25)` 与 L738 的 `jitterAround(dwellMs * this.tempo, 0.2)` 对云端已烘入档位的中心值又乘了一次档位，这与已归档 `command-pacing` 的"云端已下发 dwellMs 不再叠 tempo（避免风控放慢被计两次）"直接冲突。本 change 按 `command-pacing` 与退役小红书会话的口径实装，**MUST NOT 复制退役 Facebook 会话的二次放大**。
+
+**指针原语。** `native/page-engine/src/facebook/shared.rs:802-820` 的点击原语只有三条事件：移动直达目标坐标、按下、抬起；无轨迹、无过冲回拉、无帧间抖动、无落点停顿。按下用 `?` 直接向上抛，错误路径下抬起永不发出。它是 Facebook 侧几乎所有点击的唯一出口（feed_like 3 处、feed 1 处、comment 1 处、shared 1 处、runtime 1 处、publish 3 处、reels 1 处，共 11 处调用点）。
+
+退役实现 `src/browse/cdp-util.ts:186-259` 的**默认行为**是：三阶贝塞尔逐帧移动（ease-in-out，`src/humanize/mouse-path.ts`）、约 15% 概率过冲回拉、每帧固定 8ms 延迟、无落点停顿；每帧 lognormal 延迟（`moveDelayJitter`）与落点停顿（`hoverDwellMs`）是**可选项，默认关，全仓只有验证码协助的轨迹回放一处开启**（`src/browse/captcha-assist.ts:335-336`）。因此"帧间延迟非恒定"是本 change 相对退役默认行为的**抬高**，而不是回退到旧状态；抬高的依据写在退役代码自己的注释里——"开抖动时每帧走 lognormal（消 dt 方差=0 的机器特征）"（`cdp-util.ts:203`）。真正被丢掉、必须原样恢复的是配平：退役实现用 try/finally 保证按下抛错也补发抬起，注释明写"按下发了、抬起没发 = 左键按下不松开，此后所有移动都变成拖拽 / 框选"（`cdp-util.ts:245-259`）。
+
+**指针轨迹并非可选优化，而是已生效的规格义务。** 已归档 `facebook-note-scoped-targeting` 的"Feed 两步点赞的反应浮层提交"要求第 2 条明写：浮层反应项提交 MUST 用 CDP 坐标点击（拟人化贝塞尔移动 + press/release），且"移动起点 SHALL 设为目标卡的帖级 react 控件坐标（路径落在『控件→浮层』走廊）、且 MUST NOT overshoot"。当前 Rust 原语的签名只有目标坐标，起点与 overshoot 都无法表达，两处浮层提交调用点（`feed_like.rs:123`、`:193`）结构上无法满足该要求。这条决定了新原语必须支持调用方指定起点与禁用过冲。
+
+**滚动手势。** 共享拟人滚轮 `input.rs:43` 已存在（8-15 帧、内部加减速峰值、16-60ms 帧间延迟、精确总位移），但消费者只有 `facebook/feed.rs:563` 与 `facebook/comment.rs:90`。首页点赞前的对齐滚动仍是裸滚轮：`facebook/feed_like.rs:263-275` 用「控件顶边减去视口高的 0.55 倍」精确算出位移、单帧打完、固定睡 250 毫秒再重探。短视频推进的兜底滚轮在 `facebook/reels.rs:215-224`，距离取 `70 + 墙钟毫秒 % 31`、滚前无光标移动。
+
+**定位三道闸。** Rust 侧全仓 grep 锚点相关只有评论锚点 id 一族（`command.rs:308` 字段、`:706`/`:708` 校验、`model.rs:272`/`:399` 投影），无锚点缓存、无暂存区、无晋升阈值。唯一出现"升级"结论的是允许清单内的遗留步骤路径 `native/page-engine/src/xhs-command-router.js:242`：单次尝试、`attempts:1`，后置校验不过即直接给出升级结论。旧定位层仍在仓库（`src/locating/engine.ts:92` 有重试上限与守卫轮次、`src/locating/cache.ts:89/104/119` 有暂存 / 连续确认晋升 / 丢弃），但 `src/main.ts` 已不再构造它（切换前 `git show 317cd47^:src/main.ts` L79-L80/L437-L438 构造过云端选择器与点赞步骤执行器），且 `scripts/prune-production-dist.mjs:64-68` 把定位引擎、锚点缓存连同它们的全部生产消费方列入禁入表，生产产物里若出现即构建失败。
+
+## Goals / Non-Goals
+
+**Goals**
+
+- 让云端为限流状态准备的降速手段在 Native 路径上重新生效：所有携带时间字段的命令都有消费点，且"转发未消费"能被机械发现。
+- 把指针原语抬到与退役实现同一条拟人边界上，并消除"左键留在按下状态"这一可持续污染页面的失败形态。
+- 让频次最高的写动作前置手势（首页点赞前的对齐滚动）与短视频兜底滚动共用已存在的拟人滚轮手势。
+- 在 Native 生产路径上给出定位三道闸的等价保证，并让"升级"这一结论恢复其原义（重试上限已耗尽）。
+
+**Non-Goals**
+
+- 不改云端时间中心值的算法、风控状态机、配额档位与记账口径。
+- 不改协议消息集合、命令信封、结果形状与动作名映射。
+- 不把退役的 TypeScript 定位层重新放回生产产物；等价保证必须由 Native 侧提供。
+- 不改各平台命令自身的目标解析与选取策略（那是各平台能力自己的规格）。
+- 不打安装包、不部署、不做真机写动作验收。
+
+**具名不做的事（逐条给出理由或承接方，不留静默漏项）**
+
+- **文件输入原语**（迁移主 change 3.3 里与指针并列的另一半）：两侧设置文件输入用的是同一个浏览器机制（Rust `cdp.rs:255` `set_file_input_files` ↔ 退役 `src/cdp/file-input-setter.ts:58`），设置文件输入不含任何节奏维度，因此在代码里**找不到可坐实的拟人化或取消安全缺口**，不凭推断立要求。退役实现多出的一层是元素句柄失效后的重取重试（`file-input-setter.ts:58/63`），那属于上传流程内的目标解析，归发布类能力与 `fb-publish-fill-deadline`。迁移主 change 3.3 因此在本 change 落地后仍**不能视为完成**，须由其负责人另行处置文件输入这一半。
+- **最小间隔 gating 与反射采样兜底**：已归档 `command-pacing` 另有两条已生效义务在 Native 路径上完全缺席——按单调锚点的最小间隔 gating（且"动作前犹豫与最小间隔取 max、MUST NOT 相加"）、以及兜底采样用反射而非硬裁（防在 floor 值处堆成尖峰）。实测 `src/native-page-engine/` 全目录零命中相关实现，退役小红书会话则消费 `opFloorsMs` 的 `card_gap`/`scroll`/`detail_dwell` 并做 gating（`git show 317cd47^:src/browse/browse-session.ts` L450-L490）。本 change **只恢复时间指令消费与快照接线**，最小间隔 gating 与反射采样是独立的第二块，须另起 change 承接；本 change 的 tasks 里登记该残留缺口，不假装已覆盖。
+- **可见性 / 几何 / 歧义拒绝**：迁移主 change 3.2 的任务正文除三道闸外还列了这三项。它们在 Native 侧已逐命令存在（歧义拒绝有 `ambiguous_target` 一类结论），且其口径归各平台的目标解析能力（`facebook-note-scoped-targeting` 等）。本 change 对 3.2 的承接**只到三道闸**，不代其立跨平台要求。
+- **小红书与微信路径上的指针调用点改造**：本 change 只建共享指针原语并改 Facebook 唯一点击出口。其余平台调用点未做盘点，归各平台能力。
+- **简报 C 段中与本主题无关的条目**，逐条给出承接方：小红书开帖 404 与看图深读挂起、通知去重键折叠与行选择器退化 → `restore-native-xiaohongshu-action-honesty`；Facebook 热度恒 0 → `restore-native-facebook-residual-parity`；跨环境错投（重连复用旧端点） → `harden-native-engine-runtime-contracts`（重连重取端点 + 分身身份证据）；CI 上生效的 Rust 编译器版本 → `enforce-native-engine-artifact-gates`；小红书提交窗口缺失与空根塌陷 → `restore-native-xiaohongshu-session-guards` 与 `harden-native-engine-runtime-contracts`。简报开头那条"七个簇里被判维持原判的编号清单缺正文"属简报自身的取证缺口，不是本 change 的规格对象；本 change 只用它作为交叉参考，不据其编号立任何要求。
+
+**范围外项的具名交接表（2026-07-28 覆盖漏洞收口新增）**
+
+合并退役实现参照书时查出一批「参照书里有、tasks 里没有」的条目。下列各项判定为**超出本 change 范围**，逐条具名交接；本 change 的 tasks 7.10–7.15 各有一条登记任务，不得因本 change 落地被当成已覆盖。
+
+| 漏洞 | 为什么不在本 change 做 | 建议承接方 | 不做的后果 |
+| --- | --- | --- | --- |
+| 运营真机鼠标轨迹回放通道本体（按下前补权威落点一帧、只裁不压缩的帧间上限、帧间抖动与亚像素、五项样本校验、漏点补发） | 需要新能力：协议侧字段已在（`src/comm/protocol.ts:1227-1324`），但引擎侧验证码点击参数结构体带「拒绝未知字段」（`native/page-engine/src/command.rs:351-361`），云端带下来也进不去；回放实现是一整条新链路，不属"把已有原语接上"这一类 | **需新立 change**（承接退役 `src/humanize/trajectory-replay.ts` 的整条契约） | 运营在后台划出的真实轨迹永远用不上，验证码协助只有合成路径；本 change 的 2.10 只保证「丢弃可观测 + 回放模式不谎报」，不等于通道恢复 |
+| 小红书注入路由的通用点击助手（点击前 `scrollIntoView` 瞬移 + 派发与真实落点无关的伪造鼠标移动） | 实现点 `native/page-engine/src/xhs-command-router.js:45-51` 是并行 change 的**单写区**，本 change 明文不碰该文件；且其五个消费点（点赞 / 收藏 / 关注、评论提交、话题候选、发布提交、遗留步骤）的回执与判据也归该 change | **restore-native-xiaohongshu-action-honesty** | 小红书全线点击仍是「页面瞬跳到目标居中 + 伪造移动 + 页面内点击」，滚动位移完全绕开节奏层，且旧测试点名禁止的瞬移在小红书侧原样保留 |
+| 话题标记的后置判据（只认带话题属性的真标记、剔隐藏后缀、精确相等） | 实现点 `xhs-command-router.js:256` 在同一单写区；且该判据是小红书发布链路的平台判据，不是跨平台原语 | **restore-native-xiaohongshu-action-honesty**（本 change 的 5.10 只立「禁自证循环、禁整段包含判断」的跨平台判据要求） | 用户打了纯文本话题、下拉没提交也判成功；页面已有更长话题名时短词被误判成已贴上 |
+| 动作前守卫层（干扰扫描 + 多轮清障 + 无配对关闭动作即停手） | 需要新能力且规则库须按当前平台重建：退役的三条内置规则是 2026-06 的小红书 / 通用形态（`src/locating/guard.ts:41-63`），Facebook 与短视频面的同意浮层、频率限流、参与答题、登录检查点完全不在其中；同时新引擎已在别处积累的真机经验必须并入而不是被覆盖 | **需新立 change**（可照抄的只有编排骨架与阈值） | 「三道闸已恢复」会被读成「定位层已补齐」；浮层遮挡时表现为找不到目标或点到浮层，而不是先清障，动作前无统一清障环节 |
+| 语义类名白名单的词边界匹配 + 匹配唯一性闸（置信度 / 分差 / 权重表） | 属匹配层整体，本 change 的 tasks 5.8 已声明未承接；且小红书侧的子串选择器落在上述单写区 | **需新立 change**（与匹配唯一性闸同批立项） | 混淆类名里偶然含语义片段的节点被当成互动控件，与「首个可见即取」叠加放大：更靠前的含相近类名节点会被当成点赞控件读计数 |
+| 按边缘标识派生的每机节奏偏置（反车队指纹） | 需要新入参：引擎会话结构里没有边缘标识（`native/page-engine/src/engine.rs:107-123`），要从宿主经会话打开契约穿进来，属跨进程契约变更 | **harden-native-engine-runtime-contracts**（会话身份与端点契约的属主） | 同一版二进制在全车队产出同一节奏形状，节奏本身成为车队级标识；本 change 的 2.9 只恢复验证码协助那一档专用节奏，不含每机偏置 |
+
+## 待裁定（实装前必须有人裁定，未裁定即阻塞对应任务）
+
+**P1 · 锚点暂存区的前提在新引擎里不成立。** 任务 5.4 / 5.5 与 `native-locating-gates` 的锚点要求写的是「非确定性来源得到的新锚点先暂存、连续确认成功才晋升」，但退役实现里那个唯一的非确定性来源（模型选元素路径，`src/locating/engine.ts:162-193` + `selector.ts`）在新引擎里整条消失，注入脚本每次都从编译进二进制的选择器常量现场找元素。照当前写法实装，会得到一个**永远为空的暂存区**。
+
+- 走法甲：保留空结构（先把暂存 / 晋升 / 丢弃三个动作与阈值建出来，等将来接回非确定性来源）。后果：多一层当下无输入的机制，测试只能测空转，验收时「已实现」与「有实际效果」不是一回事，容易被后人误读成定位自愈已恢复。
+- 走法乙：改判据（把「非确定性来源」放宽为「任何一次成功定位得到的指纹」，让确定性选择器的命中也进暂存并按连续成功晋升）。后果：语义从「防单次模型错误被复制成系统性故障」变成「稳定性统计」，与退役实现的原意不同，须重写规格正文，且要一并解决持有位置与持久化（退役实现的主缓存是纯进程内、快照存取全仓零调用方，重启即空）。
+- 走法丙：暂不做（把整条锚点闸移出本 change，与守卫层 / 匹配唯一性闸 / 模型兜底一起另立）。后果：本 change 的「定位三道闸」只落两道，proposal 与能力名须相应收窄，迁移主 change 的 3.2 仍开口。
+- 不裁定会怎样：5.4 / 5.5 无法验收——实装完也拿不出任何一条能证明它生效的用例，而规格里的要求已经成立，会变成一条永远半亮的义务。
+
+**P2 · 脱机断言能力在迁移中消失。** 退役实现把「拿 DOM」与「把操作落到页面」抽成两个可替换接口（`src/locating/engine.ts:24-41`、`src/cdp/dom-provider.ts`、`src/cdp/action-executor.ts`），定位与判据因此能在无浏览器的桩上单测（退役仓 `test/locating/` 全部用例都不起浏览器）。新引擎里定位逻辑写在注入脚本内、隐式依赖真实页面对象，Rust 侧直接对会话发指令，没有可替换的页面来源与执行层。本 change 的 1.3 / 1.4 / 1.5 写的是「Rust 假 CDP 测试」，5.1–5.5 更需要脱机跑判据。
+
+- 走法甲：在 Native 侧重建可替换缝（把 CDP 会话抽象成 trait / 把注入脚本的判据段拆成可在脱机 DOM 桩上跑的纯函数）。后果：改动面扩到引擎骨架，与四条并行流共写 `engine.rs`，集成成本高；但换来判据可脱机断言，且退役仓那批用例可以整批 port。
+- 走法乙：接受退化为真机验收（本 change 只保留假 CDP 层面的事件序列断言，判据强度类要求靠真机核对）。后果：5.9 / 5.10 立的判据强度要求没有机械门禁，退化成人工 review；真机验收项数量显著增加，验收周期被共享真机环境拉长。
+- 不裁定会怎样：1.3 / 1.4 / 1.5 的「假 CDP 测试」到底能覆盖到哪一层无定论，5.1–5.5 的验收方式悬空；实装者会各自选一种，导致同一 change 内的验证强度不一致。
+
+## 关键决策
+
+### D1. 时间指令的消费点放在 Native 引擎内，而不是留在宿主 TypeScript 侧
+
+**决定**：动作前犹豫与离页停留由 Rust 引擎在执行该命令时消费；宿主只做转发与兜底下限的传递。
+
+**被否决的替代**：在 `browse-session.ts` 统一按命令类型 sleep（把现有 Facebook 翻页停留的做法推广到所有命令）。理由：宿主不知道一条命令内部真正的"动作时刻"在哪——开帖命令里有滚动、探针、点击多段，在宿主侧统一前置等待会把犹豫时间错放在整条命令之前，且离页停留必须以"内容实际开始被看的时刻"为锚点，那个时刻只有引擎内部知道。宿主统一 sleep 还会与引擎内已有的截止预算相互挤压。
+
+**代价**：Rust 侧要在多条命令路径上增加消费点，工作量比宿主一处大。用"转发即消费"的门禁把遗漏变成可检测。
+
+### D2. 用"转发即消费"的机械门禁，而不是靠人工清点
+
+**决定**：转发白名单（`command-mapper.ts` 的按命令允许字段表）中出现时间字段的命令，必须在 Native 侧存在对应消费点；不一致即测试失败。
+
+**被否决的替代**：只写一条规格要求"所有命令都要消费"，靠 review 保证。理由：本仓已有先例说明这类漂移人工抓不到——协议白名单遗漏、动作名口径漂移都属于"编译与类型检查抓不到、只有真跑才现形"的一类。时间字段是纯可选的 `Option<u64>`，漏读不报错、不影响任何断言，是同一类静默漂移。
+
+**权衡**：门禁需要一份显式对照表，新增命令时要同步维护；这正是让遗漏浮现的成本。
+
+### D3. 指针轨迹落在共享原语里，平台点击函数只做调用
+
+**决定**：在 `input.rs` 新增指针原语（多帧轨迹 + 帧间抖动 + 落点停顿 + 按下抬起配平），Facebook 的点击出口改为调用它。
+
+**起点的默认值是一处真实的回归风险，必须显式定：** 退役实现在调用方不给起点时默认取"目标左上方一段随机距离"（`cdp-util.ts:186-192`），并把真实落点作为返回值，供多点循环把上一落点当下一点起点、保光标连续。Facebook 两步点赞正好是这种多点循环——第一次点帖级中性控件，第二次点它上方弹出的浮层项，两次之间光标必须留在"控件→浮层"走廊内。若新原语沿用"目标附近随机起点"这个默认，第二次点击会从走廊外斜插进来、可能先划出浮层 hover 区使其收起，把一处已生效的规格要求做成新的失效路径。**决定**：新原语默认起点取会话内最近一次的真实落点（无历史落点时才回落随机偏移），并允许调用方显式覆盖起点与禁用过冲。
+
+**被否决的替代 A**：只在 Facebook 点击函数里就地补轨迹。理由：小红书与微信路径将来同样需要，就地补会产生第二份实现；而滚轮原语已经证明"共享原语 + 多平台调用"这条形状可行。
+
+**被否决的替代 B**：把退役 TypeScript 的轨迹生成器保留在宿主侧、由宿主算好点位再逐点下发给引擎。理由：这会把点位序列重新暴露到可反编译的 JavaScript 里，与迁移动机直接冲突，且每帧一次跨进程往返会让帧间隔被 IPC 抖动主导。
+
+### D4. 按下与抬起之间不留取消点，取消检查只在按下之前
+
+**决定**：指针原语在按下之前做取消与截止检查；按下到抬起之间是原子区，即使取消信号已置位也必须先补发抬起。
+
+**被否决的替代**：在原子区内也响应取消以更快让位。理由：取消的收益是几十毫秒的让位速度，代价是左键停在按下状态、后续所有移动变成拖拽框选——页面被不可见地污染，而调用方只看到一个普通异常。退役实现的注释把这条列为"已执行、未后置校验窗口的最恶形态"。这与本仓"绝不静默假成功"红线同源：一次未完成的原子写不能对外表现为普通失败。
+
+### D5. 对齐滚动改为"共享手势 + 有界步进 + 每步重探"，不追求单次精确落位
+
+**决定**：把控件带进视口的过程改成若干次共享拟人手势，每次手势后重新解析目标与控件位置，直到进入可视带或轮次耗尽。手势的总位移允许在基线上下浮动，不再等于按控件偏移算出的精确值。
+
+**被否决的替代**：保留精确位移、只把单帧拆成多帧。理由：位移量与目标位置精确相关本身就是可判别特征（人手滚不出这种数），拆帧只改了帧数不改这个相关性。共享手势自带围绕基线 ±20% 的采样（`input.rs:272-273`），把"位移=位置的确定函数"打散成"位移≈位置的带噪估计"。已归档的 `facebook-note-scoped-targeting` 的"Target is scrolled into view before acting"也已经要求"有界拟人步进 + 每步重读"，当前实现只是没有落到手势层。
+
+**现状里已经对的部分不要动**：`feed_like.rs:238-276` 的循环**已经**是有界轮次 + 每轮重解析目标（`probe_facebook_feed_like_target`）+ 耗尽后返回 `target_not_visible` 的 `NotStarted`。本 change 只换手势与重探间隔，**不改**轮次结构与结果取值集合。
+
+**实装注记**：共享手势的签名要求传入取消信号与绝对截止（`input.rs:43-49`），而当前对齐滚动块既无取消检查也无截止感知（只有一句裸 `tokio::time::sleep`）。改造时须把这两个参数一路透传进对齐循环，否则会把一段不可打断的等待塞进一条本可让位的路径。
+
+**代价**：轮次可能变多。用现有轮次上限约束，耗尽时仍返回诚实的不可见结论，不改结果语义。
+
+### D6. 定位三道闸新起能力，而不是往迁移主 change 的能力里塞
+
+**决定**：新增 `native-locating-gates` 与 `native-actuation-primitives` 两个能力。
+
+理由：迁移主 change 的能力 `native-page-engine-production` 尚未归档，其 delta 仍活在那个 change 目录里（实测 `openspec/specs/` 下无此目录），不能作为 MODIFIED 的对象；而已归档的 `native-page-engine` 是当初可行性验证阶段的只读探针规格（opt-in、只读），生产运行时行为不属于它。两个新能力按"原语层"与"定位层"切分，正好对应主 change 的 3.3 与 3.2 两条任务，将来主 change 归档时不会与它们产生要求级重叠。
+
+**与两份已归档 Facebook 规格的关系（防要求级重复）**：
+
+- `native-facebook-behavior-parity` 的"Native write actions use trusted actuation and preserve terminal truth"已对 Facebook 的点赞 / 关注 / 评论 / 加群 / 发布要求"可信输入 + 重探同一 scoped 目标 + 区分五种终局"。本 change 的 `native-locating-gates` **不重述那条平台义务**，只补它没覆盖的两件事：跨平台适用（不止 Facebook），以及三道闸里那两道该规格完全没有的机制——有界重试与升级语义、锚点先暂存后晋升。凡与它重叠的部分以它为权威口径。
+- `facebook-note-scoped-targeting` 的"反应浮层提交走真指针事件 + 起点落在走廊 + 不得 overshoot"是本 change 指针要求的**上游依据**，不是被它取代。本 change 只把该义务所需的能力（可指定起点、可禁过冲、多帧轨迹）建在共享原语里；浮层定位、scope 限定、屏外坐标不点这些判据仍归它。
+
+**与 `command-pacing` 的关系**：`command-pacing` 仍是时间中心值如何算、边缘必须叠抖动并保证达标的权威。本 change 不重述那些义务，只补一条运行时归属：Native 引擎是当前边缘的执行层，那些义务必须在它内部兑现，且"转发未消费"是可检测的回归。
+
+### D7. 定位三道闸在 Native 侧重建，不复活被剪枝的 TypeScript 定位层
+
+**决定**：三道闸的等价保证由 Rust 侧提供；`prune-production-dist.mjs` 的禁入表不放宽。
+
+**被否决的替代**：把定位引擎与锚点缓存从禁入表里摘掉、让生产重新走 TypeScript 定位层。理由：那等于把选择器与页面规则重新放回可反编译的 JavaScript，直接推翻迁移动机；而且禁入表是构建期硬失败，放宽一条会给后续回填留缺口。
+
+## 风险与回滚
+
+- **指针轨迹变慢拖长命令墙钟时长**：每次点击多出十余帧移动与落点停顿。缓解：轨迹帧预算与现有命令截止预算一起核算，超预算时缩帧而不是跳过配平；评论类命令已有单独的更长上限。回滚：指针原语可退回单帧移动（仍保留配平），是独立的一处开关。
+- **时间指令恢复消费后单位时间动作数下降**：这是预期效果（降速旋钮重新生效），但会改变现网节奏观感。缓解：先在 dev 观察，不改云端中心值；若中心值偏大属云端配置问题，走 `command-pacing` 侧调整。
+- **对齐滚动改有界步进后轮次上限不够，出现新的不可见结论**：缓解：以现有轮次上限为准做回归，超限仍返回诚实结论、绝不改判成功；若实测轮次不足，单独调整上限并记录。
+- **指针起点默认值破坏"控件→浮层"走廊**（见 D3 的起点决定）：两步点赞的第二次点击若从目标附近随机起点斜插进来，可能先划出浮层 hover 区使其收起，把一条已生效的规格要求做成新的失效路径。缓解：默认起点取最近一次真实落点、调用方可显式覆盖并禁用过冲；两处浮层提交调用点显式传起点，并加事件序列断言。
+- **对云端已下发的时长二次乘风控档位**：退役 Facebook 会话就是这么写的，照搬即 double-count（风控放慢被计两次），与 `command-pacing` 明文冲突。缓解：只在本地采样兜底处乘档位，并加一条断言"给定 dwellMs 时改变档位不改变等待中心值"。
+- **升级语义变更影响云端判读**：遗留步骤路径此后要重试到上限才给升级结论。缓解：结果字段集合不变，只是取值时机变化；云端对该结论的处理是停手，与新语义一致。该实现点在另一 change 的单写区，落地顺序上依赖它，本 change 只立要求。
+- **回滚**：本 change 全部改动落在 Edge 的一个提交范围内，无数据迁移、无协议变更；回滚即回退该提交并重打包。
+
+## 与其他并行 change 的边界
+
+本 change **只碰**：`native/page-engine/src/input.rs`、`facebook/shared.rs` 的点击原语函数、`facebook/feed_like.rs` 的对齐滚动块、`facebook/reels.rs` 的兜底滚动块、时间字段的消费接线（`command.rs` / `engine.rs` / `facebook/runtime.rs` 中与该字段直接相关的行）、`src/native-page-engine/browse-session.ts` 与 `command-mapper.ts` 的节奏接线，以及对应测试目录。
+
+**与并行 Native change 的重叠文件（须串行集成，不与他人同时改）**：Native 侧同期有五条并行流，重叠面已逐条对过：
+
+| 文件 | 另一属主 | 处置 |
+| --- | --- | --- |
+| `native/page-engine/src/xhs-command-router.js` | `restore-native-xiaohongshu-action-honesty`（其 Impact 首项；`restore-native-xiaohongshu-session-guards` 已明写"另一 change 的单写区"） | **本 change 不碰**。升级语义只立要求，由属主落地或以删除该 v1 分支达成 |
+| `src/main.ts` | `restore-native-xiaohongshu-session-guards` | **本 change 不碰**（三处快照注入点已存在，无需新接线） |
+| `scripts/prune-production-dist.mjs` | `enforce-native-engine-artifact-gates` | **只读断言**禁入表未放宽，不改一行 |
+| `native/page-engine/src/input.rs` | `harden-native-engine-runtime-contracts`（改逐字输入的焦点守卫） | 本 change 只**新增**指针原语函数，不动既有文本 / 滚轮函数；集成时先 rebase 到其后 |
+| `src/native-page-engine/browse-session.ts` | `harden-native-engine-runtime-contracts`、`restore-native-xiaohongshu-session-guards` | 三方重叠。本 change 只改节奏两处（`:121` 早退、`:213` 空方法体），集成串行 |
+| `native/page-engine/src/command.rs`、`facebook/runtime.rs` | `restore-native-facebook-residual-parity`、`harden-native-engine-runtime-contracts` | 本 change 只改时间字段相关行，集成串行 |
+| `native/page-engine/src/engine.rs` | 上述四条流均有份 | 本 change 只改时间字段相关行，集成串行 |
+| `native/page-engine/src/facebook/comment.rs` | `restore-native-facebook-residual-parity`（评论入口点击改走可信指针提交） | 本 change 不碰该文件；但其新增的入口点击将消费本 change 的指针原语，落地顺序上它应在本 change 之后 |
+
+本 change **不碰**（避免与 fleet 内其他流撞车）：
+
+- 两份 `src/comm/protocol.ts`、`aidcp-cloud/src/comm/command-bridge.ts` 的动作映射、`event-bus/types.ts` 的角色枚举、`src/config/role-catalog.ts`、`src/risk/risk-state-machine.ts`——协议 / 角色 / 风控三处热点文件一律不动。
+- Facebook 各能力的目标解析与选取逻辑（首帖识别、群组作用域、feed 续读、Reels 提交可靠性等），归 `facebook-first-post-*`、`repair-facebook-feed-exhaustion-continuation`、`facebook-reels-like-commit-reliability` 等并行 change 所有。
+- `facebook/publish.rs` 的发帖编排与填写预算，归 `fb-publish-fill-deadline` 所有；本 change 只改它调用的点击原语实现，不改其调用点与编排。
+- `openspec/specs/` 下任何文件、其他 change 目录、云端与 console 仓。
+- 迁移主 change `native-page-engine-production-cutover` 的 `tasks.md`：本 change 落地后由该 change 的负责人按其自身流程回写 3.2 / 3.3（3.3 因文件输入那一半仍开口，**不得**因本 change 落地就整条勾掉），本 change 不代改。
