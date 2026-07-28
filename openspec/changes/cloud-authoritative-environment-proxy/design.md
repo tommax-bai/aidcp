@@ -65,6 +65,7 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
 
    - direct preflight and original-profile target when the switch is off;
    - GOST second hop, loopback preflight, and loopback profile target when the switch is on;
+   - the expected public egress observed through that frozen effective proxy;
    - the private anonymous pipe delivered to the Edge core;
    - best-effort close restoration for that browser generation.
 
@@ -72,7 +73,7 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
 
 7. **Fail closed on missing or unavailable Cloud authority.**
 
-   AdsPower explicit `no_proxy` skips Cloud authority resolution, preflight, GOST, profile update, active-profile proxy restriction, and restore. For profiles AdsPower reports as proxy-configured, Cloud 404, authentication failure, timeout, malformed response, or ownership denial blocks preflight/start with a stable safe reason. There is no configured-route fallback to AdsPower current state. Explicit Cloud `no_proxy` also skips the proxy subsystem, including the partial-edit case where AdsPower has not yet adopted it.
+   AdsPower explicit `no_proxy` skips Cloud authority resolution, preflight, GOST, profile update, configured-profile Active takeover gate, and restore. Its existing Active-browser path remains unchanged. For profiles AdsPower reports as proxy-configured, Cloud 404, authentication failure, timeout, malformed response, or ownership denial blocks preflight/start with a stable safe reason. There is no configured-route fallback to AdsPower current state. Explicit Cloud `no_proxy` also skips the proxy subsystem, including the partial-edit case where AdsPower has not yet adopted it.
 
 8. **Use Edge local records only for bounded migration/cache.**
 
@@ -88,6 +89,12 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
 
    A child waiting for a broker response remains honestly `starting`; waiting is not a failed launch and does not consume respawn budget. The ordinary launch queue still keeps later environments unspawned until the current environment is ready or fails. Arbitrary AdsPower messages are not logged: errors retain HTTP/code plus a safe reason classification such as `rate_limited` or `api_rejected`.
 
+11. **Gate configured Active-browser takeover on exact one-time egress evidence.**
+
+   An inactive configured profile keeps the existing startup transaction: write the frozen effective proxy, read it back exactly, and only then start AdsPower. An already-Active configured profile cannot be rewritten without changing a running browser, so Edge does not compare mutable profile fields or demand a generation marker. Instead, the successful preflight also records the public egress observed through the frozen effective proxy. After attaching to the Active browser, Edge probes the same controlled endpoint through that browser and takes over only when both normalized IPs match exactly.
+
+   This comparison occurs once at the startup/takeover boundary. Edge does not poll profile consistency or continuously compare Cloud revision, profile fields, and browser egress after takeover. If either egress cannot be observed or the values differ, startup fails closed with a stable terminal reason, the pre-existing browser remains untouched, and Electron does not automatically respawn the same deterministic failure. Explicit `no_proxy` never enters this gate.
+
 ## Risks / Trade-offs
 
 - [Plaintext proxy credentials are exposed by database access or backups] → Record the accepted boundary, isolate the table from list queries, restrict exact routes, redact logs/errors, and include credential-leak regression tests.
@@ -100,6 +107,7 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
 - [Credentials leak through broad projections] → Separate table, exact DTOs, structural tests, and log/error redaction.
 - [Main and child processes independently satisfy 1req/s but collide at the device API] → Route all requests owned by one desktop runtime through one FIFO; hold proxy update/readback as an exclusive batch and keep queued state non-failing.
 - [A compromised or stale child attempts a broad Local API call] → Allow only the browser-provider endpoint/method shapes, require every profile identifier to match the child handle, cap batch size, and never accept a child-supplied API base/key.
+- [A rotating proxy produces different public IPs for separate preflight and browser connections] → Exact equality may conservatively reject a valid Active browser. Stop once and require an explicit close/start rather than weakening the proof or silently adopting an ambiguous route.
 
 ## Migration Plan
 

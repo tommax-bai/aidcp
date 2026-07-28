@@ -17,6 +17,25 @@ Before starting an AdsPower profile with a configured proxy, Edge SHALL write ex
 - **WHEN** AdsPower readback does not match the intended effective proxy
 - **THEN** Edge SHALL stop startup and report the synchronization failure
 
+#### Scenario: Configured profile is already Active with matching egress
+- **WHEN** AdsPower reports a configured profile as Active
+- **AND** the browser's observed public egress exactly matches the egress observed through the frozen effective proxy
+- **THEN** Edge SHALL attach to and take over that Active browser without rewriting its running profile
+- **AND** SHALL NOT require a profile-generation marker or continue checking profile consistency after startup
+
+#### Scenario: Configured Active-browser egress is mismatched or unavailable
+- **WHEN** AdsPower reports a configured profile as Active
+- **AND** exact browser-versus-effective-proxy egress equality cannot be established
+- **THEN** Edge SHALL fail startup with a stable terminal reason
+- **AND** SHALL leave the pre-existing browser open and untouched
+- **AND** Electron SHALL NOT automatically respawn the same deterministic startup failure
+
+#### Scenario: No-proxy Active browser keeps the existing path
+- **WHEN** AdsPower or Cloud authority is explicit `no_proxy`
+- **AND** AdsPower reports the profile as Active
+- **THEN** Edge SHALL bypass Cloud proxy resolution, proxy preflight, egress-equality takeover gating, profile mutation, and restore
+- **AND** SHALL preserve the existing no-proxy Active-browser takeover behavior
+
 #### Scenario: Close restores the frozen original as fallback
 - **WHEN** a managed profile closes after an execution-copy override
 - **THEN** Edge SHALL attempt to restore the original proxy from the frozen Cloud revision
