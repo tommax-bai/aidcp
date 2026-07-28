@@ -14,6 +14,7 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
 - Give legacy valid Edge-local authorities a bounded one-time Cloud migration path.
 - Keep exact credentials limited to an owned-environment read/write path and the existing private Edge → core pipe.
 - Preserve truthful partial outcomes when Cloud and AdsPower cannot both be updated.
+- Serialize Electron-main and managed Edge-child AdsPower Local API traffic through one runtime-owned coordinator, with proxy write/readback held as one exclusive batch.
 
 **Non-Goals:**
 
@@ -21,6 +22,7 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
 - Add proxy authority to `/my-environments`, general environment lists, fleet snapshots, logs, errors, or Console list pages.
 - Treat AdsPower's current configured profile value as original-proxy authority. The only permitted runtime classification is the credential-free fact that AdsPower explicitly reports `no_proxy`.
 - Add automatic proxy-provider discovery, credential rotation, cross-customer sharing, or a new retry worker.
+- Coordinate AdsPower requests issued by another AIDCP desktop process or third-party scripts; those remain external callers and are not silently retried.
 - Permit two installations to edit one authority without revision conflict detection.
 
 ## Decisions
@@ -80,6 +82,12 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
 
    Environment proxy summaries for configured profiles come from Cloud-safe type/host/port fields. AdsPower explicit `no_proxy` stays a local credential-free summary and exact editor result, so it cannot be replaced by an “authority uninitialized” error. Exact valid configured editor reads may include username/password for the selected owned environment. Missing, unavailable, or malformed configured reads open a blank repair form rather than blocking the editor; malformed fields are never reflected. Runtime status separately reports Cloud authority revision, chain preparation, preflight, and browser egress. A successful preflight does not become browser verification.
 
+10. **Use one main-process AdsPower Local API coordinator per desktop runtime.**
+
+   Managed Edge children SHALL not call AdsPower Local API directly. They send typed requests over the existing private parent/child IPC channel; Electron validates the operation, pins it to the child profile, injects the runtime-owned API base/key, and executes it on the same FIFO used by main-process list, status, kernel, inspection, creation, edit, rename, and deletion calls. Proxy synchronization submits `user/update` and its exact `user/list` readback as one batch, preserving the minimum interval while preventing another main/child request from interleaving.
+
+   A child waiting for a broker response remains honestly `starting`; waiting is not a failed launch and does not consume respawn budget. The ordinary launch queue still keeps later environments unspawned until the current environment is ready or fails. Arbitrary AdsPower messages are not logged: errors retain HTTP/code plus a safe reason classification such as `rate_limited` or `api_rejected`.
+
 ## Risks / Trade-offs
 
 - [Plaintext proxy credentials are exposed by database access or backups] → Record the accepted boundary, isolate the table from list queries, restrict exact routes, redact logs/errors, and include credential-leak regression tests.
@@ -90,6 +98,8 @@ AIDCP Cloud already owns the environment registry, customer assignment, provisio
 - [Cloud authority cannot be read for editing] → Preserve the owned inactive environment's editor as a blank repair surface. Save only when Cloud can accept a create or revision-bound replacement; never turn an unavailable or malformed value into an unversioned overwrite.
 - [Legacy local record contains a stale GOST loopback] → Reject all loopback migration and require explicit re-entry.
 - [Credentials leak through broad projections] → Separate table, exact DTOs, structural tests, and log/error redaction.
+- [Main and child processes independently satisfy 1req/s but collide at the device API] → Route all requests owned by one desktop runtime through one FIFO; hold proxy update/readback as an exclusive batch and keep queued state non-failing.
+- [A compromised or stale child attempts a broad Local API call] → Allow only the browser-provider endpoint/method shapes, require every profile identifier to match the child handle, cap batch size, and never accept a child-supplied API base/key.
 
 ## Migration Plan
 

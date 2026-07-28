@@ -8,6 +8,7 @@ The original environment proxy is currently retained only in an Edge `userData`-
 - Save proxy authority when Edge completes environment creation and whenever an inactive environment's proxy is edited; reject launch when a configured environment has no usable Cloud authority.
 - Fetch one exact Cloud proxy revision before preflight/start, freeze it for that browser generation, and use it to choose direct environment proxy or system-proxy → GOST → environment-proxy routing.
 - Stop treating the mutable AdsPower profile as a source for the original proxy. Continue reading it to verify values Edge has just written and to recognize the credential-free `no_proxy` applicability state only.
+- Route every AdsPower Local API request owned by one Electron desktop runtime through one main-process FIFO. Child proxy synchronization SHALL reserve one uninterrupted `user/update` → `user/list` batch so main-process refreshes cannot collide with the same device-level API limit.
 - Treat Edge `safeStorage` records as migration/cache inputs only. Allow one-time upload of a valid non-loopback local authority, but never import a loopback from AdsPower as the original proxy.
 - Add revision/CAS and environment ownership checks so multiple installations cannot silently overwrite each other's proxy authority.
 - Keep proxy credentials out of environment lists, ordinary status projections, logs, errors, argv, and renderer-wide IPC despite plaintext-at-rest storage.
@@ -29,6 +30,6 @@ The original environment proxy is currently retained only in an Edge `userData`-
 ## Impact
 
 - **Cloud:** new PostgreSQL capability/table, client-auth API DTOs, ownership/CAS checks, provisioning transaction changes, tests, and DEV deployment.
-- **Edge:** creation/edit synchronization, exact authority fetch, local migration/cache handling, preflight/start generation freeze, close restore source, renderer-safe status, and regression tests.
+- **Edge:** creation/edit synchronization, exact authority fetch, local migration/cache handling, preflight/start generation freeze, runtime-wide AdsPower API coordination, close restore source, renderer-safe status, and regression tests.
 - **Control:** new cross-repository behavior contracts and migration/acceptance evidence.
 - **Security/operations:** proxy credentials are intentionally plaintext at rest in PostgreSQL but remain excluded from list APIs and logs; database access and backups therefore gain direct access to usable proxy credentials.
