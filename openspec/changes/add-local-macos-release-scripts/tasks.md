@@ -18,3 +18,11 @@
 - [x] 3.2 Commit and push the control OpenSpec artifacts with final Edge commit and validation evidence
 <!-- Edge branch codex/add-local-macos-release-scripts and master both point to pushed implementation commit 23351cd. -->
 <!-- Control OpenSpec artifacts and strict-validation evidence were committed and pushed in aidcp f05dd5d; this follow-up records final task completion. -->
+
+## 4. Observed local script regressions
+
+- [x] 4.1 Allow unrelated untracked files outside build-relevant source paths while continuing to reject tracked changes and untracked build inputs
+- [x] 4.2 Prevent signed-only mode from exiting when notarization credentials are intentionally skipped, and add regression coverage for both observed failures
+- [x] 4.3 Re-run focused validation, strict OpenSpec validation, and fast-forward the fix into Edge `master`
+<!-- Follow-up validation: Bash syntax PASS; 61 passed/1 skipped focused packaging tests; typecheck PASS; verify:desktop-build-input PASS; build:dist PASS (reachable=81, legacy_page_rules=absent, source_maps=absent). -->
+<!-- Follow-up integration: aidcp-edge 9cd7691 was pushed to codex/add-local-macos-release-scripts and fast-forwarded to master; strict OpenSpec validation PASS. No installer was built, notarized, uploaded, or published by this fix. -->
