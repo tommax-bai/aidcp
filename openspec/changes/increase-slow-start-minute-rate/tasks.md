@@ -12,5 +12,5 @@
 ## 3. Integration and development verification
 
 - [x] 3.1 Commit the Cloud implementation and control artifacts with validation evidence recorded here <!-- Cloud 911a4c2; control commit contains this record. Focused 46/46, acceptance 166/166, full 3829 pass + 11 skipped, typecheck and OpenSpec strict validation pass. -->
-- [ ] 3.2 Rebase and fast-forward Cloud/control default branches, then push
+- [x] 3.2 Rebase and fast-forward Cloud/control default branches, then push <!-- Cloud master fast-forwarded and pushed at 911a4c2 after land-change revalidated acceptance 166/166, full 3829 pass + 11 skipped, and typecheck. Control main push includes this record. -->
 - [ ] 3.3 Deploy the Cloud change to dev and verify service, listeners, health, configuration mirrors, Feishu, PostgreSQL, and the effective `/10` quota behavior
