@@ -22,6 +22,9 @@
 
 ## 4. DEV delivery
 
-- [ ] 4.1 Run the DEV deployment preflight, inspect concurrent runtime state, and back up Cloud plus `.env`.
-- [ ] 4.2 Deploy only the clean integrated Cloud default revision, remove only the obsolete `AIDCP_FB_COMMENT_DAILY_CAP` DEV line, and restart only `aidcp-cloud.service`.
-- [ ] 4.3 Verify deployed source/config, schema gates, automation writer lock, service/listeners/health, Feishu, PostgreSQL and unrelated `isales` services without issuing a Facebook write.
+- [x] 4.1 Run the DEV deployment preflight, inspect concurrent runtime state, and back up Cloud plus `.env`.
+  <!-- DEV preflight passed for 121.89.85.150. The six affected runtime files matched the prior 985d47e baseline before sync. Backups: /opt/aidcp/backups/cloud-20260728-191543-pre-unify-facebook-comment-quota.tar.gz and cloud.env-20260728-191543-pre-unify-facebook-comment-quota. -->
+- [x] 4.2 Deploy only the clean integrated Cloud default revision, remove only the obsolete `AIDCP_FB_COMMENT_DAILY_CAP` DEV line, and restart only `aidcp-cloud.service`.
+  <!-- Deployed clean Cloud master 9a5613ea81516085792ed018fb4c8cecc45457e0 by checksum rsync; package manifests were unchanged. Migration status reported zero pending for content/automation/api. Exactly one obsolete env line was removed before a stop-then-start systemd restart. -->
+- [x] 4.3 Verify deployed source/config, schema gates, automation writer lock, service/listeners/health, Feishu, PostgreSQL and unrelated `isales` services without issuing a Facebook write.
+  <!-- Exact committed source diff=0; hidden-cap source/env refs=0. Enforce schema gates passed at 0069/0096/0097; dev writer lock held; service active with NRestarts=0; 8787/8090/8091 and nginx 8088 healthy; Feishu bot=Dev.A; Nancy remains normal/normal with visible normal comment daily=8; all four isales services stayed active. No Facebook write was issued. -->
