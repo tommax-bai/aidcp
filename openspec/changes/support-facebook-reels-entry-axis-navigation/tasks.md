@@ -25,5 +25,6 @@
 
 ## 4. Integration
 
-- [ ] 4.1 Commit the Edge implementation and OpenSpec artifacts with explicit path scopes, rebase both branches on their latest defaults, and rerun required validation.
+- [x] 4.1 Commit the Edge implementation and OpenSpec artifacts with explicit path scopes, rebase both branches on their latest defaults, and rerun required validation.
+<!-- Edge implementation commit 845ef0d; control artifacts committed on the matching branch. Both branches rebased cleanly. land-change reran test:acceptance (30 pass), npm test (2552 pass / 1 gated E2E skip), and typecheck before Edge integration. -->
 - [ ] 4.2 Fast-forward the Edge and control default branches, push them without force, and record repo SHAs and source-only delivery boundaries.
