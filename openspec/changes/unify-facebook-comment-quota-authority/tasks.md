@@ -17,7 +17,8 @@
 - [x] 3.2 Run focused Cloud tests and `npm run typecheck`.
 - [x] 3.3 Run comment/risk acceptance coverage, the Cloud full test suite, and final typecheck.
   <!-- Validation: focused 134/134; acceptance 166/166; full 3822 passed, 0 failed, 11 explicit PostgreSQL-channel skips; npm run typecheck passed. No protocol, schema, retry, cooldown, or historical-backfill deviation. -->
-- [ ] 3.4 Run `openspec validate unify-facebook-comment-quota-authority --strict`, record repository SHAs and deviations, then commit and push both default branches without force.
+- [x] 3.4 Run `openspec validate unify-facebook-comment-quota-authority --strict`, record repository SHAs and deviations, then commit and push both default branches without force.
+  <!-- Cloud master 9a5613ea81516085792ed018fb4c8cecc45457e0; control main artifact commit 258fbc380d35798ff32ec9531183965de5c28833. Both were fast-forward pushes; strict validation passed; no deviations. -->
 
 ## 4. DEV delivery
 
