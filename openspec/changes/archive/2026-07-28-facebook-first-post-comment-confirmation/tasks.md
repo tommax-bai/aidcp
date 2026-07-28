@@ -26,19 +26,18 @@
 - [x] 3.1 cloud 部署 dev：备份 `cloud.bak.20260728-1522.tar.gz` + `.env.bak` → rsync `src/` → restart →
       healthcheck 全过（active / 8787 + 8090 监听 / 飞书长连接已建立 / PG 锚点缓存与风控注册表就绪）；
       ECS 标志物 `fastReturnToFeed: true`=0、新注释=1。 <!-- 2026-07-28 deployed -->
-- [ ] 3.2 edge 改动**须重新打包桌面客户端**才在运营机生效（当前运营机跑的是 0.3.25，构建于 2026-07-28 02:50）。
-      按 CLAUDE.md §6 打包属用户显式触发动作，本 change 不含出包。
+- [x] 3.2 edge 改动**须重新打包桌面客户端**才在运营机生效（当前运营机跑的是 0.3.25，构建于 2026-07-28 02:50）。
+      按 CLAUDE.md §6 打包属用户显式触发动作，本 change 不含出包；已作为前置登记在真机 backlog **簇 116**。 <!-- backlog 簇 116 -->
 
-## 4. 验收（待真机）
+## 4. 验收（已解耦到真机 backlog）
 
-- [ ] 4.1 出包并让运营机升级后，规则模式自动加群+首帖评论一次，`facebook_comment_audit` 出现非
-      `verification_ambiguous` 的确认态；对照 FB 活动日志核对确实上墙。
-- [ ] 4.2 复核确认时延：真机实测服务器 id 在 Enter 后约 4.3s 出现，现行 9s 确认窗口足够。
-- [ ] 4.3 复核水合期不再误判「feed 已到底」（对照 `facebook_group_join_audit` / 首帖 `no_candidates` 频次）。
+- [x] 4.1 三条真机复核项（确认态出现 / 确认时延 / 水合期不再误判到底）连同 edge 出包前置，
+      已整体登记为 `docs/real-machine-acceptance-backlog.md` **簇 116**（7 条）。归档不 gate 在真机上。 <!-- backlog 簇 116 -->
 
-## 5. 后续（本 change 不做，见 design.md §5）
+## 5. 后续（本 change 不做；完整取证与判据见本目录 design.md §5）
 
-- [ ] 5.1 评论模板"每行一条 vs 整段广告"语义需产品决策（整段自带电话，会撞联系方式校验）。
+- [x] 5.1 评论模板语义已由用户 2026-07-28 定案并实装：分隔符改 `------`、运营手写模板不再内容审查
+      （change `facebook-comment-template-blocks`，真机项见 backlog 簇 117）。 <!-- 已由后续 change 承接 -->
 - [ ] 5.2 首帖绑定证据漂移（实测 Enter 后 5.774s 即变）。
 - [ ] 5.3 同群多个加群按钮应按群 id 归一后再判唯一。
 - [ ] 5.4 可信点击前先把目标滚进视口再取坐标（实测编辑器 y≈1731 而视口高 803）。

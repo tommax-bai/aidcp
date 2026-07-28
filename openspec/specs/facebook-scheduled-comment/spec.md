@@ -175,6 +175,8 @@ Each Facebook account's comment configuration SHALL include a comment-body mode.
 
 Template mode MUST fail closed when the account has no valid templates; it MUST NOT silently fall back to generated mode. Generated mode MUST NOT require templates. Templates MUST be stored per account, may contain multiple entries, and SHALL be sanitized for empties/duplicates while preserving meaningful internal whitespace.
 
+**A template is a block, not a line.** Operator editors SHALL separate templates by a line containing only `------` (six or more hyphens), so a single template may span multiple lines and keep its own line breaks. The same separator SHALL be used when rendering stored templates back into the editor. Line breaks inside a block are part of that template's body and MUST NOT split it into separate templates. This applies to both the per-account template editor and the region-wide template editor.
+
 #### Scenario: Generated mode uses the composer
 - **WHEN** a Facebook account is configured for `generated` mode and a target post is opened
 - **THEN** the pipeline calls the Facebook composer with the keyword, group label, post text, and discussion sample before validating and reviewing the produced body
@@ -187,13 +189,35 @@ Template mode MUST fail closed when the account has no valid templates; it MUST 
 - **WHEN** a Facebook account is configured for `template` mode but has no valid templates
 - **THEN** the pipeline records/returns an honest no-op or compose-skipped outcome and MUST NOT fall back to generated comments
 
+#### Scenario: A multi-line block is one template
+- **WHEN** an operator enters several lines of text with no `------` separator line
+- **THEN** the editor stores exactly one template whose body keeps those line breaks
+
+#### Scenario: Separator lines split templates
+- **WHEN** an operator enters two blocks of text separated by a line containing only `------`
+- **THEN** the editor stores exactly two templates, and neither body contains the separator line
+
 ### Requirement: Template comments use the same safety and contact lanes as generated comments
 
-Template comment bodies SHALL pass the same deterministic body validators before any submit attempt: empty/low-signal, length, URL/bare-domain, contact-info text, `@mention`, spam phrase, and relevance rules where applicable. A rejected template MUST NOT be repaired and posted. Contact-info comments SHALL keep the template/generated body separate from the account contact string: the body is sent as `text`, and the contact string is injected through the existing contact-info lane after human review.
+Template comment bodies SHALL pass the **structural** deterministic validators before any submit attempt: empty, low-signal, minimum length, and maximum length. A rejected template MUST NOT be repaired and posted.
 
-#### Scenario: Template body with contact text is rejected
-- **WHEN** a template body contains a phone number, email, WeChat-like contact phrase, or similar contact text
-- **THEN** the body validator rejects it before submit, and the contact-info lane is not used to rescue that invalid body
+Template bodies SHALL NOT be subject to the **content-policy** validators (URL/bare-domain, contact-info text, `@mention`, spam phrase, relevance). Those validators exist because an unattended generated body has no human author to answer for it; a template's author is the operator, who owns its content. Applying them to operator-written campaign copy rejects legitimate material — real-machine evidence 2026-07-28: a recruitment template carrying its own phone number is rejected as `contains_contact` and never posts. The operator's decision of record (2026-07-28) is that template content is their responsibility and that a template carrying contact details alongside the account contact string is intended, not a conflict.
+
+The maximum-length validator is retained for templates because it is a physical constraint rather than a policy one: the edge types a comment character by character at human cadence inside a bounded platform step budget, so an over-long body ends as a typing-deadline failure instead of a posted comment.
+
+Contact-info comments SHALL keep the template/generated body separate from the account contact string: the body is sent as `text`, and the contact string is injected through the existing contact-info lane after human review.
+
+#### Scenario: Operator template with contact text is accepted
+- **WHEN** a template body contains a phone number or other contact text
+- **THEN** the body validator does not reject it, and the comment proceeds to the existing review and submit lanes
+
+#### Scenario: Generated body with contact text is still rejected
+- **WHEN** an unattended generated (non-template) body contains a phone number, email, WeChat-like contact phrase, bare domain, `@mention`, or spam phrase
+- **THEN** the body validator rejects it before submit, exactly as before
+
+#### Scenario: Over-long template is still rejected
+- **WHEN** a template body exceeds the platform body length limit
+- **THEN** the validator rejects it, because the edge cannot finish typing it inside the platform step budget
 
 #### Scenario: Contact template comment appends account contact info separately
 - **WHEN** a contact comment uses template mode and the account has configured contact info
@@ -290,7 +314,10 @@ Edge SHALL perform this post-navigation validation inside the existing bounded d
 - **AND** it MUST NOT reinterpret timeout or mismatch as success
 
 ### Requirement: Facebook manual comment fast return
+
 When and only when a manual single-comment task carries the explicit `--feed` switch, the Facebook Edge executor SHALL preserve all pre-submit gates and input verification, dispatch Enter to submit the comment, wait 500 milliseconds, skip the in-place acknowledgement/result-detection loop, and navigate directly to the canonical Facebook home page. The post-submit outcome MUST be `verification_ambiguous`/submitted-unconfirmed rather than confirmed success, so Cloud writes anti-retry deduplication without recording a confirmed comment or retrying the target. A Facebook comment without the switch SHALL retain the existing in-place platform-confirmation lifecycle, including confirmed, rejected, pending-approval, and ambiguous terminal distinctions.
+
+**Automatically triggered Facebook comment paths MUST NOT set the fast-return switch.** This covers scheduled comments, rule-mode join-then-contact-comment batches, coverage-mode comments, and hot-lead triggered comments — every path whose trigger is not an operator's explicit `--feed` command. An automatic path that sets the switch is structurally incapable of ever reporting a confirmed comment: it reports submitted-unconfirmed on every run, which then writes de-duplication against the target and burns it while recording no confirmed comment, no coverage cooldown, and no daily-cap consumption. Cloud SHALL therefore pass the switch only from the manual command surface that parsed `--feed`.
 
 #### Scenario: Facebook fast return after Enter dispatch
 - **WHEN** a manual `/comment <nickname> --feed` Facebook task passes all gates and Enter is dispatched in the target post editor
@@ -299,6 +326,10 @@ When and only when a manual single-comment task carries the explicit `--feed` sw
 #### Scenario: Facebook default path retains lifecycle evidence
 - **WHEN** a Facebook comment task does not carry the explicit manual `--feed` switch
 - **THEN** Edge MUST keep the existing in-place acknowledgement loop and preserve its confirmed, rejected, pending-approval, and ambiguous outcomes
+
+#### Scenario: Rule-mode join-then-comment keeps the confirmation lifecycle
+- **WHEN** the Facebook rule-mode batch triggers a join-then-contact-comment task without any operator `--feed` switch
+- **THEN** Cloud MUST NOT request fast return, and the task's outcome reflects the real in-place lifecycle (confirmed / rejected / pending-approval / ambiguous) rather than a fixed submitted-unconfirmed result
 
 ### Requirement: Facebook scheduled comments are authorized by scoped product controls and fail closed
 
