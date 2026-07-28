@@ -43,8 +43,8 @@ Runtime resolution SHALL read the configuration of the environment that currentl
 Rule collecting progress, unique-view dedupe facts and batch terminal states SHALL continue to be persisted and deduplicated per account, execution target and rule definition version. They MUST NOT be migrated to, mirrored onto, or resolved through the environment key. When an environment's bound account changes, the new account SHALL start collecting from zero and SHALL NOT inherit the previous account's visited-content set or in-flight batch.
 
 #### Scenario: New account starts from zero after rebinding
-- **WHEN** an environment with rule mode enabled rebinds from account A at `7/10` to account B
-- **THEN** account B begins at `0/10` with an empty visited-content set and MUST NOT skip content solely because account A had already viewed it
+- **WHEN** an environment with rule mode enabled rebinds from account A part-way through a collecting round to account B
+- **THEN** account B begins at zero collected reads with an empty visited-content set and MUST NOT skip content solely because account A had already viewed it
 
 #### Scenario: In-flight batch does not survive rebinding
 - **WHEN** account A has an open rule batch at the moment its environment rebinds to account B
