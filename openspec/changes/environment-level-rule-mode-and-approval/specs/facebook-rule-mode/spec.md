@@ -2,7 +2,9 @@
 
 ### Requirement: Facebook rule mode is an explicit account-scoped fixed definition
 
-The system SHALL provide a Facebook-only rule mode with the fixed versioned definition `facebook_browse_10_like_1_join_contact_1@1`, persisted with the **environment** as its authoritative key. The only v1 operator choice SHALL be enabled or disabled; operators MUST NOT supply scripts, prompts, thresholds, action lists or other free-form execution logic. Missing configuration SHALL mean disabled. Writes MUST validate the target environment's authoritative normalized platform, persist atomically with audit fields and return server readback; unsupported, unknown or non-Facebook environments MUST be rejected without a partial write. Configuration MUST be writable and readable for an environment that currently has no bound account.
+The system SHALL provide a Facebook-only rule mode with the fixed versioned definition `facebook_browse_5_like_1_join_contact_every_2@2`, expressing a two-tier cadence: every five durable unique confirmed reads open one rule round that attempts one like, and every second round additionally attempts one join-contact. It SHALL be persisted with the **environment** as its authoritative key. The only operator choice SHALL be enabled or disabled; operators MUST NOT supply scripts, prompts, thresholds, cadence numbers, action lists or other free-form execution logic. Missing configuration SHALL mean disabled. Writes MUST validate the target environment's authoritative normalized platform, persist atomically with audit fields and return server readback; unsupported, unknown or non-Facebook environments MUST be rejected without a partial write. Configuration MUST be writable and readable for an environment that currently has no bound account.
+
+Configuration readback SHALL report the definition identity persisted in the authoritative row. Cloud MUST NOT substitute the compiled-in definition constants for a stored row whose definition identity differs; a mismatch SHALL be surfaced as a named projection problem rather than silently rendered as the current definition.
 
 Runtime resolution SHALL read the configuration of the environment that currently binds the executing account. When that reverse resolution yields no unique environment — binding unknown, binding conflict, cross-customer contention or an unreadable environment registry — the system MUST fail closed to "rule mode not enabled" with a named blocker and MUST NOT infer enablement from any account-keyed legacy value.
 
@@ -17,6 +19,10 @@ Runtime resolution SHALL read the configuration of the environment that currentl
 #### Scenario: Missing configuration is safely off
 - **WHEN** a Facebook environment has no rule-mode configuration row
 - **THEN** reads report rule mode disabled and MUST NOT create a row or start rule execution
+
+#### Scenario: Stored definition mismatch is not disguised as the current definition
+- **WHEN** a stored rule configuration row carries a definition identity other than the current one
+- **THEN** readback names the mismatch and MUST NOT report that row as configured for the current definition
 
 #### Scenario: Unbound environment can be preconfigured
 - **WHEN** an owner enables rule mode for an owned Facebook environment that has no bound account yet

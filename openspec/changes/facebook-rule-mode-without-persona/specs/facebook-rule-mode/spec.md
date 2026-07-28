@@ -10,7 +10,7 @@ For an account admitted to Facebook rule mode, Cloud SHALL select structurally e
 
 #### Scenario: Mandatory persona rule does not redirect selection
 - **WHEN** a bound Soul contains a `mandatory_interactions` rule and rule mode is active
-- **THEN** that rule does not prioritize a card, create an interaction intent or alter the fixed ten-view cadence
+- **THEN** that rule does not prioritize a card, create an interaction intent or alter the fixed rule cadence
 
 #### Scenario: Safety rejection still blocks a card
 - **WHEN** a structurally visible card fails the Soul-free prohibited-content or page-identity safety gate
