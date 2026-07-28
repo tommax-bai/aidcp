@@ -2691,3 +2691,28 @@ cloud master `7b316ce` 已部署 dev。**建议与簇 112 同一次真机 sessio
   MUST 仍被拒——本次只放开运营手写模板这一条车道。
 - [ ] 117.6 **（长度余量）** 记录当前模板字数与打字耗时。上限 500 字是物理约束（拟人逐字输入 + 有界步预算），
   若运营要更长的素材，MUST 先改节奏或步预算，不能只改上限。
+
+## 簇 118 — Facebook 常规滚动的零卡终态：读不出内容时别再原地空转
+
+> change `restore-native-facebook-feed-scroll-continuation`（2026-07-28，edge `a7f9edc` 已合 master）。
+> 线上事故：dev 上两个账号 20:20–20:37 只滚不读，每次滚动回 `no_target`、间隔恒 4 分 15 秒
+> （= 云端闲置看门狗 240s）。根因是常规滚动丢了启动首扫那条「物理卡在场 → present_unreportable /
+> 空态确认 → empty」的证据阶梯，裸报的 `no_target` 在云端没有归宿。
+> **本 change 只改 Rust 引擎，必须重打边缘客户端包才在运营机上生效**；仅 push 不改变现场行为。
+
+- [ ] 118.1 **（不再原地空转）** 取一个首页读不出可上报卡的账号：一次滚动命令内 MUST 产出
+  `present_unreportable` 或 `empty`，云端 MUST 在同一分钟内授权切 Reels，
+  MUST NOT 再出现「每 4 分钟一次滚动、每次 no_target」的空转序列。
+- [ ] 118.2 **（懒加载真的有时间出批）** 采样一次滚动命令的执行时长与轮次：零卡视口 MUST 等满
+  单轮 settle 预算（3.5s）而非约 0.5s 就返回；若八轮 × 3.5s 仍不足以让 Facebook 懒加载出一批，
+  MUST 改用「连续 N 轮无增长」而非单纯抬预算，并回写 change 的 design.md D3。
+- [ ] 118.3 **（正常路径没有变慢）** 有可上报卡时 MUST 仍在判稳后立即早退，
+  单次滚动耗时 MUST NOT 因本 change 明显上升。
+- [ ] 118.4 **（诚实失败没有被放宽）** 构造 loading / 登录 / 验证码 / 同意浮层 / 非首页 / 无物理卡
+  六种情形：MUST 仍走原有诚实失败，MUST NOT 借 present-but-unreportable 通道切 Reels。
+- [ ] 118.5 **（首扫收紧无回归）** 本 change 把启动首扫的准入从「只看有无物理卡」收紧为
+  「首页 + 不 loading + 有物理卡 + 探测自判不可上报」。观察启动阶段 MUST NOT 出现
+  「首扫本该报 present_unreportable 却退回 no_target」的新失败。
+- [ ] 118.6 **（切 Reels 的频率）** 记录 `present_unreportable` 的实际上报频率与 Reels 切换次数：
+  云端已按 startup/generation 幂等去重，但真实频率未测；若账号频繁掉进 Reels，
+  须回头看是首页解析能力问题而非兜底问题。
