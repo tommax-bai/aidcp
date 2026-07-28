@@ -2,18 +2,18 @@
 
 ## 1. aidcp-edge — 表征当前退化（失败优先）
 
-- [ ] 1.1 新建 `test/native-page-engine/xhs-behavior-parity.test.ts`，加一条失败用例：带联系方式串码的评论命令，断言提交进编辑器的文本同时含正文与串码（当前实现只含正文，必失败）（参照 src/browse/browse-session.ts:2543-2553；串码须单独整段插入绕开 @/# 补全 — 见 oracle.md ②）
-- [ ] 1.2 加失败用例：开帖后页面处于「笔记暂时无法浏览」错误页且地址仍含笔记 id，断言返回非成功且不产出 `note_detail` 输出（参照 src/browse/browse-session.ts:1876-2036；缺错误页否决/正面详情证据/令牌门控 — 见 oracle.md ①）
-- [ ] 1.3 加失败用例：详情容器存在但标题、正文、图片三项皆空，断言返回 ambiguous 而非确认详情（参照 src/browse/browse-session.ts:2067-2110 正文渲染门 + note-extractor.ts:283-292；缺渲染门与选择器排除 — 见 oracle.md ①）
-- [ ] 1.4 加失败用例：看图命令断言输出为动作回执且回执带实际前进张数；无轮播时断言 `no_target` 回执（参照 src/browse/browse-session.ts:2797-2844；旧回执即 no_target / browsed=N — 见 oracle.md ⑤）
-- [ ] 1.5 加失败用例：翻页控件在第一次前进后被替换，断言回执张数等于实际观察到的前进次数、不等于请求张数（参照 同上 2807-2844；旧实现循环内重解析控件、点不动即 break，但**无图序前进校验**需新写 — 见 oracle.md ⑤）
-- [ ] 1.6 加失败用例：返回列表后落在非列表面，断言动作回执 `ok=false`（参照 src/browse/browse-session.ts:2735-2795；⚠ 旧回执 :2794 恒真、不可照抄 — 见 oracle.md ④）
-- [ ] 1.7 加失败用例：页面同时存在互动条内具名点赞控件、聚合赞数控件、含「取消赞」文本的反向控件，断言只解析到互动条内的那一个；互动条缺失时断言 `control_not_found`（参照 src/browse/browse-session.ts:2298-2360 + flows/anchors.ts:46-64；互动栏无 aria/无文本，唯一锚点是语义 class — 见 oracle.md ⑥a/⑥b）
-- [ ] 1.8 加失败用例：控件在首次采样之后、有界窗口之内才翻转，断言判成功；全程不翻转断言 ambiguous `state_unchanged`，且控件文本含「已」不得提成成功（参照 同上 2339-2341；真机翻转 300–600ms、上限 1500ms — 见 oracle.md ⑥a）
-- [ ] 1.9 加失败用例：通知列表同时含头像行、裸列表项与真实通知行，断言只产出真实通知行；同一发送者的多条通知断言 itemKey 互不相同或为空；无正文容器时断言正文为空串且不回落整行文本（参照 src/browse/notification-monitor.ts:148/163-164/169；行容器两级、正文缺失发空串、itemKey 排除主页链 — 见 oracle.md 通知三条）
-- [ ] 1.10 加失败用例：滚动评论区后评论区位置未变，断言动作回执 `ok=false`；另一例断言回执里的评论条数等于滚动后页面上实际可见的条数、不等于请求的步数（当前实现恒 `ok:true` 且直接回报请求值，两例必失败）（参照 src/browse/browse-session.ts:2797-2844 同族 scrolled=N / no_scroll 回执 — 见 oracle.md ⑤）
-- [ ] 1.11 加失败用例：看图翻页过程中新加载出的图片，断言仍随本次命令到达云端（不因终局改成动作回执而丢掉图片证据）；同时断言本次命令只有一个终局（参照 src/browse/browse-session.ts:1284-1311 refreshOnly 快照；旧规则=抽不到图不发、失败不伪造快照 — 见 oracle.md ⑤）
-- [ ] 1.12 修 `test/native-page-engine/router-contract.test.ts:37-39` 的夹具：不再在 `HTMLElement.prototype` 上全局钉死 `getBoundingClientRect`（当前返回固定 100×40，使 `xhs-command-router.js:7-12` 的宽高判定恒真），改为按用例给定几何，使可见性判断在测试里可真伪两态；修完重跑既有小红书路由用例并记录因此暴露的既有失败。**只改小红书那份契约测试，`facebook-router-contract.test.ts` 的同款夹具属 Facebook 平价 change，不动**（参照 oracle.md ⑥a 末条：router-contract.test.ts:34-36 钉死几何使 :84 那条互动用例无保护力）
+- [x] 1.1 新建 `test/native-page-engine/xhs-behavior-parity.test.ts`，加一条失败用例：带联系方式串码的评论命令，断言提交进编辑器的文本同时含正文与串码（当前实现只含正文，必失败）（参照 src/browse/browse-session.ts:2543-2553；串码须单独整段插入绕开 @/# 补全 — 见 oracle.md ②） <!-- aidcp-edge 552eda1 已由 2.1 转绿 -->
+- [x] 1.2 加失败用例：开帖后页面处于「笔记暂时无法浏览」错误页且地址仍含笔记 id，断言返回非成功且不产出 `note_detail` 输出（参照 src/browse/browse-session.ts:1876-2036；缺错误页否决/正面详情证据/令牌门控 — 见 oracle.md ①） <!-- aidcp-edge 552eda1 幂等早退与点击后两条路径各一例；已由 2.2 转绿 -->
+- [x] 1.3 加失败用例：详情容器存在但标题、正文、图片三项皆空，断言返回 ambiguous 而非确认详情（参照 src/browse/browse-session.ts:2067-2110 正文渲染门 + note-extractor.ts:283-292；缺渲染门与选择器排除 — 见 oracle.md ①） <!-- aidcp-edge 552eda1 已由 2.2 转绿 -->
+- [x] 1.4 加失败用例：看图命令断言输出为动作回执且回执带实际前进张数；无轮播时断言 `no_target` 回执（参照 src/browse/browse-session.ts:2797-2844；旧回执即 no_target / browsed=N — 见 oracle.md ⑤） <!-- aidcp-edge 552eda1 两例仍红，待 2.3 -->
+- [x] 1.5 加失败用例：翻页控件在第一次前进后被替换，断言回执张数等于实际观察到的前进次数、不等于请求张数（参照 同上 2807-2844；旧实现循环内重解析控件、点不动即 break，但**无图序前进校验**需新写 — 见 oracle.md ⑤） <!-- aidcp-edge 552eda1 仍红，待 2.3 -->
+- [x] 1.6 加失败用例：返回列表后落在非列表面，断言动作回执 `ok=false`（参照 src/browse/browse-session.ts:2735-2795；⚠ 旧回执 :2794 恒真、不可照抄 — 见 oracle.md ④） <!-- aidcp-edge 552eda1 仍红，待 2.4 -->
+- [x] 1.7 加失败用例：页面同时存在互动条内具名点赞控件、聚合赞数控件、含「取消赞」文本的反向控件，断言只解析到互动条内的那一个；互动条缺失时断言 `control_not_found`（参照 src/browse/browse-session.ts:2298-2360 + flows/anchors.ts:46-64；互动栏无 aria/无文本，唯一锚点是语义 class — 见 oracle.md ⑥a/⑥b） <!-- aidcp-edge 552eda1 两例仍红，待 2.5 -->
+- [x] 1.8 加失败用例：控件在首次采样之后、有界窗口之内才翻转，断言判成功；全程不翻转断言 ambiguous `state_unchanged`，且控件文本含「已」不得提成成功（参照 同上 2339-2341；真机翻转 300–600ms、上限 1500ms — 见 oracle.md ⑥a） <!-- aidcp-edge 552eda1 三例仍红，待 2.6 -->
+- [x] 1.9 加失败用例：通知列表同时含头像行、裸列表项与真实通知行，断言只产出真实通知行；同一发送者的多条通知断言 itemKey 互不相同或为空；无正文容器时断言正文为空串且不回落整行文本（参照 src/browse/notification-monitor.ts:148/163-164/169；行容器两级、正文缺失发空串、itemKey 排除主页链 — 见 oracle.md 通知三条） <!-- aidcp-edge 552eda1 三例仍红，待 2.7 -->
+- [x] 1.10 加失败用例：滚动评论区后评论区位置未变，断言动作回执 `ok=false`；另一例断言回执里的评论条数等于滚动后页面上实际可见的条数、不等于请求的步数（当前实现恒 `ok:true` 且直接回报请求值，两例必失败）（参照 src/browse/browse-session.ts:2797-2844 同族 scrolled=N / no_scroll 回执 — 见 oracle.md ⑤） <!-- aidcp-edge 552eda1 两例仍红，待 2.4a -->
+- [x] 1.11 加失败用例：看图翻页过程中新加载出的图片，断言仍随本次命令到达云端（不因终局改成动作回执而丢掉图片证据）；同时断言本次命令只有一个终局（参照 src/browse/browse-session.ts:1284-1311 refreshOnly 快照；旧规则=抽不到图不发、失败不伪造快照 — 见 oracle.md ⑤） <!-- aidcp-edge 552eda1 仍红，待 2.3a -->
+- [x] 1.12 修 `test/native-page-engine/router-contract.test.ts:37-39` 的夹具：不再在 `HTMLElement.prototype` 上全局钉死 `getBoundingClientRect`（当前返回固定 100×40，使 `xhs-command-router.js:7-12` 的宽高判定恒真），改为按用例给定几何，使可见性判断在测试里可真伪两态；修完重跑既有小红书路由用例并记录因此暴露的既有失败。**只改小红书那份契约测试，`facebook-router-contract.test.ts` 的同款夹具属 Facebook 平价 change，不动**（参照 oracle.md ⑥a 末条：router-contract.test.ts:34-36 钉死几何使 :84 那条互动用例无保护力） <!-- aidcp-edge 552eda1 几何改按元素给定（新增 test/native-page-engine/xhs-dom-fixture.ts）；facebook-router-contract.test.ts 未动；重跑既有小红书路由用例 7/7 全过，夹具修正未暴露任何既有失败 -->
 
 - [ ] 1.13 加失败用例：页面规则层的未读角标读数——宽 / 窄双布局 DOM 同时存在隐藏侧栏入口与可见底部入口时断言取可见那个；角标容器里只有常驻图标与空槽时断言「无未读」；数字角标断言「有未读」且计数带出；无数字红点断言「有未读」计数 0；读不到入口时断言返回「读不到」而非「无未读」（当前 Native 无任何未读读数，全部必失败）（参照 `317cd47^:src/browse/notification-monitor.ts:17-91`；判据为 2026-06-23 真机校准、须按 5.8 复核 — 见 oracle.md 未读监测体条）
 - [ ] 1.14 加失败用例：「赞和收藏」「新增关注」两类命令断言产出动作回执，动作名与云端角色等待的规范名一致（`browse_notification_likes` / `browse_notification_follows`，见 `aidcp-cloud/src/agents/notification-like-browser.ts:36`、`notification-follow-browser.ts:35`）；分类栏未命中时断言 `ok=false` + `no_target`；发送者抽取失败时断言清零回执仍产出（当前只上报 `notification.items`、不产回执，必失败）（参照 `317cd47^:src/browse/browse-session.ts:3161-3173/3195-3210` — 见 oracle.md「看一眼」条）
@@ -22,11 +22,14 @@
 - [ ] 1.17 加失败用例：页面只存在含「赞」「关注」字样的非分类栏元素（笔记卡片 / 侧栏项 / 包裹容器）时，断言分类栏点击诚实回未命中，不得点到包裹容器、也不得按类名激活态猜成成功（参照 `317cd47^:src/browse/browse-session.ts:3112-3114/3166-3167` 的叶子 tab + 严格文本判据 — 见 oracle.md 分类栏点击条）
 - [ ] 1.18 加失败用例：通知项正文第 200 个 code point 落在 emoji 上时，断言截断不劈裂代理对且补省略号（当前 `xhs-command-router.js:6` 按 UTF-16 `slice`，必失败）（参照 `317cd47^:src/browse/notification-monitor.ts:146` 的 `Array.from` 截断 — 见 oracle.md 截断条）
 - [ ] 1.19 加失败用例：断言通知列表与通知首页上报里不含页面规则自造的墙钟批次序号（现为 `xhs-command-router.js:134/139` 的 `epoch:Date.now()`）；该字段在协议里是可选（`src/comm/protocol.ts:1782/1790`），去掉不动协议（参照 oracle.md epoch 条：批次序号唯一来源是未读「无→有」翻转，本 change 只禁自造）
+  - 进度说明（2026-07-28）：1.13–1.19 对应的失败优先用例已由**并行 session** 写在 `test/native-page-engine/xhs-notification-parity.test.ts`（13 例 / 11 红），但该文件在 worktree `native-migration-repair` 里**仍是未追踪状态、未进任何提交**，故本轮不勾选、也未代为提交（避免捕获他人在写的中间态）。集成前须由其属主提交，否则 1.13–1.19 的覆盖会随分支合并静默丢失。
 
 ## 2. aidcp-edge — 恢复动作诚实（两条 critical 优先）
 
-- [ ] 2.1 在小红书评论路径合成「正文 + 联系方式串码」的完整提交文本，提交前回读校验覆盖合成后的完整文本；回读不含串码即在提交前返回 not_started，不派发提交（参照 src/browse/browse-session.ts:2450-2648；缺清场闸/串码整段插入/提交三态 — 见 oracle.md ②）
-- [ ] 2.2 把开帖成功判据改为正面详情证据（详情容器 + 标题/正文/图片至少一项非空），错误页语义命中即诚实失败；未确认打开一律不产出 `note_detail` 输出。**两个判据点都要改**：点击后的那处（`xhs-command-router.js:194`）与「已在详情页」的快速返回处（`:188`，当前地址里有目标 id 就直接回详情、连点击都不发）（参照 src/browse/browse-session.ts:1876-2036 + probe.rs:158 的 PageKind::Error；⚠「必落 404」未在 Native 复核，见 oracle.md ①）
+- [x] 2.1 在小红书评论路径合成「正文 + 联系方式串码」的完整提交文本，提交前回读校验覆盖合成后的完整文本；回读不含串码即在提交前返回 not_started，不派发提交（参照 src/browse/browse-session.ts:2450-2648；缺清场闸/串码整段插入/提交三态 — 见 oracle.md ②） <!-- aidcp-edge 8b99183 只改 native/page-engine/src/xhs-command-router.js；加清场闸 editor_not_clean、正文空 comment_text_empty、串码缺失 comment_contact_code_missing、未派发 comment_submit_not_actuated 四个诚实终局 -->
+  - 偏离说明（2026-07-28）：① 提交后未确认的 reason 由 `comment_submit_unconfirmed` 改回退役实现的 `submitted_unconfirmed` —— 云端 `aidcp-cloud/src/comment-agent/edge-steps.ts:357` **精确匹配**该串才归「已提交、结果未知」并写去重，串不上会归 `not_dispatched` 触发上游重投 ⇒ 重复评论。② **逐字输入原语未接线**：`native/page-engine/src/input.rs:67/76` 的 `type_text_humanized*` 是 CDP 层原语，只能从 Rust 平台语义臂调用，而 `interaction_comment` 落在 `engine.rs:708` 的 `_ => evaluate_router`（整条命令在注入的页面 JS 里跑完）。接线需把整条评论路径重写进 Rust，属拟人化 change 范围，且 `engine.rs` 与同批 `restore-native-xiaohongshu-session-guards` 共写（design D6）。本轮只在页面规则层做合成，段界（正文一段 / 串码一段）已保留，将来换成「正文逐字 + 串码整段插入」是 drop-in。附带结论：现整段写值**不触发** @/# 补全劫持（劫持只由逐字派发触发）。③ 折叠态入口激活（oracle ②-5）未做，不在 2.1 任务面内，真机确认后需单开。
+- [x] 2.2 把开帖成功判据改为正面详情证据（详情容器 + 标题/正文/图片至少一项非空），错误页语义命中即诚实失败；未确认打开一律不产出 `note_detail` 输出。**两个判据点都要改**：点击后的那处（`xhs-command-router.js:194`）与「已在详情页」的快速返回处（`:188`，当前地址里有目标 id 就直接回详情、连点击都不发）（参照 src/browse/browse-session.ts:1876-2036 + probe.rs:158 的 PageKind::Error；⚠「必落 404」未在 Native 复核，见 oracle.md ①） <!-- aidcp-edge 8b99183 两个判据点都改；新增 confirmedDetail() / noteUnavailable()；按 oracle ① 第三层加令牌门控（地址无 xsec_token= 则详情 url 诚实置空） -->
+  - 偏离说明（2026-07-28）：① 按 oracle ① 的 caveat **只实装可无条件成立的三层**（正面详情证据 / 错误页否决 / 令牌门控），开帖执行方式（页内点击 vs 可信指针输入）**刻意未动**，等真机项 5.1 结论。② 幂等早退触发条件收窄为「命令带 noteId 且地址 id 等于它」，行为差异只在「命令未带 noteId + 地址是某条笔记详情 + 页面无详情容器」这一种组合（原来直接回详情，现在落点击路径）—— 收窄是为避免「已在目标笔记但拿不到证据」时掉进点击路径点开邻座笔记；云端现役 open_note 恒带 noteId（`aidcp-cloud/src/orchestrator/role-dispatcher.ts:3278-3288`），该组合在闭环上不出现。③ 令牌门控不在本行字面里，但在 oracle ① 的「可无条件实装的三层」内且退役实现有逐字对应物（`src/browse/browse-session.ts:1994`），它同时作用于 `note_open` 与 `note_browse_images` 的详情输出。④ 给 2.3a 的耦合提醒：`detail()` 的 `url` 现在无令牌时是 `undefined`，`NoteDetail.url` 是 `#[serde(default)] Option<String>`、Rust 解析无碍，但 2.3a 断言随行详情时**别把 url 当必填**。
 - [ ] 2.3 看图命令改为返回动作回执：每步重新解析翻页控件、校验图序真前进、按实际前进张数回报；无轮播回 `no_target`；不再以 `refreshOnly` 详情充当终局（参照 src/browse/browse-session.ts:2797-2844；缺 total 探测/viewed 计数/循环内重解析 — 见 oracle.md ⑤）
 - [ ] 2.3a 安排看图过程中新图片的去处（先定机制再改判据）：一条命令只能回一个输出（`evaluate_router` 返回单个 `(EffectPhase, CommandOutput)`，宿主按 `kind` 走互斥分支），而当前那条 `refreshOnly` 详情是云端参考图刷新（`aidcp-cloud/src/agents/curated-note-evaluator.ts:114-118`）与灵感 / 观测笔记 `referenceImages` 更新（`aidcp-cloud/src/server.ts:4914`）的唯一来源。二选一并在此记录所选：① 回执携带本次观察到的图片；② 宿主在收到回执后补一次详情读取。**验收判据：改完后跑一遍云端参考图刷新的既有用例仍绿，且新图片确实到达云端**；不得只改回执把图片证据静默丢掉（参照 src/browse/browse-session.ts:1284-1311：旧实现是回执与 refreshOnly 快照两条出口并存 — 见 oracle.md ⑤）
   - 决策记录（2026-07-28，实读云端后定）：**选 ①「回执携带观测」**，但携带的是**完整详情快照**而非裸图片数组，且不加宽 `ActionReceipt`，改用新的单一输出 kind `action_receipt_with_observation`。
@@ -70,9 +73,13 @@
 ## 4. aidcp-edge — 验证（代码级）
 
 - [ ] 4.1 运行 `npm run test:acceptance`，记录安全红线用例（协议不漂移 / 未授权不发布 / 风控不自残）全过
+  - 阶段性记录（2026-07-28，2.1 / 2.2 落地后跑；本条为 change 收口门，余下 slice 落地后须重跑，故不勾选）：`npm run test:acceptance` **30 / 30 全过、0 失败**（1 条 gated 跳过 = AC-E2E 真机联调，需 `AIDCP_E2E=1`）。安全红线三族全过：AC-PROTO-01～20b（协议版本 2、消息类型 94、两端不漂移）、AC-PUB-01～07（未授权绝不静默发布）、风控不自残族在 edge 侧无用例（属 cloud）。
 - [ ] 4.2 运行全量 `npm test` 与 `npm run typecheck`，记录通过数与因夹具修正（1.12）新暴露的既有失败
+  - 阶段性记录（2026-07-28，同上不勾选）：`npm test` **2583 例 / 2556 绿 / 26 红 / 1 跳过**；`npm run typecheck` **通过**。26 条红**全部**是失败优先的表征用例、按设计留红等后续 slice：`xhs-behavior-parity.test.ts` 15 条（1.4→2.3、1.5→2.3、1.6→2.4、1.7→2.5、1.8→2.6、1.9→2.7、1.10→2.4a、1.11→2.3a）+ `xhs-notification-parity.test.ts` 11 条（1.13–1.19，并行 session 的未追踪文件）。**本轮零新增失败**：上一阶段基线 30 红 → 现 26 红，净转绿 4 条正是 1.1 + 1.2（两条）+ 1.3。**夹具修正（1.12）未暴露任何既有失败**：`router-contract.test.ts` 单跑 7 / 7 全过。
 - [ ] 4.3 运行 Rust 侧 `cargo test` 与 `cargo fmt --check`，记录通过数
+  - 阶段性记录（2026-07-28，同上不勾选）：`cargo test` **138 通过 / 0 失败**（单元 100 + 集成 34 + 2 + 1 + 1，doc-test 0）；`cargo fmt --check` **干净、退出码 0**。本轮 **Rust 零改动**，仅 `build.rs` 重新嵌入改后的页面规则 JS。⚠ 上一阶段首跑时 `facebook::publish::tests::submit_does_not_confirm_when_the_submitted_probe_crosses_the_deadline` 红过一次、单跑与复跑全绿，判为并发负载下的 deadline 计时 flaky，与本 change 无关；本轮复跑未复现。
 - [ ] 4.4 明确记录本次**未做**的门：未打安装包、未部署、未替换运行中的桌面客户端、未做任何真机写动作
+  - 阶段性记录（2026-07-28，change 未收口故不勾选）：本轮**未打安装包、未部署（dev / ol 都没碰）、未替换运行中的桌面客户端、未做任何真机写动作**。另未碰：Rust 源码（无新输出 kind）、宿主 `src/native-page-engine/browse-session.ts`（属 session-guards 单写区）、云端仓、协议四处同步文件、`openspec/specs/`。分支 `native-migration-repair` 已推 origin（`552eda1` / `8b99183`），**未合入 master**。
 
 - [ ] 4.5 登记「未读监测体的宿主周期装配与未读信号发送方（含单调翻转批次序号的持有位置）」为本 change 范围外项，已在 design.md「覆盖漏洞的范围外交接」具名交接给 `restore-native-xiaohongshu-session-guards`（其 1.2 周期探针按平台分类适配、6.1 恒假装配块逐条对账、6.4 退役监测体去留结论）。登记时须写明：`src/browse/notification-monitor.ts` 在 `src/` 里只被恒假块引用，按 6.4 的三分类会落进「仅恒假块引用」，**若按孤儿删除则本 change 的通知类修复永久不通电**——该项要的是恢复而不是清理
 - [ ] 4.6 通电对账（承接方不落地即不算修好）：确认小红书未读信号在运行路径上确有发送方——当前边缘全仓仅协议定义（`src/comm/protocol.ts:110/1965`）与验收测试出现 `notification.detected`，而云端整条巡视链的唯一触发源就是它（`aidcp-cloud/src/agents/notification-gatekeeper.ts:48`、`src/orchestrator/role-dispatcher.ts:2062`）。未落地则在此记录为阻断依赖，并明确写下「通知抽取 / 清零 / 计数类修复已实装但生产未通电」，**不得按已生效结案**
@@ -94,6 +101,7 @@
 ## 6. 控制仓收口
 
 - [ ] 6.1 运行 `openspec validate restore-native-xiaohongshu-action-honesty --strict`，记录输出
+  - 阶段性记录（2026-07-28，change 未收口故不勾选）：输出 `Change 'restore-native-xiaohongshu-action-honesty' is valid`，退出码 0。
 - [ ] 6.2 运行 `openspec show restore-native-xiaohongshu-action-honesty` 自查能力与要求条数
 - [ ] 6.3 与同批 `restore-native-xiaohongshu-session-guards` 对账集成顺序：两者共写 `native/page-engine/src/engine.rs` 的小红书执行入口与 `test/native-page-engine/` 目录。集成前 `git fetch` + rebase 到最新 `master`，跑 `cargo test` 与 `npm test` 后再合；并核对该 change 的「小红书评论提交须开提交窗口」与本 change 的「评论提交合成完整文本」两条同时生效（窗口在外、写入在内），后落地的一方在此记录核对结果（参照 oracle.md 提交窗口条：xhs 四处窗口预算在 317cd47^ 已逐处坐实，勿照抄 Facebook 值）
 - [ ] 6.4 在本清单回写 Edge 与控制仓的 commit sha、偏离说明，以及与并行 change 的重叠文件（Facebook 路由 / 微信适配器 / 协议四处同步文件本 change 不碰）
