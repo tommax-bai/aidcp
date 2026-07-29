@@ -60,5 +60,7 @@
   ff-only main push. Cloud changed comments/tests only, so no runtime deploy.
   Edge source is landed, but installed clients remain unchanged: no package,
   signing, installer, or release was performed. -->
-- [ ] 4.3 Archive the completed OpenSpec change and run strict validation of
+- [x] 4.3 Archive the completed OpenSpec change and run strict validation of
   the synchronized baseline.
+  <!-- All artifacts/tasks complete; archive sync applies the Cloud-authority
+  delta to the browser-cold-standby baseline, followed by strict validation. -->
