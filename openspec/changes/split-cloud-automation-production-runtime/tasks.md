@@ -129,12 +129,14 @@
 - [x] 0.5d 修「假消边」残留：`curated-note-evaluator.ts` 与 `text-card-transcriber.ts` 的类型 import
   改指 `../kernel/curated-content-types.js`，不再经 `../cache/curated-content-store.js` 的再导出壳。
   <!-- aidcp-cloud fbb66e7 + 1d31c30。 -->
-- [ ] 0.5e **可选实参未升级成编译期错误（取舍已知情，待裁）**：
-  `CuratedNoteEvaluatorOptions.textCardTranscriber` 仍是可选（类型放宽成 实现 | 能力态）。
-  省略它**不再等于沉默**（结算成 unavailable + 具名日志），但也**不是编译红**。
-  要升级需同批改三个今天直接传裸实现的测试文件
-  （`test/agents/curated-note-evaluator.test.ts` / `test/role-prompt-persona-segments.test.ts` /
-  `test/helpers/role-factories.ts`）。
+- [x] 0.5e **可选实参已升级成编译期错误**。
+  <!-- aidcp-cloud b50fec1。`textCardTranscriber` 由可选改必填（类型仍是 实现 | 能力态），
+       省略即**编译红**，不再是要靠人看见的运行期日志。
+       **之所以负担得起**：单体里转写器是无条件构造 + 无条件注入的，
+       没有任何合法调用方会省略它——代价只是三个测试构造点，其中两个是编译器替我找出来的。
+       不接该能力仍允许，但必须明说 `{state:'unavailable', reason}`。
+       运行期兜底（对 undefined 判 not_injected）保留不动：它守的是绕过类型的调用方，
+       不是给 TS 侧留后门。相关 27 个测试全过。 -->
 - [x] 0.5f **测试侧工厂镜像已与生产对齐**。
   <!-- aidcp-cloud 0dcd0eb。漂移方向是**测试比生产宽松**：省略字段正是让「依赖没接上」
        读起来跟「旗标关掉了」一模一样的那个写法，所以拆仓引入的漏传在测试里会照样绿。
