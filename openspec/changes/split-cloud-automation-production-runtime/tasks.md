@@ -38,12 +38,14 @@
        **原任务描述有一半是错的**：所谓「删解构而真实调用还在 → 静默放行（假阴）」机械上不会发生，
        containsIdentifier() 遍历整个 scope 匹配任意同名标识符，真实调用点照样命中。
        真正成立的只有假阳那一半。记下来免得后来人照着错的失败模式设计判据。 -->
-- [ ] 0.3c1 **同类弱探针还有 10 处**（本轮按不擅自扩大范围未动，逐条已登记）：
-  segC 被 3900 那行大解构覆盖的还有 `mirrorVersionStore` / `accountStore` /
-  `CONTENT_ROLE_FACTORIES` / `llm` / `tokenUsageStore` 五条；
-  **segD 有一模一样的问题**——`src/server.ts:7788` 也是一整行大解构，
-  `curatedContentStore` / `facebookPublishMediaStore` / `draftRefinementStore` / `llm` /
-  `tokenUsageStore` 五条同病。统一切到 `identifier-use` 是纯机械改动（改 kind + 跑一次 refresh-ledger）。
+- [x] 0.3c1 **同类弱探针九条已补齐**（原记 10 条，其中一条是误记）。
+  <!-- aidcp-cloud abdadae。segD 五条（curatedContentStore / facebookPublishMediaStore /
+       draftRefinementStore / llm / tokenUsageStore——segD 开头 src/server.ts:7794 确实是与 segC
+       一模一样的大解构）+ segC 四条（mirrorVersionStore / accountStore / llm / tokenUsageStore）。
+       **`CONTENT_ROLE_FACTORIES` 不在此列，上一轮把它列进去是错的**：它是模块级 import，
+       在 segC body 内零声明绑定、唯一出现就是真实取用，换 kind 只是同一条探针换个更长的名字。
+       结论已就地写进注释钉住。变异实测两个方向各一轮，改后 src/server.ts 经 cmp 逐字节还原。
+       台账条目数 / 顺序 / id / 分类计数全不变（55），只有 9 行证据串改了 kind。 -->
 - [x] 0.3d **补进台账：文字卡 OCR 整条子链**（segC 内构造、属主全是 content、automation 仓全无）。
   <!-- 2026-07-29 走派生机制补记（不是手写 JSON）：在 REVIEWED_BLOCKER_BINDINGS 追加 3 条
        content-owner 条目，台账由 refresh-ledger 重新派生。cloud 台账 52→55，automation 收窄台账 12→15。
@@ -52,6 +54,23 @@
        账号人设端口取自 4a 的 accountPersona（5327-5330），不阻塞 automation 独立根。
        cloud inventory 测试 258-264 行本来就显式断言「任何证据含 PersonaGenerator 的条目不得留在台账里」，
        补进去会当场撞既有裁定。裁定理由已写进那条断言的失败消息。 -->
+- [ ] 0.3f **把 seam 过滤判据放宽到「automation 模式下不执行的分支」（已裁定要做，本轮未做）。**
+  本轮给 `new` / `call` 探针补的过滤器只认 `seamMode === 'monolith'`。但草稿精修那条的 segC 探针
+  指向的构造坐在 `if (seamMode !== 'automation' && ...)` 里——**automation 进程里根本不构造它**，
+  按台账的语义（「automation 独立起根被什么挡住」）同样不该算欠账。
+  **裁定：放宽。** 与 0.6a 是同一条判断的两面（那条已定「草稿精修撤出岔口 C」），
+  不放宽就会出现「文档说不算欠账、机器说算」的长期不一致。
+  **但放宽 MUST 响亮**：过滤掉哪几条证据要当场报出来，MUST NOT 静默少几行；
+  且要顺带扫一遍 segC 里其余 `seamMode !== 'automation'` 守卫（约 5919 / 6259 / 6295 一带）。
+  **注意后果不是「条目消失」而是「条目变成纯 api 侧证据」**——收录判据是「任一探针命中即保留」，
+  segA / segD 那两条还在。真正会消失的是它在 **automation 收窄台账**里的位置，而那正是 0.6a 要的结果。
+- [x] 0.3g **automation 那份 census helper 是有意的手写分叉，不是派生物**（本轮核实）。
+  <!-- 2026-07-29 实测：文件第 1 行是 `// aidcp:test-owner=derived`，
+       按 scripts/sync-split-repos 的 derived_private 逻辑，带该标记的派生仓测试**被排除出同步对账**
+       ——所以它不会被 cloud 那份覆盖，也不会被 --prune 删掉。
+       代价要知道：cloud 侧的探针改进（identifier-use、seam 过滤）**不会传播到它**；
+       它的 deriveIndependentRootBlockers() 直接把手写常量映射成条目、不读任何生产源码。
+       这也正是 0.3e 那条「更强的锚」要解决的东西。 -->
 - [ ] 0.3e **更强的锚（已提出，本轮未做，需裁定）**：即使有了 deepEqual 自洽锚，
   automation 那份仍是「两侧一起改就能一起漂」——锚住的是自洽，不是与现实的一致。
   真正继承自熄性的做法：cloud 侧按 `consumer` 含 automation 从 AST 派生台账过滤出 id 集合，
@@ -110,13 +129,21 @@
 - [ ] 0.6a **撤掉草稿精修那一条**：`src/server.ts:6171` 的守卫是 `seamMode !== 'automation' && ...`，
   该 worker 在 automation 模式下本来就不跑；剩余两条证据都是 api 侧。
   automation 方向现存 runtime 边为零，**不开这个写口**。
-- [x] 0.6b0 **两个端口的契约已定义**（只定义、未接线）：`src/kernel/content-port-result.ts`
-  （统一结果信封 + 7 选一具名失败原因 + 结构化守卫）、`src/kernel/concept-pool-port.ts`、
-  `src/kernel/curated-selection-port.ts`。
-  <!-- aidcp-cloud 1d31c30。精选库刻意是**两个方法而非一个**：发帖侧要全字段，评论侧只要三字段窄投影
-       ——全字段视图挂着参照图集 / 视觉分析 / 文字卡转写等大块 JSON，搬过边界只为留三个字段，
-       投影本就该在属主侧做。参数照抄属主存储真实签名（沿用 publish-log-writer-port.ts 立的房规）。
-       缺失计数用 null 而非 0，区别「不知道」与「真是 0」。 -->
+- [x] 0.6b0 **两个端口的契约已定义**（只定义、未接线）：`src/kernel/concept-pool-port.ts`、
+  `src/kernel/curated-selection-port.ts`，失败信号 `src/kernel/content-port-error.ts`。
+  <!-- aidcp-cloud 1d31c30 定义，abdadae 按用户裁决改回既有范式（裸值返回 + 失败抛）。
+       信封文件 content-port-result.ts 已删。精选库刻意是**两个方法而非一个**：发帖侧要全字段，
+       评论侧只要三字段窄投影——全字段视图挂着参照图集 / 视觉分析 / 文字卡转写等大块 JSON，
+       搬过边界只为留三个字段，投影本就该在属主侧做。签名照抄属主真实签名，故属主实例可原样注入。
+       缺失计数用 null 而非 0，区别「不知道」与「真是 0」。
+       **一处只有读传输层才发现的事**：内部 HTTP 的错误编码只保 code + message，
+       name / reason 跨那一跳会全丢，所以错误另带 code 与还原函数；
+       **还原不出返回 null、绝不套默认 reason**——套默认会把「对面不支持这个方法」
+       吞成「对面报错了」，概念池的回落分支就第二次变成死代码。 -->
+- [x] 0.6b1 **`ContentPortResult` 信封已删，统一到既有约定**（用户 2026-07-29 裁定）。
+  <!-- 见 design.md §3.0。理由：抛出本来就不是空数组，「分得开」既有约定做得到；
+       病根在五处把抛出压成空数组的代码（0.6f）。两套并存的实际后果是接线的人顺手照抄既有范式、
+       新端口被整体绕过。 -->
 - [ ] 0.6b **概念池端口面补齐到 6 个方法**：除 `addCandidate` / `loadPool` / `markSearched`，
   还有 `countNewSince` / `getNewConceptsSince` / `getNewConceptsWithSourceSince?`
   （`aidcp-automation/src/publish-agent/publish-scheduler.ts:34-39`）。
