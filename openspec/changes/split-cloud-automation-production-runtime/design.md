@@ -316,8 +316,22 @@ MUST NOT 由调用方选择 target。
 - 评论 / 首作 / 通知巡视等调度器与监测体；
 - 4a 的 16 组 api 客户端 + 4b 的同步读镜像 + 本 change 的 content 客户端组 + 四个指令 receiver。
 
-**启动 gate 与 api 同形**：同步读镜像首次装载完成、readiness 到 `ready` 之前**不放行业务入口**
-（api 的做法是 `businessIngressStarted` 闸，见 `startBusinessIfReady`）。
+**启动 gate 与 api 同形**：同步读镜像首次装载完成、readiness 到 `ready` 之前**不放行业务入口**。
+api 的实现在 `aidcp-api/src/server.ts:1401-1443`，**照抄它，四个要点缺一不可**：
+
+1. 一个 `businessIngressStarted` 布尔 + 一个 `startBusinessIfReady()`，
+   三个条件任一成立就早退：**正在关闭 / 已经启过 / readiness 不是 `ready`**。
+2. **用一个在途 promise 去重**（`businessStart`），而不是只看那个布尔——
+   否则「监听成功」与「readiness 变更」两个触发点并发调用时会**启动两次**。
+   规格里「重复的就绪信号不重复启动业务入口」这条，靠的就是这个去重，不是那个布尔。
+3. 启动业务入口**之后**才起周期性任务（api 那边是审批 outbox 中继），并 `unref()`
+   ——否则进程会因为一个定时器而不肯退出。
+4. **先 `listen` 再放行业务**：readiness 探活路由要在业务入口起来之前就可访问，
+   否则外部无法区分「还没就绪」与「进程没起来」。
+
+`registerApiSyncReadReadinessRoute` 把 `businessIngressStarted` 一并暴露在探活响应里，
+**automation 侧照做**——「监听着但没放行业务」这个中间态必须是可观测的，
+否则运维只能看到端口通、以为一切正常。
 **缺依赖 MUST 停在具名原因上**，MUST NOT 以空值 / `false` / 默认值放行——
 这正是现在那个 fail-closed 壳在替我们守的东西，接线时不能把它守的东西一起删掉。
 
