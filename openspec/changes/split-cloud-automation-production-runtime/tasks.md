@@ -227,11 +227,11 @@
   还有 `countNewSince` / `getNewConceptsSince` / `getNewConceptsWithSourceSince?`
   （`aidcp-automation/src/publish-agent/publish-scheduler.ts:34-39`）。
   `getNewConceptsSince` 是**回落分支**，漏了只有回落时才炸。
-- [ ] 0.6c **精选库补跨界读 `selectForCreation`**：两个调用方（发帖调度器 / 评论调度器），
+- [x] 0.6c **精选库补跨界读 `selectForCreation`**：两个调用方（发帖调度器 / 评论调度器），
   **投影形状不同**。今天 `server.ts:7024` 的 `: Promise.resolve([])` 降级形状跨进程后会把
   「连不上」吃成「没有精选素材」，MUST 换成可区分的结果。
   另：`server.ts:4986` 与 `:5311` 只把 store 当「有没有」用，MUST 换成显式可用性查询。
-- [ ] 0.6e **「能力探针」跨进程后恒为真——比可选方法漏实现更糟。**
+- [x] 0.6e **「能力探针」跨进程后恒为真——比可选方法漏实现更糟。**
   今天的回落写法是 `this.d.conceptStore.getNewConceptsWithSourceSince ? … : …`，
   一个 `typeof` 能力探针。跨进程后客户端类**总是**定义着那个方法，探针恒真、**回落分支变死代码**，
   而真实的能力缺口（对面版本落后 / 路由没注册）反被静默吞掉。
@@ -300,9 +300,20 @@
        校订后把这一条写明了。`boundaries:refresh` 后 48 个文件的 `note` 字段随之更新，跨层边仍 0。
        **为什么值得改**：那句 note 是逐文件抄进生成物的，不改会让后来人以为
        「新文件必须有 SQL 才配进这个目录」——一条凭空多出来的准入条件。 -->
-- [ ] 0.6g **调用点比原记录多两处**（接线时都要改）：`markSearched` 有两个
+- [x] 0.6g **调用点比原记录多两处**（接线时都要改）：`markSearched` 有两个
   （`role-dispatcher.ts:3411` 下发搜索后 + `:3714` 回执后）；`countNewSince` 有两个
   （`publish-scheduler.ts:263` 聚合输入 + `:323` 概念积累扳机）。
+  <!-- aidcp-cloud 1b36b74。**复核：恰好 4 处，没有第五处**，计数对、行号全漂（实为 `:3436` / `:3739`
+       与 `:288` / `:348`）。两处 `markSearched` 已收进一个带阶段标签的私有函数。 -->
+  <!-- 0.6c / 0.6e 同批（同一提交）：四个注入面全改成 kernel 端口类型；
+       能力探针删除、回落改由具名的「不支持这个方法」驱动，其余原因一律原样冒泡；
+       两处「把 store 当有没有用」的真值判断改成能力二态（形状逐字照文字转写那套，未自创第二套）。
+       **单体行为逐位不变**，确认方式是全量测试通过集与基线逐条相同、差值恰好等于新增的 3 条用例。
+       变异实测两轮：把回落放宽成「凡端口错误就回落」→ 当场红；把旧探针形态原样复活 → 当场红。 -->
+  <!-- **组装根撤桩的连带**（1.4a 的后半）：`src/server.ts` 里两个占位桩删掉后，
+       台账少了一条证据行（那条 text 探针指的正是桩里的错误串），
+       `feishu-operator-dispatch-start-stop` 条目**仍在**（面板那个调用点还是证据）。
+       已跑官方出口重新派生，台账仍 55 条。这是机制在正常工作：台账由源码派生，源码变了它就得变。 -->
 - [x] 0.6d **Sink 的可选方法是第二处静默陷阱**：`CuratedNoteSink` 的 `refreshReferenceImages?`
   与 `getTextCardContext?` 都用 `?.` 调用（`:153` / `:182`）。换成 HTTP 客户端后**少实现一个方法
   编译通过、运行不报**——少 `getTextCardContext` 则缓存恒空、每篇图文帖重跑视觉转写（纯成本爆炸、
@@ -619,6 +630,17 @@
   <!-- 六仓对齐：kernel `d4f451b` / transport `c07e9b5` / api `f42df86` /
        automation `686253d` / content `30a32c9` / cloud `9ae8e1d`。
        测试：cloud 3883 / api 470 / automation 1897 / content 436 / kernel 57 / transport 36，全 0 fail。 -->
+  <!-- 2026-07-29 23:47 已部署第三批（aidcp-cloud@1b36b74，仍是单体形态）。
+       备份 /opt/aidcp/cloud.bak.20260729-234657.tar.gz；package.json 零变更。
+       重启后错误 0；PG / 飞书长连接 / 面板 8090 / 客户鉴权 8091 全就绪；isales 四服务未受影响。
+       六仓对齐：kernel `c59172c` / transport `cb7423c` / api `6bde4db` /
+       automation `f224070` / content `d1d8fe1` / cloud `1b36b74`。
+       测试：cloud 3890 / api 470 / automation 1900 / content 436 / kernel 59 / transport 36，全 0 fail。 -->
+  <!-- **同步顺序上踩到一次 pin 级联，记下来**：`--apply --tests` 会给 kernel 也派测试文件，
+       而我是在**三个业务仓 pin 已经抬完之后**才跑的那一趟——kernel 头一动，
+       transport 与三个业务仓的 pin 全部作废，只能整条链重抬一遍。
+       **正确顺序**：先 `--apply --prune`（src）+ `--apply --tests`（测试）**全部落完**，
+       再按 kernel → transport → 三个业务仓抬 pin。 -->
 - [ ] 5.5 本地桩验不了的登记 `docs/real-machine-acceptance-backlog.md`（簇 60）。
 - [x] 5.6 回写 `docs/cloud-composition-root-trisection.md` §0.0 与
   `docs/cloud-split-next-session-handoff.md` §0.1/§0.2 的实测现状。
