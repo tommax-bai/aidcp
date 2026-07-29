@@ -7,14 +7,25 @@
   把实测 HEAD 回写 design.md §0，**不要沿用文档里的快照**。
 - [ ] 0.3 逐条重放 12 条 blocker 的 evidence（`aidcp-cloud/boundaries/composition-root-independent-blockers.json`
   按 `file#符号` 定位），确认每条今天仍成立；不成立的当场记下并说明为何。
-- [ ] 0.4 **岔口 A 拍板**：模型调用出口归属（A1 进 `aidcp-transport` / A2 经 content 转发 /
-  A3 automation 自建）。裁决写进 design.md §2 并注明拍板人与日期。
-- [ ] 0.5 **岔口 B 拍板**：四个内容属主角色工厂归属（B1 改判归 automation / B2 content 侧第二调度器），
-  连带裁决 `curated_note_evaluator` 的可选 `textCardTranscriber` 依赖。
-- [ ] 0.6 **岔口 C 确认**：四个 content 属主存储写走 content 内部 HTTP 写口；确认在既有
+- [x] 0.4 **岔口 A 拍板**：模型调用出口归属。
+  <!-- 2026-07-29 用户裁定 A1：提进 aidcp-transport，三家各自 new，密钥各自从 env 读。
+       理由＝符合 transport 准入（三家都可能调用 + 不含任何属主表 SQL），且热路径不加内网跳。 -->
+- [x] 0.5 **岔口 B 拍板**：四个内容属主角色工厂归属。
+  <!-- 2026-07-29 用户裁定 B1：四个角色类改判归 automation，写 content 表走 §3 写口。
+       理由＝与 §10.7 发帖调度器同形，端口包不了工厂函数。
+       尾巴未决：curated_note_evaluator 的可选 textCardTranscriber 依赖仍需在实施时一并处置，
+       见 0.5a。 -->
+- [ ] 0.5a 处置 `curated_note_evaluator` 的**可选** `textCardTranscriber`（content 属主视觉行为类，
+  旗标默认关）：一并改判、或显式走 content 调用口。**不许默默不传**——可选实参缺席不报错。
+- [ ] 0.6 **岔口 C 落实**：四个 content 属主存储写走 content 内部 HTTP 写口，在既有
   `AIDCP_CONTENT_PORT` 监听上扩，不新造监听。
-- [ ] 0.7 若 A/B 裁决涉及归属改判：先改控制仓 `docs/cloud-service-decomposition-proposal.md` §4.x
-  （**归属的唯一事实源**），再 `npm run boundaries:refresh` 回写规则表；MUST NOT 直接手改生成物。
+- [ ] 0.7 落实 B1 的归属改判：先改控制仓 `docs/cloud-service-decomposition-proposal.md` §4.x
+  （**归属的唯一事实源**），再手工 Edit 增量追加 `boundaries/ownership-rules.json`，
+  最后 `npm run boundaries:refresh` 生成派生物；MUST NOT 直接手改生成物，
+  MUST NOT 脚本整体重序列化规则表（CLAUDE §8.2）。
+- [ ] 0.8 落实 A1：模型出口进 `aidcp-transport`。核对准入判据实跑一遍
+  （`test/acceptance/module-boundary.test.ts` 的真正则，别凭记忆用「四条硬禁」），
+  再按 kernel → transport → 三个业务仓的顺序快进 pin。
 
 ## 1. 四条运营指令通道（api 飞书入站 → automation 处理器）
 
