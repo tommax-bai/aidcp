@@ -6,7 +6,7 @@ Panel 账号 API SHALL 为每个账号返回 Cloud 统一解析器产生的 `dis
 
 #### Scenario: 管理后台展示客户端人工别名
 - **WHEN** 账号在 Cloud 已有运营别名
-- **THEN** 账号列表、人设、内容、用量、联系方式、环境归属及其它账号选择或展示位置均显示该别名，并保留同一账号显示语义
+- **THEN** 账号列表、人设、内容、用量、联系方式及其它账号选择或展示位置均显示该别名并保留同一 `displayNameSource`，环境归属也显示同一别名
 
 #### Scenario: 环境归属按稳定环境键关联显示名
 - **WHEN** 已分配 scope 行只含 `envKey`，且全局环境注册表中该 `envKey` 已绑定带统一 `displayName` 的账号

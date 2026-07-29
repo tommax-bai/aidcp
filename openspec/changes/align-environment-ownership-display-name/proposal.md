@@ -17,10 +17,10 @@
 
 ### Modified Capabilities
 
-- `account-display-name`: 明确管理后台“环境归属”中的环境昵称也必须消费绑定账号的统一 `displayName`，并规定未挂载环境的非账号回落边界。
+- `console-panel-api`: 明确管理后台“环境归属”中的环境昵称也必须消费绑定账号的统一 `displayName`，并规定未挂载环境的非账号回落边界。
 
 ## Impact
 
 - 代码：`aidcp-console` 的环境注册表 DTO、环境归属展示辅助函数和页面测试。
-- 契约：补充 `account-display-name` 对环境归属位置的具体场景。
+- 契约：补充 `console-panel-api` 对环境归属位置的具体场景。
 - API/运行时：复用 Cloud `/api/client-environments` 已有 `account.displayName`，无需 Cloud、Edge、协议或数据库变更；Console 运行时行为变化需发布到 `dev`。
