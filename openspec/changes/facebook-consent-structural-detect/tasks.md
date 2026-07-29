@@ -1,4 +1,20 @@
 > **实装前以 proposal / design「2026-07-12 修订」块为准**：C3 首发定性为**安全加固、零新增语种覆盖**（结构标志未取得前）；现状错述已订正（未覆盖语种是 `handled=false` 静默继续、非 `no_target`；`COOKIE_COPY` 非跨语言稳定）；D4 分不清主次时诚实 `no_target` 不 best-guess。
+>
+> ## ⚠️ 实装前必读（2026-07-29 实读订正）
+>
+> **本清单第 1 / 2 节点名的实装点 `src/facebook/consent.ts` 已不在生产可达图上。** 该文件仍在仓里，但
+> `src/` 内除自身外**零引用**（实测 `aidcp-edge@a05bee9`）。Native 引擎切换后真正生效的同意条探测在页面规则
+> `native/page-engine/src/facebook-router/05-session.js` 的 `consentProbe()` 里（构建期编进引擎二进制、运行时注入页面执行），
+> 消费点在同文件 `blockingProbe()` 与 `10-feed-like.js` 的两处 `blocked_by_consent`。
+>
+> 本清单起草于 2026-07-12，早于切换。**照原文实装等于加固一段永不运行的代码** —— 与本批复盘反复出现的形态同族
+> （见 `docs/native-migration-repair-handoff.md`）。开工第一步 MUST 是把实装点重定向到页面规则那份，
+> 判据（容器隔离 / 登录门负向护栏 / 只点正向识别 / 分不清主次诚实 `no_target`）逐条不变。
+>
+> **用户裁定（2026-07-29）——歧义时的处置：维持现有规则「认不准就停手」。**
+> 现状：`05-session.js` 的 `consentProbe()` 在同意动作按钮命中 **>1** 个时不给坐标（`acceptAllAmbiguous` / `necessaryOnlyAmbiguous` 置真、坐标为 `null`），于是同意条消不掉、后续点赞 / 评论 / 发帖 / 加群 / 滚动全回 `blocked_by_consent`。
+> 曾提出的备选（按 DOM 包含关系先去重再判歧义 —— 依据是候选采集含 `div[aria-label]` / `span[aria-label]`，嵌套时**同一个按钮会被数两遍**）**未被采纳**：那是读代码推出的假设，从未在真机上观察到。
+> 承接为**真机观察项**（见下 3.3）：真机上真碰到「认不准」时先 dump 一次同意条 DOM，坐实到底是两个真按钮还是一个按钮被数了两遍，再决定是否引入去重。**在取证之前 MUST NOT 改判据。**
 
 ## 1. aidcp-edge — 容器隔离 + 登录门负向护栏 + 只点正向识别
 
@@ -25,6 +41,10 @@
 - [ ] 3.1 edge master land（edge-only，无协议/无云端），干净 worktree 确认。
 - [ ] 3.2 dev 生效路径：electron:dev / 安装包重建后运营机 pull master（无 ECS）。
 - [ ] 3.3 真机验收项登记 backlog（同意容器边界真机取证定档；**FB 同意条结构标志取证——启用 D3-② 前 MUST 通过负向验收「不与 Continue-墙家族匹配」**；非英文同意条真机点通）——不阻塞码级。
+- [ ] 3.3.1 【真机 · 2026-07-29 新增，承接用户裁定】**「认不准」到底是几个按钮**：真机上碰到同意动作按钮命中 >1 个（`acceptAllAmbiguous` / `necessaryOnlyAmbiguous` 置真）时，dump 一次同意容器的 DOM 与全部候选（标签文本、`aria-label`、标签名、彼此的 DOM 包含关系），坐实是**两个真按钮**还是**一个按钮被嵌套数了两遍**（候选采集含 `div[aria-label]` / `span[aria-label]`，外层容器与内层按钮同标签时会各命中一次）。
+  - 若为嵌套重复：按 DOM 包含关系去重后再判歧义，去重后仍 >1 才停手 —— 这样「认不准就停手」这条不变量不松，同时不再把「其实确定」误判成不确定。
+  - 若确为两个真按钮：维持停手，并把这一形态记进 D3-② 的结构标志取证。
+  - **取证前 MUST NOT 改判据**（用户 2026-07-29 明确：保持现有规则）。停手期间的代价是同意条消不掉、该账号后续写动作全回 `blocked_by_consent`，需在观察时一并记录发生频次。
 
 ## 4. 收尾
 
