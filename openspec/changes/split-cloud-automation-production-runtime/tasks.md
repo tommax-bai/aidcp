@@ -81,7 +81,14 @@
        ——所以它不会被 cloud 那份覆盖，也不会被 --prune 删掉。
        代价要知道：cloud 侧的探针改进（identifier-use、seam 过滤）**不会传播到它**；
        它的 deriveIndependentRootBlockers() 直接把手写常量映射成条目、不读任何生产源码。
-       这也正是 0.3e 那条「更强的锚」要解决的东西。 -->
+       这也正是 0.3e 那条「更强的锚」要解决的东西。
+       **复核把这条查得更透、结论比原判更麻烦**：读 scripts/sync-split-repos:851-863，
+       带该标记的文件被从**两侧同时**减掉（wanted -= derived_private，synced_actual = actual - derived_private）
+       ——所以它既不会被覆盖，**也永远不会被报成 drift**。
+       后果：两个同路径、同导出名的文件（cloud 1916 行 / automation 1792 行）**永久分叉且零机械信号**，
+       本轮 cloud 侧的 identifier-use / seam 过滤 / 更正后的注释一条都到不了那份 fork，
+       而且没有任何东西会告诉你。真正要裁的不是「是不是派生物」，而是
+       **「要不要给同名分叉加一道对账」**——见 0.3e。 -->
 - [ ] 0.3e **更强的锚（已提出，本轮未做，需裁定）**：即使有了 deepEqual 自洽锚，
   automation 那份仍是「两侧一起改就能一起漂」——锚住的是自洽，不是与现实的一致。
   真正继承自熄性的做法：cloud 侧按 `consumer` 含 automation 从 AST 派生台账过滤出 id 集合，
@@ -132,6 +139,21 @@
   <!-- aidcp-cloud 0dcd0eb。漂移方向是**测试比生产宽松**：省略字段正是让「依赖没接上」
        读起来跟「旗标关掉了」一模一样的那个写法，所以拆仓引入的漏传在测试里会照样绿。
        typecheck 0，相关两个测试 16/16。 -->
+- [x] 0.5h **测试派生落点已用真工具验过**（不是推理）：拿 `sync-split-repos` 的真 `classify_tests`
+  跑改前 / 改后两个 ref 对比。
+  <!-- 改前四条全是 STAY-cloud；改后 curated-note-evaluator.test.ts / text-card-transcription-absence.test.ts /
+       helpers/role-factories.ts → aidcp-automation，text-card-transcription-honesty.test.ts → aidcp-content。
+       即那条「专为拆仓失败态写的用例落不进目标仓」已解决。
+       **顺带查清一条前瞻性隐患、不是当下 bug**：`src/cache/curated-content-store.ts` 还留着 24 个类型的
+       再导出壳，但当前 124 条 STAY-cloud 测试里只有 3 条唯一 content 依赖是它，且那 3 条本来就该归 content。
+       别当待修项排期。 -->
+- [ ] 0.5i **既有判例 `FacebookPublishMediaError` 没有 `code`，同样跨不过传输那一跳**（潜伏项）。
+  它今天只在同进程内用，所以**还不是活 bug**；但拆进程后一旦它需要跨边界，
+  守卫会恒不命中、失败静默退化。本 change 新写的错误加 `code` **不是镀金，是补了判例本身的缺口**。
+  等它真要跨边界时，照同一形状补。
+- [ ] 0.5j **AC-TCT-3 有一处已知脆性**（可接受，记下来免得将来误判）：
+  留痕函数带一次性闸、有两个调用点（图片快照 stage 与准入评估 stage），
+  而该用例只触发后者。若将来这条 fixture 先触发前者，跳过断言会因为**与不变量无关**的原因变红。
 - [ ] 0.5g **缺席的真正上游在角色调度器**：`role-dispatcher.ts:2170` 决定要不要把不透明句柄
   放进工厂 options。链路现在是「调度器可能不给 → 组装根**显式**翻译成 unavailable → 角色留痕」，
   缺席不会再被压成假；但若要让「漏传」变成**编译期**错误，得从那里连同工厂选项类型一起收紧。
