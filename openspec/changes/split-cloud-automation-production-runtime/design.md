@@ -14,16 +14,28 @@ ls -d ../aidcp-cloud ../aidcp-api ../aidcp-automation ../aidcp-content ../aidcp-
 openspec status --change split-cloud-automation-production-runtime
 ```
 
-**2026-07-29 的起点**（六仓已对齐 `aidcp-cloud@424834d`，五个派生仓首次同时全绿）：
+**2026-07-29 实测起点**（本 session 重新对齐后；**上一版记的 `424834d` 已过期，勿沿用**）：
 
 | 仓 | HEAD | typecheck | 测试 |
 | --- | --- | --- | --- |
-| `aidcp` | `0788501d` | — | — |
-| `aidcp-kernel` | `6bf0603` | 0 | 57 / 57 |
-| `aidcp-transport` | `eeb6b3e` | 0 | — |
-| `aidcp-api` | `6181771` | 0 | 470 / 470 |
-| `aidcp-automation` | `21dfe08` | 0 | 1832 pass / 0 fail / 3 skip |
-| `aidcp-content` | `b4b1bf6` | 0 | 455 / 455 |
+| `aidcp` | `6a3006a0` | — | — |
+| `aidcp-cloud`（事实源） | `babdd84` | — | — |
+| `aidcp-kernel` | `d7153b3` | 0 | 57 / 57 |
+| `aidcp-transport` | `6cd3339` | 0 | — |
+| `aidcp-api` | `02396d8` | 0 | 470 / 470 |
+| `aidcp-automation` | `71e5299` | 0 | 1841 pass / 0 fail / 3 skip（共 1844） |
+| `aidcp-content` | `d72d653` | 0 | 455 / 455 |
+
+**重新对齐时坐实了一条 pin 纪律的实际后果**（0.2 的产物，记下来免得下次再诊断一遍）：
+cloud master 期间前进 4 个提交（`2564f47`/`e009c6f`/`ec4f6dd`/`babdd84`），其中一个改了
+`src/kernel/scheduled-automation-catalog.ts` 与 `sync-read-facts.ts`（新增 `contactCommentDailyCap`）。
+只跑 `sync-split-repos --apply` 把 src 与 test 同步过去，**automation 立刻 typecheck 红两条**——
+同步来的 `test/platform-registry.test.ts` 引用了新字段，而 automation 的 `package.json`
+仍 pin 在旧 kernel sha，`node_modules` 里的 kernel 没有那个字段。
+**结论：kernel 的 src 一变，「同步」就不是一步而是三步**——
+① kernel commit+push 拿到新 sha → ② transport 与三个业务仓的 pin 快进 + `npm install` 刷 lock
+→ ③ 才轮到各仓 typecheck / test。跳过 ② 的表现不是「装了个旧版本」而是**当场编译红**，
+所以它抓得到；但顺序做反会让人误以为是同步工具搬错了文件。
 
 **依赖装不上这条坑已经解决**：四个新仓的 `npm install` 会被内网 registry 对 `@types` 域的劫持打断，
 绕法是 `npm install --userconfig /dev/null --no-audit --no-fund`。在此之前所有「已验证」都只是「看着对」。

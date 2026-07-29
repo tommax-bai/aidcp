@@ -1,10 +1,21 @@
 ## 0. 准入与三个岔口的裁决（**未完成前不写任何代码**）
 
-- [ ] 0.1 控制仓 `./scripts/task-preflight` 通过；按 CLAUDE §7 为 cloud / kernel / transport / api /
+- [x] 0.1 控制仓 `./scripts/task-preflight` 通过；按 CLAUDE §7 为 cloud / kernel / transport / api /
   automation / content 各开 `../<repo>.wt/split-cloud-automation-production-runtime` worktree
   （控制仓在 `main` 上直接写本 change 目录，不切分支）。
-- [ ] 0.2 重跑 `./scripts/sync-split-repos --ref origin/master --tests`，确认除组装根外零差异；
+  <!-- 2026-07-29 六个 worktree 已建，分支名 codex/split-cloud-automation-production-runtime，
+       均自各仓 origin/master 切出；四仓 preflight 全绿。 -->
+- [x] 0.2 重跑 `./scripts/sync-split-repos --ref origin/master --tests`，确认除组装根外零差异；
   把实测 HEAD 回写 design.md §0，**不要沿用文档里的快照**。
+  <!-- aidcp-kernel d7153b3 / aidcp-transport 6cd3339 / aidcp-api 02396d8 /
+       aidcp-automation 71e5299 / aidcp-content d72d653，源 aidcp-cloud@babdd84。
+       cloud 期间前进 4 提交带来 4 个文件漂移，已 --apply --tests 同步；kernel 契约变更
+       连带四仓 pin 快进（见 design.md §0 那段 pin 纪律）。同步后各仓 typecheck 0、
+       测试 57/470/1841(+3 skip)/455 全绿。复跑对账仅剩组装根差异（按设计从不同步）。 -->
+- [x] 0.2a 六仓 worktree 装依赖（`npm install --userconfig /dev/null`，绕内网 registry 对
+  `@types` 域的劫持）。
+  <!-- 2026-07-29 cloud / kernel / transport / api / automation / content 六个 worktree 各自独立装，
+       不共享 node_modules 软链（CLAUDE §7）。 -->
 - [ ] 0.3 逐条重放 12 条 blocker 的 evidence（`aidcp-cloud/boundaries/composition-root-independent-blockers.json`
   按 `file#符号` 定位），确认每条今天仍成立；不成立的当场记下并说明为何。
 - [x] 0.4 **岔口 A 拍板**：模型调用出口归属。
