@@ -381,6 +381,14 @@ TBD - created by archiving change content-schedule-auto-publish. Update Purpose 
 
 系统 SHALL 为 Facebook 账号提供独立 `join_group` 自动化配置：动作开关、受限非负整数每日上限、可选 168 位动作周历覆盖、更新人/时间以及最近一次 scheduled 执行结果。无配置行、开关关闭、日上限为 0、非 Facebook 账号或全局 kill switch 关闭任一 SHALL 完全不触发自动加群。该动作 SHALL 聚合进统一账号自动化目录，但其领域配置 MUST 与通用发帖/评论字段分开持久化。最近结果 MUST 来自带 `scheduled` 来源的真实审计，不能用人工结果或 membership 更新时间猜测。
 
+自动加群日上限的硬上限 SHALL 为 50（越界整块拒）。三个动作的硬上限 SHALL 各自独立、MUST NOT 相互推导：发帖与评论为 50、**联系评论为 10**、自动加群为 50。联系评论那个 10 是刻意与其余动作分开的既有约定，本要求 MUST NOT 被读作把它一并抬高。
+
+硬上限 SHALL 只约束**运营可配置的天花板**，MUST NOT 改变生效值的计算规则：既有的「账号配置 MUST NOT 提高 RiskController 日额度或会话额度」保持不变，实际每日准入仍取账号配置与风控日额度的较小者，并逐次通过 `canDo('join_group')` 与剩余会话预算。因此抬高硬上限本身 SHALL NOT 使任何账号的实际加群量增加；增量只能来自运营对风控配额与会话预算的显式调整。
+
+硬上限的事实源 SHALL 是契约层单一常量，写前校验、后台输入框上限下发与配置表约束三处 MUST 全部由它派生或与它逐字一致；任一处漂移 SHALL 被视为缺陷，MUST NOT 依赖「写入端更严即安全」来掩盖。
+
+**「默认关闭」的适用范围**：本要求标题所称的默认关闭，SHALL 理解为「系统不会凭空为一个没有配置行的账号触发自动加群」。它 SHALL NOT 被读作「任何账号在任何情况下都必须以关闭状态起步」——真正首次登记的 Facebook 账号会被种入开启状态的配置行（见「新登记 Facebook 账号种入自动化默认配置」）。对**仍然没有配置行**的账号，本要求第一段的「无配置行即完全不触发」逐字保留、不受种入影响。
+
 #### Scenario: 未配置账号不自动加群
 - **WHEN** Facebook 账号没有自动加群配置行，即使全局 kill switch、风险额度和群目标都可用
 - **THEN** 内容调度器不认领目标、不导航、不点击，也不记录一次伪执行
@@ -388,6 +396,26 @@ TBD - created by archiving change content-schedule-auto-publish. Update Purpose 
 #### Scenario: 最近结果只取自动来源
 - **WHEN** 账号最新审计是人工指定 URL 加群，而更早有一条 scheduled 自动结果
 - **THEN** 账号自动化页显示更早的 scheduled 结果，不把人工结果冒充成自动执行结果
+
+#### Scenario: 日上限可配到 50
+- **WHEN** 运营为某 Facebook 账号把自动加群日上限设为 50
+- **THEN** 写前校验放行、配置表约束放行、后台输入框允许输入该值，配置成功落库
+
+#### Scenario: 超过 50 整块拒
+- **WHEN** 运营把自动加群日上限设为 51
+- **THEN** 写入被整块拒绝并回可诊断原因，MUST NOT 静默截断为 50 落库
+
+#### Scenario: 抬高硬上限不放大实际加群量
+- **WHEN** 某账号自动加群日上限配为 50，而该账号当前风控档位的 `join_group` 日额度为 3
+- **THEN** 当日至多加入 3 个群，超出后不认领、不点击并记录可诊断拒因，MUST NOT 因账号配置为 50 而突破风控额度
+
+#### Scenario: 联系评论硬上限不受本次抬升影响
+- **WHEN** 运营把联系评论日上限设为 11
+- **THEN** 写入仍被整块拒绝（其硬上限保持 10），MUST NOT 因自动加群硬上限抬到 50 而放宽
+
+#### Scenario: 存量无行账号仍不自动加群
+- **WHEN** 一个已存在但从未配过自动加群的 Facebook 账号上线
+- **THEN** 它仍然没有配置行，因而不触发任何自动加群——种入只作用于真正新登记的账号
 
 ### Requirement: Facebook 自动加群时窗为公共时窗与动作时窗交集
 
@@ -506,4 +534,55 @@ Rule-mode session start, resume and safe stop SHALL use the same account-effecti
 #### Scenario: Content action off does not disable rule mode
 - **WHEN** all scheduled `post`, `comment`, `contact_comment` and `join_group` modes are off but the Facebook rule and weekly active cell are enabled
 - **THEN** rule browsing may run because its count trigger is independent of content action scheduling
+
+### Requirement: 新登记 Facebook 账号种入自动化默认配置
+
+系统 SHALL 在一个账号**真正被首次登记进主表**时，为 Facebook 账号种入一份自动化默认配置，使其无需运营逐项手工配置即可进入既有各道闸的判定。
+
+**触发判据** SHALL 是「本次登记真的插入了一行新账号」。系统 MUST NOT 用「配置侧表没有该账号的行」作为判据——一个早已存在、只是从未被配置过的账号同样满足后者，用它会把种入扩散到存量账号，与本要求的范围相反。
+
+**平台过滤** SHALL 为：
+
+- `facebook` → 种入排期侧表与自动加群配置表两行。
+- 其余平台（含小红书与视频号）→ **不种入任何行**。视频号在平台动作目录中四个动作全部不支持，为其写入任何正日上限都 MUST 被写前校验整块拒绝。
+- 登记调用方**未显式声明平台**时 SHALL NOT 种入。账号登记的平台参数可缺省并回落，按回落值种配置等同于给一个平台未知的账号写一份可能错误的默认值。此时系统 SHALL 留下可检索日志说明「因平台未声明而未种入」。
+
+**种入取值** SHALL 为：账号总开关开；自动发帖开、审批模式 `review`、日上限 5；自动评论开、审批模式 `auto_approve`、日上限 20；自动加群开、日上限 20。
+
+**联系评论 SHALL NOT 被种入**（保持关闭）。理由有二且都要保留：其一，本要求覆盖的是发帖、评论、加群三项；其二，带「先加群再评论」标记的复合动作由联系评论驱动，不种入它即使新账号不会出现「加入新群后在同一轮立即于该群评论」这一形态。任何后续 change 若要开启联系评论默认值，MUST 先处置该复合动作。
+
+**审批模式** SHALL 逐动作分别取值，MUST NOT 相互推导：
+
+- **发帖 SHALL 取 `review`**。这不是选择——Facebook 排期发帖在既有要求里就 MUST 走 `review` 路径，免审对它保持禁用或 fail-closed。
+- **评论 SHALL 取 `auto_approve`**（用户 2026-07-29 决定）。其可达性依赖既有的环境级评论审批策略只能**升权**这一性质：策略为缺省值时来源模式被逐字沿用，只有策略读取失败才 fail-closed 回 `review`。本要求 MUST NOT 被实现成「绕过该策略」——它只是提供了一个免审的来源模式。
+
+由此产生的后果 SHALL 被如实记录、MUST NOT 被读作疏漏：新登记账号一旦绑定人设并通过其余各闸，其自动评论会直接发到平台、无人过目。发帖不受影响，仍逐条待人审。
+
+**失败语义**：种入失败 MUST NOT 阻断账号登记，SHALL 被捕获并留下可检索的具名日志。系统 SHALL NOT 提供自动补种路径（理由见 `accounts-master-data` 同名约束）。
+
+**种入 SHALL NOT 改变生效值的计算规则**：每日准入仍取账号配置与风控日额度的较小者，每次执行仍需通过逐动作准入与剩余会话预算；账号总开关、两张时段周历、人设绑定、边缘在线与风控状态各闸逐一保留。种入只移除「运营尚未配置」这一道闸。
+
+#### Scenario: 新 Facebook 账号被种入默认配置
+- **WHEN** 一个此前不存在的 Facebook 账号首次登记，且登记方已声明平台
+- **THEN** 该账号获得排期行（总开关开、发帖 `review`/5、评论 `auto_approve`/20）与自动加群行（开、20），且联系评论保持关闭
+
+#### Scenario: 种入的免审评论仍受环境级策略读取失败的 fail-closed 保护
+- **WHEN** 某个被种入免审评论的账号在发评论时，环境级评论审批策略读取失败
+- **THEN** 该次评论回落为需人审，MUST NOT 因来源模式是免审就直接发出
+
+#### Scenario: 非 Facebook 平台不被种入
+- **WHEN** 一个新的小红书账号或视频号账号首次登记
+- **THEN** 系统不为其种入任何排期行或自动加群行
+
+#### Scenario: 平台未声明时不种入
+- **WHEN** 一个新账号经不带平台参数的登记入口首次登记
+- **THEN** 系统不种入任何配置，并留下说明「因平台未声明而未种入」的可检索日志
+
+#### Scenario: 存量账号不被种入
+- **WHEN** 一个已在主表中、且从未被配置过的 Facebook 账号再次登记或握手
+- **THEN** 系统不种入任何配置，该账号维持既有的「无配置行即不自动」行为
+
+#### Scenario: 种入不等于立即开跑
+- **WHEN** 一个新 Facebook 账号刚被种入默认配置，但尚未绑定人设
+- **THEN** 该账号仍被既有启动闸拦住、不产生任何平台动作
 
