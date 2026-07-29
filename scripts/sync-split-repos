@@ -128,7 +128,25 @@ TRANSPORT_MEMBERS = [
     # A3-A6 runtime changed 仅作轮询加速：automation outbox relay 与 API ingress
     # 共用闭合 signal/ACK 传输；outbox SQL/consumer 仍只留 automation 属主仓。
     'src/transport/sync-read-changed-http.ts',
+    # 0.8 文本模型出口（裁决 A1，2026-07-29）：三家各自 `new` 一个 QwenClient，不再由谁替谁持有。
+    # 准入判据逐条对上：**三家都可能调用**（automation 的角色全靠 kernel 的 TextCompletionPort 拿注入、
+    # 具体客户端只能在各自 main() 里构造；content 的生成链、api 的命令式生成同理）+ **零属主表 SQL**
+    # （两文件通篇无 SQL、无连接池、无 storage 引用）。
+    # 闭包恰好只有这两个，判据是「编译还缺谁」而非「同目录还有谁」：
+    #   qwen.ts      —— import 只有两条且都指 kernel（llm-contract / llm-errors）；
+    #   providers.ts —— 端点表，import 两条：qwen.ts 的 DEFAULT_BASE_URL + kernel/text-provider-registry。
+    # 它**进不了 kernel**（厂商 base URL 字面量命中准入正则），所以随 qwen 落在这一层。
+    # 错误族已在本轮抬进 src/kernel/llm-errors.ts，两侧不再各持一份 —— 否则拆进程后
+    # `instanceof` 恒 false，会把「该厂商密钥缺失」静默降级成泛化的「模型不可用」。
+    'src/llm/qwen.ts',
+    'src/llm/providers.ts',
 ]
+# 有意**不**进包的同目录文件：
+#   vision.ts —— 视觉出口的消费者全是 content（视觉分析 / 保真核验 / 封面形态 / 文字卡转写），
+#     只有一家用，判据第一条就不成立；
+#   index.ts  —— 桶文件，`export * from './vision.js'` 在模块图里就是一条 import 边，
+#     收进来等于把整条 content 视觉栈顺带拖进包（消费方一律直接 import `aidcp-transport/llm/qwen.js`）；
+#   persona-generator-command-receiver.ts —— content 私有的命令接收端。
 # 有意**不**进包的同目录文件（判据：只有 automation 一家用，或直接持有属主表 SQL）：
 #   event-outbox.ts / risk-command-outbox.ts / eventbus-outbox-bridge.ts / outbox-health.ts /
 #   outbox-notify-listener.ts / account-projection-store.ts

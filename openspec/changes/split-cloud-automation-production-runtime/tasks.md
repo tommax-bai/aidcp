@@ -261,6 +261,38 @@
   两者经 `src/llm/index.ts` 这个 barrel（`export * from './qwen.js'`）取错误族，
   而它们同时也从同一 barrel 取模型客户端本体，所以 `index.ts → qwen.ts` 这条边**本来就存在**，
   再导出既没新增也没假消掉任何边。真正要消的 `vision.ts → qwen.ts` 已彻底消失。
+- [x] 0.8f **模型出口的传输包成员已点名**（闭包＝恰好两个文件，实测证明）。
+  <!-- 控制仓 scripts/sync-split-repos 的 TRANSPORT_MEMBERS 手工增量追加 qwen.ts + providers.ts。
+       **不需要动任何归属条目**：transport 分支只读该名单，属主仓的应有集在另一处独立按 layer 算——
+       这两个文件在归属表里仍是 content，与既有先例同形（src/transport/* 是 automation 属主、
+       同样既落本仓 src/ 又复制进包）。**本次是第一批非 automation 属主的成员。**
+       闭包用 transport 自己的 tsconfig（strict + noUnusedLocals）实跑证明：只放这两个 + 三个 kernel
+       文件即 tsc 退出码 0，多一个都不需要。视觉栈**没有被顺带拖进去**——vision.ts 消费者全是 content，
+       index.ts 是桶文件（`export * from './vision.js'` 在模块图里就是一条边，收进来等于把整条视觉栈拖进包）。
+       对账实测：transport 47/45 → 新增 2，其它仓零连带变化。 -->
+- [ ] 0.8g **⚠️ 活缺口：三进程形态下厂商密钥读必然失败，且失败被吞成「本来就没配」。**
+  `aidcp-api` 的手写 main **既没注册 `provider-secret/get-for-runtime`、也没注册
+  `role-model-selection/fetch`**，而单体两条都注册。后果：content 的库内密钥读**必失败**，
+  调用点是 `.catch(() => null)` → 落到 env 回退，**没有任何一行日志说明这次是「读失败」还是
+  「本来就没配库内值」**（传输层文件头明写「失败原样抛、绝不吞成没配」，但调用侧的 catch 又吞回去了）。
+  模型选择那条至少还有「真值 / 保守默认（取源未成功）」的自证行，密钥这条没有。
+  → **0.4 要改的不只是「env 读」那句措辞，还得连带补上 api 侧这两条 route 的注册**，
+  否则「库内优先」在派生栈里目前只是纸面成立。
+- [ ] 0.8h **顺序依赖，别倒过来做**（已实测为红）：transport 同步 qwen **必须排在**
+  kernel 同步 + `aidcp-kernel` 提交 + 三仓与 transport 的 kernel pin 上抬**之后**。
+  否则 transport 编译当场 `TS2307`（找不到 `aidcp-kernel/kernel/llm-errors.js`）。
+  **这次是编译期就红，反而是好事**——它是 pin 漂移那类「编译照过、只有真跑才炸」的镜像版本。
+- [ ] 0.8i **automation 第一次真需要 `aidcp-transport` 依赖**：它今天没 pin
+  （对账工具明确打「未 pin aidcp-transport（用得上它的仓才需要）」），因为它自己是 `src/transport/` 属主、
+  一直用本地副本。而 `src/llm/*` **不是** automation 属主，只能走包。接线时要新增这条 pin。
+- [ ] 0.8j **`qwen.ts` 有一个静默兜底，automation 的 main MUST 显式传 key 绕开它**：
+  `this.apiKey = options.apiKey ?? process.env.DASHSCOPE_API_KEY ?? ''`——不传 key 时既不报错也不抛，
+  直接落成空串；**更坏的是构造非 dashscope 厂商的出口时也会去读 `DASHSCOPE_API_KEY`**。
+  content 的 main 是显式传的，automation 照抄。
+- [ ] 0.8k **归属不变意味着派生栈里会有两份模型客户端实现**（content 的 `src/llm/` 本地副本 + 包里那份）。
+  今天不致命（错误族已抬 kernel，跨副本 `instanceof` 问题已消），但两份各带一份默认 base URL
+  与 env 读取默认值，**会悄悄漂**。建议让 content 的手写 main 改指包里那份
+  （与它已经在用的 `aidcp-transport/transport/*.js` 同口径），本轮只登记。
 - [ ] 0.8c **`vision.ts` 留 content**（其消费者全是 content：视觉分析 / 保真核验 / 封面形态 / 文字卡转写）；
   **`providers.ts` 随 qwen 进 transport**——厂商 base URL 字面量当场命中准入正则
   （正则只剥注释、**不剥字符串字面量**），进不了 kernel。
