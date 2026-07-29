@@ -11,4 +11,4 @@
 ## 3. Validation and delivery
 
 - [x] 3.1 Run the Edge typecheck and proportionate full test suite. <!-- repo=aidcp-edge; commit=88ff177; validation=acceptance 31/31, full 2716 passed 1 gated skip, typecheck passed; deployment=not applicable; deviations=AIDCP_E2E remained gated -->
-- [ ] 3.2 Run `openspec validate align-environment-management-display-name --strict`, record implementation evidence, and integrate the clean Edge and control commits.
+- [x] 3.2 Run `openspec validate align-environment-management-display-name --strict`, record implementation evidence, and integrate the clean Edge and control commits. <!-- repo=aidcp; commit=8e716ff0; validation=openspec strict passed; delivery=aidcp-edge 88ff177 on origin/master; deployment=not applicable; deviations=no Edge installer built -->
