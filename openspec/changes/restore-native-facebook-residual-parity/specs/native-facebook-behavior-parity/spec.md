@@ -76,21 +76,26 @@ If no navigable canonical target can be resolved, or the landed page's canonical
 
 Bottom confirmation MUST be reachable on every declared Facebook list surface — home feed, search results, and group — using the same set of surfaces the adapter already accepts as the active list. The pre-round guard MUST NOT skip bottom confirmation merely because the current surface is not the home feed, **and the confirmation's own validity predicate MUST NOT invalidate a sample merely for being on a non-home list surface**: reachability requires both, and relaxing only the guard leaves the state unreachable.
 
-Bottom confirmation MUST use exactly five samples at offsets `t=0`, `t=5s`, `t=7.5s`, `t=10s`, and `t=12.5s`, where the probe passed into confirmation is the `t=0` sample. Across all five samples, the document generation and declared list surface MUST remain unchanged, the surface MUST remain non-loading and near-bottom, the height MUST NOT grow past the established noise floor, and the canonical card identity set MUST remain unchanged. `feed_exhausted` MUST be returned only after the fifth sample and only when `explicit_end` is present in all five samples. The adapter MUST NOT return `feed_exhausted` after any earlier sample. If structural evidence is invalidated, the confirmation MUST be cancelled immediately; if structural evidence remains stable through the fifth sample but `explicit_end` was absent from any sample, the result MUST be continuation-unconfirmed. The separate home-empty confirmation stays home-only and keeps its independent timing.
+Bottom confirmation MUST use exactly five samples at offsets `t=0`, `t=5s`, `t=7.5s`, `t=10s`, and `t=12.5s`, where the probe passed into confirmation is the `t=0` sample. Across all five samples, the URL, non-zero document time origin, document generation, and declared list surface MUST remain unchanged; `document_age_ms` MUST NOT move backward relative to the immediately preceding sample; the surface MUST remain non-loading and near-bottom, where at most one actual scrolling-container viewport may remain and exact mathematical bottom is not required; height growth relative to the initial sample MUST NOT exceed 100px (`>100px` invalidates); and the ordered canonical card identity vector MUST remain unchanged. `feed_exhausted` MUST NOT be returned before the fifth sample. For a canonical home Feed where the commanded list context began on home and the scroll observed at least one real canonical card on that same home URL and document time origin, the fifth structurally valid sample MUST confirm `feed_exhausted` even when `explicit_end` is missing or unstable. Search/group contexts and search/group commands redirected to home MUST retain their existing complete explicit terminal evidence and MUST NOT gain marker-free home-Reels authorization from this rule. If structural evidence is invalidated, the confirmation MUST be cancelled immediately. The separate home-empty confirmation stays home-only and keeps its independent timing.
 
 The Facebook browse-scroll and page-scroll command budget MUST be long enough for every bounded confirmation round and MUST be aligned across the Edge request, Edge admission, and Native engine ceiling. The fixed-sample wait MUST remain interruptible by task cancellation and the command deadline; lengthening confirmation MUST NOT make Native task quiescence wait for the full confirmation window.
 
-#### Scenario: Exhaustion requires the complete five-sample sequence
+#### Scenario: Home exhaustion requires the complete five-sample sequence
 
-- **WHEN** all bottom evidence, including `explicit_end`, remains valid at `t=0`, `t=5s`, `t=7.5s`, `t=10s`, and `t=12.5s`
+- **WHEN** the commanded list context began on home, that home Feed exposed a real canonical card on the same URL and document time origin, and all structural bottom evidence remains valid at `t=0`, `t=5s`, `t=7.5s`, `t=10s`, and `t=12.5s`
 - **THEN** the adapter returns `feed_exhausted` only after the `t=12.5s` sample
 - **AND** it does not return `feed_exhausted` after any of the first four samples
 
-#### Scenario: One missing explicit-end sample prevents exhaustion
+#### Scenario: Missing explicit-end samples do not block a previously non-empty home Feed
 
-- **WHEN** structural bottom evidence remains valid for all five samples but `explicit_end` is absent from any one sample
-- **THEN** the adapter returns continuation-unconfirmed after the fifth sample
-- **AND** it does not authorize a Reels transition from that confirmation
+- **WHEN** the commanded list context began on home, that home Feed exposed at least one real canonical card on the same URL and document time origin, and structural bottom evidence remains valid for all five samples
+- **AND WHEN** `explicit_end` is absent or unstable in any sample
+- **THEN** the adapter returns `feed_exhausted` after the fifth sample and leaves the actual Reels transition to Cloud authorization
+
+#### Scenario: Marker-free non-home stability does not authorize home Reels
+
+- **WHEN** a search or group list surface remains structurally near-bottom for all five samples but lacks its existing explicit terminal evidence
+- **THEN** the adapter retains the non-home continuation or recovery result and does not authorize the home Reels fallback
 
 When a bounded scroll ends without new canonical cards, the terminal reason MUST be classified by observed evidence, not by home-surface-only conditions: if canonical cards were seen on any declared list surface, the adapter MUST return a non-terminal continuation-unconfirmed reason; a target-not-found reason MUST be reserved for the case where no canonical card was observed at all. Reporting a target-not-found reason for a "this batch is fully seen" state is a prohibited semantic downgrade. Every Facebook scroll receipt MUST carry the observed list surface in its existing optional observation so Cloud can select a surface-appropriate recovery, and a Reels transition MUST NOT be authorized from exhaustion observed on a non-home list surface.
 
