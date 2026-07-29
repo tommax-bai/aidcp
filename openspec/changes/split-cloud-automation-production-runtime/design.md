@@ -335,6 +335,20 @@ api 的实现在 `aidcp-api/src/server.ts:1401-1443`，**照抄它，四个要�
 **缺依赖 MUST 停在具名原因上**，MUST NOT 以空值 / `false` / 默认值放行——
 这正是现在那个 fail-closed 壳在替我们守的东西，接线时不能把它守的东西一起删掉。
 
+### 4.1 dev 上的真实现状（2026-07-29 实测，**批次 5 的起点，别按文档想当然**）
+
+- **今天只有一个进程**：`aidcp-cloud.service`，单个 node 同时监听
+  `0.0.0.0:8787`（边-云 WS）、`127.0.0.1:8090`（面板）、`127.0.0.1:8091`（客户端鉴权 API）。
+  **`8092` / `8093` 空着**，api / automation / content 的 systemd 单元**一个都不存在**——
+  批次 5 要新建三个单元，不是改现有那个。
+- 同机 isales 四个服务在跑（`isales-api` / `-engine` / `-scheduler` / `-worker`）+ nginx 占 80 / 8088。
+  **红线照旧：任何 ECS 操作绝不碰它们。**
+- 运行方式是 `node --import tsx/loader src/server.ts`（源码直跑，非构建产物）——
+  三进程拆开后每个单元的 ExecStart 形态要照此确认，别假设有 dist。
+- 磁盘 40G 用 45%（余 21G）；`/opt/aidcp` 占 9.1G，其中 **131 个 `cloud.bak.*.tar.gz` 合计 1.1G**，
+  最早回溯到 07-17。**cloud 侧的部署备份没有保留策略**（console 侧有，只留最近 10 个）。
+  不阻塞，但三进程上线后备份会变三倍，**批次 5 前应给 cloud 备份加同样的保留策略**。
+
 **端口与隔离**：automation 内部端口默认 `8093`（`AIDCP_AUTOMATION_PORT`）；
 边-云 8787 与面板 8090 各有其主，**不要在本 change 里动它们的归属**。
 所有后台扫描 / 认领 / 重试 / 恢复类持久任务仍按 `AIDCP_DEPLOY_ENV` 写 `execution_target`，
