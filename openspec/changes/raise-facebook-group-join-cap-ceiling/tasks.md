@@ -5,29 +5,41 @@
 
 ## 1. aidcp-cloud — 数据库约束
 
-- [ ] 1.1 新增迁移 `migrations/0098_facebook_group_join_daily_cap_50.sql`（序号已核：现最大 0097）。内容为「按显式约束名删除旧 CHECK（不存在也不报错）→ 新增 `daily_cap BETWEEN 0 AND 50` 的同名 CHECK」，写成可重复执行。
-- [ ] 1.2 迁移头部按仓内既有格式补 `-- aidcp:kind=` 与 `-- aidcp:objects=` 元信息行，并注明「自愈建表模板对已存在的表不生效，故必须显式 ALTER」。
-- [ ] 1.3 确认现网旧约束的**真实名字**（自动生成名在不同环境可能不一致）。若不可预知，迁移改为「按 `information_schema` 查出该表上引用 `daily_cap` 的 CHECK 并逐个删除」再新增，避免删不掉旧约束导致两条约束并存、严格者继续生效。
+- [x] 1.1 新增迁移 `migrations/0098_facebook_group_join_daily_cap_50.sql`（序号已核：现最大 0097）。内容为「按显式约束名删除旧 CHECK（不存在也不报错）→ 新增 `daily_cap BETWEEN 0 AND 50` 的同名 CHECK」，写成可重复执行。 <!-- aidcp-cloud 196b2d3 照 0094/0039 先例按 pg_constraint 动态查名循环 DROP；含 undefined_table 兜底 -->
+- [x] 1.2 迁移头部按仓内既有格式补 `-- aidcp:kind=` 与 `-- aidcp:objects=` 元信息行，并注明「自愈建表模板对已存在的表不生效，故必须显式 ALTER」。 <!-- aidcp-cloud 196b2d3 偏离：objects 必须声明 table: 而非 constraint:，否则属主归属反推不出、落进残留分支被计入全部属主库（门禁 sync-read-checkpoint-migration 抓到） -->
+- [x] 1.3 确认现网旧约束的**真实名字**（自动生成名在不同环境可能不一致）。若不可预知，迁移改为「按 `information_schema` 查出该表上引用 `daily_cap` 的 CHECK 并逐个删除」再新增，避免删不掉旧约束导致两条约束并存、严格者继续生效。 <!-- aidcp-cloud 196b2d3 采动态查名方案（走 pg_constraint 而非 information_schema，与仓内先例一致） -->
 
 ## 2. aidcp-cloud — 契约常量与写入校验
 
-- [ ] 2.1 契约层平台常量：自动加群日上限硬上限 10 → 50，**按符号名定位**。
-- [ ] 2.2 逐字核对：同文件相邻的联系评论硬上限常量仍为 10，未被顺带修改。
-- [ ] 2.3 核对加群配置存储的自愈建表模板：确认它按常量插值、插值结果为 `BETWEEN 0 AND 50`；确认写前校验复用同一常量、无第二处写死数字。
-- [ ] 2.4 全仓搜一次自动加群日上限的其它写死表达（含测试、夹具、注释里的断言），逐处判定是跟随还是保留。
+- [x] 2.1 契约层平台常量：自动加群日上限硬上限 10 → 50，**按符号名定位**。 <!-- aidcp-cloud 196b2d3 -->
+- [x] 2.2 逐字核对：同文件相邻的联系评论硬上限常量仍为 10，未被顺带修改。 <!-- aidcp-cloud 196b2d3 两个常量各补了一段注释写明为何刻意不同值 -->
+- [x] 2.3 核对加群配置存储的自愈建表模板：确认它按常量插值、插值结果为 `BETWEEN 0 AND 50`；确认写前校验复用同一常量、无第二处写死数字。 <!-- aidcp-cloud 196b2d3 已核，模板与校验均单点派生 -->
+- [x] 2.4 全仓搜一次自动加群日上限的其它写死表达（含测试、夹具、注释里的断言），逐处判定是跟随还是保留。 <!-- aidcp-cloud 196b2d3 命中 4 处需跟随：store 测试 2 处、platform-registry 测试 1 处、schema 版本常量 1 处；migrations/0067 基线保留原值（历史快照，由 0098 覆盖） -->
 
 ## 3. aidcp-cloud — 测试
 
-- [ ] 3.1 新增/更新单测：日上限 50 写入成功；51 被整块拒并回可诊断原因，**不静默截断为 50**。
-- [ ] 3.2 新增回归断言：联系评论日上限 11 仍被整块拒（硬上限保持 10）——这条专门用来挡住 2.1 的误改。
-- [ ] 3.3 新增断言：账号配置 50 而风控日额度为 3 时，当日至多加入 3 个群并记录可诊断拒因（验证「抬天花板不放大实际跑量」这一不变量未被破坏）。
-- [ ] 3.4 跑 `npm run test:acceptance` → `npm test` → `npm run typecheck`（顺序按控制仓 §4 回归纪律）。
+- [x] 3.1 新增/更新单测：日上限 50 写入成功；51 被整块拒并回可诊断原因，**不静默截断为 50**。 <!-- aidcp-cloud 196b2d3 越界样本改用 MAX+1 而非写死 51，硬上限再变时不会退化成测合法值 -->
+- [x] 3.2 新增回归断言：联系评论日上限 11 仍被整块拒（硬上限保持 10）——这条专门用来挡住 2.1 的误改。 <!-- aidcp-cloud 196b2d3 store 测试与 platform-registry 测试各一处 -->
+- [x] 3.3 新增断言：账号配置 50 而风控日额度为 3 时，当日至多加入 3 个群并记录可诊断拒因（验证「抬天花板不放大实际跑量」这一不变量未被破坏）。 <!-- aidcp-cloud 196b2d3 偏离：该不变量由排期调度器既有用例覆盖（取小逻辑未被本次触碰），本 change 未新增重复用例；规格侧已补该场景 -->
+- [x] 3.4 跑 `npm run test:acceptance` → `npm test` → `npm run typecheck`（顺序按控制仓 §4 回归纪律）。 <!-- aidcp-cloud 196b2d3 acceptance 166/166、全量 3835 pass 0 fail、typecheck clean -->
 
 ## 4. aidcp-console — 夹具同步
 
-- [ ] 4.1 `src/pages/ContentSchedulePage.test.tsx` 里 `join_group` 的 `maxDailyCap` 由 10 改为 50（现位于 :204；同文件 :44 与 :203 的 `contact_comment` 保持 10 不动）。
-- [ ] 4.2 确认前端无其它写死的加群上限：输入框上限来自服务端下发的平台动作声明，**不需要改业务代码**。
-- [ ] 4.3 跑 console 测试与 typecheck。
+- [x] 4.1 `src/pages/ContentSchedulePage.test.tsx` 里 `join_group` 的 `maxDailyCap` 由 10 改为 50（现位于 :204；同文件 :44 与 :203 的 `contact_comment` 保持 10 不动）。 <!-- aidcp-console ff07b8a -->
+- [x] 4.2 确认前端无其它写死的加群上限：输入框上限来自服务端下发的平台动作声明，**不需要改业务代码**。 <!-- aidcp-console ff07b8a 已核，仅夹具与一处展示断言（分母 / 10 → / 50） -->
+- [x] 4.3 跑 console 测试与 typecheck。 <!-- aidcp-console ff07b8a 297 pass 1 skipped、typecheck clean -->
+
+## 4b. 门禁遗留记录（实装中被红线抓到、值得后来人知道）
+
+- [x] 4b.1 运行时 DDL 棘轮**连注释文本一起数**：在常量注释里写一句字面的建表语句就会把冻结基线顶上去。注释改用功能性描述即可。 <!-- aidcp-cloud 196b2d3 -->
+- [x] 4b.2 迁移顺序闸的表名正则**不含点号**：写 `public.<表>` 会被截成表名 `public`，误报成「引用了尚未建出的表」。仓内约定不写 schema 前缀。 <!-- aidcp-cloud 196b2d3 -->
+- [x] 4b.3 `KNOWN_MAX_SCHEMA_VERSION` 抬到 0098，**REQUIRED 刻意不抬**：放宽方向的约束替换不构成硬依赖，旧库仍能正常跑。 <!-- aidcp-cloud 196b2d3 -->
+- [x] 4b.4 aidcp-console 的 `package-lock.json` 被 gitignore，新建 worktree 里没有，`npm ci` 会直接失败；需从 canonical checkout 拷一份。 <!-- aidcp-console ff07b8a -->
+
+## 4c. 集成
+
+- [x] 4c.1 aidcp-cloud ff 推送到 origin/master。 <!-- aidcp-cloud 196b2d3 -->
+- [x] 4c.2 aidcp-console ff 推送到 origin/master。 <!-- aidcp-console ff07b8a -->
 
 ## 5. 执行与验收（运维，人工按序）
 
