@@ -258,15 +258,40 @@
   改判后它按 import 派生就成了跨属主测试、**留守 cloud，两个派生仓都不跑它**。
   那道闸守的是「角色名写错一个字母 → 调度器按名字查不到模型配置 → 静默用默认模型跑、零日志」，
   **不能就这么失效**。按属主拆成两份，或明确记录它为何留守。
-- [ ] 0.7b **同步时需要 `--prune`**：四个角色 + `content-role.ts` + `curated-gate.ts` 要从
+- [x] 0.7b **同步时需要 `--prune`**：四个角色 + `content-role.ts` + `curated-gate.ts` 要从
   `aidcp-content/src` 移除、进 `aidcp-automation/src`。`sync-split-repos` 默认只报不删，
   **必须显式 `--prune`**，否则 content 仓会同时留着旧副本（两份实现，本项目点名的失败形态）。
   <!-- 2026-07-29 已对改判分支实跑预演坐实（--ref origin/codex/<change>，只读）：
        automation 227→233（新增 6）、content 85→79（**多出 6**）、kernel 96→101（新增 5）。
        「多出 6」就是不 prune 会留在 content 的那批。 -->
-- [ ] 0.8 落实 A1：模型出口进 `aidcp-transport`。核对准入判据实跑一遍
+  <!-- 2026-07-29 已真同步：`--apply --prune` 后六仓全对齐（automation 234/234、content 79/79、
+       kernel 102/102、transport 48、api 115/115，pin 全对齐），残余「差异」只剩组装根（设计上从不同步）。 -->
+  <!-- 实跑还挖出两个预演看不见的坑，都不在原计划里：
+       ① **测试要单独一趟 `--apply --tests`，且它不删**。src 搬完不带测试，content 会留下三个引用已搬走
+          符号的测试文件（编译红）。`--tests` 与 `--prune` 互斥（脚本硬拦），所以顺序必须是
+          先 `--apply --prune` 收 src、再 `--apply --tests` 收测试、最后**人工删**它报出的「多出」那一个
+          （`test/publish-agent/curated-gate.test.ts`，脚本只报不删，理由是派生私有测试必须显式保留）。
+       ② **派生仓自己那份 `boundaries/ownership-rules.json` 不在同步范围内，会长期静默漂**。
+          automation 那份还写着四个角色归 content（我在事实源里已改判 automation），
+          且**早就**漏了两条 facebook-rule-mode 裁定——之所以一直没人发现，是因为它的
+          `module-ownership.json` 是个更早生成的产物、把窟窿盖住了：census 测试过得去，
+          而 `boundaries:refresh` 一跑就抛。本轮按事实源补齐了这三处。
+          **这是结构性问题，不是本次的一次性修补**：登记为 0.7c。 -->
+- [ ] 0.7c **派生仓的 `boundaries/*.json` 目前是手抄件、不在 `sync-split-repos` 的同步范围内。**
+  按 §8.1，归属的唯一事实源是控制仓 §4.7 → `aidcp-cloud/boundaries/ownership-rules.json`。
+  但 `aidcp-automation/boundaries/ownership-rules.json` 是从 `aidcp-cloud@41f2c73` 抄下来后
+  **各改各的**，与事实源已差 88 行；`kernel-non-members.json` 差 49 行、`adjudicated-files.json` 差 4 行。
+  漂移不会当场报错，只在有人跑 `boundaries:refresh` 时才炸——而平时跑的是 census 测试，
+  它读的是**已生成**的 `module-ownership.json`，正好把窟窿盖住。
+  **要么让 `sync-split-repos` 把规则表也纳入对账，要么让派生仓不再自持规则表、直接读事实源那一份。**
+  本轮只按事实源补齐了 automation 的三处，没动这个结构。
+- [x] 0.8 落实 A1：模型出口进 `aidcp-transport`。核对准入判据实跑一遍
   （`test/acceptance/module-boundary.test.ts` 的真正则，别凭记忆用「四条硬禁」），
   再按 kernel → transport → 三个业务仓的顺序快进 pin。
+  <!-- 2026-07-29 完成：`src/llm/qwen.ts` + `src/llm/providers.ts` 进 aidcp-transport（08c4e81）。
+       pin 按序快进：kernel 21cc10a → transport 21cc10a → 三个业务仓 21cc10a/08c4e81，
+       每一步 `npm install --userconfig /dev/null` + typecheck + 全量测试。
+       六仓全绿：cloud 全量 / api 470 / automation 1888 / content 436 / kernel 57 / transport 36。 -->
   <!-- 0.4 的裁决实质成立且已实跑核过：qwen.ts 548 行、SQL/池/存储引用零命中、import 只指 kernel。
        但 0.4 记的理由有一条是错的，见 0.8a。落点闭包见 0.8b/0.8c。 -->
 - [ ] 0.8a **更正 0.4 的密钥口径**：0.4 写的「密钥各自从 env 读」与生产事实不符——真实做法是
@@ -443,6 +468,17 @@
   **三进程真跑属批次 5，本 change 不声称**。
 - [ ] 5.4 dev 部署按 CLAUDE §5 安全序列（先备份 → rsync → restart → healthcheck → 失败即回滚）；
   **绝不碰同机 isales**。ol 一律等用户明确要求且走发布分支。
+  <!-- 2026-07-29 22:08 已部署第一批（aidcp-cloud@b66c022，单体形态）。
+       快照来源：从 master 目标提交 `git archive` 出的干净快照，**不从任何 worktree 部署**。
+       备份：/opt/aidcp/cloud.bak.20260729-220746.tar.gz + .env.bak.20260729。
+       rsync 排除 .env / node_modules / .git；本批 package.json 零变更，故未动 node_modules。
+       healthcheck 全过：active running；8787 与 127.0.0.1:8090 均在监听；PG 锚点缓存就绪；
+       飞书长连接已建立（WSClient onReady）；重启后错误行数 0；config-mirror 正常 5s 一跳。
+       同机 isales 四个服务重启前后均 active，全程未触碰。
+       **这只证明单体现网零回归**（5.3 的口径），不证明三进程能跑。ol 未部署、用户未提。 -->
+  <!-- b66c022 是本批的**最后一个**提交，所以 0.3f 的台账收窄与四条运营指令契约都在这次部署里；
+       但它俩不改运行时行为（契约零接线、台账只活在测试面），现网真正变的只有
+       错误族抬 kernel、文字转写能力二态、四个角色改判这三处。 -->
 - [ ] 5.5 本地桩验不了的登记 `docs/real-machine-acceptance-backlog.md`（簇 60）。
 - [ ] 5.6 回写 `docs/cloud-composition-root-trisection.md` §0.0 与
   `docs/cloud-split-next-session-handoff.md` §0.1/§0.2 的实测现状。
