@@ -24,7 +24,19 @@ authoritative vetoes.
 
 #### Scenario: Missing Cloud threshold does not use a local fallback
 - **WHEN** a standby hint is missing, malformed, or lacks a valid `minWaitMs`
-- **THEN** Edge MUST NOT enter a new cold-standby cycle from that hint
+- **THEN** Edge MUST revoke any cached hint and pending post-hold recheck for
+  an awake browser and MUST NOT enter a new cold-standby cycle from that hint
+
+#### Scenario: Invalid non-positive Cloud threshold is rejected
+- **WHEN** a standby hint advertises `minWaitMs` below Cloud's supported
+  positive threshold
+- **THEN** Edge treats the hint as malformed and keeps an awake browser open
+
+#### Scenario: Existing standby keeps its deterministic wake
+- **WHEN** a browser is already in cold standby from a previously valid hint
+  and a later snapshot omits or malforms `browserStandby`
+- **THEN** Edge retains that cycle's existing wake timer, but the stale hint
+  MUST NOT start another standby cycle after the browser wakes
 
 #### Scenario: Legacy threshold cannot be re-persisted
 - **WHEN** an upgraded client loads or is asked to save a settings object that

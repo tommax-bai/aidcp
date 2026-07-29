@@ -52,14 +52,19 @@ Alternatives rejected:
 
 ### Missing Cloud evidence never starts a new standby cycle
 
-The existing `browserStandby` payload remains optional. A missing payload does
-nothing; a payload with missing or invalid required fields is rejected; and
-Edge's existing `cloud === connected` gate remains required before entering
-standby. No local threshold attempts to reconstruct Cloud's decision.
+The existing `browserStandby` payload remains optional. Every received
+`ui.snapshot` is an authority update: a valid hint replaces the current hint,
+while a missing or malformed payload revokes any cached hint and pending
+post-hold recheck for an environment whose browser is still awake. A
+`minWaitMs` below Cloud's supported positive threshold is malformed. Edge's
+existing `cloud === connected` gate remains required before entering standby,
+and no local threshold attempts to reconstruct Cloud's decision.
 
 An environment already in standby retains the wake timer created from its last
-valid hint and its existing Cloud reconnect behavior. This preserves the
-deterministic wake path without allowing new decisions from incomplete data.
+valid hint and its existing Cloud reconnect behavior. A close that is only
+pending is cancelled when the hint is revoked. This preserves deterministic
+wake for an already sleeping browser without allowing a cached hint to start a
+new cycle after Cloud evidence disappears.
 
 ### Legacy settings are ignored immediately and removed through normal writes
 
