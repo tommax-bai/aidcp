@@ -71,6 +71,20 @@
   **投影形状不同**。今天 `server.ts:7024` 的 `: Promise.resolve([])` 降级形状跨进程后会把
   「连不上」吃成「没有精选素材」，MUST 换成可区分的结果。
   另：`server.ts:4986` 与 `:5311` 只把 store 当「有没有」用，MUST 换成显式可用性查询。
+- [ ] 0.6e **「能力探针」跨进程后恒为真——比可选方法漏实现更糟。**
+  今天的回落写法是 `this.d.conceptStore.getNewConceptsWithSourceSince ? … : …`，
+  一个 `typeof` 能力探针。跨进程后客户端类**总是**定义着那个方法，探针恒真、**回落分支变死代码**，
+  而真实的能力缺口（对面版本落后 / 路由没注册）反被静默吞掉。
+  → 端口上两个读方法**都不带可选标记**，回落改由具名的 `unsupported_method` 驱动。
+  **保留 `?` 等于保留一张假的安全网。**
+- [ ] 0.6f **降级形状有三处，只改一处等于没改**：
+  ① `src/server.ts:7024` 的 `: Promise.resolve([])`（组装根层）；
+  ② `aidcp-automation/src/comment-agent/comment-scheduler.ts:1603` 的 `.catch(() => [])`
+  ——**即使组装根那层改了，调度器自己这个 catch 仍会把端口抛出的传输失败重新吃成空数组**；
+  ③ `role-dispatcher.ts:2456` 的「PG 不可用 / 装载失败 → 回退空池」。
+- [ ] 0.6g **调用点比原记录多两处**（接线时都要改）：`markSearched` 有两个
+  （`role-dispatcher.ts:3411` 下发搜索后 + `:3714` 回执后）；`countNewSince` 有两个
+  （`publish-scheduler.ts:263` 聚合输入 + `:323` 概念积累扳机）。
 - [ ] 0.6d **Sink 的可选方法是第二处静默陷阱**：`CuratedNoteSink` 的 `refreshReferenceImages?`
   与 `getTextCardContext?` 都用 `?.` 调用（`:153` / `:182`）。换成 HTTP 客户端后**少实现一个方法
   编译通过、运行不报**——少 `getTextCardContext` 则缓存恒空、每篇图文帖重跑视觉转写（纯成本爆炸、
@@ -108,6 +122,14 @@
   理由是结构性的：`src/llm/vision.ts:19-24` 从 `qwen.ts` 取这 5 个符号，
   qwen 进包而 vision 留 content 会各持一份错误类，跨副本 `instanceof` 静默退化——
   把「密钥没配」报成「模型不可用」。**一份定义才能让 `instanceof` 跨进程仍然成立。**
+- [ ] 0.8d **`LlmTimeoutError` 暂未随迁，登记为后续项**：它不在错误族那 5 个符号里，留在 `qwen.ts`、
+  现从 kernel 取 `formatLlmMeta` 拼消息。**现状风险为零**（全仓只有 qwen 侧一处对它 `instanceof`）；
+  但**拆仓后若 content 侧也需要识别「模型调用超时」，它必须跟着进 kernel**——否则原样重演
+  跨副本 `instanceof` 恒 false 那个坑。
+- [ ] 0.8e **`src/llm/index.ts` 与 `src/server.ts` 是否改指 kernel 由集成时定**：
+  两者经 `src/llm/index.ts` 这个 barrel（`export * from './qwen.js'`）取错误族，
+  而它们同时也从同一 barrel 取模型客户端本体，所以 `index.ts → qwen.ts` 这条边**本来就存在**，
+  再导出既没新增也没假消掉任何边。真正要消的 `vision.ts → qwen.ts` 已彻底消失。
 - [ ] 0.8c **`vision.ts` 留 content**（其消费者全是 content：视觉分析 / 保真核验 / 封面形态 / 文字卡转写）；
   **`providers.ts` 随 qwen 进 transport**——厂商 base URL 字面量当场命中准入正则
   （正则只剥注释、**不剥字符串字面量**），进不了 kernel。
