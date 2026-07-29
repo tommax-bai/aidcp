@@ -76,7 +76,27 @@
 
 ## 9. 规格待和解（不得无限期挂着）
 
-- [ ] 9.1 `facebook-feed-browse` 现有正文隐含「可上报 = 持有平台永久链接」，与本 change 的第二类身份口径不一致。因该能力已被 `repair-facebook-feed-exhaustion-continuation` 与 `restore-native-facebook-residual-parity` 各持 delta，本 change 刻意不叠第三份。**待那两条归档后立即补一条只改措辞的 change 收口**——两份规格同时有效期间，后来人按哪一份实现都说得通，这是真实的歧义风险
+- [ ] 9.1 `facebook-feed-browse` 现有正文隐含「可上报 = 持有平台永久链接」，与本 change 的第二类身份口径不一致。本 change 刻意不叠 delta，**待门槛齐备后补一条只改措辞的 change 收口**——两份规格同时有效期间，后来人按哪一份实现都说得通，这是真实的歧义风险
+
+  > **2026-07-29 复核，本条的范围与门槛都被改写过，见 §12。**下面是收口时必须覆盖的清单
+  > （原文只点了 `facebook-feed-browse` 一份能力，实测**划窄了**）：
+
+- [ ] 9.2 **收口范围（三份能力、至少七条要求）**。逐条核对过，勿再按「就那三条」估工：
+  - `facebook-feed-browse:123` 卡的身份边界（「卡内没有帖子形状的链接就 MUST NOT 可上报 / 可动手」）
+  - `facebook-feed-browse:145` 轻量视频卡（明写「作者、或正文文本 MUST NOT 被提升为帖子身份」——正是本机制的原料）
+  - `facebook-feed-browse:187` 「在场但不可上报」→ 授权切 Reels（触发条件按「有没有可上报的卡」定义）
+  - `facebook-feed-browse:163` 严格轻量视频「只有真呈现才可上报」——**第四道**同前提的可上报闸，原清单漏了
+  - `facebook-feed-browse:6` 「按会话级 canonical-id 游标只报新出现的卡」
+  - **`facebook-feed-browse:63` 就地读全文——最要紧的一条，原清单漏了**
+  - `platform-browse-surface:102` 「回执的 noteId MUST 由被动作的 DOM 派生**为规范帖 id**，feed 面无派生 id 的回执 MUST 拒记账」
+    ——就地点赞会话内引用的回执带的正是引用而非规范帖 id
+  - `native-facebook-behavior-parity:20` 「可见文章缺**可信永久链接**时继续下滚」
+
+- [ ] 9.3 **`facebook-feed-browse:63` 不是歧义、是直接互斥，优先级高于其余各条。**
+  它管的正是本 change 打开的那条主路径（就地读）：正文要求「MUST 按命令里的**规范帖 id** 锁定唯一一篇文章」，
+  且场景「展开会离开 feed 时**回落到详情页导航**」。而本 change 的新能力明写会话内引用
+  **MUST NOT 被导航、MUST NOT 被当详情页打开**。也就是说两份规格互相禁止对方的行为，
+  不是「按哪份都说得通」，是「按哪份都会违反另一份」。
 
 ## 10. 实装实测记录
 
@@ -106,10 +126,38 @@
 
 ## 12. 归档前置（本 change 尚未归档的原因）
 
-- [ ] 12.1 **§9.1 的规格和解还没门槛**：它要等 `repair-facebook-feed-exhaustion-continuation` 与
-  `restore-native-facebook-residual-parity` 归档后才能补那条只改措辞的 change（现在叠第三份 delta
-  会在归档合并时撞车）。**此前不归档本 change**——一旦归档，§9.1 就只活在归档目录的 tasks.md 里，
-  等于把一条已知的规格歧义悄悄丢掉，而这正是提案里明写「不得无限期挂着」的那条。
+- [x] 12.1 ~~**§9.1 要等两条 change 归档，因为现在叠第三份 delta 会在归档合并时撞车**~~
+  <!-- 2026-07-29 复核：**这条理由是错的，已推翻。**归档合并的单位是**单条要求**（按 `### Requirement:`
+  标题精确匹配、`name.trim()` 归一），不是整份能力文件；未被 delta 点名的要求逐字原样带过。
+  三路独立坐实：① 读 CLI 源码 `@fission-ai/openspec@1.2.0` 的 `specs-apply.js`（MODIFIED = 一次 map 条目替换，
+  重组时按原顺序带过未点名的块）；② 仓库先例——`content-schedule` 被三条 change 于同日各改不相干的要求后归档，
+  六个块在 HEAD 上全部逐字存活；③ 在沙盒副本里用**真 CLI 跑了两种归档顺序**，产物逐字节相同。
+  另外两条同期已归档：`repair-facebook-feed-exhaustion-continuation` 已于 2026-07-29 归档并合并成功。
+  **真正的撞车条件是「两条 change 改同一条要求」**——那是静默的 last-writer-wins，工具不会警告
+  （仓内实例：`Facebook 自动加群按账号独立配置且默认关闭` 被两条 change 各改一次，只因作者手工把前一版
+  正文抄成超集才没丢东西）。 -->
+
+- [ ] 12.2 **但门槛仍在，只是换了三条真理由**（对抗性复核，三路全部推翻「现在就能收口」）：
+  - **(a) 范围划窄了。**「可上报 = 有永久链接」不止那三条要求，见 §9.2 的七条清单、跨三份能力。
+    只改三条 = 同一份文件自相矛盾，§9.1 并未被讨清。
+  - **(b) 活跃 change 会在收口之后把假设**写回来**。`restore-native-facebook-residual-parity` 的
+    delta 里有主规格**今天还没有**的新句子：`facebook-feed-browse` 的 Navigate 那条新增
+    「MUST 从命令本身解析可导航的规范目标（**作为笔记身份携带的规范帖永久链接**，或显式给出的地址）」；
+    它给 `native-facebook-behavior-parity` 新增的八条要求里，`Facebook list-surface exhaustion…` 又把
+    「规范卡」重新立为可上报的计量单位。现在收口 = 讨清几小时到几天，然后被一份**已经躺在磁盘上**的
+    delta 静默还原。
+  - **(c) 顺序在这一侧是硬约束。**完整收口必须改到那条**尚不存在**的新要求；MODIFIED 匹配不到标题会
+    `MODIFIED failed for header ... - not found` → `Aborted. No files were changed.`。
+    即「收口先归档」会硬失败，必须 `restore-native-facebook-residual-parity` 先归档。
+  - **(d) 经验前提本身未定。**`acquire-facebook-feed-post-identity-by-hover`（32/48）正在测「悬停能不能
+    把无地址的卡变成有地址」，其 tasks 自述「真机验证：未通过」「5/5 与 0/1，样本太小，不下结论」。
+    第二类身份到底覆盖多少卡是**未测量的**；现在把措辞写死＝替一个没人知道的答案定稿。
+
+- [ ] 12.3 **此前不归档本 change**——一旦归档，§9.1 就只活在归档目录的 tasks.md 里，
+  等于把一条已知的规格互斥悄悄丢掉，而这正是提案里明写「不得无限期挂着」的那条。
+  **触发条件（三者齐备即可动手，勿再等「那两条」这个已过期的说法）**：
+  ① `restore-native-facebook-residual-parity` 归档；② §9.2 七条清单逐条起草完毕；
+  ③ 悬停采集那条的真机结论出来（决定第二类身份的措辞该写多强）。
 - [ ] 12.2 归档时顺带确认：本 change 的 spec delta 只新增 `facebook-content-derived-post-identity`
   一份能力，不碰 `facebook-feed-browse`（刻意为之，见提案）。
 
