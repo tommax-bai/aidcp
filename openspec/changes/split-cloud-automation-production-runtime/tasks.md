@@ -22,11 +22,22 @@
        cloud 侧 11 条另有机械证据：test/acceptance/composition-root-4a-inventory.test.ts
        的 AST 派生探针实跑 6 pass / 0 fail（该测试自熄——依赖真被解决就会 deepEqual 失败）。
        第 12 条由读 runAutomationEntry 源码确认。复核同时推翻 / 补正了 8 处，见 design.md §5.5。 -->
-- [ ] 0.3a **台账其实有三份，第三份已静默漂到 20 条**：
+- [x] 0.3a **台账其实有三份，第三份已静默漂到 20 条**：
   `aidcp-automation/boundaries/composition-root-independent-blockers.json` 是手写台账的陈旧快照、
   全仓零读取点（多出的 8 条是 4b 已关闭的镜像项）。§4 的「两份同批收缩」实为**三份**。
-- [ ] 0.3b **给 automation 台账加机械锚**：cloud 那份是 AST 派生、自熄；automation 那份是手写、
-  无任何机械力量把它钉在现实上——**这正是它会漂的原因**。清零前先补锚，否则清完还会再漂一次。
+  <!-- aidcp-automation a09a956。多出的 8 条**恰好全部是 4b-mirror**（4b 已由同步读镜像关闭，
+       TS 常量早就删了，JSON 停在旧快照）。已删并经官方写出口重新派生，未手改 JSON。
+       cloud 那份与 automation 那份不是同一口径（前者单体全量、后者收窄子集），不能直接比总数。 -->
+- [x] 0.3b **给 automation 台账加机械锚**：cloud 那份是 AST 派生、自熄；automation 那份是手写、
+  无任何机械力量把它钉在现实上——**这正是它会漂的原因**。
+  <!-- aidcp-automation a09a956 + 32f3aa8。新增 test/acceptance/automation-root-readiness-ledger.test.ts
+       （带 aidcp:test-owner=derived 标记，属派生私有、不被同步覆盖）。四条断言：TS 常量与 JSON 必须
+       deepEqual（含顺序与 id 序列）；summary 三个字段必须从台账算出且四个分类键齐全（含当前为 0 的那类，
+       防「零值被省掉→漏了看不出来」）；id 唯一 + owner/category 取值合法；4b-mirror 分类恒为空
+       （那 8 条是被关闭的，重新出现即镜像回归，须裁定而非静默回填）。
+       **锚的有效性用双向变异实测过**：JSON 单加一条 → 3 个用例红；TS 常量单删一条 → deepEqual 红。
+       **边界要知道**：它锚的是**自洽**不是与现实一致——两侧一起改仍然全绿。docstring 已收敛到如实
+       （32f3aa8）。继承自熄性的做法见 0.3e。 -->
 - [x] 0.3c **三条 `identifier` 探针不具判别力**（`concept` / `curated` / `facebookPublishMedia`）：
   `src/server.ts:3900` 是 segC 开头一整行解构，三个名字都在里面。
   <!-- 2026-07-29 已改：在 census 既有机制内新增探针种类 identifier-use（沿用同一 EvidenceProbe 与
@@ -117,9 +128,10 @@
   要升级需同批改三个今天直接传裸实现的测试文件
   （`test/agents/curated-note-evaluator.test.ts` / `test/role-prompt-persona-segments.test.ts` /
   `test/helpers/role-factories.ts`）。
-- [ ] 0.5f **测试侧工厂镜像已与生产不同步**：`test/helpers/role-factories.ts:29-36` 仍写着
-  `...(textCardTranscriber ? {...} : {})`。今天无正确性问题（缺失仍落 `not_injected` 并留痕），
-  但那份镜像的注释自称「与生产逐条对齐」——不改，这句话会慢慢变成假的。
+- [x] 0.5f **测试侧工厂镜像已与生产对齐**。
+  <!-- aidcp-cloud 0dcd0eb。漂移方向是**测试比生产宽松**：省略字段正是让「依赖没接上」
+       读起来跟「旗标关掉了」一模一样的那个写法，所以拆仓引入的漏传在测试里会照样绿。
+       typecheck 0，相关两个测试 16/16。 -->
 - [ ] 0.5g **缺席的真正上游在角色调度器**：`role-dispatcher.ts:2170` 决定要不要把不透明句柄
   放进工厂 options。链路现在是「调度器可能不给 → 组装根**显式**翻译成 unavailable → 角色留痕」，
   缺席不会再被压成假；但若要让「漏传」变成**编译期**错误，得从那里连同工厂选项类型一起收紧。
