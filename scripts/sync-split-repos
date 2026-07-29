@@ -239,13 +239,19 @@ def migration_owner_scopes(ref: str) -> dict[str, set[str]]:
 import { loadMigrationFiles } from './src/schema/migration-files.js';
 import { loadMigrationOwnerScopes } from './src/schema/migration-owners.js';
 import { buildOwnerScopes } from './src/schema/schema-gate.js';
+import { narrowSchemaContract, REQUIRED_SCHEMA_VERSION } from './src/schema/schema-contract.js';
 const files = await loadMigrationFiles(process.argv[2]);
 const nameOf = new Map(files.map((f) => [f.name.replace(/\\.sql$/, ''), f.name]));
 const { index } = await loadMigrationOwnerScopes(() => Promise.resolve(files));
 const scopes = buildOwnerScopes(index);
-const out = { _residue: index.residue };
-for (const owner of ['api', 'automation', 'content'])
+const out = { _residue: index.residue, _narrowed: {} };
+for (const owner of ['api', 'automation', 'content']) {
   out[owner] = scopes[owner].known.map((v) => nameOf.get(v) ?? `${v}.sql`);
+  // 派生仓的启动契约 = 把单体那个「三家并集」的下限收窄到该属主自己的版本集上。
+  // 这正是 narrowSchemaContract 存在的理由（它的注释点名了 content 库会被假 behind/ahead 判定），
+  // 所以这里调它，不在 Python 侧复刻 —— 复刻过一次，当场差了 1 条。
+  out._narrowed[owner] = narrowSchemaContract(scopes[owner].known, REQUIRED_SCHEMA_VERSION).required;
+}
 console.log(JSON.stringify(out));
 """
     with open(script, 'w', encoding='utf8') as fh:
@@ -260,7 +266,8 @@ console.log(JSON.stringify(out));
         return {}
     finally:
         os.path.exists(script) and os.remove(script)
-    return {k: set(v) for k, v in json.loads(raw).items()}
+    # `_narrowed` 是 owner → 版本串的字典，其余是文件名列表；只把列表转成集合。
+    return {k: (set(v) if isinstance(v, list) else v) for k, v in json.loads(raw).items()}
 
 
 def check_migrations(path: str, scopes: dict[str, set[str]], layer: str) -> int:
@@ -317,11 +324,12 @@ def rewrite_kernel_imports(text: str, kernel_paths: set[str], src_file: str) -> 
 SCHEMA_VERSION_RE = re.compile(r"export const REQUIRED_SCHEMA_VERSION = '(?P<v>[^']+)';")
 
 
-def derived_schema_version(scopes: dict[str, set[str]], layer: str) -> str:
-    """派生仓的启动契约版本 ＝ **它自己真正随仓发的**最高那条迁移。
+def derived_schema_version(scopes: dict, layer: str) -> str:
+    """派生仓的启动契约版本 —— 取自云端 `narrowSchemaContract` 的收窄结果，**不在这里算**。
 
-    单体的 `REQUIRED_SCHEMA_VERSION` 是三个属主库合起来的最高版本；派生仓照抄，
-    就会在启动自检里断言一条它根本不发的迁移。
+    单体的 `REQUIRED_SCHEMA_VERSION` 是三家并集上的下限；派生仓照抄，就会在启动自检里
+    断言一条它根本不发的迁移。注意它**不等于「最高迁移」**（今天是 `0097`，而 `0098` 已存在）
+    —— 它是手工设的下限，所以「取该仓最高属主迁移」是另一条规则、会在别的日子给出不同答案。
 
     **MUST NOT 把某个版本串写死。** 这里曾经写死过：改写规则拿当时云端的
     `0076_config_mirror_bump_inbox` 当「必须存在的源标记」，云端走到 `0097` 后当场
@@ -329,15 +337,15 @@ def derived_schema_version(scopes: dict[str, set[str]], layer: str) -> str:
     transport 三个目标一个都没对账**，默认跑法看着却像跑完了。锚点选错的代价不是这一行
     改写失效，是整轮对账静默缩水到 1/5。
     """
-    owned = scopes.get(layer) or set()
-    if not owned:
+    narrowed = scopes.get('_narrowed') or {}
+    version = narrowed.get(layer)
+    if not version:
         raise RuntimeError(
-            f'无法为 {layer} 推导启动契约版本：迁移属主范围为空。'
+            f'无法为 {layer} 取得收窄后的启动契约版本。'
             f'（权威实现跑不起来时上游返回 {{}}，此时 MUST 停手 —— '
             f'照抄单体版本会让派生仓断言一条它不发的迁移。先修 npx tsx 再来。）'
         )
-    highest = max(owned, key=lambda n: (n.split('_', 1)[0].rjust(8, '0'), n))
-    return highest[: -len('.sql')] if highest.endswith('.sql') else highest
+    return version
 
 
 def rewrite_schema_contract(text: str, scopes: dict[str, set[str]], layer: str) -> str:
