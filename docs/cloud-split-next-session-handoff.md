@@ -29,21 +29,31 @@ AC-BOUND metrics {"sourceFiles":455,"crossBoundaryEdges":0,"involvingContent":0,
 
 ### 0.1 当前指针（fleet 活跃，务必自己复核）
 
-**2026-07-29 实测**（源 = `aidcp-cloud@424834d`）：
+**2026-07-29 22:15 实测**（源 = `aidcp-cloud@b66c022`，change `split-cloud-automation-production-runtime` 第一批已 land）：
 
 | 仓 | HEAD | 分支 | 状态 |
 | --- | --- | --- | --- |
-| `aidcp`（控制仓） | `284fc015` | `main` | — |
-| `aidcp-cloud`（事实源） | `424834d` | `master` | — |
-| `aidcp-kernel` | `6bf0603` | `master` | typecheck 0 · 测试 57/57 |
-| `aidcp-transport` | `eeb6b3e` | `master` | typecheck 0 |
-| `aidcp-api` | `6181771` | `master` | typecheck 0 · 测试 470/470 |
-| `aidcp-automation` | `21dfe08` | `master` | typecheck 0 · 测试 1832 pass / 0 fail |
-| `aidcp-content` | `b4b1bf6` | `master` | typecheck 0 · 测试 455/455 |
+| `aidcp`（控制仓） | `beb8e5c1` | `main` | — |
+| `aidcp-cloud`（事实源） | `b66c022` | `master` | typecheck 0 · 全量绿 |
+| `aidcp-kernel` | `21cc10a` | `master` | typecheck 0 · 测试 57/57 |
+| `aidcp-transport` | `08c4e81` | `master` | typecheck 0 · 测试 36/36 |
+| `aidcp-api` | `662918f` | `master` | typecheck 0 · 测试 470/470 |
+| `aidcp-automation` | `2c45e1b` | `master` | typecheck 0 · 测试 1888/1888 |
+| `aidcp-content` | `3770ea2` | `master` | typecheck 0 · 测试 436/436 |
 
-六仓：工作区干净、已推远端、共享包 pin 对齐（kernel `6bf0603` / transport `eeb6b3e`）。
-`./scripts/sync-split-repos --ref <cloud sha> --tests` 除组装根外零差异。
-**五个派生仓第一次同时全绿。**
+六仓：工作区干净、已推远端、共享包 pin 对齐（kernel `21cc10a` / transport `08c4e81`）。
+`./scripts/sync-split-repos` 除组装根外零差异（api 115/115、automation 234/234、content 79/79、
+kernel 102/102、transport 48）。边界门禁：`sourceFiles 526 · crossBoundaryEdges 0 ·
+exemptionEntries 0 · frozenTotal 0`。
+**`aidcp-cloud@b66c022` 已部署 dev（单体形态），healthcheck 全过，同机 isales 未触碰。**
+
+**同步链路上这次实测出的两条，照着做能省一晚上：**
+- **测试要单独一趟 `--apply --tests`，而且它不删。** `--prune` 与 `--tests` 互斥（脚本硬拦）。
+  正确顺序：先 `--apply --prune` 收 src、再 `--apply --tests` 收测试、最后**人工删**它报出的「多出」。
+  少了这一趟，src 搬走而测试留在原仓，原仓当场编译红。
+- **派生仓自己那份 `boundaries/*.json` 不在同步范围内，会长期静默漂。** automation 那份与事实源
+  已差 88 行，且早就漏了两条裁定——平时跑的 census 读的是**已生成**的 `module-ownership.json`，
+  正好把窟窿盖住，只有跑 `boundaries:refresh` 才炸。见 change 的 tasks.md 0.7c。
 
 **下面 0.1 之外的历史快照（`f9ff71e` / `7d32913` 那一版）已过期，只作追溯。**
 
@@ -57,6 +67,14 @@ AC-BOUND metrics {"sourceFiles":455,"crossBoundaryEdges":0,"involvingContent":0,
 的 `runAutomationEntry()` 读完配置即抛 `AutomationRootNotReadyError`，
 12 条 readiness blocker 全标 `closingChange:'future'`、**无 change 承接**。
 这不是 bug 是设计，但意味着批次 4 未完成；批次 5（dev 三服务真跑）随之未开工。
+
+**2026-07-29 更新：那 12 条孤儿 blocker 已有承接者** —— change
+`split-cloud-automation-production-runtime`（用户当日拍板）。当前进度见该 change 的 `tasks.md`。
+第一批已 land + 部署 dev，做完的是「前置」而非入口本身：
+归属改判（四个精选评估角色 + 基类 + 精选闸 content → automation）、模型出口进 transport、
+LLM 错误族抬进 kernel、automation→content 的三个 kernel 端口面、四条运营指令的 kernel/transport 契约。
+**这些都只定义、未接线**；automation 的 `main()` 仍未写，批次 5 仍未开工。
+台账本身也仍未清零（cloud 55 条 / automation 14 条），**清零是入口能写的前提，不是入口写完的结果**。
 
 ---
 

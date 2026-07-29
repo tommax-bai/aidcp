@@ -480,7 +480,7 @@
        但它俩不改运行时行为（契约零接线、台账只活在测试面），现网真正变的只有
        错误族抬 kernel、文字转写能力二态、四个角色改判这三处。 -->
 - [ ] 5.5 本地桩验不了的登记 `docs/real-machine-acceptance-backlog.md`（簇 60）。
-- [ ] 5.6 回写 `docs/cloud-composition-root-trisection.md` §0.0 与
+- [x] 5.6 回写 `docs/cloud-composition-root-trisection.md` §0.0 与
   `docs/cloud-split-next-session-handoff.md` §0.1/§0.2 的实测现状。
 - [ ] 5.7 `openspec validate split-cloud-automation-production-runtime --strict` 通过后归档；
   删除 worktree 与分支。

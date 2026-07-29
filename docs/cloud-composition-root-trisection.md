@@ -7,18 +7,31 @@
 
 ## 0.0 进度卡（2026-07-29 更新，接手先看这里）
 
-> **2026-07-29 现状（实测，六仓已对齐到 `aidcp-cloud@424834d`）**
+> **2026-07-29 22:15 现状（实测，六仓已对齐到 `aidcp-cloud@b66c022`）**
 >
 > | 仓 | HEAD | typecheck | 测试 |
 > | --- | --- | --- | --- |
-> | `aidcp`（控制仓） | `284fc015` | — | — |
-> | `aidcp-kernel` | `6bf0603` | 0 | **57 / 57** |
-> | `aidcp-transport` | `eeb6b3e` | 0 | — |
-> | `aidcp-api` | `6181771` | 0 | **470 / 470** |
-> | `aidcp-automation` | `21dfe08` | 0 | **1832 pass / 0 fail / 3 skipped** |
-> | `aidcp-content` | `b4b1bf6` | 0 | **455 / 455** |
+> | `aidcp`（控制仓） | `beb8e5c1` | — | — |
+> | `aidcp-cloud`（事实源） | `b66c022` | 0 | 全量绿 |
+> | `aidcp-kernel` | `21cc10a` | 0 | **57 / 57** |
+> | `aidcp-transport` | `08c4e81` | 0 | **36 / 36** |
+> | `aidcp-api` | `662918f` | 0 | **470 / 470** |
+> | `aidcp-automation` | `2c45e1b` | 0 | **1888 / 1888** |
+> | `aidcp-content` | `3770ea2` | 0 | **436 / 436** |
 >
-> **五个派生仓第一次同时全绿。** 三件事换来的：
+> 边界门禁：`sourceFiles 526 · crossBoundaryEdges 0 · exemptionEntries 0 · frozenTotal 0`。
+> `aidcp-cloud@b66c022` 已部署 dev（单体形态），healthcheck 全过。
+>
+> **2026-07-29 这一批（change `split-cloud-automation-production-runtime` 第一批）落了什么：**
+> 归属改判（四个精选评估角色 + 公共基类 + 精选发帖闸 content → automation，
+> 判据是「属主随消费面」——它们订阅 automation 的浏览闭环事件、由它的调度器驱动）、
+> 模型文本出口进 `aidcp-transport`、LLM 错误族抬进 `aidcp-kernel`（消掉视觉出口→文本出口那条边）、
+> automation→content 的三个 kernel 端口面、四条运营指令的 kernel/transport 契约。
+> **全部只定义、未接线。**
+>
+> ---
+>
+> **原「五个派生仓第一次同时全绿」（2026-07-29 早些时候，`424834d`）** 是三件事换来的：
 >
 > 1. **`npm install` 通了**（`--userconfig /dev/null` 绕开内网 registry 对 `@types` 域的劫持，
 >    见 memory `split-repos-npm-install-blocker`）。在此之前四个新仓装不上依赖，
@@ -29,8 +42,12 @@
 > 3. **测试归属改由「import + 字面路径读」两类证据共同派生**（见 §0.0.4）。
 >
 > **仍未动**：三个仓的 `src/server.ts` / `src/index.ts` 组装根按设计从不同步；
-> automation 的可执行入口仍**有意 fail-closed**（12 条 readiness blocker 全标 `closingChange:'future'`，
-> 无 change 承接）。批次 5（dev 三服务真跑）未开工。
+> automation 的可执行入口仍**有意 fail-closed**。批次 5（dev 三服务真跑）未开工。
+>
+> **那 12 条孤儿 blocker 已有承接者**（2026-07-29 用户拍板）：change
+> `split-cloud-automation-production-runtime`。**但别把「前置做完了」读成「入口快好了」**——
+> 台账仍是 cloud 55 条 / automation 14 条，**清零是入口能写的前提**。
+> 今天减少的只有一条证据行（草稿精修工作器坐在 automation 不执行的分支里），条目一条没少。
 
 ### 0.0.0 原进度卡（2026-07-26）
 
