@@ -236,6 +236,33 @@
   `: Promise.resolve([] as CuratedSelectItem[])`（精选库未注入即静默空）。
   **这五处正是用户裁决「把力气花在堵吞点」所指的地方**——失败靠抛这条约定本身分得开
   「没问到对面」与「对面回答了空」，被吃掉是因为这五处把抛出重新压成了空数组。
+- [x] 0.6h **概念池 + 精选库的传输三件套已落**（只定义 + 注册函数 + 客户端，**未接线**）。
+  <!-- aidcp-cloud <pending> src/transport/content-authority-http.ts（零属主表 SQL，继承 src/transport/
+       目录规则判 automation，`boundaries/ownership-rules.json` 一个字不用改，只需集成时跑一次
+       `boundaries:refresh` 生成一条条目）；同批加进控制仓 TRANSPORT_MEMBERS
+       （服务端跑 content、客户端跑 automation，不进名单 content 仓拿不到注册函数）。
+       接线期欠账 8 条登记在导出常量 `CONTENT_AUTHORITY_WIRING_DEBT`。
+       测试 5 条，做过变异实测：注册函数漏挂一条路由 → typecheck 仍绿、用例当场红
+       （`satisfies` 只保证表全，保证不了都挂上）。 -->
+  <!-- **四条实装中才看得见的事实，端口注释里没有：**
+       ① **`unsupported_method` 真正的触发路径不是端口注释设想的那个。** 端口把两个读方法都定成必选，
+          属主实例结构上恒满足，「属主不提供这个方法」其实很难发生；现实路径是**对面跑旧版本、
+          这条路由没注册 → 404**。已显式把 404 译成 `unsupported_method`，回落分支才真的活着。
+       ② **反过来，版本不支持刻意不译成 `unsupported_method`**：回落方法同属一个契约版本、照样会失败，
+          判成回落等于把一次通道级配置错误伪装成一次能力缺口。
+       ③ **`ContentPortErrorShape.code` 是可选的，这是端口注释没覆盖的洞。** 线格式只透传带 string
+          `code` 的抛出物；属主若抛一个没有 code 的 shape，reason 会在这一跳被压成泛化错误、
+          回落分支第二次死掉。故服务端那层**重建**而不是原样透传。
+       ④ 召回 `limit` 取下限 1：`limit=0` 会让「问错了的提问」读起来像「库里没素材」。
+          今天调用方传 8 / 3 / 默认 20，无 0。 -->
+- [ ] 0.6i **`CuratedContentUnavailableError` 没有 `code`，与 0.5i 登记的 `FacebookPublishMediaError`
+  是同一个判例缺口，但 tasks.md 只登记了后者。**
+  它今天已有三个 api 侧 `instanceof` 消费者——跨进程后恒 false（§8.5）。
+  本次概念池 / 精选库那条链路不受影响（服务端译成具名原因、原文进 detail），但缺口本身仍在。
+- [ ] 0.6j **`src/transport/` 的目录规则描述已与目录实际内容脱节**（可选修文）：
+  规则原文写的是「异步事件 outbox 传输原语（有 SQL、不进 kernel）」，
+  而本 change 新落的两个文件（运营指令、内容属主召回）都不是那个形态、也都零 SQL。
+  归属判定不受影响（`newFile: inherit` 照样对），只是生成物里那句 `note` 会误导后来人。
 - [ ] 0.6g **调用点比原记录多两处**（接线时都要改）：`markSearched` 有两个
   （`role-dispatcher.ts:3411` 下发搜索后 + `:3714` 回执后）；`countNewSince` 有两个
   （`publish-scheduler.ts:263` 聚合输入 + `:323` 概念积累扳机）。
@@ -441,9 +468,17 @@
 
 - [ ] 2.1 `aidcp-content`：在既有内部 HTTP 服务端上注册四组写口——草稿精修 / FB 发帖素材 /
   概念池 / 精选库；每组独立注册，**一组初始化失败不得连带关闭其它组**（照 content 现有纪律）。
+  <!-- ⚠️ 本条的「四组写口」两处不准，实装时按下面这版走：
+       ① **草稿精修那条已被 0.6a 撤掉**（automation 方向现存 runtime 边为零，不开这个写口）；
+       ② FB 发帖素材（2.1）与 token 用量（2.2）**今天在 kernel 里根本没有端口**，三件套无从写起，
+          得先补端口面才谈得上注册；
+       ③ 「写口」是误称：精选库两条**纯读**（0.6c 自己写的就是「补跨界读」），
+          概念池 6 条里只有 2 条是写。名字不改没关系，但别照字面去找四组写。
+       实际有契约的只有概念池 + 精选库这两条，且 2.3 的三件套已随 0.6h 落地。 -->
 - [ ] 2.2 `aidcp-content`：token 用量记账写口。成本 MUST 由厂商账单反算，
   **禁止**在这一层硬编码价目表。
-- [ ] 2.3 `aidcp-transport`：上述各口的三件套；`aidcp-kernel`：对应窄接口与失败原因联合类型。
+- [x] 2.3 `aidcp-transport`：上述各口的三件套；`aidcp-kernel`：对应窄接口与失败原因联合类型。
+  <!-- 概念池 + 精选库这两条已完成，见 0.6h；FB 发帖素材与 token 用量两条待补端口面（见 2.1 注）。 -->
 - [ ] 2.4 `aidcp-automation`：新增 content 客户端组与 `AIDCP_CONTENT_URL` /
   `AIDCP_CONTENT_INTERNAL_TOKEN`（本仓第一次有 content 方向的出边）。
 - [ ] 2.5 按岔口 A 的裁决落地模型调用出口；按岔口 B 的裁决落地四个角色工厂。
