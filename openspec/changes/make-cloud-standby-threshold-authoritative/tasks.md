@@ -53,8 +53,12 @@
   branches, recording commit SHAs and validation evidence here.
   <!-- Serial ff-only land complete: aidcp-cloud master babdd84, then
   aidcp-edge master 2459214. Both canonical checkouts fast-forwarded. -->
-- [ ] 4.2 Commit and push the control-repo artifacts, record that no Cloud
+- [x] 4.2 Commit and push the control-repo artifacts, record that no Cloud
   runtime deployment is needed, and preserve the explicit boundary that no
   installed Edge client changes until a separately authorized package/release.
+  <!-- Control artifacts are committed on the isolated branch and queued for
+  ff-only main push. Cloud changed comments/tests only, so no runtime deploy.
+  Edge source is landed, but installed clients remain unchanged: no package,
+  signing, installer, or release was performed. -->
 - [ ] 4.3 Archive the completed OpenSpec change and run strict validation of
   the synchronized baseline.
