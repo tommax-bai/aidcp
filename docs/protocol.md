@@ -371,7 +371,7 @@ Cloud 切换通过 Electron→core 的本地 `lifecycle.cloud_rebind` 控制协�
     "wakeAt": 1730001801000,
     "generatedAt": 1730000001000,
     "source": "risk",
-    "minWaitMs": 1200000,
+    "minWaitMs": 300000,
     "warmupMs": 90000
   }
 }
@@ -400,7 +400,7 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 
 `startedAt/windowMs/expiresAt` 为窗口时效元数据；分钟/小时是滚动窗口，日窗口是本地自然日窗口，Electron 可在过期且未收到新快照时停止展示过期的“已达上限”。`windows.session.totals` 可包含浏览/发帖等无单场上限动作的真实计数，但不得为这些动作复制其他窗口的上限。
 
-`browserStandby` 是 cloud 对“下一个自动浏览动作还要等多久”的确定性建议，不是强制命令。`eligible=true` 只在 cloud 能从风控/配额等确定性来源算出有限长等待、且等待超过阈值时出现；验证码、登录、人工干预、环境占用或未知调度状态不得伪装成可恢复等待。Electron 仍会用本地开关、会话状态、关闭/暂停中标志和预热时间做二次判断；通过后才会在等待期间关闭浏览器，并在 `wakeAt - warmupMs` 前后恢复。
+`browserStandby` 是 cloud 对“下一个自动浏览动作还要等多久”的确定性建议，不是强制命令。`eligible=true` 只在 cloud 能从风控/配额等确定性来源算出有限长等待、且等待超过阈值时出现；验证码、登录、人工干预、环境占用或未知调度状态不得伪装成可恢复等待。`browserStandby.minWaitMs` 是待机门槛的唯一策略权威，默认 `300000ms`（5 分钟）。Electron 只用有效 hint 中的 `minWaitMs` 复核当前剩余等待 `wakeAt - now`，防止延迟到达或最短持有期后重判的 hint 在剩余时间已不足时仍触发关闭；MUST NOT 再与本地默认值、持久化设置或环境变量取较大值，字段缺失或无效时也 MUST NOT 回退到本地门槛。Electron 仍会用可见的本地开关、会话状态、关闭/暂停中标志和预热时间做执行安全二次判断；通过后才会在等待期间关闭浏览器，并在 `wakeAt - warmupMs` 前后恢复。
 
 ### 3.2 任务规划
 

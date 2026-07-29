@@ -7,14 +7,14 @@
 | 单个有界面指纹浏览器 ≈ 700MB；一机约 10 个封顶 | 用户实测口径（代码里 `PER_ENV_BYTES_DEFAULT = 1GB` 是没量过的设计默认值，`fleet.cjs:167`） |
 | AdsPower **不限**并发席位 | 用户确认 |
 | AdsPower 本地 API ~1 req/s | 既有错峰队列 `DEFAULT_STAGGER_MS = 1100`（`fleet.cjs`） |
-| 冷待机门槛 20 分钟、预热 90 秒 | `browser-standby.ts:4-5` |
+| Cloud 单一冷待机门槛 5 分钟、预热 90 秒 | `browser-standby.ts:4-5` |
 | 冷待机**只认浏览配额等待** | `buildBrowserStandbyHint` 只看 `explain('view')`，reason 必须 `quota:` 开头（`browser-standby.ts:57-59`） |
 | 云端空转看门狗 240 秒 | `DEFAULT_IDLE_NUDGE_MS = 240_000` |
 | 冷启预算 30–90 秒 | AdsPower start ≤30s + CDP ready ≤15s + 身份 + 云端握手 |
 
 ## 二、算账：槽位够不够，1:2 安不安全
 
-正常档配额（`quotas.ts`，`deriveWindowQuotasFromDaily`）：日浏览 150；小时 `min(60, ⌈150/4⌉) = 38`；分钟 `min(8, ⌈150/20⌉) = 8`。撞配额则睡到滑动窗最早那条事件滑出（`sliding-window-counter.ts:37-54`）：撞分钟窗 ≤60s；**撞小时窗睡几十分钟**（≥20min → 冷待机关浏览器）；撞日窗睡到次日上海零点。
+正常档配额（`quotas.ts`，`deriveWindowQuotasFromDaily`）：日浏览 150；小时 `min(60, ⌈150/4⌉) = 38`；分钟 `min(8, ⌈150/20⌉) = 8`。撞配额则睡到滑动窗最早那条事件滑出（`sliding-window-counter.ts:37-54`）：撞分钟窗 ≤60s；**撞小时窗睡几十分钟**（达到 Cloud 单一 5 分钟门槛 → 冷待机关浏览器）；撞日窗睡到次日上海零点。
 
 - 跑满一小时 38 次浏览约需 ~20 分钟真实操作 → 随后约 40 分钟停泊。
 - 日额 150 次约需 **4 小时**跑完 → 之后约 20 小时全程停泊。

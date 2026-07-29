@@ -2,7 +2,7 @@
 
 ### Requirement: Edge 仅在安全状态下关闭并按预测时间恢复
 
-Edge SHALL treat `browserStandby` as advisory and perform local safety checks before releasing the browser. It MAY enter standby only when the hint is eligible, the local switch is enabled, the wait exceeds the local threshold, the session is running/resting without pending pause/close/remove/auth/blocker state, and **no task lease is active**.
+Edge SHALL treat `browserStandby` as advisory and perform local safety checks before releasing the browser. It MAY enter standby only when the hint is valid and eligible, the local switch is enabled, the current remaining wait meets the Cloud-advertised `minWaitMs` (Cloud's sole wait threshold, default five minutes), the session is running/resting without pending pause/close/remove/auth/blocker state, and **no task lease is active**. Edge MUST NOT combine the hint with a local threshold or use a local fallback when the Cloud threshold is missing or invalid.
 
 进入待机时 Edge SHALL **释放全部本地浏览器句柄**——断开浏览器控制连接、退订依赖浏览器的监测体、清除页面/目标引用、关闭浏览器——并 SHALL **保留核心进程与云端连接**。释放前 MUST 先按既有排空契约把浏览循环有界排空。释放 MUST NOT 留下任何仍被长期存活组件持有的过期浏览器句柄。
 
