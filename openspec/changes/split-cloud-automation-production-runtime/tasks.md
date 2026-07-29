@@ -174,10 +174,20 @@
        **顺带查清一条前瞻性隐患、不是当下 bug**：`src/cache/curated-content-store.ts` 还留着 24 个类型的
        再导出壳，但当前 124 条 STAY-cloud 测试里只有 3 条唯一 content 依赖是它，且那 3 条本来就该归 content。
        别当待修项排期。 -->
-- [ ] 0.5i **既有判例 `FacebookPublishMediaError` 没有 `code`，同样跨不过传输那一跳**（潜伏项）。
+- [x] 0.5i **既有判例 `FacebookPublishMediaError` 没有 `code`，同样跨不过传输那一跳**（潜伏项）。
   它今天只在同进程内用，所以**还不是活 bug**；但拆进程后一旦它需要跨边界，
   守卫会恒不命中、失败静默退化。本 change 新写的错误加 `code` **不是镀金，是补了判例本身的缺口**。
   等它真要跨边界时，照同一形状补。
+  <!-- aidcp-cloud <pending>。**本条与 0.6i 的记载各错一半，且方向相反，一并更正：**
+       ① 0.5i 说「等它真要跨边界时再补」——但结构化守卫、name 常量、shape **早就存在**了
+          （由更早的 change `cloud-coupling-phase2-panel-contracts@0bbc43b` 落的），
+          api 侧那个消费者**也早已迁完**，测试也已经钉住跨进程用例。
+          所以「还没做」的其实只有 `code` 这一件——恰恰是本条标题点名的那件。已补。
+       ② 反过来 0.6i 说「有三个 api 侧 instanceof 消费者」——实测是 4 处 / 3 个文件。
+       教训一致：**这两条记的都是「凭印象的消费者清单」，实测才作数。** -->
+  <!-- 补法照 `content-port-error.ts` 的形状：前缀常量 + 编码 / 还原两个函数，
+       **还原不出返回 `null`、绝不套默认**。类的构造里设 `code`。
+       理由是传输层的错误编码只保 `code` + `message`，没有 `code` 的抛出物到对面会被压成泛化错误。 -->
 - [ ] 0.5j **AC-TCT-3 有一处已知脆性**（可接受，记下来免得将来误判）：
   留痕函数带一次性闸、有两个调用点（图片快照 stage 与准入评估 stage），
   而该用例只触发后者。若将来这条 fixture 先触发前者，跳过断言会因为**与不变量无关**的原因变红。
@@ -270,10 +280,16 @@
           回落分支第二次死掉。故服务端那层**重建**而不是原样透传。
        ④ 召回 `limit` 取下限 1：`limit=0` 会让「问错了的提问」读起来像「库里没素材」。
           今天调用方传 8 / 3 / 默认 20，无 0。 -->
-- [ ] 0.6i **`CuratedContentUnavailableError` 没有 `code`，与 0.5i 登记的 `FacebookPublishMediaError`
+- [x] 0.6i **`CuratedContentUnavailableError` 没有 `code`，与 0.5i 登记的 `FacebookPublishMediaError`
   是同一个判例缺口，但 tasks.md 只登记了后者。**
   它今天已有三个 api 侧 `instanceof` 消费者——跨进程后恒 false（§8.5）。
   本次概念池 / 精选库那条链路不受影响（服务端译成具名原因、原文进 detail），但缺口本身仍在。
+  <!-- aidcp-cloud <pending>。**消费者是 4 处 / 3 个文件，不是 3 处**（面板 1、客户鉴权 1、组装根 2）。
+       已补 `code` 常量 + 字段 + shape。**守卫刻意仍只按 `name` 判、不要求 `code`**：
+       要求 `code` 会让守卫对「跑着旧版本的对面」恒 false——那正是它存在要杀的那个失败。 -->
+  <!-- 组装根那两处（约 `:3018` / `:3055`，在委托任务预检与目标校验闭包里）本轮**未改**——
+       `src/server.ts` 是并行热点，由集成方补。不改的后果是它们会掉进兜底 `throw err`、
+       报一个泛化失败而不是具名的「精选库不可用」。 -->
 - [x] 0.6j **`src/transport/` 的目录规则描述已与目录实际内容脱节**（可选修文）：
   规则原文写的是「异步事件 outbox 传输原语（有 SQL、不进 kernel）」，
   而本 change 新落的两个文件（运营指令、内容属主召回）都不是那个形态、也都零 SQL。
@@ -468,6 +484,15 @@
   ① `delegated-task-http.ts` 既有 7 条路由**不带信封**（无版本 / 无 target 校验 / 无 Bearer），MUST 与新的
   `create-from-text` 统一到信封形态，否则同一个域会有两套鉴权口径；
   ② 上面那两处 `instanceof` MUST 迁到结构化守卫；
+  <!-- ② **已做，且实测是 3 个文件 / 6 个调用点，不是「两处」**（aidcp-cloud <pending>）：
+       飞书委托卡片 1 处、客户鉴权服务 **4 处**（本条记成了 1 处）、
+       **面板服务 1 处（`panel/panel-server.ts` 的委托任务错误出口，tasks.md 里从来没登记过）**。
+       最后那处是同一个潜伏 bug 的第三个受害者：后台控制台发起的委托任务，任何 409 / 422
+       都会塌成一条泛化的 500，操作员看不到「版本冲突」这个真原因。
+       客户鉴权那 4 处原本是逐字重复的四段，已收成一个本地函数。 -->
+  <!-- 遗留两条陈述已过时、但落在并行热点文件里，本轮没改（集成方补）：
+       `src/transport/content-authority-http.ts` 的欠账表里那条「精选库错误没有 code」现已不成立；
+       `src/kernel/operator-command-port.ts` 的文件头只点了两个消费者，漏了面板那个。 -->
   ③ 四条写指令的接收方 MUST 建**持久**幂等台账（跨进程重启仍成立），否则 ④ 那条「原样回放首次结果」无处可放；
   ④ `ApiDirectWriteErrorCode` 可按 4a 惯例补四个逐命令的 `*_result_unknown` 码（本轮统一用
   `api_authority_result_unknown`，刻意不改既有 kernel 文件以免与并行任务撞热点）。
@@ -477,10 +502,20 @@
   `status/pause/resume/bindChat/delegate/publish/comment`，无 dispatch）；那个 `:dispatch` 文案只服务
   **面板路由**与 dashboard 状态灯。台账两条证据是同一条通道的两个证据。
   一条 paired command 一次接线即同时点亮面板按钮与状态灯，**飞书侧零改动**。
-- [ ] 1.4a **批 1 的前置改动**：`feishu/command-face.ts:27-35` 那份 `PanelCommandActions` 的
+- [x] 1.4a **批 1 的前置改动**：`feishu/command-face.ts:27-35` 那份 `PanelCommandActions` 的
   `dispatch` / `dispatchActive` 是**必填**，而 `panel/types.ts:270/275` 那份是**可选**。
   api 因此被迫必须传一个函数——「诚实地不注入」在类型层做不到，只能在「抛错」与「撒谎」之间选。
   先把前者改成可选，顺带消掉两份同名类型的漂移。
+  <!-- aidcp-cloud <pending> 已做，且**两份同名类型已收成一份**（面板那份改为从飞书侧导入，
+       它本来就有那条 import 说明符，没新增模块边；两个文件同属 api，归属零变化）。
+       两处的 dispatch / dispatchActive 现在都是可选。
+       **本条对「飞书 dispatch 通道自始至终不存在」的记载已核实为真**：飞书那份动作全集是
+       `status / pause / resume / publishTest? / publish? / comment? / bindChat?`，没有 dispatch，
+       `src/feishu/` 里也没有任何一条路由指向它。 -->
+  <!-- ⚠️ **本条现在只是「使能」，还没兑现**：组装根仍在往下传两个占位桩
+       （约 `src/server.ts:8219-8229` 的 `?? (() => Promise.reject(...))` / `?? (() => { throw ... })`）。
+       桩还在，面板那条「未接线 → 503」分支与状态灯的 null 态就仍然到不了，行为逐位未变。
+       改成直接传可选句柄才算落地——`src/server.ts` 是并行热点，本轮没动。 -->
 - [ ] 1.4b **委托卡片动作的处理器其实是 api 属主**（`src/feishu/` 整目录 15/15 归 api）：
   方向仍是 api→automation（缺的是服务端口注入），但**没有任何代码需要搬家**。
 - [ ] 1.4c **委托的跨进程通道已经写好、只差接线**：
