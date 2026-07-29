@@ -19,4 +19,5 @@
   <!-- aidcp-console eda6a43: rebased/up-to-date with origin/master; land-change reran full 300 passed + 1 skipped and typecheck, then fast-forward pushed master without force and cleaned the worktree. -->
 - [x] 2.4 按部署规范从干净 Console 默认分支发布到 `dev`，验证静态站点与服务健康，不触碰 `ol` 或 Edge 安装包。
   <!-- DEV 121.89.85.150: deploy-target check passed; clean console master eda6a43 built and was backed up at /opt/aidcp/console.bak.20260729-195622.tar.gz. Dist synced without deletion; local/remote SHA-256 matched for index, CSS and assets/index-wrCxsmR6.js. Nginx active, local/public Console and JS returned 200, Panel health returned {"ok":true}, and all 4 running isales services remained untouched. OL, Cloud, Edge and installers were not changed. -->
-- [ ] 2.5 回写提交、验证、部署与偏差证据，提交并推送 control 变更后归档。
+- [x] 2.5 回写提交、验证、部署与偏差证据，提交并推送 control 变更后归档。
+  <!-- Evidence recorded above. Console eda6a43 and control 0db63716 were fast-forward pushed to their default branches; the only deviation was physical npm install without a lockfile, with no manifest change. Change is ready for archive. -->
