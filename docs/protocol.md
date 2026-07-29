@@ -84,7 +84,7 @@
 
 | type | 方向 | 用途 |
 | --- | --- | --- |
-| `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll；Facebook Native 有界续滚耗尽但未形成终止证据时，Cloud 以 `feed_continuation_unconfirmed` 走现有浏览闸继续普通 Feed；仅首页显式空态、物理卡不可可靠上报或诚实 `feed_exhausted` 时，Cloud 可下发 `empty_feed_reels_fallback` 授权进入 Reels；可选 `dwellMs`） |
+| `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll / idle_recover_nudge 等；Facebook Native 仅 `idle_recover_nudge` 可将精确 target 置前，其它自动滚动保持后台；有界续滚耗尽但未形成终止证据时，Cloud 以 `feed_continuation_unconfirmed` 走现有浏览闸继续普通 Feed；仅首页显式空态、物理卡不可可靠上报或诚实 `feed_exhausted` 时，Cloud 可下发 `empty_feed_reels_fallback` 授权进入 Reels；可选 `dwellMs`） |
 | `feed.refresh` | cloud → edge | 主 feed 浏览深度到阈值后，点右下「刷新」按钮回到顶部换出全新一批（`reason`: feed_refresh；可选 `thinkMs`；边缘诚实回执 `action.completed{action:'refresh'}`，非 feed 页 / 无按钮 / 点后未换新批均如实失败，绝不假成功） |
 | `pacing.update` | cloud → edge | 会话中途风控档位变化推送新 `tempo`（payload `{tempo}`）；边缘刷新兜底节奏（最小间隔 + 停留兜底）、**不重置**操作间隔锚点、不入队/不唤醒会话（change pacing-fallback-hardening） |
 | `interaction.like` | cloud → edge | 点赞指定笔记 |
@@ -786,8 +786,12 @@ Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有
 }
 ```
 
-Facebook Native `page.scroll` 在输入前先将已绑定的精确 Facebook target 置前，避免后台 AdsPower
-tab 的 CDP 滚轮调用悬而不返。普通 Feed 只有在 canonical 首页近底部的显式终止标记连续稳定出现时才回
+Facebook Native 仅在 `page.scroll.reason` 精确等于 `idle_recover_nudge` 时，才在输入前将已绑定的
+精确 Facebook target 置前，并且每条该命令恰好置前一次。缺失 reason 或 `feed_scroll`、`search_scroll`、
+`resume_redrive`、`feed_continuation_unconfirmed` 等其它自动滚动不得调用 `Page.bringToFront`；Feed
+恢复控件也不得独立触发前台化。该 watchdog reason 表达 Cloud 的长时间无活动恢复意图，不构成滚动成功
+证据，Edge 仍须按同一 target/page 的既有后置状态确认结果。用户显式显示浏览器、引导登录和非 Facebook
+前台行为不受此规则影响。普通 Feed 只有在 canonical 首页近底部的显式终止标记连续稳定出现时才回
 `feed_exhausted`；“完整窗口内高度不增长 + 近底部”只算非终态观察，因为 Facebook 可能显示
 没有 Feed-scoped loading 语义的骨架卡。该完整稳定窗口结束后立即回
 `action.completed{action:"scroll",ok:false,reason:"feed_continuation_unconfirmed"}`；Cloud 仅据此继续普通
