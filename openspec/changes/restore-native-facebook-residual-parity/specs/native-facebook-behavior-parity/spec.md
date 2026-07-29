@@ -74,7 +74,23 @@ If no navigable canonical target can be resolved, or the landed page's canonical
 
 ### Requirement: Facebook list-surface exhaustion is classified per surface and never mislabeled as target-not-found
 
-Bottom confirmation MUST be reachable on every declared Facebook list surface — home feed, search results, and group — using the same set of surfaces the adapter already accepts as the active list. The pre-round guard MUST NOT skip bottom confirmation merely because the current surface is not the home feed, **and the confirmation's own validity predicate MUST NOT invalidate a sample merely for being on a non-home list surface**: reachability requires both, and relaxing only the guard leaves the state unreachable. That predicate MUST instead require the surface to be a declared list surface and to remain the same surface across the confirmation window. Every other element of the established termination-evidence chain — same document generation, near-bottom, no height growth, unchanged card identity set, repeated explicit-end sampling, and the confirmation window — MUST be preserved unchanged, and the separate home-empty confirmation stays home-only by definition.
+Bottom confirmation MUST be reachable on every declared Facebook list surface — home feed, search results, and group — using the same set of surfaces the adapter already accepts as the active list. The pre-round guard MUST NOT skip bottom confirmation merely because the current surface is not the home feed, **and the confirmation's own validity predicate MUST NOT invalidate a sample merely for being on a non-home list surface**: reachability requires both, and relaxing only the guard leaves the state unreachable.
+
+Bottom confirmation MUST use exactly five samples at offsets `t=0`, `t=5s`, `t=7.5s`, `t=10s`, and `t=12.5s`, where the probe passed into confirmation is the `t=0` sample. Across all five samples, the document generation and declared list surface MUST remain unchanged, the surface MUST remain non-loading and near-bottom, the height MUST NOT grow past the established noise floor, and the canonical card identity set MUST remain unchanged. `feed_exhausted` MUST be returned only after the fifth sample and only when `explicit_end` is present in all five samples. The adapter MUST NOT return `feed_exhausted` after any earlier sample. If structural evidence is invalidated, the confirmation MUST be cancelled immediately; if structural evidence remains stable through the fifth sample but `explicit_end` was absent from any sample, the result MUST be continuation-unconfirmed. The separate home-empty confirmation stays home-only and keeps its independent timing.
+
+The Facebook browse-scroll and page-scroll command budget MUST be long enough for every bounded confirmation round and MUST be aligned across the Edge request, Edge admission, and Native engine ceiling. The fixed-sample wait MUST remain interruptible by task cancellation and the command deadline; lengthening confirmation MUST NOT make Native task quiescence wait for the full confirmation window.
+
+#### Scenario: Exhaustion requires the complete five-sample sequence
+
+- **WHEN** all bottom evidence, including `explicit_end`, remains valid at `t=0`, `t=5s`, `t=7.5s`, `t=10s`, and `t=12.5s`
+- **THEN** the adapter returns `feed_exhausted` only after the `t=12.5s` sample
+- **AND** it does not return `feed_exhausted` after any of the first four samples
+
+#### Scenario: One missing explicit-end sample prevents exhaustion
+
+- **WHEN** structural bottom evidence remains valid for all five samples but `explicit_end` is absent from any one sample
+- **THEN** the adapter returns continuation-unconfirmed after the fifth sample
+- **AND** it does not authorize a Reels transition from that confirmation
 
 When a bounded scroll ends without new canonical cards, the terminal reason MUST be classified by observed evidence, not by home-surface-only conditions: if canonical cards were seen on any declared list surface, the adapter MUST return a non-terminal continuation-unconfirmed reason; a target-not-found reason MUST be reserved for the case where no canonical card was observed at all. Reporting a target-not-found reason for a "this batch is fully seen" state is a prohibited semantic downgrade. Every Facebook scroll receipt MUST carry the observed list surface in its existing optional observation so Cloud can select a surface-appropriate recovery, and a Reels transition MUST NOT be authorized from exhaustion observed on a non-home list surface.
 
@@ -156,7 +172,7 @@ The comment predicate MUST accept the commanded text when the normalized editor 
 
 The adapter's "the page is still growing" judgement MUST compare scroll height against a **declared named noise-floor constant**, not against an arbitrarily small epsilon. A one-pixel epsilon makes any reflow count as growth, which keeps the scroll loop in its continue branch forever and leaves bottom confirmation unreachable on every list surface — including the home feed — even after the surface predicates are relaxed. The constant MUST be the retired implementation's noise floor unless a sampled Native-layout value replaces it, and the same constant MUST back both the pre-round guard and the no-growth element of the termination-evidence chain, because a single helper serves both.
 
-Relaxing the epsilon MUST NOT change the meaning of the judgement: the adapter MUST still continue scrolling while the page is genuinely growing and MUST NOT declare a bottom while it is. Every other element of the termination-evidence chain MUST remain unchanged.
+Relaxing the epsilon MUST NOT change the meaning of the judgement: the adapter MUST still continue scrolling while the page is genuinely growing and MUST NOT declare a bottom while it is. Every other evidence predicate MUST remain unchanged; the sampling schedule is governed independently by the five-sample requirement above.
 
 #### Scenario: A reflow smaller than the noise floor is not growth
 
