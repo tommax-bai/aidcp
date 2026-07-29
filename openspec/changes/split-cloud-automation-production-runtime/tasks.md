@@ -85,6 +85,21 @@
        即：过滤只缩短证据，不熄灭条目——这正是收录判据「任一探针命中即保留」应有的行为，现在有断言钉着了。 -->
   <!-- 顺带扫完 segC 其余 `seamMode !== 'automation'` 守卫：真正被过滤的只有两处（草稿精修 worker、
        待派发看门狗那次 `accountDisplayName`），其余守卫内没有 new/call 探针指向。 -->
+  <!-- 判据比本条原文更严，是**有意的**：写成「automation 不执行就过滤」会在 segA（三个模式都跑）里
+       误删 api / content 的真欠账——那一段里的 `seamMode !== 'automation'` 分支恰恰是它俩的欠账。
+       实际判据是「**没有任何一个独立起根会执行这个节点**」，由段归属 + 守卫抽象求值两条独立排除合成。
+       在 segC 里两种判法结果完全等价（api / content 压根不跑 segC），所以本条要的结果一分不少；
+       差别只在将来有人往 segA 写下第一条 seam 守卫的那一刻才显现。
+       另外判据不再是字符串正则而是真实语义求值（模式全集来自 `ServiceMode` 的 `Record` 穷举，
+       新增模式会编译红而不是被静默漏掉；认不出的表达式一律当「可能执行」，即只朝**保留**方向失败）。 -->
+- [ ] 0.3g **`identifier-use` 家族不在 seam 过滤范围内（实测有真命中，本轮如实不处理）。**
+  0.3f 只放宽了 `new` / `call`。实测 `segCAutomation:identifier-use:llm` 有 **2/11** 处落在
+  automation 不执行的分支里；因另 9 处存活，条目与证据行零影响，故本轮未动。
+  若日后要求 identifier 家族也按 seam 过滤，**需另行裁定**——那会真的删掉证据行，不是零影响改动。
+- [ ] 0.3h **`isApiOwnerModeOnly`（segA 属主 store 过滤器）仍是老式字符串正则，未随 0.3f 统一。**
+  它回答的是另一个问题（「是否只有 api 模式构造」），且它产出的 blocker 声明的消费方是
+  「automation 与 content 两个根」，量词与 0.3f 的判据不同——混用会改变 segA 输出。
+  属可选的后续统一项，**不在 0.3f 范围内**，登记以免以为已统一。
 - [x] 0.3g **automation 那份 census helper 是有意的手写分叉，不是派生物**（本轮核实）。
   <!-- 2026-07-29 实测：文件第 1 行是 `// aidcp:test-owner=derived`，
        按 scripts/sync-split-repos 的 derived_private 逻辑，带该标记的派生仓测试**被排除出同步对账**
