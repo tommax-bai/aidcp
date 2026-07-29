@@ -17,5 +17,7 @@
 
 ## 4. Delivery
 
-- [ ] 4.1 Commit and integrate the Cloud and control changes with repository SHAs and validation evidence recorded here.
-- [ ] 4.2 Deploy the integrated clean Cloud default branch to DEV and verify the documented service, listener, health, and schema gates without issuing a real Facebook write.
+- [x] 4.1 Commit and integrate the Cloud and control changes with repository SHAs and validation evidence recorded here.
+  <!-- aidcp-cloud master e009c6f; aidcp control main cacc7f1d. Both were rebased onto the latest remote default and pushed by fast-forward. -->
+- [x] 4.2 Deploy the integrated clean Cloud default branch to DEV and verify the documented service, listener, health, and schema gates without issuing a real Facebook write.
+  <!-- DEV 2026-07-29: backup `/opt/aidcp/cloud.bak.20260729-184459.tar.gz` and `.env.bak.20260729-184459`; rsync changed only the scheduler source/test; all three owner migration ledgers had zero pending migrations and matching checksums; restarted only `aidcp-cloud.service`. Post-check: active, NRestarts=0, 8787/8090/8091/5432 listening, local/public health OK, three enforce schema gates passed, dev writer lock/RiskControllerRegistry/Feishu WS ready, deployed source hash matched local. No real Facebook write performed. -->
