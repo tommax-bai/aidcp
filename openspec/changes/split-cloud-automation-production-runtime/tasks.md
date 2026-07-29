@@ -227,7 +227,7 @@
   而真实的能力缺口（对面版本落后 / 路由没注册）反被静默吞掉。
   → 端口上两个读方法**都不带可选标记**，回落改由具名的 `unsupported_method` 驱动。
   **保留 `?` 等于保留一张假的安全网。**
-- [ ] 0.6f **降级形状有五处，只改一处等于没改**（复核补出后两处）：
+- [x] 0.6f **降级形状有五处，只改一处等于没改**（复核补出后两处）：
   ① `src/server.ts:7024` 的 `: Promise.resolve([])`（组装根层）；
   ② `aidcp-automation/src/comment-agent/comment-scheduler.ts:1603` 的 `.catch(() => [])`
   ——**即使组装根那层改了，调度器自己这个 catch 仍会把端口抛出的传输失败重新吃成空数组**；
@@ -236,6 +236,21 @@
   `: Promise.resolve([] as CuratedSelectItem[])`（精选库未注入即静默空）。
   **这五处正是用户裁决「把力气花在堵吞点」所指的地方**——失败靠抛这条约定本身分得开
   「没问到对面」与「对面回答了空」，被吃掉是因为这五处把抛出重新压成了空数组。
+  <!-- aidcp-cloud 9ae8e1d。**复核结论：确实是 5 处，没有第六处**（行号漂了：① 7024→7031，其余基本准）。
+       **降级本身一处没动**——概念池装载失败仍回空池、评论命令仍降到零样本、精选库未接线仍不报错，
+       改的是「降级从 catch 顺手吃掉的副产物，变成看着具名原因明写的决定」，且日志明写
+       「**未**确认对面为空」。逐处：
+       ① 组装根：精选库缺席不再回空数组，改抛具名 `not_configured`（窄投影仍留属主侧就地做）。
+       ② 评论调度器：`.catch(() => [])` → 显式 try/catch，仍降级但落带具名原因的 warn。
+       ③ 概念池装载：拆成三种情形各有名字（真空池 / 未配置 / 装载失败）；
+          「未配置」原本**连一行日志都没有**，「装载失败」原本那行 warn **没有原因码**。
+       ④⑤ 发帖调度器：两处收进一个具名缺席分支。
+       **④⑤ 刻意只管缺席、不给读失败补 catch**：那条路径今天本来就会冒泡出去、已经分得开，
+       补 catch 等于新造第六个吞点。 -->
+  <!-- 守卫做法：新增结构化归类函数，按 `name` + 具名字段同时认端口错误与属主自有错误，
+       对同进程实例与跨进程反序列化裸对象一视同仁；**认不出来也给名字**，不因「不认识」退回沉默。
+       落点是 `src/kernel/curated-content-types.ts`（贴着它认的那个错误类），
+       语义上更该在 `content-port-error.ts`，只是那样得反向 import；并行流放开后可顺手搬。 -->
 - [x] 0.6h **概念池 + 精选库的传输三件套已落**（只定义 + 注册函数 + 客户端，**未接线**）。
   <!-- aidcp-cloud <pending> src/transport/content-authority-http.ts（零属主表 SQL，继承 src/transport/
        目录规则判 automation，`boundaries/ownership-rules.json` 一个字不用改，只需集成时跑一次
@@ -266,10 +281,18 @@
 - [ ] 0.6g **调用点比原记录多两处**（接线时都要改）：`markSearched` 有两个
   （`role-dispatcher.ts:3411` 下发搜索后 + `:3714` 回执后）；`countNewSince` 有两个
   （`publish-scheduler.ts:263` 聚合输入 + `:323` 概念积累扳机）。
-- [ ] 0.6d **Sink 的可选方法是第二处静默陷阱**：`CuratedNoteSink` 的 `refreshReferenceImages?`
+- [x] 0.6d **Sink 的可选方法是第二处静默陷阱**：`CuratedNoteSink` 的 `refreshReferenceImages?`
   与 `getTextCardContext?` 都用 `?.` 调用（`:153` / `:182`）。换成 HTTP 客户端后**少实现一个方法
   编译通过、运行不报**——少 `getTextCardContext` 则缓存恒空、每篇图文帖重跑视觉转写（纯成本爆炸、
   零错误信号）。端口面 MUST 显式声明可选能力的在场与否。
+  <!-- aidcp-cloud 9ae8e1d。行号已漂到 `:218` / `:253`（差 65~71 行）。
+       落法不是「显式声明可选」而是**三个方法全改必选、`?` 全删、调用点去掉 `?.`**。
+       判据取自本 change 自己的概念池端口：「提供不了」**MUST 由实现方抛具名原因来说，
+       不许靠不定义方法来说**——留着 `?` 等于留一张假的安全网。
+       另在组装根把那个宽松断言改成两跳（先断言成真实注入的属主类型、再靠赋值做结构核对），
+       于是「换成 HTTP 客户端后少实现一个方法」变成**组装根编译红**，而不是运行时静默跳过。
+       转写上下文读到「不支持」时额外响一条一次性告警，点名后果是
+       「每篇图文帖重跑视觉转写、不会自愈」。 -->
 - [x] 0.7 落实 B1 的归属改判：先改控制仓 `docs/cloud-service-decomposition-proposal.md` §4.x
   （**归属的唯一事实源**），再手工 Edit 增量追加 `boundaries/ownership-rules.json`，
   最后 `npm run boundaries:refresh` 生成派生物；MUST NOT 直接手改生成物，
@@ -546,6 +569,15 @@
   <!-- b66c022 是本批的**最后一个**提交，所以 0.3f 的台账收窄与四条运营指令契约都在这次部署里；
        但它俩不改运行时行为（契约零接线、台账只活在测试面），现网真正变的只有
        错误族抬 kernel、文字转写能力二态、四个角色改判这三处。 -->
+  <!-- 2026-07-29 22:52 已部署第二批（aidcp-cloud@9ae8e1d，仍是单体形态）。
+       备份 /opt/aidcp/cloud.bak.20260729-225145.tar.gz；package.json 零变更故未动 node_modules。
+       **这批是真运行时改动**（五个吞点 + Sink 三方法改必选 + 组装根断言收紧），所以部署验证有意义：
+       重启后错误 0；PG / 飞书长连接 / 面板 API 8090 / 客户鉴权 8091 全部就绪；isales 四服务未受影响。
+       **具名降级告警一条没出，这是对的**——dev 上精选库与概念池都接着线，本来就不该降级；
+       那些告警只在真缺席时才响。另实测属主存储确实实现了改必选的那三个方法。 -->
+  <!-- 六仓对齐：kernel `d4f451b` / transport `c07e9b5` / api `f42df86` /
+       automation `686253d` / content `30a32c9` / cloud `9ae8e1d`。
+       测试：cloud 3883 / api 470 / automation 1897 / content 436 / kernel 57 / transport 36，全 0 fail。 -->
 - [ ] 5.5 本地桩验不了的登记 `docs/real-machine-acceptance-backlog.md`（簇 60）。
 - [x] 5.6 回写 `docs/cloud-composition-root-trisection.md` §0.0 与
   `docs/cloud-split-next-session-handoff.md` §0.1/§0.2 的实测现状。
