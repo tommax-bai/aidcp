@@ -21,4 +21,4 @@
 ## 5. Delivery
 
 - [x] 5.1 Commit, rebase, fast-forward integrate, and push the Edge change to `master`. <!-- aidcp-edge aaa7afb; rebased onto 2459214; integrated and pushed by scripts/land-change -->
-- [ ] 5.2 Record Edge commit/validation and the no-installer delivery boundary, then commit and push the control change to `main`.
+- [x] 5.2 Record Edge commit/validation and the no-installer delivery boundary, then commit and push the control change to `main`. <!-- aidcp a88bbe26 pushed to main. No Edge installer was built or released; installed clients remain unchanged. -->
