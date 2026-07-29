@@ -29,24 +29,34 @@ AC-BOUND metrics {"sourceFiles":455,"crossBoundaryEdges":0,"involvingContent":0,
 
 ### 0.1 当前指针（fleet 活跃，务必自己复核）
 
-| 仓 | HEAD | 分支 |
-| --- | --- | --- |
-| `aidcp`（控制仓） | `f9ff71e` | `main` |
-| `aidcp-cloud`（事实源） | `7d32913` | `master` |
-| `aidcp-console` | `bee7391` | `master` |
-| `aidcp-api` | `9f980e0` | `master` |
-| `aidcp-automation` | `a37bbba` | `master` |
-| `aidcp-content` | `aa1f09a` | `master` |
-| `aidcp-kernel` | `c49bdb9` | `master` |
-| `aidcp-transport` | `8582e66` | `master` |
+**2026-07-29 实测**（源 = `aidcp-cloud@424834d`）：
 
-七仓全部：工作区干净、已推远端、kernel pin 对齐 `c49bdb9`。
-dev 已部署 `aidcp-cloud@7d32913`（迁移 `0079` 已跑、三个 schema 闸全过、零错误）。**ol 未动。**
+| 仓 | HEAD | 分支 | 状态 |
+| --- | --- | --- | --- |
+| `aidcp`（控制仓） | `284fc015` | `main` | — |
+| `aidcp-cloud`（事实源） | `424834d` | `master` | — |
+| `aidcp-kernel` | `6bf0603` | `master` | typecheck 0 · 测试 57/57 |
+| `aidcp-transport` | `eeb6b3e` | `master` | typecheck 0 |
+| `aidcp-api` | `6181771` | `master` | typecheck 0 · 测试 470/470 |
+| `aidcp-automation` | `21dfe08` | `master` | typecheck 0 · 测试 1832 pass / 0 fail |
+| `aidcp-content` | `b4b1bf6` | `master` | typecheck 0 · 测试 455/455 |
+
+六仓：工作区干净、已推远端、共享包 pin 对齐（kernel `6bf0603` / transport `eeb6b3e`）。
+`./scripts/sync-split-repos --ref <cloud sha> --tests` 除组装根外零差异。
+**五个派生仓第一次同时全绿。**
+
+**下面 0.1 之外的历史快照（`f9ff71e` / `7d32913` 那一版）已过期，只作追溯。**
 
 ### 0.2 一句话进度
 
-**跨服务耦合处置已全部完成（Phase 0–5，96 → 0）。下一步是三个仓各写自己的启动入口 `main()`——主交付物。**
-但在动手前**必须先看 §1**：有一个既存线上缺陷等你（或用户）拍板。
+**跨服务耦合处置已全部完成（Phase 0–5，96 → 0）；同步与验证链路 2026-07-29 已全部打通
+（依赖装得上、迁移进同步范围、测试归属两类证据共同派生），六仓源码 / 迁移 / pin 三项零漂移。**
+
+**下一步仍是主交付物：三个仓各写自己的启动入口 `main()`。** content 与 api 已有真手写入口；
+**automation 的入口仍是有意 fail-closed 的壳**——`src/automation-composition-root.ts`
+的 `runAutomationEntry()` 读完配置即抛 `AutomationRootNotReadyError`，
+12 条 readiness blocker 全标 `closingChange:'future'`、**无 change 承接**。
+这不是 bug 是设计，但意味着批次 4 未完成；批次 5（dev 三服务真跑）随之未开工。
 
 ---
 
