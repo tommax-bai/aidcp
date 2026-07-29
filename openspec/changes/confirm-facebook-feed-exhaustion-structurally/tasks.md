@@ -19,4 +19,4 @@
 
 - [x] 4.1 Run focused Facebook Feed Rust tests, `npm run gate:native`, and `npm run typecheck` in the Edge worktree. <!-- Feed Rust 23/23; router contract 98/98; native fmt/clippy/full test OK; typecheck OK -->
 - [x] 4.2 Run `openspec validate confirm-facebook-feed-exhaustion-structurally --strict` and strict validation of the synchronized predecessor change. <!-- both strict validations pass -->
-- [ ] 4.3 Record repository commit SHAs and validation evidence, rebase onto the latest defaults, then fast-forward and push Edge `master` and control `main` without packaging an installer.
+- [x] 4.3 Record repository commit SHAs and validation evidence, rebase onto the latest defaults, then fast-forward and push Edge `master` and control `main` without packaging an installer. <!-- aidcp-edge 1607b4f; aidcp dc3ab14c; post-rebase Feed 23/23, router 98/98, native gate/typecheck and both OpenSpec strict validations pass; both defaults fast-forwarded and pushed; no installer built -->
