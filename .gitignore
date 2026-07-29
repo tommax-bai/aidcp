@@ -6,3 +6,6 @@ dist/
 
 # openspec CLI 生成的 agent skill 脚手架（.claude/skills 的镜像，非人工维护）
 .agents/
+
+# python 运行 scripts/ 里可执行脚本时的字节码缓存（非产物）
+__pycache__/

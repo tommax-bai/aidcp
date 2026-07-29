@@ -277,6 +277,16 @@
           `module-ownership.json` 是个更早生成的产物、把窟窿盖住了：census 测试过得去，
           而 `boundaries:refresh` 一跑就抛。本轮按事实源补齐了这三处。
           **这是结构性问题，不是本次的一次性修补**：登记为 0.7c。 -->
+- [ ] 0.7d **集成纪律（今晚差点漏掉一半，记下来）：一个任务的改动可能落在**多个仓的 worktree**里，
+  集成时 MUST 逐仓查一遍脏状态，不能只看主改的那个仓。**
+  实例：0.3f 的改动同时落在 `aidcp-cloud.wt/` 与 `aidcp-automation.wt/`。cloud 侧我提交并合了，
+  automation 侧那三个文件（台账 15→14、组装根常量、断言）**还留在 worktree 里未提交**，
+  而我已经把 automation 的分支合进 master 并推了。
+  **后果不会当场报错**：两份台账各自自洽（automation 的 JSON 与它的常量仍然 deepEqual、
+  测试照绿），只是 automation 的台账比 cloud 多留了一条不属于它的欠账，
+  且这个差**没有任何机械手段会提醒**——两份台账本来就允许不同（问的是不同的问题）。
+  已补合（automation `ed5188d`）。**做法**：land 前跑一遍
+  `for r in …; do git -C ../$r.wt/<change> status --short; done`，非空即停。
 - [ ] 0.7c **派生仓的 `boundaries/*.json` 目前是手抄件、不在 `sync-split-repos` 的同步范围内。**
   按 §8.1，归属的唯一事实源是控制仓 §4.7 → `aidcp-cloud/boundaries/ownership-rules.json`。
   但 `aidcp-automation/boundaries/ownership-rules.json` 是从 `aidcp-cloud@41f2c73` 抄下来后
