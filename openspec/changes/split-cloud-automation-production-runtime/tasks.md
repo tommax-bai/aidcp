@@ -165,6 +165,9 @@
 - [ ] 0.7b **同步时需要 `--prune`**：四个角色 + `content-role.ts` + `curated-gate.ts` 要从
   `aidcp-content/src` 移除、进 `aidcp-automation/src`。`sync-split-repos` 默认只报不删，
   **必须显式 `--prune`**，否则 content 仓会同时留着旧副本（两份实现，本项目点名的失败形态）。
+  <!-- 2026-07-29 已对改判分支实跑预演坐实（--ref origin/codex/<change>，只读）：
+       automation 227→233（新增 6）、content 85→79（**多出 6**）、kernel 96→101（新增 5）。
+       「多出 6」就是不 prune 会留在 content 的那批。 -->
 - [ ] 0.8 落实 A1：模型出口进 `aidcp-transport`。核对准入判据实跑一遍
   （`test/acceptance/module-boundary.test.ts` 的真正则，别凭记忆用「四条硬禁」），
   再按 kernel → transport → 三个业务仓的顺序快进 pin。
