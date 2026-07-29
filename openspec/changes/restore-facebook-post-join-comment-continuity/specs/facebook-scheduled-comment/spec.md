@@ -48,3 +48,37 @@ The keyword-search open step keeps its existing ceiling; only the empty-keyword 
 - **WHEN** a comment run supplies a search keyword
 - **THEN** its open step keeps the previously established ceiling
 - **AND** the widened first-post ceilings do not apply to it
+
+### Requirement: A command's time ceiling is defined in several places at once and MUST be changed as one unit
+
+The time ceiling for a single Native page command is not one number. It is spread across the request value, the edge admission check, the session timeout, the engine ceiling, and the engine's own protocol admission check — across two languages and two repositories. Changing a Facebook command's time budget SHALL change every one of those layers together.
+
+Each omission has a different and non-obvious failure shape, and none of them is a compile or type error:
+
+- Omitting the admission check makes the command **rejected before dispatch**; the page is never touched, while the operator-visible outcome describes the page instead.
+- Omitting the session timeout makes the engine **silently clamp** the ceiling back to the old value, with no error and no log line.
+- Omitting the engine's protocol admission makes **session open** fail, taking the whole platform offline rather than one command.
+
+A machine-checked guard SHALL assert these relations so that a partial change fails a test rather than reaching a real account. The guard MUST cover: request ≤ admission, request ≤ engine ceiling, session timeout ≥ every command ceiling it can clamp, and session timeout ≤ every admission check it must pass.
+
+Any budget carved out of a command's deadline for a later stage SHALL be large enough to contain that stage's own bounded waits plus room to deliver the receipt. A reserve exactly equal to the sum of its contents leaves no room to report the outcome.
+
+#### Scenario: A budget is raised in only one layer
+- **WHEN** a Facebook command's time budget is raised in the request value but not in the admission check
+- **THEN** the guard fails
+- **AND** the change does not reach a real account
+
+#### Scenario: Session timeout would clamp a raised ceiling
+- **WHEN** a command ceiling is raised above the session timeout
+- **THEN** the guard fails, naming the clamp
+- **AND** the raise is not silently ineffective
+
+#### Scenario: Session timeout would be rejected at admission
+- **WHEN** the session timeout exceeds an admission check it must pass
+- **THEN** the guard fails
+- **AND** the platform does not go fully offline at session open
+
+#### Scenario: Pacing is not tolerance
+- **WHEN** time budgets are scaled to tolerate slower pages
+- **THEN** humanized keystroke and pointer pacing, polling intervals, and rate-limit floors are left unchanged
+- **AND** only the windows that decide "waited too long, call it a failure" are scaled
