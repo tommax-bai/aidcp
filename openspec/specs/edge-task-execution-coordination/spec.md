@@ -322,3 +322,24 @@ After an edge has confirmed acquisition of a page-task lease, the Native page se
 - **WHEN** task `T` owns the page lease and a command carrying task ID `U` arrives
 - **THEN** Edge SHALL reject or suppress that command without touching the page
 
+### Requirement: 被任务租约抑制的命令必须回执，不得静默丢弃
+
+当一条云端下发的页面命令因租约归属不符（含释放与下发在同一瞬间竞态）而不被执行时，边缘 SHALL 向云端回一条如实的「未执行」回执，写明抑制原因与当时的租约归属。边缘 MUST NOT 只打日志后直接返回。
+
+云端 SHALL 能据此立即区分「命令被抑制、未触达页面」与「命令已执行但页面无结果」，并按自己的策略重试或诚实终止；MUST NOT 依赖步超时到点才发现这条命令从未执行。该回执 MUST NOT 被表述为成功或部分成功。
+
+#### Scenario: 释放与命令同毫秒竞态
+- **WHEN** 一条浏览命令与其所属任务的租约释放在同一毫秒到达
+- **THEN** 边缘回一条具名的未执行回执
+- **AND** 云端在毫秒级得知该命令未触达页面，而不是等满步超时
+
+#### Scenario: 归属他人租约的命令
+- **WHEN** 命令携带的任务标识与当前持有的租约不一致
+- **THEN** 边缘拒绝执行并回执说明当前租约归属
+- **AND** 页面状态不被该命令改动
+
+#### Scenario: 回执不得冒充成功
+- **WHEN** 命令被租约抑制
+- **THEN** 回执的成功位为假、原因具名
+- **AND** 云端不得把它计入任何已完成动作或配额
+
