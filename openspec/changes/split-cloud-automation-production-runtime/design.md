@@ -237,6 +237,25 @@ MUST NOT 由调用方选择 target。
 
 ## 3. 落地形态（裁决后）
 
+### 3.0 失败回报的约定（**用户 2026-07-29 裁定：统一到既有那套**）
+
+本仓已有的跨属主端口范式是：**客户端 implements 同一个 kernel 接口、返回裸值、失败靠抛**
+（`src/kernel/publish-log-writer-port.ts`；automation 里**已经在跑的**
+`src/transport/curated-content-http.ts` 也是这样）。
+
+本 change 一度为新端口引入了第二套（信封型返回，显式区分「成功」与「没问到对面」）。
+目的正确，落点被否掉——**两套并存的实际后果是接线的人顺手照抄既有范式、新端口被整体绕过**。
+
+**裁决：统一到既有约定。** 理由是「分得开」这件事既有约定本来就做得到——
+**抛出不是空数组**。真正的病根不在约定，在**五处把抛出重新压成空数组的代码**：
+`src/server.ts:7024`、`comment-scheduler.ts:1603` 的 `.catch(() => [])`、
+`role-dispatcher.ts:2456`、`publish-scheduler.ts:267` 与 `:272`。
+**力气花在堵这五处，不是花在换一套返回形状。**
+
+代价要说清：抛出天然容易被一行 `catch` 吞掉，靠的是纪律不是类型。所以那五处 MUST 全改，
+且跨边界的错误识别 MUST 用**结构化守卫**（按具名字段判），MUST NOT 用 `instanceof`
+——跨进程后它恒 false（CLAUDE §8.5）。
+
 - content 属主写口一律**只报真态**：写了几行就返回几行，失败按结构化原因返回。
   MUST NOT 把「传输失败」染成「领域上没有这条」——这是 3b 已经写进规格的一条
   （`cloud-api-automation-bidirectional-ports`「传输失败不得改变领域结局」），此处照守。

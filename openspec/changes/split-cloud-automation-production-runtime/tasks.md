@@ -131,11 +131,15 @@
   而真实的能力缺口（对面版本落后 / 路由没注册）反被静默吞掉。
   → 端口上两个读方法**都不带可选标记**，回落改由具名的 `unsupported_method` 驱动。
   **保留 `?` 等于保留一张假的安全网。**
-- [ ] 0.6f **降级形状有三处，只改一处等于没改**：
+- [ ] 0.6f **降级形状有五处，只改一处等于没改**（复核补出后两处）：
   ① `src/server.ts:7024` 的 `: Promise.resolve([])`（组装根层）；
   ② `aidcp-automation/src/comment-agent/comment-scheduler.ts:1603` 的 `.catch(() => [])`
   ——**即使组装根那层改了，调度器自己这个 catch 仍会把端口抛出的传输失败重新吃成空数组**；
-  ③ `role-dispatcher.ts:2456` 的「PG 不可用 / 装载失败 → 回退空池」。
+  ③ `role-dispatcher.ts:2456` 的「PG 不可用 / 装载失败 → 回退空池」；
+  ④⑤ `aidcp-automation/src/publish-agent/publish-scheduler.ts:267` 与 `:272` 的
+  `: Promise.resolve([] as CuratedSelectItem[])`（精选库未注入即静默空）。
+  **这五处正是用户裁决「把力气花在堵吞点」所指的地方**——失败靠抛这条约定本身分得开
+  「没问到对面」与「对面回答了空」，被吃掉是因为这五处把抛出重新压成了空数组。
 - [ ] 0.6g **调用点比原记录多两处**（接线时都要改）：`markSearched` 有两个
   （`role-dispatcher.ts:3411` 下发搜索后 + `:3714` 回执后）；`countNewSince` 有两个
   （`publish-scheduler.ts:263` 聚合输入 + `:323` 概念积累扳机）。
