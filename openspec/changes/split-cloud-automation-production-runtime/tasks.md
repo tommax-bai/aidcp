@@ -27,13 +27,38 @@
   全仓零读取点（多出的 8 条是 4b 已关闭的镜像项）。§4 的「两份同批收缩」实为**三份**。
 - [ ] 0.3b **给 automation 台账加机械锚**：cloud 那份是 AST 派生、自熄；automation 那份是手写、
   无任何机械力量把它钉在现实上——**这正是它会漂的原因**。清零前先补锚，否则清完还会再漂一次。
-- [ ] 0.3c **三条 `identifier` 探针不具判别力**（`concept` / `curated` / `facebookPublishMedia`）：
-  `src/server.ts:3900` 是 segC 开头一整行解构，三个名字都在里面——真实调用点改成 HTTP 后探针照样命中，
-  删解构而真实调用还在则探针静默放行。**改法必须与 census 探针一起定**，否则「台账清零」证明不了任何事。
-- [ ] 0.3d **补进台账：文字卡 OCR 整条子链**（segC 内构造、属主全是 content、automation 仓全无）：
-  `OpenAiCompatVisionClient` ×2（6473/6486）、`createCoverFormSensor`（6479）、
-  `createTextCardTranscriber`（6493）、两个 provider/model 解析闭包（6460/6461），
-  另有 `new PersonaGenerator`（5290）、`new ReplyAiService`（4693）、`hasUserRejectionEvidence`（7506）。
+- [x] 0.3c **三条 `identifier` 探针不具判别力**（`concept` / `curated` / `facebookPublishMedia`）：
+  `src/server.ts:3900` 是 segC 开头一整行解构，三个名字都在里面。
+  <!-- 2026-07-29 已改：在 census 既有机制内新增探针种类 identifier-use（沿用同一 EvidenceProbe 与
+       分发，不另造一套），语义＝该标识符在 scope 内**非声明绑定位置**的出现次数 > 0；
+       排除解构条目 / 变量与参数声明名 / import 说明符 / 对象与类型成员键，成员读与简写转发仍算真实使用。
+       判别力用变异实验坐实：变异「只删解构行里三个名字」→ 三条 segC 证据仍在；
+       变异「保留解构行、把 segC 内其余 19 处出现全改名」→ 新探针三条全消失，
+       同一变异下 kind 临时改回 identifier 则照样出——假阳当场复现、修复有效。
+       **原任务描述有一半是错的**：所谓「删解构而真实调用还在 → 静默放行（假阴）」机械上不会发生，
+       containsIdentifier() 遍历整个 scope 匹配任意同名标识符，真实调用点照样命中。
+       真正成立的只有假阳那一半。记下来免得后来人照着错的失败模式设计判据。 -->
+- [ ] 0.3c1 **同类弱探针还有 10 处**（本轮按不擅自扩大范围未动，逐条已登记）：
+  segC 被 3900 那行大解构覆盖的还有 `mirrorVersionStore` / `accountStore` /
+  `CONTENT_ROLE_FACTORIES` / `llm` / `tokenUsageStore` 五条；
+  **segD 有一模一样的问题**——`src/server.ts:7788` 也是一整行大解构，
+  `curatedContentStore` / `facebookPublishMediaStore` / `draftRefinementStore` / `llm` /
+  `tokenUsageStore` 五条同病。统一切到 `identifier-use` 是纯机械改动（改 kind + 跑一次 refresh-ledger）。
+- [x] 0.3d **补进台账：文字卡 OCR 整条子链**（segC 内构造、属主全是 content、automation 仓全无）。
+  <!-- 2026-07-29 走派生机制补记（不是手写 JSON）：在 REVIEWED_BLOCKER_BINDINGS 追加 3 条
+       content-owner 条目，台账由 refresh-ledger 重新派生。cloud 台账 52→55，automation 收窄台账 12→15。
+       **`new PersonaGenerator`（5290）经核不该补，已从清单剔除**——它在 seamMode === 'monolith'
+       分支里（5288-5305），core 走 HTTP 客户端，而 automation 模式下该句柄保持 undefined、
+       账号人设端口取自 4a 的 accountPersona（5327-5330），不阻塞 automation 独立根。
+       cloud inventory 测试 258-264 行本来就显式断言「任何证据含 PersonaGenerator 的条目不得留在台账里」，
+       补进去会当场撞既有裁定。裁定理由已写进那条断言的失败消息。 -->
+- [ ] 0.3e **更强的锚（已提出，本轮未做，需裁定）**：即使有了 deepEqual 自洽锚，
+  automation 那份仍是「两侧一起改就能一起漂」——锚住的是自洽，不是与现实的一致。
+  真正继承自熄性的做法：cloud 侧按 `consumer` 含 automation 从 AST 派生台账过滤出 id 集合，
+  随 `sync-split-repos` 落一份只读投影进 automation 仓；automation 侧断言自己的 id 集合 ⊆ 该投影。
+  这样 cloud 那边依赖一被解决，automation 台账当场红。**代价是给同步脚本加一个新产物（跨仓改动）。**
+  本 change 会把台账清到零，届时 deepEqual 锚 + 「4b-mirror 分类恒为空」两条已够守「保持零」；
+  这条留作后续。
 - [x] 0.4 **岔口 A 拍板**：模型调用出口归属。
   <!-- 2026-07-29 用户裁定 A1：提进 aidcp-transport，三家各自 new，密钥各自从 env 读。
        理由＝符合 transport 准入（三家都可能调用 + 不含任何属主表 SQL），且热路径不加内网跳。 -->
@@ -49,20 +74,49 @@
        segB(3664) 与 segC(6479) 各建一个实例，另有 cover-card-writer / post-image-form-profile
        两个 content 消费者；搬会打断 content，复制则两份实现只有真跑才对不上。
        详见 design.md §2.5。 -->
-- [ ] 0.5b 先修「缺席被静默吞掉」：`curated-note-evaluator.ts:145` 与 `:179` 的
+- [x] 0.5b 先修「缺席被静默吞掉」：`curated-note-evaluator.ts:145` 与 `:179` 的
   `this.textCardTranscriber?.enabled()` 改成显式能力状态，让「旗标关掉」与「依赖没接上」可区分。
-  **与 0.5a 选哪条无关，都必须做**（CLAUDE §8.5 的裸 `?.` 静默吞形态）。
-- [ ] 0.5c 抬两个纯函数进 kernel：`normalizeCuratedReferenceImages` / `orderedTextCardTexts`
-  （现居 `src/cache/curated-content-store.ts`，实测零 SQL）。**这一步与 0.5a 的裁决无关也该做**——
-  `orderedTextCardTexts` 本来就还有一个 content 侧消费者（发布链封面卡撰写角色），不抬必出两份实现。
-- [ ] 0.5d 修「假消边」残留：`curated-note-evaluator.ts` 与 `text-card-transcriber.ts` 的类型 import
-  改指 `../kernel/curated-content-types.js`，不再经 `../cache/curated-content-store.js` 的再导出壳
-  （类型早已抬进 kernel，消费方没改指；扫描器认 import 说明符，那条边账面上仍在。CLAUDE §8.3）。
+  <!-- aidcp-cloud 1d31c30。kernel 新增能力二态（wired / unavailable+具名 reason）与调用点三态
+       （active / flag_off / unavailable）+ 两个纯结算函数。缺席在构造期结算并打一条具名日志、
+       **全程不抛**（该角色是 fire-and-forget，抛出会打断浏览闭环）；跳过日志带 once-guard 不刷屏。
+       既有行为逐条保住：刷新返回 falsy 仍继续重评，enabled() 的调用时机与次数不变。
+       组装根工厂表的条件展开改成必给字段的三元（句柄缺 → 显式 unavailable）。 -->
+- [x] 0.5c 抬纯物件进 kernel。**对象按 0.5a 的裁决重算过**：真正跨过去的不是
+  `normalizeCuratedReferenceImages`（它只有 content 侧消费者，随转写器留 content），
+  而是评估角色值引用的 `mergeBodyWithTextCardTranscription` + 它内部调的 `orderedTextCardTexts`
+  （后者还有一个 content 侧消费者＝发布链封面卡撰写角色，不抬必出两份实现），
+  外加转写器的三个纯接口。
+  <!-- aidcp-cloud 1d31c30。两个纯函数进 kernel/text-card-transcription.ts；三个接口进新文件
+       kernel/text-card-transcriber-port.ts（那个文件是这一族的运行时纯函数家，kernel 既有约定是
+       口与数据模型只放类型，故不并进去）。**两处都没留再导出壳**——留壳会让扫描器继续看到那条边。 -->
+- [x] 0.5d 修「假消边」残留：`curated-note-evaluator.ts` 与 `text-card-transcriber.ts` 的类型 import
+  改指 `../kernel/curated-content-types.js`，不再经 `../cache/curated-content-store.js` 的再导出壳。
+  <!-- aidcp-cloud fbb66e7 + 1d31c30。 -->
+- [ ] 0.5e **可选实参未升级成编译期错误（取舍已知情，待裁）**：
+  `CuratedNoteEvaluatorOptions.textCardTranscriber` 仍是可选（类型放宽成 实现 | 能力态）。
+  省略它**不再等于沉默**（结算成 unavailable + 具名日志），但也**不是编译红**。
+  要升级需同批改三个今天直接传裸实现的测试文件
+  （`test/agents/curated-note-evaluator.test.ts` / `test/role-prompt-persona-segments.test.ts` /
+  `test/helpers/role-factories.ts`）。
+- [ ] 0.5f **测试侧工厂镜像已与生产不同步**：`test/helpers/role-factories.ts:29-36` 仍写着
+  `...(textCardTranscriber ? {...} : {})`。今天无正确性问题（缺失仍落 `not_injected` 并留痕），
+  但那份镜像的注释自称「与生产逐条对齐」——不改，这句话会慢慢变成假的。
+- [ ] 0.5g **缺席的真正上游在角色调度器**：`role-dispatcher.ts:2170` 决定要不要把不透明句柄
+  放进工厂 options。链路现在是「调度器可能不给 → 组装根**显式**翻译成 unavailable → 角色留痕」，
+  缺席不会再被压成假；但若要让「漏传」变成**编译期**错误，得从那里连同工厂选项类型一起收紧。
+  该文件是热点文件，需串行。
 - [ ] 0.6 **岔口 C 落实**：content 属主存储写走 content 内部 HTTP 写口，在既有
   `AIDCP_CONTENT_PORT` 监听上扩，不新造监听。**范围按 0.3 复核修正**（见 0.6a–0.6c）。
 - [ ] 0.6a **撤掉草稿精修那一条**：`src/server.ts:6171` 的守卫是 `seamMode !== 'automation' && ...`，
   该 worker 在 automation 模式下本来就不跑；剩余两条证据都是 api 侧。
   automation 方向现存 runtime 边为零，**不开这个写口**。
+- [x] 0.6b0 **两个端口的契约已定义**（只定义、未接线）：`src/kernel/content-port-result.ts`
+  （统一结果信封 + 7 选一具名失败原因 + 结构化守卫）、`src/kernel/concept-pool-port.ts`、
+  `src/kernel/curated-selection-port.ts`。
+  <!-- aidcp-cloud 1d31c30。精选库刻意是**两个方法而非一个**：发帖侧要全字段，评论侧只要三字段窄投影
+       ——全字段视图挂着参照图集 / 视觉分析 / 文字卡转写等大块 JSON，搬过边界只为留三个字段，
+       投影本就该在属主侧做。参数照抄属主存储真实签名（沿用 publish-log-writer-port.ts 立的房规）。
+       缺失计数用 null 而非 0，区别「不知道」与「真是 0」。 -->
 - [ ] 0.6b **概念池端口面补齐到 6 个方法**：除 `addCandidate` / `loadPool` / `markSearched`，
   还有 `countNewSince` / `getNewConceptsSince` / `getNewConceptsWithSourceSince?`
   （`aidcp-automation/src/publish-agent/publish-scheduler.ts:34-39`）。
@@ -117,7 +171,14 @@
   content 手写 main 已改成经属主侧窄读口取（`aidcp-content/src/server.ts:421-428`）。
   **按字面实施会让后台「厂商密钥」页对 automation 进程彻底失效且无任何信号。**
   照 content 的做法接窄读口，**MUST NOT 复刻四层回落逻辑**（复刻正是两侧悄悄不一致的来源）。
-- [ ] 0.8b **错误族抬进 kernel**：`ProviderKeyMissingError` / `LlmErrorMeta` / `buildLlmHttpError` /
+- [x] 0.8b **错误族抬进 kernel**（已完成，见下方原文与 <!-- --> 记录）
+  <!-- aidcp-cloud 1d31c30。新建 src/kernel/llm-errors.ts，5 个符号整体搬入（原处已删定义、非复制），
+       连同它们的私有格式化闭包；formatLlmMeta 提升为 export——留在 qwen.ts 的 LlmTimeoutError
+       也用它拼同一套排障字段，不导出就得复制第二份、字段位次会悄悄漂。
+       vision.ts → qwen.ts 这条边已彻底消失。四条准入正则实跑全 CLEAN，第五条（不 import 业务层）
+       也满足——该文件 import 说明符列表为空。另补一条会红的测试：视觉出口抛的错误类
+       与 kernel 那个是**同一个引用**，钉死「以后谁再复制一份」。 -->
+- [ ] 0.8b0 **错误族抬进 kernel**（原文，保留供追溯）：`ProviderKeyMissingError` / `LlmErrorMeta` / `buildLlmHttpError` /
   `buildLlmApiError` / `buildLlmShapeError`（共 53 行，四条准入正则实跑全 CLEAN）。
   理由是结构性的：`src/llm/vision.ts:19-24` 从 `qwen.ts` 取这 5 个符号，
   qwen 进包而 vision 留 content 会各持一份错误类，跨副本 `instanceof` 静默退化——

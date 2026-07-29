@@ -276,6 +276,11 @@ target 缺失或非法时**不启动那个 worker**（CLAUDE §2）。
    告警只在启动时响一次，之后每条委托任务照常被接收、落库、永不执行，收任务那侧没有任何提示。
 3. **`ReplyWorkflow` 的第三个实参是 content 属主的具体类**，不是模型客户端本身。
    就算岔口 A 裁成 A1，这个类仍然是 automation 仓里没有的东西，要单独处置。
+4a. **给一个文件加 `fileOverride` 之前，先查它在不在已裁决名册里。**
+   `boundaries/adjudicated-files.json` 与 `ownership-rules.json` 的 `fileOverrides` **不许重叠**——
+   后者优先，重叠会让名册那条变成永不生效的死条目，`AC-BOUND-01` 当场红并逐条点名。
+   实例：本 change 给 `src/publish-agent/curated-gate.ts` 加 override（原本靠目录默认判 content）时踩到，
+   修法是把它从名册里删掉。**这条只有加 override 时才会遇到，改已有 override 的 layer 不触发。**
 4. **别在 `boundaries/` 上抄错方向。** 同目录两种相反规则：`module-ownership.json` 按本仓实际文件
    **收窄**（照抄云端全量会多出几百条陈旧条目）；`table-ownership.json` 是**全量生成物**。
    两者都 MUST 手工 Edit 增量追加，**绝不脚本整体重序列化**（CLAUDE §8.2）。
