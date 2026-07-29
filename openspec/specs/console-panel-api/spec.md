@@ -654,15 +654,19 @@ Cloud `GET /api/content-schedule` SHALL 为每个账号目录行增量返回规�
 
 ### Requirement: Facebook 群组面板 API 暴露账号分组范围读模型
 
-Facebook 群组列表 SHALL 为每个目标返回完整 `accountGroupLabels`，接受可选账号分组过滤；facets 或等价只读端点 SHALL 返回当前 Facebook 账号实际使用的可选分组及无范围目标计数。导入 API SHALL 接受可选请求级 `accountGroupLabels`，未提供与显式空集合的语义必须可区分。所有字段为增量兼容，既有 URL-only 和元数据导入继续有效。
+Facebook 群组列表 SHALL 为每个目标返回完整 `accountScopeMode` 和 `accountGroupLabels`，接受可选显式范围模式或精确账号分组过滤；facets 或等价只读端点 SHALL 返回当前 Facebook 账号实际使用的可选分组、全局目标计数及受限空范围目标计数。导入和批量范围 API SHALL 接受 `global` 或 `restricted + accountGroupLabels`，并让“未提供范围”“显式全局”“显式受限空集合”的语义可区分。`global` 与非空标签、非法目标或非法 Facebook 分组标签 MUST 使整个请求拒绝；成功写入 SHALL 返回数据库回读真态。既有 URL-only、元数据导入和 labels-only 旧请求继续有效，labels-only 按 restricted 解释。
 
-#### Scenario: 未带范围字段的旧导入兼容
-- **WHEN** 旧客户端仍只提交 URL 或 metadata items
-- **THEN** API 继续处理导入且不清空既有目标范围
+#### Scenario: 列表区分全局和未设置范围
+- **WHEN** 目录同时含 global 目标、restricted 多标签目标和 restricted 空范围目标
+- **THEN** API 为每行返回可区分的范围模式和标签，并返回对应 facets 计数
 
-#### Scenario: 列表返回完整范围
-- **WHEN** 一个目标映射两个账号分组且列表按其中一个过滤
-- **THEN** 返回行仍包含两个完整标签，而不是只返回命中过滤的一个
+#### Scenario: 批量全局写返回真态
+- **WHEN** Console 把一批现有目标范围替换为 global
+- **THEN** API 整块校验并写入后返回每个目标 `accountScopeMode=global` 且标签为空的数据库真态
+
+#### Scenario: 旧 labels-only 写保持兼容
+- **WHEN** 旧客户端只提交 `accountGroupLabels=["华东组"]`
+- **THEN** API 按 `restricted` 范围处理，不把该请求解释为 global
 
 ### Requirement: 账号自动化目录聚合 Facebook 加群配置和 scheduled 最近结果
 
@@ -675,38 +679,6 @@ Facebook 群组列表 SHALL 为每个目标返回完整 `accountGroupLabels`，�
 #### Scenario: 小红书行不出现加群
 - **WHEN** 目录包含小红书账号
 - **THEN** 其 `availableActions` 不含 `join_group`，也不返回伪造的加群配置
-
-### Requirement: 内部 Panel 环境删除返回 Cloud 直调后的写后真态
-
-内部 Panel SHALL 通过 JWT 守护的逐环境端点接收完整 envKey 确认和幂等键，并在 Cloud 直接完成 AdsPower 调用与 AIDCP 收口后返回写后真态。成功 SHALL 返回 `state=deleted`；AdsPower 或配置失败 SHALL 返回非成功 HTTP、稳定错误类别和脱敏写后失败状态。端点 MUST NOT 以 202、`waiting_edge`、请求已受理或等待客户端表示未完成调用。
-
-#### Scenario: 直接删除成功返回终态
-- **WHEN** 内部管理员提交合法删除且 AdsPower 与 AIDCP 收口均成功
-- **THEN** Panel 返回 200 和 `state=deleted`，Console 刷新后默认列表不再显示该有效环境
-
-#### Scenario: AdsPower 不可用返回真实失败
-- **WHEN** AdsPower Key 未配置、API 不可达或业务拒绝删除
-- **THEN** Panel 返回可辨认非成功状态且环境仍存在，不返回 waiting_edge 或 deleted
-
-#### Scenario: 客户令牌无法调用内部删除
-- **WHEN** 客户令牌请求内部环境删除端点
-- **THEN** 请求被拒且不会调用 AdsPower
-
-### Requirement: Panel 平台凭据接口展示并保存 AdsPower API Key 状态
-
-现有 `GET /api/config/model` 与 `PUT /api/config/credential` SHALL 将 AdsPower API Key 作为平台凭据目录项处理，GET 只返回标签、来源、配置状态、掩码与 `restartRequired=false`，MUST NOT 返回明文；PUT SHALL 复用服务端加密存储、JWT、允许列表和非乐观写后结果。保存后的 Key SHALL 被下一次 Cloud 删除按需读取，无需重启。
-
-#### Scenario: 设置读取只返回掩码
-- **WHEN** AdsPower API Key 已加密保存在 Cloud
-- **THEN** Panel 配置读返回已配置、服务端密文来源和掩码，不返回明文或 Authorization
-
-#### Scenario: 保存后下一次删除生效
-- **WHEN** 管理员通过凭据端点覆盖保存 AdsPower API Key
-- **THEN** 返回加密保存后的掩码状态，下一次环境删除读取新 Key 且不要求重启 Cloud
-
-#### Scenario: 主加密密钥缺失时拒绝保存
-- **WHEN** Cloud 未配置有效 `AIDCP_CRED_KEY`
-- **THEN** AdsPower Key 写入与其它平台凭据一致被拒，绝不明文落库或假称保存成功
 
 ### Requirement: 内部 Panel 提供环境资产投影与账号环境摘要
 
@@ -925,4 +897,159 @@ delivery 不 fresh 时，整段 entries MUST 视为 unavailable；响应 MUST NO
 - **WHEN** automation health snapshot 的 deliveryState 为 stale
 - **THEN** API 将 automation 段标为 unavailable 并保留 source/delivery 时刻
 - **AND** 管理后台 MUST NOT 展示旧 entries 为当前 fresh
+
+### Requirement: Internal API 必须按账号管理 runtime controls 与版本化回复配置
+
+internal panel API SHALL 提供 `interaction-runtime-controls`、`interaction-reply-policy`、`reply-templates`、`reply-rules`、`reply-profile`、`reply-preview`、`reply-config/publish` 与 `reply-config/audit` 冻结路径。所有路径 MUST 校验 account 存在且 `accounts.platform='wechat_channels'`；MUST 使用共享 internal schema 与统一 envelope，MUST NOT 复用 Facebook 专用表或让客户 JWT 访问。
+
+#### Scenario: 非视频号账号不可写视频号配置
+- **WHEN** 管理员对 XHS/Facebook account 调用 reply config 写端点
+- **THEN** API 返回稳定 validation/platform mismatch，MUST NOT 创建配置行
+
+#### Scenario: 客户 token 不能进入 internal config API
+- **WHEN** 持 customer-auth token 请求任一 `/api/accounts/:accountId/reply-*` 端点
+- **THEN** 内部 JWT 校验失败并返回 401，不读写配置
+
+### Requirement: 配置权限必须区分查看编辑发布预览与敏感内容
+
+internal API SHALL 使用显式 permission：`interaction.config.view`、`interaction.config.edit`、`interaction.config.publish`、`interaction.config.preview`、`interaction.dm.view_full`、`interaction.audit.view`。缺 permission MUST fail closed；普通排障/配置列表 MUST 不因 config view 权限获得 DM 原文。
+
+#### Scenario: 编辑者不能越权发布
+- **WHEN** actor 有 config.edit 但无 config.publish
+- **THEN** 可保存 draft，publish 返回 403 且 published 指针不变
+
+#### Scenario: 无 DM full permission 只见脱敏内容
+- **WHEN** actor 有 audit/view 但无 `interaction.dm.view_full`
+- **THEN** DM 正文被脱敏或省略，MUST NOT 通过错误、preview 或 audit details 泄漏
+
+### Requirement: Draft 写与 publish 必须非乐观且原子
+
+配置写 SHALL 携 aggregate `expectedVersion`；服务端验证成功并落库后才回显写后真态。version conflict 返回 409/currentVersion；schema、变量、规则冲突或硬门禁错误整块拒绝，MUST NOT 部分落库或前端假保存。publish SHALL 生成 immutable version 和 append-only audit。
+
+#### Scenario: 规则冲突整块拒绝
+- **WHEN** draft 请求同时包含合法 profile 和同优先级冲突规则
+- **THEN** 整次写/发布返回 validation issues，MUST NOT 只保存 profile 或产生 published version
+
+#### Scenario: 写成功回显服务端真态
+- **WHEN** 合法 draft CAS 写入成功
+- **THEN** 响应 data 含新 currentVersion/updatedAt/updatedBy，Console 以回显刷新而非本地假设
+
+### Requirement: Preview 与 audit 必须无发送副作用并保护正文
+
+preview SHALL 只运行规则、template、可选 AI 与 risk 链并返回 would-action，MUST NOT 创建真实 job/attempt 或发 WS。audit SHALL 记录 actor、版本、实体 ID、状态/diff 摘要；普通日志/audit MUST NOT 保存完整 DM、Cookie 或第三方原始响应。
+
+#### Scenario: Preview 不触发 Edge
+- **WHEN** 管理员预览一条模拟私信
+- **THEN** Cloud 不向任何 Edge 发 interaction.reply.send，数据库无真实 inbound message/job/attempt
+
+#### Scenario: Audit 可追溯但不含私信正文
+- **WHEN** 管理员发布配置或查看预览审计
+- **THEN** 可读 actor/version/rule/template/result tags，普通 audit 中没有模拟/真实私信全文
+
+### Requirement: 限频四类安全配置的面板读回值必须来自权威服务
+
+面板对安全限额、操作兜底 floor、单场会话上限与自动续场护栏这四类配置的读取 SHALL 透传权威服务（这四项归属自动化服务）的同一次求值结果。客户业务 API MUST NOT 为这四张表维护本地副本并用它回答面板读请求，MUST NOT 由异步复制的投影充当这四项的当前真值。
+
+回包 SHALL 携带**数据时刻**（该值在权威侧被求出的时刻），与响应时刻分开表达。权威侧不可达时 MUST 以具名不可用态诚实回落，MUST NOT 展示上次已知值而不标注、MUST NOT 展示代码写死默认冒充当前生效值。
+
+理由与慢启动投影必须与实际 clamp 同源同格一致：展示值与生效值一旦分两处求值，就一定会出现「后台显示的数字」与「闸实际按的数字」不一致，而这类不一致在界面上完全看不出来。
+
+#### Scenario: 面板数字与生效数字逐格相等
+- **WHEN** 运营在面板查看某档某动作的当前限额
+- **THEN** 展示值与同一时刻自动化侧实际采用的值逐格相等，且回包标注该值的数据时刻
+
+#### Scenario: 权威不可达时诚实不可用
+- **WHEN** 自动化服务不可达，面板请求这四类配置
+- **THEN** 接口返回具名不可用态，MUST NOT 返回上次已知值而不标注，MUST NOT 返回代码写死默认冒充当前生效值
+
+#### Scenario: 内容排期目录不自行合成全局活跃掩码
+- **WHEN** 面板请求内容排期目录，其中某账号未设活跃时段覆盖、需回落全局掩码
+- **THEN** 该全局掩码取自权威侧的生效值，MUST NOT 由客户业务 API 侧的本地副本自行合成
+
+### Requirement: 内部 Panel 环境管理不提供删除写面
+
+内部 Panel SHALL 保留环境资产与历史 lifecycle 的读取能力，但 MUST NOT 注册或代理环境删除写端点，MUST NOT 调用 AdsPower，MUST NOT 创建删除申请或改变环境 lifecycle。对曾存在的 `POST /api/environments/:envKey/deletion` 的任何请求 SHALL 返回非成功结果且保持零删除副作用。
+
+#### Scenario: 旧删除路径不再可用
+- **WHEN** 内部管理员或旧 Console 请求 `POST /api/environments/:envKey/deletion`
+- **THEN** 请求返回非成功结果，Cloud 不请求 AdsPower、不新增删除审计且不改变目标环境状态
+
+#### Scenario: 环境资产读取保持可用
+- **WHEN** 内部管理员读取环境列表、单环境影响信息或账号环境摘要
+- **THEN** Panel 继续返回真实只读数据，包括已有历史 lifecycle，但不返回可执行删除动作
+
+#### Scenario: 历史删除状态只读保留
+- **WHEN** 数据库存在 deleting、delete_failed 或 deleted 历史行
+- **THEN** Panel MAY 在只读查询中按真实状态展示，但 MUST NOT 自动重试、复活或推进这些行
+
+### Requirement: Panel 平台凭据接口不提供 AdsPower API Key
+
+`GET /api/config/model` SHALL 从平台凭据目录中省略 AdsPower API Key；`PUT /api/config/credential` 收到 `provider=adspower, field=api_key` SHALL 按未知或不允许的凭据拒绝，MUST NOT 新增、覆盖或读取 AdsPower 密文。其它已注册平台凭据行为保持不变。
+
+#### Scenario: 设置读取不展示 AdsPower 凭据
+- **WHEN** 管理员读取平台配置
+- **THEN** 返回的凭据目录不包含 AdsPower API Key、掩码、来源或删除生效提示
+
+#### Scenario: 旧客户端保存 AdsPower Key 被拒绝
+- **WHEN** 旧 Console 向凭据端点提交 `provider=adspower, field=api_key`
+- **THEN** Cloud 返回非成功结果且不写入或覆盖凭据数据
+
+#### Scenario: 其它平台凭据不受影响
+- **WHEN** 管理员读取或保存仍在允许列表中的模型或账单凭据
+- **THEN** 其加密、掩码、来源与生效时机保持既有契约
+
+### Requirement: Facebook 群组面板 API 管理区域通用评论模板
+
+Panel API SHALL 提供区域通用评论模板目录读取及单区域完整模板集合替换写。读取 SHALL 返回区域、完整模板集合、更新时间和更新人；写入 SHALL 校验区域非空且当前存在于群目标目录、模板集合类型/数量/长度合法，并在数据库成功后返回回读真态。非法请求 MUST 整块拒绝，不得只保存部分模板。该接口 MUST 经由 automation 配置权威写入，不得在 API 组合根形成第二写者。
+
+#### Scenario: 读取区域模板目录
+- **WHEN** Console 打开 Facebook 群组配置
+- **THEN** API 返回所有已配置区域的通用模板真态且不包含账号私有模板
+
+#### Scenario: 替换一个区域的完整模板集合
+- **WHEN** 运营为一个现有群区域提交两条合法模板
+- **THEN** API 经权威写入并返回该区域恰好两条模板及数据库更新时间
+
+#### Scenario: 非法模板写不产生部分成功
+- **WHEN** 同一写请求中任一模板类型错误、超长或区域不存在
+- **THEN** API 具名拒绝，原区域模板集合保持不变
+
+### Requirement: 内部 Panel 提供环境慢启动配置投影与写接口
+
+内部 Panel 环境资产响应 SHALL additive 返回直接来自 `client_environments.slow_start_since` 的环境慢启动配置，以及当前 Cloud 的全局停用真态。内部 Panel SHALL 在有效 Panel JWT 之后提供按 `envKey` 写入 `{ enabled: boolean }` 的慢启动接口；请求 MUST NOT 接受 `accountId`、起点时间、平台或其它选择器。
+
+接口开启慢启动时 SHALL 仅在原值为 NULL 时写入服务器当前时刻所属上海自然日的 00:00，重复开启 MUST 保留原起点；关闭时 SHALL 清空环境起点。写入成功后 MUST 在回包前推进并刷新 `client_environment_slow_start` 镜像，使已缓存 RiskController 的下一次同步读可见新值。环境不存在、非 active 或非 Facebook 时 MUST 具名拒绝，MUST NOT 部分写入、重置起点或改变账号风控状态。
+
+#### Scenario: 内部管理员首次开启环境慢启动
+
+- **WHEN** 有效 Panel JWT 对 active Facebook 环境提交严格的 `{ "enabled": true }`
+- **THEN** Cloud 写入上海当日 00:00 起点、刷新环境慢启动镜像并返回写后配置
+- **AND** 未挂载账号不阻止该环境配置保存
+
+#### Scenario: 重复开启保持原起点
+
+- **WHEN** 已开启第 4 天的 Facebook 环境再次收到 `enabled=true`
+- **THEN** 接口幂等返回开启状态，`slow_start_since` 保持原值，MUST NOT 重置为第 1 天
+
+#### Scenario: 关闭环境慢启动
+
+- **WHEN** 有效 Panel JWT 对已开启的 active Facebook 环境提交 `{ "enabled": false }`
+- **THEN** Cloud 清空该环境的 `slow_start_since`、刷新镜像并返回关闭真态
+- **AND** 账号风险状态、档位和旧账号慢启动列逐位不变
+
+#### Scenario: 非法目标和非法请求 fail closed
+
+- **WHEN** 环境不存在、生命周期非 active、平台不是 Facebook，或请求体包含非布尔值或额外选择器
+- **THEN** 接口返回可区分的 4xx 拒绝且不修改任何环境慢启动字段
+
+#### Scenario: 客户令牌无法调用内部写接口
+
+- **WHEN** 持客户令牌请求内部 Panel 环境慢启动写接口
+- **THEN** Panel JWT 校验拒绝请求，且不返回跨客户环境配置或写入结果
+
+#### Scenario: 全局停用真态随资产投影返回
+
+- **WHEN** `AIDCP_SLOW_START_DISABLED=true` 且一个环境的慢启动配置已开启
+- **THEN** 资产响应同时返回该环境配置为开启与 `globallyDisabled=true`
+- **AND** 接口 MUST NOT 把全局停用改写成环境配置关闭
 

@@ -151,29 +151,138 @@ The join orchestration SHALL catch edge-task-lease acquisition and disconnect er
 - **WHEN** the account invokes group join again after the previous target failed on lease acquisition and another scoped target is available
 - **THEN** the scheduler may claim the other target and MUST NOT return `no_targets` because of the terminal failed row
 
-### Requirement: Slow-render observations SHALL fail the current join attempt without cooldown
+### Requirement: Native Facebook group join SHALL preserve the established scoped actuation and bounded verification contract
 
-When the readiness poll exhausts with the page still below a minimal readiness threshold (document still loading or zero visible action nodes), the edge SHALL report a distinct not-ready outcome carrying readiness diagnostics and the cloud SHALL mark the current membership `failed`. The system MUST NOT schedule a hidden retry, write a minutes-scale cooldown, or call the fail-closed model on an unready observation.
+For current-group scope, React-compatible actuation, readiness, hydration, post-click verification, and honest outcome classification, the Native-only Facebook adapter SHALL apply the established Facebook group-join executor semantics. This requirement does not assert parity with the legacy coordinator-visible 18.5-second commit window, because the current host-to-Native lifecycle does not expose the engine's internal click boundary. The adapter MUST NOT treat a command being dispatched, a click being attempted, cancellation, or a timeout expiring as proof that the account joined the group.
 
-#### Scenario: Ready poll exhausts on a still-loading page
-- **WHEN** the join readiness poll reaches its deadline while the document is still loading or no action nodes are visible
-- **THEN** the current target is marked `failed`, its not-ready reason is audited, and no cooldown is written
+The adapter SHALL positively resolve the target group's own heading/action region from the current `/groups/<id>` page and SHALL classify Join, member, and pending controls only within that region. It SHALL retain bounded out-of-scope candidate evidence but MUST NOT use a recommendation control to establish the target group's state or to actuate a join. Unresolved or ambiguous scope MUST fail closed without a click.
+
+Immediately before actuation, the adapter SHALL re-resolve exactly one enabled in-scope Join control and invoke that current React-owned element's in-page click behavior. It MUST NOT rely on coordinates captured by an earlier readiness probe as the join actuation.
+
+The join command SHALL permit the established bounded sequence of up to 30 seconds readiness polling, a 2-second pre-click hydration settle, a 1.5-second immediate post-click settle, and up to 45 seconds durable verification. This longer budget SHALL apply only to Native Facebook `group.join`; ordinary Native commands SHALL retain their existing deadline.
+
+The Native join SHALL honor cancellation during readiness and hydration and immediately before actuation as a not-started result. Once the in-page click has been invoked, cancellation SHALL stop bounded verification with `clicked=true` and an ambiguous `preempted_by_task` result; it MUST NOT report joined or replay the click.
+
+#### Scenario: Unique current-group React control is re-resolved and joined state is confirmed
+
+- **WHEN** the target group page resolves one enabled in-scope Join control and its React handler changes the page to a positive member state
+- **THEN** the Native adapter re-resolves that element at the actuation boundary, invokes its in-page click behavior, and reports joined only after the member state is observed
+
+#### Scenario: Recommended-group Join is excluded
+
+- **WHEN** the current target group is pending or otherwise has no in-scope Join control while a recommendation region contains an identically labelled Join control for another group
+- **THEN** the Native adapter reports the current group's pending or no-target state, records the recommendation as out of scope, and never clicks it
+
+#### Scenario: Ambiguous target region fails closed
+
+- **WHEN** more than one heading/action region can plausibly resolve as the target group or more than one in-scope Join control remains
+- **THEN** the Native adapter reports a retryable not-ready/ambiguous no-click outcome and MUST NOT select by document order
+
+#### Scenario: Existing terminal state short-circuits before actuation
+
+- **WHEN** the scoped pre-click observation positively establishes already-member, pending, or questionnaire-required state
+- **THEN** the Native adapter returns that honest outcome without invoking any Join control
+
+#### Scenario: Slow hydration and durable state remain inside the join budget
+
+- **WHEN** the Join control appears near the end of the 30-second readiness window and Facebook needs the established hydration and post-click verification windows before rendering a durable state
+- **THEN** the host and Native session allow the bounded join sequence to complete instead of truncating it at the ordinary 30-second command deadline
+
+#### Scenario: Dispatched click without durable proof is ambiguous
+
+- **WHEN** the in-scope Join control was invoked but no member, pending, questionnaire, or structural membership transition can be proven within the bounded post-click window
+- **THEN** the Native adapter reports `join_verification_ambiguous` with a dispatched/ambiguous effect and MUST NOT report joined
+
+#### Scenario: Cancellation before actuation is not started
+
+- **WHEN** takeover cancellation arrives before the in-page Join invocation
+- **THEN** the Native adapter returns a not-started cancellation and clicks nothing
+
+#### Scenario: Cancellation after actuation is ambiguous
+
+- **WHEN** takeover cancellation arrives after the Join invocation but before durable verification
+- **THEN** the Native adapter returns `preempted_by_task` with `clicked=true` and an ambiguous effect, without replay or claimed membership
+
+### Requirement: Native Facebook group join SHALL repair only observed bounded-result faults
+
+The Native Facebook group-join router and Rust consumer SHALL produce and decode every bounded result used by the complete group-join path. Before changing a producer field, router helper, or consumer type in response to an `invalid bounded result`, the implementation MUST capture the real failure's operation stage and decode stage plus its field path/JSON category or safely classified exception evidence with the diagnostic-only build. It MUST repair the observed boundary and add that exact condition to a regression fixture; it MUST NOT add broad coercion or compatibility fallbacks for unobserved shapes.
+
+#### Scenario: Real diagnostic identifies the repair
+
+- **WHEN** the diagnostic-only Native binary runs the full observation-only join path against the exact failing browser page
+- **THEN** the captured typed path/category or safely classified exception condition is recorded before the producer/consumer boundary is changed, and the regression test uses that observed condition
+
+#### Scenario: Sampled probes do not substitute for the full command
+
+- **WHEN** isolated consent or join probes decode successfully but the full group-join command still fails
+- **THEN** the repair follows the full command's diagnostic stage and MUST NOT guess a field from the isolated samples
+
+#### Scenario: Transient null document body does not throw
+
+- **WHEN** the readiness join probe runs while Facebook navigation has no `document.body` and therefore no main action root
+- **THEN** the router reports no composer and unresolved/not-ready scope as bounded data, allowing the existing readiness loop to continue, rather than throwing before a result exists
+
+### Requirement: Target group header membership SHALL be recognized without widening actuation scope
+
+The Native Facebook group-join scope resolver SHALL include the target group's real primary header action region when it is positively related to the unique current-group heading, including layouts where the heading and action controls are siblings inside a common target-owned header container. A member-classified control such as `已加入` in that region SHALL contribute a positive current-group membership signal.
+
+The resolver MUST continue to exclude controls owned by a different-group navigation reference or recommendation/suggestion card, MUST keep candidates out of scope by default when target ownership is unresolved or ambiguous, and MUST never use the expanded membership scope as a page-wide Join fallback. An in-scope Join control SHALL continue to contradict and prevent an `already_member` verdict.
+
+#### Scenario: Real current-group header reports already member
+
+- **WHEN** the exact target page has one positively resolved group heading and its sibling primary header control is member-classified as `已加入`
+- **THEN** that control is in target scope and the observation-only command reports the target as already a member without clicking
+
+#### Scenario: Suggested-group member control remains excluded
+
+- **WHEN** a recommendation card contains a member-classified control for another group
+- **THEN** that control remains out of target scope and cannot establish membership for the current group
+
+#### Scenario: Suggested-group Join remains ineligible
+
+- **WHEN** the target header relation is expanded to cover a sibling action region and the page also contains Join controls in recommendation cards
+- **THEN** only a uniquely target-owned in-scope Join can be eligible for actuation and no recommendation Join is admitted by the expansion
+
+#### Scenario: Ambiguous target ownership still fails closed
+
+- **WHEN** more than one heading/action region can plausibly own the current group's controls
+- **THEN** the resolver reports unresolved or ambiguous scope and clicks nothing rather than choosing by document order
+
+### Requirement: Slow-render observations SHALL receive one bounded no-click recovery before terminal failure
+
+When the first readiness observation ends with a no-click `not_ready` or `nav_error`, the scheduler SHALL run exactly one fresh observe leg within the same logical join invocation. The recovery observe SHALL navigate the canonical group URL again, SHALL be audited as a non-terminal recovery, and SHALL NOT write a retry cooldown or retain a database assignment between invocations. If the recovery produces a minimally ready observation, the existing judge and click flow proceeds. If it produces another execution failure, the cloud SHALL mark the current membership `failed` with the final concrete reason. The system MUST NOT call the fail-closed model on an unready observation.
+
+#### Scenario: Slow first render recovers on a fresh observe
+- **WHEN** the first observe reaches its readiness deadline with `clicked=false` and `reason=not_ready`, and a second canonical observe becomes minimally ready
+- **THEN** the scheduler audits one recovery, evaluates only the ready observation, and may continue to the existing click leg without writing a cooldown
+
+#### Scenario: Repeated slow render is terminal without target-pool blockage
+- **WHEN** both the first and bounded recovery observes return `not_ready`
+- **THEN** the membership becomes `failed` with the final not-ready reason, no cooldown is written, and another scoped target remains claimable on a later invocation
 
 #### Scenario: Pre-click model call remains gated behind minimal readiness
-- **WHEN** the observation is not minimally ready
-- **THEN** the cloud does not spend a fail-closed pre-click model call and returns the honest current-attempt failure
+- **WHEN** an observation is not minimally ready and the bounded recovery has not produced a ready observation
+- **THEN** the cloud does not spend a fail-closed pre-click model call and returns the honest final current-attempt failure
 
-### Requirement: Join execution failures SHALL fail fast while account-level blockers retain pause
+### Requirement: Join execution failures SHALL fail after bounded no-click recovery while account-level blockers retain pause
 
-Pure execution failures before confirmed membership—including observe/confirm timeouts, no-observation, navigation errors, not-ready, lease-unavailable, and post-confirmation slow render—SHALL immediately mark the current membership `failed`, retain the original reason in audit, and write no retry cooldown. The failed membership MUST stop occupying the account's unfinished-assignment slot so a later invocation can select another scoped target. Account-level login-required and captcha/checkpoint states SHALL retain their existing account pause, long backoff, and bounded-attempt behavior. Already-joined coverage cooldowns SHALL remain unchanged.
+Pure execution failures before confirmed membership—including observe/confirm timeouts, no-observation, navigation errors, not-ready, lease-unavailable, and post-confirmation slow render—SHALL retain the original reason in audit and SHALL write no retry cooldown. Only a no-click `not_ready` or `nav_error` receives the single in-invocation recovery defined above. After that recovery is exhausted, or for every other execution failure, the current membership SHALL immediately become `failed` and stop occupying the account's unfinished-assignment slot so a later invocation can select another scoped target. Account-level login-required and captcha/checkpoint states SHALL retain their existing account pause, long backoff, and bounded-attempt behavior. Already-joined coverage cooldowns SHALL remain unchanged.
 
-#### Scenario: Navigation failure is terminal for this target
-- **WHEN** opening the claimed group page returns `nav_error`
-- **THEN** the membership becomes `failed`, the result reports `nav_error`, no cooldown is written, and the command does not comment
+#### Scenario: Repeated navigation failure is terminal for this target
+- **WHEN** opening the claimed group page returns `nav_error` and the one fresh observe recovery also returns `nav_error`
+- **THEN** the membership becomes `failed`, the result reports the final `nav_error`, no cooldown is written, and the command does not comment
 
 #### Scenario: Next invocation selects another target
-- **WHEN** a previous target is terminal `failed` due to a join execution failure and the account still has another eligible scoped group
+- **WHEN** a previous target is terminal `failed` after its bounded no-click recovery and the account still has another eligible scoped group
 - **THEN** the next invocation can claim the other group without waiting for a retry timer
+
+#### Scenario: Clicked ambiguity is never replayed
+- **WHEN** a join result reports `clicked=true` but membership verification remains slow or ambiguous
+- **THEN** the scheduler MUST NOT run the no-click observe recovery or issue another Join click, and MUST preserve an honest non-success outcome
+
+#### Scenario: Lease failure keeps current fail-fast behavior
+- **WHEN** a join attempt cannot acquire or retain its Edge task lease
+- **THEN** the membership becomes `failed` with the concrete lease reason, without a cooldown or hidden retry
 
 #### Scenario: Account-level failure keeps the long backoff
 - **WHEN** a join attempt encounters login-required or captcha
@@ -182,4 +291,16 @@ Pure execution failures before confirmed membership—including observe/confirm 
 #### Scenario: Joined coverage behavior is unchanged
 - **WHEN** navigation fails while checking comment coverage for a membership already recorded `joined`
 - **THEN** the existing left-confirmation/cooldown protection remains in force and the joined fact is not demoted by this change
+
+### Requirement: Native Facebook task release SHALL preserve the current page until deliberate navigation
+
+After an exclusive Facebook page task releases, the Native host SHALL unblock command handling and resume passive page observation without issuing an autonomous home/feed navigation. The current group page MUST remain available to the next join or comment leg. A later deliberate feed command SHALL remain responsible for validating and restoring the retained active feed/search list before it scrolls.
+
+#### Scenario: Observe release does not navigate home before click
+- **WHEN** a Facebook group observe leg finishes on the canonical target group page and releases its task lease
+- **THEN** Native resume performs no `initial_scan` navigation, and the following click leg can reuse that exact group page
+
+#### Scenario: Deliberate feed work still restores the active list
+- **WHEN** a task leaves Facebook on a group or post page and the next authorized command is a feed scroll
+- **THEN** the feed command validates the current surface against the retained active list and navigates to that list if required before scrolling
 

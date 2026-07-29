@@ -1,0 +1,72 @@
+# admin-console-navigation Specification
+
+## Purpose
+TBD - created by archiving change group-admin-console-navigation. Update Purpose after archive.
+## Requirements
+### Requirement: Admin destinations SHALL be organized into stable business groups
+The admin console SHALL present the existing visible destinations under six ordered groups: Overview contains Data; Accounts contains Accounts, WeChat Strategy, and Facebook Groups; Content contains Content, Curated, and Schedule; Interaction contains Interaction Contacts and Notification Routes; AI Configuration contains Persona and Roles; System contains Safety, Usage, and Client Users.
+
+#### Scenario: Desktop operator scans the primary navigation
+- **WHEN** an authenticated operator views the console at desktop width
+- **THEN** the first header row presents the six labelled groups instead of fourteen flat destination buttons
+
+#### Scenario: Operator selects a group
+- **WHEN** the operator hovers over or activates a multi-destination group
+- **THEN** a compact floating menu presents every labelled destination in that group without changing the header height or moving page content
+
+#### Scenario: Operator uses the single-destination Overview group
+- **WHEN** the operator activates Overview
+- **THEN** the console navigates directly to Data without opening a redundant one-item menu
+
+### Requirement: Navigation context SHALL follow the current route
+The console SHALL visibly identify both the owning group and visible destination for exact and nested routes, using path-boundary matching so similar prefixes do not activate multiple destinations.
+
+#### Scenario: Direct destination URL loads
+- **WHEN** the operator opens an existing destination URL directly
+- **THEN** its owning primary group is active and the destination is selected when that group's floating menu opens
+
+#### Scenario: Nested destination URL loads
+- **WHEN** the operator opens a nested path below a visible destination
+- **THEN** the owning group remains active and the destination remains selected in that group's floating menu
+
+#### Scenario: Operator cannot or does not use hover
+- **WHEN** the operator activates a multi-destination group by click or keyboard
+- **THEN** the same floating destination menu opens and its links remain operable
+
+#### Scenario: Operator clicks a group that pointer hover already opened
+- **WHEN** pointer hover has opened a multi-destination group and the operator habitually clicks the same trigger before choosing a destination
+- **THEN** the floating menu remains open until the pointer leaves the trigger/menu hover region or navigation occurs
+
+#### Scenario: Similar route prefixes are present
+- **WHEN** the current path is `/content-schedule`
+- **THEN** Schedule is active and Content is not active
+
+#### Scenario: Settings route loads
+- **WHEN** the operator opens `/settings`
+- **THEN** the independent Settings action is active and the System group remains the navigation context
+
+### Requirement: Narrow navigation SHALL keep every destination readable and reachable
+Below the narrow layout breakpoint, the console SHALL replace the desktop group strip with a labelled grouped navigation trigger. The opened menu MUST expose every visible destination with text under its owning group; it MUST NOT rely on an icon-only strip.
+
+#### Scenario: Header enters narrow layout
+- **WHEN** the available width crosses below the narrow breakpoint
+- **THEN** the desktop group navigation is hidden and a labelled current-location trigger is visible
+
+#### Scenario: Operator opens the narrow menu
+- **WHEN** the operator activates the narrow navigation trigger
+- **THEN** all fourteen destination labels are reachable under the six group headings
+
+### Requirement: Existing routes and independent actions SHALL remain stable
+The navigation redesign SHALL NOT change existing destination URLs. Download, Settings, and User actions SHALL remain independent header actions, and route definitions plus all navigation surfaces SHALL continue to derive from shared route metadata.
+
+#### Scenario: Operator follows an existing bookmark
+- **WHEN** an operator follows any existing admin destination URL after deployment
+- **THEN** the same page loads without a navigation migration or redirect introduced by this change
+
+#### Scenario: Operator uses a header action
+- **WHEN** the operator uses Download, Settings, or User controls
+- **THEN** the control remains available outside the grouped business navigation
+
+#### Scenario: A visible route is registered
+- **WHEN** the navigation catalog is validated
+- **THEN** every visible route belongs to exactly one known group and appears in the derived desktop and narrow navigation models

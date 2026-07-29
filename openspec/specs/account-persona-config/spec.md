@@ -7,9 +7,13 @@ TBD - created by archiving change account-persona-config. Update Purpose after a
 
 系统 SHALL 支持**按账号**配置人设（soul：identity / interests / behavior_guidelines），落 PostgreSQL `persona_config` 表（`account_id` 主键，外键引用 `accounts(account_id)`）。**系统不存在默认 / 兜底人设**：任一账号**缺行 / 人设为空 / 解析失败**时，解析器 MUST 返回明确的「无人设」信号（null），MUST NOT 回落到任何打包默认人设，MUST NOT 抛错。「无人设」账号能否运行由各入口闸决定（见 `persona-gated-session-start` 与 `mandatory-account-persona`）——解析器只如实报告有无。人设存储初始化失败 MUST fail-closed：全部账号按未绑人设对待（被入口闸拒绝），MUST NOT 以任何默认人设「带病运行」。写入 MUST 先持久化成功、再刷新内存镜像（绝不出现「镜像已变、库未变」的不一致）。
 
+写入 SHALL 在**持久化成功的同一个数据库事务内**推进人设镜像的版本，供跨进程消费方据以失效重载；持久化失败 MUST NOT 推进版本。解绑（空人设保存）与绑定同样 MUST 推进版本——否则「客户在应用里清空了人设」这件事在其它进程里永远不可见。
+
+当人设由**跨进程本地只读副本**提供时，「副本中缺行」MUST NOT 直接等同于「无人设」：只有副本新鲜时才可作此判定；副本超过声明的陈旧上限时 MUST 表达为「未知」，由入口闸按不可用态处理。人设存储**初始化失败**仍按上述 fail-closed 规则以「未绑」对待（那是权威侧明确不可用、且发生在进程启动期，与运行期副本陈旧是两回事）。
+
 #### Scenario: 账号无人设行返回明确无人设信号
 
-- **WHEN** 某账号在 `persona_config` 无行（或行内容为空 / 解析失败）
+- **WHEN** 某账号在 `persona_config` 无行（或行内容为空 / 解析失败），且权威存储可读
 - **THEN** 解析器返回「无人设」（null）信号——不抛错、不返回任何默认 soul；该账号的浏览 / 发布 / 评论入口闸据此诚实拒绝
 
 #### Scenario: 人设存储初始化失败 fail-closed
@@ -20,7 +24,12 @@ TBD - created by archiving change account-persona-config. Update Purpose after a
 #### Scenario: 写库成功才刷新镜像
 
 - **WHEN** 面板写入某账号人设且 PG 持久化失败
-- **THEN** 内存镜像不变、返回诚实失败；绝不出现镜像与库不一致
+- **THEN** 内存镜像不变、版本不变、返回诚实失败；绝不出现镜像与库不一致，也绝不出现版本已进而库未变
+
+#### Scenario: 绑定与解绑都推进版本
+
+- **WHEN** 某账号的人设被绑定，或被以空人设保存而解绑，且持久化成功
+- **THEN** 人设镜像版本加一，其它进程的只读副本在有界时间内读到该变更
 
 ### Requirement: 人设写入经 soul 加载器校验，非法人设诚实拒绝绝不静默接受
 

@@ -111,54 +111,82 @@ TBD - created by archiving change dedicated-title-creator-role. Update Purpose a
 
 内容后处理 SHALL 拆为三个单职责角色：`ContentCleaner`（去 AI 味）watch `createdContent`、复用现有
 `PostProcessor`（不改其实现）产出 `cleanedContent`；`AiFlavorScorer`（AI 味分）watch `cleanedContent`
-产出 `aiFlavorScore`（其 `aiScore` 为去 AI 味命中归一值）；`QualityScorer`（质量分）watch
-`cleanedContent` 经 LLM 评审产出 `qualityReport`（`qualityScore` 为 0-100）。三角色 MUST 如实回报分数——
-评审 LLM 失败时 `QualityScorer` MUST 走既有降级公式 `qualityScore = round((1-aiScore)*70)`，MUST NOT 编造
-满分或固定高分掩盖失败。单个角色 MUST NOT 同时承担"去 AI 味 + AI 味评分 + 质量评审"两项以上职责。
+产出 `aiFlavorScore`（其 `aiScore` 为去 AI 味命中归一值）；`QualityScorer`（质量适用策略与非 Facebook
+质量分）watch `cleanedContent` 产出 `qualityReport`。
 
-#### Scenario: 清洗、AI 味分、质量分分属三角色
+对非 Facebook 平台，`QualityScorer` SHALL 经 LLM 评审产出 `qualityScore` 0-100 和 `status='scored'`；
+评审 LLM 失败时 MUST 走既有降级公式 `qualityScore = round((1-aiScore)*70)`，MUST NOT 编造满分或固定高分。
+对 Facebook，`QualityScorer` SHALL 不调用 LLM，产出 `qualityScore=null` 和
+`status='not_applicable'`，MUST NOT 用任意数字冒充跳过评分。单个角色 MUST NOT 同时承担
+“去 AI 味 + AI 味评分 + 质量评审”两项以上职责。
 
-- **WHEN** `createdContent` 就绪、进入内容后处理
-- **THEN** `ContentCleaner` 去 AI 味写 `cleanedContent`，`AiFlavorScorer` 写 `aiFlavorScore`，`QualityScorer` 经 LLM 评审写 `qualityReport`；没有任一角色同时做清洗与质量评审，为 `QualityScorer` 写单测只需桩评审 LLM、无需桩 `PostProcessor`
+#### Scenario: 非 Facebook 的清洗、AI 味分、质量分分属三角色
+
+- **WHEN** 非 Facebook `createdContent` 就绪、进入内容后处理
+- **THEN** `ContentCleaner` 去 AI 味写 `cleanedContent`，`AiFlavorScorer` 写 `aiFlavorScore`，`QualityScorer` 经 LLM 评审写 `qualityReport { status:'scored', qualityScore:<0-100> }`
+- **AND** 没有任一角色同时做清洗与质量评审
+
+#### Scenario: Facebook 写不适用结果且不调评分模型
+
+- **WHEN** Facebook `createdContent` 就绪、进入内容后处理
+- **THEN** `QualityScorer` SHALL 写 `qualityReport { status:'not_applicable', qualityScore:null }`
+- **AND** MUST NOT 构造质量评审 prompt 或调用评分 LLM
 
 #### Scenario: AI 味分如实投影、不重复计算
 
 - **WHEN** `ContentCleaner` 已产出 `cleanedContent.aiScore`
 - **THEN** `AiFlavorScorer` 产出的 `aiFlavorScore.aiScore` 恒等于 `cleanedContent.aiScore`（显式收口、留独立演进点），不重算、不篡改
 
-#### Scenario: 评审 LLM 失败时质量分如实降级
+#### Scenario: 非 Facebook 评审 LLM 失败时质量分如实降级
 
-- **WHEN** `QualityScorer` 的评审 LLM 失败 / 返回非法 JSON
-- **THEN** `QualityScorer` 走降级公式产出 `qualityScore = round((1-aiScore)*70)` 并记日志，分数随 AI 味浓度如实变化，绝不返回固定满分
+- **WHEN** 非 Facebook `QualityScorer` 的评审 LLM 失败或返回非法 JSON
+- **THEN** `QualityScorer` 走降级公式产出 `status='scored'` 与 `qualityScore = round((1-aiScore)*70)` 并记日志
+- **AND** 分数随 AI 味浓度如实变化，绝不返回固定满分
 
-#### Scenario: 红线——分数造假或职责混杂（反例）
+#### Scenario: 红线——用数字伪装不适用（反例）
 
-- **WHEN** 任一实现谎报质量 / AI 味分（如失败时硬编码高分、把 `aiScore` 抹零），或一个角色同时做"去 AI 味 + 质量评分"
-- **THEN** MUST 视为违规、不予合入（质量 / AI 味分必须如实，清洗与评分必须分属不同角色）
+- **WHEN** 任一实现用固定高分、零分或 `NaN` 表示 Facebook “未评分”，或把 `aiScore` 抹零
+- **THEN** MUST 视为违规、不予合入；未评分必须使用显式 `null + not_applicable`
 
 ### Requirement: ContentAssembler 瘦身但产出同形 assembledContent（稳定边界、下游零改动）
 
-`ContentAssembler` SHALL 瘦身为**纯组装**角色：`watchAll`（`waitAll: true`）`cleanedContent` / `aiFlavorScore` / `qualityReport` / `imageDirective` / `coverSelection` 就绪后仅做字段拼装，MUST NOT 再持有 `llmClient` / `postProcessor`、MUST NOT 做任何 LLM 调用或外部 IO。它 SHALL 产出 `assembledContent`，字段为 `{ finalContent, finalTags, imageUrls, imageUrl, aiScore, qualityScore, rewritten, flaggedPhrases, assembledAt }`：`imageUrls` ← `coverSelection.imageUrls`（上传全集），`imageUrl` ← 封面（`imageUrls[0] ?? null`，保留为向后兼容的单数派生字段）。**自话题拆分能力起，`finalTags` 恒为 `[]`**——话题改由独立 `TopicGenerator` / `TopicEvaluator` 产出、经 `publishMetadata.topics` 落地并成为唯一真源，`finalTags` 不再承载笔记话题；这是话题拆分能力显式许可的语义变更（与多图能力显式新增 `imageUrls` 同类的预期演进），MUST NOT 被读作历史细拆所禁的静默改形。除此显式变更外，其余字段集 / 语义与细拆前一致。下游 `PublishExecutor` 因多图能力 SHALL 读 `imageUrls` 下发上传全集；`ApprovalGatekeeper`（watch `assembledContent`）MUST NOT 因字段拼装方式而改注册。本要求 MUST NOT 触及协议或 edge。
+`ContentAssembler` SHALL 瘦身为**纯组装**角色：`watchAll`（`waitAll: true`）`cleanedContent` /
+`aiFlavorScore` / `qualityReport` / `imageDirective` / `coverSelection` 就绪后仅做字段拼装，MUST NOT 再持有
+`llmClient` / `postProcessor`、MUST NOT 做任何 LLM 调用或外部 IO。它 SHALL 产出
+`assembledContent`，字段为 `{ finalContent, finalTags, imageUrls, imageUrl, aiScore, qualityScore,
+qualityStatus, rewritten, flaggedPhrases, assembledAt }`：`qualityScore` 与 `qualityStatus` 逐字透传
+`qualityReport`；Facebook 为 `null + not_applicable`，非 Facebook 为真实数字 + `scored`。
+`imageUrls` ← `coverSelection.imageUrls`，`imageUrl` ← `imageUrls[0] ?? null`。
+自话题拆分能力起 `finalTags` 恒为 `[]`，话题继续由 `publishMetadata.topics` 承载。
+`ApprovalGatekeeper` 仍 watch `assembledContent`；本要求 MUST NOT 触及协议或 edge。
 
-#### Scenario: 瘦身后仅组装、无 LLM / 无 IO
+#### Scenario: 瘦身后仅组装、无 LLM 或 IO
 
 - **WHEN** `cleanedContent` / `aiFlavorScore` / `qualityReport` / `imageDirective` / `coverSelection` 五键全部就绪
-- **THEN** `ContentAssembler` 仅做字段映射（`finalContent ← cleanedContent.content`、`finalTags ← createdContent.tags`（因 `createdContent.tags` 自话题拆分起恒 `[]`，`finalTags` 恒 `[]`）、`imageUrls ← coverSelection.imageUrls`、`imageUrl ← imageUrls[0] ?? null`、`aiScore ← aiFlavorScore.aiScore`、`qualityScore ← qualityReport.qualityScore`、`rewritten`/`flaggedPhrases ← cleanedContent`），其依赖中不含 `llmClient` / `postProcessor`
+- **THEN** `ContentAssembler` SHALL 仅映射既有字段，并逐字透传 `qualityReport.qualityScore` 与 `qualityReport.status`
+- **AND** 其依赖中不含 `llmClient` / `postProcessor`
 
-#### Scenario: 多图能力新增 imageUrls 字段、其余形状不变
+#### Scenario: Facebook 组装结果保留未评分事实
 
-- **WHEN** 重组后的生产段跑完、`ContentAssembler` 写出 `assembledContent`
-- **THEN** `assembledContent` 含 `finalContent` / `finalTags` / `imageUrls` / `imageUrl` / `aiScore` / `qualityScore` / `rewritten` / `flaggedPhrases` / `assembledAt`；`imageUrls` 为上传全集、`imageUrl` 为封面（首张派生），`finalTags` 恒 `[]`（话题移交独立角色），其余字段语义与细拆前等价
+- **WHEN** `qualityReport={ status:'not_applicable', qualityScore:null }`
+- **THEN** `assembledContent.qualityStatus` SHALL 为 `not_applicable` 且 `qualityScore` SHALL 为 `null`
+- **AND** MUST NOT 在组装层回落成数字
 
-#### Scenario: 下游消费方按多图能力读取
+#### Scenario: 非 Facebook 组装结果保留真实分数
 
-- **WHEN** 一轮发布流水线在多图能力下完整跑通
-- **THEN** `ApprovalGatekeeper` 仍 watch `assembledContent`、`PublishExecutor` 仍 watch `gateDecision`；`PublishExecutor` 读 `assembledContent.imageUrls` 下发上传全集、读封面字段下发 `cover`，读 `publishMetadata.topics` 作为话题真源，端到端结果（`gateDecision` / `publishResult`）形状与单图等价
+- **WHEN** `qualityReport={ status:'scored', qualityScore:72 }`
+- **THEN** `assembledContent.qualityStatus` SHALL 为 `scored` 且 `qualityScore` SHALL 为 `72`
 
-#### Scenario: 红线——细拆波及协议或越界改形（反例）
+#### Scenario: 下游消费方保持同一发布门
 
-- **WHEN** 任一改动改了 `assembledContent` 除 `imageUrls`（多图能力显式新增）/ `finalTags` 恒空（话题拆分能力显式许可）外的字段集 / 字段名 / 字段语义，或触及协议 / edge
-- **THEN** MUST 视为越界、不予合入（稳定边界 `assembledContent` 除各能力显式许可的变更外不可破，且 MUST NOT 触及协议 / edge）
+- **WHEN** 一轮发布流水线完成组装
+- **THEN** `ApprovalGatekeeper` 仍 SHALL watch `assembledContent`，`PublishExecutor` 仍 SHALL watch `gateDecision`
+- **AND** `PublishExecutor` 继续读 `imageUrls` 上传全集、读 `publishMetadata.topics` 作为话题真源
+
+#### Scenario: 红线——组装层发明平台策略（反例）
+
+- **WHEN** 任一实现让 `ContentAssembler` 自行判断平台、调用模型或把 `null` 改成数字
+- **THEN** MUST 视为越界；平台适用策略属于评分与 admission 角色，组装层只透传
 
 ### Requirement: ContentTypeSelector 产出内容类型
 
@@ -1025,19 +1053,36 @@ Facebook 发布草稿写入 `publish_log` 时，`images` SHALL 等于素材池�
 
 ### Requirement: 内容质量评审随品类与人设自适应（不改放行闸与降级公式）
 
-`QualityScorer` 的评审 SHALL 随本帖**内容品类**与账号**人设**自适应，MUST NOT 用单一「干货 / 信息密度」口味评判所有品类：干货类看信息量 / 实用性，情感 / 审美 / 生活类看共鸣 / 画面感 / 真实体验；「真实感」判据 SHALL 改为「是否贴合该账号人设声音」而非泛化真人腔。账号人设 SHALL 作为一等入参接入评审 prompt（从管线内已可达的 `soul` 取，无新增跨阶段 plumbing）。本要求 MUST NOT 改动既有诚实性约束：评审 LLM 失败时仍走降级公式 `qualityScore = round((1-aiScore)*70)`、MUST NOT 编造高分；MUST NOT 改动 `ApprovalGatekeeper` 的放行 / 人审 / 拒绝分支阈值（AC-PUB）。改评审 prompt 函数签名 SHALL 同步后台只读预览（`prompts-preview`）以保与线上同源。
+对启用质量评分的非 Facebook 平台，`QualityScorer` 的评审 SHALL 随本帖**内容品类**与账号**人设**
+自适应，MUST NOT 用单一“干货 / 信息密度”口味评判所有品类：干货类看信息量 / 实用性，情感 / 审美 /
+生活类看共鸣 / 画面感 / 真实体验；“真实感”判据 SHALL 为“是否贴合该账号人设声音”。账号人设 SHALL
+作为一等入参接入评审 prompt。评审 LLM 失败时仍走 `qualityScore = round((1-aiScore)*70)`，MUST NOT
+编造高分；非 Facebook 的 `ApprovalGatekeeper` 放行 / 人审 / 拒绝分支阈值不变。
 
-#### Scenario: 情感类不因缺硬信息被压低
-- **WHEN** 一篇情感 / 生活类笔记（共鸣强、无硬核数据）进入质量评审
-- **THEN** 评审按该品类子标准（共鸣 / 画面感 / 真实体验）打分，MUST NOT 仅因「缺少具体数据 / 实用信息」而系统性压低其质量分
+Facebook 不适用本质量评审要求：MUST NOT 构造该 prompt 或调用对应 LLM，并 SHALL 由平台 admission
+确定性进入 `manual_review`。
 
-#### Scenario: 评审接人设声音
-- **WHEN** 构造 `QualityScorer` 评审 prompt
-- **THEN** prompt 含该账号人设（角色 / 语气 / 兴趣），「真实感」判据表述为「是否贴合该人设声音」
+#### Scenario: 非 Facebook 情感类不因缺硬信息被压低
 
-#### Scenario: 不动放行闸与降级公式
-- **WHEN** 评审 LLM 失败，或审视 `ApprovalGatekeeper` 放行逻辑
-- **THEN** `QualityScorer` 仍走 `round((1-aiScore)*70)` 降级、不造假分；`auto_publish` / `manual_review` / `retry` / `abort` 的阈值与分支未被本要求改动
+- **WHEN** 一篇启用质量评分的情感或生活类内容进入质量评审
+- **THEN** 评审 SHALL 按共鸣、画面感、真实体验等品类子标准打分
+- **AND** MUST NOT 仅因缺少具体数据而系统性压低质量分
+
+#### Scenario: 非 Facebook 评审接人设声音
+
+- **WHEN** 构造非 Facebook `QualityScorer` 评审 prompt
+- **THEN** prompt SHALL 含账号人设，并把真实感表述为是否贴合该人设声音
+
+#### Scenario: Facebook 不进入自适应质量评审
+
+- **WHEN** 发布平台为 Facebook
+- **THEN** MUST NOT 构造品类/人设质量评审 prompt，MUST NOT 调用质量评分 LLM
+
+#### Scenario: 非 Facebook 不动放行闸与降级公式
+
+- **WHEN** 非 Facebook 评审 LLM 失败，或审视其 `ApprovalGatekeeper` 放行逻辑
+- **THEN** `QualityScorer` 仍走 `round((1-aiScore)*70)` 降级
+- **AND** 既有 `auto_publish` / `manual_review` / `retry` / `abort` 阈值与分支保持不变
 
 ### Requirement: 正文标点表达按品类分档且生成与后处理检测口径同步
 
@@ -1084,4 +1129,26 @@ Facebook 正文在去 AI 味或其它生成期改写时 SHALL 保持已经确定
 #### Scenario: 配置变化不改已审稿件
 - **WHEN** Facebook 草稿进入审核后账号写作语言发生变化
 - **THEN** 已审草稿仍按内容版本逐字下发或由运营显式编辑/重生成，发布执行层 MUST NOT 静默改写已审正文
+
+### Requirement: 质量 admission 按平台适用且保持单生产者
+
+`ApprovalGatekeeper` SHALL 继续作为 `gateDecision` 的唯一生产者。对 Facebook，它 MUST NOT 调用
+Gatekeeper LLM，必须确定性返回 `needsApproval=true`、`recommendedAction='manual_review'` 和稳定安全原因码；
+对非 Facebook，它 SHALL 继续使用既有质量分、AI 味和禁用词规则与 LLM/fallback。
+
+#### Scenario: Facebook Gatekeeper 零模型调用
+
+- **WHEN** `assembledContent.qualityStatus='not_applicable'` 且平台为 Facebook
+- **THEN** `ApprovalGatekeeper` SHALL 不构造 prompt、不调用 LLM
+- **AND** SHALL 产出 `manual_review`，使既有 `PublishExecutor` 激活
+
+#### Scenario: Facebook 不会因空分数进入 retry
+
+- **WHEN** Facebook `qualityScore=null`
+- **THEN** 系统 MUST NOT 把 `null` 转成 0 或据此选择 `retry` / `abort`
+
+#### Scenario: 非 Facebook 缺质量分失败安全
+
+- **WHEN** 非 Facebook admission 收到 `qualityStatus!='scored'` 或 `qualityScore=null`
+- **THEN** 系统 SHALL 诚实拒绝该候选，MUST NOT 自动发布或回落高分
 

@@ -5,15 +5,22 @@ TBD - created by archiving change edge-multi-environment-fleet. Update Purpose a
 ## Requirements
 ### Requirement: 桌面外壳按环境监督一组独立子进程
 
-`adspower` 模式下，Electron 桌面外壳 SHALL 从「只托管一个核心子进程」升级为**按环境 id 索引的一组受监督子进程**（`Map<envId, EnvHandle>`），每个环境 = 一个 AdsPower 分身 = 一个独立操作系统子进程 = 一条独立云端连接。每个子进程 SHALL 运行既有单环境核心（打包产物）**逐字复用**为隔离 worker，仅经其自身冻结环境变量绑定到一个分身；核心自身 MUST NOT 为多环境改动。外壳 SHALL 支持对单个环境独立启动 / 停止 / 暂停 / 恢复 / 重起，各环境互不牵连。既有单实例锁 SHALL 保留，但其语义改为「一台机一个监督者、其下并行托管 N 个环境」，MUST NOT 再以「不支持多账号」为由拒绝。
+`adspower` 模式下，Electron 桌面外壳 SHALL 按环境 id 监督一组按需自动化引擎（`Map<envId, EnvHandle>`）。每个正在启动、等待或执行自动化的环境 SHALL 使用一个绑定该分身的独立操作系统子进程和 automation WebSocket；客户仅登录或管理数据时 MUST NOT 因环境在 roster 中而创建普通子进程。外壳 SHALL 支持对单个环境独立启动、暂停、恢复、关闭和异常恢复，各环境互不牵连。既有单实例锁 SHALL 保留为“一台机一个客户端监督器”。
 
-#### Scenario: 多个环境各起一个隔离子进程
-- **WHEN** 运维在花名册选了 2 个及以上环境并启动
-- **THEN** 外壳为每个环境各 spawn 一个独立子进程，各自绑定其分身、各起各的浏览器与云端连接，互不共享进程内存
+#### Scenario: 多个环境按需启动独立引擎
 
-#### Scenario: 单环境操作不牵连兄弟
-- **WHEN** 运维对某一个环境点「停止」
-- **THEN** 仅该环境的子进程被停止，其余环境的子进程与浏览会话继续运行、状态不受影响
+- **WHEN** 运维对两个及以上环境启动自动化
+- **THEN** 外壳分别 spawn 绑定各自分身的独立引擎、建立各自 automation WebSocket 并准备浏览器，互不共享进程内存
+
+#### Scenario: roster 环境不自动产生引擎
+
+- **WHEN** 客户登录后 roster 含十六个环境但未启动任何自动化
+- **THEN** 外壳建立十六个可管理环境句柄但不 spawn 十六个普通引擎或浏览器
+
+#### Scenario: 单环境关闭不牵连兄弟
+
+- **WHEN** 运维对某一个环境点“关闭自动化”
+- **THEN** 仅该环境的引擎和浏览器被停止，其余环境的引擎与浏览会话继续运行、状态不受影响
 
 ### Requirement: 每环境 MUST 携带唯一稳定的边缘身份、绝不回落共享常量
 
@@ -103,29 +110,6 @@ TBD - created by archiving change edge-multi-environment-fleet. Update Purpose a
 - **WHEN** 运维对某环境行点启动 / 暂停 / 恢复 / 停止
 - **THEN** 该 IPC 携带其 envId、只作用于对应子进程，MUST NOT 误控其他环境
 
-### Requirement: 监督器 SHALL 分别监督每环境核心与浏览器执行器
-
-桌面监督器 SHALL 为每个环境维护独立的核心句柄和浏览器执行器句柄。核心退出只触发核心的有界退避重启，不得顺带启动浏览器；浏览器退出只更新执行器和受影响页面任务，不得终止核心。两类资源 MUST 使用独立并发预算，浏览器槽位不得限制核心数。
-
-#### Scenario: 核心重启保持浏览器关闭
-
-- **WHEN** 浏览器关闭的环境 core 意外退出且仍满足客户归属条件
-- **THEN** 监督器按核心退避预算恢复 core，整个恢复过程不得调用 provider 或进入浏览器槽位队列
-
-#### Scenario: 浏览器故障不重启核心
-
-- **WHEN** 环境 core 正常而浏览器执行器崩溃
-- **THEN** 监督器只回收执行器并诚实更新页面任务，核心 PID/会话不因该故障被普通 restart 流程替换
-
-### Requirement: 批量核心 bootstrap MUST 有界且不复用浏览器启动队列
-
-客户登录后的多环境核心 bootstrap SHALL 使用专用的有界并发、指数退避、抖动与每环境熔断；MUST NOT 通过 AdsPower 串行队列、浏览器槽位或 `queueStartEnv` 实现。一个环境失败 MUST NOT 阻塞其他环境，达到熔断阈值时该环境 SHALL 停在具名 `core=error` 直至显式恢复或条件变化。
-
-#### Scenario: 十六环境登录不造成同时重连风暴
-
-- **WHEN** roster 一次返回十六个可信环境
-- **THEN** 监督器按核心专用并发上限分批 bootstrap 并对失败使用抖动退避，MUST NOT 同时启动十六个浏览器或让一个失败环境卡住队列
-
 ### Requirement: offboard 恢复 MUST 使用无浏览器的受限清理会话
 
 未完成的 offboard 清理 SHALL 使用 Cloud 签发并绑定 `offboardId/envKey/accountId/edgeId` 的短期单用途凭证启动受限核心会话。该会话仅可领取和回报对应清理命令，MUST NOT 注册普通任务能力、恢复通用客户会话、调用 `queueStartEnv` 或启动浏览器。凭证过期、已使用或绑定不匹配时 MUST 诚实失败并进入人工处理。
@@ -139,4 +123,18 @@ TBD - created by archiving change edge-multi-environment-fleet. Update Purpose a
 
 - **WHEN** 受限会话携带的凭证绑定到另一个环境或已经过期
 - **THEN** Cloud 拒绝清理命令，客户端不得降级为普通环境启动或打开浏览器重试
+
+### Requirement: 监督器 SHALL 分别监督每环境自动化引擎与浏览器执行器
+
+桌面监督器 SHALL 为每个环境维护自动化意图、可选引擎句柄和浏览器执行器句柄。只有意图为启动/恢复时才 SHALL 启动或有界恢复普通引擎；意图为暂停/停止时引擎退出 MUST NOT 触发自动重启。浏览器退出只更新执行器和受影响页面任务，不得把客户端数据面投影为离线。引擎与浏览器使用独立故障原因，浏览器槽位只限制页面执行器。
+
+#### Scenario: 暂停后的引擎退出不自动重启
+
+- **WHEN** 自动化完成暂停回报并停止普通引擎
+- **THEN** 监督器保持 `paused`，不得按崩溃退避重启引擎；客户 HTTP 操作继续可用
+
+#### Scenario: 浏览器故障不把客户端数据面置为离线
+
+- **WHEN** 引擎运行期间浏览器执行器崩溃
+- **THEN** 监督器只回收/重排执行器并诚实更新页面任务，客户端客户会话和 HTTP 数据入口不受影响
 

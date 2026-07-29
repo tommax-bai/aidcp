@@ -281,31 +281,22 @@ Before quiescing browse or granting a task lease, edge task coordination MUST ch
 
 ### Requirement: 页面任务协调 SHALL 仅接收已分类的 page_automation 操作
 
-页面任务租约、同账号排他、CDP 准入和浏览器槽位协调 SHALL 仅用于注册表中声明为 `page_automation` 的操作。`local`、`cloud` 和 `platform_api` 操作 MUST NOT 创建页面任务租约、等待浏览器槽位或因 `browser_control_unavailable` 被拒；`browser_lifecycle` 只协调执行器生命周期，不得冒充页面任务成功。
+页面任务租约、同账号排他、CDP 准入和浏览器槽位协调 SHALL 仅用于注册表中声明为 `page_automation` 的操作。`local` 和 `cloud_data` 操作 MUST NOT 依赖自动化引擎；`automation_control` 与 `platform_api_automation` SHALL 依赖引擎但 MUST NOT 创建页面任务租约、等待浏览器槽位或因 `browser_control_unavailable` 被拒；`browser_lifecycle` 只协调执行器生命周期，不得冒充页面任务成功。
 
-#### Scenario: API-only 操作不取得页面租约
+#### Scenario: API-only 自动化不取得页面租约
 
-- **WHEN** 已登记为 `platform_api` 的互动同步被触发且同账号页面任务正在运行
-- **THEN** API-only 操作按其自身并发与身份合同执行，MUST NOT 等待页面任务租约或抢占浏览器槽位
+- **WHEN** 已登记为 `platform_api_automation` 的互动同步被触发且同账号页面任务正在运行
+- **THEN** API-only 操作按其自身并发与身份合同经引擎执行，MUST NOT 等待页面任务租约或抢占浏览器槽位
+
+#### Scenario: API-only 自动化不在引擎停止时偷偷执行
+
+- **WHEN** 自动化状态为 `stopped` 或 `paused`
+- **THEN** 新的 `platform_api_automation` 外部平台动作不得执行，但 `cloud_data` HTTP 操作继续可用
 
 #### Scenario: 页面自动化仍受同账号租约保护
 
 - **WHEN** 两个已登记为 `page_automation` 的任务同时请求同一账号
-- **THEN** 系统仍按既有租约合同串行/拒绝，核心常驻不得放宽同账号并发保护
-
-### Requirement: 浏览器执行器获取失败 MUST 与核心在线状态分离
-
-页面任务申请执行器失败时，协调器 SHALL 返回槽位排队、provider 启动失败、CDP 附着失败或身份不匹配等可区分状态；MUST NOT 把这些状态投影为 core/Cloud 离线。执行器释放后 SHALL 释放页面租约与槽位，但 MUST NOT 关闭核心控制连接。
-
-#### Scenario: 槽位已满时页面任务排队
-
-- **WHEN** 页面任务需要浏览器而所有槽位已占用
-- **THEN** 页面任务进入真实排队态，core 与 Cloud 保持在线，浏览器无关操作继续可用
-
-#### Scenario: CDP 附着失败
-
-- **WHEN** provider 已启动但 CDP 在时限内不可用
-- **THEN** 协调器诚实回报 `cdp_unavailable` 并回收本次执行器资源，MUST NOT 杀死 core 或宣称页面操作成功
+- **THEN** 系统仍按既有租约合同串行或拒绝，自动化引擎生命周期不得放宽同账号并发保护
 
 ### Requirement: Native task takeover SHALL block only the ordinary browse lane
 After an edge has confirmed acquisition of a page-task lease, the Native page session MUST admit commands whose task ID matches the active lease and MUST continue to reject commands with no task ID or a different task ID until release.
@@ -342,4 +333,58 @@ After an edge has confirmed acquisition of a page-task lease, the Native page se
 - **WHEN** 命令被租约抑制
 - **THEN** 回执的成功位为假、原因具名
 - **AND** 云端不得把它计入任何已完成动作或配额
+
+### Requirement: Browser-absent edge 的任务 SHALL 触发唤醒并得到终局回执
+
+Cloud 在 Edge 控制面在线但浏览器缺席时 SHALL 允许需要浏览器的任务进入 acquire/wake 流程。Edge MUST 在唤醒完成且身份复核成功后才授予浏览器执行租约；唤醒失败或死线到达 SHALL 返回明确终局并保持后续可重试。
+
+#### Scenario: 控制面在线任务唤醒浏览器
+- **WHEN** Cloud 向 browser-absent edge 派发一个需要浏览器的任务且其在死线内取得槽位
+- **THEN** Edge 完成浏览器启动、身份复核与租约 acquired 后才接收首条业务命令
+
+#### Scenario: 排队超出唤醒死线
+- **WHEN** 任务等待浏览器槽位超过调用方死线
+- **THEN** Cloud 收到 `browser_wake_failed` 类可恢复终局并可按策略重试
+- **AND** MUST NOT 把它记录为 edge offline、成功或无回执
+
+#### Scenario: 浏览器缺席时业务命令不得静默丢弃
+- **WHEN** 浏览器缺席期间仍收到一条需要页面的业务命令
+- **THEN** Edge 返回明确的 browser-unavailable/wake-required 失败
+- **AND** MUST NOT 只写本地日志而让 Cloud 看门狗超时
+
+### Requirement: 浏览器执行器获取失败 MUST 与客户端数据面和引擎连接状态分离
+
+页面任务申请执行器失败时，协调器 SHALL 返回槽位排队、provider 启动失败、CDP 附着失败或身份不匹配等可区分状态；MUST NOT 把这些状态投影为客户会话或 HTTP 数据面离线。若引擎仍连接，失败只影响当前页面执行和浏览器状态；执行器释放后 SHALL 释放页面租约与槽位，是否继续保持引擎连接由自动化意图决定。
+
+#### Scenario: 槽位已满时页面任务排队
+
+- **WHEN** 页面任务需要浏览器而所有槽位已占用
+- **THEN** 自动化进入真实 `waiting_resource`，HTTP 数据管理继续可用，MUST NOT 显示客户端离线或正在执行
+
+#### Scenario: CDP 附着失败
+
+- **WHEN** provider 已启动但 CDP 在时限内不可用
+- **THEN** 协调器诚实回报 `cdp_unavailable` 并回收本次执行器资源，MUST NOT 宣称页面操作成功或破坏客户会话
+
+### Requirement: Cross-platform Native commands preserve one-writer task ownership
+Every Facebook page command and WeChat browser-session capture command SHALL carry the active Edge task identity, unique command identity, and bounded deadline through Native IPC. Native MUST reject stale tasks, duplicate dispatch, concurrent page writers, and platform/session mismatches before browser input.
+
+#### Scenario: Stale Facebook task sends a write
+- **WHEN** Edge has transferred the browser lease to a new task and the old task submits a Facebook interaction command
+- **THEN** Native rejects the stale task before any CDP input
+
+#### Scenario: Duplicate write identity is received
+- **WHEN** Native receives a Facebook command identity it already completed
+- **THEN** it returns the recorded terminal result or rejects the duplicate without redispatch
+
+### Requirement: Cross-platform cancellation cannot erase ambiguous effects
+Cancellation, timeout, process exit, or reconnect across Facebook and WeChat Native commands SHALL preserve the declared safe-point and effect-phase rules. Edge MUST NOT infer not-started merely because the Native process lost in-memory state.
+
+#### Scenario: Native exits after possible Facebook submit
+- **WHEN** the process exits after a publish/comment submit may have been dispatched and no terminal proof exists
+- **THEN** Edge preserves an ambiguous outcome and does not replay the write
+
+#### Scenario: WeChat capture is cancelled
+- **WHEN** cancellation is observed during read-only WeChat session capture
+- **THEN** Native stops at a safe point, closes its session, and returns a bounded cancelled result without fabricated material
 

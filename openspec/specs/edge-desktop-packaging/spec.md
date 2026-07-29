@@ -132,3 +132,98 @@ This removes the class of release bug where the page and the directory disagree:
 - **WHEN** 托盘图像文件缺失、无法读取或解码结果为空
 - **THEN** 监督者不创建透明托盘入口，明确暴露加载失败并保持主窗口可见，关闭动作不得把应用变成不可发现但仍占单实例锁的后台进程
 
+### Requirement: Final packages exclude all migrated platform browser rules
+The desktop build SHALL exclude migrated Facebook and WeChat browser-rule modules, production-reachable page probes, development probe scripts, standalone embedded-router sources, and source maps from distributable JavaScript and packaged resources. Verification MUST inspect both the production import graph and the final ASAR/resources rather than inferring absence from source imports.
+
+#### Scenario: Migrated Facebook marker remains
+- **WHEN** production-dist or final-package inspection finds a denied Facebook executor/probe path or representative cleartext page-rule marker
+- **THEN** the desktop build fails and no distributable is accepted
+
+#### Scenario: Development probe is accidentally packaged
+- **WHEN** any `scripts/*probe*` input or equivalent calibration payload appears in ASAR or packaged resources
+- **THEN** final-package verification fails
+
+### Requirement: Expanded Native artifact is package-compatible
+The packaged Native Page Engine manifest SHALL declare the protocol and adapter coverage required for Xiaohongshu, Facebook, and WeChat browser-session capture, and the executable SHALL match the target architecture and verified digest. Missing platform coverage or a mismatched artifact MUST fail packaging/startup.
+
+#### Scenario: Facebook adapter is absent
+- **WHEN** a customer package requires Facebook but its Native manifest does not declare the compatible Facebook adapter/protocol
+- **THEN** package verification fails before a distributable is emitted
+
+#### Scenario: Packaged smoke test opens each adapter
+- **WHEN** the final packaged resource is smoke-tested
+- **THEN** the executable starts outside ASAR and accepts bounded session/protocol validation for every declared platform adapter
+
+### Requirement: 打包态运行时验证不得执行未签名的 macOS 中间应用
+
+桌面打包流程 MUST 在产出安装包前验证最终 ASAR 中必需的生产依赖能够由目标 Electron Node 运行时加载。macOS 的该验证 MUST NOT 在 electron-builder 完成正式签名前启动刚生成的产品 App；同架构验证 SHALL 使用仓库锁定且代码签名有效的开发 Electron 读取最终 ASAR。验证运行时缺失、签名无效、架构不可执行或 smoke 失败时，构建 MUST 诚实失败并给出可诊断原因，MUST NOT 关闭 Gatekeeper、移除系统安全策略或把动态失败降级为成功。
+
+#### Scenario: macOS 同架构构建不启动未签名产品 App
+
+- **WHEN** arm64 macOS 主机为 arm64 目标执行 `afterPack`
+- **THEN** 构建 SHALL 使用签名有效的开发 Electron 加载生成 App 内的最终 ASAR，且 MUST NOT 启动尚未正式签名的产品 App
+
+#### Scenario: 打包依赖无法加载时仍然失败
+
+- **WHEN** 最终 ASAR 中的 `jsdom`、`tough-cookie` 或 `ws` 缺失或不可加载
+- **THEN** 动态 smoke SHALL 非零失败并阻止安装包生成，MUST NOT 因改用可信 runner 而跳过运行时验证
+
+#### Scenario: 可信 runner 无效时诚实停手
+
+- **WHEN** 开发 Electron 不存在或代码签名校验失败
+- **THEN** 构建 SHALL 在执行 smoke 前失败并指出 runner 问题，MUST NOT 回退启动未签名产品 App
+
+#### Scenario: 跨架构构建保持静态验证
+
+- **WHEN** 构建目标架构不能由当前主机原生执行
+- **THEN** 构建 SHALL 继续执行依赖闭包、native artifact 与泄漏静态检查，并跳过动态二进制执行
+
+### Requirement: 本地 arm64 OL 打包入口可复用且失败关闭
+
+Edge 仓库 SHALL 提供两个受版本控制的 macOS arm64 OL 本地打包入口：一个生成 Developer ID 签名但未公证的 DMG，另一个生成 Developer ID 签名、Apple 公证并 staple 的 DMG。两个入口 MUST 共用同一套构建和最终产物验证逻辑，MUST 基于无已跟踪改动且无构建相关未跟踪源码的 checkout、锁定的 npm 依赖和 Native Page Engine 声明的 Rust 版本重新构建 TypeScript dist、AdsPower CLI 运行时、GOST 与 Native Page Engine。任一构建、架构、环境注入或签名门禁失败 MUST 使脚本非零退出，MUST NOT 报告安装包成功。
+
+#### Scenario: 仅签名入口生成 arm64 OL 包
+
+- **WHEN** 操作者在 macOS 上以有效 Developer ID 凭据运行仅签名入口
+- **THEN** 脚本生成只包含本次 arm64 构建的 OL DMG，验证 DMG 内应用、GOST、Native Page Engine 与 AdsPower sqlite 的 arm64 架构及有效代码签名，并明确标记产物未公证
+
+#### Scenario: 仅签名入口不要求公证凭据
+
+- **WHEN** 操作者运行仅签名入口且未提供 App Store Connect API 凭据
+- **THEN** 脚本跳过公证凭据检查并继续构建，MUST NOT 在 Developer ID 身份检查后静默退出
+
+#### Scenario: 公证入口串行完成 App 与 DMG 公证
+
+- **WHEN** 操作者以有效 Developer ID 与 App Store Connect API 凭据运行公证入口
+- **THEN** 脚本先签名并公证/staple App，再由该 App 生成 DMG，随后公证/staple DMG，并仅在 Gatekeeper、staple 与包内运行时验证全部通过后报告成功
+
+#### Scenario: 自动使用项目要求的 Rust 工具链
+
+- **WHEN** 当前默认 Rust 版本低于 Native Page Engine `Cargo.toml` 声明的 `rust-version`
+- **THEN** 脚本解析并使用声明版本的 Cargo/Rustc，必要时安装该工具链，而不是继续使用不兼容的默认版本
+
+#### Scenario: 最终 DMG 环境注入不匹配
+
+- **WHEN** 挂载后的 DMG 内 `app.asar` 未包含预期 `ol` 环境或指定的客户登录 URL
+- **THEN** 脚本非零退出并且不报告成功
+
+#### Scenario: 凭据不进入仓库和日志
+
+- **WHEN** 脚本需要 p12 密码或 Apple API 私钥
+- **THEN** 密码仅从环境变量或 `/dev/tty` 隐式读取，私钥仅以文件路径引用，脚本 MUST NOT 把秘密值写入源码或日志
+
+#### Scenario: 旧产物不进入本次验证或公证
+
+- **WHEN** 构建前输出目录已有其他架构或版本的安装包
+- **THEN** 脚本先隔离旧输出，并仅按本次版本和 arm64 文件名选择待验证或公证的 DMG
+
+#### Scenario: 无关未跟踪文件不阻塞构建
+
+- **WHEN** checkout 没有已跟踪改动，且未跟踪文件仅为根目录临时探针或历史 `dist-electron.backup-*` 等不属于源码构建图的文件
+- **THEN** 脚本保留这些文件并继续构建，MUST NOT 因无关未跟踪文件拒绝出包
+
+#### Scenario: 构建相关未跟踪源码仍被拒绝
+
+- **WHEN** checkout 在 `src/`、`native/` 或 `scripts/` 下存在未跟踪源码，或存在任何已跟踪文件改动
+- **THEN** 脚本列出相关路径并非零退出，避免不可审计内容进入最终安装包
+

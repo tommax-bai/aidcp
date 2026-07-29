@@ -5,11 +5,16 @@ TBD - created by archiving change facebook-empty-feed-reels-fallback. Update Pur
 ## Requirements
 ### Requirement: Facebook Reels identifies exactly one active video card
 
-Edge SHALL accept a Reel only on a canonical Facebook `/reel/<id>` route and SHALL select the active video from preloaded videos by greatest viewport intersection, using viewport-center distance only as a tie-breaker. The canonical Reel URL SHALL be the card and note identity. Missing, ambiguous, off-route, or identity-changing observations MUST fail closed and MUST NOT fabricate a card.
+Edge SHALL distinguish a structurally targetable active video from a reportable Reel card. On `/reel/` or `/reels/`, Edge MAY resolve one unique visible video by greatest viewport intersection, using viewport-center distance only as a tie-breaker, and bind it to a session-local `videoKey` for navigation even when canonical identity is absent. Edge SHALL emit a Reel card only when that same active video is bound to a canonical Facebook `/reel/<id>` identity; the canonical Reel URL SHALL be the card and note identity. Missing or ambiguous active video, off-route observations, and identity-changing reads MUST fail closed and MUST NOT fabricate a card.
 
 #### Scenario: Current Reel wins over preloaded neighbours
 - **WHEN** previous, current, and next videos coexist in the DOM
-- **THEN** Edge reports only the video with the greatest current viewport intersection and binds it to the current canonical Reel route
+- **THEN** Edge resolves only the video with the greatest current viewport intersection
+- **AND** it reports that video only if a canonical current Reel identity is available
+
+#### Scenario: Anonymous Reel landing is navigation-only
+- **WHEN** `/reel/` exposes one unique active video but no canonical Reel id
+- **THEN** Edge exposes its stable video observation only to the Native navigation actuator and emits no Reel card
 
 #### Scenario: Route is not a Reel
 - **WHEN** the current top-level route is home, login, checkpoint, another Facebook surface, or a non-Facebook URL
@@ -43,22 +48,6 @@ When Cloud authorizes `interaction.like`, Edge SHALL require the command noteId 
 - **WHEN** the requested noteId differs from the active Reel or more than one structural like candidate remains
 - **THEN** Edge clicks nothing and returns `no_target` or `ambiguous_target`
 
-### Requirement: Facebook Reels advances through the global next-card control
-
-For `page.scroll` while in the authorized Reels list mode, Edge SHALL use the far-right global lower navigation control rather than page wheel scrolling or an in-video media control. Success SHALL require the canonical Reel URL or active video identity to change and the new active card to pass the same identity and summary probe before reporting. Disabled/missing/ambiguous controls or unchanged identity MUST fail honestly.
-
-#### Scenario: Next control changes active Reel
-- **WHEN** the unique enabled global lower navigation control is clicked and the route changes to a new canonical Reel
-- **THEN** Edge reports exactly the new Reel card and marks it seen for deduplication
-
-#### Scenario: Wheel does not count as navigation
-- **WHEN** page wheel input leaves `scrollY`, route, and active video identity unchanged
-- **THEN** Edge MUST NOT claim a new card or a successful scroll
-
-#### Scenario: In-video control is not used as next Reel
-- **WHEN** a bottom media/attachment control exists inside the active video
-- **THEN** Edge ignores it and only considers the unique far-right global navigation control
-
 ### Requirement: Reels re-entry MUST NOT require a non-empty ordinary feed as its only unlock
 
 An account whose ordinary home feed produces nothing SHALL still be able to be re-authorized onto the Reels surface. Re-authorization MUST NOT depend solely on a non-empty ordinary feed returning, because an account is on Reels precisely when its ordinary feed produced nothing — that unlock can never fire for the accounts that need it.
@@ -86,4 +75,28 @@ Re-entry SHALL be bounded per session. Once the bound is spent, the browse loop 
 - **WHEN** re-entry has already been used its allowed number of times in one session
 - **THEN** further no-target scroll receipts do not reopen the epoch
 - **AND** the session reaches a terminal state instead of alternating indefinitely
+
+### Requirement: Facebook Reels advances through an axis-specific global next-card control
+
+For `page.scroll` while in the authorized Reels list mode, Edge SHALL classify the current global navigation controls as one unambiguous vertical or horizontal rail relative to the active video. Vertical navigation MAY use its lower global next control after the vertical key and wheel fallbacks; horizontal navigation MAY use its right global next control after the horizontal key fallback. Edge MUST NOT use an in-video media control or a control from another axis. Success SHALL require the applicable canonical Reel URL plus active-video transition rule and the new active card to pass the same identity and summary probe before reporting. Disabled, missing, ambiguous, stale, or axis-drifting controls and unchanged identity MUST fail honestly.
+
+#### Scenario: Vertical next control changes active Reel
+- **WHEN** the unique enabled lower control in a proven vertical rail is clicked and a new canonical active Reel is proven
+- **THEN** Edge reports exactly the new Reel card and marks it seen through the existing canonical deduplication path
+
+#### Scenario: Horizontal next control changes active Reel
+- **WHEN** the unique enabled right control in a proven horizontal rail is clicked and a new canonical active Reel is proven
+- **THEN** Edge reports exactly the new Reel card and marks it seen through the existing canonical deduplication path
+
+#### Scenario: Wheel does not count as navigation
+- **WHEN** vertical wheel input leaves route and active-video identity unchanged
+- **THEN** Edge MUST NOT claim a new card or a successful scroll
+
+#### Scenario: In-video control is not used as next Reel
+- **WHEN** a bottom media or attachment control exists inside the active video
+- **THEN** Edge ignores it and considers only the unique global control belonging to the proven navigation rail
+
+#### Scenario: Generic single next control has no axis proof
+- **WHEN** only one generic next-labelled control is visible and neither a structural pair nor directional semantics proves its axis
+- **THEN** Edge clicks nothing and emits no fabricated progress
 

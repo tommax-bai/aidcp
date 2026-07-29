@@ -138,3 +138,39 @@ edge 客户端启动时 MUST 先恢复并校验客户会话。仍有效的客户
 - **WHEN** 短期客户令牌在运行期本地过期、续签被拒或受保护请求返回 401
 - **THEN** 客户端停止环境并回到登录门，同时保留 `safeStorage` 加密凭据供手动登录或下次启动的一次自动恢复
 
+### Requirement: Edge client login gate activation
+
+The edge desktop client SHALL enable the customer login gate whenever it can
+resolve a customer-auth base URL. Explicit full URLs from
+`AIDCP_CLIENT_AUTH_URL` or persisted `clientAuthUrl` SHALL take precedence over
+baked package metadata. Baked package metadata SHALL take precedence over
+environment defaults.
+
+When no explicit or baked customer-auth URL is present, the client SHALL resolve
+the default customer-auth URL from the resolved cloud environment key. The
+official `dev` and `ol` cloud environments SHALL both have default customer-auth
+URLs and therefore SHALL require customer login by default.
+
+#### Scenario: dev starts with customer login by default
+
+- **WHEN** the desktop client starts with the resolved cloud environment `dev`
+  and no explicit customer-auth URL override
+- **THEN** the client resolves `http://121.89.85.150:8088/capi` as the
+  customer-auth base URL
+- **AND** the login gate is enabled before the main window can proceed
+
+#### Scenario: ol starts with customer login by default
+
+- **WHEN** the desktop client starts with the resolved cloud environment `ol`
+  and no explicit customer-auth URL override
+- **THEN** the client resolves `https://aidcp.tommax.cc/capi` as the
+  customer-auth base URL
+- **AND** the login gate is enabled before the main window can proceed
+
+#### Scenario: explicit customer-auth URL still wins
+
+- **WHEN** the desktop client is started with `AIDCP_CLIENT_AUTH_URL` or a
+  persisted full `clientAuthUrl`
+- **THEN** that full URL is used as the customer-auth base URL
+- **AND** the dev/ol default URL mapping does not override it
+

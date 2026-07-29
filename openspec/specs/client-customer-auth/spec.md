@@ -605,33 +605,29 @@ customer-auth 的程序化环境归属完成接口 SHALL 接受可选布尔字�
 - **THEN** Cloud 返回幂等成功但不更新 `slow_start_since`
 - **AND** 即使该环境已被运营手动关闭，也不得重新开启
 
-### Requirement: 客户登录后 SHALL 自动建立可信环境的浏览器无关核心
-
-客户登录完成并取得权威环境 roster 后，客户端 SHALL 对每个归属可用且已解析可信绑定的环境自动启动或恢复浏览器无关核心，无需用户点击“启动环境”。该 bootstrap MUST 使用有界并发和独立退避，MUST NOT 调用浏览器 provider、申请浏览器槽位或要求 CDP。环境未绑定、归属冲突或绑定不可用时 SHALL fail-closed 显示具名原因，不得猜测账号或通过打开浏览器自动消除归属闸。
-
-#### Scenario: 首次登录自动恢复全部可信环境
-
-- **WHEN** 客户登录后 roster 返回三个已归属且可信绑定的环境
-- **THEN** 客户端有界并发建立三个浏览器无关核心与其 Cloud 会话，三个环境的浏览器均保持关闭且不消费槽位
-
-#### Scenario: 一个环境绑定冲突不牵连其他环境
-
-- **WHEN** roster 中一个环境存在绑定冲突、另两个环境绑定可信
-- **THEN** 冲突环境停在具名 fail-closed 状态，另两个环境正常建立核心，客户端不得为冲突环境自动打开浏览器
-
 ### Requirement: 客户态 Cloud 操作 MUST 逐请求解析环境归属与账号绑定
 
-由客户鉴权直接执行的人设、内容、待审编辑、审批受理和配置操作 SHALL 只接收客户令牌上下文、`envKey` 与最小业务入参；Cloud MUST 逐请求验证客户拥有该环境并从权威绑定解析 `accountId`，MUST NOT 采信 renderer 或请求体自报账号。该类操作 MUST NOT 以 Edge 活会话、浏览器登录、CDP 或槽位为准入条件；renderer MUST NOT 获得客户令牌、权威 `accountId` 或通用 HTTP 能力。
+由客户鉴权直接执行的人设、内容、待审编辑、审批受理、配置及其他 AIDCP 自有数据操作 SHALL 只接收客户令牌上下文、`envKey` 与最小业务入参，并 SHALL 通过逐请求 customer-auth HTTP 执行。Cloud MUST 每次验证客户状态和环境归属并从权威绑定解析 `accountId`，MUST NOT 采信 renderer 或请求体自报账号。该类操作 MUST NOT 以普通自动化引擎进程、automation WebSocket、浏览器登录、CDP 或槽位为准入条件；renderer MUST NOT 获得客户令牌、权威 `accountId` 或通用 HTTP 能力。
 
-#### Scenario: 浏览器和 Edge 页面会话均缺席时生成客户人设
+#### Scenario: 引擎和浏览器均缺席时生成客户人设
 
-- **WHEN** 客户已登录、拥有环境且其账号绑定可信，但该环境浏览器关闭且无 CDP
-- **THEN** Cloud 由 customer-auth 请求解析账号归属并执行人设生成，MUST NOT 返回“请启动浏览器”或等待浏览器槽位
+- **WHEN** 客户已登录、拥有环境且其账号绑定可信，但自动化引擎停止、浏览器关闭且无 CDP
+- **THEN** Cloud 由 customer-auth HTTP 请求解析账号归属并执行人设生成，MUST NOT 返回“请启动自动化/浏览器”或等待浏览器槽位
+
+#### Scenario: 自动化 WebSocket 离线时审批待审稿
+
+- **WHEN** automation WebSocket 不可用但 customer-auth HTTP 可达，客户批准一份待审稿
+- **THEN** Cloud 记录并返回“决定已受理/平台执行待完成”，MUST NOT 因引擎离线拒绝受理，也不得显示已发布
 
 #### Scenario: 客户请求越权环境
 
 - **WHEN** 客户请求中的 `envKey` 不属于当前客户，或该环境绑定无法权威解析
 - **THEN** Cloud 以可区分拒因 fail-closed，MUST NOT 使用请求体账号、历史 UI 缓存或浏览器启动来绕过校验
+
+#### Scenario: 环境概览离线于自动化引擎可读
+
+- **WHEN** 客户读取所拥有环境的今日进展与发布摘要，而该环境没有在线 Edge 或浏览器
+- **THEN** Cloud SHALL 逐请求解析环境绑定并返回同一账号的权威用量与发布投影，响应 MUST NOT 泄漏 `accountId` 或要求建立 automation WebSocket
 
 ### Requirement: 客户稿件编辑与调整接口 SHALL 按环境归属隔离
 
@@ -1121,4 +1117,161 @@ customer-auth SHALL 提供 env-scoped `GET /environments/:envKey/slow-start`，�
 
 - **WHEN** id 对应视频、评论或正文为空的精选行
 - **THEN** 服务端不创建任务并返回稳定拒绝原因，不宣称排队成功
+
+### Requirement: 客户互动 API 必须逐请求验证 enabled user 与 env ownership
+
+customer-auth SHALL 暴露冻结的 interaction list/detail/draft/approve/send/regenerate/ignore/escalate/sync/auth-reopen 路径。每次请求 MUST 在客户 JWT 验签后，于同一数据库事务锁定并复核 user enabled、权威 `envKey` ownership 与 interaction account binding；thread/message/job 还 MUST 属于同一 env/account。跨环境资源与不存在资源 MUST 返回同一 404，不可枚举。
+
+#### Scenario: 有 token 但无环境归属仍不可读
+- **WHEN** enabled 客户携有效 token 请求未归属 env 的互动列表
+- **THEN** 返回不可枚举 404，MUST NOT 返回 item 数量、accountId 或最后同步时间
+
+#### Scenario: 归属被移除即时生效
+- **WHEN** 管理员移除客户对 env 的归属后其 token 尚未过期
+- **THEN** 客户下一次 interaction 请求即被拒，无需等待 token 过期
+
+### Requirement: 客户不得自声明环境归属
+
+`envKey` ownership SHALL 只来自内部权威环境注册与管理员授权；在明确共享授权模型上线前，每个 active env MUST 全局唯一归属一个客户。customer-auth 的 `POST /environments` 或其他客户可控字段 MUST NOT 创建、替换或恢复 ownership。
+
+#### Scenario: 用户 A 不能 attach 用户 B 的环境
+- **WHEN** 用户 A 携有效 token 提交用户 B 的 `envKey`
+- **THEN** 请求被拒且全局 owner 不变，用户 A 后续 read/act 仍返回不可枚举错误
+
+#### Scenario: 管理员不能把 active env 静默分给第二人
+- **WHEN** 内部管理员尝试把仍归属用户 B 的 env 分给用户 A
+- **THEN** 返回冲突并保持用户 B ownership，除非先完成显式 revoke/offboard 流程
+
+### Requirement: Customer API 路径和 envelope 必须与共享 schema 一致
+
+客户 API SHALL 实现：`GET /environments/:envKey/interactions`、`GET /environments/:envKey/interactions/:threadId`、`PUT /environments/:envKey/replies/:jobId/draft`、三个 reply POST（approve/send/regenerate）、message ignore/escalate、interaction sync 与 auth/reopen，以及 `DELETE /environments/:envKey`、`GET /offboarding/:offboardId`。成功/错误 envelope、分页 cursor、枚举与字段 MUST 通过 `docs/contracts/wechat-channels-interaction/v1/schemas/customer-auth-api.schema.json`。
+
+#### Scenario: 列表回包携 scope 和真态
+- **WHEN** 客户读取当前环境互动列表
+- **THEN** 响应 data 明确回带 `envKey/accountId/platform/items/nextCursor` 且 meta 含 requestId/asOf，renderer 可拒绝错 env 回包
+
+#### Scenario: 2xx send 不等于平台 confirmed
+- **WHEN** send endpoint 成功把 job 从 approved 转 queued
+- **THEN** 响应返回 job 真态 queued，MUST NOT 返回 sent 或让客户端解释为平台成功
+
+#### Scenario: 删除环境返回待清理而非完成
+- **WHEN** enabled 客户删除自己权威归属且 account binding 匹配的环境
+- **THEN** 同一事务撤权并创建 durable offboard，响应回 `pending_edge|dispatched` 与 envKey/accountId/meta.asOf，MUST NOT 显示凭证或数据已删除
+
+#### Scenario: 用户 A 不能查看用户 B 的 offboard
+- **WHEN** 用户 A 读取由用户 B 创建的 offboardId
+- **THEN** 返回不可枚举 404，MUST NOT 泄露 envKey/accountId/state
+
+### Requirement: 客户写操作必须使用 CAS 与幂等 header
+
+job draft/approve/send/regenerate/ignore/escalate MUST 携 `expectedVersion`；版本或状态不符 MUST 409 并返回当前 version/state，不执行部分副作用。send/sync/auth-reopen MUST 要求 `Idempotency-Key` header，重复 key MUST 返回既有请求真态。
+
+#### Scenario: 重复点击发送只有一个 attempt
+- **WHEN** 客户端以相同 idempotency key 重试 send
+- **THEN** Cloud 返回既有 job/attempt 状态，MUST NOT 创建第二 attempt
+
+#### Scenario: 迟到编辑不能覆盖新批准
+- **WHEN** 客户用旧 expectedVersion 修改已被另一客户端批准的 job
+- **THEN** 服务端返回 version conflict 和当前真态，批准/文本保持不变
+
+### Requirement: 登录失效时历史可读但写 fail closed
+
+只要客户仍有 env ownership，已同步历史 MAY 继续读取；当 auth 非 active、identity mismatch 或 challenge 时，所有 reply/send 写 MUST 返回稳定阻断码，并可通过 auth/reopen 请求原 Edge sidecar。auth/reopen accepted 只表示请求已受理，MUST NOT 表示登录完成。
+
+#### Scenario: Cookie 失效后仍能查看历史
+- **WHEN** 当前环境 auth=reauth_required 且客户读取已同步 thread
+- **THEN** API 返回历史与 auth 阻断状态，但 approve/send 按门禁拒绝
+
+#### Scenario: Reopen 成功响应不冒充已登录
+- **WHEN** Cloud 已接受 auth/reopen 并下发 Edge
+- **THEN** API 返回 accepted/requestId，UI 等待后续 auth.status active，MUST NOT立即显示同步正常
+
+### Requirement: Customer browser control API is ownership-scoped and acceptance-only
+Customer auth SHALL expose an idempotent browser control operation for an owned video-channel environment. Every request MUST revalidate enabled-user state, environment ownership, and authoritative interaction account binding before routing the exact `envKey + accountId` to one negotiated online Edge. The success response SHALL mean accepted only and MUST NOT represent browser execution success.
+
+#### Scenario: Owner requests browser open
+- **WHEN** an enabled customer submits an idempotent open action for an owned video-channel environment with an authoritative interaction binding and one compatible Edge online
+- **THEN** Cloud returns an accepted envelope with an action request ID and routes one scoped browser control command
+- **AND** the response MUST NOT state that the browser is already open
+
+#### Scenario: Owner requests browser close
+- **WHEN** an enabled customer submits an idempotent close action for an owned video-channel environment with one compatible Edge online
+- **THEN** Cloud returns an accepted envelope with an action request ID and routes one scoped browser control command
+- **AND** the response MUST NOT state that the browser is already closed
+
+#### Scenario: Environment is not owned by the customer
+- **WHEN** a customer submits browser control for an environment they do not own
+- **THEN** the API rejects the request without resolving or exposing the environment's account, Edge, or browser state
+
+#### Scenario: Compatible Edge is unavailable
+- **WHEN** ownership and binding are valid but no uniquely matched negotiated Edge can receive browser control
+- **THEN** the API returns a stable unavailable or unsupported error and MUST NOT fall back to another environment, profile, or reauthorization command
+
+### Requirement: 客户端控制面启动引导必须经环境归属与绑定解析
+
+customer-auth SHALL 提供 env-scoped 的最小只读控制面引导。接口 MUST 先验证 enabled customer 与环境归属，再复用权威环境→账号绑定解析器；成功时只返回请求 envKey 与已解析 accountId。该接口 MUST NOT 创建、修改、推断或修复环境归属/账号绑定。
+
+#### Scenario: 已归属已绑定环境取得引导
+- **WHEN** 已登录客户请求其拥有且唯一绑定账号 A 的环境 E 的控制面引导
+- **THEN** Cloud 返回 `{envKey: E, accountId: A}`
+- **AND** 该结果可用于无浏览器核心的首次 hello
+
+#### Scenario: 越权环境 fail-closed
+- **WHEN** 客户请求不归其所有的环境
+- **THEN** 接口以 `environment_not_owned` 拒绝
+- **AND** MUST NOT 暴露该环境是否绑定、绑定到谁或是否在线
+
+#### Scenario: 不可解析原因保持可区分
+- **WHEN** 环境尚未绑定、存在跨客户绑定冲突或绑定存储不可用
+- **THEN** 接口分别以 `binding_unknown`、`binding_conflict` 或 `binding_unavailable` 拒绝
+- **AND** MUST NOT 返回空 accountId、成功空对象或猜测值
+
+### Requirement: 控制面引导 MUST 限于 Electron 主进程客户会话
+
+控制面引导请求 SHALL 使用既有 customer bearer session 并遵守其失效、禁用与轮换边界。renderer MUST NOT 获得 customer token，Cloud MUST NOT 提供未鉴权的 envKey→accountId 查询入口。
+
+#### Scenario: 登录失效后不可继续引导
+- **WHEN** 客户已退出、被禁用或 token 已失效
+- **THEN** 控制面引导请求被鉴权层拒绝
+- **AND** 客户端 MUST NOT 以本地缓存绕过该拒绝建立新的 Cloud 会话
+
+### Requirement: 客户端代理写入必须逐目标绑定当前客户可见环境
+
+客户鉴权启用时，单环境和批量代理写入的主进程入口 SHALL 只接受当前有效客户会话下、最新可信 `allowedProfileIds` 中的明确 `user_id`。批量入口 SHALL 要求非空、去重、有序的 ID 数组，并在第一笔写入前验证每个目标；任一目标越权、重复、缺失，或会话/可见集不可信时 SHALL 整批失败关闭，不调用 AdsPower `user/update`。主进程 MUST NOT 仅依赖 renderer 已过滤列表、当前选中环境或平台筛选作为写权限证据。
+
+未启用客户鉴权的兼容模式 SHALL 保持既有本地运维能力，但仍需明确 ID 和代理输入校验。错误与日志 MUST NOT 泄露其它客户环境名称、代理摘要或凭据。
+
+#### Scenario: 单环境越权目标被拒绝
+- **WHEN** renderer 或被篡改调用向单环境代理入口提交不在当前 `allowedProfileIds` 的 `user_id`
+- **THEN** 主进程在调用 AdsPower 前拒绝且不返回该环境的名称、代理或其它信息
+
+#### Scenario: 批量任一越权目标使整批失败关闭
+- **WHEN** 批量目标中有一个 ID 不属于当前客户可见环境
+- **THEN** 主进程在第一笔写入前拒绝整批，不更新其它合法目标，也不回落到本机全量环境
+
+#### Scenario: 会话或可见集不可信时不写代理
+- **WHEN** 客户会话失效、刷新可见集失败或 `allowedProfileIds` 未建立
+- **THEN** 单个和批量代理入口诚实要求重新登录或重试，MUST NOT 沿用不可信旧集或调用 AdsPower 写接口
+
+#### Scenario: 重复目标在写入前拒绝
+- **WHEN** 批量请求包含重复 `user_id`
+- **THEN** 主进程在第一笔写入前拒绝该请求，MUST NOT 对同一环境重复改代理
+
+### Requirement: Customer proxy-authority routes SHALL recheck exact environment ownership
+Cloud SHALL expose customer-authenticated exact-environment proxy-authority read and compare-and-set write routes. Every request SHALL resolve current ownership from server-side assignment state and SHALL fail closed when ownership is missing, revoked, or ambiguous.
+
+#### Scenario: Owned environment can be read and updated
+- **WHEN** an authenticated customer addresses one currently assigned environment
+- **THEN** Cloud SHALL permit the exact authority read or revision-checked write
+
+#### Scenario: Revoked assignment cannot reuse an earlier read
+- **WHEN** ownership is revoked after a client read but before its write
+- **THEN** the write SHALL be rejected even if its revision otherwise matches
+
+### Requirement: Customer environment projections SHALL not disclose proxy credentials
+Existing customer environment roster and browser-independent status routes SHALL remain minimum-disclosure projections and SHALL NOT include proxy username or password. Credential-bearing authority data SHALL only be returned from the exact owned authority route.
+
+#### Scenario: Roster remains credential-free
+- **WHEN** a customer loads the environment roster
+- **THEN** no proxy username or password SHALL be present in the response
 

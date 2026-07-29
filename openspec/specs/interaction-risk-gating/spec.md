@@ -813,7 +813,7 @@ The system SHALL 保证：对任一 `accountId`、任一时刻，`risk_state` �
 
 具体要求：
 
-- outbox 行 MUST 带 `execution_target`（服务端注入），worker MUST 只认领本 target 的行；MUST 带去重键，边缘重发同一回执信封 MUST 只产生一行。
+- outbox 行 MUST 带 `execution_target`（服务端注入），worker MUST 只认领本 target 的行；MUST 带去重键。Edge 来源事实的去重键 MUST 同时绑定已认证会话中的账号 ID、Edge 环境 ID、原始回执信封时间戳、原始回执信封 ID、动作及既有事实判别字段；边缘重发同一原始回执信封 MUST 只产生一行，不同账号、不同环境或不同原始时间戳的回执 MUST NOT 因复用同一顺序信封 ID 而碰撞。
 - 认领 MUST 使用认领令牌 + 租约 + 跳锁，并 MUST 在进程启动时回收租约过期的在途行——与委托任务 worker 同一范式。
 - apply MUST 在单个数据库事务内同时完成「写入计数」与「标记 outbox 行已应用」，且 MUST 由数据库唯一约束保证 exactly-once，MUST NOT 用进程内集合去重。
 - 内存计数 MUST 只在 apply 成功时递增，且 MUST 只有这一条递增路径（回执处理时 MUST NOT 先加一次）。
@@ -828,8 +828,20 @@ The system SHALL 保证：对任一 `accountId`、任一时刻，`risk_state` �
 
 #### Scenario: 重复投递只记一次
 
-- **WHEN** 边缘因重连重发了同一条动作确认信封
+- **WHEN** 边缘因重连重发了账号、环境、时间戳、信封 ID 和事实内容均相同的动作确认信封
 - **THEN** outbox MUST 只保留一行，计数 MUST 只增加一次
+
+#### Scenario: 不同账号或环境不被顺序 ID 误去重
+
+- **WHEN** 两个不同账号或不同 Edge 环境提交了相同顺序信封 ID、动作和原始时间戳的确认回执
+- **THEN** Cloud MUST 为两条事实生成不同去重键
+- **AND** 两条事实 MUST 分别进入各自账号的计数
+
+#### Scenario: 进程重启后复用顺序 ID 不碰撞
+
+- **WHEN** 同一账号和环境的新 Edge 进程复用了旧顺序信封 ID，但原始信封时间戳不同
+- **THEN** Cloud MUST 为新事实生成不同去重键
+- **AND** 新事实 MUST 正常进入该账号的计数
 
 #### Scenario: 入队失败不静默继续
 
@@ -848,4 +860,120 @@ The system SHALL 保证：对任一 `accountId`、任一时刻，`risk_state` �
 - **WHEN** 一次动作的回执抵达时该账号配额已耗尽
 - **THEN** 该动作 MUST 照常入队并最终计入（既成事实照记，与既有「绝不因策略事后重判而丢弃」一致）
 - **AND** 节奏饱和告警所依据的判定 MUST 仍取自写入前的判定值，MUST NOT 改为读取含这一笔的新状态
+
+### Requirement: 视频号回复发送必须经 Cloud RiskController 与回复硬门禁
+
+Cloud SHALL 在创建 send attempt 前再次校验 runtime/global/account/channel write switch、published policy、auth/identity/capability、job CAS、单飞、限速、ambiguous blocker 与 `RiskController.canDo`。评论回复 SHALL 使用既有 `comment` risk action；私信文本回复 SHALL 新增 `dm_reply` risk action。`dm_reply` 的 minute/hour/day 写死 fallback quota MUST 为 0，只有显式配置后才可发送。
+
+#### Scenario: 默认私信 quota 阻止发送
+- **WHEN** `dm_reply` 没有显式安全限额配置
+- **THEN** 有效 quota 回落 0，send 被具名背压，MUST NOT 调 Edge 或伪造失败/成功
+
+#### Scenario: 评论回复与其它评论共享风险预算
+- **WHEN** 视频号评论回复准备发送
+- **THEN** Cloud 用同一账号的 `comment` RiskController 窗口判定，MUST NOT 建立绕开现有评论预算的私有计数器
+
+### Requirement: 只有平台确认的回复才记录成功风险事件
+
+Cloud MUST 仅在 `interaction.reply.result.status='confirmed'` 且 scope/idempotency/attempt 匹配时调用 `RiskController.record('comment'|'dm_reply')`。failed、ambiguous、duplicate command、approval、queued、sending、shadow 或 gated 结果 MUST NOT 记录成功。最终风险 status/quotaLevel 仍只由 Cloud RiskController 单写；runtime controls/reply limiter/Edge MUST NOT 改写。
+
+#### Scenario: Ambiguous 不计成功
+- **WHEN** Edge 回报 reply result ambiguous
+- **THEN** Cloud 保存 attempt/job ambiguous 但不 record 风控成功，后续回查 confirmed 后才记录一次
+
+#### Scenario: 重复 confirmed 只记一次
+- **WHEN** 同一 attempt confirmed result 因重连重复到达
+- **THEN** 幂等消费只记录一个 risk event，job 仍为单一 sent
+
+### Requirement: 配额饱和只做背压且不能自动清除 ambiguous
+
+`dm_reply` 或 `comment` 配额饱和 SHALL 沿用既有“节奏背压，不升级风险态”不变量。配额恢复 MAY 重新评估 queued/failed 可重试 job，但 MUST NOT 自动重投 ambiguous attempt。
+
+#### Scenario: DM 配额撞顶不自升 warned
+- **WHEN** normal 账号的 dm_reply 配额耗尽
+- **THEN** send 被拒/延迟，账号风险终态和 signal_count 不变
+
+#### Scenario: 配额恢复不重发待核验消息
+- **WHEN** ambiguous attempt 存在且配额窗口随后恢复
+- **THEN** job 继续等待平台回查，MUST NOT 因 canDo 重新允许而创建第二 attempt
+
+### Requirement: 限频四类配置存储随其消费方归属自动化服务
+
+安全限额（`quota_config`）、操作兜底 floor（`pacing_floor_config`）、单场会话上限（`session_config_global`）与自动续场护栏（`resume_config_global`）四个配置存储及其数据表 SHALL 归属**自动化服务**——即 `RiskController`、配额、冷却与节奏的所在方，MUST NOT 归属客户业务 API 服务。依据是已核实的依赖方向：风控层对配置层的源码引用为 0，而配置层引用风控层的常量与校验共 13 处，方向已单向倒置；这四个存储在组合根之外的运行时消费者只有风控层。归属对齐后，「`canDo` 每次现读、后台改完即热加载、MUST NOT 需要重启进程」的既有要求 MUST 在同一进程内逐字成立，MUST NOT 退化为跨服务同步请求或构造期快照。
+
+后台编辑 SHALL 经 Console → 客户业务 API → 自动化服务的窄内部写通道落地。客户业务 API MUST NOT 为这四张表保留本地副本用于面板回显；面板读回值 MUST 透传权威侧同一次求值结果。
+
+归属对齐 MUST NOT 被理解为「跨进程可见性问题已消失」：同一部署库上存在两个部署目标各自的自动化进程，一次写入只到达其中一个进程的镜像，因此这四项配置 MUST 同样接入镜像版本与失效刷新通道。
+
+#### Scenario: 归属对齐后热加载语义零回归
+- **WHEN** 运营在后台把某档某动作的每日上限改小并保存成功
+- **THEN** 同一自动化进程内下一次 `canDo` 即按新值判定，无需重启，行为与归属对齐前逐位一致
+
+#### Scenario: 面板回显值与生效值同源
+- **WHEN** 面板展示某档某动作的当前限额数字
+- **THEN** 该数字与同一时刻 `effectiveQuotas()` 实际采用的数字逐格相等，MUST NOT 由另一处副本独立求值
+
+#### Scenario: 跨部署目标的写入在有界时间内可见
+- **WHEN** 在一个部署目标的后台改动全局安全限额，另一个部署目标的自动化进程共用同一数据库
+- **THEN** 后者在不超过声明的版本轮询周期内读到新值，MUST NOT 到重启才生效
+
+### Requirement: 慢启动锚点作为跨服务副本时未知不得等同于未开启
+
+环境慢启动起点由客户业务侧写入、由风控层在每个动作的配额求值中同步现读。当该事实以跨进程本地副本形式被消费时，副本读不到 MUST 表达为「未知」，MUST NOT 与「该环境未开启慢启动」合并为同一取值。未知状态下 MUST 走闸门镜像的停手路径，MUST NOT 按无锚点放行满档配额——把未知压成「未开启」等价于让一个刚开启慢启动的新号按毕业档跑。
+
+副本新鲜时的解析优先级、`binding` 语义以及投影与 clamp 同源同格的既有要求 MUST 保持不变。
+
+#### Scenario: 锚点副本陈旧不得放行满配额
+- **WHEN** 慢启动锚点副本超过陈旧上限，无法确认某账号是否处于慢启动期
+- **THEN** 该账号的新平台动作被停手并告警，MUST NOT 按「无锚点 = 未开启慢启动」放行毕业档配额
+
+#### Scenario: 副本新鲜时行为零回归
+- **WHEN** 慢启动锚点副本新鲜且某账号恰有唯一绑定环境的显式起点
+- **THEN** clamp 与投影按既有优先级和同一次时钟求值，行为与本变更前逐位一致
+
+### Requirement: Facebook comment quota accounting and target de-duplication have separate authorities
+
+For Facebook comments, Cloud SHALL use the durable `risk_counters` ledger and the account's effective `RiskController` as the only hard safety-quota count and decision authority for minute, hour and day windows. Cloud MUST NOT derive a hard safety quota from `risk_interactions`, a feature-local environment variable, or another hidden counter.
+
+`risk_interactions` SHALL remain a same-account, same-target, same-action de-duplication ledger. A confirmed or `verification_ambiguous` comment submission MAY create the de-duplication fact because retry could duplicate a real platform write, but that fact MUST NOT independently reduce or veto the visible safety quota.
+
+#### Scenario: Visible comment safety quota is authoritative
+
+- **WHEN** an automatic Facebook comment is considered and the account's effective `RiskController.explain('comment')` allows it
+- **THEN** no hidden Facebook-specific daily cap derived from `risk_interactions` or an environment variable may reject it
+
+#### Scenario: De-duplication does not become quota accounting
+
+- **WHEN** a prior Facebook comment submission created a `risk_interactions` row for its target
+- **THEN** Cloud MUST use that row only to prevent another comment on the same target
+- **AND** minute, hour and day usage MUST come from the idempotent `risk_counters` accounting path
+
+#### Scenario: Ambiguous submission consumes safety usage without becoming success
+
+- **WHEN** Facebook reports `verification_ambiguous` after the comment submit action was dispatched
+- **THEN** Cloud SHALL count one consumed comment through the durable risk-accounting funnel and SHALL retain the target de-duplication fact
+- **AND** every result and terminal surface MUST remain non-success and MUST NOT claim that the comment is live
+
+### Requirement: 每日配额派生的分钟窗口采用十分之一密度
+
+云端将每日配额派生为内置分钟窗口或慢启动分钟天花板时，SHALL 对每个动作使用 `daily <= 0 ? 0 : max(1, min(MINUTE_BURST_CAP[action], ceil(daily / 10)))`。小时窗口与每日窗口 MUST 保持既有公式和值不变。
+
+合法的 `quota_config.per_minute` 显式覆盖 SHALL 继续优先于档位内置派生值；慢启动 SHALL 继续把派生出的分钟天花板与风控缩放后的分钟值逐动作取更小值，MUST NOT 因新公式越过更严格的账号档位或显式覆盖。
+
+#### Scenario: Facebook 慢启动第一天浏览分钟天花板为二
+
+- **WHEN** Facebook 环境处于慢启动第 1 天，曲线的浏览每日上限为 20，且账号风控缩放后的浏览分钟上限不低于 2
+- **THEN** 慢启动派生的浏览分钟天花板为 2，最终 `effectiveQuotas().minute.view` 为 2
+- **AND** 浏览每日上限仍为 20，小时上限仍按既有小时公式计算
+
+#### Scenario: 零额度与突发硬上限保持不变
+
+- **WHEN** 某动作每日额度为 0，或按 `ceil(daily / 10)` 计算出的值超过该动作 `MINUTE_BURST_CAP`
+- **THEN** 零额度的分钟值仍为 0，超出值仍被夹到对应突发硬上限
+
+#### Scenario: 显式分钟覆盖仍然优先
+
+- **WHEN** 某档位动作存在合法的 `quota_config.per_minute` 覆盖
+- **THEN** 该档位基准分钟值采用显式覆盖而不是从每日值派生
+- **AND** 若慢启动分钟天花板更严格，最终值仍取两者中更小者
 

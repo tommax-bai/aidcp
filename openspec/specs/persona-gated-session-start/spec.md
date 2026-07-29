@@ -5,11 +5,19 @@ TBD - created by archiving change multi-account-node-support. Update Purpose aft
 ## Requirements
 ### Requirement: 仅对已绑人设的账号启动会话，未绑诚实拒绝
 
-云端 SHALL 在启动某连接的浏览会话前，用**独立于人设解析器**的判据确认该账号**已绑定人设**（以人设存储中存在该账号的人设行为准）。已绑 → 照常启动。未绑 → MUST NOT 启动浏览循环、MUST NOT 发出巡刷信号、MUST 在角色重订阅/指令翻译重连**之前**短路，并将该账号置 `needs_persona_setup` 态、发出运营告警。**该闸对所有账号一视同仁、无任何豁免**（`default` 账号已退役、系统已无默认人设可回落）。绝不以任何人设静默把未绑账号跑起来（违反「绝不静默假成功」）。
+云端 SHALL 在启动某连接的浏览会话前，用**独立于人设解析器**的判据确认该账号的人设绑定状态。该判据 SHALL 返回三态 `bound | unbound | unknown`，MUST NOT 返回二值布尔，也 MUST NOT 用「可选布尔」表达第三态——可选布尔在消费点极易被压平成 `false`，而这类压平类型检查抓不到。
+
+- `bound` → 照常启动。
+- `unbound` → MUST NOT 启动浏览循环、MUST NOT 发出巡刷信号、MUST 在角色重订阅/指令翻译重连**之前**短路，并将该账号置 `needs_persona_setup` 态、发出运营告警。
+- `unknown`（权威人设存储不可达，或本地只读副本超过声明的陈旧上限）→ MUST NOT 启动浏览循环，MUST 置独立的不可用态 `persona_unavailable`，MUST NOT 置 `needs_persona_setup`、MUST NOT 触发人设向导、MUST NOT 发出「该账号未设置人设」类运营告警（那是对运营的错误指认，会把一次基础设施故障讲成一件需要人去补配置的事）。
+
+**该闸对所有账号一视同仁、无任何豁免**（`default` 账号已退役、系统已无默认人设可回落）。绝不以任何人设静默把未绑账号跑起来（违反「绝不静默假成功」）。
+
+人设取值口在角色执行中途遇到副本陈旧时 MUST NOT 靠抛异常兜底——闸门 MUST 在会话与动作入口就收敛；保留取值口的抛出仅作「会话中途被真实解绑」的防御性路径。
 
 #### Scenario: 新账号未绑人设被诚实拒绝
 
-- **WHEN** 一个此前未在后台设过人设的真实账号握手接入
+- **WHEN** 一个此前未在后台设过人设的真实账号握手接入，且权威人设存储可读
 - **THEN** 云端不启动其浏览循环、不发巡刷信号，将该账号标为 `needs_persona_setup` 并告警，绝不以任何默认人设开跑
 
 #### Scenario: 原有账号复用已绑人设直接启动
@@ -21,6 +29,11 @@ TBD - created by archiving change multi-account-node-support. Update Purpose aft
 
 - **WHEN** 判定某账号是否已绑人设
 - **THEN** 判据基于人设行是否存在，而非解析结果——显式绑定算「已绑」，没有人设行算「未绑」，两者不混为一谈
+
+#### Scenario: 人设副本陈旧时走独立不可用态
+
+- **WHEN** 一个账号握手接入，而云端的人设只读副本已超过陈旧上限
+- **THEN** 云端不启动浏览循环，置 `persona_unavailable`，MUST NOT 置 `needs_persona_setup`、MUST NOT 触发人设向导
 
 ### Requirement: 缺失账号身份按配置错误拒绝握手，不得偷映射为 default
 
@@ -35,4 +48,18 @@ TBD - created by archiving change multi-account-node-support. Update Purpose aft
 
 - **WHEN** 一个 edge 显式声明了 `accountId` 握手成功，但该账号未在后台绑人设
 - **THEN** 握手可建立（身份合法），但其浏览 / 发布 / 评论任务被入口闸以 `needs_persona_setup` 拒绝，直至后台补绑人设
+
+### Requirement: 人设未知状态绝不下发为权威的「未绑」信号
+
+云端是账号人设绑定状态的唯一权威写方。当云端自身的绑定判据为 `unknown` 时，客户端快照 MUST NOT 携带绑定字段——「字段缺省 = 云端还没说」是既有的线上未知表达，保持它可使执行端零改动。云端 MUST NOT 在 `unknown` 时下发权威的「未绑」值：下发一次即触发客户端自动打开人设向导，而该账号可能早已绑好人设。
+
+`persona_unavailable` SHALL 是一个与「未绑」可区分的用户可见状态，其文案 MUST 指向「云端暂时读不到人设配置」而非「你还没设置人设」。
+
+#### Scenario: 未知不下发绑定字段
+- **WHEN** 云端人设判据为 `unknown`
+- **THEN** 客户端快照不携带人设绑定字段，客户端保持「未知」态且不弹向导
+
+#### Scenario: 权威未绑才允许弹向导
+- **WHEN** 云端人设判据为 `unbound`
+- **THEN** 云端下发权威的「未绑」值，客户端按既有规则展示未设置态并可自动打开人设向导
 

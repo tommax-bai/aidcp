@@ -1804,14 +1804,14 @@ Electron SHALL 仅渲染 Cloud 明确供给的 `search` 键。旧 Cloud 未供�
 
 ### Requirement: 小红书内容首页 SHALL 复用当前环境生命周期控制
 
-内容首页的启动、关闭和浏览器操作 SHALL 委托现有当前环境生命周期控件与状态源。环境关闭时，启动按钮 SHALL 明确可用，浏览器控件 SHALL 按现有登录/检查能力如实禁用或呈现；环境启动后控件、首页文案和工作区状态 SHALL 同步。内容页 MUST NOT 建立第二套 running 状态或自行假定启动成功。
+小红书环境价值首页中的启动、关闭和浏览器操作 SHALL 委托现有当前环境生命周期控件与状态源。环境关闭时，首页启动按钮 SHALL 明确可用，浏览器控件 SHALL 按现有登录/检查能力如实禁用或呈现；环境启动后控件、首页文案和工作状态 SHALL 同步。价值首页 MUST NOT 建立第二套 running 状态或自行假定启动成功。
 
-#### Scenario: 从内容首页启动关闭环境
-- **WHEN** 环境已关闭且客户点击内容首页“启动当前环境”
+#### Scenario: 从环境价值首页启动环境
+- **WHEN** 环境已关闭且客户点击价值首页“启动当前环境”
 - **THEN** 客户端触发现有真实启动按钮的同一动作链，只有权威状态变为运行后才更新为运行中并恢复允许的浏览器控制
 
 #### Scenario: 关闭环境需要确认
-- **WHEN** 当前环境正在运行且客户请求关闭
+- **WHEN** 当前环境正在运行且客户从价值首页请求关闭
 - **THEN** 客户端使用现有环境关闭确认与当前 envId，确认前不关闭，且不得影响其它环境
 
 ### Requirement: 首次用户引导 SHALL 指向真实启动按钮
@@ -1828,11 +1828,15 @@ Electron SHALL 仅渲染 Cloud 明确供给的 `search` 键。旧 Cloud 未供�
 
 ### Requirement: 内容首页 SHALL 在主窗口尺寸内无横向溢出
 
-内容首页、工作面板、启动引导、按钮组、精选卡和稿件调整器 SHALL 在支持的主窗口宽度内换行或堆叠，不得撑出主内容区。顶部工作面板桌面态含 padding 与边框 MUST 不超过 255px，完成消息图标与字体 SHALL 保持一致尺寸。
+小红书环境价值首页、工作面板、账号排期、启动引导、按钮组、精选卡和稿件调整器 SHALL 在环境主内容区的支持宽度内换行或堆叠，不得撑出应用壳或环境栏。顶部工作面板桌面态含 padding 与边框 MUST 不超过 255px，完成消息图标与字体 SHALL 保持一致尺寸。
 
-#### Scenario: 窄主窗口查看工作面板
+#### Scenario: 窄主窗口查看环境价值首页
 - **WHEN** 主窗口缩窄到客户端支持的最小内容宽度
-- **THEN** 控件换行或分栏堆叠，页面无横向滚动，工作过程文字、状态图标和操作按钮均可见可操作
+- **THEN** 控件换行或分栏堆叠，页面无横向滚动，账号排期、工作过程文字、状态图标和操作按钮均可见可操作
+
+#### Scenario: 环境栏压缩了首页实际宽度
+- **WHEN** Electron 窗口仍满足桌面媒体查询但环境栏和外层布局使价值首页容器进入中等宽度
+- **THEN** 首页依据自身容器而不是窗口宽度调整分栏，标题、摘要、赞藏证据和按钮保持客户可读尺寸且空态不留下失衡的大块空白
 
 ### Requirement: Selected Facebook environment shows an explicit compact restricted recovery row
 
@@ -2507,4 +2511,203 @@ After an accepted reset the workspace SHALL clear only the selected channel from
 
 - **WHEN** 云端以具名拒因拒绝删除（如稿件已被他处修改、该配图已不在稿件里、稿件已审批过、客户端未连上云端）
 - **THEN** 界面 SHALL 呈现对应的中文原因、该张配图 SHALL 仍在界面上（未被抹掉），MUST NOT 出现任何成功措辞
+
+### Requirement: 视频号只替换当前环境右侧 workspace
+
+Electron 客户端 SHALL 保持现有全局标题栏与左侧环境栏；当前环境 platform=`wechat_channels` 时，只在右侧渲染 InteractionWorkspace。MUST NOT 新增永久第二侧栏、替换环境栏或展示 browse/like/collect/follow/publish 的无意义零指标。XHS/Facebook 继续使用既有 workspace。
+
+#### Scenario: 切换到视频号保留应用壳
+- **WHEN** 用户从 XHS/FB 环境切换到 wechat_channels 环境
+- **THEN** 左侧环境栏与标题栏保持位置/功能，右侧原子切成互动队列与详情
+
+#### Scenario: 切回旧平台零回归
+- **WHEN** 用户从视频号环境切回 XHS/Facebook
+- **THEN** 原工作区恢复且不残留视频号 tabs、thread 或写按钮
+
+### Requirement: 环境切换必须取消旧请求并校验 envKey
+
+列表、详情、auth/sync 状态与所有写回包 SHALL 绑定当前 `envKey`。切换环境 MUST 取消可取消请求并丢弃迟到回包；新环境加载中显示自身 loading/unknown，MUST NOT 复用旧账号数据。最终文本草稿 MUST 绑定原 env/job，不能静默移到新环境。
+
+#### Scenario: A 的迟到回包不覆盖 B
+- **WHEN** 用户快速 A→B 切换且 A 的详情响应后到
+- **THEN** renderer 校验 envKey 后丢弃 A 响应，B 页面不闪现 A 的昵称/私信/动作
+
+### Requirement: 视频号 workspace 必须保留当前环境生命周期控制
+
+InteractionWorkspace SHALL 在顶部提供当前视频号环境可见的生命周期控件，并与 XHS 使用同一状态矩阵和判定优先级。会话为 paused 时 SHALL 优先同时显示“恢复”和独立的“关闭”；其余核心为 stopped/warning 时 SHALL 只显示“启动”；其余 starting/running 时 SHALL 只显示“暂停”。“暂停” MUST 保留当前浏览器/会话；“关闭” MUST 仅在暂停态可见且可执行，关闭完成后 SHALL 按主进程回传真态回到“启动”。所有动作 MUST 复用既有单环境 lifecycle IPC 并携当前 `envKey`；MUST NOT 调用 fleet 全部启动、把显示浏览器/重新登录冒充启动、操作其他环境、清除登录凭证或触发 offboard。
+
+#### Scenario: 离线视频号环境可以就地启动
+- **WHEN** 用户选中 edge=stopped 的 wechat_channels 环境并点击“启动”
+- **THEN** 客户端只向该环境的单环境启动 IPC 传递当前 envKey，其他环境保持原状态
+
+#### Scenario: 生命周期状态切换使用同一入口
+- **WHEN** 当前视频号环境从 running 进入 paused，或从 paused 恢复运行
+- **THEN** 按钮依次显示“暂停”“恢复”“暂停”，每次动作都绑定当前 envKey 且以主进程回传真态刷新
+
+#### Scenario: 暂停后可以显式关闭当前环境
+- **WHEN** 当前视频号环境为 paused
+- **THEN** workspace 同时显示“恢复”和“关闭”；点击“关闭”只调用当前 envKey 的单环境关闭 IPC，完成后显示“启动”，且其他环境、登录凭证和 offboard 状态保持不变
+
+#### Scenario: 非暂停态不暴露关闭入口
+- **WHEN** 当前视频号环境为 starting、running、stopped 或 warning
+- **THEN** “关闭”入口不可见且 handler 拒绝执行，用户必须先暂停当前环境才能显式关闭
+
+### Requirement: 开发者详情必须跨 workspace 保持可见
+
+设置中的“显示开发者详情”开关 SHALL 继续控制共享的当前环境原始日志面板，默认隐藏和持久化语义 SHALL 保持不变。该面板 MUST 位于 XHS/Facebook legacy workspace 与视频号 InteractionWorkspace 的互斥切换之外；开关启用后切换到 `wechat_channels` MUST 继续显示当前选中 `envKey` 的日志，MUST NOT 因 legacy workspace 隐藏而消失或展示其他环境日志。
+
+#### Scenario: 视频号环境显示已启用的开发者详情
+- **WHEN** 用户已启用“显示开发者详情”并从 XHS/Facebook 切换到视频号环境
+- **THEN** InteractionWorkspace 与开发者详情同时可见，日志内容切换到当前视频号 envKey 的分桶；切回其他环境时同一面板继续显示对应环境日志
+
+### Requirement: 互动 workspace 必须呈现真实队列与发送状态
+
+InteractionWorkspace SHALL 提供横向 `待处理/评论/私信/已回复` 视图、分页列表、thread 详情、模板/AI 差异、风险、final text 与 ignore/escalate/regenerate/approve/send 动作。`queued`、`sending`、`ambiguous`、`sent`、`failed` MUST 有不同文案/视觉；只有 sent 可显示平台确认成功，ambiguous 必须显示待核验。
+
+#### Scenario: HTTP accepted 不显示绿色成功
+- **WHEN** send API 返回 job queued
+- **THEN** UI 显示已进入发送队列/等待平台结果，MUST NOT 显示已回复成功
+
+#### Scenario: 未配置模板仍继续显示收件箱
+- **WHEN** 环境能同步但无有效 published reply config
+- **THEN** 列表/详情可读并显示配置阻断卡，生成/发送禁用，MUST NOT 显示空成功态
+
+### Requirement: 浏览器关闭是正常副状态而 reauth/challenge 是阻断
+
+顶部状态 SHALL 区分 interaction auth 与 browser sidecar：auth active + browser closed 显示正常 API 同步；reauth_required/challenge_required 禁用写、保留历史并提供 reopen。网络/限流/schema disabled SHALL 各自使用可解释状态，MUST NOT 解析 Edge 日志猜测。
+
+#### Scenario: API-only running 不告警
+- **WHEN** auth active、最近同步成功且 browserState=closed
+- **THEN** 标题显示互动托管/接口同步正常，辅助文字说明浏览器已关闭（正常）
+
+#### Scenario: Challenge 保留历史并禁写
+- **WHEN** auth status=challenge_required
+- **THEN** 已同步 thread 仍可读，approve/send 禁用并提示在原浏览器处理
+
+### Requirement: Renderer 必须经最小具名 IPC 访问 customer-auth API
+
+renderer MUST NOT 持有 JWT/Cookie、访问平台接口、记录完整 DM 或获得任意 URL fetch。preload SHALL 只暴露冻结路径对应的具名 IPC；Electron main 校验 method/path/body，并复用现有 client auth session。Cloud 仍作最终 enabled user/env ownership/CAS 检查。
+
+#### Scenario: Renderer 不能构造任意请求
+- **WHEN** renderer 尝试传入任意 URL 或非冻结 method/path
+- **THEN** preload/main 拒绝，MUST NOT 代发网络请求或泄漏 token
+
+### Requirement: 环境删除必须显示 offboard 真态
+
+视频号环境的显式删除/解绑 SHALL 先调用 customer-auth `DELETE /environments/:envKey`，再用 `GET /offboarding/:offboardId` 读取 Cloud/Edge 清理真态。`pending_edge|dispatched` MUST 显示“已撤权，等待本机/离线设备清理”，不能把本地 profile 删除、普通 logout、pause/close 或 HTTP 2xx 显示成凭证已删除。只有 `tombstoned|purged` 才可显示 Cloud 已完成对应阶段。
+
+#### Scenario: Edge 离线时环境仍显示待清理
+- **WHEN** 用户解绑环境而所属 Edge 离线
+- **THEN** UI 立即停止该环境互动访问/写，保留 offboardId 与待清理状态，MUST NOT 显示“删除完成”或丢弃恢复入口
+
+#### Scenario: 本地 profile 删除不冒充 offboard 完成
+- **WHEN** 浏览器 profile 本地删除成功但 Cloud offboard 尚未收到 Edge cleared ack
+- **THEN** UI 仍显示待凭证清理，MUST NOT 将本地动作映射为 tombstoned/purged
+
+### Requirement: 互动 workspace 必须满足基线尺寸与无障碍
+
+在 `820×720` SHALL 可完成列表选择、上下文查看、编辑、批准/发送/转人工；更窄窗口 SHALL 按基线折叠而不遮挡主动作。tabs、列表、编辑器和主要动作 MUST 键盘可达、focus 可见、状态不只靠颜色。
+
+#### Scenario: 820×720 完成主流程
+- **WHEN** 窗口为 820×720 且 thread 有待审草稿
+- **THEN** 用户无需页面级横向滚动即可查看风险、编辑并执行主要动作
+
+### Requirement: 单列互动布局必须提供主列整体滚动
+
+当左侧环境栏使右侧 InteractionWorkspace 的 container 宽度进入单列布局时，Electron 客户端 SHALL 让右侧主列整体纵向滚动，MUST NOT 继续用宽屏固定高度加 `overflow:hidden` 裁掉列表下方的详情或共享开发者详情。是否折叠为单列 MUST 以右侧 workspace 的实际可用宽度为准；支持 container query 的客户端 MUST NOT 再被 viewport-only 断点提前覆盖。宽屏双列布局 MAY 保留列表/详情各自滚动，但任何布局都必须让当前 thread 详情可达。
+
+#### Scenario: 820×720 环境栏展开后详情仍可达
+- **WHEN** 窗口为 820×720、环境栏可见且 workspace container 宽度不超过 640px
+- **THEN** 用户在右侧主列向下滚动可依次到达互动详情和开发者详情，MUST NOT 被只响应 viewport 宽度的断点裁切
+
+#### Scenario: 窄 viewport 但右侧仍够宽时保持双栏
+- **WHEN** viewport 不超过 700px，但 InteractionWorkspace 的实际可用宽度仍大于 640px
+- **THEN** 收件箱保持列表/详情双栏，MUST NOT 因 viewport-only 兜底把消息列表拉成通栏；只有 workspace 自身进入单列阈值后才折叠
+
+### Requirement: Video-channel workspace exposes truthful browser foreground controls
+The Electron video-channel workspace SHALL show an environment-scoped browser control when authorization is active: `browserState=closed` SHALL expose “打开浏览器”, `browserState=open` SHALL expose “转入后台”, and transitional states SHALL show a disabled progress label. Reauthorization and customer logout controls MUST remain separate actions with distinct copy.
+
+#### Scenario: Active browser is closed normally
+- **WHEN** the selected video-channel environment reports `status=active` and `browserState=closed`
+- **THEN** the workspace states that API background operation is active and exposes “打开浏览器” for that environment
+
+#### Scenario: Active browser is visible
+- **WHEN** the selected video-channel environment reports `status=active` and `browserState=open`
+- **THEN** the workspace states that the browser is open and exposes “转入后台” without labeling the account as newly logged in
+
+#### Scenario: Browser action is awaiting Edge truth
+- **WHEN** the customer API accepts an open or close request but the target browser state has not yet arrived
+- **THEN** the workspace displays a waiting-for-Edge message and MUST NOT claim the browser has opened or closed
+
+#### Scenario: Authorization requires user action
+- **WHEN** auth status is login required, reauthorization required, or challenge required
+- **THEN** the workspace shows the existing login or challenge action instead of the ordinary foreground/background control
+
+### Requirement: 云端、浏览器与人设状态 SHALL 正交呈现
+
+Electron 客户端 SHALL 分别呈现 Cloud 会话、浏览器执行层和 `personaBound` 三态。浏览器排队、缺席或冷待机 MUST NOT 自动推导 Cloud 离线；Cloud transport 打开或握手响应异常 MUST NOT自动推导 Cloud 已连接；persona 未收到 MUST 保持未知。
+
+#### Scenario: 浏览器排队但 Cloud 与人设已知
+- **WHEN** 环境以 browser-absent 状态完成有效 Cloud welcome 并收到 `personaBound=true`
+- **THEN** 客户端显示 Cloud 已连接、人设已设置、浏览器正在排队或待机
+- **AND** MUST NOT 把整个环境显示为离线
+
+#### Scenario: 有 socket 但 welcome 无效
+- **WHEN** WebSocket 已打开但 hello 收到 error 或畸形 welcome
+- **THEN** 客户端显示云端连接失败及可诊断原因
+- **AND** MUST NOT 显示绿色“已连接云端”或用未知人设弹出未设置向导
+
+#### Scenario: 引导不可用
+- **WHEN** 控制面启动因未绑定、冲突、越权或存储不可用而不能建立 Cloud 会话
+- **THEN** 客户端明确显示对应云端未连接原因与独立的浏览器排队状态
+- **AND** MUST NOT 用泛化“离线”掩盖原因
+
+### Requirement: 启动数量与失败原因 SHALL 可核对
+
+客户端 SHALL 如实展示生效浏览器并发、正在运行数、排队数以及每个未启动环境的具体状态。单个 AdsPower 环境被占用或启动失败 MUST 释放启动闩并继续处理后续队列项，MUST NOT 使剩余任务无回复。
+
+#### Scenario: 第五个环境被其它设备占用
+- **WHEN** 浏览器并发上限为 5，而第 5 个被放行环境被 AdsPower 拒绝为“由其它设备使用”
+- **THEN** 客户端将该环境标为具体启动失败、归还其槽位并继续放行下一队列项
+- **AND** 运行数、排队数与失败数之和可与已请求启动数核对
+
+### Requirement: 小红书环境首页与旧平台首页 SHALL 严格互斥
+
+Edge SHALL 仅从当前权威环境平台派生首页模式。小红书模式 SHALL 显示完整价值首页并抑制重复的旧运行正文；Facebook、视频号和未知平台 SHALL 保留既有环境正文并完全隐藏小红书价值首页。环境切换后的迟到请求 MUST NOT 回写当前页面。
+
+#### Scenario: 从小红书切换到 Facebook
+- **WHEN** 小红书价值首页仍有内容请求在途且客户切换到 Facebook 环境
+- **THEN** 客户端立即隐藏小红书价值首页、恢复 Facebook 既有环境正文，并丢弃随后到达的小红书响应
+
+#### Scenario: 环境级阻塞证据仍可见
+- **WHEN** 当前小红书环境存在登录提示、重复账号警告或真实 Edge 异常
+- **THEN** 对应环境级提示仍显示在价值首页之上，不因旧运行正文被抑制而丢失
+
+### Requirement: 首次启动引导 SHALL 作用于价值首页可见动作
+
+首个真实小红书环境完成创建并进入权威花名册后，若当前环境动作明确为 start，客户端 SHALL 在价值首页可见的真实启动代理按钮旁显示一次性说明和有限光环。该按钮 SHALL 委托共享生命周期动作；引导 MUST NOT 指向隐藏控件、模拟成功或阻断离线内容读取。
+
+#### Scenario: 新用户从价值首页启动
+- **WHEN** 新用户选择首个未启动的小红书环境并点击价值首页引导中的启动动作
+- **THEN** 引导立即结束，客户端走正常保存与启动链并等待真实回执
+
+### Requirement: 空闲工作面板与账号排期 SHALL 保持主次层级
+
+环境未启动或当前无任务时，桌面工作面板含 padding 与边框 MUST NOT 超过 168px，并 SHALL 仍展示启动/查看灵感动作、不会自动发布的边界以及任务开始后会出现的“计划与判断、生成与调整、检查与确认”过程预告。过程预告 SHALL 使用紧凑横向说明，MUST NOT 用大面积居中空白把精选灵感推出首屏。有真实任务的展开态 SHALL 保持 240px 稳定高度。账号排期 SHALL 保持为低干扰入口行，其视觉高度、阴影和强调度 MUST NOT 超过工作面板或精选灵感链路。
+
+#### Scenario: 有灵感但环境未启动
+- **WHEN** 当前账号已有精选灵感而环境未启动
+- **THEN** 工作面板以不超过 168px 的紧凑态明确提供启动动作并展示后续过程预告，首屏可看到精选灵感分区入口，排期入口不遮蔽或替代二者
+
+### Requirement: 价值首页排版与客户端默认窗口 SHALL 保持设计比例
+
+已登录客户端主窗口 SHALL 默认以 1080px 宽度启动，登录窗口 SHALL 保持其独立的 900px 宽度。价值标题中的动态灵感数量短语 SHALL 使用设计蓝强调，周围句子保持深色；“收起”和“查看全部灵感 →” SHALL 使用显式且稳定的客户可读字号。空闲过程说明 SHALL 紧接过程标题出现，不得垂直居中形成大块上方留白。真实笔记图片与装饰性封面兜底 SHALL 使用同一克制阴影层级。
+
+#### Scenario: 已收集灵感但尚无草稿
+- **WHEN** 首页显示“已收集 2 条精选灵感，等待发起创作”
+- **THEN** 仅“2 条精选灵感”使用蓝色强调，收起与查看全部入口保持设计稿字号，空闲过程说明靠近标题且封面与卡片背景有轻微层次
+
+#### Scenario: 已登录客户端首次打开
+- **WHEN** Electron 创建已登录主窗口
+- **THEN** 主窗口默认宽度为 1080px，最小宽度和登录窗口尺寸保持原有安全边界
 

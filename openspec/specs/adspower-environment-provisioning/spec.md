@@ -53,53 +53,55 @@ AdsPower API key 与代理账号密码 SHALL 仅在创建 / 改代理批处理�
 
 ### Requirement: 删除环境仅经界面逐个二次确认触发，绝不自动 / 批量
 
-桌面外壳 MAY 提供本地删除环境（`user/delete`）功能，但 SHALL 仅由运维在界面上逐个、二次确认触发。管理后台 MAY 作为第二个允许的远程触发源，但同样 SHALL 逐环境展示影响预览并要求完整 envKey 确认；Cloud 只写删除期望状态，官方 Edge 主进程 MUST 通过客户鉴权 HTTP 主动拉取、领取匹配 installation 的责任后才执行。删除前 SHALL 明确警示不可恢复（若该环境已登录账号，其登录态/cookie 一并丢失）。删除 MUST NOT 批量执行，MUST NOT 由本机 ledger、过期、离线或陈旧状态自动触发，MUST NOT 通过 Cloud→Edge WS 删除命令触发。
+桌面外壳 MAY 提供删除环境（`user/delete`）功能，但 SHALL 仅由运维在桌面界面上**逐个、二次确认**触发：第一次点击仅进入待确认态（如「确认删除?」，短时后自动收回）、**第二次点击才执行**删除。删除前 SHALL 明确警示**不可恢复**（若该环境已登录账号，其登录态 / cookie 一并丢失）。删除 MUST NOT 自动触发、MUST NOT 批量执行、MUST NOT 由本机 ledger / 过期状态驱动。管理后台、Cloud、远程 maintenance、客户端 outbox 与 Cloud→Edge 命令 MUST NOT 触发 AdsPower 环境删除。桌面写客户端对 `user/delete` 放行、但对浏览器生命周期（`browser/start|stop|active`）SHALL 仍**直接抛错**（M7 不变）。桌面凭据只在内存持有，日志须脱敏。
 
-写客户端对 `user/delete` 放行、但对浏览器生命周期（`browser/start|stop|active`）SHALL 仍直接抛错（M7 不变）。Edge SHALL 在本地执行路径先停止该环境的既有运行 handle；视频号还 MUST 等待既有 offboard 凭证清理达到允许物理删除的终态。AdsPower 返回成功或 claimed 权威 installation 明确返回不存在后，Edge 才可回写成功；其它错误 MUST 原样归为待重试失败。凭据同建号：只内存持有、日志脱敏。
-
-#### Scenario: 本地删除需二次确认
+#### Scenario: 桌面删除需二次确认
 - **WHEN** 运维在桌面客户端点击某环境的删除按钮
-- **THEN** 第一次点击仅进入“确认删除?”待确认态、不发任何删除请求，第二次点击才执行本地受控删除，删前已警示不可恢复
+- **THEN** 第一次点击仅进入「确认删除?」待确认态、不发任何删除请求；第二次点击才执行本地 `user/delete`，删前已警示不可恢复
 
-#### Scenario: 管理后台远程删除需精确确认并由 Edge 拉取
-- **WHEN** 管理员在环境页查看单环境影响预览、输入完整 envKey 并确认
-- **THEN** Cloud 只记录删除期望；匹配 installation 的 Edge 经 HTTP poll/claim 后逐个执行 `user/delete`，不得收到新增 WS 删除命令
+#### Scenario: 管理后台不提供删除来源
+- **WHEN** 管理员查看 Cloud 环境资产或直接请求曾存在的 Panel 删除路径
+- **THEN** 系统不触发 AdsPower `user/delete`，不创建 Edge maintenance 责任且不发送 Cloud→Edge 删除命令
 
-#### Scenario: 绝不按本地状态或批量删除
-- **WHEN** 任何批量、自动清理、ledger、过期、离线或未确认路径尝试触发删除
-- **THEN** MUST NOT 调用 `user/delete`
+#### Scenario: 绝不自动 / 批量删
+- **WHEN** 任何非桌面界面逐环境明确二次确认的路径（自动清理 / 批量 / ledger / Cloud 管理后台）尝试删除
+- **THEN** MUST NOT 触发 `user/delete`
 
 #### Scenario: 写客户端仍禁浏览器生命周期
-- **WHEN** 代码路径尝试经写客户端调用 `browser/start|stop|active`
-- **THEN** 直接抛错、不发出，放宽远程确认来源不改变 M7 生命周期红线
-
-#### Scenario: AdsPower 失败不回报删除成功
-- **WHEN** `user/delete` 返回环境占用、运行中、限流或其它非“不存在”错误
-- **THEN** Edge 经 HTTP 回写真实失败并保留重试责任，Cloud 与管理后台不得显示已删除
+- **WHEN** 代码路径尝试经桌面写客户端调用 `browser/start|stop|active`
+- **THEN** 直接抛错、不发出，保留 M7 生命周期红线
 
 ### Requirement: 代理可在客户端配置：创建可选填、已有环境可增改、无代理如实标注
 
-桌面外壳 SHALL 允许在客户端内完成代理配置：**创建时**表单提供可选代理区块（类型 `http`/`https`/`socks5` + host/port + 可选账密，默认「无代理」）；**已有环境**提供逐环境的「代理」编辑入口，读回现配置的非密字段预填、保存经写客户端的 `user/update` 封装下发。代理输入 SHALL 经统一归一层校验（类型枚举、host 非空、port 为 1-65535 整数、有密码必须有用户名），任一不合法 SHALL **诚实拒绝提交**（创建时拒建、编辑时拒存并说明原因），MUST NOT 静默降级成 `no_proxy` 或砍掉非法字段后照发。选「无代理」保存 SHALL 显式下发 `{ proxy_soft: 'no_proxy' }`（支持清除既有代理）。桌面外壳 SHALL NOT 因未配代理而阻止创建：未配代理时 SHALL 给出提醒，但仍允许创建；环境列表 SHALL 如实呈现「无代理」状态，该标注 MUST NOT 拦截任何操作。编辑已配代理的环境时 SHALL 提示改代理对已养成账号画像的影响（出口 IP / 时区 / 地理随代理跳变）。桌面外壳 MUST NOT 自动采购/管理代理池、MUST NOT 引用/管理 AdsPower 侧已保存代理账本（`proxyid`/`global_config` 不做）。改代理的生效时机以 AdsPower 实际行为为准，UI SHALL 按「下次启动该环境生效」的保守口径提示，MUST NOT 承诺即时生效。
+桌面外壳 SHALL 允许在客户端环境管理中完成代理配置：创建时表单提供可选代理区块；已有环境在环境行提供“代理”入口。代理类型 SHALL 为 `http`、`https`、`socks5` 或显式“无代理”，结构化输入包含 host、port 与可选账密。单环境编辑 SHALL 额外提供“快速粘贴”，接受与批量建号一致的 `host:port`、`host:port:username:password` 和 `host----port----username----password` 单行格式，解析成功后回填结构化字段供确认和修改。
 
-#### Scenario: 未配代理仍可创建但给提醒并标注
-- **WHEN** 运维未填代理即点「创建环境」
-- **THEN** 桌面外壳给出「未配置代理」提醒但仍允许创建，成功后该环境在列表如实标「无代理」，不阻止任何后续操作
+单行与多行代理 SHALL 共用主进程通用解析/归一真源，校验类型枚举、host 非空、port 为 1-65535 整数以及有密码必须有用户名。任一不合法 SHALL 诚实拒绝并只返回安全行号和字段原因，MUST NOT 回显原始代理行、静默降级成 `no_proxy` 或截断非法字段后照发。密码中的后续冒号或 `----` SHALL 归入密码尾部。已保存代理密码 MUST NOT 以明文呈现；系统 MAY 在重新校验当前客户作用域后精确读取并仅回填到 `type=password` 遮蔽输入，以便修改其它字段时保留密码，但 MUST NOT 将其写入列表摘要、消息或日志。
 
-#### Scenario: 创建时填合法代理随建号下发
-- **WHEN** 运维在创建表单选择 socks5 并填合法 host/port（及可选账密）后点「创建环境」
-- **THEN** `user/create` 的 `user_proxy_config` 携带 `{ proxy_soft:'other', proxy_type:'socks5', … }`，建成后列表如实显示该代理摘要
+保存已有环境代理 SHALL 经写客户端的 `user/update` 两键封装下发；选择“无代理” SHALL 显式下发 `{ proxy_soft: 'no_proxy' }`。未配代理 MUST NOT 阻止创建或其它环境操作。编辑已配代理的环境 SHALL 提示出口 IP、时区和地理画像变化风险；成功只 SHALL 表示 AdsPower 配置已写入并按“下次启动该环境生效”提示，MUST NOT 宣称真实出口已经验证。
 
-#### Scenario: 非法代理输入诚实拒绝
-- **WHEN** 代理输入含非法 port（如 `70000`）或选了类型但 host 为空
-- **THEN** 归一层在提交前诚实拒绝并说明原因，MUST NOT 发出请求、MUST NOT 静默按 `no_proxy` 处理
+#### Scenario: 单环境快速粘贴回填结构化字段
+- **WHEN** 运维选择 HTTPS 并粘贴一条合法 `host:port:username:password`
+- **THEN** 主进程通用解析器返回规范化 host、port、用户名和密码并回填现有编辑字段，用户仍需显式保存后才写入 AdsPower
+
+#### Scenario: 两种分隔格式与密码尾部得到保留
+- **WHEN** 运维粘贴冒号或 `----` 格式且密码包含额外同类分隔符
+- **THEN** 系统把固定的 host、port、username 之后内容完整归入密码，并继续经统一归一校验
+
+#### Scenario: 非法快速粘贴安全拒绝
+- **WHEN** 单行输入缺 host、端口越界或只有密码没有用户名
+- **THEN** 系统只说明格式或字段原因，不回显原始行或凭据，不修改现有结构化字段且不发出 `user/update`
 
 #### Scenario: 已有环境改代理经受限 update 下发
-- **WHEN** 运维在某环境行打开「代理」编辑浮层、填入合法代理并保存
-- **THEN** 写客户端以 `{ user_id, user_proxy_config }` 两键 body 调 `user/update`，成功后提示「下次启动该环境生效」并刷新列表摘要；失败按 AdsPower 返回诚实展示
+- **WHEN** 运维在某环境行编辑并保存合法代理
+- **THEN** 写客户端仅以 `{ user_id, user_proxy_config }` 两键 body 调用 `user/update`，成功后提示下次启动生效并刷新配置摘要
+
+#### Scenario: 已保存密码只在遮蔽输入中保留
+- **WHEN** 运维打开当前客户可见环境的代理编辑，并只修改 host 或端口
+- **THEN** 系统可将精确读取的原密码回填到 `type=password` 输入后随保存原样提交，但列表、提示和日志均不显示密码明文
 
 #### Scenario: 显式清除代理
-- **WHEN** 运维在编辑浮层选「无代理」并保存
-- **THEN** 下发 `{ proxy_soft:'no_proxy' }`，列表摘要回到「无代理配置」
+- **WHEN** 运维在编辑中选择“无代理”并保存
+- **THEN** 系统下发 `{ proxy_soft:'no_proxy' }`，环境列表摘要回到无代理状态且不阻止其它操作
 
 ### Requirement: New AdsPower profiles block geolocation permission prompts by default
 The desktop shell SHALL include `location='block'` in the `fingerprint_config` sent through AdsPower `user/create` for every newly provisioned profile. It SHALL also retain `location_switch='1'` so the profile's fingerprint location follows the proxy IP. The shell MUST NOT represent `location='block'` as disabling IP-based fingerprint location, and MUST NOT broaden the proxy-only `user/update` wrapper to retrofit existing profiles.
@@ -377,4 +379,76 @@ Facebook batch creation SHALL assign each planned account an OS family independe
 #### Scenario: 部分创建或创建失败
 - **WHEN** Facebook 批量创建只完成部分环境或中途失败
 - **THEN** 创建回执只表达真实环境结果，不夹带人设补齐受理、失败或等待绑定状态
+
+### Requirement: 批量代理只作用于明确关闭环境并按预览顺序轮询分配
+
+环境管理 SHALL 提供按需“批量代理”模式，默认环境列表 MUST NOT 常驻复选框。进入该模式后，运维 SHALL 显式选择一个或多个当前客户可见且已关闭的环境，选择一次代理类型并逐行粘贴代理。运行中、启动中或清理中的环境 SHALL 不可选择并说明原因，系统 MUST NOT 为批量改代理自动关闭环境。
+
+renderer SHALL 冻结去重有序的明确 `user_id` 列表并在确认前展示目标数量、合法代理数量、去密映射摘要，以及“其中 N 个环境复用代理”的重复分配说明，其中 `N = max(0, targetCount - proxyCount)`；MUST NOT 使用容易被误解为循环轮数的“循环复用 N 次”。主进程 SHALL 在任何 `user/update` 前重新校验目标列表、当前客户可见范围、已知运行状态及全部代理行；若有 `P` 条代理，第 `i` 个明确目标 SHALL 使用第 `i mod P` 条代理。目标顺序 MUST 来自冻结列表，MUST NOT 因 DOM 状态分组、随后筛选变化或当前选中环境而改变。
+
+批量写入 SHALL 复用 AdsPower 写客户端限速并串行执行。主进程只 SHALL 在某个 `user/update` 明确成功后发送当前请求的单调进度，renderer SHALL 显示 `已完成 N/M` 和简洁进度条；进度事件 MUST 绑定一次性请求标识且 MUST NOT 包含环境 ID、代理原文或凭据。任一项失败 SHALL 立即停止后续项，返回真实成功数、失败序号/原因与未执行数；系统 MUST NOT 自动回滚已成功配置、跳过失败继续扩大写入面或宣称整批原子成功。全部成功后才清空一次性代理输入；部分失败时 SHALL 保留选择和输入供核对，错误和回执 MUST NOT 包含代理原文或密码。
+
+#### Scenario: 默认环境页不展示批量控件
+- **WHEN** 运维普通打开环境管理
+- **THEN** 环境列表不显示复选框；只有点击“批量代理”后才进入临时选择态
+
+#### Scenario: 运行环境不可作为批量目标
+- **WHEN** 某环境正在运行、启动或清理中
+- **THEN** 批量模式将该环境标为不可选择并提示先关闭，系统不自动执行任何关闭动作
+
+#### Scenario: 五个环境轮询两条代理
+- **WHEN** 冻结目标顺序为五个环境且代理顺序为 A、B
+- **THEN** 确认预览和主进程写入计划均为 A、B、A、B、A，并显示“其中 3 个环境复用代理”，不把 3 表述成循环轮数
+
+#### Scenario: 执行中只按确认成功项推进
+- **WHEN** 共修改 11 个环境且主进程已收到前 4 个 `user/update` 的成功结果
+- **THEN** 当前请求显示“正在按顺序修改… 已完成 4/11”和对应进度条，MUST NOT 提前计入第 5 个环境或显示估算剩余时间
+
+#### Scenario: 失败后进度停在实际成功数
+- **WHEN** 前 4 个环境成功而第 5 个环境失败
+- **THEN** 最终界面保留“已完成 4/11”的真实进度并说明第 5 个失败及未执行数量，旧请求进度不得覆盖该结果
+
+#### Scenario: 筛选变化不能扩大批量目标
+- **WHEN** 运维选定目标后平台筛选、状态分组或当前环境发生变化
+- **THEN** 最终请求仍只包含冻结的明确 ID 顺序，MUST NOT 把新出现或新可见环境自动加入批次
+
+#### Scenario: 后置坏代理在写入前拒绝整批
+- **WHEN** 代理列表任一后置行端口或鉴权格式非法
+- **THEN** 主进程在第一条 `user/update` 前按安全行号拒绝整批，不修改任何环境且不回显凭据
+
+#### Scenario: 中途失败诚实停止并保留部分成功
+- **WHEN** 前两个环境更新成功而第三个环境被 AdsPower 拒绝
+- **THEN** 系统停止第四个及后续环境，回执说明成功 2 个、第三项失败和真实未执行数，不自动回滚前两个，也不清空输入
+
+#### Scenario: 全批成功只声明配置写入
+- **WHEN** 所有目标的 `user/update` 都返回成功
+- **THEN** 系统显示真实成功数并清空一次性输入，文案只说明代理配置已更新且下次启动生效，MUST NOT 宣称出口 IP 已验证
+
+### Requirement: Environment proxy creation and editing SHALL synchronize the Cloud authority
+The user-entered proxy configuration SHALL remain the creation input sent to AdsPower. After AdsPower creates the profile, Edge SHALL include the same configured or explicit no-proxy authority in provisioning completion. For an existing environment edit, Edge SHALL commit the Cloud authority with revision comparison before updating the AdsPower execution copy.
+
+#### Scenario: New environment preserves the entered proxy
+- **WHEN** a user creates an environment with a validated proxy
+- **THEN** Edge SHALL create the AdsPower profile with that proxy
+- **AND** SHALL complete Cloud provisioning with the same original proxy authority
+
+#### Scenario: New environment explicitly has no proxy
+- **WHEN** a user creates an environment without a proxy
+- **THEN** Edge SHALL create the AdsPower profile without a proxy
+- **AND** SHALL complete Cloud provisioning with explicit `no_proxy`
+
+#### Scenario: Existing environment edit is Cloud-first
+- **WHEN** a user saves a new proxy for an owned existing environment
+- **THEN** Edge SHALL first write the exact Cloud authority using the observed revision
+- **AND** only after Cloud accepts the write SHALL Edge update AdsPower
+
+#### Scenario: AdsPower update fails after Cloud commit
+- **WHEN** Cloud accepts an existing-environment proxy edit but AdsPower rejects the execution-copy update
+- **THEN** Edge SHALL report that Cloud is authoritative and AdsPower synchronization failed
+- **AND** the next managed start SHALL overwrite AdsPower from the Cloud authority
+
+#### Scenario: Cloud write fails
+- **WHEN** Cloud rejects or cannot persist a creation completion or proxy edit
+- **THEN** Edge SHALL NOT report the proxy authority as saved
+- **AND** an existing-environment edit SHALL NOT update AdsPower
 

@@ -171,9 +171,9 @@ An operator-configured Facebook comment search keyword that contains internal wh
 
 ### Requirement: Facebook account config supports generated or template comment bodies
 
-Each Facebook account's comment configuration SHALL include a comment-body mode. `generated` mode SHALL use the existing Facebook composer after the target post is opened and read. `template` mode SHALL choose from operator-configured account templates and MUST skip LLM comment generation for the body. Both modes SHALL use target selection from the account joined-group ledger or a caller-pinned just-joined group, deterministic validation, configured approval, edge submit, server-confirmed verification, and honest audit outcomes. Search keywords are optional and select the targeting path; they MUST NOT determine whether generated mode is enabled.
+Each Facebook account's comment configuration SHALL support an explicit comment-body mode and SHALL persist whether that mode was explicitly configured independently of the mode value and template array. Explicit `generated` mode SHALL use the existing Facebook composer after the target post is opened and read. Explicit `template` mode SHALL first use valid operator-configured account templates; when the account template set is empty, it SHALL resolve the selected target group's region and use that region's configured common templates. When the account has no explicit comment-body configuration, the effective mode SHALL default to `template` and use the same regional-template resolution. Explicit `generated` MUST remain authoritative and MUST NOT be replaced merely because account templates are empty. The explicit-mode fact SHALL survive the existing Cloud internal sync-read path.
 
-Template mode MUST fail closed when the account has no valid templates; it MUST NOT silently fall back to generated mode. Generated mode MUST NOT require templates or keywords. Templates MUST be stored per account, may contain multiple entries, and SHALL be sanitized for empties/duplicates while preserving meaningful internal whitespace.
+Both modes SHALL use target selection from the account joined-group ledger or a caller-pinned just-joined group, deterministic validation, configured approval, edge submit, server-confirmed verification, and honest audit outcomes. Search keywords are optional and select the targeting path; they MUST NOT determine whether generated mode is enabled or whether the scheduled comment path may run. Regional fallback MUST fail closed when the target has no region or the region has no valid templates; it MUST NOT fall back to generated comments, another region, or arbitrary text. Account and regional templates SHALL be sanitized for empties/duplicates while preserving meaningful internal whitespace. Generated mode MUST NOT require templates or keywords.
 
 #### Scenario: Generated mode with keywords uses the composer after search
 - **WHEN** a Facebook account is configured for `generated` mode with at least one keyword and a target post is opened from search
@@ -188,9 +188,17 @@ Template mode MUST fail closed when the account has no valid templates; it MUST 
 - **WHEN** a Facebook account is configured for `template` mode and has valid templates
 - **THEN** the pipeline selects a template body and does not call the Facebook composer for that comment attempt
 
-#### Scenario: Template mode without templates fails closed
-- **WHEN** a Facebook account is configured for `template` mode but has no valid templates
-- **THEN** the pipeline records/returns an honest no-op or compose-skipped outcome and MUST NOT fall back to generated comments
+#### Scenario: Template mode without account templates uses target region
+- **WHEN** a Facebook account's effective mode is `template`, its account templates are empty, and the selected target group has valid common templates for its region
+- **THEN** the pipeline selects a common template for that target region and does not call the Facebook composer
+
+#### Scenario: Missing explicit mode defaults to regional template
+- **WHEN** a Facebook account has no explicit body mode and the selected target group has valid common templates for its region
+- **THEN** the effective mode is `template` and the pipeline selects a regional common template
+
+#### Scenario: Missing regional template fails closed
+- **WHEN** the effective mode is `template`, account templates are empty, and the selected target has no region or no valid common templates for its region
+- **THEN** the pipeline records/returns an honest non-submit outcome and MUST NOT fall back to generated comments
 
 ### Requirement: Template comments use the same safety and contact lanes as generated comments
 
@@ -486,4 +494,114 @@ When the container is invalid, the group feed cannot be opened, the page is bloc
 - **WHEN** first-post opening ends because no candidate hydrated, the selected post has no uniquely bound comment editor, target context mismatches, or Cloud times out waiting for detail
 - **THEN** the result and user-facing receipt preserve the corresponding reason
 - **AND** Cloud MUST NOT report all of those outcomes as “群内未找到合适的可评论帖子”
+### Requirement: First-post scroll settles before candidate probing
 
+For `selection=first_commentable_group_post`, Edge SHALL retain the existing smooth-scroll completion wait and then wait an additional fixed 2 seconds after each bounded same-container downward scroll before probing rendered feed cards for that round. The candidate snapshot returned from the scroll operation MUST be collected after this additional settle interval, not before it.
+
+The initial pre-scroll probe, maximum scroll-round count, exact-group binding, canonical-permalink and comment-affordance eligibility, stop conditions, and honest failure behavior SHALL remain unchanged. The additional wait MUST NOT apply to keyword-search targeting or create a fallback to search.
+
+#### Scenario: Slow first post hydrates during the post-scroll settle
+
+- **WHEN** the first bounded scroll completes and a commentable group post hydrates during the following 2-second settle interval
+- **THEN** Edge probes after the settle and can select that hydrated post in the same scroll round
+- **AND** it does not dispatch the next scroll before that probe
+
+#### Scenario: Every exhausted scroll round remains bounded
+
+- **WHEN** no eligible post appears after the additional settle in a scroll round
+- **THEN** Edge may continue only within the existing fixed maximum scroll-round count
+- **AND** it still returns an honest non-success when no eligible candidate appears
+
+#### Scenario: Keyword search is unaffected
+
+- **WHEN** a Facebook group-comment run has configured search keywords
+- **THEN** it uses the existing search targeting path without the first-post post-scroll settle
+
+### Requirement: Permalinkless first-post targets remain bound to one live group-post container
+
+For empty-keyword Facebook group comments, Edge SHALL continue to prefer the first eligible post that exposes a canonical same-group permalink. When the first eligible hydrated group-feed post has a uniquely associated comment editor but exposes no canonical permalink, Edge SHALL bind that rendered post container, read its context in place, and return a strict Edge-issued first-post target reference instead of reporting `no_candidates`.
+
+The target reference MUST be deterministic from normalized same-container evidence, MUST NOT be represented as a Facebook permalink or post ID, and MUST NOT be derived from an opaque fragment alone. Context extraction, approval identity, editor focus/fill, pre-commit target recheck, submit, and post-submit acknowledgement SHALL all use the same reference. The reference is valid for actuation only while its original page-local binding and keep-open task lease remain intact.
+
+Canonical-permalink and in-place targets MUST NOT silently fall back to each other after selection. The first-post path MUST NOT switch to keyword search, reselect by document order before submit, or advance to a later post because the selected target is deduped or its binding is lost.
+
+When a uniquely associated comment action must be activated before the editor exists, the page router SHALL return a fresh point target and MUST NOT call DOM `click()` as actuation. Native SHALL dispatch real CDP mouse move/press/release events at most once, then require exactly one eligible editor under the same selected target. Dispatch completion without that editor post-state is not success.
+
+#### Scenario: Visible commentable first post has no canonical permalink
+- **WHEN** the group discussion stream hydrates a first eligible post with uniquely bound context and comment editor
+- **AND** every rendered story/timestamp link lacks a canonical group-post permalink
+- **THEN** Edge returns `note.detail` for that same container with a strict first-post target reference
+- **AND** Cloud may compose and approve against that reference without dispatching search or navigating to a fabricated post URL
+
+#### Scenario: Canonical permalink remains the preferred target
+- **WHEN** the first eligible group post exposes a canonical same-group permalink
+- **THEN** Edge uses the existing permalink detail path
+- **AND** it does not replace that canonical identity with an in-place target reference
+
+#### Scenario: Opaque group-root fragment is not promoted to a post identity
+- **WHEN** a rendered timestamp link is the group root plus an opaque fragment
+- **THEN** Edge does not accept that link as a permalink and does not infer a Facebook post ID from the fragment, text, author, media URL, or feed order
+- **AND** any fallback identity remains explicitly typed as an internal first-post target reference
+
+#### Scenario: Context and editor resolve to the same live container
+- **WHEN** Cloud returns the approved comment with the Edge-issued first-post target reference
+- **THEN** Edge resolves the originally bound container, verifies its normalized evidence is unchanged, and requires exactly one eligible editor inside that boundary before typing
+- **AND** it never uses an editor from another post or the document root
+
+#### Scenario: Comment editor requires a trusted pointer activation
+- **WHEN** the selected first post has exactly one eligible comment action but no hydrated editor
+- **THEN** Edge returns that action's fresh coordinates without invoking DOM `click()`
+- **AND** Native dispatches `mouseMoved`, `mousePressed`, and `mouseReleased` through CDP
+- **AND** the workflow proceeds only after the same target exposes exactly one eligible editor
+
+#### Scenario: Real click does not hydrate the selected editor
+- **WHEN** Native dispatches the bounded pointer activation but the same target does not expose a unique eligible editor
+- **THEN** Edge reports an honest non-submit outcome
+- **AND** it does not repeat the click, invoke DOM `click()`, or select another post
+
+#### Scenario: Bound container is replaced during approval
+- **WHEN** Facebook detaches, recycles, or materially changes the bound post container before submit
+- **THEN** Edge reports an honest target-moved or context-mismatch non-submit outcome
+- **AND** it does not re-run first-post selection or comment on the new first rendered post
+
+#### Scenario: Duplicate container evidence is ambiguous
+- **WHEN** more than one rendered post container produces the same fallback reference or the selected boundary contains multiple peer comment editors
+- **THEN** Edge reports an ambiguous target and submits nothing
+
+#### Scenario: In-place acknowledgement remains scoped to the bound post
+- **WHEN** Enter is dispatched through an in-place first-post target
+- **THEN** server acknowledgement is evaluated only within the bound container using the existing own-account and persistence evidence
+- **AND** an optimistic row, editor clearing, or a comment visible under another post does not confirm success
+
+#### Scenario: Cloud rejects opaque references outside first-post selection
+- **WHEN** a search candidate, ordinary `openPost`, or unrelated platform flow supplies a non-canonical target reference
+- **THEN** Cloud rejects it as an invalid target
+- **AND** only the result of the active `first_commentable_group_post` request may introduce the strict first-post reference form
+
+#### Scenario: Deterministic fallback reference preserves dedup
+- **WHEN** the same unchanged permalinkless group post is selected on a later run
+- **THEN** Edge derives the same first-post target reference from its normalized same-container evidence
+- **AND** the existing comment dedup ledger may prevent a repeated comment without pretending the reference is a Facebook post ID
+
+### Requirement: Facebook targeted comments use visible safety quotas without a hidden feature cap
+
+Every automatic Facebook targeted-comment entry point SHALL pass the account's current `RiskController` state and minute/hour/day comment quota. The targeted-comment pipeline MUST NOT apply `AIDCP_FB_COMMENT_DAILY_CAP` or any equivalent hidden feature-local daily veto.
+
+Visible content-schedule enablement and schedule-level planning limits SHALL retain their existing admission role at the schedule entry point. They MUST NOT be reconstructed from `risk_interactions` inside the targeted-comment pipeline. Manual `/comment` override behavior SHALL remain unchanged.
+
+#### Scenario: Automatic targeted comment follows the visible safety policy
+
+- **WHEN** an automatic Facebook targeted comment reaches the write pipeline and the account `RiskController` allows `comment`
+- **THEN** the pipeline continues to its existing session, approval, de-duplication, target and submission gates
+- **AND** no hidden environment daily cap may stop it
+
+#### Scenario: Safety quota rejects before submission
+
+- **WHEN** the account `RiskController` rejects an automatic Facebook comment for a minute, hour or day quota
+- **THEN** Cloud MUST NOT submit the comment and SHALL report the named quota reason without promoting it to success
+
+#### Scenario: Manual override remains explicit
+
+- **WHEN** an authorized operator invokes manual `/comment` through the existing override entry point
+- **THEN** the existing manual override semantics remain unchanged
+- **AND** removing the hidden Facebook cap MUST NOT add a new manual restriction or bypass a non-quota safety gate that the manual contract retains

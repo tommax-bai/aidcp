@@ -21,6 +21,12 @@ The Facebook Native-only adapter SHALL implement only commands covered by the Fa
 
 The Native Facebook session SHALL distinguish canonical cards, visible unreportable articles, loading, explicit empty, and exhausted Feed states. It SHALL use loading-aware card-set settling, continue downward for up to the established bounded rounds when visible articles lack trusted permalinks, filter canonical identities already reported by that session, and report `feed_exhausted` only after the established no-growth, near-bottom, consecutive-confirmation evidence. It MUST NOT authorize or perform a Reels transition merely because the current viewport has no reportable permalink.
 
+The bounded terminal taxonomy SHALL be identical for the startup Feed scan and for every Cloud-commanded Feed scroll. When a commanded scroll exhausts its bounded rounds without producing a reportable card, the Native session SHALL apply the same evidence ladder the startup scan applies before falling back to a bare no-target result: a confirmed home surface carrying physical card evidence, not loading and not blocked, SHALL be reported as the present-but-unreportable list state; an otherwise confirmed empty home SHALL be reported as the explicit empty list state. Only when neither ladder rung holds MAY the session return the loading / continuation-unconfirmed / no-target classification. A commanded scroll MUST NOT return a terminal result that leaves the account on the same viewport with no Cloud-consumable observation, because the sole remaining recovery would be the Cloud idle watchdog.
+
+Loading-aware card-set settling SHALL treat a zero-card viewport as unsettled. The settle loop MAY return early only once it has observed at least one extractable card in a stable, non-loading sample; a viewport that is merely stable at zero cards SHALL keep polling until its bounded budget is spent, so that lazy-loaded batches have time to render between scrolls.
+
+This requirement adds no new receipt reason code and no new protocol field: the present-but-unreportable and explicit-empty observations reuse the existing zero-card `page.cards` list states that Cloud already consumes.
+
 #### Scenario: Visible unreportable first viewport continues in Feed
 
 - **WHEN** the initial Facebook Feed viewport contains visible hydrated articles but no trusted canonical permalink and a later bounded viewport contains a canonical card
@@ -40,6 +46,31 @@ The Native Facebook session SHALL distinguish canonical cards, visible unreporta
 
 - **WHEN** a scroll command finds no new canonical cards
 - **THEN** Native reports `feed_exhausted` only after document height stops growing, the page is near the bottom, and that state is confirmed in consecutive rounds
+
+#### Scenario: Commanded scroll exhausting its rounds over physical cards reports present-but-unreportable
+
+- **WHEN** a Cloud-commanded Feed scroll spends all of its bounded rounds without a reportable card, and the final observation is a confirmed home surface that still carries physical card evidence, is not loading, and is not login/captcha/consent blocked
+- **THEN** Native reports a zero-card `page.cards` observation carrying the present-but-unreportable list state, exactly as the startup Feed scan does, and does not return a bare no-target receipt
+
+#### Scenario: Commanded scroll exhausting its rounds over a confirmed empty home reports explicit empty
+
+- **WHEN** a Cloud-commanded Feed scroll spends all of its bounded rounds without a reportable card, the final observation carries no physical card evidence, and the existing stable explicit-empty confirmation succeeds
+- **THEN** Native reports a zero-card `page.cards` observation carrying the explicit empty list state and does not return a bare no-target receipt
+
+#### Scenario: Blocked or non-home exhaustion keeps today's honest failure
+
+- **WHEN** a commanded scroll exhausts its rounds while the final observation is loading, login-like, captcha-like, consent-blocked, off the home surface, or carries no physical card evidence and fails explicit-empty confirmation
+- **THEN** Native returns the existing honest failure classification, reports neither present-but-unreportable nor explicit empty, and never transitions to Reels through this path
+
+#### Scenario: Zero-card viewport is not settled by stability alone
+
+- **WHEN** two consecutive settle samples of a non-loading viewport both extract zero cards
+- **THEN** Native keeps polling until the bounded settle budget is spent instead of returning immediately, so a lazy-loaded batch arriving later in the budget is still observed
+
+#### Scenario: A settled non-empty card set still returns early
+
+- **WHEN** two consecutive settle samples of a non-loading viewport extract the same non-empty card set
+- **THEN** Native returns that sample immediately without spending the remainder of the settle budget
 
 ### Requirement: Native navigation preserves the active Facebook list surface
 
@@ -203,4 +234,58 @@ Native 完成一次 feed 面就地读后 SHALL 按读到的正文长度（叠当
 
 - **WHEN** 就地读在极短时间内完成
 - **THEN** Native 仍补足 read floor 后才发出下一条 `page.scroll`
+
+### Requirement: Native Facebook production dependencies exclude retired page-rule modules
+
+The Edge production distribution SHALL keep Native Facebook orchestration dependencies separate from retired TypeScript Facebook page executors and injected JavaScript page-rule bundles. Shared pure helpers, including canonical post-identity parsing and presentation classification, MUST be provided from a module whose transitive dependency graph does not import those retired page-rule modules. Compatibility exports for development-only consumers MUST NOT make the mixed legacy façade reachable from Native production orchestration.
+
+#### Scenario: Native orchestration shares post identity without shipping legacy rules
+
+- **WHEN** the production Edge TypeScript distribution is built after Native Facebook browse orchestration imports canonical Reel or Feed-video identity helpers
+- **THEN** the build succeeds with the helper behavior preserved and the production graph contains none of the forbidden migrated Facebook page-rule JavaScript modules
+
+#### Scenario: A pure helper import reintroduces a legacy dependency
+
+- **WHEN** a Native production module transitively imports a retired Facebook page executor or injected JavaScript rule bundle through a shared helper
+- **THEN** production distribution verification fails instead of allowlisting or silently shipping that dependency
+
+### Requirement: Native Feed card discovery covers non-semantic layouts
+
+Facebook serves Feed layouts that expose neither a `role="feed"` container nor hydrated `role="article"` cards. The Native Facebook session SHALL NOT depend on those semantic roles alone to find Feed cards. It SHALL additionally discover cards by seeding from post-body markers and walking outward to the nearest ancestor that carries an author link, treating that ancestor as the card boundary. Seeds already inside a semantic Feed container SHALL be left to the semantic path. Discovered candidates SHALL be reduced to outermost elements only, ordered by document position, and merged with the semantic result so that one post never yields two cards.
+
+Discovery MUST remain evidence-bound: when no ancestor carrying an author link is found, the seed SHALL yield no card. The session MUST NOT promote the page body, the main region, or any container lacking author evidence into a card, and MUST NOT borrow a neighbouring card's author or identity.
+
+#### Scenario: Layout without a semantic feed container still yields cards
+
+- **WHEN** the home Feed renders no `role="feed"` container and its only `role="article"` elements are unhydrated shells, while post-body markers with author links are present
+- **THEN** Native discovers one card per post-body marker at its author-bearing ancestor and reports those cards through the normal Feed path
+
+#### Scenario: Semantic layout is unchanged
+
+- **WHEN** the home Feed renders a semantic Feed container with hydrated article cards
+- **THEN** Native reports exactly the cards the semantic path already produced, and the fallback discovery contributes no duplicate for the same post
+
+#### Scenario: Nested candidates collapse to the outermost card
+
+- **WHEN** a shared or quoted post produces a post-body marker nested inside another discovered card
+- **THEN** only the outermost card survives, so one post never yields two cards and identities are never attributed across card boundaries
+
+#### Scenario: A seed without author evidence yields nothing
+
+- **WHEN** a post-body marker has no ancestor carrying an author link before reaching the document body
+- **THEN** Native discovers no card for that seed and neither fabricates a boundary nor falls back to a page-level container
+
+### Requirement: Physical Feed card evidence requires hydration
+
+The Native Facebook session SHALL count a Feed card as physical card evidence only when that card is hydrated — that is, it carries an author link or a post-body marker. Visibility and layout height alone MUST NOT qualify. Virtualized placeholder shells, which Facebook renders with reserved height but no content, MUST NOT be counted as physical cards and MUST NOT, on their own, justify the present-but-unreportable observation that authorizes a Reels transition.
+
+#### Scenario: Placeholder shells do not count as physical cards
+
+- **WHEN** the only card-shaped elements on a confirmed home Feed are virtualized placeholders with reserved height, no author link, and no post-body marker
+- **THEN** Native reports zero physical cards, and the present-but-unreportable path is not taken on that evidence
+
+#### Scenario: Hydrated but unidentifiable cards still count
+
+- **WHEN** a card carries an author link or post-body marker but exposes no acceptable post permalink
+- **THEN** Native counts it as physical card evidence and the existing present-but-unreportable observation remains available
 
