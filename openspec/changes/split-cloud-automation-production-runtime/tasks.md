@@ -75,10 +75,24 @@
   与 `getTextCardContext?` 都用 `?.` 调用（`:153` / `:182`）。换成 HTTP 客户端后**少实现一个方法
   编译通过、运行不报**——少 `getTextCardContext` 则缓存恒空、每篇图文帖重跑视觉转写（纯成本爆炸、
   零错误信号）。端口面 MUST 显式声明可选能力的在场与否。
-- [ ] 0.7 落实 B1 的归属改判：先改控制仓 `docs/cloud-service-decomposition-proposal.md` §4.x
+- [x] 0.7 落实 B1 的归属改判：先改控制仓 `docs/cloud-service-decomposition-proposal.md` §4.x
   （**归属的唯一事实源**），再手工 Edit 增量追加 `boundaries/ownership-rules.json`，
   最后 `npm run boundaries:refresh` 生成派生物；MUST NOT 直接手改生成物，
   MUST NOT 脚本整体重序列化规则表（CLAUDE §8.2）。
+  <!-- 2026-07-29 事实源新增 §7.2.1（判据三的四个角色改判 automation，persona_generator 不在范围内）；
+       ownership-rules.json 手工 Edit 六条 fileOverride：四个角色 + content-role.ts 由 content 改
+       automation，另新增 curated-gate.ts 的点名（src/publish-agent/ 目录默认 content，必须逐文件点名）。
+       改判闭包实测：content-role.ts 的消费者恰好只有那四个角色（persona-generator 与
+       cover-form-sensor 的命中都只是注释，已逐条核过）。boundaries:refresh 待并行流的新 kernel
+       文件归属条目补齐后统一刷一次。 -->
+- [ ] 0.7a **改判的连带项：角色名合同测试会横跨两个属主。**
+  `test/agents/content-role-names.test.ts` 同时引用四个改判角色与 `PersonaGenerator`（留 content），
+  改判后它按 import 派生就成了跨属主测试、**留守 cloud，两个派生仓都不跑它**。
+  那道闸守的是「角色名写错一个字母 → 调度器按名字查不到模型配置 → 静默用默认模型跑、零日志」，
+  **不能就这么失效**。按属主拆成两份，或明确记录它为何留守。
+- [ ] 0.7b **同步时需要 `--prune`**：四个角色 + `content-role.ts` + `curated-gate.ts` 要从
+  `aidcp-content/src` 移除、进 `aidcp-automation/src`。`sync-split-repos` 默认只报不删，
+  **必须显式 `--prune`**，否则 content 仓会同时留着旧副本（两份实现，本项目点名的失败形态）。
 - [ ] 0.8 落实 A1：模型出口进 `aidcp-transport`。核对准入判据实跑一遍
   （`test/acceptance/module-boundary.test.ts` 的真正则，别凭记忆用「四条硬禁」），
   再按 kernel → transport → 三个业务仓的顺序快进 pin。

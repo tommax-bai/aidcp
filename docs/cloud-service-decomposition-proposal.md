@@ -1286,6 +1286,60 @@ aidcp-automation → aidcp-api       ExecutionDispatched
 | 发布生成段 | `src/publish-agent/` 54 文件 10723 行（清单见 §4.6.3） | 生成与下发已由既有 change 切开，接缝现成（`publish-dispatcher.ts:1-16`） |
 | 微信回复 AI 段 | `src/interactions/reply-ai.ts`（248 行） | 意图分类、风险复核与润色，输入输出闭合，非会话绑定 |
 
+#### 7.2.1 判据三的四个角色已改判 `aidcp-automation`（用户 2026-07-29 裁定 · change `split-cloud-automation-production-runtime`）
+
+> **改判范围**：判据三名单里的前四个——`curated_note_evaluator` / `curated_comment_evaluator` /
+> `concept_extractor` / `valuable_comment_archivist`。**`persona_generator` 不在改判范围内**
+> （它是命令式、非会话绑定的，判据三对它的依据依然成立）。发布生成段与微信回复 AI 段同样不变。
+
+**为什么原判据在拆仓后不成立**：判据三给出的可切依据（「产物落精选库」「旁路写概念池」「无动作输出」）
+说的都是这四个角色的**输出**——那部分判断今天仍然对，它们确实不回灌动作链。
+但它们的**输入**是 `aidcp-automation` 的**进程内事件总线**（订阅 `note.detail.arrived` /
+`comment_like.confirmed` / 图片快照等浏览闭环事件），而拆仓后这些事件不跨进程：
+系统里没有跨进程事件总线，且「在 content 侧另起第二个角色调度器 + 造跨进程事件总线」这条路
+已在本 change 的 design 里被否掉（与「浏览闭环由单一调度器驱动、角色间纯靠进程内总线接力」正面冲突）。
+
+**还有一条端口修不了的形态**：这四个角色是经 `CONTENT_ROLE_FACTORIES`
+（`aidcp-cloud/src/server.ts:108-123`）以**一张工厂函数表**注入角色调度器的，
+即它们是调度器的**构造输入**而不是被调用的服务。**HTTP 端口包不了工厂函数。**
+这与 §10.7（发帖调度器归 automation）是同一类岔口，判据可直接复用：
+**端口修不了「同时需要两个对象」的守卫，也修不了「需要一个工厂函数」的构造。**
+
+**连带迁移的三个文件（闭包，实测逐文件核过 import 与消费者）**：
+
+| 文件 | 原属 | 为何必须一起走 | 迁移代价 |
+| --- | --- | --- | --- |
+| `src/agents/content-role.ts` | content | 四个角色的**公共基类**，消费者恰好只有这四个 | **零**——它的 import 全部指向 kernel，换层不产生任何新的跨层边（与 §10.7 那条「零代价机械依据」同形） |
+| `src/publish-agent/curated-gate.ts` | content | 两个 evaluator 值引用它的共鸣预筛与配置解析 | **零**——该文件零 import |
+| （不迁）`src/publish-agent/text-card-transcriber.ts` | content | 见下 | — |
+
+**文字卡转写器不随迁（同批裁定，方案 A）**：`curated_note_evaluator` 有一个**可选**的图内文字转写依赖。
+实测推翻了「一并改判」：转写器依赖的封面形态感知模块是**真·双段共用**——
+组装根在 content 段与 automation 段**各建了一个实例**（`src/server.ts:3664` 与 `:6479`），
+另有发布链封面卡撰写角色与图片形态画像两个 content 消费者。
+搬它会当场打断 content，复制它则两份实现各自编译通过、只有真跑才对不上。
+**落点**：转写器留 content，automation 侧经 content 的内部调用口使用；
+其**窄接口与两个纯函数**（`orderedTextCardTexts` / `mergeBodyWithTextCardTranscription`）抬进 kernel，
+使两侧共用一份定义。
+
+**连带的写口义务**：这四个角色改判后仍然写 content 属主表（概念池 / 精选库），
+按 §5.1 单一写入者，这些写 MUST 经 content 的窄端口，MUST NOT 由 automation 直连 content 属主库。
+**判据五对它们照常适用**：模型用量 MUST 经上报路径回到 `aidcp-content`，MUST NOT 直写用量表。
+
+**顺带消掉两条谁都没记的边**（这是改判正确性的额外证据，非改判目的）：
+① `resolveCuratedGateConfig` 在 segC 的 `src/server.ts:7225` 被调用，而它属 content、
+automation 仓里没有这个文件——任何 blocker 台账都没记它，随 `curated-gate.ts` 迁移后就地消失；
+② `valuable_comment_archivist` 归档的 `valuableCommentStore`
+（`src/cache/valuable-comment-store.ts`）属主是 **automation**，即今天存在一条
+「content 角色写 automation 属主表」的**反方向**边，同样未被任何台账记录，改判后一并消失。
+
+**§4.7 主表的还原义务**：本节改判使 `src/agents/` 目录的 content/automation 分格发生变化
+（content 5 → 2：`persona-generator.ts` 与 `content-role.ts` 之外的四个角色转出，
+而 `content-role.ts` 本身也转出，故实际 content 剩 `persona-generator.ts` 1 个 + 原 api 2 个不变）。
+按 §4.7 的口径纪律，**主表逐格留待整表重算时并入，此处不逐格改写**；
+机械事实源以 `aidcp-cloud/boundaries/ownership-rules.json` 的 `fileOverrides` 为准，
+且该表是本节的**转写**而非事实源（CLAUDE §8.1）。
+
 **判据四（本阶段不迁）**：浏览闭环的 L1/L2 实时判断本阶段 MUST NOT 迁出 `aidcp-automation`。原因是可核对的：这些角色的构造参数直接注入会话预算、当日配额、冷却、风控解释与会话上下文，两个还反向写会话状态。名单为 `interaction_appraiser`、`content_evaluator`、`comment_appraiser`、`comment_like_appraiser`、`follow_agent`、`content_curator`、`comment_reviewer`、`author_evaluator`、`search_evaluator` 共 9 个，加上判据二点名的 `facebook_group_join_judge`。它们的「评估段 / 预闸段」切分是一次独立的行为变更，MUST 由单独的 OpenSpec change 承载并真机对账，MUST NOT 作为仓库拆分的前置条件，也 MUST NOT 被当作搬文件处理。
 
 **判据五（例外条款的连带义务）**：按本节留在 `aidcp-automation` 的模型调用，其用量 MUST 经上报路径回到 `aidcp-content`（见 §4.6.6），MUST NOT 直写用量表。
