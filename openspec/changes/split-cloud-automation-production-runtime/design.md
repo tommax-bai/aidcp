@@ -221,6 +221,20 @@ automation 侧需要新增 `AIDCP_CONTENT_URL` 与 `AIDCP_CONTENT_INTERNAL_TOKEN
 **A 与「§10.7 端口修不了工厂函数」不矛盾**：那条判据针对的是「构造输入」与「同时需要两个对象的守卫」。
 转写器两者都不是——它是一次输入图片、输出转写结果的调用，**天然可包成 RPC**。
 
+### 2.6 content 内部 HTTP 服务端的既有形态（岔口 C 的模板，实测于 `aidcp-content/src/server.ts:868-893`）
+
+四组路由的注册纪律已经写在代码里，照它扩即可：
+一个 `InternalHttpServer` + 一个 `registered[]` 清单，**每组独立注册**，
+初始化失败的那组走 `else console.warn(...)` 具名跳过、**不连带关闭其它组**，
+最后把实际注册成功的组名一起打进启动日志（「声称注册了什么」与「实际注册了什么」不分家）。
+
+**但有一处 MUST NOT 照抄**：现有四组里只有 persona 那组带内部令牌与部署 target
+（`registerPersonaGeneratorCommandRoutes(httpServer, authority, contentInternalToken, deploymentTarget)`），
+**精选库那组是裸的**（`registerCuratedContentRoutes(httpServer, curatedContentStore)`，
+无 Bearer、无信封）——它是更早期的形态。
+**本 change 新增的写口一律按 persona 那组的形状**：带内部令牌、带 target 且**由服务端注入 target**，
+MUST NOT 由调用方选择 target。
+
 ## 3. 落地形态（裁决后）
 
 - content 属主写口一律**只报真态**：写了几行就返回几行，失败按结构化原因返回。
