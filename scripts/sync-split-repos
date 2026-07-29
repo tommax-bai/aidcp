@@ -434,25 +434,106 @@ FIXTURE_DIR_RE = re.compile(
 )
 BIZ_LAYERS = ('api', 'automation', 'content')
 
+# 归属的第二类判据：**测试还会按路径直接读仓里的文件**，而路径读没有 import 边可推。
+# 实测三种形态，只按 import 判归属时全部会被派到读不到目标文件的仓里：
+#   ① `new URL('../../migrations/0094_x.sql', import.meta.url)` —— 读的是**别属主**的迁移；
+#   ② `` new URL(`../../migrations/${name}`, ...) `` —— 字面前缀只到目录，实际读整个 migrations/；
+#   ③ `` new URL(`../../${rel}`, ...) `` / 读 `src/server.ts` —— 全仓扫描或读**组装根**。
+# 后果不是「同步搬坏了」而是「归属本身判错」：搬过去必红，且红在文件缺失上、看着像同步的锅。
+# 判据与 import 完全一致 —— 触到的属主超过一个就留守 cloud，不强行分配。
+PATH_LITERAL_RE = re.compile(r"""['"`](\.{1,2}/[^'"`\n$]*)""")
+# 组装根按设计**从不同步**（各仓自己写 main()），所以任何按路径读它的测试在派生仓里
+# 永远读不到对应内容 —— 这类测试不是「暂时跨属主」，是**结构上不可派生**，一律留守。
+COMPOSITION_ROOT_FILES = ('src/server.ts', 'src/index.ts')
+
 
 def _resolve(spec: str, from_file: str) -> str:
     p = os.path.normpath(os.path.join(os.path.dirname(from_file), spec))
     return p[: -len('.js')] + '.ts' if p.endswith('.js') else p
 
 
-def classify_tests(own: dict[str, str], ref: str) -> tuple[dict[str, str], dict[str, list[str]]]:
-    """返回 (测试路径 → 归属仓 or None, 归属仓 → 测试清单)。None = 跨属主，留守 aidcp-cloud。"""
+def file_presence(
+    path: str, own: dict[str, str], mig_scopes: dict[str, set[str]]
+) -> set[str] | None:
+    """这个文件最终会出现在哪些属主的仓里。None = 不构成约束（仓外文件 / 每个仓各有一份）。"""
+    layer = own.get(path)
+    if layer:
+        return {layer}
+    if path.startswith(MIGRATIONS_DIR + '/'):
+        name = os.path.basename(path)
+        return {o for o in BIZ_LAYERS if name in mig_scopes.get(o, ())}
+    return None
+
+
+def path_read_candidates(
+    text: str,
+    from_file: str,
+    tracked: list[str],
+    own: dict[str, str],
+    mig_scopes: dict[str, set[str]],
+    import_specs: set[str],
+) -> tuple[set[str] | None, bool]:
+    """字面路径读 → (还剩哪些属主读得到全部被读文件, 是否读了组装根)。
+
+    **与 import 是两种语义，不能混算**：import 说的是「需要谁的代码」（并集必须收敛到一个属主），
+    路径读说的是「需要哪些文件在场」（能容纳它的属主取交集）。早先把两者混成一个并集，
+    于是一条只读 automation 自己两条迁移的测试，会因为其中一条迁移**同时**属于 api
+    而被判成跨属主 —— 白白丢掉一批本来派得下去的测试。
+
+    字面串可能只是**前缀**（模板拼接到 `${` 为止），此时按目录处理：测试可能读到该目录下任意一个，
+    所以要求属主同时具备全部。`../../` 即仓根，于是「全仓扫描」自然收敛到空集、如实留守。
+    """
+    candidates: set[str] | None = None
+    for m in PATH_LITERAL_RE.finditer(text):
+        spec = m.group(1)
+        if spec in import_specs:
+            continue  # import 说明符另有判据，别在这里重复推导
+        target = os.path.normpath(os.path.join(os.path.dirname(from_file), spec))
+        if target == '.':
+            target = ''
+        if target.startswith('test/'):
+            continue  # 测试自带的 helper / fixture 由 test_local_deps 负责
+        if target in tracked:
+            if target in COMPOSITION_ROOT_FILES:
+                return None, True
+            hits = [target]
+        else:
+            prefix = (target + '/') if target else ''
+            hits = [p for p in tracked if p.startswith(prefix)]
+        for path in hits:
+            present = (
+                set() if path in COMPOSITION_ROOT_FILES
+                else file_presence(path, own, mig_scopes)
+            )
+            if present is None:
+                continue
+            candidates = present if candidates is None else (candidates & present)
+    return candidates, False
+
+
+def classify_tests(
+    own: dict[str, str], ref: str, mig_scopes: dict[str, set[str]]
+) -> tuple[dict[str, str], dict[str, list[str]], int, int]:
+    """返回 (测试路径 → 归属仓 or ''，归属仓 → 测试清单，读组装根条数，路径读不落地条数)。
+
+    '' = 跨属主或不可派生，留守 aidcp-cloud。
+    """
     listing = git(CLOUD, 'ls-tree', '-r', '--name-only', ref).split()
     tracked = set(listing)
+    tracked_list = sorted(tracked)
     tests = [f for f in listing if f.startswith('test/') and f.endswith('.ts')]
     verdict: dict[str, str] = {}
     by_repo: dict[str, list[str]] = {}
+    root_readers = 0
+    unreachable_reads = 0
     for t in tests:
         entry_text = git(CLOUD, 'show', f'{ref}:{t}')
         if 'aidcp:test-owner=cloud' in entry_text:
             verdict[t] = ''
             continue
         layers = set()
+        candidates: set[str] | None = None
+        reads_root = False
         # Test helpers can import owner source that the entry itself never
         # mentions. Classify the complete local-test dependency closure so a
         # helper cannot smuggle API/content modules into a derived repo.
@@ -460,25 +541,45 @@ def classify_tests(own: dict[str, str], ref: str) -> tuple[dict[str, str], dict[
             if not dep.endswith('.ts'):
                 continue
             text = git(CLOUD, 'show', f'{ref}:{dep}')
+            specs = set()
             for m in IMPORT_RE.finditer(text):
                 spec = m.group(1)
+                specs.add(spec)
                 if not spec.startswith('.'):
                     continue
                 layer = own.get(_resolve(spec, dep))
                 if layer:
                     layers.add(layer)
+            reachable, hit_root = path_read_candidates(
+                text, dep, tracked_list, own, mig_scopes, specs
+            )
+            if hit_root:
+                reads_root = True
+                break
+            if reachable is not None:
+                candidates = reachable if candidates is None else (candidates & reachable)
+        if reads_root:
+            verdict[t] = ''
+            root_readers += 1
+            continue
         biz = layers & set(BIZ_LAYERS)
         if len(biz) == 1:
             only = next(iter(biz))
             repo = next(r for r, l in REPOS.items() if l == only)
         elif not biz and 'kernel' in layers:
-            repo = KERNEL_REPO
+            only, repo = 'kernel', KERNEL_REPO
         else:
             verdict[t] = ''  # 跨属主或与 src 无关：留守
             continue
+        # import 定了「该去哪个仓」，路径读定了「那个仓读不读得到它要的文件」。
+        # 后者不满足时搬过去必红，且红在文件缺失上 —— 看着像同步搬坏了，其实是归属判错。
+        if candidates is not None and only not in candidates:
+            verdict[t] = ''
+            unreachable_reads += 1
+            continue
         verdict[t] = repo
         by_repo.setdefault(repo, []).append(t)
-    return verdict, by_repo
+    return verdict, by_repo, root_readers, unreachable_reads
 
 
 def test_local_deps(ref: str, entry: str, seen: set[str], tracked: set[str]) -> set[str]:
@@ -661,7 +762,9 @@ def main() -> int:
 
     if args.tests:
         selected_test_repos = set(REPOS) if not args.repo else set(args.repo) & set(REPOS)
-        exit_code = sync_tests(args, own, kernel_paths, selected_test_repos) or exit_code
+        exit_code = sync_tests(
+            args, own, kernel_paths, mig_scopes, selected_test_repos
+        ) or exit_code
 
     if exit_code and not args.apply:
         print('存在差异。--apply 可同步（组装根除外）；组装根的差异须人工判断。')
@@ -712,15 +815,27 @@ def sync_transport(args, own, kernel_paths, shared_heads) -> int:
     return 1 if drift else 0
 
 
-def sync_tests(args, own, kernel_paths, selected_repos: set[str]) -> int:
+def sync_tests(args, own, kernel_paths, mig_scopes, selected_repos: set[str]) -> int:
     """按派生归属对账 / 同步 test/。跨属主的测试**留守 aidcp-cloud**，不强行分配。"""
-    verdict, by_repo = classify_tests(own, args.ref)
+    verdict, by_repo, root_readers, unreachable_reads = classify_tests(
+        own, args.ref, mig_scopes
+    )
     tracked = set(git(CLOUD, 'ls-tree', '-r', '--name-only', args.ref).split())
     stay = sum(1 for v in verdict.values() if not v)
-    print(f'=== test/ 归属（由 import 派生，共 {len(verdict)} 个文件）===')
+    print(f'=== test/ 归属（由 import + 字面路径读派生，共 {len(verdict)} 个文件）===')
     for repo in sorted(by_repo):
         print(f'  {repo:20s} {len(by_repo[repo]):4d}')
     print(f'  {"（跨属主·留守 cloud）":20s} {stay:4d}  ← 每消掉一条跨服务耦合，这里就自动少几个')
+    if root_readers:
+        print(
+            f'  {"其中读组装根·不可派生":20s} {root_readers:4d}'
+            '  ← 组装根从不同步，这类测试在派生仓里永远读不到，属结构性留守'
+        )
+    if unreachable_reads:
+        print(
+            f'  {"其中路径读落在别属主":20s} {unreachable_reads:4d}'
+            '  ← import 指向本仓、却按路径读别属主的文件，搬过去必红'
+        )
     drift = 0
     for repo, entries in sorted(by_repo.items()):
         if repo not in selected_repos:
@@ -762,6 +877,10 @@ def sync_tests(args, own, kernel_paths, selected_repos: set[str]) -> int:
             f'  {repo}: 新增 {len(add)} · 内容不同 {len(changed)} · 多出 {len(remove)}'
             f' · 派生私有 {len(derived_private)}'
         )
+        # 「多出」在 test/ 这里几乎总是**归属判定变了**（某条测试被重判为跨属主 / 不可派生），
+        # 而 --prune 对 test/ 是禁用的 —— 不点名就只剩一个数字，那个数字看不出该删哪一个。
+        for rel in remove[:20]:
+            print(f'   ? 多出 {rel}（归属已变，--tests 不自动删，请人工确认后删除）')
         if args.apply:
             for rel in add + changed:
                 want = git(CLOUD, 'show', f'{args.ref}:{rel}')
