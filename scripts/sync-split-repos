@@ -250,7 +250,9 @@ for (const owner of ['api', 'automation', 'content']) {
   // 派生仓的启动契约 = 把单体那个「三家并集」的下限收窄到该属主自己的版本集上。
   // 这正是 narrowSchemaContract 存在的理由（它的注释点名了 content 库会被假 behind/ahead 判定），
   // 所以这里调它，不在 Python 侧复刻 —— 复刻过一次，当场差了 1 条。
-  out._narrowed[owner] = narrowSchemaContract(scopes[owner].known, REQUIRED_SCHEMA_VERSION).required;
+  // 两个值 MUST 一起收窄。只窄 required 会让 knownMax 停在三家并集的最大版本，
+  // 而派生仓的 migrations/ 里根本没有那一条 —— 「已知最高版本 ≠ 目录里的最高版本」当场破。
+  out._narrowed[owner] = narrowSchemaContract(scopes[owner].known, REQUIRED_SCHEMA_VERSION);
 }
 console.log(JSON.stringify(out));
 """
@@ -322,6 +324,7 @@ def rewrite_kernel_imports(text: str, kernel_paths: set[str], src_file: str) -> 
 
 
 SCHEMA_VERSION_RE = re.compile(r"export const REQUIRED_SCHEMA_VERSION = '(?P<v>[^']+)';")
+SCHEMA_KNOWN_MAX_RE = re.compile(r"export const KNOWN_MAX_SCHEMA_VERSION = '(?P<v>[^']+)';")
 
 
 def derived_schema_version(scopes: dict, layer: str) -> str:
@@ -337,35 +340,45 @@ def derived_schema_version(scopes: dict, layer: str) -> str:
     transport 三个目标一个都没对账**，默认跑法看着却像跑完了。锚点选错的代价不是这一行
     改写失效，是整轮对账静默缩水到 1/5。
     """
-    narrowed = scopes.get('_narrowed') or {}
-    version = narrowed.get(layer)
-    if not version:
+    narrowed = (scopes.get('_narrowed') or {}).get(layer) or {}
+    required, known_max = narrowed.get('required'), narrowed.get('knownMax')
+    if not required or not known_max:
         raise RuntimeError(
             f'无法为 {layer} 取得收窄后的启动契约版本。'
             f'（权威实现跑不起来时上游返回 {{}}，此时 MUST 停手 —— '
             f'照抄单体版本会让派生仓断言一条它不发的迁移。先修 npx tsx 再来。）'
         )
-    return version
+    return required, known_max
 
 
-def rewrite_schema_contract(text: str, scopes: dict[str, set[str]], layer: str) -> str:
-    """把启动契约版本改写成该派生仓自己的最高属主迁移（幂等、可复现）。"""
-    m = SCHEMA_VERSION_RE.search(text)
-    if not m:
-        raise RuntimeError(
-            'schema-contract 里找不到 REQUIRED_SCHEMA_VERSION 声明 —— 文件形状变了，'
-            '先人工复核再改本脚本（这一条 MUST 响亮失败：静默跳过＝派生仓拿到单体版本）'
+def rewrite_schema_contract(text: str, scopes: dict, layer: str) -> str:
+    """把启动契约的两个版本常量都收窄到该派生仓自己的属主范围（幂等、可复现）。
+
+    **两个 MUST 一起改。** 只改下限、留着三家并集的「已知最高版本」，该仓的
+    `migrations/` 里根本没有那一条 —— 「已知最高版本 ＝ 目录里的最高版本」这条不变量当场破，
+    而它恰恰是「新增迁移后没抬版本号」的守卫。实测：只收窄 required 时 automation 从 6 红涨到 14 红。
+    """
+    required, known_max = derived_schema_version(scopes, layer)
+    for pattern, name, value in (
+        (SCHEMA_VERSION_RE, 'REQUIRED_SCHEMA_VERSION', required),
+        (SCHEMA_KNOWN_MAX_RE, 'KNOWN_MAX_SCHEMA_VERSION', known_max),
+    ):
+        m = pattern.search(text)
+        if not m:
+            raise RuntimeError(
+                f'schema-contract 里找不到 {name} 声明 —— 文件形状变了，'
+                '先人工复核再改本脚本（这一条 MUST 响亮失败：静默跳过＝派生仓拿到单体版本）'
+            )
+        if m.group('v') == value:
+            continue
+        derived = (
+            f'// Derived {layer} checkout: this repo only ships {layer}-owned migrations, so the\n'
+            f'// start-up contract is narrowed to its own scope. Machine-derived on every sync by\n'
+            f'// scripts/sync-split-repos:derived_schema_version — do not hand-edit.\n'
+            f"export const {name} = '{value}';"
         )
-    version = derived_schema_version(scopes, layer)
-    if m.group('v') == version:
-        return text
-    derived = (
-        f'// Derived {layer} checkout: this repo only ships {layer}-owned migrations, so its\n'
-        f'// start-up contract is pinned to its own highest one. Machine-derived on every sync\n'
-        f'// by scripts/sync-split-repos:derived_schema_version — do not hand-edit.\n'
-        f"export const REQUIRED_SCHEMA_VERSION = '{version}';"
-    )
-    return text[: m.start()] + derived + text[m.end():]
+        text = text[: m.start()] + derived + text[m.end():]
+    return text
 
 
 def rewrite_repo_source(
