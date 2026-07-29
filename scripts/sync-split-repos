@@ -39,6 +39,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 # 隔离 worktree 下脚本位于 .../codes/aidcp.wt/<change>/scripts；仅按 __file__ 回退两层会误把
 # .../codes/aidcp.wt 当成仓库父目录。显式根只影响路径解析，不改变 ref、成员或同步判据。
@@ -228,7 +229,12 @@ def migration_owner_scopes(ref: str) -> dict[str, set[str]]:
     「同一条迁移在不同仓算不同属主，而两侧都编译通过、测试都过，只有真跑迁移才炸。」
     所以这里跑 `tsx` 直接 import `aidcp-cloud/src/schema/`，一份规则、一个结果。
     """
-    script = os.path.join(CLOUD, '.sync-migration-scopes.mts')
+    # 入口必须落在 CLOUD 里（body 用相对路径 import `./src/schema/`），但**路径必须唯一**：
+    # 原先写死成 `.sync-migration-scopes.mts` 并在 finally 无条件删除，两个进程并跑时
+    # 一方的清理会删掉另一方的入口 —— 表现为随机的 ERR_MODULE_NOT_FOUND + 迁移对账被跳过，
+    # 而「跳过」只打一行警告、退出码不变，看着像对账过了。
+    fd, script = tempfile.mkstemp(dir=CLOUD, prefix='.sync-migration-scopes-', suffix='.mts')
+    os.close(fd)
     body = """
 import { loadMigrationFiles } from './src/schema/migration-files.js';
 import { loadMigrationOwnerScopes } from './src/schema/migration-owners.js';
@@ -308,26 +314,63 @@ def rewrite_kernel_imports(text: str, kernel_paths: set[str], src_file: str) -> 
     )
 
 
+SCHEMA_VERSION_RE = re.compile(r"export const REQUIRED_SCHEMA_VERSION = '(?P<v>[^']+)';")
+
+
+def derived_schema_version(scopes: dict[str, set[str]], layer: str) -> str:
+    """派生仓的启动契约版本 ＝ **它自己真正随仓发的**最高那条迁移。
+
+    单体的 `REQUIRED_SCHEMA_VERSION` 是三个属主库合起来的最高版本；派生仓照抄，
+    就会在启动自检里断言一条它根本不发的迁移。
+
+    **MUST NOT 把某个版本串写死。** 这里曾经写死过：改写规则拿当时云端的
+    `0076_config_mirror_bump_inbox` 当「必须存在的源标记」，云端走到 `0097` 后当场
+    RuntimeError —— 而且崩在字母序第二个仓（automation），**后面 content / kernel /
+    transport 三个目标一个都没对账**，默认跑法看着却像跑完了。锚点选错的代价不是这一行
+    改写失效，是整轮对账静默缩水到 1/5。
+    """
+    owned = scopes.get(layer) or set()
+    if not owned:
+        raise RuntimeError(
+            f'无法为 {layer} 推导启动契约版本：迁移属主范围为空。'
+            f'（权威实现跑不起来时上游返回 {{}}，此时 MUST 停手 —— '
+            f'照抄单体版本会让派生仓断言一条它不发的迁移。先修 npx tsx 再来。）'
+        )
+    highest = max(owned, key=lambda n: (n.split('_', 1)[0].rjust(8, '0'), n))
+    return highest[: -len('.sql')] if highest.endswith('.sql') else highest
+
+
+def rewrite_schema_contract(text: str, scopes: dict[str, set[str]], layer: str) -> str:
+    """把启动契约版本改写成该派生仓自己的最高属主迁移（幂等、可复现）。"""
+    m = SCHEMA_VERSION_RE.search(text)
+    if not m:
+        raise RuntimeError(
+            'schema-contract 里找不到 REQUIRED_SCHEMA_VERSION 声明 —— 文件形状变了，'
+            '先人工复核再改本脚本（这一条 MUST 响亮失败：静默跳过＝派生仓拿到单体版本）'
+        )
+    version = derived_schema_version(scopes, layer)
+    if m.group('v') == version:
+        return text
+    derived = (
+        f'// Derived {layer} checkout: this repo only ships {layer}-owned migrations, so its\n'
+        f'// start-up contract is pinned to its own highest one. Machine-derived on every sync\n'
+        f'// by scripts/sync-split-repos:derived_schema_version — do not hand-edit.\n'
+        f"export const REQUIRED_SCHEMA_VERSION = '{version}';"
+    )
+    return text[: m.start()] + derived + text[m.end():]
+
+
 def rewrite_repo_source(
     repo: str,
     text: str,
     kernel_paths: set[str],
     src_file: str,
+    scopes: dict[str, set[str]] | None = None,
 ) -> str:
     """Apply the reproducible, reviewed source adaptations for one derived repo."""
     text = rewrite_kernel_imports(text, kernel_paths, src_file)
     if repo == 'aidcp-automation' and src_file == 'src/schema/schema-contract.ts':
-        source = "export const REQUIRED_SCHEMA_VERSION = '0076_config_mirror_bump_inbox';"
-        derived = (
-            '// The derived automation checkout does not ship API-owned migration 0076.\n'
-            '// Its highest required local prerequisite is the target-scoped outbox cursor.\n'
-            "export const REQUIRED_SCHEMA_VERSION = '0075_event_outbox_topic_cursor';"
-        )
-        if source not in text:
-            raise RuntimeError(
-                'schema-contract derived rewrite lost its reviewed source marker'
-            )
-        text = text.replace(source, derived, 1)
+        text = rewrite_schema_contract(text, scopes or {}, 'automation')
     return text
 
 
@@ -534,7 +577,7 @@ def main() -> int:
         for rel in sorted(expected & actual):
             want = git(CLOUD, 'show', f'{args.ref}:{rel}')
             if layer != 'kernel':
-                want = rewrite_repo_source(repo, want, kernel_paths, rel)
+                want = rewrite_repo_source(repo, want, kernel_paths, rel, mig_scopes)
             with open(os.path.join(path, rel), encoding='utf8') as fh:
                 if fh.read() != want:
                     (comp_changed if rel in COMPOSITION else changed).append(rel)
@@ -570,7 +613,7 @@ def main() -> int:
                     continue
                 want = git(CLOUD, 'show', f'{args.ref}:{rel}')
                 if layer != 'kernel':
-                    want = rewrite_repo_source(repo, want, kernel_paths, rel)
+                    want = rewrite_repo_source(repo, want, kernel_paths, rel, mig_scopes)
                 dst = os.path.join(path, rel)
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
                 with open(dst, 'w', encoding='utf8') as fh:
