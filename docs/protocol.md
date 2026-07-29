@@ -109,7 +109,7 @@
 
 | type | 方向 | 用途 |
 | --- | --- | --- |
-| `page.cards` | edge → cloud | 上报当前可见卡片列表；可选 `listKind`/`listState` 是页面形态与内容状态观察，缺省 `feed/ready`，不扩展 `feed/detail` Surface |
+| `page.cards` | edge → cloud | 上报当前可见卡片列表；可选 `listKind`/`listState` 是页面形态与内容状态观察，缺省 `feed/ready`，不扩展 `feed/detail` Surface；卡上可选 `noteIdKind` 是身份分档（缺省 `permalink`，`content_ref` 只在本会话本列表面内有效，见 §3.8） |
 | `note.detail` | edge → cloud | 上报笔记详情（正文/作者/计数） |
 | `profile.detail` | edge → cloud | 上报作者主页数据（粉丝数/作品数） |
 | `identity.observed` | edge → cloud | 上报与 `captureId` 关联的本人身份观察；独立于普通作者 `profile.detail` |
@@ -694,6 +694,11 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
       "index": 0, "title": "周末好去处", "author": "小张",
       "likeCount": 1234, "collectCount": 200,
       "coverDesc": "封面描述", "noteId": "n123",  // coverDesc / author / noteId 可选
+      "noteIdKind": "permalink",                  // 可选：noteId 的身份分档；缺省 permalink（老边端与既有路径逐位不变）
+                                                  // content_ref = 内容派生的会话内引用（aidcp:facebook-group-feed-post:v1:<sha256>，
+                                                  // 前缀为历史命名、语义已不止群组）：可评估、可计浏览、可就地点赞；
+                                                  // MUST NOT 用于导航 / 打开详情 / 定向评论 / 交付人工线索 / 跨会话去重。
+                                                  // 消费方 MUST 读本字段判能力，MUST NOT 正则匹配 noteId 的字符串形态来猜
       "isVideo": false                            // 可选：卡片是否为视频；供后续 note.detail 推导媒体类型
     }
   ],
