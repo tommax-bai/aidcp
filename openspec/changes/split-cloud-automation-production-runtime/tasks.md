@@ -65,7 +65,7 @@
        账号人设端口取自 4a 的 accountPersona（5327-5330），不阻塞 automation 独立根。
        cloud inventory 测试 258-264 行本来就显式断言「任何证据含 PersonaGenerator 的条目不得留在台账里」，
        补进去会当场撞既有裁定。裁定理由已写进那条断言的失败消息。 -->
-- [ ] 0.3f **把 seam 过滤判据放宽到「automation 模式下不执行的分支」（已裁定要做，本轮未做）。**
+- [x] 0.3f **把 seam 过滤判据放宽到「automation 模式下不执行的分支」（已裁定要做，本轮未做）。**
   本轮给 `new` / `call` 探针补的过滤器只认 `seamMode === 'monolith'`。但草稿精修那条的 segC 探针
   指向的构造坐在 `if (seamMode !== 'automation' && ...)` 里——**automation 进程里根本不构造它**，
   按台账的语义（「automation 独立起根被什么挡住」）同样不该算欠账。
@@ -75,6 +75,16 @@
   且要顺带扫一遍 segC 里其余 `seamMode !== 'automation'` 守卫（约 5919 / 6259 / 6295 一带）。
   **注意后果不是「条目消失」而是「条目变成纯 api 侧证据」**——收录判据是「任一探针命中即保留」，
   segA / segD 那两条还在。真正会消失的是它在 **automation 收窄台账**里的位置，而那正是 0.6a 要的结果。
+  <!-- aidcp-cloud <pending> 已放宽：过滤判据从「只认 `seamMode === 'monolith'`」扩到「三个独立根都不执行的分支」，
+       并把「放宽 MUST 响亮」做成机械的：新增 `deriveSeamSuppressedProbeMatches()` + 一条把**被过滤掉的证据全集**
+       逐条钉死的断言（含每条的三行理由：automation 被哪个守卫挡、api / content 不跑 segC）。
+       此前这个过滤器唯一的失败模式就是沉默——它做的是「减掉证据行」，而减掉的行与从来没派生出来的行长得一模一样。
+       实测后果与本条预判一致：台账里只少了 `segCAutomation:new:DraftRefinementWorker` 一行，
+       `content-draft-refinement-authority` 这个条目**仍在**（靠 segA 建店 + segD 读两条证据），
+       `4b-b4-account-identity-status-mirror` 也仍在（它那条 `accountDisplayName` 还有另一处无守卫的 segC 调用点）。
+       即：过滤只缩短证据，不熄灭条目——这正是收录判据「任一探针命中即保留」应有的行为，现在有断言钉着了。 -->
+  <!-- 顺带扫完 segC 其余 `seamMode !== 'automation'` 守卫：真正被过滤的只有两处（草稿精修 worker、
+       待派发看门狗那次 `accountDisplayName`），其余守卫内没有 new/call 探针指向。 -->
 - [x] 0.3g **automation 那份 census helper 是有意的手写分叉，不是派生物**（本轮核实）。
   <!-- 2026-07-29 实测：文件第 1 行是 `// aidcp:test-owner=derived`，
        按 scripts/sync-split-repos 的 derived_private 逻辑，带该标记的派生仓测试**被排除出同步对账**
@@ -307,8 +317,32 @@
 
 ## 1. 四条运营指令通道（api 飞书入站 → automation 处理器）
 
-- [ ] 1.1 `aidcp-kernel`：为四条指令定义窄接口与纯类型（请求 / 结果 / 具名失败原因）；不放行为类。
-- [ ] 1.2 `aidcp-transport`：四条指令的「服务端注册 + 客户端 + 路径常量」三件套各一份，两端共用同一定义。
+- [x] 1.1 `aidcp-kernel`：为四条指令定义窄接口与纯类型（请求 / 结果 / 具名失败原因）；不放行为类。
+  <!-- aidcp-cloud <pending> src/kernel/operator-command-port.ts。形状**逐字复用 4a 已建立的 paired command**
+       （信封 + 幂等键 + `applied|duplicate|collision` 回执），没有另造第二套机制——这是本条最重要的落点。
+       四条语义钉在类型上：① `executionTarget` 由客户端从本进程部署事实注入，调用方（飞书 handler / 面板路由 /
+       卡片回调）**没有任何入口能选它**（DEV/OL 共库，让调用方挑 target 等于把「在哪台机器上真跑」交给一个 body 字段）；
+       ② 处理器没接线回 `not_delivered` + 具名原因，api 侧 MUST NOT 表述成已受理 / 已排队；
+       ③ 传输失败 / 超时=**结果未知**，既不推断成功也不推断失败（发布 / 评论 / 启停都有真实副作用）；
+       ④ 重放按持久台账**原样回放首次结果**，MUST NOT 现算一个 `changed:false`。
+       不新造错误类：传输失败复用既有 `ApiDirectHttpError`，业务拒绝复用既有 `DelegatedTaskServiceError`。 -->
+  <!-- 顺带查出一个**现役潜伏 bug**（登记在 1.7）：`feishu/delegated-task-card.ts` 与
+       `client-auth/client-auth-server.ts` 用 `instanceof DelegatedTaskServiceError` 认错误，
+       跨进程后错误是 JSON 反序列化出来的裸对象、原型链上什么都没有，那两处**恒 false**。
+       后果不是报错而是静默降级：`version_conflict` 会退化成一条普通错误 toast、刷新卡不再回。
+       本轮补了结构化守卫 `isDelegatedTaskServiceError`，迁移调用点留到接线那一轮。 -->
+- [x] 1.2 `aidcp-transport`：四条指令的「服务端注册 + 客户端 + 路径常量」三件套各一份，两端共用同一定义。
+  <!-- aidcp-cloud <pending> src/transport/operator-command-http.ts（零属主表 SQL），
+       同批加进控制仓 scripts/sync-split-repos 的 TRANSPORT_MEMBERS。
+       三件套同文件的理由照 §8.4：复制成两份，两端路径会悄悄对不上，且两侧各自编译通过、各自测试通过，
+       只有真跑起来才 404。 -->
+- [ ] 1.7 **接线期欠账（本轮只定义契约，已在 `operator-command-http.ts` 的 `OPERATOR_COMMAND_WIRING_DEBT` 显式登记）**：
+  ① `delegated-task-http.ts` 既有 7 条路由**不带信封**（无版本 / 无 target 校验 / 无 Bearer），MUST 与新的
+  `create-from-text` 统一到信封形态，否则同一个域会有两套鉴权口径；
+  ② 上面那两处 `instanceof` MUST 迁到结构化守卫；
+  ③ 四条写指令的接收方 MUST 建**持久**幂等台账（跨进程重启仍成立），否则 ④ 那条「原样回放首次结果」无处可放；
+  ④ `ApiDirectWriteErrorCode` 可按 4a 惯例补四个逐命令的 `*_result_unknown` 码（本轮统一用
+  `api_authority_result_unknown`，刻意不改既有 kernel 文件以免与并行任务撞热点）。
 - [ ] 1.3 `aidcp-cloud`（事实源）：按 4a paired command 形态实现 route + receiver + api 侧 client；
   自由文本委托的**意图解析留在 automation**，api 侧 MUST NOT 自己拼 intent 调结构化入口。
 - [ ] 1.4 调度启停：**「飞书 dispatch」这条通道自始至终不存在**（`feishu/command-face.ts` 的动作全集是

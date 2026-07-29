@@ -113,6 +113,12 @@ TRANSPORT_MEMBERS = [
     'src/transport/api-aux-authority-http.ts',
     'src/transport/paired-command-http.ts',
     'src/transport/api-direct-http.ts',
+    # change split-cloud-automation-production-runtime：四条运营指令（委托自由文本 /
+    # 手动发布 / 手动评论 / 调度启停）的 api→automation 传输三件套。与上面 4a 同一
+    # 机制（信封 + 幂等键 + applied|duplicate|collision），路由常量 + 服务端注册 +
+    # 客户端在同一文件：复制成两份两端路径会悄悄对不上，且两侧各自编译通过、各自
+    # 测试通过，只有真跑起来才 404。零属主表 SQL。
+    'src/transport/operator-command-http.ts',
     # 批次 3a：automation owner → api 的第一批单向异步能力。五个成员都同时包含
     # owner route 与 typed client，且不持有属主表 SQL；Facebook 群口刻意不含需要
     # 反向刷新 api 花名册的 importTargets / replaceTargetScopes。
