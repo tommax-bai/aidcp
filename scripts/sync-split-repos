@@ -123,6 +123,11 @@ TRANSPORT_MEMBERS = [
     # 精选库召回。服务端跑在 content、客户端跑在 automation，两端都要拿到同一份路由常量，
     # 所以必须在名单里——不进名单，content 仓根本拿不到注册函数。零属主表 SQL。
     'src/transport/content-authority-http.ts',
+    # 同 change：FB 发帖素材状态流转 + token 用量记账两组三件套，以及它俩与上一行共用的
+    # 线上失败译码层（那 120 行映射表复制成两份会各自编译过、各自测试过，只在失败真发生
+    # 那一刻才看得出对不上）。同样零属主表 SQL。
+    'src/transport/content-authority-wire.ts',
+    'src/transport/content-media-usage-http.ts',
     # 批次 3a：automation owner → api 的第一批单向异步能力。五个成员都同时包含
     # owner route 与 typed client，且不持有属主表 SQL；Facebook 群口刻意不含需要
     # 反向刷新 api 花名册的 importTargets / replaceTargetScopes。
