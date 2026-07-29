@@ -547,16 +547,23 @@ Rule-mode session start, resume and safe stop SHALL use the same account-effecti
 - 其余平台（含小红书与视频号）→ **不种入任何行**。视频号在平台动作目录中四个动作全部不支持，为其写入任何正日上限都 MUST 被写前校验整块拒绝。
 - 登记调用方**未显式声明平台**时 SHALL NOT 种入。账号登记的平台参数可缺省并回落，按回落值种配置等同于给一个平台未知的账号写一份可能错误的默认值。此时系统 SHALL 留下可检索日志说明「因平台未声明而未种入」。
 
-**种入取值** SHALL 为：账号总开关开；自动发帖开、审批模式 `review`、日上限 5；自动评论开、审批模式 `auto_approve`、日上限 20；自动加群开、日上限 20。
+**种入取值** SHALL 为：账号总开关开；自动发帖开、审批模式 `review`、日上限 5；自动评论开、审批模式 `auto_approve`、日上限 20；**自动联系评论开、审批模式 `auto_approve`、日上限 5**；自动加群开、日上限 20。
 
-**联系评论 SHALL NOT 被种入**（保持关闭）。理由有二且都要保留：其一，本要求覆盖的是发帖、评论、加群三项；其二，带「先加群再评论」标记的复合动作由联系评论驱动，不种入它即使新账号不会出现「加入新群后在同一轮立即于该群评论」这一形态。任何后续 change 若要开启联系评论默认值，MUST 先处置该复合动作。
+**联系评论被种入的前置条件 SHALL 被记录并保持有效**：种入它曾被明确禁止，理由是带「先加群再评论」标记的复合动作**只挂在联系评论上**，种它等同于让新账号具备「加入新群后同一轮立即于该群评论」这一会招致平台警告的形态。该前置已由排期路径与复合动作的解耦解除——排期联系评论改走已加入群账本的选群口，因而受预热期与单群冷却约束。
+
+上述因果 MUST NOT 被删成一句「联系评论默认开」：**若将来有任何改动让排期联系评论重新携带「先加群」标记，本条种入默认值 MUST 同时被撤回**。两者是一对绑定的前提与结论，不是两件独立的配置。
+
+**联系评论的两条已知后果** SHALL 被如实记录、MUST NOT 被读作缺陷：
+
+- 排期路径缺联系方式时 SHALL fail-closed（本次不发，绝不降级成不带联系方式的普通评论——该降级只有固定规则模式会显式声明）。因此刚登记、尚未配置联系方式的账号会按其错峰分钟收到诚实的未发提示，直到运营补上配置。
+- 联系评论的自动路径 SHALL 继续通过评论配额闸，因而与普通评论**竞争同一配额池**。其日上限取值 MUST 考虑这一竞争，MUST NOT 被当作一个独立于普通评论的额度。
 
 **审批模式** SHALL 逐动作分别取值，MUST NOT 相互推导：
 
 - **发帖 SHALL 取 `review`**。这不是选择——Facebook 排期发帖在既有要求里就 MUST 走 `review` 路径，免审对它保持禁用或 fail-closed。
-- **评论 SHALL 取 `auto_approve`**（用户 2026-07-29 决定）。其可达性依赖既有的环境级评论审批策略只能**升权**这一性质：策略为缺省值时来源模式被逐字沿用，只有策略读取失败才 fail-closed 回 `review`。本要求 MUST NOT 被实现成「绕过该策略」——它只是提供了一个免审的来源模式。
+- **评论与联系评论 SHALL 取 `auto_approve`**（用户 2026-07-29 决定）。其可达性依赖既有的环境级评论审批策略只能**升权**这一性质：策略为缺省值时来源模式被逐字沿用，只有策略读取失败才 fail-closed 回 `review`。本要求 MUST NOT 被实现成「绕过该策略」——它只是提供了一个免审的来源模式。
 
-由此产生的后果 SHALL 被如实记录、MUST NOT 被读作疏漏：新登记账号一旦绑定人设并通过其余各闸，其自动评论会直接发到平台、无人过目。发帖不受影响，仍逐条待人审。
+由此产生的后果 SHALL 被如实记录、MUST NOT 被读作疏漏：新登记账号一旦绑定人设并通过其余各闸，其自动评论与联系评论会直接发到平台、无人过目。发帖不受影响，仍逐条待人审。
 
 **失败语义**：种入失败 MUST NOT 阻断账号登记，SHALL 被捕获并留下可检索的具名日志。系统 SHALL NOT 提供自动补种路径（理由见 `accounts-master-data` 同名约束）。
 
@@ -564,7 +571,15 @@ Rule-mode session start, resume and safe stop SHALL use the same account-effecti
 
 #### Scenario: 新 Facebook 账号被种入默认配置
 - **WHEN** 一个此前不存在的 Facebook 账号首次登记，且登记方已声明平台
-- **THEN** 该账号获得排期行（总开关开、发帖 `review`/5、评论 `auto_approve`/20）与自动加群行（开、20），且联系评论保持关闭
+- **THEN** 该账号获得排期行（总开关开、发帖 `review`/5、评论 `auto_approve`/20、联系评论 `auto_approve`/5）与自动加群行（开、20）
+
+#### Scenario: 种入的联系评论不带任何加群副作用
+- **WHEN** 一个被种入联系评论的新账号命中其联系评论槽位
+- **THEN** 系统从该账号已加入群账本中选群并评论，不加入任何新群；刚加入未满预热期的群不会被选中
+
+#### Scenario: 缺联系方式时诚实不发
+- **WHEN** 一个被种入联系评论的新账号尚未配置联系方式
+- **THEN** 本次不发任何评论，回一条说明未配置联系方式的诚实提示，MUST NOT 降级成不带联系方式的普通评论
 
 #### Scenario: 种入的免审评论仍受环境级策略读取失败的 fail-closed 保护
 - **WHEN** 某个被种入免审评论的账号在发评论时，环境级评论审批策略读取失败
@@ -588,19 +603,33 @@ Rule-mode session start, resume and safe stop SHALL use the same account-effecti
 
 ### Requirement: Facebook scheduled contact comment joins a new group before commenting
 
-For a Facebook account, the scheduled internal action key `contact_comment` SHALL execute as “加群评论（联系）”: it MUST invoke the existing join-then-comment orchestrator with `injectContact=true`, `joinFirst=true`, automatic priority, and the account's configured approval mode. It MUST NOT set manual override or force flags. The comment stage MAY begin only after the join stage returns platform-confirmed `joined` or `already_member` with the exact group URL; every pending, gated, ambiguous, failed, or unconfirmed join outcome MUST terminate without commenting.
+排期的 Facebook 联系评论 SHALL NOT 先加群。它 MUST NOT 携带「先加群」标记，MUST 走既有的正常定向评论路径，其评论容器 MUST 由**已加入群账本的选群口**给出。
 
-After membership confirmation, target selection SHALL follow the Facebook keyword rule: configured keywords use group search; no keywords use the group's first eligible post. Existing contact-info, attempt-cap, comment-risk, approval, dedupe, server-verification, account single-flight, and honest combined-result behavior SHALL remain in force.
+这条约束的理由是机制性的，MUST 随要求一起保留：选群口是预热期与单群冷却唯一生效的地方。一旦评论容器被外部钉死（例如钉死成刚加入的那个群），选群口根本不会被调用，两道闸就结构性失效——**不是被绕过一次，而是永远不参与判定**。
 
-Non-Facebook scheduled contact comments MUST retain their existing non-join behavior.
+加群 SHALL 只由独立的自动加群动作驱动（见「Standalone Facebook automatic join remains join-only」）。系统 MUST NOT 保留任何「开启联系评论即隐式加群」的路径：那条路径不查每账号加群开关、不查加群日上限、也不查加群动作时段，等于让一个动作的开关去驱动另一个动作。
 
-#### Scenario: Facebook scheduled contact comment joins then comments
-- **WHEN** a Facebook account hits an enabled `contact_comment` schedule slot and all preflight gates pass
-- **THEN** the system first attempts one automatic new-group join and only after confirmed membership selects a post, composes/approves, and submits a contact comment
+选定容器之后，目标选择 SHALL 继续遵循既有的 Facebook 关键词规则：配了关键词走群内搜索，没配则取该群第一条可评帖。既有的联系方式闸、尝试型日上限、评论风控闸、审批、去重、服务端校验、账号单飞与诚实结果回执 SHALL 全部保持不变。
 
-#### Scenario: Unconfirmed join never advances to comment
-- **WHEN** the scheduled join returns pending, gated, ambiguous, failed, or otherwise not platform-confirmed as a member
-- **THEN** the combined task reports an honest non-commented outcome and dispatches no post selection, approval, or comment submit
+以下三条路径 SHALL 继续使用「先加群再评论」的复合动作，本要求 MUST NOT 被读作把它们一并拆掉：飞书手动命令、委托任务、以及固定规则模式的轮次（后者另由 `facebook-rule-mode` 规定）。
+
+非 Facebook 的排期联系评论 SHALL 保持其既有的不加群行为。
+
+#### Scenario: 排期联系评论从账本选群，不加新群
+- **WHEN** 某 Facebook 账号命中已开启的排期联系评论槽位且各前置闸通过
+- **THEN** 系统不加任何新群，改从该账号已加入群账本中选出一个满足预热期与冷却的群，在其中选帖、撰写、审批并提交联系评论
+
+#### Scenario: 账本里没有合规群时诚实空转
+- **WHEN** 该账号已加入的群全部不满足预热期或仍在冷却中
+- **THEN** 本次不评论、不加群，并如实回报无可用目标，MUST NOT 为了有事可做而去加一个新群
+
+#### Scenario: 刚加入的群不会在同一轮被评论
+- **WHEN** 独立自动加群动作刚刚为某账号确认加入了一个新群
+- **THEN** 该群在满足预热期之前不会被排期联系评论选中
+
+#### Scenario: 手动与规则模式仍先加群
+- **WHEN** 运营发出带加群参数的手动评论命令，或固定规则模式命中其加群轮次
+- **THEN** 系统仍执行「先加群、确认加入后在该群评论」的复合动作
 
 #### Scenario: Non-Facebook contact comments do not acquire join semantics
 - **WHEN** a non-Facebook account hits its existing scheduled contact-comment slot
@@ -616,19 +645,23 @@ The independent scheduled Facebook `join_group` action SHALL continue to invoke 
 
 ### Requirement: Facebook scheduled contact comment is labeled 加群评论（联系）
 
-Facebook-facing Console action labels and scheduled execution/result notifications SHALL render the `contact_comment` action as “加群评论（联系）”. The internal action key, API fields, and persistence schema SHALL remain `contact_comment`-compatible. Non-Facebook product surfaces MAY retain the existing contact-comment label.
+旧名「加群评论（联系）」MUST NOT 继续用于该动作：拆分后它不再加群，旧名会让运营以为开启它就会加群，进而在真正的自动加群开关关着时把「不加群」误判成系统故障。
 
-Clearing all Facebook search keywords MUST be accepted without an error or disabled-state warning. The Console MUST NOT add a “当前使用群内首帖” status label or equivalent explicit current-mode indicator.
+Facebook 侧的控制台动作名与排期执行 / 结果通知 SHALL 改用与其它平台**一致**的联系评论名，MUST NOT 再为 Facebook 保留一个特例名。具体字面量由各呈现面各自的既有通用名决定（排期执行与结果通知为「联系评论」，控制台排期表沿用其既有通用列名），本要求约束的是「不再有 Facebook 特例」，而不是统一到某一个字符串。内部动作键、接口字段与持久化结构 SHALL 保持 `contact_comment` 兼容。
 
-#### Scenario: Facebook automation page shows the new action name
-- **WHEN** an operator filters the automation page to Facebook
-- **THEN** the contact-comment action column and controls are labeled “加群评论（联系）”
+固定规则模式面板中描述其轮次的文案 SHALL NOT 被本要求波及——规则模式仍然先加群，那里的措辞依然准确。
+
+清空全部 Facebook 搜索关键词 MUST 被接受，不报错、也不给禁用态警告。控制台 MUST NOT 增加「当前使用群内首帖」一类的显式当前模式标签。
+
+#### Scenario: Facebook 自动化页不再出现加群特例名
+- **WHEN** 运营把自动化页筛选到 Facebook
+- **THEN** 该动作的列名与控件用与其它平台一致的联系评论名，页面上不再出现「加群评论（联系）」
+
+#### Scenario: 规则模式文案不受影响
+- **WHEN** 运营查看某账号的固定规则模式面板
+- **THEN** 其中关于加群轮次的说明保持原样，仍如实描述「先加群再评论」
 
 #### Scenario: Empty keywords show no first-post mode status
 - **WHEN** an operator clears and saves all Facebook comment search keywords
 - **THEN** the save is accepted and the configuration dialog shows no “当前使用群内首帖” status or empty-keyword error
-
-#### Scenario: Persisted contract remains compatible
-- **WHEN** the renamed action is read or written through existing APIs
-- **THEN** the system continues using the existing `contact_comment` action and `contactComment*` fields without a database migration
 
