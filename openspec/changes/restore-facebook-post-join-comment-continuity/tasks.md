@@ -12,8 +12,8 @@
 ## 2. aidcp-edge — 首帖时间预算与命令上限
 
 - [x] 2.1 `native/page-engine/src/facebook/runtime.rs`：首帖身份回读窗 8s → 20s，首帖评论框绑定窗 4s → 12s。 <!-- aidcp-edge d6d60c7 FIRST_POST_EDITOR_TIMEOUT 4s→12s、FIRST_POST_DETAIL_TIMEOUT 8s→20s -->
-- [x] 2.2 `src/native-page-engine/browse-session.ts`：首帖开帖命令的原子上限从默认 30s 提到 90s（与加群命令同值，避免上限种类膨胀）；仅对「首帖选择」这一形态生效，普通开帖不变。 <!-- aidcp-edge d6d60c7 FACEBOOK_FIRST_POST_OPEN_TIMEOUT_MS=90s，按 selection=first_commentable_group_post 生效 -->
-- [x] 2.3 补回归：首帖开帖命令取到 90s 上限，关键词开帖与其他命令仍取默认值。 <!-- aidcp-edge d6d60c7 browse-session.test：首帖 90s、按 URL 开帖 30s -->
+- [x] 2.2 首帖开帖命令的原子上限从默认 30s 提到 90s，**三处同步**：请求值 `src/native-page-engine/browse-session.ts`、准入校验 `src/native-page-engine/client.ts`、引擎天花板 `native/page-engine/src/engine.rs`；仅对「首帖选择」这一形态生效，按 URL 开帖不变。 <!-- aidcp-edge d6d60c7 请求值；aidcp-edge 99bed5b 补齐漏改的准入校验与引擎天花板 —— 只改请求值的后果不是「没生效」而是每次首帖开帖毫秒级被判 invalid_request、命令根本不下发，云端却读成「群内未找到合适的可评论帖子」（2026-07-29 01:41 真机实证 ads-k1enonmg） -->
+- [x] 2.3 补回归：首帖开帖命令取到 90s 上限，关键词开帖与其他命令仍取默认值。 <!-- aidcp-edge d6d60c7 browse-session.test（桩运行时，只验请求值）；aidcp-edge 99bed5b 补两条走**真实准入校验**的回归（client.test）+ 引擎天花板单测 —— 桩测绕过校验正是这次回归漏网的原因 -->
 - [x] 2.4 加群侧任何预算**不得改动**（proposal「Constraint To Resolve Explicitly」）。 <!-- aidcp-edge d6d60c7 已核：group_join 相关 4 个预算常量零改动 -->
 
 ## 3. aidcp-edge — 租约抑制命令必须回执

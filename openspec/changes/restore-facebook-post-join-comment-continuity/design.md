@@ -118,3 +118,25 @@ The pointer sequence is not itself success. Native waits for the same recovery c
 - Normalising multiple join buttons by group id (that change's task 5.3).
 - Scrolling a trusted-click target into the viewport before reading its coordinates (that change's task 5.4).
 - The unverified lead that an in-place first-post fingerprint deliberately excludes the canonical permalink while identity readback may depend on one. If true it would make failure more likely the *better* the page hydrates, which is the opposite of the hydration-speed correlation measured in §3.2. It needs a real-machine capture of the returned identity to confirm and is recorded in the acceptance backlog rather than guessed at here.
+
+## 7. 事后：只抬一处上限造成的回归（2026-07-29）
+
+首帖开帖的时间上限**有三张表**，且**两张不在同一个语言里**：
+
+| 层 | 位置 | 作用 |
+| --- | --- | --- |
+| 请求值 | 边缘 `src/native-page-engine/browse-session.ts` | 这条命令要多少毫秒 |
+| 准入校验 | 边缘 `src/native-page-engine/client.ts` | 超上限 ⇒ `invalid_request`，**命令根本不下发** |
+| 引擎天花板 | `native/page-engine/src/engine.rs` | 进了引擎之后再夹一次 |
+
+首次实装只抬了第一张。后果不是「放宽没生效」，而是**每一次首帖开帖都在毫秒级被拒**：
+边缘 27ms 后回 `note.open failed: Invalid native operation timeout`，而云端读到的是
+「群内未找到合适的可评论帖子」——比原缺陷更糟，且把诊断指向完全错误的方向（看起来像"群里没帖子"，
+实际上命令从未触达页面）。真机实证：2026-07-29 01:41 `ads-k1enonmg`。
+
+**为什么测试没抓到**：首次实装的回归打的是**桩运行时**，只断言"请求了多少毫秒"，
+天然绕过准入校验；引擎天花板那层则完全没有覆盖。补上的两条回归分别走真实校验路径和引擎单测，
+并且都断言"放宽只落在首帖那一形态"——按 URL 开帖在两层里仍是 30s。
+
+**给后来者的判据**：改任何一个 Native 命令的时间预算，先把这三处一起找出来再动。
+只改请求值时，失败形态是"命令被拒"而不是"预算不够"，两者在云端的回执上长得完全不一样。
