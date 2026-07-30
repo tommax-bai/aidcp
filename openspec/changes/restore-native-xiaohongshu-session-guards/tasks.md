@@ -149,19 +149,25 @@
 - [x] 7.1 运行聚焦测试：小红书阻断上报、提交窗口、键入取证、诊断对称、身份校验五组 <!-- aidcp-edge 7b8d556（阻断上报 / 提交窗口 / 诊断对称）+ 3236d23 与 bfaa33d 与 197edae（键入取证）+ 95af401 与后续五轮加固（身份校验）；五组齐备并全绿，逐组证据见下 -->
   - 阶段性记录（2026-07-29，第一波）：五组里三组已有并全绿——阻断上报 + 诊断对称（`test/native-page-engine/xhs-session-guard-blocking.test.ts`，14 条）、提交窗口（`xhs-session-guard-commit-window.test.ts` 4 条 + Rust `xhs_session_guard_write_protection.rs` 7 条）；第 6 节另有 `host-assembly-guard.test.ts` 13 条全过。
   - **收口记录（2026-07-30，第二波）——五组齐备、全绿**：新增**键入取证**组 `test/captcha/click-result.test.ts`（8 条）+ Rust `native/page-engine/tests/captcha_type_forensics.rs`（9 条，含四条「探针抛异常不得读成页面事实」），另在 `native/page-engine/tests/fake_cdp.rs` 补 2 条搜索框探针抛异常；新增**身份校验**组 `test/native-page-engine/identity-revalidation.test.ts`（收口时 **36 条全绿**，覆盖 T1–T24 + 宿主装配契约扫描）。前三组在全量套件里持续全绿。**注：本条只声明「这五组测试存在且跑绿」**，不声明真机行为——真机口径见 7.7 及以下。
-- [ ] 7.2 运行 `cd ../aidcp-edge && npm run test:acceptance`，确认 `AC-PROTO-*` / `AC-RISK-*` 全过，两份 `protocol.ts` 消息总数不变
+- [x] 7.2 运行 `cd ../aidcp-edge && npm run test:acceptance`，确认 `AC-PROTO-*` / `AC-RISK-*` 全过，两份 `protocol.ts` 消息总数不变 <!-- aidcp-edge 7f9ea7f 2026-07-30 第五波在主干目标提交上重跑：31/31 全过、0 红 0 跳过；两份 protocol.ts 一字未改、消息总数不变 -->
   - 阶段性记录（2026-07-29，第一波，worktree `native-migration-repair` @ `a05bee9`）：**30/30 全过**（1 条 gated 跳过 = 需真机的 E2E），`AC-PROTO-*` 全过、两份 `protocol.ts` 消息总数不变（该波零协议改动）。
   - 阶段性记录（2026-07-30，第二波，worktree `restore-native-xiaohongshu-session-guards` 收口提交）：**30/30 全过**（`AC-PROTO-*` / `AC-PUB-01..07` 全绿，`AC-E2E` 按 gate 跳过）。**两份 `protocol.ts` 一字未改**，消息总数不变。
-  - **不勾的理由（2026-07-30）**：以上两次都是**合回主干之前**在各自 worktree 上取得的绿灯。合并后在 `origin/master` 目标提交上的**重跑没有证据**，而 memory `native-command-timeout-three-tables` 与本波集成侦察都点名「时间上限三处同步」类改动 rebase 后必须重跑才算数。本条待主控在主干目标提交上重跑一次后勾。
-- [ ] 7.3 运行 `cd ../aidcp-edge && npm test` 与 `npm run typecheck`
+  - ~~**不勾的理由（2026-07-30）**~~ **【已消解，第五波】**：以上两次都是**合回主干之前**在各自 worktree 上取得的绿灯。合并后在 `origin/master` 目标提交上的**重跑没有证据**，而 memory `native-command-timeout-three-tables` 与本波集成侦察都点名「时间上限三处同步」类改动 rebase 后必须重跑才算数。
+  - **主干重跑记录（2026-07-30，第五波，canonical checkout @ `7f9ea7f`）**：`npm run test:acceptance` **31/31 全过、0 红 0 跳过**。注意条数由第二波的 30 变成 31，是**他轨在此期间新增了一条验收用例**（其间主干合入了 `confirm-facebook-feed-exhaustion-structurally` 等），不是本 change 的改动。
+- [x] 7.3 运行 `cd ../aidcp-edge && npm test` 与 `npm run typecheck` <!-- aidcp-edge 7f9ea7f 2026-07-30 第五波主干重跑：npm test 2792/2792 绿 0 红 0 跳过；typecheck 通过；build:dist 通过 -->
   - 阶段性记录（2026-07-29，第一波）：`npm test` **2676 例 / 2675 绿 / 0 红 / 1 跳过**；`npm run typecheck` **通过**；另 `npm run build:dist` **通过**（`reachable=77 removed=68 legacy_page_rules=absent page_rule_fragments_guarded=11 source_maps=absent`）。
   - 阶段性记录（2026-07-30，第二波，逐轮）：`npm test` 由 2704 → **2741 例 / 2740 绿 / 0 红 / 1 跳过**（唯一跳过为 gated 真机 E2E，非本波引入）；`npm run typecheck` 每轮通过；`npm run build:dist` 通过，`reachable` 由 77 → **79**（新增的 `captcha/click-result.js` 与 `native-page-engine/identity-guard.js` **确实进了生产可达集**，不是死码）。
-  - **不勾的理由**：同 7.2——合并后在主干目标提交上未重跑。
-- [ ] 7.4 运行 Rust 侧 `cargo fmt --check`、`cargo clippy -- -D warnings`、`cargo test`
+  - ~~**不勾的理由**：同 7.2——合并后在主干目标提交上未重跑。~~ **【已消解，第五波】**
+  - **主干重跑记录（2026-07-30，第五波 @ `7f9ea7f`）**：`npm test` **2792 例 / 2792 绿 / 0 红 / 0 跳过**；`npm run typecheck` **通过**；`npm run build:dist` **通过**，输出 `reachable=81 removed=68 legacy_page_rules=absent page_rule_fragments_guarded=17 source_maps=absent`。
+    - **三个数与第二波不同，且都不是本 change 造成的**：例数 2741 → 2792、`reachable` 79 → 81、分片守卫 11 → **17**。前两个是其间他轨合入主干；**17 是覆盖面变了**（分片泄漏守卫已从「只数 Facebook 有序清单」改成按目录派生，`f652786`），**不是新增了 6 个分片** —— 别把它读成分片变多了。
+    - 另：第二波记的「唯一跳过为 gated 真机 E2E」这次是 **0 跳过**，因为本机未设 `AIDCP_E2E`，该用例这次未被计入跳过而是未注册；**不代表真机 E2E 跑过了**（真机口径仍见 7.7 及以下）。
+- [x] 7.4 运行 Rust 侧 `cargo fmt --check`、`cargo clippy -- -D warnings`、`cargo test` <!-- aidcp-edge 7f9ea7f 2026-07-30 第五波主干重跑：npm run gate:native 通过（fmt + clippy -D warnings + test），toolchain 1.97.1-aarch64-apple-darwin，19 个测试 target 全绿 -->
   - 阶段性记录（2026-07-29，第一波）：`npm run gate:native` **通过**（fmt + clippy `-D warnings` + test），toolchain `1.97.1-aarch64-apple-darwin`。
   - 阶段性记录（2026-07-30，第二波）：`npm run gate:native` 每轮通过（同一 toolchain）；`cargo fmt --check` 只跑 `--check`、**未跑仓级 `cargo fmt`**（共享文件的格式 diff 逐条手改）。另做了抖动收敛：独立 target 目录下全量 `cargo test` **连跑 25 次 0 红**（修前那条 Reel 手势用例 14 次红 2 次）。
   - **抖动修的是「用例前提」不是引擎缺陷，且踩过一次空操作**：Reel 手势用例的真实预算是「死线余量」与「会话超时」取小，而会话超时默认 2 秒——上一轮只抬死线**是一次空操作**，当时「连跑 6 次 + 8 次全绿」只是抽样太小。两个上限同时抬之后才真生效，常量注释里写了「只抬一个等于没抬」。
-  - **不勾的理由**：同 7.2。另登记一条**不在本 change 可写范围**的既有墙钟敏感用例（`native/page-engine/src/facebook/publish_tests.rs` 的提交探针跨死线那条，8 核满载人造过载下 3 次红 2 次，正常负载 39 次全量从未红），来自 `restore-native-facebook-localized-action-parity`，判据同上，建议交由 Facebook 侧 change 处理。
+  - ~~**不勾的理由**：同 7.2。~~ **【已消解，第五波】** 另登记一条**不在本 change 可写范围**的既有墙钟敏感用例（`native/page-engine/src/facebook/publish_tests.rs` 的提交探针跨死线那条，8 核满载人造过载下 3 次红 2 次，正常负载 39 次全量从未红），来自 `restore-native-facebook-localized-action-parity`，判据同上，建议交由 Facebook 侧 change 处理。
+  - **对上面那条墙钟用例的实测订正（2026-07-30，第五波）**：「正常负载 39 次全量从未红」**不成立**。干净主干 10 次全量里 **2 次**红，涉及三条而非一条：`select_mode_reports_ambiguous_after_one_unconfirmed_click`（`publish_tests.rs:659`）、`select_mode_is_ambiguous_when_post_click_confirmation_crosses_the_deadline`（`:728`）、`submit_does_not_confirm_when_the_submitted_probe_crosses_the_deadline`（`:1007`）。**红的那 2 次都落在有并发负载的时段**，随后 10 轮低负载配对测量里 0 次 —— 也就是说原结论多半是**在空载下取样**得出的，与本批反复踩的「单独跑那个文件永远全绿」是同一种自证。属主已明确为 `enforce-native-engine-artifact-gates` **8.4**；详细归因见 `restore-native-actuation-humanization-and-locating/tasks.md` §9.5 第 8 条。
+  - **另一族抖动已在第五波修掉**（`aidcp-edge 7f9ea7f`）：`fake_cdp.rs` 三条 feed-recovery 用例共用落点导致的塌帧红，配对交错测量**修前 7/10 红 → 修后 0/10 红**。**本次 7.4 的绿灯是在该修复之后取得的** —— 在它之前，主干上这条门禁本身约 50% 红，任何「主干重跑通过」的声明都不可信。
 - [ ] 7.5 运行 `openspec validate restore-native-xiaohongshu-session-guards --strict`
   - 阶段性记录（2026-07-29 / 2026-07-30 各一次）：均输出 `Change 'restore-native-xiaohongshu-session-guards' is valid`。
   - **不勾的理由（2026-07-30）**：change 仍未收口——**1.6 的有界预算档位待人确认**、**5.6 阻塞待人裁定**、7.2–7.4 待主干重跑、真机组整批零跑。本条留到收口时勾。
