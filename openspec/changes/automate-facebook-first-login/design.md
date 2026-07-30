@@ -99,8 +99,8 @@ The reconciler uses the existing startup login-wait budget and lifecycle cancell
 2. Implement the Electron profile-bound TOTP operation and AdsPower startup policy.
 3. Implement Native Facebook probe/action commands and the bounded TypeScript coordinator.
 4. Run focused, acceptance, full edge tests, typecheck, and the Native Page Engine build/tests.
-5. Perform one final operator-approved live validation from the gated feature source against the third imported stable test profile.
-6. Only after that live gate succeeds, rebase, integrate, and push the edge and control changes. Roll back by reverting the edge commits. Existing manually logged-in profiles remain compatible because `authenticated` is a no-op and stable identity remains authoritative.
+5. Perform one final operator-approved live validation from the gated feature source against the third imported stable test profile. If the operator explicitly waives a repeat after reviewing a stopped attempt and its evidence gap, record that waiver without claiming real-account success.
+6. After the live gate succeeds or that explicit waiver is recorded, rebase, integrate, and push the edge and control source changes. Packaging remains a separate delivery boundary: source integration alone does not update installed clients. Roll back by reverting the edge commits. Existing manually logged-in profiles remain compatible because `authenticated` is a no-op and stable identity remains authoritative.
 
 ## Open Questions
 

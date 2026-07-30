@@ -31,3 +31,4 @@ None.
 - Likely affected areas: AdsPower Local API broker, AdsPower browser-provider startup body, Facebook startup/identity path, CDP page interaction helpers, and focused Electron/Facebook/provider tests.
 - No Cloud API, protocol-v2, database, Console, deployment, or installer change is intended.
 - Live acceptance is limited to explicitly operator-approved, one-at-a-time runs against only the third imported Facebook profile after code-level gates pass; the implementation never retries a failed live run automatically.
+- On 2026-07-30 the operator explicitly waived a second live-account attempt and requested source integration without packaging. This delivery deviation does not convert the first stopped attempt into real-account success or update any installed client.
