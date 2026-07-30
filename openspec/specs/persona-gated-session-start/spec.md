@@ -8,16 +8,16 @@ TBD - created by archiving change multi-account-node-support. Update Purpose aft
 云端 SHALL 在启动某连接的浏览会话前，用**独立于人设解析器**的判据确认该账号的人设绑定状态。该判据 SHALL 返回三态 `bound | unbound | unknown`，MUST NOT 返回二值布尔，也 MUST NOT 用「可选布尔」表达第三态——可选布尔在消费点极易被压平成 `false`，而这类压平类型检查抓不到。
 
 - `bound` → 照常启动。
-- `unbound` → MUST NOT 启动浏览循环、MUST NOT 发出巡刷信号、MUST 在角色重订阅/指令翻译重连**之前**短路，并将该账号置 `needs_persona_setup` 态、发出运营告警。
+- `unbound` → 除下述 Facebook 规则模式例外外，MUST NOT 启动浏览循环、MUST NOT 发出巡刷信号、MUST 在角色重订阅/指令翻译重连**之前**短路，并将该账号置 `needs_persona_setup` 态、发出运营告警。
 - `unknown`（权威人设存储不可达，或本地只读副本超过声明的陈旧上限）→ MUST NOT 启动浏览循环，MUST 置独立的不可用态 `persona_unavailable`，MUST NOT 置 `needs_persona_setup`、MUST NOT 触发人设向导、MUST NOT 发出「该账号未设置人设」类运营告警（那是对运营的错误指认，会把一次基础设施故障讲成一件需要人去补配置的事）。
 
-**该闸对所有账号一视同仁、无任何豁免**（`default` 账号已退役、系统已无默认人设可回落）。绝不以任何人设静默把未绑账号跑起来（违反「绝不静默假成功」）。
+该闸有且只有一处对 `unbound` 的豁免：账号平台为 Facebook 且其绑定环境已启用规则模式时，未绑人设 MUST NOT 触发短路、MUST NOT 置 `needs_persona_setup`、MUST NOT 告警，会话按规则模式正常启动。豁免判据 MUST 与启动闸同源现读权威规则模式配置，MUST NOT 依赖客户端自报、环境变量或缓存猜测；配置读不到时 MUST fail-closed 回到未豁免行为。`unknown` MUST NOT 被压成 `unbound` 后借此豁免。该豁免只解除本闸，MUST NOT 改变慢启动对规则模式的绝对优先权，也 MUST NOT 让非规则模式的浏览循环跑起来。
 
-人设取值口在角色执行中途遇到副本陈旧时 MUST NOT 靠抛异常兜底——闸门 MUST 在会话与动作入口就收敛；保留取值口的抛出仅作「会话中途被真实解绑」的防御性路径。
+绝不以任何人设静默把未绑账号跑起来（违反「绝不静默假成功」）。人设取值口在角色执行中途遇到副本陈旧时 MUST NOT 靠抛异常兜底——闸门 MUST 在会话与动作入口就收敛；保留取值口的抛出仅作「会话中途被真实解绑」的防御性路径。
 
 #### Scenario: 新账号未绑人设被诚实拒绝
 
-- **WHEN** 一个此前未在后台设过人设的真实账号握手接入，且权威人设存储可读
+- **WHEN** 一个此前未在后台设过人设的真实账号握手接入，且权威人设存储可读，其环境未启用规则模式
 - **THEN** 云端不启动其浏览循环、不发巡刷信号，将该账号标为 `needs_persona_setup` 并告警，绝不以任何默认人设开跑
 
 #### Scenario: 原有账号复用已绑人设直接启动
@@ -35,19 +35,34 @@ TBD - created by archiving change multi-account-node-support. Update Purpose aft
 - **WHEN** 一个账号握手接入，而云端的人设只读副本已超过陈旧上限
 - **THEN** 云端不启动浏览循环，置 `persona_unavailable`，MUST NOT 置 `needs_persona_setup`、MUST NOT 触发人设向导
 
+#### Scenario: 规则模式 Facebook 账号未绑人设仍启动
+
+- **WHEN** 一个未绑人设的 Facebook 账号握手接入，其绑定环境已启用规则模式
+- **THEN** 云端按规则模式启动会话，不置 `needs_persona_setup`、不发运营告警，也不以任何默认人设开跑
+
+#### Scenario: 规则模式配置读不到时不豁免
+
+- **WHEN** 判定豁免时规则模式配置不可读、绑定不可解析或平台未确认为 Facebook
+- **THEN** 本闸按未豁免处理，未绑人设账号仍被短路为 `needs_persona_setup`，MUST NOT 猜测为已启用规则模式
+
+#### Scenario: 人设未知不借规则模式豁免
+
+- **WHEN** 规则模式配置可读且已启用，但账号的人设绑定状态为 `unknown`
+- **THEN** 云端仍置 `persona_unavailable` 并停止启动，MUST NOT 把 `unknown` 当成可豁免的 `unbound`
+
 ### Requirement: 缺失账号身份按配置错误拒绝握手，不得偷映射为 default
 
-当握手缺失或为空 `accountId` 时，云端 MUST 将其当作**配置错误拒绝握手 / 不建立会话**并发出运营告警，MUST NOT 把缺失账号静默映射成任何账号后开跑。一个无名连接没有可路由 / 可限频 / 可在后台设人设的身份，因此 MUST NOT 被当作一个匿名「需设置」账号挂起。每个节点 MUST 在握手显式声明自己的 `accountId`，且该账号须已在后台绑定人设方可运行任务。
+当握手缺失或为空 `accountId` 时，云端 MUST 将其当作**配置错误拒绝握手 / 不建立会话**并发出运营告警，MUST NOT 把缺失账号静默映射成任何账号后开跑。一个无名连接没有可路由 / 可限频 / 可在后台设人设的身份，因此 MUST NOT 被当作一个匿名「需设置」账号挂起。每个节点 MUST 在握手显式声明自己的 `accountId`；一个未绑定账号只有在执行上文所述 Facebook 规则批次时可用该窄例外，普通浏览、发布及其它来源的评论任务仍须已绑定人设。
 
 #### Scenario: 空账号被当配置错误拒绝
 
 - **WHEN** 一个 edge 不带 `accountId`（或为空）握手
 - **THEN** 云端拒绝该握手 / 不建立会话、发出配置错误告警，绝不以任何默认人设为其开跑
 
-#### Scenario: 声明了身份但未绑人设仍被启动闸拒
+#### Scenario: 声明了身份但不满足豁免的未绑账号仍被启动闸拒
 
-- **WHEN** 一个 edge 显式声明了 `accountId` 握手成功，但该账号未在后台绑人设
-- **THEN** 握手可建立（身份合法），但其浏览 / 发布 / 评论任务被入口闸以 `needs_persona_setup` 拒绝，直至后台补绑人设
+- **WHEN** 一个 edge 显式声明了 `accountId` 握手成功，但该账号未在后台绑人设且不满足 Facebook 规则模式豁免
+- **THEN** 握手可建立（身份合法），但其普通浏览、发布及其它来源的评论任务被入口闸以 `needs_persona_setup` 拒绝，直至后台补绑人设
 
 ### Requirement: 人设未知状态绝不下发为权威的「未绑」信号
 
@@ -59,7 +74,6 @@ TBD - created by archiving change multi-account-node-support. Update Purpose aft
 - **WHEN** 云端人设判据为 `unknown`
 - **THEN** 客户端快照不携带人设绑定字段，客户端保持「未知」态且不弹向导
 
-#### Scenario: 权威未绑才允许弹向导
-- **WHEN** 云端人设判据为 `unbound`
+#### Scenario: 权威未绑且不满足豁免才允许弹向导
+- **WHEN** 云端人设判据为 `unbound`，且账号不满足 Facebook 规则模式豁免
 - **THEN** 云端下发权威的「未绑」值，客户端按既有规则展示未设置态并可自动打开人设向导
-

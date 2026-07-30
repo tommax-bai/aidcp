@@ -39,6 +39,7 @@
 <!-- 2026-07-28 deployed dev — schema 契约门 enforce 三属主全通过；飞书长连接已建立；8787/8090 在听 -->
 <!-- 2026-07-30 Console 4.1-4.3 纳入本变更后重新打开 5.1-5.3；旧证据只覆盖 Cloud/Edge，不能替代本次 Console 验证与集成。 -->
 <!-- 2026-07-30 Console 验证：聚焦 5 文件 40/40；全量 42 文件 329 passed、1 skipped；typecheck 与 Vite production build 通过。b084e3a fast-forward 推送 master 后，从干净 canonical master 构建并部署 DEV；入口、JS、CSS 均 HTTP 200，远端 SHA-256 与本地一致，Cloud 未重启（active/running，NRestarts=0）。 -->
+<!-- 归档同步手工保留 persona-gated-session-start 后续已生效的 bound/unbound/unknown 与 persona_unavailable 契约，仅将本变更豁免合并到已确认 unbound 分支；unknown 不借规则模式豁免。 -->
 
 - [x] 5.1 各仓跑聚焦测试 → 全量测试 → typecheck，输出有界记录。
 - [x] 5.2 各 worktree rebase 到最新默认分支、重跑必需验证、fast-forward 集成并推送，回写本清单的 commit-sha。 <!-- aidcp-cloud 8b31e97；aidcp-edge ed2559e；aidcp-console b084e3a -->

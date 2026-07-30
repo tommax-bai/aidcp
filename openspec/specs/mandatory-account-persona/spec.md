@@ -5,27 +5,39 @@ TBD - created by archiving change persona-driven-content-pipeline. Update Purpos
 ## Requirements
 ### Requirement: 人设是账号运行的前提
 
-账号 SHALL 在绑定人设后方可参与浏览与发布。人设经 `getSoul(accountId)` / `resolvePersona(accountId)` 提供，普通浏览闭环与发布管线均以其为输入。唯一浏览例外是已绑定人设 Facebook 账号的显式规则模式：该模式的选卡、浏览批次和固定点赞意图 MUST NOT 读取人设身份、兴趣、点赞倾向或强制互动规则，但账号绑定闸仍保留，且加群联系评论的正文配置、联系方式和审批继续走既有合同。账号无绑定人设时，系统 SHALL 诚实拒绝并给出 `no_persona`，MUST NOT 继续以任何替代人设运行。
+账号 SHALL 在绑定人设后方可参与浏览与发布。人设经 `getSoul(accountId)` / `resolvePersona(accountId)` 提供，浏览闭环与发布管线均以其为输入。账号无绑定人设时，系统 SHALL 诚实拒绝并给出 `no_persona`，MUST NOT 继续以任何替代人设运行（红线：不静默假成功）。
 
-#### Scenario: 已绑人设的普通账号可运行
+唯一例外是 Facebook 规则模式：环境已启用规则模式且平台为 Facebook 时，该模式自身的浏览、点赞、加群与模板评论四个动作 SHALL 无需账号绑定人设即可运行，且 MUST NOT 读取人设做任何判断。该例外 MUST 逐条收窄：仅对规则批次成立；同一账号经普通浏览、发布、飞书手工评论、排期评论或 mandatory 评论触发时，人设闸逐字不变、仍以 `no_persona` 诚实拒绝；规则批次的评论段有效正文方案 MUST 为模板，显式生成方案时该评论段 MUST 以具名原因如实不可执行，MUST NOT 调用生成器。例外的含义是「这条路不需要人设」，MUST NOT 被实现为「缺人设时回落一份替代人设」。
 
-- **WHEN** 账号已绑定人设并触发普通浏览会话或发布
+#### Scenario: 已绑人设的账号可运行
+
+- **WHEN** 账号已绑定人设，触发浏览会话或发布
 - **THEN** 浏览/发布以该账号真实人设为输入正常运行
-
-#### Scenario: 已绑人设的 Facebook 规则模式不做人设判断
-
-- **WHEN** 已绑定人设的 Facebook 账号被权威生命周期选入规则模式
-- **THEN** 选卡、十条浏览批次和点赞意图不读取人设做相关性或偏好判断，评论链仍沿用其既有配置与授权
 
 #### Scenario: 无人设账号浏览被拒
 
-- **WHEN** 账号未绑定人设，尝试启动普通或规则模式浏览会话
+- **WHEN** 账号未绑定人设，尝试启动普通浏览会话
 - **THEN** 系统以 `no_persona` 诚实拒绝启动，不以任何默认/替代人设开始浏览
 
 #### Scenario: 无人设账号发布被拒
 
 - **WHEN** 账号未绑定人设，触发发布
 - **THEN** 系统以 `no_persona` 诚实拒绝发布，不生成任何内容，不以替代人设代偿
+
+#### Scenario: 未绑人设的 Facebook 规则模式可运行
+
+- **WHEN** 某 Facebook 环境已启用规则模式，其绑定账号未绑定人设
+- **THEN** 规则模式的浏览、点赞、加群与模板评论正常运行，全程不读取人设，也不回落任何替代人设
+
+#### Scenario: 例外不外溢到其它来源
+
+- **WHEN** 一个未绑人设、已启用规则模式的 Facebook 账号被普通浏览、发布、飞书手工评论、排期评论或 mandatory 评论触发
+- **THEN** 该次触发仍以 `no_persona` 诚实拒绝，MUST NOT 因规则模式例外而放行
+
+#### Scenario: 生成式正文方案不被例外覆盖
+
+- **WHEN** 未绑人设账号的规则批次进入评论段，而该账号显式选择了生成式正文方案
+- **THEN** 该评论段以具名原因如实标为不可执行，批次只保留浏览与点赞结果，MUST NOT 调用生成器，MUST NOT 改用模板顶替该显式选择
 
 ### Requirement: 系统不提供默认或兜底人设
 
