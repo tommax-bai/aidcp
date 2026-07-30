@@ -47,7 +47,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **实装后**：用 HTML 注释把 task 标 `[x]`，写清 commit-sha / 偏离说明，格式 `<!-- <repo> <commit-sha> 备注 -->`（部署后追加 `<!-- <date> deployed -->`）。
 - **完成全部 task → `openspec validate <change> --strict` → archive**（archive 时 `changes/<change>/specs/` 的 delta 合并进 `openspec/specs/`，归档目录按 `<YYYY-MM-DD>-<change-name>/` 命名）。
 - **现状指针**（接手时先核对；**fleet 高度活跃，任何硬编码计数都会滞后——一律以 CLI live 为准，不要相信正文里的快照数字**）：活跃 change 跑 `openspec list`，已合并 spec 跑 `openspec list --specs`（2026-07-14 实测 97 个、随归档增长），最近归档目录见 `openspec/changes/archive/`（按 `<YYYY-MM-DD>-<name>/` 命名，最新一批为 `2026-07-13-*`）。**下一批清账清单现成**：`openspec list` 里已 ✓ Complete 但未归档的 change 即候选（2026-07-14 有 8 个）。**勿手改 `openspec/specs/`，新功能一律走 change 流程**（archive 时其 `specs/` delta 自动并入主 spec）。清账节奏：landed+deployed 的 change 攒批「分诊清账」归档，真机验收项解耦收拢在 `docs/real-machine-acceptance-backlog.md`（按共享真机环境聚成「簇」）。历史锚点：`implement-deepread-lineage`（详情页深读：`profile.open` 协议 / `DeepReader` 真实看图 / `comment_reviewer` 实体化 / 修 `FollowAgent` 假 0 粉丝）于 2026-06-18 归档。上一次大规模清账 2026-07-11：归档 31 个 landed+deployed change、真机项归并入 backlog（含新簇 59），另有 5 个因另有门槛（部署待核 / 依赖未落 / spec delta 待理顺）留活跃、1 个（`facebook-scheduled-comment`，target-URL 设计已被取代）已废弃删除，见 backlog 顶部清账清单。
-- **⚠️ 有一个活跃 change 在运行模型层取代约 60 份已上线 spec**：`add-managed-automation-runtime`（统一自动化运行模型）。用户 2026-07-25 裁定「重叠处以本方案为准」。**动 publish / comment / browse / 排期 / 风控配额 / 仲裁 / 客户投影 类 spec 前，先看该 change 的 `design.md` §24 处置映射表**（约 60 份能力逐条标了取代 / 收编 / 保留 + 由哪条新要求承接 + 哪个阶段落 delta），以免与它冲突或重复劳动。三条关键口径：① 取代**不得先于**对应 delta 生效，delta 未落地前旧 spec 仍是权威；② §24.2 只剩 C5 / C7 / C14 + C2 半条待裁决，其余已落规格正文、**别照作废的建议重做**；③ §24.4 记着两条**已具名放弃**的已上线保证（取消能力级审批下限、取消操作员越权档），放弃是用户决定、不是遗漏。该 change 有意**不**含阻断态/事故生命周期、置信度第三态、降级态自愈这三层，另起 change 承接（见其 tasks 1.13），在那之前这三层仍听 `captcha-incident-handling` 等旧 spec。
+- **统一自动化运行模型已撤出计划（2026-07-30 用户裁定），其「以本方案为准」的授权同时失效。** 原 change `add-managed-automation-runtime`（111 项、零开工）已移到 `docs/design/managed-automation-runtime/`，**不再出现在 `openspec list` 里，不再是任何工作的前置或阻塞**；后续由用户本人重新立项。
+  - **随之撤销的旧口径**：2026-07-25 那条「重叠处以本方案为准」**不再有效**；动 publish / comment / browse / 排期 / 风控配额 / 仲裁 / 客户投影 类 spec **不再需要**先去查它的 §24 处置映射表。**已上线规格重新是唯一权威。**
+  - **撤出不改变任何生产行为、不丢任何已上线保证**：它零开工、一条 delta 都没落，而它自己的规则本来就写着「取代不得先于对应 delta 生效」。那份设计里所有「取代 / 收编」表述现在都只是设计意图、零约束力。
+  - **重新立项时别重做的**：§24 那张约 60 份能力的逐条处置映射表（实读规格得出，成本很高；且早先 72 条取代主张已有 63 条被推翻改判为「收编」，表里是修正后的口径）、§24.2 的四条待裁决冲突、§24.4 两条已具名放弃的保证。索引见该目录 `README.md`。
+  - **不随本次撤出取消的**：边缘侧「页面身份复核 / 动作后验证 / 诚实回执」那批缺口，用户已裁定继续做——它们是边缘本该有的行为，与这套运行模型是否立项无关。
 
 ## 4. 测试（中控触发，落 sub-repo 执行）
 
