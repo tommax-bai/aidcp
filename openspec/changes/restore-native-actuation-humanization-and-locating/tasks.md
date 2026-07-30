@@ -89,10 +89,21 @@
 
 ## 5. aidcp-edge — Native 定位三道闸
 
-- [ ] 5.1 在 Native 侧建立共享的解析—执行—后置校验编排：写动作后按同一绑定目标读回业务结果，无证据只报诚实的未开始 / 不确定 （参照 src/locating/engine.ts:213-235 执行后重取根再校验；判据分家见 flows/like-post.ts:27-75、publish-post.ts:203-251 — 见 oracle.md ⑫⑬）
+- [x] 5.1 在 Native 侧建立共享的解析—执行—后置校验编排：写动作后按同一绑定目标读回业务结果，无证据只报诚实的未开始 / 不确定 （参照 src/locating/engine.ts:213-235 执行后重取根再校验；判据分家见 flows/like-post.ts:27-75、publish-post.ts:203-251 — 见 oracle.md ⑫⑬） <!-- aidcp-edge 4a2c8d4 建模块 + 55c9d2e 接第一条真实命令（Facebook Reels 面身份退化点赞分支）；后置校验改三态、删掉两态塌陷的 wait_for_facebook_like -->
   - 部分完成（2026-07-29，`aidcp-edge 4a2c8d4`；**模块已建但零接线，故不勾选**）：新增 `native/page-engine/src/locating.rs`（348 行）与 `tests/locating_gates.rs`（12 例）。已落——① `LocatingSteps` 三段接口（解析 / 执行 / 后置校验）重建了「可换的页面来源与执行层」这条缝，使判据能脱离浏览器被断言（这正是 7.17 里「在 Native 侧重建可替换缝」那个选项）；② `run_locating_gates` 每一轮**重新解析**、不复用上一轮活引用；③ 终局四态 `Confirmed / NoTarget / Ambiguous / Escalated`，无证据只回诚实的未开始或不确定，绝不回落成已确认。
-  - 未落的部分：**该模块没有被任何平台命令调用**（提交信息自己写明「Not yet wired」）。所以现役的写动作一条也没有因此获得后置校验，本条要的「在 Native 侧建立编排」目前只是「有了一个可用的编排原语」。收口前须至少接一条真实命令，否则这三道闸在生产上等于不存在。
-- [ ] 5.2 实现有界重试与升级：可重放的写在未达上限时继续尝试；不可重放的写一经派发即停手报不确定、绝不重放；升级结论只在上限耗尽时给出 （参照 engine.ts:137-264：3 轮重试 + no_target / systemic_revision / llm_unavailable 三态终局 — 见 oracle.md ⑮）
+  - ~~未落的部分：**该模块没有被任何平台命令调用**~~ **【已接线，2026-07-30 第五波，`aidcp-edge 55c9d2e`】**（原文：提交信息自己写明「Not yet wired」，现役写动作一条也没有因此获得后置校验，收口前须至少接一条真实命令，否则这三道闸在生产上等于不存在）。
+  - **第一条接线对象：Facebook 点赞在 Reels 面、且 `note_id` 不是 `/reel/` 地址的那条分支**（`native/page-engine/src/facebook/feed_like.rs`）。**选它不是因为改起来方便，是因为它带着一条活的红线违规**：`shared.rs` 的 `wait_for_facebook_like` 返回 `bool`，把「探针读不到目标」与「读到了、赞确实没点上」压成同一个 `false`，调用方两种情形一律回 `like_unconfirmed`。而**它上面十行**的 `/reel/` 分支早就是三态。也就是说这条是十行之外那段正确代码的**退化拷贝**。
+  - **接线后**：后置校验按 `Confirmed / Unchanged / Indeterminate` 三态回报，**无需改任何页面规则分片** —— `FacebookLikeProbe` 本来就分开带 `ok` 与 `already`。`wait_for_facebook_like` 已删除（唯二调用点就是被替换掉的这两行），原地留注释写明删除理由，防止被重新引入。
+  - **`max_attempts = 2`**，与 `capability.rs` 早就声明的 `max_dispatch_count = 2` 对齐：第一轮打帖级主控件、第二轮打反应浮层 —— **与接线前是同一个两步形状**，只是从两段写死的阶段变成了「有界重试 + 升级终局」。`Escalated` 在出口映射回 `Ambiguous`，因为能力台账声明的终局里没有 escalated 这一档，**所以台账一个字都不用改，也确实没改**。
+  - **复审抓出并已处置的三个坑**（都写进了代码注释，因为没有任何机械手段会提醒下一个人）：
+    ① `LocatingOutcome` 只带 attempts、**不带原因**，直接映射成回执就会把 `target_not_found` / `like_button_not_found` / `ambiguous_target` 压成一档 —— **正是本 change 要修的病**。已由 steps 结构体自存 `last_resolve_reason` / `last_verdict`，出口按它们选原因码。
+    ② **`replayable = true` 在这里不等于「同一个控件可以再点一次」**：对帖级主控件再点一次会把赞**取消掉**。它成立的唯一依据是 `resolve` 在两轮之间**换了目标**。`locating.rs` 里 `replayable` 的文档注释写着「点赞这类幂等翻转可重放」，照它朴素理解就会踩这个坑，故在调用点就地写明。
+    ③ **没有**把「确实没点上」那档改成 `state_unchanged` 去和首页 feed 分支对齐 —— 云端 `role-dispatcher.ts` 的 `RETRIABLE_INTERACTION_REASONS` 把它当**重试触发词**，命中即原地重发一次点赞，等于给一个翻转动作凭空加一次自动重发。实读云端确认 `verify_indeterminate` 与 `like_unconfirmed` **两个都零消费者**，所以本次回执变化是**纯诊断收益、零行为变更**。
+  - **`/reel/` 分支故意不同批接**：它在第一次校验读到 `Indeterminate` 时**当场停手、不再写第二次**，而 `run_locating_gates` 只要 `replayable` 为真就会继续下一轮 —— 照接等于**把今天更强的那条路径改弱**。要同批接，得先让编排支持「`Indeterminate` 也能停手」，那是动共享原语，另起一仗。
+  - **测试**：这条分支**接线前零 Rust 用例**（所以「全量绿」证明不了任何事）。新增 3 条假 CDP 用例覆盖三态。**中性化验证**：把 `validate` 里「读不到」那一档折回 `Unchanged`，`reel_surface_like_reports_an_unreadable_reread_as_indeterminate_never_as_unchanged` 当场红在那条断言上；「读得到、确实没点上」那条是它的**配对用例**，两条一起才防得住「用一个恒定返回值把单条用例骗过」。`fake_cdp` 49 → 52。
+  - **闸③（锚点暂存 / 反污染）在这条路径上恒空转，且是「声明出来的空转」不是「碰巧的空转」**：显式传 `AnchorCacheMode::ReadOnly`，因为每个定位器都是编译进二进制的固定选择器、没有任何非确定性来源。**5.4 / 5.5 仍不勾** —— 7.16 待裁定，**MUST NOT 靠接线绕过它**。
+  - **诚实边界**：这条分支的触发前提是 Reels 面 + 身份退化（页面规则里两侧 `postId` 都归约成空串、身份比对真空通过）。所以本次拿到的收益是**「读不到」不再被谎报成「没点上」**，**不是**「定位自愈恢复了」，也**不是**「视频点赞主路径」。台账与注释都按这个口径写。
+- [x] 5.2 实现有界重试与升级：可重放的写在未达上限时继续尝试；不可重放的写一经派发即停手报不确定、绝不重放；升级结论只在上限耗尽时给出 （参照 engine.ts:137-264：3 轮重试 + no_target / systemic_revision / llm_unavailable 三态终局 — 见 oracle.md ⑮） <!-- aidcp-edge 4a2c8d4 逻辑齐备 + 55c9d2e 接线生效；max_attempts=2 与 capability.rs 的 max_dispatch_count=2 对齐，Escalated 出口映射回 Ambiguous（台账未声明 escalated 终局，故台账零改动） -->
   - 部分完成（2026-07-29，`aidcp-edge 4a2c8d4`；同 5.1，**逻辑齐备但零接线，故不勾选**）：`locating.rs` 里三条判据都在且都有用例——上限默认 3 轮（与退役实现同）、只有上限耗尽才给升级结论、且升级分「一次都没写下去（`NoTarget`）」与「写下去了但结果始终没发生（`SystemicRevision`）」；解析来源本身不可用（`SourceUnavailable`）**立刻升级、不再重试**，与「平台改版」分开；不可重放的写一经派发即停手回 `Ambiguous`，绝不重放（用例 `a_dispatched_non_replayable_write_is_never_retried`）。未落的仍是接线。
 - [ ] 5.3 升级语义与尝试计数的实现点在 `native/page-engine/src/xhs-command-router.js`，该文件是并行 change `restore-native-xiaohongshu-action-honesty` 的单写区：**本 change 不改该文件**，只与其属主对齐落地方式（在文件内修正、或以删除该 v1 分支达成），并把结论与对应 sha 写回本清单；1.6 的合约测试按属主落地后的形态转绿 （参照 locating/types.ts:138-148 的升级三态枚举；旧口径下 escalated 须连续 3 次校验失败 — 见 oracle.md ⑮）
   - 对账结果（2026-07-29，属主已落地，**但两个选项都没选，故本条不勾选**）：属主 `restore-native-xiaohongshu-action-honesty` 在 `aidcp-edge 19d4872` 里就其 2.8 做了决策——**保留 v1 分支、走「补测量」**（实读云端 CLI 与规划器后确认该路径仍有活跃产出方，删除即删活路径）。属主只改了 `page.scroll` 那一支（改按实测位移回报），**click / input 两支的 `outcome:'escalated', attempts:1` 原样保留**。因此：本条要的「在文件内修正升级语义」与「删除该 v1 分支」两个选项**都未发生**，`xhs-command-router.js` 里「升级结论 + 尝试次数为 1」的组合**依然存在**，1.6 的合约测试按现状仍会红（1.6 本身也还没写）。下一步须与属主重新对齐：要么把这两支的 `escalated` 降级为 `ambiguous`/`no_target` 之类如实取值，要么给 v1 兼容路径真做有界重试。
@@ -101,9 +112,17 @@
 - [ ] 5.5 实现反污染丢弃：任一次后置校验失败即把相关暂存锚点丢弃，且不得被后续解析当作已确认复用 （参照 cache.ts:119-121 dropStaged + engine.ts:238-243「校验失败即丢弃且强制换路径」 — 见 oracle.md ⑯）
   - 部分完成（2026-07-29，`aidcp-edge 4a2c8d4`；同 5.4，受 7.16 阻断故不勾选）：`record_failure` 当场 `staged.remove(key)` 并给主缓存记一次失败；用例 `a_failed_validation_drops_the_staged_anchor_for_good` 断言丢弃后不再被当已确认复用。同样受「暂存区恒为空」这个前提影响：逻辑正确，但在生产上无事可做。
 - [ ] 5.6 逐条盘点当前 Native 命令面，标出哪些已具备后置校验、哪些暂不具备并注明原因；不具备的不得默认返回成功 （参照 engine.ts:39-41 校验器是接口式强制、缺判据即编译不过；判据强度反例见 oracle.md ⑬⑭）
-- [ ] 5.7 **只读**确认 `scripts/prune-production-dist.mjs` 的禁入表未被放宽（该文件归 `enforce-native-engine-artifact-gates`，本 change 不改一行），退役的 TypeScript 定位层与锚点缓存仍不进生产产物
+- [x] 5.7 **只读**确认 `scripts/prune-production-dist.mjs` 的禁入表未被放宽（该文件归 `enforce-native-engine-artifact-gates`，本 change 不改一行），退役的 TypeScript 定位层与锚点缓存仍不进生产产物 <!-- aidcp-edge 2026-07-30 只读复核（本 change 未改该文件一行）；判据见下方记录 -->
+  - **复核记录（2026-07-30，第五波，以 `be0a8be` 重写后的脚本为准重做）**：结论**未被放宽**，退役的 TypeScript 定位层与锚点缓存**确实不进生产产物**。
+  - **但判据与本条原文的预期不同，值得写下来**：重写后的 `scripts/prune-production-dist.mjs` **不是靠一张「禁入表」列出 `src/locating/**`**（全文 grep `locating` / `anchor` / `cache` 零命中），
+    而是**从核心入口做可达性闭包、把不可达的整批删掉**（`collectReachable`）。禁入表现在只管两类东西：页面规则分片名与明文标记。
+  - **实测证据**（主干 `55c9d2e` 上跑 `npm run build:dist`，输出 `reachable=81 removed=68 legacy_page_rules=absent page_rule_fragments_guarded=17 source_maps=absent`）：
+    `dist/locating/` 是一个**空目录**（8 个源文件 `cache.ts` / `engine.ts` / `extractor.ts` / `guard.ts` / `index.ts` / `matcher.ts` / `selector.ts` / `types.ts` 全部被剪掉）；
+    全 `dist` 树 grep `AnchorCache` / `anchorCache` **零命中**。唯一提到 `locating/` 的是 `dist/cdp/dom-provider.js` 第 4 行的一句**注释**，不是运行时导入。
+  - **由此得到一条对后人有用的判据**：这层保护**不是**「禁入表列了它」，而是「从入口到不了」。
+    所以**给退役定位层新增一个可达引用，就会让它重新进产物，而禁入表不会喊** —— 与 §5 的孤岛判据（「没人引用」是错的，「从入口到不了」才是对的）同型。
   - 进度说明（2026-07-29）：**未做**，且现在更该做了。属主 change `enforce-native-engine-artifact-gates` 已在同一分支的 `aidcp-edge be0a8be` 落地，**把该脚本整体重写**（242 行改动，同批还新增了 `scripts/gate-native.mjs`、`scripts/native-engine-inventory.cjs` 与 `test/native-page-engine/artifact-gates.test.ts`）。本条的只读确认必须**以 `be0a8be` 之后的脚本为准**重做一次：禁入表在重写中是否仍覆盖退役的 TypeScript 定位层与锚点缓存，尚无人核对。本 change 不改该文件一行的纪律不变。
-- [ ] 5.8 记录本 change 对迁移主 change 3.2 的承接边界：只承接三道闸，可见性 / 几何 / 歧义拒绝仍归各平台目标解析能力；3.3 的文件输入那一半也不在本 change 内 —— 两条都不得因本 change 落地而被整条勾掉 （本 change 未承接的参照条目：匹配唯一性闸 / 守卫层 / 模型兜底 / 语义 class 白名单 / 可换接口 — 见 oracle.md 覆盖漏洞）
+- [x] 5.8 记录本 change 对迁移主 change 3.2 的承接边界：只承接三道闸，可见性 / 几何 / 歧义拒绝仍归各平台目标解析能力；3.3 的文件输入那一半也不在本 change 内 —— 两条都不得因本 change 落地而被整条勾掉 （本 change 未承接的参照条目：匹配唯一性闸 / 守卫层 / 模型兜底 / 语义 class 白名单 / 可换接口 — 见 oracle.md 覆盖漏洞） <!-- aidcp 2026-07-30 已回写 native-page-engine-production-cutover 的 3.2（三道闸承接范围 + 晋升那半条仍空转、受 7.16 阻断）与 3.3（file-input 原语不在本 change 内），两条均明写「不得整条勾掉」 -->
 - [ ] 5.9 给后置校验判据立**强度下限**（5.1 只要求「有校验环节」，一条宽松子串正则即可满足其字面）：状态翻转只认属性白名单等于真值（可访问按下态 / 选中态 / 站点稳定的已点赞与已选中属性），类名只认词边界匹配出来的语义片段（片段须是整个 class token，或被连字符 / 下划线包裹），并沿祖先做有限层级回溯（翻转可能落在包裹容器上）；**MUST NOT** 用宽松子串正则判「已生效」，也不得用单个汉字（如「已」）作文本兜底。没有实测锚点的判据一律 fail-closed 诚实失败 （参照 flows/like-post.ts:27-60 属性白名单 + 3 层回溯、publish-command-handlers.ts:346-360 封面判据 fail-closed；现状反例 `xhs-command-router.js:52`、`:233`、`:287` — 见 oracle.md ⑬⑳）
 - [ ] 5.10 禁止**自证循环**：后置校验读回的证据不得是本命令自己刚写进页面的那段文本。文本类结果的校验须走结构信号 + 精确相等（去前导标记、去空白、大小写归一，并剔除隐藏后缀），不得对整段编辑器文本做包含判断 （参照 publish-post.ts:255-294 真话题标记判据：只认带话题属性的真标记、精确相等；现状反例 `xhs-command-router.js:256` 读回的正是自己刚写入的文本 — 见 oracle.md ⑭）
 - [ ] 5.11 按 5.9 / 5.10 逐条盘点现存后置判据（小红书注入路由 8 处、Facebook 加群的有界轮询复查、其余靠一次 sleep 后复读的分支），标出达标 / 不达标；不达标且实现点落在他人单写区（`xhs-command-router.js` 归 `restore-native-xiaohongshu-action-honesty`）的，只与属主对齐落地方式并回写 sha，本 change 不代改 （参照 engine.ts:39-41「校验器是接口式强制、缺判据即编译不过」 — 见 oracle.md ⑫）
@@ -293,7 +312,12 @@
    `select_mode_is_ambiguous_when_post_click_confirmation_crosses_the_deadline`（`:728`）、
    `submit_does_not_confirm_when_the_submitted_probe_crosses_the_deadline`（`:1007`，`unix_time_ms() + 50`）
    把**绝对墙钟死线**与「必须已经点出去一次」耦合在一起：机器有负载时死线在点击派发之前就到 ⇒ 回执变成 `deadline_expired_before_dispatch` / `mouse_releases == 0` ⇒ 红。
-   **实测**：干净主干 10 次全量里 **2 次**红（都落在有并发负载的那一段；随后 10 轮低负载配对测量里 0 次）。
+   **实测（2026-07-30 当天累计约 34 次全量，红 4 次 ≈ 12%，且全部集中在有并发负载的时段）**：
+   干净主干 10 次全量里 **2 次**红；随后 20 轮低负载配对测量（修 P4 的那次，两棵树各 10 轮）**0 次**；
+   接线落地后在主干上跑 `npm run gate:native`，**首跑即红**（`submit_does_not_confirm_when_the_submitted_probe_crosses_the_deadline`，
+   `left: NotStarted, right: Ambiguous` —— 50ms 预算在派发之前就到点），紧接着连跑 3 次又红 1 次。
+   **结论：P4 修掉之后，主干 Rust 门禁仍然不是稳定绿的，剩下的红全部来自这一族。**
+   「一个 50% 红的门禁比没有门禁更坏」这句话在 ~12% 这个量级上依然成立 —— 它还是会训练人无视红灯。
    属主是 `enforce-native-engine-artifact-gates` **8.4**（已写明修法：改可注入 / 测试可控时钟，或显式串行化）。
    **本 change 未动**（跨属主 + 另有 session 在 Facebook 侧）。
    一条对属主有用的观察：`submit_...` 那条给的预算是 50ms，而 `pointer_time_allowance_ms` 会据此把帧预算算成 **1** ——

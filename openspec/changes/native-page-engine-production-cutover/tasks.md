@@ -25,9 +25,22 @@
 - [x] 3.1 Port page-state classification and URL compatibility for home, explore, `search_result_ai`, note detail, profile, notification, publish, login, error, and unknown states.
   <!-- aidcp-edge 372936c: encoded Native probe and typed projections cover every listed state; fixture/unit tests include search_result_ai compatibility, query redaction, login precedence, notification, creator publish, error, and unknown behavior. -->
 - [ ] 3.2 Port DOM-first locating with visibility, geometry, ambiguity rejection, bounded retry/escalation, post-action validation, and cache promotion only after repeated success.
+  <!-- 承接边界登记（2026-07-30，由 restore-native-actuation-humanization-and-locating 的 5.8 回写；本条仍不勾） -->
+  - **本条只被部分承接，勿整条勾掉。** `restore-native-actuation-humanization-and-locating` 只承接**三道闸**
+    （后置校验 / 有界重试与升级 / 反污染回写），已于 `aidcp-edge 4a2c8d4` 建 `native/page-engine/src/locating.rs`、
+    `55c9d2e` 接进第一条真实命令（Facebook 点赞在 Reels 面、`note_id` 非 `/reel/` 地址那条分支）。
+  - **仍未承接、仍属本 change**：可见性 / 几何 / 歧义拒绝归各平台的目标解析能力；匹配唯一性闸、守卫层、
+    模型兜底、语义 class 白名单、可换接口均不在那条 change 内（见其 5.8 与 oracle.md 覆盖漏洞一节）。
+  - **「cache promotion only after repeated success」这半条在生产上仍是空转**：晋升逻辑与阈值已实现，
+    但每个定位器都是编译进二进制的固定选择器、无任何非确定性锚点来源，暂存区恒空。
+    那条 change 的 7.16 正因此**待人裁定**，其 5.4 / 5.5 明令裁定前不得按已实现勾掉 —— 本条同理，
+    **MUST NOT 因为「模块已存在」就把这半条读成已完成**。
 - [ ] 3.3 Implement Native pointer, wheel, keyboard, text, and file-input primitives with current humanization bounds and cancellation-safe atomic actions.
   <!-- Partial 2026-07-27, aidcp-edge 745b754: shared text input now preserves per-Unicode-scalar pacing, cancellation, and deadlines; captcha text uses bounded real keyDown/keyUp pairs with Shift cleanup. The broader pointer/wheel/file primitive task remains open. -->
   <!-- Partial 2026-07-28, aidcp-edge 02313f1: Facebook Feed and comment lazy-load wheel input now preserves the existing 650 px +/-20% distance across 8-15 frames with 16-60 ms inter-frame delays, an interior acceleration/deceleration peak, exact total distance, and cancellation/deadline checks. Rust unit/fake-CDP/full suites, clippy -D warnings, Edge acceptance/full tests, and typecheck passed. Pointer and file-input coverage remain open; no package, deployment, or live-account validation was performed. -->
+  <!-- 承接边界登记（2026-07-30，由 restore-native-actuation-humanization-and-locating 的 5.8 回写；本条仍不勾） -->
+  - **文件输入（file-input）这一半不在那条 change 内**，勿因其拟人化原语落地就把本条整条勾掉：
+    那条 change 承接的是指针 / 滚轮 / 键盘 / 文本四类原语的拟人化边界，**file-input 原语仍属本 change**。
 - [x] 3.4 Define bounded structured models for feed cards, search results, note details, profiles, notifications, interaction receipts, and publish receipts.
   <!-- aidcp-edge 804aadc: deny-unknown Rust command/result types cover the complete frozen command manifest; card/note/profile/notification/action/publish projections apply explicit text/list/URL/ID bounds. cargo test and clippy -D warnings passed. Command behavior remains sections 4-6. -->
 - [x] 3.5 Restore Native Facebook comment and Xiaohongshu search text entry to one humanized `Input.insertText` call per Unicode scalar, with pre-submit cancellation/deadline checks, exact readback, and cleanup before any failed commit.

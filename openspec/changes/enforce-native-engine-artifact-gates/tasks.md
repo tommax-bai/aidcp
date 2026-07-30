@@ -70,7 +70,19 @@
 - [ ] 8.1 给退役路径用例（当前抽样 6 个文件 4717 行：`test/flows/publish-command-handlers.test.ts`、`test/browse/browse-session.test.ts`、`test/locating/engine.test.ts`、`test/browse/note-extractor.test.ts`、`test/flows/like-runner.test.ts`、`test/integration/publish-e2e.test.ts`）加统一标记，标记依据为「其被测模块出现在生产剪枝黑名单里」，MUST NOT 用 skip
 - [ ] 8.2 让套件收尾分别报出「生产路径覆盖 / 退役路径覆盖」两个计数
 - [ ] 8.3 加一条对账断言：生产剪枝黑名单新增条目时，指向该模块的测试文件必须已被标记为退役覆盖，否则失败
-- [ ] 8.4 修 `native/page-engine/src/facebook/publish_tests.rs:1006-1035` 的截止期用例（:1022 的 `unix_time_ms() + 50`）：改用可注入 / 测试可控时钟表达「已过期」，或显式串行化；被测判定点在 `src/facebook/publish.rs` 点击前的过期检查，行为不改
+- [ ] 8.4 修 `native/page-engine/src/facebook/publish_tests.rs:1006-1035` 的截止期用例
+  - **频率与范围实测（2026-07-30，由 `restore-native-actuation-humanization-and-locating` 的第五波回写；本条仍归本 change 处置）**：
+    ① **范围比本条原文大**：不止 `:1022` 那一条。同族至少三条 —— `select_mode_reports_ambiguous_after_one_unconfirmed_click`（`:659`，`unix_time_ms() + 150`）、
+    `select_mode_is_ambiguous_when_post_click_confirmation_crosses_the_deadline`（`:728`）、`submit_does_not_confirm_when_the_submitted_probe_crosses_the_deadline`（`:1007`，`+50`）。
+    ② **频率**：当天累计约 34 次全量、红 4 次（≈12%），**全部落在有并发负载的时段**；20 轮低负载测量里 0 次。
+    在主干上跑 `npm run gate:native` **首跑即红**（`left: NotStarted, right: Ambiguous`）。
+    ③ **订正一条流传的旧结论**：`restore-native-xiaohongshu-session-guards` 7.4 记的「正常负载 39 次全量从未红」**不成立**，
+    多半是在空载下取样得出的 —— 与本批反复踩的「单独跑那个文件永远全绿」是同一种自证。
+    ④ **修法上的一个反直觉约束（动手前必看）**：`submit_...` 那条给的预算是 50ms，而 `pointer_time_allowance_ms` 会据此把帧预算算成 **1**，
+    也就是说**它今天能过，正是因为踩中了「预算不足就静默退化成瞬移」那条降级路径**。
+    单纯抬预算会让点击变慢、反而更容易红；「换可测试时钟」与「指针降级」这两件事必须一起想。
+    ⑤ 另一族（`fake_cdp.rs` 三条 feed-recovery 用例共用落点）已于 `aidcp-edge 7f9ea7f` 修掉，配对测量修前 7/10 红 → 修后 0/10。
+    **P4 修掉之后主干门禁剩下的红全部来自本条这一族。**（:1022 的 `unix_time_ms() + 50`）：改用可注入 / 测试可控时钟表达「已过期」，或显式串行化；被测判定点在 `src/facebook/publish.rs` 点击前的过期检查，行为不改
 - [ ] 8.5 按同一模式清理 `native/page-engine/tests/fake_cdp.rs` 里的 `unix_time_ms() + N` 绝对墙钟截止期
 - [ ] 8.6 修 `test/native-page-engine/client.test.ts:13-27` 的子进程握手预算（当前逐条 500 毫秒 / 进程 3 秒）：或抬到能容纳默认并行度下的进程启动，或把该文件显式串行化；两者择一并写清理由
 
