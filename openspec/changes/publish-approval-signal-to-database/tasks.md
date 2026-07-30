@@ -1,22 +1,3 @@
-# ⛔ 已划出计划（2026-07-30，用户裁定）
-
-> **本 change 的剩余任务已被划掉，不再是待办。已落地的代码原样保留、不回滚。**
->
-> 用户在通盘复核任务量时裁定：**发布授权信号入库** 这条不继续做。
-> 下面**每一条未勾选项都已就地标注「不是待办」**——`- [ ]` 的方框在这里不表示待办，只表示「没做，也不打算做」。
->
-> **进度快照（划掉时）：已做 52/58，剩余 6 项作废。**
->
-> ## 两条接手时必须知道的
->
-> 1. **这不是零开工的 change，是做到一半停的。** 已交付的部分是真上线的行为，
->    **MUST NOT 因为「这条被划掉了」就把已落地的代码当成实验品删掉**。
-> 2. **归档是另一个决定，本次没做。** 归档会把 `specs/` 下的 delta 并进主规格、
->    等于声称整套行为已上线，而这里只做了一部分。**若日后要归档，必须先把 delta 收窄到「实际交付的那部分」**，
->    否则就是在主规格里写下一条没人实现的保证。
->
-> 恢复做法：删掉本节与各条的「不是待办」标注即可，任务原文未改动。
-
 ## 1. aidcp — 控制仓文档与盘点范围
 
 > 本节全部落在控制仓文档上。5 个并行 change 都要改 `docs/cloud-service-decomposition-proposal.md`，
@@ -37,7 +18,7 @@
 <!-- 2026-07-23 主控套用 docpatch 补丁 5：docs/cloud-service-decomposition-proposal.md §14.1 尾部追加红线 AC-DECOMP-32（可检测性·已批准待下发）。原稿拟 31，因三条并行新增红线按套用顺序排号、config-mirror 先取 31，本 change 顺延为 32（boundary-gates=33）。 -->
 - [x] 1.7 在仓内产出阶段 0 盘点表初版（六类，至少覆盖本 change 已坐实的：审批信号文件、`interaction-env:<envKey>` advisory lock、`interaction-store.ts:409` / `:989` 两把单服务内锁、常驻定时任务）。**常驻定时任务的计数 MUST 同时给出两个数、且 MUST 在实施当天重测**：定稿 §4.6.5 / §12 阶段 0 的「14」是逐个定归属的**宿主**数（其第 13、14 项并非 `setInterval`），本稿的「24」是 `grep -rn setInterval src` 的**调用点**数（2026-07-22 实测在 23–24 之间漂动）。两者不是一回事，只写一个数会让盘点者提前收工。
 <!-- aidcp-cloud 66d05e7 docs/cross-service-shared-state-inventory.md；计数两口径：宿主 14（引定稿）/ 调用点 2026-07-23 当日实测 26（含本 change 新增看门狗，主干应为 25）。表放 sub-repo 而非控制仓：控制仓 docs/ 是 5 个并行 change 的冲突热点，指针由 docpatch 补丁 3 加入定稿 -->
-- [ ] **【已划出计划 2026-07-30，不是待办】** 1.8 影子写关闭后更新 `CLAUDE.md` §4 中「发布审批信号文件两端契约路径必须一致」的表述，改为「授权以持久记录为准，两端不得依赖同机路径」。
+- [ ] 1.8 影子写关闭后更新 `CLAUDE.md` §4 中「发布审批信号文件两端契约路径必须一致」的表述，改为「授权以持久记录为准，两端不得依赖同机路径」。
 <!-- BLOCKED: 前置条件未满足——影子写仍默认开（AIDCP_PUBLISH_APPROVAL_LEGACY_SIGNAL_FILE 默认 true），两端确实仍写同一路径，CLAUDE.md 现有表述在过渡窗口内仍准确。改法已备在 docpatch 补丁 6，标注「现在还不能套用」。2026-07-23 主控复核：docpatch 补丁 6 未套用，CLAUDE.md §4 保持原表述（影子写关闭 + 两端满一发布周期无读者后另起独立收尾）。 -->
 
 ## 2. aidcp-cloud — 持久授权记录与单写出口（未来 api 域）
@@ -111,9 +92,9 @@
 
 - [x] 5.1 产出 `pg_advisory_*` 引用点盘点表：`src/client-auth/client-user-store.ts:619`、`:1468`、`:2001`、`:2128`（api）、`src/interactions/interaction-store.ts:339`（automation）、`:409`、`:989`（单服务内），每行标注 key 命名空间、归属服务、是否跨服务。
 <!-- aidcp-cloud 66d05e7 docs/cross-service-shared-state-inventory.md 类别 6a -->
-- [ ] **【已划出计划 2026-07-30，不是待办】** 5.2 新增内部端点 `PUT /internal/environments/{envKey}/auth-state`，由 api 侧在事务内 `SELECT ... FROM client_environments WHERE env_key=$1 FOR UPDATE` 后写 `interaction_auth_state`。
+- [ ] 5.2 新增内部端点 `PUT /internal/environments/{envKey}/auth-state`，由 api 侧在事务内 `SELECT ... FROM client_environments WHERE env_key=$1 FOR UPDATE` 后写 `interaction_auth_state`。
 <!-- BLOCKED: 未做。`upsertAuthStatus` 是一个跨 interaction_offboards / interaction_offboard_audit / interaction_auth_state 的长事务方法，把它整体搬进 ClientUserStore 属跨 Store 边界的大重构，回归面远超本 change 其余改动的总和。**跨服务 advisory lock 已在 5.3/5.4 被行锁消除**（本项的安全目的已达成）：拆库后 automation 连不到 client_environments 是**响亮的失败**而非静默失去互斥。残留缺口（写点仍在 automation）已在盘点表末尾明写 -->
-- [ ] **【已划出计划 2026-07-30，不是待办】** 5.3 `src/interactions/interaction-store.ts:333` 的 `upsertAuthStatus` 改经 5.2 的端点，删除该处 `interaction-env:` advisory lock
+- [ ] 5.3 `src/interactions/interaction-store.ts:333` 的 `upsertAuthStatus` 改经 5.2 的端点，删除该处 `interaction-env:` advisory lock
 <!-- 部分完成（aidcp-cloud 66d05e7）：该处 advisory lock **已删除**，改为同事务内 client_environments 行锁（lockEnvironmentRow）。BLOCKED 的是「改经 5.2 端点」那一半，理由同 5.2 -->
 <!-- aidcp-cloud a9ce113 修：行锁在**环境未注册**时命中 0 行 ⇒ 既不加锁也不报错，而本写点恰恰不要求注册行存在（上游校验不查注册表，握手时的自动登记还是 fire-and-forget）⇒ 换掉 advisory lock 却留了同一种无声失效。现取锁结果是可判定返回值（locked/unregistered，未取到即记日志），未注册时回落去锁该环境的客户归属行 client_env_scope（解绑侧正是遍历那张表找环境的）；两张表都无行才是真无对手 -->
 - [x] 5.4 `src/client-auth/client-user-store.ts` 四处 `interaction-env:` 改为对 `client_environments` 按 `env_key` 升序取行锁；`:1468`、`:2001` 既有的排序取锁顺序 MUST 保持不变（死锁序不回归）。
@@ -157,7 +138,7 @@
 <!-- aidcp-cloud a9ce113 补三条回归：告警必须指明账号（alerts 行 + 文案）；一个接收端都没有时 MUST NOT 计成已送达；候选窗口打满本身要响。原用例全部用 subjectKind='publish' 的行，故完全没覆盖评论行滞留这一形态（见 4.1 / 4.3 修复注） -->
 - [x] 8.5 cloud：`execution_target` 隔离测试——非本机 target 的 `pending_dispatch` 行不被兜底扫描拉取。
 <!-- aidcp-cloud 3a4ff8e：Store 层断言查询带 execution_target = $1 且实参为本机 target；看门狗断言只传本机 target -->
-- [ ] **【已划出计划 2026-07-30，不是待办】** 8.6 cloud：advisory lock 替换后的串行测试——首次登录态写入与客户解绑对同一 `envKey` 仍观察到单一串行顺序。
+- [ ] 8.6 cloud：advisory lock 替换后的串行测试——首次登录态写入与客户解绑对同一 `envKey` 仍观察到单一串行顺序。
 <!-- BLOCKED: 桩验不了。行锁的串行性是 PostgreSQL 的运行时性质，必须两个并发真事务打同一 envKey 才能证明；用假 pool 只能断言「发了哪条 SQL」，那是把结论写进桩里。已改为静态检查（5.5 的 AC-LOCK-01/02，防回归）+ 真机验收项 -->
 - [x] 8.7 cloud + edge：`publish-approval-contract` 验收改判据——从「同一文件路径」改为「同一 `requestId` + 同一 `contentVersion` 的授权判定」；edge 侧断言改为「生产路径无文件依赖」。`AC-PUB-*` MUST 仍全过。
 <!-- aidcp-edge 0b5f536 重写 test/acceptance/publish-approval-contract.test.ts（AC-PUB-01 生产路径无文件依赖 / AC-PUB-03 未启用即拒 / 其余判据保留）；cloud 侧 test/acceptance/publish-approval-contract.test.ts 保留（它验的是 parseApprovalActionValue 入口与路径构造，作为影子写实现的契约仍成立），授权判定的新回归落在 3a4ff8e 的 Store / outlet / dispatcher 三组用例 -->
@@ -166,7 +147,7 @@
 <!-- aidcp-cloud a9ce113 复跑（修完六处静默后）：acceptance 70/70 fail 0；full tests 2944 / pass 2936 / fail 0 / skipped 8；typecheck 干净。edge / console 本轮无改动，沿用上一行实测 -->
 - [x] 8.9 console：待下发态呈现与字段缺省回落的聚焦测试。
 <!-- aidcp-console 851df74 src/pages/ContentPage.test.tsx 三条：可区分 + 无原因超阈值告警标记 + 字段缺省回落 -->
-- [ ] **【已划出计划 2026-07-30，不是待办】** 8.10 端到端（dev）：审批通过后停掉下发侧，确认界面在阈值内显示「已批准·待下发」+ 阻塞原因，阈值后收到告警；恢复下发侧后稿件正常发出，全程无重复发布。
+- [ ] 8.10 端到端（dev）：审批通过后停掉下发侧，确认界面在阈值内显示「已批准·待下发」+ 阻塞原因，阈值后收到告警；恢复下发侧后稿件正常发出，全程无重复发布。
 <!-- BLOCKED: 真机验收项，需 dev ECS + 真库 + 真边缘。本 session 不部署、不碰 ECS -->
-- [ ] **【已划出计划 2026-07-30，不是待办】** 8.11 关闭影子写前的验证：确认无任何读者读取 `/tmp/aidcp-publish-approve-*`，dev 与 ol 各观察满一个发布周期；关闭动作单独提交、可单独回滚。
+- [ ] 8.11 关闭影子写前的验证：确认无任何读者读取 `/tmp/aidcp-publish-approve-*`，dev 与 ol 各观察满一个发布周期；关闭动作单独提交、可单独回滚。
 <!-- BLOCKED: 真机验收项 + 需要观察期。影子写开关已实装（AIDCP_PUBLISH_APPROVAL_LEGACY_SIGNAL_FILE，默认 true），关闭是一次改 env 即可回滚的独立动作，但关闭本身与观察期不在本 session 范围 -->
