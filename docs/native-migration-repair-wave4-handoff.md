@@ -178,22 +178,49 @@ A 流前三轮是「报一条、修一条」，主项每次都真修好，但**�
 
 ---
 
+## 6.5 台账回写时又抓出三件（本节后补）
+
+回写台账的三个 agent 各自发现了一件我没预料到的事，都已落进控制仓 `277183d8`：
+
+### 6.5.1 两份 tasks.md 里都有**从未推送过的 sha**
+
+原台账记的是**合并前 worktree 的本地 sha**——它们从来没进过 `origin/master`，谁也 `checkout` 不出来。
+两份文件合计 47 处已换成落地等价提交。
+
+**判定法要用 `git merge-base --is-ancestor <sha> master`，不是「能不能 `git show`」**：
+本地对象库还留着旧 sha，**`git show` 成功恰恰是陷阱**。这条比 memory 里那条记法更精确。
+
+### 6.5.2 一次跨属主越界已经发生
+
+`f652786` 改了 `scripts/prune-production-dist.mjs` / `native-engine-inventory.cjs` / `artifact-gates.test.ts`，
+**与该 change 自己的 5.7「不改该文件一行」直接冲突**。方向是收紧（把分片泄漏守卫从「只数 Facebook 清单」
+改成按目录派生），**但须属主追认**，不能当成默认通过。
+
+### 6.5.3 8.1 只做了一半，且剩下的部分有一条**待裁定**
+
+5 个输入消费点只落了 2 个（评论提交、发布字段填写）；话题/提及候选、遗留步骤输入步、定时设置未落。
+
+**待裁定**：定时设置是**分段日期时间控件**，退役实现用的就是原生 setter。
+照任务字面「逐字打进去」做，**会是功能回归**。裁定前别按字面实装。
+
+---
+
 ## 7. 在飞的（接手时先确认状态）
 
-**控制仓台账回写**：本 session 末尾派了一个 workflow（3 个 agent）回写两份 `tasks.md`、
-并入真机验收清单、更新 `docs/native-migration-repair-handoff.md` 的 §3/§4/§5。
-**它要求在控制仓提交但不 push**，主控统一推。
+**台账回写已完成并推送**（控制仓 `277183d8`）：两份 `tasks.md` 已按已推送的 sha 勾选与登记；
+真机项并入 `docs/real-machine-acceptance-backlog.md` 的**新增簇 122**（小红书运行期身份与验证码键入取证，17 条）
+与**簇 123**（小红书写动作拟人化与云端节奏消费，23 条）；`docs/native-migration-repair-handoff.md`
+的 §3/§4/§5 已更新（第四波结项、改写成第五波、§5 第 3 条已订正）。
+两条 change 的 `openspec validate --strict` 均通过。
 
-接手先跑：
+> 两簇都写明：**仅 push 不生效，必须重打桌面客户端包**——主体是编进 Rust 二进制的引擎 / 原语 / 分片。
+
+接手起手确认：
 
 ```bash
-git -C /Users/baitianxing/codes/aidcp status --short
 git -C /Users/baitianxing/codes/aidcp log --oneline -3
-openspec validate restore-native-xiaohongshu-session-guards --strict
-openspec validate restore-native-actuation-humanization-and-locating --strict
+openspec list | grep -E "restore-native-(xiaohongshu-session-guards|actuation)"
 ```
-
-若台账未回写完，**照第 5、6 节自己补**——那两节就是它的素材。
 
 ---
 
