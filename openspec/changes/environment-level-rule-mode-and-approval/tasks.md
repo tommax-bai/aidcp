@@ -25,6 +25,7 @@
 - [x] 2.4 确认规则进度、浏览去重事实与批次终态三张表保持账号键不变；补测「换绑后新账号从零收集、不继承去重集合、旧账号在途批次按自身账号键如实收敛」。
 - [x] 2.5 确认慢启动对规则模式的绝对优先权、规则定义版本、风控与配额安全闸逐条未变，补回归测试。
 - [x] 2.6 面板 API 的规则模式与审批策略写入口改按环境定位并回读真态。
+  <!-- aidcp-cloud 6a77b05: added strict envKey PUTs and environment-list truth projections, removed account-targeted PUTs, returned each setter's committed row without a second fallible read, and projected execution binding with the runtime resolver. Validation: 53 focused Panel/policy tests, full 3916 pass + 11 skipped, typecheck. -->
 
 ## 3. aidcp-edge — 创建表单与提交契约
 
@@ -37,12 +38,11 @@
 
 ## 4. aidcp-console — 按环境配置
 
-<!-- 未做：按主控裁定与另一条流串行——两条流都要重排同一片配置面，等本变更落地后再做。客户接口回包新增的 stored_definition_mismatch 具名问题字段目前也只在负载与日志里可见，Console 未呈现。 -->
-
-- [ ] 4.1 规则模式开关由账号维度改为环境维度，保留写后回真态与非乐观呈现。
-- [ ] 4.2 全局免审选择由账号维度改为环境维度；未绑定环境可配置并如实标注当前没有执行对象。
-- [ ] 4.3 界面明确该配置作用于环境、由当前绑定账号执行，换绑后不展示旧账号为当前生效者。
-- [ ] 4.4 补对应前端测试。
+- [x] 4.1 规则模式开关由账号维度改为环境维度，保留写后回真态与非乐观呈现。
+- [x] 4.2 全局免审选择由账号维度改为环境维度；未绑定环境可配置并如实标注当前没有执行对象。
+- [x] 4.3 界面明确该配置作用于环境、由当前绑定账号执行，换绑后不展示旧账号为当前生效者。
+- [x] 4.4 补对应前端测试。
+  <!-- aidcp-console 8798fd9: moved both controls to Environments, removed account-targeted writes, kept account runtime progress read-only, surfaced stored definition mismatch with a safe disable path, and only claims an executor for a matching unique binding. Validation: 38 focused tests, full single-worker 304 pass + 1 skipped, typecheck, production build. -->
 
 ## 5. 验证与集成
 
@@ -51,12 +51,17 @@
 <!-- 2026-07-28 deployed dev — 0097 applied (expand, 20ms)；回填：规则模式 22→20（2 行 environment_missing）、审批策略 22→21（1 行 environment_missing）；20 行新配置全部带 v2 定义身份，证实 CHECK 必须新旧都接受 -->
 
 - [x] 5.1 各仓跑聚焦测试 → 全量测试 → typecheck，输出有界记录。
-- [x] 5.2 各 worktree rebase 到最新默认分支、重跑必需验证、fast-forward 集成并推送，回写本清单的 commit-sha。
+  <!-- Cloud: focused Panel/policy 53/53, acceptance composition 25/25, full 3916 pass + 11 skipped, typecheck. Console: focused 38/38, full single-worker 304 pass + 1 skipped, typecheck and Vite production build. Two default-worker Console attempts timed out only in untouched suites; isolated reruns passed, so the deterministic single-worker full run is the recorded gate. -->
+- [ ] 5.2 各 worktree rebase 到最新默认分支、重跑必需验证、fast-forward 集成并推送，回写本清单的 commit-sha。
 - [x] 5.3 `openspec validate environment-level-rule-mode-and-approval --strict` 通过。
+  <!-- 2026-07-30 strict validation passed after Cloud/Console implementation and delivery-boundary updates. -->
 
 ## 6. 交付边界
 
 - [x] 6.1 数据迁移在 DEV 先执行并核对回填结果与跳过清单，再谈其它环境。
-- [ ] 6.2 客户端与服务端的归属完成契约扩展必须同批上线；新客户端配旧服务端会因白名单整请求 400 而建不出环境，发版顺序需显式核对。
-- [ ] 6.3 OL 部署、Edge 打包签名与真实账号写入验收不在本变更范围，分别作为独立事实报告。
-- [ ] 6.4 规则模式脱离人设入口闸不在本变更范围，另立变更承接。
+- [x] 6.2 客户端与服务端的归属完成契约扩展必须同批上线；新客户端配旧服务端会因白名单整请求 400 而建不出环境，发版顺序需显式核对。
+  <!-- Release-order check: Cloud 985d47e and Edge 959504d are both ancestors of their current origin/master. DEV received the Cloud contract/migration before any future installer release; no installer is produced by this change. Any later client release must target a server at or after that Cloud contract. -->
+- [x] 6.3 OL 部署、Edge 打包签名与真实账号写入验收不在本变更范围，分别作为独立事实报告。
+  <!-- Boundary retained: this completion deploys only DEV Cloud/Console after integration; no OL mutation, Edge package/signing, or real-account platform write is authorized. -->
+- [x] 6.4 规则模式脱离人设入口闸不在本变更范围，另立变更承接。
+  <!-- Tracked separately by active change facebook-rule-mode-without-persona; no persona-gate behavior is changed here. -->
