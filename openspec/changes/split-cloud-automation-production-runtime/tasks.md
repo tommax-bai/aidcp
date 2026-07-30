@@ -797,7 +797,65 @@
   <!-- 📌 **2.4 需要第三个工作区**（automation 的手写组装根，cloud 里根本没有这个文件）。
        派生仓的手写组装根从不同步，只能手工改 + 手工 land。 -->
 - [ ] 2.5 按岔口 A 的裁决落地模型调用出口；按岔口 B 的裁决落地四个角色工厂。
-- [ ] 2.4a **落地位置已坐实（2026-07-30，接线批次之后顺带勘的；下一手照此开工，不必重查）。**
+- [x] 2.4a **落地位置已坐实（2026-07-30，接线批次之后顺带勘的；下一手照此开工，不必重查）。**
+  <!-- aidcp-cloud 3fe4b94。segC 新增 `contentReadAuthority`：仅 `seamMode === 'automation'` 建
+       `ConceptPoolAuthorityHttpClient` / `CuratedSelectionAuthorityHttpClient`（共用一个 InternalHttpClient
+       + `AIDCP_CONTENT_INTERNAL_TOKEN` + deploymentTarget），缺 URL 或缺 target **点名抛**
+       `content_read_authority_unavailable:<缺的那项>`；其余四模式**一个客户端都不建**、逐位保持既有行为。
+       选择写成三元不是 `??`：`??` 会在客户端字段意外 undefined 时静默取到本地属主实例，
+       那正是本块要消灭的形态。
+       改指端口的消费点共五处：dispatcher 的 `conceptStore`、scheduler 的 `conceptStore`、
+       scheduler 的 `curatedStore`、发帖调度器的在场判定 `if (conceptPoolPort && likedNoteStore)`、
+       评论搜索词那层薄适配（其具名 `not_configured` 原样保留，0.6f 的吞点①没退回去）。
+       全量：typecheck 零错；acceptance 177/177；`npm test` 4023 pass / 0 fail（基线 4022，+1 为新用例）；
+       `boundaries:refresh` 零漂移，crossBoundaryEdges / exemptionEntries 仍是 0。 -->
+  <!-- ⚠️ **精选那条只做了一半，且是有意的**：`CuratedSelectionPort` 只有两条**读**方法
+       （`selectForCreation` / `selectSamplesForSearchTerms`），覆盖不了 segC 里另外三处属主实例用法——
+       ① dispatcher 的 `curatedStore`（opaque Sink 句柄，透传给 content 角色工厂、**含写**）；
+       ② `markBotAction`（自有点赞/收藏并入精选语料，是一次真写）；
+       ③ `curatedContentCapability` 的在场判定。
+       ①归 **task 2.5**（角色工厂那个岔口）；②③今天**没有端口面可接**，要接得先补写口契约。
+       所以 `content-curated-write-authority` 这条台账**不该只凭本条就撤**——它的名字里的 write 是真的。 -->
+  <!-- 📌 **关于「门 12 → 10」这个预期，实读后的更正（2026-07-30）**：本条**没有**减门，且不该减。
+       两把尺的关系比交接文档写的更细一层：
+       ① automation 台账那条的撤条判据是它自己的 docblock 写死的——
+          「only dependencies that prevent this package from supplying the complete production process」；
+       ② 而 **task 3.1 写 `main()` 在 task 4.1 清台账之前**（§3 与 §4 的顺序，不是我的解读）。
+          在 `main()` 真把 `contentClients.conceptPool` 喂进 RoleDispatcher / PublishScheduler 之前，
+          这条依赖**仍然**在阻止本包交付完整进程。
+       ⇒ 台账清零属**第 4 段**，第 2 段的交付物是「让每条依赖变得可满足」，不是「减门」。
+       本条把概念池那条做到了「只差 main() 注入」：kernel 端口 ✓ / 传输三件套 ✓ / content 侧路由注册 ✓ /
+       automation 根已建客户端 ✓（2.4）/ 消费面已是端口类型 ✓（0.6b、0.6g）/ **生产消费者已存在** ✓（本条）。
+       **别据此改交接文档里那句「起手就能做的两条能减门」而不改理由**——减门的时机变了，工作量没变。 -->
+  <!-- **变异实测（§6.5：要问哪条用例抓住的）**：六个变异，**typecheck 对每一个都是绿的**——
+       属主实例结构上就满足那两个窄端口，编译器分不出「本地实例」与「HTTP 客户端」。
+       六个全部只由新加的那一条 acceptance 用例抓住（`composition-root-4a-mode-wiring.test.ts`）。
+       **其中一个变异逃过了这条用例的第一版**：在 `throw` 前面插一句 `return undefined;`，
+       整条 fail-closed 就退化成静默回落本地实例，而「那句 throw 在文本里」的断言照样绿。
+       用例已改断结构（本 IIFE 只许有一处提前返回，且就是模式守卫那处）。
+       用例注释里写明了「别当冗余删掉」。 -->
+  <!-- ⚠️ **踩到一次、记下来省别人一次**：跑变异用 `git checkout <file>` 还原会**从索引区**还原，
+       未 staged 的本次改动当场没了；后续两个变异因此测的是「标记找不到」而不是变异本身、
+       看着也是红的、**结论完全是假的**。变异还原一律用文件级备份（`cp` 出去再 `cp` 回来）。 -->
+  <!-- **另一条实测**：`aidcp-automation` 里同名的 `composition-root-4a-mode-wiring.test.ts`
+       是一份 `// aidcp:test-owner=derived` 的**派生私有文件**（7 条用例、断的是 automation 根），
+       与 cloud 这份同名不同物、互不同步，本次改动对它零影响。 -->
+  <!-- 2026-07-30 23:05 已部署第九批（aidcp-cloud@3fe4b94，**仍是单体形态**）。
+       快照来源：从 master 目标提交 `git archive` 出的干净快照，不从任何 worktree 部署。
+       备份 /opt/aidcp/cloud.bak.20260730-230507.tar.gz + .env.bak.20260730；package.json 零变更故未动 node_modules。
+       **迁移：三属主逐一 `migrate status` 全部「待应用 0」**（content 0069 / automation 0102 / api 0100），
+       本批零新增迁移，故未跑 `migrate up`（§4.6 那一步照查了，不是省了）。
+       healthcheck 全过：active running、NRestarts=0；8787 + 面板 8090 + 客户鉴权 8091 全在监听；
+       **三属主库各自 `select 1` 均回 1**；飞书长连接已建立（WSClient onReady）；
+       ConceptStore / CuratedContentStore / PublishScheduler / CommentScheduler 均打「已就绪」；
+       重启后错误行数 0，2 分钟 soak 后仍为 0。isales 四服务全程 active、未触碰。
+       **启动日志确认跑的是 `monolith`**（「拆段传输已接线（monolith）」）⇒ 本批新代码在 dev 上走的是
+       `contentReadAuthority === undefined` 的那一支，即**本地属主实例、逐位等价**。
+       ⇒ 按 5.3 的口径：**这只证明单体现网零回归**，automation 分支在 dev 上一次都没被执行过，不声称。
+       ol 未部署、用户未提。 -->
+- [ ] 2.4b **精选写口（`content-curated-write-authority` 剩下的那一半）**：为 `markBotAction`
+  与精选能力在场判定补跨属主面，或明写它们由 2.5 的角色工厂岔口一并承接。
+  **不能留空**——今天 segC 对属主实例的这两处用法没有任何端口覆盖，而条目名里的 write 指的正是它们。
   <!-- **消费面早就不是问题**：0.6c / 0.6e / 0.6g 那批已经把四个注入面全改成 kernel 端口类型
        （`ConceptStorePort` / `SchedulerConceptStore` / `CuratedSelectionPort`），
        所以剩下的**只是组装根按模式注入哪一个实现**——与刚做完的委托那条**同形**。

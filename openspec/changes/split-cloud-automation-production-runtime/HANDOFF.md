@@ -35,6 +35,13 @@ python3 -c "import json;print(json.load(open('../aidcp-automation/boundaries/com
 cd ../aidcp && openspec validate split-cloud-automation-production-runtime --strict
 ```
 
+> **2026-07-30 23:09 更新（本 session）**：cloud 已推进到 `3fe4b94`（task 2.4a 落地，见 §3 与 §5）。
+> 期望值随之变为：`cloud=3fe4b94`、tasks.md `56/109`、cloud 全量 `4023 pass / 0 fail`、
+> acceptance `177/177`。**门仍是 12 条，且本条不该减门——理由见 §5 的更正段。**
+> 其余五仓的 sha 与 pin 一字未动（本条只改组装根与一条 cloud 私有用例，两者都不进派生同步）。
+> **dev 已部署第九批 = `3fe4b94`**（单体形态，零新增迁移，三属主 migrate status 均「待应用 0」，
+> healthcheck 全过、2 分钟 soak 错误 0、isales 未触碰）。ol 仍一次没动。
+
 **2026-07-30 17:00 实测期望值：**
 
 ```
@@ -99,8 +106,8 @@ rsync → `migrate status`（待应用恰好 3 条）→ `migrate up`（0100/010
 | `feishu-operator-natural-language-delegate` | 指令 | **已接线**（`319b0af`）：四个接线点全走取数聚合口、remote 指向 automation。**条目没清是因为探针分不出**，见下 |
 | `feishu-operator-delegated-card-actions` | 指令 | 同上（注入同一个端口即同时点亮它与自由文本那条） |
 | `feishu-operator-dispatch-start-stop` | 指令 | **只接了服务端**；api 侧卡在签名（面板的状态灯是同步布尔，远端读是异步三态）——见 tasks 1.3a，需拍板 |
-| `content-concept-write-authority` | 内容 | 契约 + 路由已注册 + 客户端已建，**缺生产消费者** |
-| `content-curated-write-authority` | 内容 | 同上 |
+| `content-concept-write-authority` | 内容 | **生产消费者已补齐**（`3fe4b94`，task 2.4a）：只差 §3 段的 `main()` 把客户端喂进去。**撤条属第 4 段**，见下 |
+| `content-curated-write-authority` | 内容 | 读那一半同上；**写那一半没做**：召回端口只有两条读方法，覆盖不了 dispatcher 的 Sink 句柄、`markBotAction`、能力在场判定（task 2.4b / 2.5） |
 | `content-facebook-publish-media-authority` | 内容 | 契约已写，**路由未注册、未接线** |
 | `content-token-usage-authority` | 内容 | 契约已写，**路由未注册、未接线**；端口是「提交已合并的增量」而非逐条上报，**属主今天没有这个方法** |
 | `content-textcard-transcription-authority` | 内容 | 能力二态端口已写，未接线 |
@@ -255,17 +262,23 @@ systemd 只有 `Restart=on-failure` / `RestartSec=5`、无 OnFailure、机器上
 > **用户 2026-07-30 已选定：先做第 2 段（内容侧 8 条），理由是减门最多。**
 > 开工指令已按符号写进 `tasks.md` 的 **2.4a**——**照它开工，不必重查落地位置**。
 
-### 起手就能做：第 2 段的两条最轻的（门 12 → 10）
+### ~~起手就能做：第 2 段的两条最轻的（门 12 → 10）~~ ✅ 已做（`3fe4b94`），**但「门 12 → 10」这句是错的**
 
-`content-concept-write-authority` 与 `content-curated-write-authority` 只缺「生产消费者」。
-**这段比 tasks.md 字面读起来轻**：
-- 消费面早就改成 kernel 端口类型了（0.6c / 0.6e / 0.6g 那批）；
-- 传输三件套齐了（`content-authority-http.ts` 的两个注册函数 + 两个客户端，**只用不改**）；
-- ⇒ 剩的**只是组装根按模式注入哪一个实现**，与刚做完的委托那条**同形**。
+接线本身按 tasks.md 2.4a 原样落地了：segC 新增 `contentReadAuthority`，
+只在 `seamMode === 'automation'` 建那两个 HTTP 客户端、缺配置点名抛，其余四模式逐位不变；
+五处消费点改指端口。全量绿、六仓零漂移。细节与变异实测记在 tasks.md 2.4a 的注释里。
 
-两处注入点、要照抄的判例（人设生成器那处的 seamMode 分流，**缺配置直接抛、绝不静默回落本地**）、
-以及「别照搬什么」（那几处降级点已被 0.6f 收成具名抛出，换实现时不能顺手退回空数组），
-全在 tasks.md 2.4a 里，带符号名。
+**⚠️ 两处更正，下一手务必按更正后的读：**
+
+1. **本条不减门，且不该减。** 撤条判据写死在 automation 台账自己的 docblock 里
+   （「阻止本包交付完整生产进程的依赖」），而 **tasks 3.1 写 `main()` 排在 tasks 4.1 清台账之前**。
+   `main()` 没把客户端喂进 RoleDispatcher / PublishScheduler 之前，这条依赖仍在阻止交付。
+   ⇒ **第 2 段的交付物是「让每条依赖变得可满足」，减门是第 4 段的事。**
+   本文原先那句「两条最轻的 → 门 12 → 10」把两段的产出算到了一起。
+2. **精选那条只做了读那一半。** `CuratedSelectionPort` 只有 `selectForCreation` /
+   `selectSamplesForSearchTerms` 两条读方法；segC 里另外三处属主实例用法它覆盖不了——
+   dispatcher 的 opaque Sink 句柄（**含写**，归 2.5）、`markBotAction`（一次真写）、
+   能力在场判定。**条目名里的 write 是真的**，已新开 task 2.4b 记着，不能靠 2.4a 撤掉它。
 
 ### 然后（同段，按依赖）
 
@@ -439,6 +452,15 @@ kernel 头一动，transport 与三个业务仓的 pin 全部作废，整条链�
 
 ⇒ 若某条不变量只被一条不起眼的用例守着，**在注释里明写「别当冗余删掉」**，
 否则那句理由只活在你脑子里，而删它的人看到的是全绿。
+
+**2026-07-30 又咬了第三次，形态是新的：断言「那句 `throw` 在文本里」证明不了它可达。**
+2.4a 那条 fail-closed 分支，在 `throw` 前插一句 `return undefined;` 就整条退化成静默回落本地实例，
+而断言 throw 文本的那条 match **照样绿、typecheck 也照样绿**。改断结构（本 IIFE 只许一处提前返回）
+才抓得住。⇒ **源码级用例断「某段文本在」是弱断言**，要断的是「没有别的出路」。
+
+**⚠️ 跑变异时别用 `git checkout <file>` 还原**：它从**索引区**还原，未 staged 的本次改动当场消失。
+后果不是报错，是**后续变异全测在一个空壳上**——标记找不到 → 用例红 → 看着像「变异被抓住了」，
+而结论完全是假的。用文件级备份（`cp` 出去、`cp` 回来）。这次实测踩过，两个变异结论作废重跑。
 
 ### 6.6 行号会漂，注释**只写符号名**
 
