@@ -46,12 +46,13 @@ tasks.md 54/105
 测试 cloud 4022 / api 493 / automation 1960 / content 439 / kernel 59 / transport 36，全 0 fail
 ```
 
-**⚠️ dev 停在 `843bac6`，落后主干，而且这次落后是有原因的、不是漏部署：**
-主干上现在还叠着另一路 change（可配置 Facebook 消费模式）的一大批改动，它把
-`REQUIRED_SCHEMA_VERSION` 抬到了 **0102** 并新增迁移 0100–0102。
-⇒ **谁要部署主干，必须先在 ECS 上 `npm run migrate up` 补 0100–0102，否则 schema 门直接拒起**
-（enforce 下抛出 → 每 5 秒静默重启，见 §4.6）。那批改动的现网验证属于它自己那一路，我没代它部署。
-我这两批的 delta 是测试 + 边界生成物 + 注释，**运行时逐位不变**，没有单独部署的必要。
+**dev 已跟到主干 `9df5210`**（2026-07-30 19:28，用户要求合并主干重部）。这批带上了另一路 change
+（可配置 Facebook 消费模式），所以部署序列里**真的用上了那一步**：
+rsync → `migrate status`（待应用恰好 3 条）→ `migrate up`（0100/0101/0102）→ 重启 → healthcheck + 2 分钟 soak。
+三属主库、属主隔离、schema 门逐属主结论全部实测通过；isales 未触碰。**ol 仍一次没动。**
+
+> **顺序倒过来会怎样是实测过的**：那批把 `REQUIRED_SCHEMA_VERSION` 抬到 0102，先重启则 schema 门
+> enforce 下抛出 → 进程退出 → systemd 每 5 秒静默重启、零告警（§4.6）。**以后带迁移的批次一律先补再重启。**
 
 `crossBoundaryEdges` **不是 0** ⇒ 有人新增了跨服务耦合，先查清再往下走（棘轮只许下降）。
 

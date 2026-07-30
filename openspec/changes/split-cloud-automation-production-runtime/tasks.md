@@ -936,6 +936,34 @@
        **一条值得记的区分**：这次漂移是**响亮的**（测试当场红），而上次 `ownership-rules.json`
        漂 88 行那次是**静默的**（检查读的是已生成的产物、把窟窿盖住了）。这影响 0.7c 的优先级判断。
        另：`sync-split-repos` 对迁移文件**只报不改**，0099 要手工拷进 automation 仓（对账会报「缺 1」）。 -->
+  <!-- 2026-07-30 19:28 已部署第七批（aidcp-cloud@9df5210，仍是单体形态）。**本批合了主干**，
+       所以带上了另一路 change（可配置 Facebook 消费模式，`f58c2d2`）——用户 2026-07-30 明确要求合并主干重部。
+       备份 /opt/aidcp/cloud.bak.20260730-192622.tar.gz + .env.bak.20260730；
+       cloud 侧 package.json / package-lock.json 相对已部署的 843bac6 **零变更**，故未动 node_modules。
+       **顺序是硬的，本批真用上了**：rsync → `migrate status`（确认待应用恰好 3 条：automation 2 / api 1 /
+       content 0，且三条 kind 都是 expand、不会被 `--allow-contract` 闸拦）→ `migrate up`
+       （applied 0101 33ms / 0102 53ms / 0100 48ms）→ 重启 → healthcheck。
+       **顺序倒过来会怎样是实测过的链路，不是推测**：那批把 REQUIRED_SCHEMA_VERSION 抬到 0102，
+       先重启则 schema 门 enforce 下抛出 → 进程 exit 1 → systemd 每 5 秒静默重启、零告警（见 0.x 那条注释）。
+       healthcheck 全过：active running；8787 + 8090 + 8091 在监听；重启后错误行数 0；
+       **schema 门逐属主全通过**（content 0069/0069、automation 0102/0102、api 0100/0100）；
+       PG 锚点缓存 / CommentScheduler / 面板 / 客户鉴权 / 飞书长连接（WSClient onReady）全就绪；
+       三属主库各自 `select 1` 全通；isales 四服务重启前后均 running、全程未触碰。
+       **另跑了 2 分钟 soak**（启动那一刻绿不等于跑起来绿）：ActiveEnterTimestamp 停在 19:28:09 未前移
+       ⇒ 没有崩溃循环；6 分钟窗口内错误 0；日志里的 warn 只有既有的「view 配额暂不可用 → 休眠浏览」，
+       不是本批带来的新形态。 -->
+  <!-- **属主隔离实测**（这批一次加了三张表所属的两个属主，值得逐库验）：
+       api 库有 facebook_operation_policy / facebook_group_comment_policy、无 automation 那三张；
+       automation 库有 facebook_consumption_progress / facebook_consumption_action /
+       operator_command_receipt、无 api 那两张；content 库五张都没有。
+       ⇒ 迁移归属从头声明 → 表归属 → 按属主分组 → 只在该属主库应用，全链再次走通。
+       另上机器逐条确认两批的新代码都真到了（对方那批的 facebook-consumption-mode.ts、
+       我这批的 operator-command-receiver.ts）——不靠「rsync 没报错」推断。 -->
+  <!-- **现网真正变的是对方那批**（可配置消费模式：新配置权威 + 运行时 + 面板）。
+       我这两批（撤两条台账 + 接收方与幂等台账）对现网**行为逐位不变**：接收方未接线、台账无消费者。
+       仍是单体形态，**不证明三进程能跑**（5.3 的口径）。ol 未部署、用户未提。 -->
+  <!-- ⚠️ **一条只报不动的运维观察**：/opt/aidcp 下 cloud 备份 tar 已累积 **139 个**（约 930MB）。
+       console 那侧有「只留最近 10 个」的纪律，cloud 这侧似乎没有。删备份是破坏性动作，未擅自做。 -->
   <!-- **dev 部署 sha 刻意停在 `e790e47`、未跟到 `730f910`**（如实记下，不是漏部署）：
        730f910 及其派生批次的 delta 只有**测试 + boundaries 生成物 + 一段 kernel 注释**，
        运行时行为逐位不变。为一批纯注释 / 纯测试改动重启在跑的 dev 车队没有收益，故不重启。
