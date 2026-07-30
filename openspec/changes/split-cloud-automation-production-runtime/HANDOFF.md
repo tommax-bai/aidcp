@@ -76,7 +76,11 @@ tasks.md 46/97   （96 → 97：核验时补了 2.9，见 §3 ②）
 
 ### 三条会改变你下一步动作的实测事实
 
-1. **§6「第二步」的步骤 0-b 靶子是死代码，MUST 先重新裁定再动**（详见 tasks.md 1.7b）。
+1. **§6「第二步」的步骤 0-b 靶子是死代码 —— 已由用户 2026-07-30 裁定并执行：以论证消掉台账、契约留着。**
+   **台账因此第一次真的少了一条：cloud 55→54、automation 14→13**（详见 tasks.md 1.7b）。
+   撤的理由不是「接好了」，是**这条欠账记在了错的条目上**——api 模式下这两条能力真正的失败走
+   委托通道，由 `feishu-operator-natural-language-delegate` 承接（那条仍在）。能力仍被覆盖，少的只是重复计数。
+   **⇒ 你的门现在是 13 条，不是 14 条。** 原始论证如下：
    `/publish`、`/comment` 在生产里**永远走委托分支**——统一命令面把 `delegate` 声明成必填、组装根恒注入
    一个函数（缺服务时是函数**内部**抛，不是不给函数），所以 `CommandRouter` 那个三元的另一支不可达；
    而面板那份动作面里**没有** publish / comment。⇒ 两个手动指令端口今天**没有任何活的 api 侧调用方**。
@@ -101,12 +105,15 @@ tasks.md 46/97   （96 → 97：核验时补了 2.9，见 §3 ②）
   不要再用 `93d339b` 那行）：
 
   ```
-  cloud=e790e47  kernel=65cf14e  transport=8b3ab8f
-  api=6997a74    automation=018dc45  content=5df122c      （六仓 master，已推送、工作区干净）
+  cloud=730f910  kernel=0a0a94e  transport=c8723bf
+  api=af2aa5a    automation=30a414b  content=f75403b      （六仓 master，已推送、工作区干净）
   测试 cloud 3913 / api 473 / automation 1910 / content 439 / kernel 59 / transport 36，全 0 fail
   AC-BOUND crossBoundaryEdges 0 · exemptionEntries 0 · frozenTotal 0 · sourceFiles 531
-  台账仍 cloud 55 / automation 14（本批全是搭桥，一条没撤——这是对的）
+  台账 cloud 54 / automation 13   ← 第一次真的少了一条（1.7b 裁定撤条）
   ```
+
+  **⚠️ dev 上跑的是 `e790e47`，不是 `730f910`，这是刻意的**：那之后的 delta 只有测试 + boundaries
+  生成物 + 一段注释，运行时逐位不变，不值得为它重启在跑的车队。你下一批有真运行时改动时一并带上去。
 
 - **dev 部署 ✅ 第五批 `e790e47`**（仍是单体形态）：备份 `cloud.bak.20260730-113238.tar.gz`；
   健康检查全过（三个属主库各自 `select 1` 全通、飞书长连接已建立、8787/8090/8091 在监听、重启后错误 0）；
