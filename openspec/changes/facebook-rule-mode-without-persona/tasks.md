@@ -26,23 +26,25 @@
 
 ## 4. Console 与 Edge — 呈现口径
 
-<!-- Edge 侧已交付（aidcp-edge ed2559e：27c2a9a 呈现 + e0471ac 事实过期时横幅不闪），含 ui-logic / persona-notice / fleet-console 测试。Console 侧未做。 -->
+<!-- Edge 侧已交付（aidcp-edge ed2559e：27c2a9a 呈现 + e0471ac 事实过期时横幅不闪），含 ui-logic / persona-notice / fleet-console 测试。 -->
+<!-- Console 侧由 aidcp-console b084e3a 交付：严格联结 /api/accounts 与 /api/environments 的权威事实；规则模式启用且未绑人设时呈现「按规则运行、未绑人设」，未知/关闭态保留原引导。 -->
 
-- [ ] 4.1 未绑人设且已启用规则模式的账号呈现为「按规则运行、未绑人设」，MUST NOT 呈现为待补人设，MUST NOT 呈现为已绑。
-- [ ] 4.2 该态下不弹出人设向导、不发补人设引导，其它未绑人设账号的既有引导不受影响。
-- [ ] 4.3 补对应前端与客户端测试。
+- [x] 4.1 未绑人设且已启用规则模式的账号呈现为「按规则运行、未绑人设」，MUST NOT 呈现为待补人设，MUST NOT 呈现为已绑。
+- [x] 4.2 该态下不弹出人设向导、不发补人设引导，其它未绑人设账号的既有引导不受影响。
+- [x] 4.3 补对应前端与客户端测试。
 
 ## 5. 验证与集成
 
 <!-- aidcp-cloud 8b31e97 / aidcp-edge ed2559e — land-change 跑完 acceptance+全量+typecheck 才 ff 推送 -->
 <!-- 2026-07-28 deployed dev — schema 契约门 enforce 三属主全通过；飞书长连接已建立；8787/8090 在听 -->
 <!-- 2026-07-30 Console 4.1-4.3 纳入本变更后重新打开 5.1-5.3；旧证据只覆盖 Cloud/Edge，不能替代本次 Console 验证与集成。 -->
+<!-- 2026-07-30 Console 验证：聚焦 5 文件 40/40；全量 42 文件 329 passed、1 skipped；typecheck 与 Vite production build 通过。b084e3a fast-forward 推送 master 后，从干净 canonical master 构建并部署 DEV；入口、JS、CSS 均 HTTP 200，远端 SHA-256 与本地一致，Cloud 未重启（active/running，NRestarts=0）。 -->
 
-- [ ] 5.1 各仓跑聚焦测试 → 全量测试 → typecheck，输出有界记录。
-- [ ] 5.2 各 worktree rebase 到最新默认分支、重跑必需验证、fast-forward 集成并推送，回写本清单的 commit-sha。
-- [ ] 5.3 `openspec validate facebook-rule-mode-without-persona --strict` 通过。
+- [x] 5.1 各仓跑聚焦测试 → 全量测试 → typecheck，输出有界记录。
+- [x] 5.2 各 worktree rebase 到最新默认分支、重跑必需验证、fast-forward 集成并推送，回写本清单的 commit-sha。 <!-- aidcp-cloud 8b31e97；aidcp-edge ed2559e；aidcp-console b084e3a -->
+- [x] 5.3 `openspec validate facebook-rule-mode-without-persona --strict` 通过。
 
 ## 6. 交付边界
 
 - [x] 6.1 Cloud 运行时变更验证后部署 DEV。
-- [ ] 6.2 OL 部署、Edge 打包签名与真实账号 Facebook 写入验收不在本变更范围，分别作为独立事实报告。
+- [x] 6.2 OL 部署、Edge 打包签名与真实账号 Facebook 写入验收不在本变更范围，分别作为独立事实报告。 <!-- 本次未执行 OL、Edge 打包签名或真实账号 Facebook 写入；仅部署 DEV Console 静态资源。 -->
