@@ -52,7 +52,8 @@
 
 - [x] 5.1 各仓跑聚焦测试 → 全量测试 → typecheck，输出有界记录。
   <!-- Cloud: focused Panel/policy 53/53, acceptance composition 25/25, full 3916 pass + 11 skipped, typecheck. Console: focused 38/38, full single-worker 304 pass + 1 skipped, typecheck and Vite production build. Two default-worker Console attempts timed out only in untouched suites; isolated reruns passed, so the deterministic single-worker full run is the recorded gate. -->
-- [ ] 5.2 各 worktree rebase 到最新默认分支、重跑必需验证、fast-forward 集成并推送，回写本清单的 commit-sha。
+- [x] 5.2 各 worktree rebase 到最新默认分支、重跑必需验证、fast-forward 集成并推送，回写本清单的 commit-sha。
+  <!-- All feature tips were direct descendants of the fetched defaults, so no rebase rewrite was needed. Fast-forwarded and pushed: aidcp-cloud master 6a77b05, aidcp-console master 8798fd9, aidcp main implementation record ab603763. This follow-up records the completed integration gate. -->
 - [x] 5.3 `openspec validate environment-level-rule-mode-and-approval --strict` 通过。
   <!-- 2026-07-30 strict validation passed after Cloud/Console implementation and delivery-boundary updates. -->
 
