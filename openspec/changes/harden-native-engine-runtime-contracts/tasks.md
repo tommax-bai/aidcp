@@ -173,3 +173,22 @@
 - [x] 9.8.2 不做任何真机写动作（点赞 / 评论 / 加群 / 发帖） <!-- aidcp-edge 74eaf41 2026-07-29 本轮实测成立：零真机动作，全部验证为本地代码级 -->
 - [x] 9.8.3 不改 Cloud↔Edge 协议 v2 消息集合、动作名口径与命令映射；不改风控状态机与配额档位 <!-- aidcp-edge 74eaf41 2026-07-29 本轮实测成立：两份 protocol.ts 与 command-bridge 动作映射零改动，AC-PROTO-* 全过、消息总数不变；风控状态机与配额档位未触碰 -->
 - [x] 9.8.4 不改 `openspec/specs/` 下任何文件 <!-- aidcp 2026-07-29 本轮实测成立：控制仓只写本 change 与 restore-native-xiaohongshu-session-guards 两份 tasks.md -->
+
+## 10. 跨属主改动待追认（他人 change 已改本 change 的属主文件）
+
+> 登记人：`restore-native-actuation-humanization-and-locating` 的第四波收口（2026-07-30）。
+> 该 change 的 9.2 表里已自认越界，但**只登记在越界方自己的台账里，属主这边看不到** —— 本节补上。
+> **MUST NOT 当成默认通过。**
+
+- [ ] 10.1 追认或否决对 `test/native-page-engine/runtime-contracts-command-receipts.test.ts` 的改动（`aidcp-edge f652786` 一批）：
+  **真因是本 change 的一道门禁被改哑了** —— 它用**源码文本切片**取「已路由命令集合」，
+  越界方把那张表改名导出后切片切出**空串**，对账退化成「空集 == 空集」**恒真**。
+  改法是直接 `import` 那张表、不再切源码文本。另订正 5 处出处串。
+  **属主要判的**：这次是运气好才红（切片正好落空）；**换个写法就是静默恒真**。
+  本 change 里是否还有同族的「按源码文本切片取集合再对账」的门禁 —— 若有，应一并换成 import 真实产物。
+
+- [ ] 10.2 追认或否决对 `test/native-page-engine/runtime-contracts-commit-window.test.ts` 的改动（同批）：
+  新增「窗口预算 ≥ 命令墙钟上限」断言，并把镜像门禁的正则改成**能解析常量引用并回查引擎侧**，解析不出即响亮失败。
+  **属主要判的**：这条与本 change §3「提交窗口预算单一事实源」同向，但断言归属该落在本 change 还是越界方。
+
+- [ ] 10.3 结论回写对应任务行备注（带 sha）；否决则由属主给出替代形态并通知越界方，**MUST NOT 静默保留**。

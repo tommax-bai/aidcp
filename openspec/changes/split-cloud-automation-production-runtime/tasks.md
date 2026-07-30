@@ -806,6 +806,27 @@
        测试：cloud 3900 / api 470 / automation 1900 / content 439 / kernel 59 / transport 36，全 0 fail。
        本批现网真正变的只有一处：三字段窄投影从组装根移到属主存储（复用同一条召回，逐位等价）；
        四组路由注册在单体下**不启用**（只在 content 监听模式跑），已用断言钉死。 -->
+  <!-- 2026-07-30 11:33 已部署第五批（aidcp-cloud@e790e47，仍是单体形态）。
+       快照来源：从 canonical master 目标提交 `git archive` 出的干净快照，**不从任何 worktree 部署**。
+       备份 /opt/aidcp/cloud.bak.20260730-113238.tar.gz + .env.bak.20260730；
+       cloud 侧 package.json / package-lock.json **零变更**（pin 抬的是三个派生仓，不是 cloud），故未动 node_modules。
+       rsync 排除 .env / .env.bak.* / node_modules / .git，事后逐条确认 .env 与 node_modules 仍在。
+       healthcheck 全过：active running；8787 + 面板 8090 + 客户鉴权 8091 均在监听；
+       **三个属主库各自 `select 1` 全通**（物理拆库后不再有单一连接串，逐库探的）；
+       PG 锚点缓存就绪 / RiskControllerRegistry 就绪 / CommentScheduler 就绪 / 飞书长连接已建立（WSClient onReady）；
+       重启后错误行数 0。isales 四服务（api / engine / scheduler / worker）重启前后均 running、全程未触碰。
+       另在机器上逐条实证新代码真的上去了（还原函数在场、批命令分隔符已是 `-`、「结果未知」分支在场）——
+       **不靠「rsync 没报错」推断**。
+       **本批现网真正变的只有一处**：飞书委托异常的渲染分流（e790e47）。传输那半零消费、对现网零影响。
+       仍是单体形态，**不证明三进程能跑**（5.3 的口径）。ol 未部署、用户未提。 -->
+  <!-- 六仓对齐（2026-07-30）：kernel `65cf14e` / transport `8b3ab8f` / api `6997a74` /
+       automation `018dc45` / content `5df122c` / cloud `e790e47`。
+       同步按 §5.2 的顺序办：`--apply --prune`（src）+ `--apply --tests`（测试）全部落完，
+       再按 kernel → transport → 三个业务仓抬 pin，逐仓 `npm install` + typecheck + 全量测试。
+       测试：cloud 3913 / api 473 / automation 1910 / content 439 / kernel 59 / transport 36，全 0 fail。
+       **新增用例落点是派生器自己判的、与预期一致**：飞书那 3 条进 api，委托传输那 10 条进 automation。
+       复跑对账：六仓 `新增 0 · 内容不同 0 · 多出 0`、pin 全对齐，只剩设计上必然存在的组装根噪声。
+       `npm install` **没有**用 `--userconfig /dev/null`：本机内网 registry 当前是通的（见 §5.3 那条更正）。 -->
   <!-- **同步顺序上踩到一次 pin 级联，记下来**：`--apply --tests` 会给 kernel 也派测试文件，
        而我是在**三个业务仓 pin 已经抬完之后**才跑的那一趟——kernel 头一动，
        transport 与三个业务仓的 pin 全部作废，只能整条链重抬一遍。

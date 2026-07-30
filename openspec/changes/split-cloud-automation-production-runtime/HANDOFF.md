@@ -95,12 +95,23 @@ tasks.md 46/97   （96 → 97：核验时补了 2.9，见 §3 ②）
    真正抓住它的是**还原判据的单测**与**传输错误透传那条用例**。
    谁日后以「409/422 已经覆盖了」为由删掉那个单测，这条闸就无声消失。
 
-### 你接手时必须先做的两件收尾（本批**没做**）
+### 收尾也做完了（原本列为「你接手时必须先做」，现已闭合）
 
-- **派生仓同步 + pin 链**：本批改了 `src/kernel/`（→ kernel 包）、`src/transport/`（→ transport 包 + automation）、
-  `src/feishu/`（→ api）与测试，**一趟都没同步**。按 §5.2 的顺序办：
-  `--apply --prune`（src）+ `--apply --tests`（测试）**全部落完**，再按 kernel → transport → 三个业务仓抬 pin。
-- **dev 部署**：本批唯一有现网行为的是 `e790e47` 那处飞书渲染分流（传输那半零消费、对现网零影响）。
+- **派生仓同步 + pin 链 ✅**：按 §5.2 顺序全跑完。**六仓新的对齐基线**（§0 那段期望值请按这行核，
+  不要再用 `93d339b` 那行）：
+
+  ```
+  cloud=e790e47  kernel=65cf14e  transport=8b3ab8f
+  api=6997a74    automation=018dc45  content=5df122c      （六仓 master，已推送、工作区干净）
+  测试 cloud 3913 / api 473 / automation 1910 / content 439 / kernel 59 / transport 36，全 0 fail
+  AC-BOUND crossBoundaryEdges 0 · exemptionEntries 0 · frozenTotal 0 · sourceFiles 531
+  台账仍 cloud 55 / automation 14（本批全是搭桥，一条没撤——这是对的）
+  ```
+
+- **dev 部署 ✅ 第五批 `e790e47`**（仍是单体形态）：备份 `cloud.bak.20260730-113238.tar.gz`；
+  健康检查全过（三个属主库各自 `select 1` 全通、飞书长连接已建立、8787/8090/8091 在监听、重启后错误 0）；
+  isales 四服务全程未触碰。**现网真正变的只有那处飞书渲染分流。** ol 未部署、用户未提。
+  另：本批 cloud 侧 `package.json` 零变更（pin 抬的是三个派生仓），故 ECS 上没动 `node_modules`。
 
 ---
 
