@@ -1,6 +1,6 @@
 # 交接 · change `split-cloud-automation-production-runtime`
 
-> **重写于 2026-07-30 17:00，末次更新 18:30**，pin 在 `aidcp-cloud@9df5210`。
+> **重写于 2026-07-30 17:00，末次更新 21:00**，pin 在 `aidcp-cloud@319b0af`。
 > 上一版是「原稿 + 三层增补」摞起来的，读的人得自己对账三个年份——**上一手就因此把一处行号 pin 认错了**。
 > 本版按「现在是什么」组织，不再按「哪一批改了什么」；历史沿革在 git log 与 tasks.md 的 `<!-- -->` 里。
 >
@@ -92,9 +92,9 @@ rsync → `migrate status`（待应用恰好 3 条）→ `migrate up`（0100/010
 
 | id | 组 | 卡在哪 |
 | --- | --- | --- |
-| `feishu-operator-natural-language-delegate` | 指令 | 契约 + 接收方 + 台账全齐，**只差组装根接线** |
+| `feishu-operator-natural-language-delegate` | 指令 | **已接线**（`319b0af`）：四个接线点全走取数聚合口、remote 指向 automation。**条目没清是因为探针分不出**，见下 |
 | `feishu-operator-delegated-card-actions` | 指令 | 同上（注入同一个端口即同时点亮它与自由文本那条） |
-| `feishu-operator-dispatch-start-stop` | 指令 | 接收方已建（**刻意无持久台账**，见 §4.5），差接线。注：**「飞书 dispatch」这条通道自始至终不存在**，入口只有面板路由与状态灯，一次接线同时点亮两者、飞书侧零改动 |
+| `feishu-operator-dispatch-start-stop` | 指令 | **只接了服务端**；api 侧卡在签名（面板的状态灯是同步布尔，远端读是异步三态）——见 tasks 1.3a，需拍板 |
 | `content-concept-write-authority` | 内容 | 契约 + 路由已注册 + 客户端已建，**缺生产消费者** |
 | `content-curated-write-authority` | 内容 | 同上 |
 | `content-facebook-publish-media-authority` | 内容 | 契约已写，**路由未注册、未接线** |
@@ -106,6 +106,14 @@ rsync → `migrate status`（待应用恰好 3 条）→ `migrate up`（0100/010
 | `automation-production-runtime-composition-unwired` | 组装 | 就是那个空壳入口本身；前两组不清完写不了 |
 
 **顺序是硬的**：指令组 + 内容组不清完，组装那条写不了。第 3 段 0/6 不是拖延，是前置没到。
+
+> ### ⚠️ 指令那三条为什么接完了还挂着（tasks 1.3b）
+> 它们的证据是**文案探针**，钉在 `automation_operator_command_unavailable:*` 这类守卫串上。
+> 接线之后那些串**仍然合法存在**，只是含义变了——从「压根没有这条通道」变成
+> 「这个进程没配置这条通道」，而**探针分不出这两者**。
+> 要清得先裁定「这些串不再构成证据」，并配自熄断言；那属**第 4 段**，别顺手带过。
+> **另一个诚实的坎**：飞书 `/delegate` 那条链**一次都没真跑过**（要真发一条飞书消息才触发）。
+> 已按 5.5 登记 backlog 簇 60。
 
 ### 已撤的两条
 
