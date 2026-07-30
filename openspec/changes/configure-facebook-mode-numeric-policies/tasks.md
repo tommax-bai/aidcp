@@ -2,7 +2,8 @@
 
 - [ ] 1.1 Finish, validate and integrate `environment-level-rule-mode-and-approval`, including its environment-scoped Console/customer API tasks, before implementing this change.
 - [ ] 1.2 Wait for the `facebook-rule-mode-without-persona` rule-runtime hotspot, `split-cloud-automation-production-runtime` sync-read/composition hotspot and `wechat-review-residuals` slow-start projection/clamp hotspot to integrate, then rebase this change and re-audit every MODIFIED requirement against the new baseline.
-- [ ] 1.3 Run `./scripts/task-preflight`, confirm canonical control/Cloud/Console/Edge checkouts remain on their default branches, and create matching isolated `codex/configure-facebook-mode-numeric-policies` worktrees without touching unrelated changes.
+- [x] 1.3 Run `./scripts/task-preflight`, confirm canonical control/Cloud/Console/Edge checkouts remain on their default branches, and create matching isolated `codex/configure-facebook-mode-numeric-policies` worktrees without touching unrelated changes.
+  <!-- 2026-07-30: control preflight passed; canonical control/Cloud/Console/Edge stayed on main/master/master/master. Created clean matching Cloud/Console/Edge worktrees at 730f91004f92875934ec7236ae17214596af4365, eda6a43c7c03d0e759e26feb270f342fe3d387d5 and 7f9ea7f369890ca12ff05f878a665c05a64d83f8. Preserved the unrelated untracked Edge release artifacts. Validation: task-preflight plus branch/status/SHA checks. Deployment: not applicable. Deviations: none. -->
 - [ ] 1.4 Install physical dependencies with `npm ci --prefer-offline` in each implementation worktree and record the exact baseline SHAs in this task file before code changes.
 
 ## 2. Cloud schema and numeric policy authority
