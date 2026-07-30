@@ -73,9 +73,16 @@ Facebook 发帖填充时限、以及几条差 1–2 项收口的。
 - **验证码协助基址自证**：基址是进程内验不了的声明，可能**跨环境错投**。
 
 另有两条的**立论已过期**（不是排期问题）：`facebook-join-actuation-decouple` 与
-`facebook-consent-structural-detect` 的实装落点在 Native 切换后已不进生产
-（前者源文件已不存在，后者文件在但被剪枝），**照原文实装等于给永不运行的代码加固**。
+`facebook-consent-structural-detect` 的实装落点在 Native 切换后已不进生产，
+**照原文实装等于给永不运行的代码加固**。
 判据是「从核心入口到不到得了」，不是「有没有人引用」。**这只是事实登记，处置权在其属主。**
+
+**2026-07-30 处置更新（用户裁定）**：`facebook-join-actuation-decouple` 已删除，全文存 git 历史。
+删前复核订正了本节原先的措辞——加群执行器的源文件**并非不存在**，它更名为
+`aidcp-edge/src/facebook/join-executor.ts` 仍在仓里；真正成立的判据是它**运行时不可达**：
+全仓对 `FacebookJoinExecutor` 只剩两处 `import type`，类型导入编译后被抹除，
+`join-executor.js` 从核心入口不可达、随生产剪枝移出产物。`classifyCtaLabel` 亦无任何调用方。
+`facebook-consent-structural-detect` **未删**（文件在、被剪枝，且近日仍有改动），维持事实登记、处置权仍在其属主。
 
 ## 5. 交接给下一个 session 时要知道的
 

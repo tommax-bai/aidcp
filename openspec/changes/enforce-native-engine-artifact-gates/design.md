@@ -154,4 +154,4 @@
 
 与 `openspec/specs/native-page-engine/` 的关系：那是可行性验证阶段的只读探针规格（写着 opt-in、read-only、"现有 JavaScript 执行器仍是唯一生产写入方"），已被生产切换实际取代但尚未重写。本 change **不往那份规格里塞生产行为要求**，新增独立能力 `native-engine-artifact-gates` 承载。
 
-与两条仍活跃、但实装落点已从生产剪除的 change（`facebook-consent-structural-detect` 指向 `src/facebook/consent.ts`、`facebook-join-actuation-decouple` 指向 TypeScript 加群执行器的词表定位）的关系：本 change **不改它们的内容**，只在自己的任务清单里要求把"落点已失效"这件事当场登记到那两条 change，由它们的属主决定是重写落点还是废弃。
+与实装落点已从生产剪除的 change 的关系：`facebook-consent-structural-detect` 指向 `src/facebook/consent.ts`，本 change **不改它的内容**，只在自己的任务清单里要求把"落点已失效"这件事当场登记进去，由其属主决定是重写落点还是废弃。（原本还有一条 `facebook-join-actuation-decouple` 指向 TypeScript 加群执行器的词表定位，已于 2026-07-30 由用户按「立论过期」裁定删除，全文存 git 历史；本 change 的判据未变。）
