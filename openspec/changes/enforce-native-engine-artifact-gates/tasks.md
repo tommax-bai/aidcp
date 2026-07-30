@@ -90,11 +90,14 @@
 
 - [ ] 9.1 把 `package.json` 的 `build.extraResources` 里 `build/native-page-engine/${platform}-${arch}` 与 `build/gost/${platform}-${arch}` 的平台来源改为目标平台（electron-builder 的 `${platform}` 宏在 `node_modules/app-builder-lib/out/util/macroExpander.js:34-35` 返回 `process.platform`，即构建主机平台）
   - 【阻塞】两个待改文件（`package.json` 的 `build.extraResources`、分平台打包配置）虽在白名单内，但改法要动分平台打包配置、**本机无法验证**（需真出包才能确认目标平台解析路径正确）。解锁条件：拿到一次真出包（或跨平台打包）的验证机会，见 11.7
+  - ⏸ **【降级为「按 case 处理」，2026-07-30，用户裁定】不做，后面看 case。****已确认这样做是安全的**：即便在 macOS 上打 Windows 包踩中这条，也是**响亮失败、不会静默出错包** —— `scripts/after-pack.cjs` 的打包后置校验按**目标平台**（`context.electronPlatformName`）取值，`src/electron/native-page-engine-artifact.cjs` 直接比对产物清单里的 `platform` / `arch` / 可执行文件名，对不上即抛错（清单实测带 `"platform":"darwin"`、`"arch":"arm64"`）。**触发条件**：第一次真的要在 macOS 上出 Windows 包时回到本条；在那之前它零影响、不可能悄悄发货。
 - [ ] 9.2 在拷贝/解析阶段即校验目标平台资源存在，失败时报错写明「目标平台/架构、主机平台/架构、实际解析到的目录」；保留 `scripts/after-pack.cjs:235-238` 现有的目标平台后置校验作为第二道
+  - ⏸ **【降级为「按 case 处理」，2026-07-30，用户裁定】不做，后面看 case。****已确认这样做是安全的**：即便在 macOS 上打 Windows 包踩中这条，也是**响亮失败、不会静默出错包** —— `scripts/after-pack.cjs` 的打包后置校验按**目标平台**（`context.electronPlatformName`）取值，`src/electron/native-page-engine-artifact.cjs` 直接比对产物清单里的 `platform` / `arch` / 可执行文件名，对不上即抛错（清单实测带 `"platform":"darwin"`、`"arch":"arm64"`）。**触发条件**：第一次真的要在 macOS 上出 Windows 包时回到本条；在那之前它零影响、不可能悄悄发货。
 - [ ] 9.3 加一条不出包的用例：以目标平台 `win32` 求解资源路径，断言解析结果与主机平台无关
 
 ## 10. aidcp（控制仓）— 护栏与在途工作收口
 
+  - ⏸ **【降级为「按 case 处理」，2026-07-30，用户裁定】不做，后面看 case。****已确认这样做是安全的**：即便在 macOS 上打 Windows 包踩中这条，也是**响亮失败、不会静默出错包** —— `scripts/after-pack.cjs` 的打包后置校验按**目标平台**（`context.electronPlatformName`）取值，`src/electron/native-page-engine-artifact.cjs` 直接比对产物清单里的 `platform` / `arch` / 可执行文件名，对不上即抛错（清单实测带 `"platform":"darwin"`、`"arch":"arm64"`）。**触发条件**：第一次真的要在 macOS 上出 Windows 包时回到本条；在那之前它零影响、不可能悄悄发货。
 - [ ] 10.1 更新 `docs/architecture.md`：组件图（72-85 行）、边缘模块表（125-138 行）、`DomProvider` / `ActionExecutor` 接口说明（141-144 行）与单步定位 / 锚点晋升两节（172-201 行）当前仍把已从生产剪除的 JS 页面智能当现役；改为如实描述 Native 引擎为现役、并标注这些 TypeScript 模块为退役保留
 - [ ] 10.2 复核根 `CLAUDE.md` §2 的「DOM-first 定位三道闸」铁律表述：三道闸的语义仍然有效，但其权威落点已不是 `aidcp-edge/src/locating/engine.ts`；据实修订指针，不改变红线本身
 - [ ] 10.3 在活跃 change `facebook-consent-structural-detect` 与 `facebook-join-actuation-decouple` 的 `tasks.md` 顶部登记「实装落点 `src/facebook/consent.ts` / TypeScript 加群执行器已在 `scripts/prune-production-dist.mjs` 的生产剪枝黑名单里，按现落点实装不会改变生产行为」，并交由其属主决定改写落点或废弃；MUST NOT 代其改写立论

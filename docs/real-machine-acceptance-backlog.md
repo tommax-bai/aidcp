@@ -19,6 +19,18 @@
 >
 > 建立日期 2026-07-03。来源 = 2026-07-03 openspec change 分诊清账批次。
 
+> ## ⏸ 执行方式变更（2026-07-30，用户裁定）
+>
+> **真机验收不再作为独立活动排期，改由用户在日常测试中逐步覆盖。**
+> 理由：真机项本来就只能由人做（需要真实分身、真实账号、真实平台页面），而用户日常本就在测试中反复触达这些路径，单独再组织一次专项验收是重复劳动。
+>
+> **不变的部分**：真机项**仍然必须登记到本文件**，不得随归档丢失；验到了就勾 `[x]` 并注日期；暴露问题仍回对应 change 或起修复 change。上面那套聚类与「一簇一次 session」的组织方式仍然有效，**只是不再由谁主动去排它**，而是等日常测试自然覆盖到。
+>
+> **必须清醒的一条后果**：日常测试的覆盖是**不均匀**的 —— 常走的路径会被反复验到，冷门分支（异常态、降级路径、失败回执）可能长期没人碰。所以：
+> **MUST NOT 把「已登记」或「所属 change 已归档」读成「已在真机上验证」。**
+> 归档只代表代码写完，本文件里没勾的项就是**至今无人验证**，与「验过了没问题」是两回事。
+> 尤其注意：小红书侧自 Native 迁移以来真机零覆盖，这一条不会因为改成「日常测试覆盖」而自动改善。
+
 > **2026-07-11 清账批**（第二次 openspec 分诊清账）：本批归档 **31 个** landed+deployed change，真机验收项按既有簇归并——发布链路 → 簇 3（`publish-select-mode-layout-robust` 5.3）、textcard → 簇 23（`textcard-carousel-form-parity` 6.3）、FB 加群评论 → 簇 32（新增 `facebook-group-join-observe-i18n` / `fb-group-join-wait-render` 两项 i18n + 就绪修复复核，见簇 32 补登）、`/comment` 搜索闭环 → 簇 34/55（`comment-search-command` 12.1，多次已跑通）、FB 评论人审 → 簇 48（`facebook-comment-review-and-targeted-join`）、**FB 公开组放量 → 新簇 59**（`facebook-group-join-and-commenting` 9.1-9.5）。归档后全库 `openspec validate --specs --all --strict` 106 项全绿。**本批刻意未归档（5 个仍活跃，另有门槛）**：① `publish-trigger-and-apply`（§11 统一部署待核）；② `edge-environment-platform-select`（tasks 3.3 明确 gate 在 FB edge driver `facebook-browser-env-and-login` 落 master，当前仅 probes 落地）；③ `humanize-interaction-prompts`（代码已部署 dev，但 tasks 9.4 spec 交织须待 `category-adaptive-images-and-judgment` 先归档）；④ `estimate-token-cost-column` + ⑤ `manual-billing-price-refresh`（代码已 shipped，但 `llm-token-usage-stats` spec delta 应用失败——前者用英文 header MODIFY 中文「console 提供…」需求、后者 MODIFY 一个无人创建的 `Token Usage Cost Estimates` 需求；两者对 cost/billing 需求建模不一致，须 owner 理顺 delta header / 重建模型后再归档）。**已废弃删除（1 个）**：`facebook-scheduled-comment`（2026-07-11 用户决定关为 superseded）——其 target-URL 定向评论设计已被 keyword-in-container 版取代（见归档 `2026-07-09-facebook-scheduled-comment` + `facebook-group-join-and-commenting`）；34/35 核心任务空，change 目录已 `git rm` 删除（内容存 git 历史）。**注**：唯一落地的 task 2.9（云端在握手时持久化 FB 昵称）代码仍在线；其需求已由后续小 change `facebook-nickname-handshake-persist`（2026-07-11 归档）正式补登进 `facebook-identity` capability——剔除了已被 `facebook-nickname-inplace-read`（簇 42）取代的 `/me` 探针描述、按现网「就地读取 → hello 附带 → 云端仅库内空时写、既有不覆盖」校订。至此该行为「代码在线 + 主 spec 有据」齐全。另 `category-adaptive-images-and-judgment`（高风险图产后校验待选视觉模型）、`self-contained-ads-runtime`（dev CLI 解析等代码活 + baked-key 决策）、及 4 个纯提案（`transcribe-textcard-image-text` / `facebook-consent-structural-detect` / `facebook-join-actuation-decouple` / `edge-installer-oss-distribution`）本就在研、非本批对象。
 
 > **2026-07-26 · 第五次「分诊清账」批：新簇 100「一次归档 86 个 change 带出的真机项」**
