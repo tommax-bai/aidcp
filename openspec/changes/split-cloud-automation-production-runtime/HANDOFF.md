@@ -1,6 +1,6 @@
 # 交接 · change `split-cloud-automation-production-runtime`
 
-> **重写于 2026-07-30 17:00**，pin 在 `aidcp-cloud@843bac6`。
+> **重写于 2026-07-30 17:00，末次更新 18:30**，pin 在 `aidcp-cloud@9df5210`。
 > 上一版是「原稿 + 三层增补」摞起来的，读的人得自己对账三个年份——**上一手就因此把一处行号 pin 认错了**。
 > 本版按「现在是什么」组织，不再按「哪一批改了什么」；历史沿革在 git log 与 tasks.md 的 `<!-- -->` 里。
 >
@@ -38,17 +38,20 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 **2026-07-30 17:00 实测期望值：**
 
 ```
-cloud=843bac6  kernel=0a0a94e  transport=c7db33e
-api=a28d134    automation=70addd5  content=747c128    （六仓 master，已推送、工作区干净）
+cloud=9df5210  kernel=aa48c29  transport=1ae53fb
+api=7c6930a    automation=86ccf18  content=44f5ca9    （六仓 master，已推送、工作区干净）
 
-AC-BOUND metrics {"sourceFiles":533,"ownershipEntries":533,"crossBoundaryEdges":0,
-                  "involvingContent":0,"exemptionEntries":0,"frozenTotal":0,"delta":0,"unplanned":0}
-
-门：automation 台账 13 条（cloud 那份 54 条，两份不同口径、不能直接比总数）
-tasks.md 53/104
-dev 部署 = 843bac6（迁移 0099 已 apply）；ol 一次没动
-测试 cloud 3932 / api 473 / automation 1926 / content 439 / kernel 59 / transport 36，全 0 fail
+门：automation 台账 12 条（cloud 那份 55 条，两份不同口径、不能直接比总数）
+tasks.md 54/105
+测试 cloud 4022 / api 493 / automation 1960 / content 439 / kernel 59 / transport 36，全 0 fail
 ```
+
+**⚠️ dev 停在 `843bac6`，落后主干，而且这次落后是有原因的、不是漏部署：**
+主干上现在还叠着另一路 change（可配置 Facebook 消费模式）的一大批改动，它把
+`REQUIRED_SCHEMA_VERSION` 抬到了 **0102** 并新增迁移 0100–0102。
+⇒ **谁要部署主干，必须先在 ECS 上 `npm run migrate up` 补 0100–0102，否则 schema 门直接拒起**
+（enforce 下抛出 → 每 5 秒静默重启，见 §4.6）。那批改动的现网验证属于它自己那一路，我没代它部署。
+我这两批的 delta 是测试 + 边界生成物 + 注释，**运行时逐位不变**，没有单独部署的必要。
 
 `crossBoundaryEdges` **不是 0** ⇒ 有人新增了跨服务耦合，先查清再往下走（棘轮只许下降）。
 
@@ -74,8 +77,8 @@ dev 部署 = 843bac6（迁移 0099 已 apply）；ol 一次没动
 
 | | 现值 | 它衡量什么 |
 | --- | --- | --- |
-| tasks.md 条数 | 53/104 | **「查清了多少」，不是「交付了多少」。** 分母会随勘察长大——最近两批往里加了 7 条实测发现的新任务 |
-| **那张清单（门）** | **13 条** | **真正的交付物。** 从 14 降到 13，而那 1 条还是**以论证撤的**（欠账记在了错的条目上、被算了两遍），不是靠干活减的 |
+| tasks.md 条数 | 54/105 | **「查清了多少」，不是「交付了多少」。** 分母会随勘察长大——最近两批往里加了 7 条实测发现的新任务 |
+| **那张清单（门）** | **12 条** | **真正的交付物。** 从 14 降到 12，而**两条都是撤的、不是干活减的**：一条被算了两遍（1.7b），一条记错了属主（2.9）。**真正靠接线减掉的，到现在是 0 条。** |
 
 **收工的判据是门清零，不是 tasks.md 打完勾。** 两者不是同一把尺，别拿后者当进度终点。
 
@@ -84,7 +87,7 @@ dev 部署 = 843bac6（迁移 0099 已 apply）；ol 一次没动
 
 ---
 
-## 3. 门：13 条逐条现状
+## 3. 门：12 条逐条现状
 
 | id | 组 | 卡在哪 |
 | --- | --- | --- |
@@ -99,12 +102,28 @@ dev 部署 = 843bac6（迁移 0099 已 apply）；ol 一次没动
 | `content-role-factories` | 内容 | 待岔口 B 落地（tasks 2.5） |
 | `content-generic-llm-authority` | 内容 | 待岔口 A 落地（tasks 2.5） |
 | `content-reply-generation-authority` | 内容 | 未开工（tasks 2.6） |
-| `content-publish-rejection-evidence-authority` | 内容 | 未开工（tasks 2.9）。**这条曾经无人承接**，核验时才发现——「tasks.md 全做完」不等于「门能清零」 |
 | `automation-production-runtime-composition-unwired` | 组装 | 就是那个空壳入口本身；前两组不清完写不了 |
 
 **顺序是硬的**：指令组 + 内容组不清完，组装那条写不了。第 3 段 0/6 不是拖延，是前置没到。
 
-### 已撤的那一条（用户 2026-07-30 裁定）
+### 已撤的两条
+
+**`content-publish-rejection-evidence-authority`（task 2.9）——记错了属主，不是没做。**
+判定是 kernel 里一个两行纯谓词（且已随 kernel pin 存在于 automation 包里）；数据来自 **api** 属主的
+publishLog 4a 端口，而自动化根**已经**构造着它的客户端；那个字段的唯一写入方也属 api。**全链没有 content。**
+错因：组装根那条 import 走 `src/publish-agent/types.ts`（content 属主），而它对这个符号只是一句
+`export * from '../kernel/...'`——kernel `git mv` 之后的六行残壳，**搬迁早于那条 binding**。
+（**别把它叫「假消边」**：那是「改成壳却不 repoint 消费方以声称边消了」，这里是合法搬迁的残留。）
+
+> **由此得到的结构性事实，比这条条目本身更要紧**：台账里 `owner` 是 binding 上**手写**的字段，
+> 派生器原样抄过去、**从不查 `module-ownership.json`**。只有「证据在场」是 AST 派生的。
+> ⇒ **属主写错了，`--refresh-ledger` 跑一万次也纠不过来。** 别把这份台账的 owner 列当派生事实读。
+
+动它之前把另外 8 条 content 条目机械扫过：证据符号**全部**定义在真 content 属主文件里 ⇒ **这条是孤例，
+不是模式**（对门的其余部分是好消息）。另标记一条**不替它裁定**的：`content-role-factories` 的证据符号是
+组装根里的一个本地常量，而它引用的四个角色类**已被 0.7 改判为 automation** ——那属 task 2.5 的问题。
+
+**`feishu-operator-publish-comment`（用户 2026-07-30 裁定）**
 
 `feishu-operator-publish-comment`：它两条证据指向的闭包**不可达**——`/publish`、`/comment` 永远走委托分支，
 因为统一命令面把 `delegate` 声明成必填、组装根恒注入一个函数（缺服务时是函数**内部**抛，不是不给函数）；
@@ -141,14 +160,24 @@ dev 部署 = 843bac6（迁移 0099 已 apply）；ol 一次没动
 老的裸形态精选路由（无鉴权、无信封、无目标校验）与新的精选召回路由**同进程并存**。
 路径不冲突，但同一个域两套鉴权口径。登记在 `CONTENT_AUTHORITY_WIRING_DEBT` 第 6 条。
 
-### 4.4 派生仓的 `boundaries/*.json` 是**手抄件、不在同步范围内**（已咬两次）
+### 4.4 派生仓的 `boundaries/*.json` 是**手抄件、不在同步范围内**（一天内咬了四次）
 
 - **第一次（静默）**：automation 那份 `ownership-rules.json` 与事实源差 **88 行**，且早就漏了两条裁定。
   为什么一直没人发现——平时跑的检查读的是**已生成**的产物，正好把窟窿盖住，只有跑「刷新归属」才当场抛。
 - **第二次（响亮）**：2026-07-30 加新表时，三仓的 `table-ownership.json` 手抄件都停在 112 条，
   automation 的迁移属主检查当场红；`module-ownership.json` 缺 2 条，边界普查当场红。
+- **第三次（静默）**：另一路 change 在 `src/orchestrator/`（逐文件切分目录）加了 4 个文件，
+  fileOverride 只进了 cloud 那份规则表 ⇒ automation 跑 `boundaries:refresh` 当场抛。
+- **第四次（响亮）**：同一批新增的 8 张表没进三仓的 `table-ownership.json` 手抄件。
 - **这条区分影响 0.7c 的优先级判断，此前没记**：静默那种才是真危险。
-- 结构问题没动（tasks 0.7c）：要么让同步脚本把这些纳入对账，要么让派生仓不再自持。
+- **结构修法不是一刀切的——这是 2026-07-30 实测出来的关键区分**：
+  - `table-ownership.json` 是事实源的**忠实整份拷贝**（实测：顶层字段一致、共有条目零内容差异）
+    ⇒ 今天就能机械同步，直接 `cp` 即正解；
+  - `ownership-rules.json` / `kernel-non-members.json` / `adjudicated-files.json` **真的各自分叉**
+    （分别差 91~101 / 51 / 4 行，且三仓差的量还不一样）⇒ **不能照搬**，那正是 §8.2 禁的整体重序列化。
+    要动它们得先裁定「这些分叉里哪些是有意的」。
+  ⇒ 0.7c 应当拆成两半做：先把那份忠实拷贝纳入同步（便宜、无风险），另三份单独裁。
+- 结构问题仍没动（tasks 0.7c）。
 - **顺带**：`sync-split-repos` 对**迁移文件只报不改**，新迁移要手工拷进属主仓（对账会报「缺 1 条」）。
 
 ### 4.5 调度启停**刻意没有持久台账**——将来一定有人想「补齐四条一致」
@@ -159,9 +188,13 @@ dev 部署 = 843bac6（迁移 0099 已 apply）；ol 一次没动
 因为它管的状态也是进程内的，本适配器 MUST NOT 暗示持久的恰好一次」。
 理由已写进 `operator-command-receiver.ts`，并有一条用例（12）钉着「重启后 MUST 重新执行」。
 
-### 4.6 `REQUIRED_SCHEMA_VERSION` 还停在 0097，是刻意的——接线那一批 MUST 一起处理
+### 4.6 迁移与 schema 门：0099 的 REQUIRED 已被别人的改动顺带覆盖，但部署那一步照旧不能省
 
-判据是那条常量自己的门槛（缺了它链路写不了），今天**不成立**：用台账的接收方还没接进任何进程。
+**当时的判断**：0099（运营指令幂等台账）不是任何存储的硬依赖（用它的接收方还没接进任何进程），
+故只抬 `KNOWN_MAX`、不抬 `REQUIRED`——早抬等于给还没跑迁移的机器装一颗静默地雷。
+
+**现在的事实**：另一路 change 已把 `REQUIRED_SCHEMA_VERSION` 抬到 **0102**，于是 0099 **按复合序被顺带覆盖**。
+⇒ **接线那一批少一件事**（不必再为 0099 抬 REQUIRED），但**部署序列里那一步一个字都不能少**。
 
 **早抬的后果实测过链路，比「起不来」更难查**：schema 契约门是 `segAApiFoundation` 的**第一句**、
 裸 `await`、刻意无 try/catch，跑在连接池与所有存储 `init()` 之前；enforce 下失败即抛 → 进程 exit 1 →
@@ -169,8 +202,7 @@ systemd 只有 `Restart=on-failure` / `RestartSec=5`、无 OnFailure、机器上
 ⇒ **每 5 秒静默重启的崩溃循环，零告警**。且「behind」这一档**没有豁免通道**
 （`pass`/`waived` 在该分支写死 false；`AIDCP_ALLOW_SCHEMA_AHEAD` 只管「库比代码新」那一档）。
 
-**接线那一批 MUST 同时做三件**：抬 REQUIRED 到 0099、部署序列里在**重启之前**跑 `npm run migrate up`、
-对 ol 也补同一步。
+**部署主干时 MUST**：在**重启之前**跑 `npm run migrate up`（现在要补的是 0100–0102），ol 同理。
 
 **补迁移只能用 `npm run migrate up`（或 `baseline`）**：`scripts/run-migration.ts` 执行 SQL 但
 **不写 `schema_migrations` 账本**（其文件头明写这条缺口，且用户 2026-07-25 裁定有意保留它）。

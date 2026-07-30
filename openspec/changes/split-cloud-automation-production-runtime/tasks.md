@@ -774,7 +774,41 @@
   **「漏传」这个失败态只可能由本次拆仓引入**，现有测试不可能覆盖它。
   新用例作 `AC-TCT-3` 加进 `test/acceptance/text-card-transcription-honesty.test.ts`。
 - [ ] 2.8 失败语义测试：写口只报真态行数；跨进程错误识别用**结构化守卫**，不用 `instanceof`。
-- [ ] 2.9 **`content-publish-rejection-evidence-authority` —— 14 条台账里唯一一条此前无人承接的**
+- [x] 2.9 **`content-publish-rejection-evidence-authority` 已撤条：它是**记错了属主**，不是没做。**
+  <!-- aidcp-cloud 9df5210 / aidcp-automation 86ccf18。门 13 → 12（content-owner 9 → 8）。
+       **每一环都机械核过，不是论证出来的**：
+       ① 判定 `hasUserRejectionEvidence` 住在 `src/kernel/publish-pipeline-types.ts`——归属表判 kernel、
+          且在 kernel 名册上；两行纯字段读、只 import kernel 类型、不构造任何东西。
+          **而且它已经随 aidcp-kernel pin 存在于 automation 包里**（在装出来的 .d.ts 里，
+          且已有 7 个 automation 文件从那个模块 import）。
+       ② 数据来自 `apiDirectPorts.publishLog.loadForDispatch()`——**api** 属主的 4a 端口
+          （表 publish_log owner=api），早已跨进程化，而自动化根**已经**构造着它的客户端
+          （`new AutomationPublishLogHttpClient(...)`）。
+       ③ 那个字段的唯一写入方是 `src/publish-agent/publish-log-store.ts`，属主 **api**。
+       ⇒ 全链没有 content。**一个 kernel 纯谓词不可能是内容授权。**
+       **错因**：组装根那条 import 走 `src/publish-agent/types.ts`（属主 content），
+       而那文件对这个符号的全部内容是一句 `export * from '../kernel/...'`——kernel 那次 `git mv` 之后
+       留下的六行残壳，**而那次搬迁（07-24）早于这条 binding（07-29）**。
+       binding 的作者读到的是 import 路径，不是代码所在。
+       **注意别把它叫「假消边」**（我一度这么写，核验时被纠正）：§8.3 的假消边指「把属主文件改成壳、
+       却不 repoint 消费方，以此声称边消了」；这里是一次合法搬迁的残留，归属注释里有记录。 -->
+  <!-- **一条结构性事实，比这条条目本身更值得记**：台账里 `owner` 字段是 binding 上**手写**的，
+       `sweepReviewedProbes` 原样抄过去、**从不查 `module-ownership.json`**。只有「证据在场」是 AST 派生的。
+       ⇒ **属主写错了，`--refresh-ledger` 跑一万次也纠不过来**，这类错只能靠人读出来。
+       别把这份台账的 owner 列当派生事实读。 -->
+  <!-- **动它之前先把另外 8 条 content 条目机械扫了一遍**（万一是同一个壳导致的系统性误记，
+       那会实质改变门的大小）：其余 8 条的证据符号**全部定义在真 content 属主文件里**
+       （ConceptStore / CuratedContentStore / FacebookPublishMediaStore / TokenUsageStore / QwenClient /
+       ReplyAiService / OpenAiCompatVisionClient / 两个文字卡工厂）。**这条是孤例，不是模式**——
+       对门的另外 8 条是好消息。
+       **另标记一条不替它裁定的**：`content-role-factories` 的证据符号是 server.ts 里的一个**本地常量**，
+       而它引用的四个角色类**已被 0.7 改判为 automation 属主**。那条现在还描述不描述一个真的内容依赖
+       （写口），属 **task 2.5** 的问题。 -->
+  <!-- **没被撤掉的那一半**（0.3d 的原始担心仍然成立）：若有人把那个谓词**打桩**而不是从 kernel import，
+       被否决的稿件会读成「没被否决」，委托执行器会把它判成 `failed` 而不是 `cancelled`。
+       那是**另一个**失败、另一种修法，自熄断言的失败消息里写明了「别拿它复活这条」。
+       变异实测：把 binding 加回去，普查用例当场红。 -->
+- [ ] 2.9a **原文（前提已被推翻，保留供追溯）**：14 条台账里唯一一条此前无人承接的
   （2026-07-30 交接文档核验时发现：本 tasks.md 与 `specs/` 全文对「否决 / 驳回证据 / 候选装载」零命中，
   我原本误以为它属于 2.7 的传递性检查，实际不属于）。
   **后果是硬的**：96 条 task 全做完，台账也清不到零，第 4 段「清零 → 入口切真启动」直接卡住。
