@@ -615,7 +615,18 @@
   <!-- aidcp-cloud 5323ee5：**升级那一半已做**（见 1.7），文件头已从「证明性接线（behavior-zero）」
        改成「正式跨进程传输实现」。接线那一半仍未做（要动组装根，热点，见 1.3 步骤 5）。
        零消费仍成立——所以这批改动**对现网行为零影响**，唯一有行为的是 e790e47 那处飞书渲染分流。 -->
-- [ ] 1.5 **契约测试：本批落了 transport 侧那半（10 条），另一半要等接收方**。
+- [x] 1.5 **契约测试 19 条里 17 条已落**（transport 侧 10 条 + 接收方侧 7 条），余 2 条各有具名理由。
+  <!-- 接收方侧新落 7 条（aidcp-cloud 843bac6）：8（连发两次 → applied/duplicate 且回执逐字段相同）/
+       9（同键不同 scope → collision）/ 10（停在 in_flight 且无同进程调用 → 抛「结果未知」）/
+       11（换接收方实例仍判 duplicate）/ 12（调度启停重启后 MUST 重新执行、不判 duplicate）/
+       13（未注入 → not_delivered 且**不是**异常）/ 15（状态灯读不到 → unavailable，不压成 active:false）。
+       另有 9 条超出清单的：同进程重投等到真结局、非业务抛出物留 in_flight、业务拒绝 status 原样、
+       控制类形状翻译、键非法即拒、7 方法不进台账、缺 status 不补默认 等。
+       **余下 2 条的处置**：
+       ① 用例 16（端口加方法而路由表没跟上 → typecheck 红）是**编译期**闸，运行期测不出来，
+          已在路由表注释里写明它「只保证表全、保证不了都挂上」，配一条逐路由注册对账用例（17）兜后半；
+       ② 用例 19（手动发帖 / 评论键跨重试稳定）**被 1.7b 挡住**——那条路径今天不执行，
+          等重新裁定后再补，现在写等于给死代码配用例。 -->
   <!-- aidcp-cloud 5323ee5。裁定文档 §4 的 19 条用例里，**不依赖接收方的 10 条已落**：
        1（逐条路由无令牌 → 401，7 条全扫）/ 2（版本不符）/ 3（目标不符）/ 4（客户端无从自选目标）/
        5（版本冲突跨线后守卫为真且 status 409）/ 6（422 不被压成 400）/ 7（缺字段判形状不符）/
@@ -625,7 +636,26 @@
        15（状态灯读不到 MUST NOT 画成 active:false）、16（`satisfies` 那道编译闸——只能靠变异证，
        本批已在路由表注释里写明它「只保证表全、保证不了都挂上」）、19（手动发帖 / 评论键跨重试稳定
        ——**被 1.7b 挡住，那条路径今天不执行**）。 -->
-- [ ] 1.5a **写幂等台账前先按这份实测清单办（避免又一次「只加迁移」）**。
+- [x] 1.5a **幂等台账已落（表 + 存储 + 接收方 + 用例），且原清单里的「四处耦合」实测是五处**。
+  <!-- aidcp-cloud 843bac6 / aidcp-automation 70addd5。落地物：
+       `migrations/0099_operator_command_receipt.sql`（kind=expand，属主 automation）+
+       `src/delegated-task/operator-command-ledger.ts`（PG 实现 + 供测试用的内存实现）+
+       `src/delegated-task/operator-command-receiver.ts`（自由文本接收方 + 调度启停接收方）+
+       16 条用例。归属由目录默认规则判 automation，**归属规则表一个字没改**（与 0.6h 的预判一致）。
+       **更正：耦合单元是五处，不是四处。** 第五处是 `test/schema/sync-read-checkpoint-migration.test.ts`
+       里**第二次写死** `KNOWN_MAX_SCHEMA_VERSION`——那条是逐字字面量，而 `schema-contract.test.ts`
+       那条是从 migrations/ 目录**算**出最大版本再比。加迁移时两处都红，改完一处会以为完事了。
+       已在该断言旁写明「这是第二处」。 -->
+  <!-- **`REQUIRED_SCHEMA_VERSION` 刻意没抬**，判据是这条常量自己的门槛（缺了它链路写不了）今天不成立：
+       接收方还没接进任何进程。**实测那条链路后果比原先记的更重**：schema 契约门是 segA 的第一句、
+       裸 await、无 try/catch，跑在连接池与所有存储 init 之前；enforce 下抛出 → 进程 exit 1 →
+       systemd 只有 `Restart=on-failure` / `RestartSec=5`、无 OnFailure、机器上无探针
+       ⇒ **每 5 秒静默重启的崩溃循环、零告警**。且「behind」这一档**没有豁免通道**
+       （`pass`/`waived` 在该分支写死 false；`AIDCP_ALLOW_SCHEMA_AHEAD` 只管「库比代码新」那一档）。
+       **另一个部署陷阱**：`scripts/run-migration.ts` 执行 SQL 但**不写账本**（其文件头明写这条缺口，
+       且用户 2026-07-25 裁定有意保留它）⇒ 用它补迁移，表建好了而门读的账本仍是旧版本、照样判 behind，
+       现场看起来「表明明在」，最费时间。补迁移只能用 `npm run migrate up`。 -->
+- [x] 1.5a0 **原清单（保留供追溯，其中「四处」已更正为五处）**。
   <!-- 2026-07-30 实测（六路勘察 + 逐条对抗核验，`aidcp-cloud@93d339b`）：
        ① **下一个可用迁移号是 0099，不是 0080**。migrations/ 现有 97 个 .sql，数字序最大
           `0098_facebook_group_join_daily_cap_50`；0079..0098 密集无空洞（0012 是永久保留空号）。
@@ -845,6 +875,33 @@
        **新增用例落点是派生器自己判的、与预期一致**：飞书那 3 条进 api，委托传输那 10 条进 automation。
        复跑对账：六仓 `新增 0 · 内容不同 0 · 多出 0`、pin 全对齐，只剩设计上必然存在的组装根噪声。
        `npm install` **没有**用 `--userconfig /dev/null`：本机内网 registry 当前是通的（见 §5.3 那条更正）。 -->
+  <!-- 2026-07-30 16:00 已部署第六批（aidcp-cloud@843bac6，仍是单体形态）。
+       备份 /opt/aidcp/cloud.bak.20260730-155902.tar.gz + .env.bak.20260730；cloud 侧 package.json 零变更。
+       **本批带迁移，故部署序列多一步、且顺序是硬的**：rsync → `npm run migrate status`（确认待应用
+       **恰好 1 条**、其余属主 0，不盲目 apply）→ `npm run migrate up`（applied 0099，kind=expand，11ms）
+       → 重启 → healthcheck。
+       healthcheck 全过：active running；8787 + 8090 + 8091 在监听；重启后错误行数 0；
+       PG 锚点缓存 / CommentScheduler / 面板 / 客户鉴权 / 飞书长连接（WSClient onReady）全就绪；
+       三属主库各自 `select 1` 全通；isales 四服务重启前后均 running、全程未触碰。
+       **schema 契约门的逐属主结论实证了「按属主收窄」这条机制**（不是推断）：
+       automation「账本 0099 / 所需 0096 / 本构建认识 0099」、api「0098 / 0097 / 0098」、
+       content「0069 / 0069 / 0069」，三条全通过——所以只抬 KNOWN_MAX 不抬 REQUIRED 确实不阻断启动。
+       **属主隔离也实证了**：`operator_command_receipt` 只在 automation 库在场，api / content 两库都不在
+       ⇒ 迁移归属从头声明 → 表归属 → 按属主分组 → 只在该属主库应用，全链走通。 -->
+  <!-- **本批唯一无测试覆盖的那段（PG 台账 SQL）已在真库上逐分支证明**——单测只覆盖内存那份，
+       所以这一步不是形式主义：init() 形状探测通过（表 + 8 列）；claim → claimed；
+       二次 claim → existing/in_flight；落定后 → existing/applied；回执 JSONB 往返逐字无损；
+       **「已落定的行绝不被第二次落定覆盖」那道闸生效**（第二次 settle 没改动载荷）；
+       同键读回首次的 scope。用 VERIFY- 前缀键、跑完删净，事后本表 0 行。 -->
+  <!-- 六仓对齐（2026-07-30 第二轮）：cloud `843bac6` / kernel `0a0a94e`（本批未变）/
+       transport `c7db33e` / api `a28d134` / automation `70addd5` / content `747c128`。
+       测试：cloud 3932 / api 473 / automation 1926 / content 439 / kernel 59 / transport 36，全 0 fail。
+       **踩到两处派生仓手抄件**（0.7c 那个结构性问题第二次兑现）：automation 自己那份
+       `boundaries/table-ownership.json` 缺新表 ⇒ 迁移属主检查当场红；`module-ownership.json` 缺 2 条
+       ⇒ 边界普查红。三仓的 table-ownership 手抄件都停在 112 条，已按事实源逐份增量补齐。
+       **一条值得记的区分**：这次漂移是**响亮的**（测试当场红），而上次 `ownership-rules.json`
+       漂 88 行那次是**静默的**（检查读的是已生成的产物、把窟窿盖住了）。这影响 0.7c 的优先级判断。
+       另：`sync-split-repos` 对迁移文件**只报不改**，0099 要手工拷进 automation 仓（对账会报「缺 1」）。 -->
   <!-- **dev 部署 sha 刻意停在 `e790e47`、未跟到 `730f910`**（如实记下，不是漏部署）：
        730f910 及其派生批次的 delta 只有**测试 + boundaries 生成物 + 一段 kernel 注释**，
        运行时行为逐位不变。为一批纯注释 / 纯测试改动重启在跑的 dev 车队没有收益，故不重启。

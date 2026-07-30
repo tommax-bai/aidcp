@@ -99,21 +99,52 @@ tasks.md 46/97   （96 → 97：核验时补了 2.9，见 §3 ②）
    真正抓住它的是**还原判据的单测**与**传输错误透传那条用例**。
    谁日后以「409/422 已经覆盖了」为由删掉那个单测，这条闸就无声消失。
 
-### 收尾也做完了（原本列为「你接手时必须先做」，现已闭合）
+### 又一批：接收方 + 幂等台账已落（2026-07-30 16:00，`aidcp-cloud@843bac6`）
+
+**§6「第二步」的步骤 1 已完成。** 新的六仓基线在下面那个代码块里，**别再用 `e790e47` 那行**。
+
+| 落地物 | 位置 |
+| --- | --- |
+| 迁移 0099（幂等台账表，属主 automation） | `migrations/0099_operator_command_receipt.sql` |
+| 台账（PG 实现 + 测试用内存实现） | `src/delegated-task/operator-command-ledger.ts` |
+| 唯一接收方（自由文本 + 调度启停） | `src/delegated-task/operator-command-receiver.ts` |
+| 契约用例 19 条里的 17 条 | 见 tasks.md 1.5 |
+
+**dev 已部署并跑过迁移**（`migrate status` 确认待应用恰好 1 条 → `migrate up` → 重启）。
+schema 门逐属主全通过，`operator_command_receipt` 只在 automation 库在场。
+
+### 四条会影响你下一步的实测事实
+
+1. **`REQUIRED_SCHEMA_VERSION` 还停在 0097，是刻意的**——接收方还没接进任何进程。
+   **接线那一批 MUST 同时**抬 REQUIRED、在部署序列里**重启之前**跑 `npm run migrate up`、并对 ol 补同一步。
+   漏了会怎样已实测：门是 segA 第一句、裸 await、无 try/catch ⇒ 抛出即 exit 1 ⇒ systemd
+   `Restart=on-failure`/`RestartSec=5`、无告警 ⇒ **每 5 秒静默重启的崩溃循环**。「behind」档**无豁免通道**。
+   **补迁移只能用 `npm run migrate up`**：`scripts/run-migration.ts` 执行 SQL 但不写账本，
+   用它补完表在库里、门照样判 behind，现场看着「表明明在」——最费时间的一种排查。
+
+2. **`sync-split-repos` 对迁移文件只报不改**：新迁移要手工拷进属主仓（对账会报「缺 1 条」）。
+
+3. **派生仓的 `boundaries/*.json` 手抄件又咬了一次**（0.7c 第二次兑现）。这次是 automation 那份
+   `table-ownership.json` 缺新表。**但这次漂移是响亮的**（迁移属主检查当场红），
+   与上次 `ownership-rules.json` 漂 88 行那次的**静默**不同——这条区分影响 0.7c 的优先级，此前没记。
+
+4. **接下来是步骤 2 起**：四组路由的服务端注册 + 客户端接到接收方与内部客户端（`operator-command-http.ts`
+   已就绪、只用不改），然后放宽取数聚合口的类型，最后在组装根把四个接线点全改指同一个口
+   （**`src/server.ts` 是热点，必须等它让出来**）。
+
+### 上一批的收尾（已闭合）
 
 - **派生仓同步 + pin 链 ✅**：按 §5.2 顺序全跑完。**六仓新的对齐基线**（§0 那段期望值请按这行核，
   不要再用 `93d339b` 那行）：
 
   ```
-  cloud=730f910  kernel=0a0a94e  transport=c8723bf
-  api=af2aa5a    automation=30a414b  content=f75403b      （六仓 master，已推送、工作区干净）
-  测试 cloud 3913 / api 473 / automation 1910 / content 439 / kernel 59 / transport 36，全 0 fail
-  AC-BOUND crossBoundaryEdges 0 · exemptionEntries 0 · frozenTotal 0 · sourceFiles 531
-  台账 cloud 54 / automation 13   ← 第一次真的少了一条（1.7b 裁定撤条）
+  cloud=843bac6  kernel=0a0a94e  transport=c7db33e
+  api=a28d134    automation=70addd5  content=747c128      （六仓 master，已推送、工作区干净）
+  测试 cloud 3932 / api 473 / automation 1926 / content 439 / kernel 59 / transport 36，全 0 fail
+  AC-BOUND crossBoundaryEdges 0 · exemptionEntries 0 · frozenTotal 0 · sourceFiles 533
+  台账 cloud 54 / automation 13   ← 1.7b 裁定撤条那次减的，本批未再减（本批是搭桥）
+  dev 部署 = 843bac6（含迁移 0099 已 apply）
   ```
-
-  **⚠️ dev 上跑的是 `e790e47`，不是 `730f910`，这是刻意的**：那之后的 delta 只有测试 + boundaries
-  生成物 + 一段注释，运行时逐位不变，不值得为它重启在跑的车队。你下一批有真运行时改动时一并带上去。
 
 - **dev 部署 ✅ 第五批 `e790e47`**（仍是单体形态）：备份 `cloud.bak.20260730-113238.tar.gz`；
   健康检查全过（三个属主库各自 `select 1` 全通、飞书长连接已建立、8787/8090/8091 在监听、重启后错误 0）；
