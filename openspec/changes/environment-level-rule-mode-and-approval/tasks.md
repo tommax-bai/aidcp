@@ -49,6 +49,7 @@
 <!-- aidcp-cloud 985d47e / aidcp-edge 959504d — land-change 跑完 acceptance+全量+typecheck 才 ff 推送 -->
 <!-- 集成期间基线三次前移：two-tier cadence 占 0094/0095、后续变更占 0096，本变更迁移最终定为 0097；schema 契约常量、两个存储的 fail-closed 版本号、属主归属断言与迁移提示标签同步改号 -->
 <!-- 2026-07-28 deployed dev — 0097 applied (expand, 20ms)；回填：规则模式 22→20（2 行 environment_missing）、审批策略 22→21（1 行 environment_missing）；20 行新配置全部带 v2 定义身份，证实 CHECK 必须新旧都接受 -->
+<!-- 2026-07-30 DEV closeout — deployed aidcp-cloud 6a77b05 and aidcp-console 8798fd9 from clean defaults. Backups: cloud.bak.20260730-151307.tar.gz, cloud/.env.bak.20260730-151307, console.bak.20260730-151307.tar.gz. Migration status: content/automation/api pending=0; enforce schema gates passed; service active with NRestarts=0; writer lock held; 8787/8090/8088/8091 healthy; PostgreSQL and Feishu ready. Authenticated environment catalog: 99 rows, Facebook rule projections 72/72, comment approval projections 99/99, binding states 65 bound + 34 unbound. Cloud and Console checksum deltas=0. -->
 
 - [x] 5.1 各仓跑聚焦测试 → 全量测试 → typecheck，输出有界记录。
   <!-- Cloud: focused Panel/policy 53/53, acceptance composition 25/25, full 3916 pass + 11 skipped, typecheck. Console: focused 38/38, full single-worker 304 pass + 1 skipped, typecheck and Vite production build. Two default-worker Console attempts timed out only in untouched suites; isolated reruns passed, so the deterministic single-worker full run is the recorded gate. -->
