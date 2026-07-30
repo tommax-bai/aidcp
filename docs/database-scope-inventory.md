@@ -40,35 +40,38 @@
 
 ## 2. 跨域外键
 
-### 2.1 源码里的外键（21 处，全部在存储的 DDL 常量里）
+### 2.1 源码里的外键（17 处，全部在存储的 DDL 常量里）
 
 | 目标 | 处数 | 引用点 |
 | --- | --- | --- |
-| `accounts(account_id)` | 6 | `src/comment-agent/facebook-group-store.ts:405`、`src/config/approval-policy-store.ts:22`、`src/config/persona-store.ts:58`、`src/delegated-task/store.ts:30`、`src/onboarding/first-post-onboarding-store.ts:27`、`src/publish-agent/facebook-publish-media-store.ts:102` |
-| `client_users(user_id)` | 3 | `src/client-auth/client-user-store.ts:102`、`:192`、`src/config/persona-auto-fill-store.ts:51` |
-| `publish_log(id)` | 3 | `src/publish-agent/draft-refinement.ts:50`、`src/publish-agent/facebook-publish-media-store.ts:109`、`:131` |
-| `facebook_group_target(group_url)` | 2 | `src/comment-agent/facebook-group-store.ts:382`、`:406` |
-| `delegated_tasks(id)` | 2 | `src/delegated-task/store.ts:106`、`:117` |
-| `account_facebook_publish_image(id)` | 2 | `src/publish-agent/facebook-publish-media-store.ts:124`、`:134` |
-| `account_facebook_publish_image_set(id)` | 1 | `src/publish-agent/facebook-publish-media-store.ts:116` |
-| `client_environments(env_key)` | 1 | `src/client-auth/client-user-store.ts:164` |
-| `persona_auto_fill_runs(run_id)` | 1 | `src/config/persona-auto-fill-store.ts:65` |
+| `accounts(account_id)` | 5 | `src/comment-agent/facebook-group-store.ts:396`、`src/config/approval-policy-store.ts:29`、`src/config/persona-store.ts:60`、`src/delegated-task/store.ts:36`、`src/onboarding/first-post-onboarding-store.ts:28` |
+| `client_users(user_id)` | 3 | `src/client-auth/client-user-store.ts:183`、`:273`、`src/config/persona-auto-fill-store.ts:52` |
+| `facebook_group_target(group_url)` | 2 | `src/comment-agent/facebook-group-store.ts:367`、`:397` |
+| `delegated_tasks(id)` | 2 | `src/delegated-task/store.ts:112`、`:123` |
+| `account_facebook_publish_image(id)` | 2 | `src/publish-agent/facebook-publish-media-store.ts:115`、`:126` |
+| `account_facebook_publish_image_set(id)` | 1 | `src/publish-agent/facebook-publish-media-store.ts:107` |
+| `client_environments(env_key)` | 1 | `src/client-auth/client-user-store.ts:245` |
+| `persona_auto_fill_runs(run_id)` | 1 | `src/config/persona-auto-fill-store.ts:66` |
 
 ### 2.2 迁移目录里的外键（按目标表计数）
 
 `accounts` 21 · `client_users` 4 · `publish_log` 3 · `interaction_reply_config_scopes` 3 ·
 `delegated_tasks` 2 · `facebook_group_target` 2 · `account_facebook_publish_image` 2 ·
-`account_facebook_publish_image_set` 1 · `client_environments` 2 · `persona_auto_fill_runs` 1。
+`account_facebook_publish_image_set` 1 · `client_environments` 6 · `facebook_consumption_progress` 2 ·
+`facebook_consumption_action` 1 · `persona_auto_fill_runs` 1 · `interaction_messages` 1 ·
+`interaction_reply_jobs` 1 · `interaction_threads` 1。
 
-新增的第二条 `client_environments` 外键来自
-`client_environment_proxy_authorities.env_key`。两张表同属 `aidcp-api`，物理拆库时 MUST
-保持同库迁移；若未来分离代理权威存储，则改为写前验证环境存在、删除环境时发送幂等清理命令，
-读侧对孤儿代理记录 fail-closed，不能把缺失环境当成可用代理。
+本 change 新增两条 `client_environments` 外键，来自 `facebook_operation_policy.env_key` 与
+`facebook_operation_policy_audit.env_key`；配置、审计与环境台账均属 `aidcp-api`，物理拆库时 MUST
+保持同库迁移。`facebook_consumption_view_fact`、`facebook_consumption_action` 对
+`facebook_consumption_progress` 的两条外键，以及 action result 对
+`facebook_consumption_action` 的一条外键，均处于 `aidcp-automation` 运行事实域，也 MUST 同库。
+若未来拆分这些属主内表，必须先改为持久命令/应用层存在性校验，并让孤儿引用 fail-closed。
 
-**指向 `accounts(account_id)` 合计 27 处**（迁移 21 + 源码 6）。design.md 记 26（迁移 19 + 源码 7）：
-差额来自 ① 本 change 第 3 节补齐的迁移把两条既有外键写进了迁移目录；② 源码那 7 处里有一处
-（`src/client-auth/client-user-store.ts:126`）其实是**注释里的反例说明**「故意不写 REFERENCES accounts」，
-不剥注释的扫描会把它当成一条真实外键。扫描器因此 MUST 先剥注释。
+**指向 `accounts(account_id)` 合计 26 处**（迁移 21 + 源码 5），与 design.md 的总数一致。
+分项变化来自 ① 本 change 第 3 节补齐的迁移把两条既有外键写进迁移目录；② 源码旧盘点曾把
+`src/client-auth/client-user-store.ts` 注释里的反例说明「故意不写 REFERENCES accounts」误算成真实
+外键；③ publish media 的运行时 DDL 已不再直接引用 `accounts`。扫描器因此 MUST 先剥注释。
 
 **作用域结论（全部外键共用）**：拆 schema 后仍生效（外键是数据库级、可跨 schema）；
 拆库后**外键根本不存在**，脏引用无人拦、且无任何错误。
