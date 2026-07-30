@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>托管自动化运行时（Managed Automation Runtime）分期实施方案</title>
+<style>
+  @page {
+    size: A4;
+    margin: 22mm 18mm;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #1f2933;
+    margin: 0;
+  }
+  h1 {
+    font-size: 24px;
+    line-height: 1.4;
+    border-bottom: 3px solid #2c5282;
+    padding-bottom: 10px;
+    margin: 0 0 22px 0;
+    color: #1a365d;
+  }
+  h2 {
+    font-size: 19px;
+    color: #2c5282;
+    border-left: 5px solid #2c5282;
+    padding-left: 10px;
+    margin: 30px 0 14px 0;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 16px;
+    color: #2d3748;
+    margin: 24px 0 10px 0;
+    page-break-after: avoid;
+  }
+  p { margin: 8px 0; }
+  strong { font-weight: 700; }
+  pre {
+    font-family: "SF Mono", Menlo, Consolas, "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    background: #f5f6f8;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    white-space: pre;
+    page-break-inside: avoid;
+  }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "Courier New", monospace;
+    font-size: 12.5px;
+    background: #f5f6f8;
+    border-radius: 3px;
+    padding: 1px 4px;
+  }
+  pre code { background: none; padding: 0; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0;
+    font-size: 13px;
+    page-break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid #cbd5e0;
+    padding: 7px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: #edf2f7; font-weight: 700; }
+  ol, ul { margin: 8px 0; padding-left: 24px; }
+  li { margin: 4px 0; }
+  hr {
+    border: none;
+    border-top: 1px solid #cbd5e0;
+    margin: 24px 0;
+  }
+</style>
+</head>
+<body>
+
+<h1>托管自动化运行时（Managed Automation Runtime）分期实施方案</h1>
+
+<h2>一、整体框架</h2>
+
+<p>这套系统要统一回答四个问题：<strong>为什么启动任务、按什么步骤推进、由谁占用账号、如何证明外部动作的结果</strong>。</p>
+
+<h3>对象模型（六层）</h3>
+
+<pre><code>ManagedPlan（长期经营计划，用户授权的边界）
+  └─ ManagedCycle（一个运营周期，如每日一轮，分配预算）
+      └─ Task / TaskRevision（一件要做的事，修订产生新版本，旧版本不可改）
+          └─ ExecutionPlan（编译后的执行图，冻结即不可变）
+              └─ TaskRun（一次执行实例：排队/运行/等待/终态）
+                  └─ StepRun（执行图中的一步，带检查点可恢复）
+                      └─ ExecutionAttempt（一次外部动作尝试，有平台证据才算确认）</code></pre>
+
+<h3>四个入口操作</h3>
+
+<table>
+  <thead>
+    <tr><th>操作</th><th>语义</th><th>特点</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>CreateTaskProposal</strong></td><td>“现在帮我做……”</td><td>仅为建议，由 API 鉴权后产生权威 Task</td></tr>
+    <tr><td><strong>ReviseTaskProposal</strong></td><td>“接下来改成……”</td><td>产生新 TaskRevision + 新执行计划，旧的在安全点停</td></tr>
+    <tr><td><strong>CancelTaskProposal</strong></td><td>“停掉，别继续了”</td><td>请求取消，已派发的动作仍如实回执</td></tr>
+    <tr><td><strong>QueryTaskRequest</strong></td><td>“进度怎么样了？”</td><td>只读投影，不产生任何新工作</td></tr>
+  </tbody>
+</table>
+
+<h3>九个模块，三层职责</h3>
+
+<table>
+  <thead>
+    <tr><th>层</th><th>模块</th><th>职责</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>L1 决定何时做</strong></td><td>trigger-registry、managed-cycle-runtime</td><td>事件/定时/手动触发，周期编排与预算分配</td></tr>
+    <tr><td><strong>L2 决定怎样推进</strong></td><td>task-runtime、account-work-arbiter、policy-risk</td><td>编译执行计划、驱动执行；账号排队仲裁；风控/配额/授权两阶段准入</td></tr>
+    <tr><td><strong>L3 执行与证明</strong></td><td>execution-ledger、edge-gateway、reconciler、decision-trace</td><td>动作账本；边缘派发与能力协商；未知结果对账；全程决策留痕</td></tr>
+  </tbody>
+</table>
+
+<h3>五条核心原则</h3>
+
+<ol>
+  <li><strong>计划不可变</strong>：改需求 = 出新版本，绝不原地改，杜绝“改了一半”的中间态；</li>
+  <li><strong>两阶段准入</strong>：编译时查一次授权预算，每次不可逆动作派发前再实时重读风控/配额/冷却；</li>
+  <li><strong>账号单车道</strong>：同一账号同一时刻只有一件事在执行，按优先级排队，安全点才能换人；</li>
+  <li><strong>平台证据才算数</strong>：只认平台稳定 ID/URL/回执，浏览器“点了”不等于“成了”；</li>
+  <li><strong>诚实的未知</strong>：结果查不清就是 submitted_unknown，交给对账器证明，绝不猜成功或失败。</li>
+</ol>
+
+<h2>二、整体能力（全部完成后）</h2>
+
+<ul>
+  <li>用户一句话（创建/修改/取消/查询）→ 受控、可审计的自动化任务；</li>
+  <li>全托管日常运营：按周期自动研究、创作、发布、互动，预算受控；</li>
+  <li>每个外部动作可证明、可追溯、可对账，风控口径全局唯一；</li>
+  <li>完整取代现有 delegated-task，且切换过程逐能力灰度、可回退。</li>
+</ul>
+
+<h2>三、三个阶段</h2>
+
+<h3>阶段一：地基 + 只读闭环（人类 2–3 周）</h3>
+
+<p>目标：把地基打死，跑通第一条端到端链路，全部可演示。</p>
+
+<p><strong>范围</strong></p>
+<ul>
+  <li>类型契约全量冻结（含阶段二三要用的，只是不实现）；旧 11 态 → 新模型映射文档 + supersession map；</li>
+  <li>核心 7 张表：tasks、task_revisions、execution_plans、task_runs、step_runs、execution_intents/attempts、decision_traces；</li>
+  <li>三个入口操作：<strong>Create / Cancel / Query</strong>（Revise 契约预留、实现延后）；</li>
+  <li>task-runtime 最小版：线性执行图编译 + TaskRun/StepRun 执行 + 检查点恢复；</li>
+  <li>一条只读纵切：<strong>persona 研究任务</strong>（搜索→浏览→评估，无平台写入）；</li>
+  <li>decision-trace 从第一天记录。</li>
+</ul>
+
+<p><strong>框架形态</strong>：入口层(3/4) + 最小执行引擎 + 只写账本 + 留痕。不含仲裁、对账、周期、预算。</p>
+
+<p><strong>能力</strong>：创建一个研究任务 → 编译 → 账号上执行只读研究 → 随时查询进度和结果。总开关默认关，现网零影响。</p>
+
+<h3>阶段二：写动作 + 仲裁与对账（增量约 4–6 周人类）</h3>
+
+<p>目标：让系统敢做“不可逆的事”。</p>
+
+<p><strong>范围</strong></p>
+<ul>
+  <li><strong>ReviseTask</strong> 完整实现（安全点切换、进度继承）；</li>
+  <li>account-work-arbiter 完整版（6 级优先级、抢占、锁顺序）；</li>
+  <li>policy-risk 两阶段准入完整版；edge-gateway 能力协商与版本锁步；</li>
+  <li><strong>reconciler</strong>（submitted_unknown 对账：唯一匹配 / 证明不存在 / 多候选留人工）；</li>
+  <li>三条写纵切：<strong>publish</strong>（意图冻结+指纹对账）、<strong>comment</strong>（prepare/commit 两段占用）、<strong>reply</strong>（api_only 路由）。</li>
+</ul>
+
+<p><strong>框架形态</strong>：九模块中八个成型（缺 managed-cycle 完整版），四操作齐全。</p>
+
+<p><strong>能力</strong>：发布、评论、回复端到端可托管执行；改任务不丢进度；断网断电结果不糊涂账。</p>
+
+<h3>阶段三：全托管 + 切换退役（增量约 4–6 周人类）</h3>
+
+<p>目标：从“能执行任务”到“能托管经营”，并完成新旧交接。</p>
+
+<p><strong>范围</strong></p>
+<ul>
+  <li>trigger-registry 完整版（事件/定时触发、幂等派生、latest_wins）；</li>
+  <li>ManagedCycle + 三类独立预算（平台配额 / 执行资源 / AI 成本）；</li>
+  <li>客户端投影完善、周期总结聚合；</li>
+  <li>legacy delegated-task 适配层、逐能力 OpenSpec delta 生效、影子对标、灰度切换、旧路径退役；</li>
+  <li>（可选并行）迁出到独立 automation 服务仓。</li>
+</ul>
+
+<p><strong>框架形态</strong>：九模块全量 + 切换设施。</p>
+
+<p><strong>能力</strong>：日常运营全自动按周期跑、预算受控；旧 delegated-task 正式退役，系统只有一套任务模型。</p>
+
+<hr>
+
+<p><strong>分期逻辑一句话</strong>：阶段一打地基且零风险可演示；阶段二攻下“不可逆写动作”这个深水区；阶段三把单任务能力升级成经营能力并完成交接。每一期的产出都是下一期的地基，无返工。</p>
+
+</body>
+</html>
