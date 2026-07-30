@@ -219,6 +219,7 @@
 {
   "edgeId": "edge-01",        // string  边缘节点标识
   "platform": "xiaohongshu",  // string? 运行时平台标识；缺省按历史 xhs 兼容，cloud 会与 accounts.platform 校验
+  "mode": "task",             // string? 会话模式：'task' | 'orchestration'；可选，缺省 = 'orchestration'（期1-3 任务模式通道）
   "app": "xhs",               // string? 业务/站点标识
   "capabilities": ["click", "input", "scroll", "captcha_assist_text_v1", "client_core_browser_executor_v1", "facebook_reel_follow_v1", "search_activity_receipt_v1", "interaction_inbox_v1", "interaction_reply_recovery_v1", "interaction_offboarding_v1", "interaction_runtime_controls_v1", "interaction_browser_control_v1"], // string[]? 能力声明（构建能力位由 EdgeClient 构造函数统一并入）
   "accountId": "acc-01",      // string? 账号标识；多账号运行时要求真实账号，default 已退役
@@ -228,6 +229,8 @@
 ```
 
 `platform` 和 `accountNickname` 都是平台抽象层的 type-only payload 扩展，不新增消息类型。cloud 在握手建运行时前以 `accounts.platform` 为事实源校验 edge 上报平台；不一致时返回 `error`，不会让 xhs edge、Facebook edge 或视频号 edge 跨平台接管账号。`accountNickname` 只能作为展示补充，不能用于身份确立、平台校验或命令路由。`client_core_browser_executor_v1` 是可选的结构能力位：双方回显只说明客户端能把 core/Cloud transport 与浏览器执行器分别管理，不改变任何旧消息类型；旧 Cloud 不回显时 Edge 保持旧协议兼容。`facebook_reel_follow_v1` 表示该 Edge 构建包含绑定规范 Reel、唯一作者和后置 Following 状态的关注执行器；Cloud 未看到此位时不得掷自动 Reel 关注概率或下发对应命令。`search_activity_receipt_v1` 表示 Edge 能为每条 search 命令回传稳定关联、真实提交边界与唯一终态；只有双方在 welcome 中协商成功时，Cloud 才以该回执记 search 风控事实并延后概念池 `markSearched`。未协商的旧 Edge 继续沿用历史搜索/关键词尝试记账，不得由 Cloud 伪造已执行 search 风控事实。五项 interaction capability 都是 optional；四个扩展 capability 依赖 `interaction_inbox_v1`，新 Edge 只有收到相应 `welcome.capabilities` 回显后才启用对应消息。回显 `interaction_offboarding_v1` 时，Cloud 还必须在 welcome 带当前 account 的 `interactionRecovery.offboardPending`；回显 `interaction_runtime_controls_v1` 时必须带 `interactionRuntime`。任一查询失败都按 all-off/pending 处理，不能沿用别的账号或旧连接的能力。
+
+`mode` 是会话模式声明（期1-3 任务模式通道），type-only optional 扩展、不新增消息类型。取值 `'task' | 'orchestration'`；**可选，缺省 = `orchestration`**——旧 Edge 不发送该字段时行为与今天逐字节一致（滚动兼容，§24.2 C7），edge 侧无需任何改动。`mode='task'` 声明该会话专供托管自动化运行时驱动：cloud 在握手时经契约纯函数归一后**权威登记**进会话状态，模式随会话生命周期、断开即失效（重连须重新声明）；任务态环境被 cloud 所有既有编排调度/派工路径（account→edge 派工解析、浏览编排 RoleDispatcher、排期扇出、自动排期身份、接管连接解析）排除，排除动作受 cloud 总开关 `AIDCP_TASK_MODE_SCHEDULING_EXCLUSION` 保护（默认关闭；关闭时过滤短路，行为与主干一致）且逐次落日志可观测。冻结契约见 cloud 仓 `src/managed-automation/contracts/session-mode.ts`。
 
 **`welcome`**（cloud → edge）
 ```jsonc
