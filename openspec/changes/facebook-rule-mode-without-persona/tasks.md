@@ -36,10 +36,11 @@
 
 <!-- aidcp-cloud 8b31e97 / aidcp-edge ed2559e — land-change 跑完 acceptance+全量+typecheck 才 ff 推送 -->
 <!-- 2026-07-28 deployed dev — schema 契约门 enforce 三属主全通过；飞书长连接已建立；8787/8090 在听 -->
+<!-- 2026-07-30 Console 4.1-4.3 纳入本变更后重新打开 5.1-5.3；旧证据只覆盖 Cloud/Edge，不能替代本次 Console 验证与集成。 -->
 
-- [x] 5.1 各仓跑聚焦测试 → 全量测试 → typecheck，输出有界记录。
-- [x] 5.2 各 worktree rebase 到最新默认分支、重跑必需验证、fast-forward 集成并推送，回写本清单的 commit-sha。
-- [x] 5.3 `openspec validate facebook-rule-mode-without-persona --strict` 通过。
+- [ ] 5.1 各仓跑聚焦测试 → 全量测试 → typecheck，输出有界记录。
+- [ ] 5.2 各 worktree rebase 到最新默认分支、重跑必需验证、fast-forward 集成并推送，回写本清单的 commit-sha。
+- [ ] 5.3 `openspec validate facebook-rule-mode-without-persona --strict` 通过。
 
 ## 6. 交付边界
 
