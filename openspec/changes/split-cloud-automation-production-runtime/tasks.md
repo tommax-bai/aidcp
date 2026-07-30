@@ -492,10 +492,58 @@
        同批加进控制仓 scripts/sync-split-repos 的 TRANSPORT_MEMBERS。
        三件套同文件的理由照 §8.4：复制成两份，两端路径会悄悄对不上，且两侧各自编译通过、各自测试通过，
        只有真跑起来才 404。 -->
-- [ ] 1.7 **接线期欠账（本轮只定义契约，已在 `operator-command-http.ts` 的 `OPERATOR_COMMAND_WIRING_DEBT` 显式登记）**：
+- [x] 1.7 **接线期欠账（①② 已消，③④ 仍在；`OPERATOR_COMMAND_WIRING_DEBT` 已收缩、消掉的两条移入
+  新增的 `OPERATOR_COMMAND_WIRING_DEBT_CLOSED`）**：
   ① `delegated-task-http.ts` 既有 7 条路由**不带信封**（无版本 / 无 target 校验 / 无 Bearer），MUST 与新的
   `create-from-text` 统一到信封形态，否则同一个域会有两套鉴权口径；
   ② 上面那两处 `instanceof` MUST 迁到结构化守卫；
+  <!-- aidcp-cloud 5323ee5。**①② 一次做完，因为它俩是同一个文件里的同一次改动**——分两轮做是白费一遍。
+       ① 7 条路由迁到信封形态：`registerBearer` + `parseApiDirectEnvelope`（版本 + 执行目标双校验），
+          **7 个方法签名一个没动**，故「组装根可原样注入本地实例」这条性质保住、不需要任何适配器。
+          读 / 写分两个出口：`get` / `list` 失败译「读不到」，其余五个有真副作用、失败译**结果未知**。
+       ② 的另一半（此前无人登记的那半）已补：服务端 `delegatedTaskErrorOriginOf` 把 `name` / `status`
+          放进传输错误的附加位（线格式对传输层自己的错误类**是保附加位的**），客户端
+          `restoreDelegatedTaskServiceError` 先按 kernel 那条**补集**判据（此前零消费）认出「这是业务原因码」
+          再还原。`status` 逐字取服务端给的，**还原不出返回 null、绝不套默认**。
+       委托任务的线上形状守卫**收成一份**，家在它所校验的端口面旁边；运营指令那侧改为引入，不再自持第二份。 -->
+  <!-- **变异实测两轮，第二轮的结论值得单独记**：
+       ① 把服务端那层附加位包装做成死代码（= 修之前的形态）→ 用例 5（版本冲突 409）与 6（平台不支持 422）
+          当场红。**这坐实了「修之前那六处在真跨进程链路上恒 false」不是推理而是实测。**
+       ② 把客户端还原改成「缺 status 就补 400」→ **用例 5 / 6 照样绿**（那两条路径服务端确实带了字段，
+          默认值根本没机会生效），真正抓住它的是**还原判据的单测**与**传输错误透传那条用例**。
+       ⇒ 「不许补默认 status」这条不变量的守卫**不在**端到端那两条用例上。谁若日后觉得单测冗余、
+          以「409/422 那两条已经覆盖了」为由删掉它，这条闸就无声消失。 -->
+  <!-- 顺带修掉裁定文档 J 条（原记「`runDelegated` 把所有异常统一渲染成黄色『需要补充信息』」）：
+       aidcp-cloud e790e47。异常改按结构化守卫分流——认得出业务原因码的仍是黄色「需要补充信息」，
+       其余一律红色「未受理，结果未知」并把原文带出来 + 提示先查任务列表再决定是否重发。
+       **J 条比原记载更糟**：`delegatedTaskService` 缺席时（正是 api 独立起进程的常态）那条
+       `automation_operator_command_unavailable:delegate` 也走同一个兜底 ⇒ 运营看到的是
+       「你的话没说清楚」。代价是运营会改措辞重发，而重发对「没接线」无效、对「超时」可能真发第二次。 -->
+- [x] 1.7a **裁定文档步骤 0-a（分号批命令键分隔符撞车）已修**。
+  <!-- aidcp-cloud 5323ee5。子命令 id 的分隔符由 `:` 改 `-`，收进具名函数 `batchSubCommandMessageId`
+       并写明单射论证（飞书消息 id 形如 `om_<hex>`、本身不含 `-`，故反解唯一；**刻意不做 replace 归一**
+       ——顺手 replace 会把两个不同 id 归成同一个，那是把「一条命令被拒发」换成「两条命令共用一把幂等键」，
+       后者更隐蔽也更贵）。
+       机械判据落在用例 18：**拿 kernel 真函数算一遍**，不在测试里重述 kernel 的规则——
+       重述的话 kernel 哪天把分隔符改成 `-`，用例还是绿的。变异实测：改回冒号，用例 18 当场红。 -->
+- [ ] 1.7b **⚠️ 裁定文档步骤 0-b 的靶子是死代码，需重新裁定后才能做（2026-07-30 实测推翻原前提）。**
+  原文说「手动发帖 / 手动评论拿不到稳定键：消息 id 只透传给了自由文本委托那条，发帖 / 评论只拿到来源会话 id」。
+  **透传缺失属实，但那两条路径在生产里根本不执行**，所以补透传补不到任何活链路上：
+  - `CommandRouter` 里 `/publish`、`/comment` 的分支是
+    `this.actions.delegate ? runDelegated(...) : runPublish/runComment(...)`；
+  - 而统一命令面把 `delegate` 声明成**必填**（`CommandFaceDeps.delegate: NonNullable<CommandActions['delegate']>`），
+    组装根恒注入一个函数（缺服务时函数**内部**抛，不是不给函数）⇒ **那个三元永远走委托分支**；
+  - `runPublish` / `runComment` 是 `CommandActions.publish` / `.comment` 的**唯一**消费者（全仓 grep 坐实），
+    而面板那份动作面（`PanelCommandActions`）**只有** pause / resume / dispatch? / dispatchActive?、
+    **没有 publish / comment** ⇒ 面板也到不了它俩。
+  ⇒ **两个手动指令端口（`ManualPublishCommandPort` / `ManualCommentCommandPort`）今天没有任何活的 api 侧调用方。**
+  生产里 `/publish`、`/comment` 走的是「委托 → automation 意图解析 → 委托任务 → 委托执行器就地调
+  `triggerManual`」，而拆完之后**执行器与调度器同在 automation 进程**，这一跳压根不跨进程。
+  **两条路都成立、但必须显式选一条，不能默认接线**：
+  ① 判定这两个端口当前无消费者，`feishu-operator-publish-comment` 那条台账**以论证消掉**
+     （连同契约保留待将来），并把理由写进两个端口的注释；
+  ② 或裁定 `/publish`、`/comment` 应绕开委托路径直发，届时 0-b 的透传才有意义。
+  **MUST NOT 静默接线**：接一条今天不执行的通道，等于新增一处「看着接好了、其实永不触发」的假绿。
   <!-- ② **已做，且实测是 3 个文件 / 6 个调用点，不是「两处」**（aidcp-cloud <pending>）：
        飞书委托卡片 1 处、客户鉴权服务 **4 处**（本条记成了 1 处）、
        **面板服务 1 处（`panel/panel-server.ts` 的委托任务错误出口，tasks.md 里从来没登记过）**。
@@ -543,9 +591,45 @@
        改成直接传可选句柄才算落地——`src/server.ts` 是并行热点，本轮没动。 -->
 - [ ] 1.4b **委托卡片动作的处理器其实是 api 属主**（`src/feishu/` 整目录 15/15 归 api）：
   方向仍是 api→automation（缺的是服务端口注入），但**没有任何代码需要搬家**。
-- [ ] 1.4c **委托的跨进程通道已经写好、只差接线**：
+- [x] 1.4c **委托的跨进程通道差的是「一次升级 + 一次接线」，不是「只差接线」**（措辞按裁定文档 §5 F 条更正）：
   `aidcp-automation/src/transport/delegated-task-http.ts` 服务端注册 + 客户端 + 7 个路由方法齐全，
-  文件头明写「不接线、不改默认注入」；cloud 全仓对这两个符号零消费。
+  文件头曾明写「不接线、不改默认注入」；cloud 全仓对这两个符号零消费。
+  <!-- aidcp-cloud 5323ee5：**升级那一半已做**（见 1.7），文件头已从「证明性接线（behavior-zero）」
+       改成「正式跨进程传输实现」。接线那一半仍未做（要动组装根，热点，见 1.3 步骤 5）。
+       零消费仍成立——所以这批改动**对现网行为零影响**，唯一有行为的是 e790e47 那处飞书渲染分流。 -->
+- [ ] 1.5 **契约测试：本批落了 transport 侧那半（10 条），另一半要等接收方**。
+  <!-- aidcp-cloud 5323ee5。裁定文档 §4 的 19 条用例里，**不依赖接收方的 10 条已落**：
+       1（逐条路由无令牌 → 401，7 条全扫）/ 2（版本不符）/ 3（目标不符）/ 4（客户端无从自选目标）/
+       5（版本冲突跨线后守卫为真且 status 409）/ 6（422 不被压成 400）/ 7（缺字段判形状不符）/
+       14（连不上 → 读译「读不到」、写译「结果未知」）/ 17（逐条路由真被挂上）/ 18（分号批键合法且互异）。
+       **余下 9 条全部依赖那个还没写的接收方**：8 / 9 / 10 / 11（幂等台账四态与跨重启）、
+       12（启停重放 MUST 重新执行、不判 duplicate）、13（未注入 → `not_delivered` 且不是异常）、
+       15（状态灯读不到 MUST NOT 画成 active:false）、16（`satisfies` 那道编译闸——只能靠变异证，
+       本批已在路由表注释里写明它「只保证表全、保证不了都挂上」）、19（手动发帖 / 评论键跨重试稳定
+       ——**被 1.7b 挡住，那条路径今天不执行**）。 -->
+- [ ] 1.5a **写幂等台账前先按这份实测清单办（避免又一次「只加迁移」）**。
+  <!-- 2026-07-30 实测（六路勘察 + 逐条对抗核验，`aidcp-cloud@93d339b`）：
+       ① **下一个可用迁移号是 0099，不是 0080**。migrations/ 现有 97 个 .sql，数字序最大
+          `0098_facebook_group_join_daily_cap_50`；0079..0098 密集无空洞（0012 是永久保留空号）。
+          裁定文档援引的 `0079_risk_command_outcome` 只是**判例**，不是队尾——它本身已被
+          `0080_restricted_recovery_outcome` 扩过一次（+10 可空列、state 的 CHECK 从 3 值放宽到 5 值、
+          6 条具名约束），**今天那张表的真实形状是 0079+0080**，照 0079 单独一份会低估形状。
+       ② 耦合单元共**四处**，同一批做完：新迁移 + `src/schema/schema-contract.ts` 的
+          `KNOWN_MAX_SCHEMA_VERSION`（现 `0098_...`，有测试断言它恒等于 migrations/ 最大版本，
+          加了迁移不抬就红）+ 该常量上方那段**逐迁移追加式的裁定台账 JSDoc**（那是事实上的登记面，
+          文件里没有任何表清单 / 版本清单数据结构）+ `boundaries/table-ownership.json` 追加一条
+          `{table, owner:'automation', basis}`（现 112 条 = api 54 / automation 51 / content 7）。
+          `REQUIRED_SCHEMA_VERSION`（现 `0097_...`）只在「缺了这条迁移链路就写不了」时才抬——
+          接收方的台账写属于这一类，故**应当一并抬到 0099**，但那会给部署引入「先建表后上代码」的顺序约束。
+       ③ **`AC-OWN-06`（跨属主表读）没有豁免通道，且这是有意的**。新台账表归 automation 后，
+          api 侧若直接读它就是硬红、无处可登记——回读只能经内部 API。 -->
+- [ ] 1.5b **⚠️ 逐条核对错误码的 status，别按 code 猜**（写还原用例时会用到）。
+  <!-- 2026-07-30 实测：`prepareTarget` 钩子里 5 个码（`candidate_target_required` /
+       `candidate_not_found_or_mismatch` / `candidate_not_pending` / `curated_content_unavailable` /
+       `curated_target_unavailable`）全部被统一压成 409；`unsupported_action` 三处抛出**都是 422**、
+       是 status-稳定的；真正 status 不稳定的那个码是 `account_name_required`。
+       ⇒ **绝不可以在客户端按 code 查一张表反推 status**（那正是「补默认」的变形），
+       status 只认服务端随附加位带过来的那个。 -->
 - [x] 1.4d **`DataGateway` 与 paired command 二选一**（已裁定：是伪二选一，见下）：委托服务在 api 侧有**三个**消费者
   （飞书入站 `8316`、面板 `8615`、客户端 API `9157`），后两个走 `DataGateway`，
   而 `DataGateway` 在 `8539-8563` 已预留 remote thunk 位置。两条都建会出现
@@ -569,7 +653,8 @@
        已有逐字同形的判例（状态是进程内的，台账就该是进程内的）。 -->
   <!-- 1.4a 的那条 ⚠️（「桩还在、行为逐位未变」）**已过时**：两个占位桩在 1b36b74 已删，
        `src/server.ts` 现写「调度启停两条句柄直接透传，不补占位桩」，两份同名动作面也已收成一份。 -->
-- [ ] 1.5 契约测试：鉴权、版本 / target 校验、幂等重放、**结果未知**（传输失败不得改写领域结局）。
+- [ ] 1.5c 契约测试（**原文，范围与进度见上面的 1.5**）：鉴权、版本 / target 校验、幂等重放、
+  **结果未知**（传输失败不得改写领域结局）。
 - [ ] 1.6 `aidcp-automation` / `aidcp-api`：同步派生并各自跑 typecheck + 聚焦测试。
 
 ## 2. content 属主 authority（automation → content）
