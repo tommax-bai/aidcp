@@ -102,3 +102,31 @@ Attempt 状态 SHALL 为 `created|dispatched|confirmed|failed|ambiguous`，ambig
 #### Scenario: offboard 审计不含正文或凭证
 - **WHEN** access revoke、Edge cleanup failed/cleared、Cloud tombstone 或 purge 被审计
 - **THEN** 事件只包含必要 scope ID、actor/user、event、status、时间，MUST NOT 包含 message content、final/template text、Cookie/session 或第三方原始响应
+
+### Requirement: 线程最后消息时间不得接受未来值
+
+云端 SHALL 在同步批次入口校验每个线程行的更新时间：超过该批次观测时刻加上时钟偏移容差的，SHALL 以校验失败（422）拒绝**整个批次**，错误信息 SHALL 点名违规的线程外部 ID 与两个时间值。
+
+理由：线程的最后消息时间采用取最大值合并（`GREATEST`），因此**永不回退**——一个被写进去的未来时间戳会永久粘住，且该字段同时是收件箱的排序键与分页游标，污染后排序与翻页一起失效、只能改库恢复。
+
+云端 MUST NOT 静默把未来值裁剪（clamp）到当前时刻后照常写入——裁剪会把「边缘在编造时间」这个上游缺陷藏起来，而该缺陷的每一次发生都在制造不可自愈的数据污染。
+
+**恢复路径**：批次被拒不产生任何持久化的失败态或墓碑——Edge 收不到匹配 ack 即不推进 checkpoint，下次同步以同一游标重试。上游修正后重试即自动通过，无需人工改库或清理状态。
+
+#### Scenario: 未来时间戳的批次被整批拒绝且不落库
+
+- **WHEN** 同步批次中某线程行的更新时间超过该批次观测时刻加时钟偏移容差
+- **THEN** 云端 SHALL 以 422 校验失败拒绝整个批次，并点名该线程外部 ID 与两个时间值
+- **AND** 该批次的线程与消息 MUST NOT 有任何部分写入库中
+
+#### Scenario: 被拒批次可在上游修正后自愈
+
+- **WHEN** 某批次因未来时间戳被拒
+- **THEN** 云端 MUST NOT 为该线程或该同步范围写入任何失败态、墓碑或降级标记
+- **AND** Edge 因未收到匹配 ack 而保留原 checkpoint，上游修正后以同一游标重试 SHALL 正常通过
+
+#### Scenario: 容差内的轻微时钟偏移正常接受
+
+- **WHEN** 线程更新时间略微超过观测时刻但仍在时钟偏移容差之内
+- **THEN** 云端 SHALL 正常接受该批次
+- **AND** MUST NOT 因边缘与云端之间的正常时钟漂移而把可用的同步判成失败
