@@ -6,7 +6,7 @@
 - [x] 1.4 Add Panel `GET/PUT /api/environments/:envKey/facebook-operation-policy` routes and map the customer environment rule-toggle endpoint through its bounded `persona ↔ rule` compatibility contract.
 - [x] 1.5 Implement the target-scoped group-comment policy store and `GET/PUT /api/facebook/groups/comment-policy`, including `db → legacy_env → default` read source, CAS, audit, strict bounds, and write-after-read.
 - [x] 1.6 Add focused store/API tests for defaults, unbound environment writes, ownership/platform rejection, stale revisions, concurrent writes, audit atomicity, compatibility conflicts, and unavailable schema/storage.
-  <!-- aidcp-cloud: migrations 0099-0101; operation/group policy stores and Panel/customer routes; legacy rule compatibility uses exact-env slow-start arbitration, server-read CAS, transactional ownership recheck, and write-after-read binding truth. -->
+  <!-- aidcp-cloud: migrations 0100-0102; operation/group policy stores and Panel/customer routes; legacy rule compatibility uses exact-env slow-start arbitration, server-read CAS, transactional ownership recheck, and write-after-read binding truth. -->
 
 ## 2. Configurable rule-mode cadence
 
@@ -42,7 +42,7 @@
 - [x] 5.2 Remove rule/consumption mutation authority from `/content-schedule` and show read-only effective mode, current revision progress, active action states and named unknown/blocker projections.
 - [x] 5.3 Add the `/facebook-groups` “入群后首次评论等待（小时）” editor with source, revision, server bounds, CAS and post-write truth, visibly separate from same-group re-comment cooldown.
 - [x] 5.4 Add Console tests for all mode-specific forms, invalid/stale/unavailable states, unbound environments, failed-write form retention, content-schedule projection-only behavior and group timing terminology.
-  <!-- aidcp-console: focused 50/50, npm run typecheck, npm run build (3730 modules; existing chunk-size warning only), git diff --check. -->
+  <!-- aidcp-console: focused 55/55, npm run typecheck, npm run build (3731 modules; existing chunk-size warning only), git diff --check. -->
 - [x] 5.5 Add customer-auth `GET/PUT /environments/:envKey/facebook-operation-policy` with ownership/platform checks, strict `{expectedRevision,mode}` input, CAS conflict truth and a cadence-free customer DTO.
 - [x] 5.6 Extend atomic environment provisioning with mutually exclusive `facebookOperationMode`, initial policy/audit persistence and write-after-read truth while retaining released Boolean inputs only as compatibility.
 - [x] 5.7 Add the Edge client consumption entry to both Facebook environment creation and the existing-environment mode area, ordered after cold-start and rule, using only the unified Cloud projection and non-optimistic CAS writes.
@@ -56,7 +56,10 @@
 - [x] 6.2 Run Cloud full tests and typecheck, then Console and Edge focused tests/build/typecheck; resolve only failures caused by this change.
   <!-- Cloud `npx tsx --test --test-reporter=dot 'test/**/*.test.ts'`: exit 0; `npm run typecheck`: exit 0. Console and Edge evidence recorded above. -->
 - [x] 6.3 Run `openspec validate add-configurable-facebook-consumption-mode --strict` and record implementation commits, validations, deviations and delivery evidence in this checklist.
-  <!-- Implementation commits before integration: aidcp-cloud 56bb0bd, aidcp-console b7cf9d8, aidcp-edge 8e0a593. Strict OpenSpec validation: exit 0. Deviation: bounded DEV behavior probes remain task 6.6 because no test environment was selected; no Edge package and no OL deployment. -->
-- [ ] 6.4 Rebase and fast-forward integrate clean Cloud, Console and Edge default branches, push them and the control change, without modifying unrelated worktree changes.
+  <!-- Rebased implementation commits before integration: aidcp-cloud f58c2d2, aidcp-console d3e6172, aidcp-edge 992f1e4. Strict OpenSpec validation: exit 0. Deviation: bounded DEV behavior probes remain task 6.6 because no test environment was selected; no Edge package and no OL deployment. -->
+- [x] 6.4 Rebase and fast-forward integrate clean Cloud, Console and Edge default branches, push them and the control change, without modifying unrelated worktree changes.
+  <!-- Default branches: aidcp-cloud/master f58c2d2, aidcp-console/master d3e6172, aidcp-edge/master 992f1e4; all fast-forwarded and pushed. The control change lands through this checklist commit. Unrelated untracked control and Edge artifacts were preserved. -->
 - [ ] 6.5 Read deployment guidance, run DEV target checks, back up the affected Cloud configuration/schema, deploy only documented AIDCP DEV services and Console, then verify service/listener/health/schema and rollback readiness.
+  <!-- 2026-07-30 read-only gate: `task-preflight` and `deploy-target dev --check` passed; DEV migration ledgers had zero pending/anomalous rows before source sync. DEV and OL still use the same three owner PostgreSQL databases. OL runs `AIDCP_SCHEMA_GATE=enforce`, recognizes at most 0098, and only allows schema ahead through 0081; applying DEV migrations 0100-0102 would therefore make the next OL restart fail closed. Stopped before backup, rsync, migration, service restart, or any other remote write; task remains pending until an explicit OL compatibility action is authorized. -->
 - [ ] 6.6 Perform a bounded DEV verification on explicitly selected test environments: backend write-after-read, effective-mode arbitration, no scheduled join outside persona, strict no-eligible-group waiting, and confirmed-versus-ambiguous counter truth; do not package Edge or deploy OL.
+  <!-- Pending: no exact DEV test environment/account was selected, so no real Facebook action was attempted. -->
