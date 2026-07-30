@@ -1,3 +1,18 @@
+# ⏸ 本轮不做（2026-07-30，用户裁定）
+
+> **剩余任务已划出本轮范围，但本 change 未被废弃。** 立论仍然成立，缺陷仍然存在，只是不在这一轮做。
+>
+> 用户口径：**这些是此前 JS 侧没做完的功能，与「迁移到 Rust 引擎」这批工作没有关系**，
+> 不应该混在这一轮里排期。
+>
+> **进度快照（划出时）：已做 0/37，剩余 37 项本轮不做。**
+>
+> **与「废弃」的区别**：本节不否定立论。下面每条未勾项都标了「本轮不做」，
+> `- [ ]` 在这里表示「没做，本轮也不打算做」，**不表示这条已经不成立**。
+> 重新排期时把本节与各条标注删掉即可，任务原文未改动。
+>
+> **MUST NOT 把本节读成「问题已解决」或「立论已作废」。** 该 change 描述的缺陷在生产上依然存在。
+
 # tasks — captcha-assist-base-url-self-proof
 
 > 落点**仅 aidcp-cloud**。不碰热点文件（两份 `protocol.ts` / `command-bridge` 动作映射 / `RoleName` 注册 / `risk-state-machine`）、**不新增 MessageType**（探针是 HTTP ⇒ 不触发协议四处/五处同步）、**不动 aidcp-console**、无新增 env / 依赖 / DB / nginx 变更。
@@ -5,58 +20,58 @@
 
 ## 1. aidcp-cloud — 探针与判据
 
-- [ ] 1.1 新增基址自证探针模块：匿名 `GET ${base}/api/captcha-assist/<probe-id>`，**无 Authorization / 无 token / 不跟随重定向**；判死 ⟺ `status===503 && body.error==='captcha_assist_unavailable'`
-- [ ] 1.2 判死需**连续 2 次**确认；其余一切（401/404/200/5xx/HTML/非 JSON/传输失败）→ `unknown`、不行动
-- [ ] 1.3 结论记录**对端 IP（socket remoteAddress）**，进日志与 P0 卡文案（用于当场看出解析落到哪台机器）
-- [ ] 1.4 实现纪律（逐条对照 design D6，缺一即为缺陷）：`void probe().catch(log)` + 顶层 try/catch（**否则 Node 18+ 会让整个 cloud 退出**）；自调度 `setTimeout`（上次结束再排下次，防堆叠）；`AbortSignal.timeout(≤5s)`；限响应体大小；timer `.unref()`（仓内惯例 `captcha-assist.ts:405`）；**显式不复用连接**（否则 undici 连接池会掩盖 DNS 割接＝正要抓的腐烂）
-- [ ] 1.5 首跑延迟到面板 listen 之后 + 退避（nginx 手动 drop-in、systemd 无 `After=nginx`）；周期分钟级（倾向 5 min，实装定值）
-- [ ] 1.6 探针**绝不阻塞启动**、异常只吞进日志并保持上一态
+- [ ] **【本轮不做 2026-07-30】** 1.1 新增基址自证探针模块：匿名 `GET ${base}/api/captcha-assist/<probe-id>`，**无 Authorization / 无 token / 不跟随重定向**；判死 ⟺ `status===503 && body.error==='captcha_assist_unavailable'`
+- [ ] **【本轮不做 2026-07-30】** 1.2 判死需**连续 2 次**确认；其余一切（401/404/200/5xx/HTML/非 JSON/传输失败）→ `unknown`、不行动
+- [ ] **【本轮不做 2026-07-30】** 1.3 结论记录**对端 IP（socket remoteAddress）**，进日志与 P0 卡文案（用于当场看出解析落到哪台机器）
+- [ ] **【本轮不做 2026-07-30】** 1.4 实现纪律（逐条对照 design D6，缺一即为缺陷）：`void probe().catch(log)` + 顶层 try/catch（**否则 Node 18+ 会让整个 cloud 退出**）；自调度 `setTimeout`（上次结束再排下次，防堆叠）；`AbortSignal.timeout(≤5s)`；限响应体大小；timer `.unref()`（仓内惯例 `captcha-assist.ts:405`）；**显式不复用连接**（否则 undici 连接池会掩盖 DNS 割接＝正要抓的腐烂）
+- [ ] **【本轮不做 2026-07-30】** 1.5 首跑延迟到面板 listen 之后 + 退避（nginx 手动 drop-in、systemd 无 `After=nginx`）；周期分钟级（倾向 5 min，实装定值）
+- [ ] **【本轮不做 2026-07-30】** 1.6 探针**绝不阻塞启动**、异常只吞进日志并保持上一态
 
 ## 2. aidcp-cloud — 判死落点（红线，落错即自残）
 
-- [ ] 2.1 新增 `canIssueLink()`（基址存在 + 语法合法 + 非判死），与 `isAvailable()`（服务能力）**分离**
-- [ ] 2.2 **只有 `actionUrl()`（`captcha-assist.ts:424`）读 `canIssueLink()`**，判死时返回 undefined
-- [ ] 2.3 **绝不把判死折进 `isAvailable()`（`:147`）**——`:156` `onDetected` 总闸会 ⇒ 不建 incident、不武装抓帧（自残）；`server.ts:3893` 面板注入是**构造期一次性求值** ⇒ 塞动态态＝死代码 + 假闸
-- [ ] 2.4 探针结论以**函数**注入（`getVerdict?: () => Verdict`），**不能是值**（deps 在 `server.ts:1721` 构造、面板 `~:4060` 才 listen）
-- [ ] 2.5 面板层禁用（`server.ts:4082`）+ 协助开着 = 必坏组合 → **懒读**判死（探针不覆盖它：面板不 listen → nginx 502 HTML → `unknown`）
-- [ ] 2.6 基址语法校验（解析失败 / 非绝对 URL → 不可签链接）。诚实说明：**它抓不住本次事故**（`http://aidcp.tommax.cc` 语法完美），只抓「配成乱码」
+- [ ] **【本轮不做 2026-07-30】** 2.1 新增 `canIssueLink()`（基址存在 + 语法合法 + 非判死），与 `isAvailable()`（服务能力）**分离**
+- [ ] **【本轮不做 2026-07-30】** 2.2 **只有 `actionUrl()`（`captcha-assist.ts:424`）读 `canIssueLink()`**，判死时返回 undefined
+- [ ] **【本轮不做 2026-07-30】** 2.3 **绝不把判死折进 `isAvailable()`（`:147`）**——`:156` `onDetected` 总闸会 ⇒ 不建 incident、不武装抓帧（自残）；`server.ts:3893` 面板注入是**构造期一次性求值** ⇒ 塞动态态＝死代码 + 假闸
+- [ ] **【本轮不做 2026-07-30】** 2.4 探针结论以**函数**注入（`getVerdict?: () => Verdict`），**不能是值**（deps 在 `server.ts:1721` 构造、面板 `~:4060` 才 listen）
+- [ ] **【本轮不做 2026-07-30】** 2.5 面板层禁用（`server.ts:4082`）+ 协助开着 = 必坏组合 → **懒读**判死（探针不覆盖它：面板不 listen → nginx 502 HTML → `unknown`）
+- [ ] **【本轮不做 2026-07-30】** 2.6 基址语法校验（解析失败 / 非绝对 URL → 不可签链接）。诚实说明：**它抓不住本次事故**（`http://aidcp.tommax.cc` 语法完美），只抓「配成乱码」
 
 ## 3. aidcp-cloud — 诚实归因与文案
 
-- [ ] 3.1 `hasAssistAction: boolean` → `assistState: 'available' | 'not_configured' | 'refuted'`（`captcha-coordinator.ts:241, 254-256`）
-- [ ] 3.2 三条文案分开；**`not_configured` 保持今天原文（零回归）**；`refuted` 说明「协助链接已停用：该基址上没有协助服务（对端 IP x.x.x.x）」；两种情形都 MUST 保留远程桌面处置文案
-- [ ] 3.3 判死告警**不新开卡种**：复用 `captcha-coordinator` 既有 `lastAlertAt` 冷却范式（`:65`），塞进 P0 卡 detail 一行 + 带冷却的 `console.error`
-- [ ] 3.4 一行启动日志：打印**生效基址 + 它来自哪个 env 变量**（消掉 `?? AIDCP_PANEL_PUBLIC_BASE_URL` 的迷雾）。**不砍该回落变量**——唯一消费者、砍它是行为变更且未核两台 `.env`
+- [ ] **【本轮不做 2026-07-30】** 3.1 `hasAssistAction: boolean` → `assistState: 'available' | 'not_configured' | 'refuted'`（`captcha-coordinator.ts:241, 254-256`）
+- [ ] **【本轮不做 2026-07-30】** 3.2 三条文案分开；**`not_configured` 保持今天原文（零回归）**；`refuted` 说明「协助链接已停用：该基址上没有协助服务（对端 IP x.x.x.x）」；两种情形都 MUST 保留远程桌面处置文案
+- [ ] **【本轮不做 2026-07-30】** 3.3 判死告警**不新开卡种**：复用 `captcha-coordinator` 既有 `lastAlertAt` 冷却范式（`:65`），塞进 P0 卡 detail 一行 + 带冷却的 `console.error`
+- [ ] **【本轮不做 2026-07-30】** 3.4 一行启动日志：打印**生效基址 + 它来自哪个 env 变量**（消掉 `?? AIDCP_PANEL_PUBLIC_BASE_URL` 的迷雾）。**不砍该回落变量**——唯一消费者、砍它是行为变更且未核两台 `.env`
 
 ## 4. aidcp-cloud — 下一次错投的可分诊性（收益随下一趟 OL 车兑现）
 
-- [ ] 4.1 incidentId 加环境标签前缀（`idGen`，`captcha-assist.ts:141`）。核实：`findActiveByEdge`（`:497-505`）不解析 id、边缘侧当不透明 map key ⇒ 改动面小
-- [ ] 4.2 401/404/503 三条 `reason` 改人话（`panel-server.ts:217-259`）；**`error` 保机器码不动**；不新增 `message` 字段（那要改 console＝第 4 仓 + 另一次部署）
-- [ ] 4.3 铁律落码：前缀**只用于文案与日志分诊，绝不用于任何授权判定**；**只有命中硬编码白名单 `^cap_(dev|ol)_` 才渲染签发方，绝不回显未知前缀原文**（URL 路径＝可控输入）
-- [ ] 4.4 错误文案**可以说「不是我」，绝不能说「正主是谁」**（正主的唯一信息源是持链接者递来的输入 ⇒ 照它渲染跳转＝自造开放重定向钓鱼面）
+- [ ] **【本轮不做 2026-07-30】** 4.1 incidentId 加环境标签前缀（`idGen`，`captcha-assist.ts:141`）。核实：`findActiveByEdge`（`:497-505`）不解析 id、边缘侧当不透明 map key ⇒ 改动面小
+- [ ] **【本轮不做 2026-07-30】** 4.2 401/404/503 三条 `reason` 改人话（`panel-server.ts:217-259`）；**`error` 保机器码不动**；不新增 `message` 字段（那要改 console＝第 4 仓 + 另一次部署）
+- [ ] **【本轮不做 2026-07-30】** 4.3 铁律落码：前缀**只用于文案与日志分诊，绝不用于任何授权判定**；**只有命中硬编码白名单 `^cap_(dev|ol)_` 才渲染签发方，绝不回显未知前缀原文**（URL 路径＝可控输入）
+- [ ] **【本轮不做 2026-07-30】** 4.4 错误文案**可以说「不是我」，绝不能说「正主是谁」**（正主的唯一信息源是持链接者递来的输入 ⇒ 照它渲染跳转＝自造开放重定向钓鱼面）
 
 ## 5. 测试（桩即可，不需真机）
 
-- [ ] 5.1 判据映射：`503 + 我方 body` → 判死；`401` / `404 非我方信封` / `200` / `5xx` / 超时 / 非 JSON → `unknown`
-- [ ] 5.2 连续 2 次才判死（第 1 次判死 + 第 2 次其它 ⇒ 不判死）
-- [ ] 5.3 判死 → `actionUrl()` 返 undefined → 卡无按钮
-- [ ] 5.4 **判死绝不影响 incident 创建与抓帧武装**（守 G3 自残红线）
-- [ ] 5.5 `assistState` 三态文案不串（`not_configured` 不得说「基址指错」）
-- [ ] 5.6 探针 reject 不使进程退出
-- [ ] 5.7 回归纪律：`npm run test:acceptance` → `npm test` → `npm run typecheck`（注意：`typecheck | tail` 的退出码是 tail 的，会假绿——别接管道）
+- [ ] **【本轮不做 2026-07-30】** 5.1 判据映射：`503 + 我方 body` → 判死；`401` / `404 非我方信封` / `200` / `5xx` / 超时 / 非 JSON → `unknown`
+- [ ] **【本轮不做 2026-07-30】** 5.2 连续 2 次才判死（第 1 次判死 + 第 2 次其它 ⇒ 不判死）
+- [ ] **【本轮不做 2026-07-30】** 5.3 判死 → `actionUrl()` 返 undefined → 卡无按钮
+- [ ] **【本轮不做 2026-07-30】** 5.4 **判死绝不影响 incident 创建与抓帧武装**（守 G3 自残红线）
+- [ ] **【本轮不做 2026-07-30】** 5.5 `assistState` 三态文案不串（`not_configured` 不得说「基址指错」）
+- [ ] **【本轮不做 2026-07-30】** 5.6 探针 reject 不使进程退出
+- [ ] **【本轮不做 2026-07-30】** 5.7 回归纪律：`npm run test:acceptance` → `npm test` → `npm run typecheck`（注意：`typecheck | tail` 的退出码是 tail 的，会假绿——别接管道）
 
 ## 6. 部署与验收（A1/A2/A3 = archive 前阻塞门，**不 park 进真机 backlog**）
 
-- [ ] 6.1 部署 dev（默认目标，走 §5 安全序列：`scripts/deploy-target dev --check` → 测试 → ECS 备份 → rsync → restart → healthcheck → 失败即回滚；**绝不碰同机 isales**）
-- [ ] 6.2 **当天一条命令**：dev 上 `curl -m3 http://aidcp.tommax.cc/api/captcha-assist/probe` 必须回 `503` + `{"error":"captcha_assist_unavailable"}`（**2026-07-16 已实证通过**，peer=Cloudflare `172.67.208.21`）
-- [ ] 6.3 **A1 跨环境注入**：dev 基址临时指向 OL，等一个周期 → 卡无按钮 + detail 出现停用说明。**必须跑两次：裸 IP 一次、域名一次**（后者验解析路径没被本机短路）
-- [ ] 6.4 **A2 运行期腐烂**：**进程不重启**，改 dev `/etc/hosts` 模拟割接（改 `.env` 对运行中进程无效 ⇒ 那样会把 A2 退化成 A1）→ 一个周期内翻旗。**hosts 是共享机器全局状态，用完必删，且绝不影响同机 isales**
-- [ ] 6.5 **A3 不误伤**：基址指向一个 200 但不是 aidcp 的地址（同机 isales `127.0.0.1:8000` 现成）→ 必须 `unknown`、不得判死
-- [ ] 6.6 验收口径复核：**「503 消失」不算通过**（那证明的是运维手快、不是机制生效）；**必须用新签发的卡**（飞书卡链接发出即固化，旧卡救不回）
-- [ ] 6.7 **不做**的验收：A5「把回显写死成常量」那类变异测试（要改源码、进不了 CI、且需两台同时部署故意破坏的构建，其中一台是稳定生产 OL）
+- [ ] **【本轮不做 2026-07-30】** 6.1 部署 dev（默认目标，走 §5 安全序列：`scripts/deploy-target dev --check` → 测试 → ECS 备份 → rsync → restart → healthcheck → 失败即回滚；**绝不碰同机 isales**）
+- [ ] **【本轮不做 2026-07-30】** 6.2 **当天一条命令**：dev 上 `curl -m3 http://aidcp.tommax.cc/api/captcha-assist/probe` 必须回 `503` + `{"error":"captcha_assist_unavailable"}`（**2026-07-16 已实证通过**，peer=Cloudflare `172.67.208.21`）
+- [ ] **【本轮不做 2026-07-30】** 6.3 **A1 跨环境注入**：dev 基址临时指向 OL，等一个周期 → 卡无按钮 + detail 出现停用说明。**必须跑两次：裸 IP 一次、域名一次**（后者验解析路径没被本机短路）
+- [ ] **【本轮不做 2026-07-30】** 6.4 **A2 运行期腐烂**：**进程不重启**，改 dev `/etc/hosts` 模拟割接（改 `.env` 对运行中进程无效 ⇒ 那样会把 A2 退化成 A1）→ 一个周期内翻旗。**hosts 是共享机器全局状态，用完必删，且绝不影响同机 isales**
+- [ ] **【本轮不做 2026-07-30】** 6.5 **A3 不误伤**：基址指向一个 200 但不是 aidcp 的地址（同机 isales `127.0.0.1:8000` 现成）→ 必须 `unknown`、不得判死
+- [ ] **【本轮不做 2026-07-30】** 6.6 验收口径复核：**「503 消失」不算通过**（那证明的是运维手快、不是机制生效）；**必须用新签发的卡**（飞书卡链接发出即固化，旧卡救不回）
+- [ ] **【本轮不做 2026-07-30】** 6.7 **不做**的验收：A5「把回显写死成常量」那类变异测试（要改源码、进不了 CI、且需两台同时部署故意破坏的构建，其中一台是稳定生产 OL）
 
 ## 7. 顺带登记的债 / 后续
 
-- [ ] 7.1 撤 dev nginx 里 inert 的 `server_name aidcp.tommax.cc` 块（手动 drop-in、不随部署走；留着就是长期制造「域名还指向 dev」假象的源）。**已实证它不影响本判据**（dev 无 hosts 短路、探针走真实解析出网）⇒ 本 change 不动 nginx，登记为债
-- [ ] 7.2 另起 change：**console 事故列表页**（JWT 鉴权）。理由见 design D9——它治「验证码没人解」（协助能力对这条 env 是单点依赖），本 change 治「发出去的按钮是坏的」；一个 change 不治两个病
-- [ ] 7.3 留缝不做：实例身份层（覆盖「对端也开着协助 → 401」这一盲区）。若做，**主判别子必须是每进程随机 boot id，绝不能用可被复制的 env 名**；env 名只做文案
+- [ ] **【本轮不做 2026-07-30】** 7.1 撤 dev nginx 里 inert 的 `server_name aidcp.tommax.cc` 块（手动 drop-in、不随部署走；留着就是长期制造「域名还指向 dev」假象的源）。**已实证它不影响本判据**（dev 无 hosts 短路、探针走真实解析出网）⇒ 本 change 不动 nginx，登记为债
+- [ ] **【本轮不做 2026-07-30】** 7.2 另起 change：**console 事故列表页**（JWT 鉴权）。理由见 design D9——它治「验证码没人解」（协助能力对这条 env 是单点依赖），本 change 治「发出去的按钮是坏的」；一个 change 不治两个病
+- [ ] **【本轮不做 2026-07-30】** 7.3 留缝不做：实例身份层（覆盖「对端也开着协助 → 401」这一盲区）。若做，**主判别子必须是每进程随机 boot id，绝不能用可被复制的 env 名**；env 名只做文案

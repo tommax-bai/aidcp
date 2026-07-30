@@ -100,7 +100,13 @@
   - ⏸ **【降级为「按 case 处理」，2026-07-30，用户裁定】不做，后面看 case。****已确认这样做是安全的**：即便在 macOS 上打 Windows 包踩中这条，也是**响亮失败、不会静默出错包** —— `scripts/after-pack.cjs` 的打包后置校验按**目标平台**（`context.electronPlatformName`）取值，`src/electron/native-page-engine-artifact.cjs` 直接比对产物清单里的 `platform` / `arch` / 可执行文件名，对不上即抛错（清单实测带 `"platform":"darwin"`、`"arch":"arm64"`）。**触发条件**：第一次真的要在 macOS 上出 Windows 包时回到本条；在那之前它零影响、不可能悄悄发货。
 - [ ] 10.1 更新 `docs/architecture.md`：组件图（72-85 行）、边缘模块表（125-138 行）、`DomProvider` / `ActionExecutor` 接口说明（141-144 行）与单步定位 / 锚点晋升两节（172-201 行）当前仍把已从生产剪除的 JS 页面智能当现役；改为如实描述 Native 引擎为现役、并标注这些 TypeScript 模块为退役保留
 - [ ] 10.2 复核根 `CLAUDE.md` §2 的「DOM-first 定位三道闸」铁律表述：三道闸的语义仍然有效，但其权威落点已不是 `aidcp-edge/src/locating/engine.ts`；据实修订指针，不改变红线本身
-- [ ] 10.3 在活跃 change `facebook-consent-structural-detect` 与 `facebook-join-actuation-decouple` 的 `tasks.md` 顶部登记「实装落点 `src/facebook/consent.ts` / TypeScript 加群执行器已在 `scripts/prune-production-dist.mjs` 的生产剪枝黑名单里，按现落点实装不会改变生产行为」，并交由其属主决定改写落点或废弃；MUST NOT 代其改写立论
+- [x] 10.3 ~~在活跃 change `facebook-consent-structural-detect` 与 `facebook-join-actuation-decouple` 的 tasks.md 顶部登记落点已被生产剪枝~~ **【本条已因两个 change 被废弃而失效，2026-07-30】** <!-- aidcp 2026-07-30 -->
+  - 用户裁定**直接废弃**那两个 change（合计 44 项、零开工），理由正是本条要登记的那件事：
+    它们的实装落点在 Native 切换后已不进生产（加群执行器源文件已不存在；同意条探测文件在但被剪枝），
+    **按原文实装等于给永不运行的代码加固**。既然整条废弃，就不需要再去它们顶部登记了。
+  - 两个目录已从 `openspec/changes/` 删除；**全文见 git 历史**（删除提交见本次批次）。
+  - **本条要守住的那条判据仍然有效、且已推广**：判「这段代码还算不算数」要看**从核心入口到不到得了**，
+    不是看「有没有人引用」。同族结论见 `restore-native-actuation-humanization-and-locating` 的 5.7。
 - [ ] 10.4 在 `native-page-engine-production-cutover/tasks.md` 里标注：其未勾的 4.6 / 6.5 / 9.1 / 9.3 所需的机械位置由本 change 提供，本 change 不代替其覆盖率承诺；并明确该 change 归档前必须先收口 9 条未勾任务（3.2 / 3.3 / 4.6 / 6.5 / 8.5 / 9.1 / 9.3 / 9.4 / 9.5），否则归档会把缺口随 delta 并进主规格变成已上线保证
 - [ ] 10.5 在 `docs/real-machine-acceptance-backlog.md` 新增或并入「小红书 Native 切换真机验收」簇，承接 9.4 / 9.5 两项（当前全文无 XHS native 簇）
 

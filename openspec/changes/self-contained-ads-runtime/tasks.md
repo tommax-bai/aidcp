@@ -1,3 +1,18 @@
+# ⏸ 本轮不做（2026-07-30，用户裁定）
+
+> **剩余任务已划出本轮范围，但本 change 未被废弃。** 立论仍然成立，缺陷仍然存在，只是不在这一轮做。
+>
+> 用户口径：**这些是此前 JS 侧没做完的功能，与「迁移到 Rust 引擎」这批工作没有关系**，
+> 不应该混在这一轮里排期。
+>
+> **进度快照（划出时）：已做 8/39，剩余 31 项本轮不做。**
+>
+> **与「废弃」的区别**：本节不否定立论。下面每条未勾项都标了「本轮不做」，
+> `- [ ]` 在这里表示「没做，本轮也不打算做」，**不表示这条已经不成立**。
+> 重新排期时把本节与各条标注删掉即可，任务原文未改动。
+>
+> **MUST NOT 把本节读成「问题已解决」或「立论已作废」。** 该 change 描述的缺陷在生产上依然存在。
+
 # Tasks — self-contained-ads-runtime
 
 <!-- Task 1.7: aidcp-edge commit 1f36bb4; validated on Windows with Node 24 via build:ads-runtime, 20 focused runtime tests, typecheck, and strict OpenSpec validation. -->
@@ -6,46 +21,46 @@
 
 ## 1. aidcp-edge — packaging (edge-desktop-packaging)
 
-- [ ] 1.1 Add `adspower-browser@2.1.0` to **devDependencies** in `package.json`; `npm install --package-lock-only`.
+- [ ] **【本轮不做 2026-07-30】** 1.1 Add `adspower-browser@2.1.0` to **devDependencies** in `package.json`; `npm install --package-lock-only`.
 - [x] 1.7 Windows local development: run npm CLI through the current build-time Node executable (no direct `npm.cmd` spawn), resolve the patched `build/ads-runtime` tree before raw `node_modules`, and cover resolution with a focused test. Windows installer packaging remains deferred.
-- [ ] 1.2 New `scripts/stage-ads-runtime.mjs`: fresh global-prefix install into `build/ads-prefix` with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` + `PLAYWRIGHT_BROWSERS_PATH=0` + `npm_config_ignore_scripts=true`; copy the package dir → `build/ads-runtime/adspower-browser` (POSIX path; leave the single win32 path line as the seam). Ship full all-arch `sqlite/`; do NOT pre-run `ads start`.
-- [ ] 1.3 New `resources/ads-runtime.json` = `{ "adsApiKey": "<baked shared key>", "version": 1 }` (data file; NEVER a `.cjs`; not committed with a real secret if repo is shared — inject at build time or keep in a gitignored local — decide per internal-repo policy).
-- [ ] 1.4 `package.json > build`: top-level `extraResources` for `build/ads-runtime/adspower-browser → adspower-browser` and `resources/ads-runtime.json → ads-runtime.json`. Add `build:ads-runtime` script; prepend it in `electron:build` / `electron:build:mac` / `electron:build:win`.
-- [ ] 1.5 New `scripts/verify-ads-runtime-staged.mjs`: assert on the built `.app` that `adspower-browser` is absent from `app.asar` and present at `Contents/Resources/adspower-browser/{cli,cwd,sqlite,node_modules}`. Wire into the mac build (fail the build on violation).
-- [ ] 1.6 `docs/release-desktop.md`: document the staging step and the **translocated** (DMG/Downloads) first-run smoke requirement.
+- [ ] **【本轮不做 2026-07-30】** 1.2 New `scripts/stage-ads-runtime.mjs`: fresh global-prefix install into `build/ads-prefix` with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` + `PLAYWRIGHT_BROWSERS_PATH=0` + `npm_config_ignore_scripts=true`; copy the package dir → `build/ads-runtime/adspower-browser` (POSIX path; leave the single win32 path line as the seam). Ship full all-arch `sqlite/`; do NOT pre-run `ads start`.
+- [ ] **【本轮不做 2026-07-30】** 1.3 New `resources/ads-runtime.json` = `{ "adsApiKey": "<baked shared key>", "version": 1 }` (data file; NEVER a `.cjs`; not committed with a real secret if repo is shared — inject at build time or keep in a gitignored local — decide per internal-repo policy).
+- [ ] **【本轮不做 2026-07-30】** 1.4 `package.json > build`: top-level `extraResources` for `build/ads-runtime/adspower-browser → adspower-browser` and `resources/ads-runtime.json → ads-runtime.json`. Add `build:ads-runtime` script; prepend it in `electron:build` / `electron:build:mac` / `electron:build:win`.
+- [ ] **【本轮不做 2026-07-30】** 1.5 New `scripts/verify-ads-runtime-staged.mjs`: assert on the built `.app` that `adspower-browser` is absent from `app.asar` and present at `Contents/Resources/adspower-browser/{cli,cwd,sqlite,node_modules}`. Wire into the mac build (fail the build on violation).
+- [ ] **【本轮不做 2026-07-30】** 1.6 `docs/release-desktop.md`: document the staging step and the **translocated** (DMG/Downloads) first-run smoke requirement.
 
 ## 2. aidcp-edge — runtime resolution & staging (edge-bundled-ads-runtime)
 
-- [ ] 2.1 `ads-runtime.cjs resolveCliEntry`: add userData candidate #0 (`userDataPath/ads-runtime/adspower-browser/cli/index.js`); keep the sqlite native-module comment (it is correct). Accept `userDataPath` param.
-- [ ] 2.2 `main.cjs stageAdsRuntimeIfNeeded()`: idempotent copy `Contents/Resources/adspower-browser` → `userData/ads-runtime/adspower-browser`; write a `{appVersion, adspowerBrowserVersion}` stamp; on mismatch wipe + re-stage; honest error on copy failure; skip in dev.
+- [ ] **【本轮不做 2026-07-30】** 2.1 `ads-runtime.cjs resolveCliEntry`: add userData candidate #0 (`userDataPath/ads-runtime/adspower-browser/cli/index.js`); keep the sqlite native-module comment (it is correct). Accept `userDataPath` param.
+- [ ] **【本轮不做 2026-07-30】** 2.2 `main.cjs stageAdsRuntimeIfNeeded()`: idempotent copy `Contents/Resources/adspower-browser` → `userData/ads-runtime/adspower-browser`; write a `{appVersion, adspowerBrowserVersion}` stamp; on mismatch wipe + re-stage; honest error on copy failure; skip in dev.
 
 ## 3. aidcp-edge — hard-switch service/kernel ensure (edge-bundled-ads-runtime)
 
-- [ ] 3.1 Split `ensureAdsRuntimeAndKernel` → `ensureAdsServiceOnce()` (single-flight, cleared on settle) + `ensureKernelOnce()` (single-flight, `kernelDownloaded` short-circuit). Remove the `mode:'external'` HTTP-adopt and `mode:'none'` proceed-anyway branches.
-- [ ] 3.2 `ensureAdsServiceOnce` step order: reset base → stage → resolveCliEntry (null = honest hard-stop, no core) → `ensureRuntime` (`ads status` reuse / `ads start -k <resolveAdsApiKey()>`) → set `adsServiceBase` from `parseRuntimePort` (never hardcode 50325) → honest failure + `surfaceFailure`.
-- [ ] 3.3 Rename `embeddedAdsApiBase` → `adsServiceBase` throughout.
+- [ ] **【本轮不做 2026-07-30】** 3.1 Split `ensureAdsRuntimeAndKernel` → `ensureAdsServiceOnce()` (single-flight, cleared on settle) + `ensureKernelOnce()` (single-flight, `kernelDownloaded` short-circuit). Remove the `mode:'external'` HTTP-adopt and `mode:'none'` proceed-anyway branches.
+- [ ] **【本轮不做 2026-07-30】** 3.2 `ensureAdsServiceOnce` step order: reset base → stage → resolveCliEntry (null = honest hard-stop, no core) → `ensureRuntime` (`ads status` reuse / `ads start -k <resolveAdsApiKey()>`) → set `adsServiceBase` from `parseRuntimePort` (never hardcode 50325) → honest failure + `surfaceFailure`.
+- [ ] **【本轮不做 2026-07-30】** 3.3 Rename `embeddedAdsApiBase` → `adsServiceBase` throughout.
 
 ## 4. aidcp-edge — one base authority + ensure-gating (adspower-environment-provisioning)
 
-- [ ] 4.1 `resolveAdsOpts`: `apiBase = form || adsServiceBase || settings.adsApiBase || undefined` (P0-A fix). Unify `buildAdsProviderEnv` to the renamed base.
-- [ ] 4.2 `ads:createEnv`: `await ensureAdsServiceOnce()` at top (service only, NO kernel); on `!ok` return `{ok:false,error:'指纹浏览器运行时未就绪：<cause>',retryable:true}`.
-- [ ] 4.3 `ads:updateEnvProxy`, `ads:deleteEnv`: `await ensureAdsServiceOnce()` before `resolveAdsOpts` (metadata, no kernel).
-- [ ] 4.4 `reconcileRunningProfiles`: run after service-ensure; stays best-effort.
-- [ ] 4.5 `ads:status` / `ads:listProfiles` read IPC: **cached-base fast path** — read `adsServiceBase` directly, re-ensure only on `fetch failed` (no subprocess per poll); failure returns honest object, never crashes panel.
+- [ ] **【本轮不做 2026-07-30】** 4.1 `resolveAdsOpts`: `apiBase = form || adsServiceBase || settings.adsApiBase || undefined` (P0-A fix). Unify `buildAdsProviderEnv` to the renamed base.
+- [ ] **【本轮不做 2026-07-30】** 4.2 `ads:createEnv`: `await ensureAdsServiceOnce()` at top (service only, NO kernel); on `!ok` return `{ok:false,error:'指纹浏览器运行时未就绪：<cause>',retryable:true}`.
+- [ ] **【本轮不做 2026-07-30】** 4.3 `ads:updateEnvProxy`, `ads:deleteEnv`: `await ensureAdsServiceOnce()` before `resolveAdsOpts` (metadata, no kernel).
+- [ ] **【本轮不做 2026-07-30】** 4.4 `reconcileRunningProfiles`: run after service-ensure; stays best-effort.
+- [ ] **【本轮不做 2026-07-30】** 4.5 `ads:status` / `ads:listProfiles` read IPC: **cached-base fast path** — read `adsServiceBase` directly, re-ensure only on `fetch failed` (no subprocess per poll); failure returns honest object, never crashes panel.
 
 ## 5. aidcp-edge — baked key + launch/kernel wiring (edge-bundled-ads-runtime)
 
-- [ ] 5.1 `resolveBakedAdsRuntimeConfig()` (memoized, next to `loadSettings`): read packaged `process.resourcesPath/ads-runtime.json` then dev `appRoot/resources/ads-runtime.json`.
-- [ ] 5.2 `resolveAdsApiKey(formKey)`: precedence form > settings > env > baked; route `resolveAdsOpts`, `buildAdsProviderEnv`, `ensureRuntime` through it. Preserve honest-failure when empty.
-- [ ] 5.3 `startAdsPowerFlow`: `await ensureAdsServiceOnce()` then `await ensureKernelOnce()` before cancel-gate + `startEdge`; honest bail on either.
-- [ ] 5.4 whenReady after `createWindow`: non-blocking `void ensureAdsServiceOnce()` warm-up (swallow failure). Delete dead `openAdsClient` ('open -a AdsPower Global').
-- [ ] 5.5 `gracefulStopAllAndQuit`: unchanged core SIGTERM; MUST NOT `ads stop` the daemon (add a comment locking the rationale).
+- [ ] **【本轮不做 2026-07-30】** 5.1 `resolveBakedAdsRuntimeConfig()` (memoized, next to `loadSettings`): read packaged `process.resourcesPath/ads-runtime.json` then dev `appRoot/resources/ads-runtime.json`.
+- [ ] **【本轮不做 2026-07-30】** 5.2 `resolveAdsApiKey(formKey)`: precedence form > settings > env > baked; route `resolveAdsOpts`, `buildAdsProviderEnv`, `ensureRuntime` through it. Preserve honest-failure when empty.
+- [ ] **【本轮不做 2026-07-30】** 5.3 `startAdsPowerFlow`: `await ensureAdsServiceOnce()` then `await ensureKernelOnce()` before cancel-gate + `startEdge`; honest bail on either.
+- [ ] **【本轮不做 2026-07-30】** 5.4 whenReady after `createWindow`: non-blocking `void ensureAdsServiceOnce()` warm-up (swallow failure). Delete dead `openAdsClient` ('open -a AdsPower Global').
+- [ ] **【本轮不做 2026-07-30】** 5.5 `gracefulStopAllAndQuit`: unchanged core SIGTERM; MUST NOT `ads stop` the daemon (add a comment locking the rationale).
 
 ## 6. aidcp-edge — UX & copy (edge-bundled-ads-runtime)
 
-- [ ] 6.1 create-env: static "正在启动指纹浏览器运行时…" line before the ensure `await`, cleared after. **No** `ads:createProgress` IPC channel (cut per review).
-- [ ] 6.2 Launch: keep the determinate `kernelPrep` bar (runtime phase no-percent → kernel phase percent). Honest post-ready `/不可达|fetch failed/` remap to "指纹浏览器服务连接中断，请重试" (raw cause to edge log only).
-- [ ] 6.3 Copy fixes: API-Key placeholder + probe hint → "留空即用随包默认凭据；仅在需要覆盖时填写".
+- [ ] **【本轮不做 2026-07-30】** 6.1 create-env: static "正在启动指纹浏览器运行时…" line before the ensure `await`, cleared after. **No** `ads:createProgress` IPC channel (cut per review).
+- [ ] **【本轮不做 2026-07-30】** 6.2 Launch: keep the determinate `kernelPrep` bar (runtime phase no-percent → kernel phase percent). Honest post-ready `/不可达|fetch failed/` remap to "指纹浏览器服务连接中断，请重试" (raw cause to edge log only).
+- [ ] **【本轮不做 2026-07-30】** 6.3 Copy fixes: API-Key placeholder + probe hint → "留空即用随包默认凭据；仅在需要覆盖时填写".
 
 ## 7. aidcp-edge — failure taxonomy (edge-bundled-ads-runtime)
 
@@ -57,16 +72,16 @@
 
 ## 8. aidcp-edge — tests
 
-- [ ] 8.1 `test/electron/lifecycle-contract.test.ts`: add a guard that `runCli` resolves the CLI writable dir from the entry path (not `process.cwd()`) and never inherits a stale cwd. Keep the asar-cwd guard.
-- [ ] 8.2 Stub-level unit tests (injectable `run`) for split ensures: service reuse (`alreadyRunning`), base from `parseRuntimePort` (non-50325), create-env triggers service-only (no kernel), honest hard-stop when resolveCliEntry null, seat-ceiling non-crash exit classification.
-- [ ] 8.3 `npm run typecheck` + `npm test` + `npm run test:acceptance` green.
+- [ ] **【本轮不做 2026-07-30】** 8.1 `test/electron/lifecycle-contract.test.ts`: add a guard that `runCli` resolves the CLI writable dir from the entry path (not `process.cwd()`) and never inherits a stale cwd. Keep the asar-cwd guard.
+- [ ] **【本轮不做 2026-07-30】** 8.2 Stub-level unit tests (injectable `run`) for split ensures: service reuse (`alreadyRunning`), base from `parseRuntimePort` (non-50325), create-env triggers service-only (no kernel), honest hard-stop when resolveCliEntry null, seat-ceiling non-crash exit classification.
+- [ ] **【本轮不做 2026-07-30】** 8.3 `npm run typecheck` + `npm test` + `npm run test:acceptance` green.
 
 ## 9. Real-machine acceptance (register to backlog, verify on operator machine)
 
-- [ ] 9.1 Fresh operator mac (no AdsPower client, no CLI): install → create env → launch → kernel downloads once → fingerprint browser opens; zero key input.
-- [ ] 9.2 Translocated build (from DMG/Downloads): first-run staging to userData works (no read-only-Resources write failure).
-- [ ] 9.3 Machine with a foreign desktop AdsPower on 50325: our CLI takes a fallback port; create/launch hit the bound port (no split-brain, no riding the foreign service).
-- [ ] 9.4 Shared-key concurrency: N operators concurrent — seat-ceiling shows the distinct message and does NOT latch the give-up.
+- [ ] **【本轮不做 2026-07-30】** 9.1 Fresh operator mac (no AdsPower client, no CLI): install → create env → launch → kernel downloads once → fingerprint browser opens; zero key input.
+- [ ] **【本轮不做 2026-07-30】** 9.2 Translocated build (from DMG/Downloads): first-run staging to userData works (no read-only-Resources write failure).
+- [ ] **【本轮不做 2026-07-30】** 9.3 Machine with a foreign desktop AdsPower on 50325: our CLI takes a fallback port; create/launch hit the bound port (no split-brain, no riding the foreign service).
+- [ ] **【本轮不做 2026-07-30】** 9.4 Shared-key concurrency: N operators concurrent — seat-ceiling shows the distinct message and does NOT latch the give-up.
 
 ## 10. aidcp-edge — V2 browser lifecycle and lost-registry recovery
 
