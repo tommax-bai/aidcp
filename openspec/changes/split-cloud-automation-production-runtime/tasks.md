@@ -797,6 +797,23 @@
   <!-- 📌 **2.4 需要第三个工作区**（automation 的手写组装根，cloud 里根本没有这个文件）。
        派生仓的手写组装根从不同步，只能手工改 + 手工 land。 -->
 - [ ] 2.5 按岔口 A 的裁决落地模型调用出口；按岔口 B 的裁决落地四个角色工厂。
+- [ ] 2.4a **落地位置已坐实（2026-07-30，接线批次之后顺带勘的；下一手照此开工，不必重查）。**
+  <!-- **消费面早就不是问题**：0.6c / 0.6e / 0.6g 那批已经把四个注入面全改成 kernel 端口类型
+       （`ConceptStorePort` / `SchedulerConceptStore` / `CuratedSelectionPort`），
+       所以剩下的**只是组装根按模式注入哪一个实现**——与刚做完的委托那条**同形**。
+       传输三件套也齐了：`src/transport/content-authority-http.ts` 里
+       `registerConceptPoolAuthorityRoutes` / `registerCuratedSelectionAuthorityRoutes` +
+       `ConceptPoolAuthorityHttpClient` / `CuratedSelectionAuthorityHttpClient`（本步只用不改）。
+       **两处注入点**（按符号定位，行号只作导航，pin 在 `aidcp-cloud@319b0af`）：
+       ① `segCAutomation` 里 `new RoleDispatcher({...})` 的 `conceptStore` 与 `curatedStore: curatedContentStore`（约 :7090 / :7093）；
+       ② 同段 `ctx.publishScheduler = new PublishScheduler({ conceptStore, ... })`（约 :7653），
+          其精选面走 `curatedStore`（约 :7666）。
+       **判例照人设生成器那处**（同段，约 :5615）：`seamMode === 'monolith'` 用本地实例；
+       其余模式读 `AIDCP_CONTENT_URL` + `requireDirectInternalToken('AIDCP_CONTENT_INTERNAL_TOKEN')`
+       + `deploymentTarget` 建 HTTP 客户端，**缺任一项直接抛**（`content_*_authority_unavailable`）——
+       **fail-closed、绝不静默回落本地**。`seamMode` 取自 `serviceModeFromEnv()`（segC 顶部）。
+       ⚠️ **别照搬「三元里塞一个 undefined」**：这两条今天的降级点已在 0.6f 收成具名抛出，
+       接线时把那几处具名原因**原样保留**，不要因为换了实现就退回空数组 / 静默。 -->
 - [ ] 2.6 处置 `ReplyWorkflow` 的 content 属主具体类实参（与模型出口是两件事，单独处置）。
 - [ ] 2.7 **传递性检查**：逐个构造点核对跨属主实参，**特别点名 optional 参数**
   （`PublishDispatcher` 的 `FacebookPublishMediaStore` 漏传不报错、三个写静默消失）。
