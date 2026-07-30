@@ -37,17 +37,20 @@ python3 -c "import json;print(json.load(open('../aidcp-automation/boundaries/com
 cd ../aidcp && openspec validate split-cloud-automation-production-runtime --strict
 ```
 
-**2026-07-30 01:00 实测期望值：**
+**当前实测期望值（2026-07-30 16:00 更新到第三批之后；本文正文里 01:00 那版已作废）：**
 
 ```
-aidcp=40df0e91(main) cloud=93d339b api=d9c60cf automation=17c7712
-content=6ffa70b kernel=3e80194 transport=cbb91b7   （六仓 master，全部已推送、工作区干净）
+cloud=843bac6  kernel=0a0a94e  transport=c7db33e
+api=a28d134    automation=70addd5  content=747c128   （六仓 master，全部已推送、工作区干净）
 
-AC-BOUND metrics {"sourceFiles":531,"ownershipEntries":531,"crossBoundaryEdges":0,
+AC-BOUND metrics {"sourceFiles":533,"ownershipEntries":533,"crossBoundaryEdges":0,
                   "involvingContent":0,"exemptionEntries":0,"frozenTotal":0,"delta":0,"unplanned":0}
-cloud 台账 55 条   automation 台账 14 条
-tasks.md 46/97   （96 → 97：核验时补了 2.9，见 §3 ②）
+cloud 台账 54 条   automation 台账 13 条    ← 门是 13 条，不是 14（1.7b 裁定撤了一条）
+tasks.md 53/104
+dev 部署 = 843bac6（迁移 0099 已 apply；REQUIRED_SCHEMA_VERSION 仍是 0097，刻意的，见 §0.5）
 ```
+
+**fleet 活跃，这几个数还是会滞后——以你自己跑出来的为准。**
 
 `crossBoundaryEdges` **不是 0** ⇒ 有人新增了跨服务耦合，先查清楚再往下走（棘轮只许下降）。
 
@@ -171,19 +174,21 @@ schema 门逐属主全通过，`operator_command_receipt` 只在 automation 库�
 
 ## 2. 进度（2026-07-30 01:00）
 
-| 段 | 完成 | 内容 |
+> **⚠️ 下表是 01:00 的快照。当前是 53/104**（第 1 段已推进到 11/19，见 §0.5 两批）。
+> 段内明细请跑 `openspec status --change split-cloud-automation-production-runtime`，别照抄本表。
+
+| 段 | 完成（01:00 快照） | 内容 |
 | --- | --- | --- |
 | 0. 准入与三个岔口裁决 | **37/58** | 开工前把有争议的判断钉死 |
-| 1. 四条运营指令通道 | **4/11** → **8/17**（07-30，见 §0.5） | 指令从接口侧送到自动化侧 |
+| 1. 四条运营指令通道 | **4/11** → 现 **11/19** | 指令从接口侧送到自动化侧 |
 | 2. 内容侧属主授权 | **4/10** | 自动化隔着进程用内容库 |
 | 3. 自动化真启动入口 | **0/6** | ← 主交付物 |
 | 4. 台账清零与门禁 | **0/5** | 清零 + 焊死不可倒退 |
 | 5. 派生对账、验收、收尾 | **1/7** | 六仓对齐、部署、归档 |
-| **合计** | **46/97** | |
 
-**已部署 dev 四批**（都是**单体形态**）：`b66c022` → `9ae8e1d` → `1b36b74` → `93d339b`。
-每批都走了安全序列（备份 → rsync → 重启 → 健康检查），四次都零错误、同机 isales 全程未碰。
-**ol 一次没动**（用户没提线上）。
+**已部署 dev 六批**（**全是单体形态**）：`b66c022` → `9ae8e1d` → `1b36b74` → `93d339b`
+→ `e790e47` → `843bac6`。每批都走安全序列（备份 → rsync →〔本批多一步：`migrate up`〕→ 重启
+→ 健康检查），六次都零错误、同机 isales 全程未碰。**ol 一次没动**（用户没提线上）。
 
 **⚠️ 分层验收口径（tasks.md 5.3，别混）**：
 契约测试证明路由与客户端形状；**dev 单体部署只证明「现网零回归」**；
