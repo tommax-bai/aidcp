@@ -2,79 +2,104 @@
 
 ## 1. aidcp-edge — 固化现状的失败优先测试
 
-- [ ] 1.1 为「时间指令被丢弃」写失败优先的测试，两个字段按各自实际转发面分开断言：携带动作前犹豫值的开帖 / 点赞 / 收藏 / 关注 / 评论命令在首条影响页面的输入前有可观测等待；携带离页停留值的关帖 / 返回命令在离开内容前补足停留（该字段转发面只有 feed 翻页、关帖、返回、看图、滚评论五条，返回类命令不携带犹豫值）；当前实现下必须失败 （参照 src/browse/browse-session.ts:504-556；缺犹豫/详情停留/feed 停留三段接线 — 见 oracle.md ⑩）
-- [ ] 1.2 为「转发未消费」写一条对照测试：把 `src/native-page-engine/command-mapper.ts` 允许字段表里出现时间字段的命令集合，与 Native 侧消费点集合做集合相等断言；当前实现下必须失败并列出差集 （参照 src/native-page-engine/command-mapper.ts:53-69 转发面 vs Rust 侧零读取点 — 见 oracle.md ⑩）
-- [x] 1.3 为「按下失败时抬起不发」写一条 Rust 假 CDP 测试：让按下事件返回错误，断言序列里仍出现抬起事件；当前实现下必须失败 （参照 src/browse/cdp-util.ts:242-260 commitLeftClick 的 try/finally 补发 — 见 oracle.md ②） <!-- aidcp-edge 3a1b2b3 新增 native/page-engine/tests/actuation_pointer.rs::a_failed_press_still_dispatches_its_release_and_never_reports_not_started：假 CDP 拒绝按下，断言抬起仍派发且紧随按下，并断言错误文案带「已派发、不得当未开始重投」 -->
-- [x] 1.4 为「点击是坐标瞬移」写一条 Rust 假 CDP 测试：断言一次点击派发的移动事件数 > 1 且帧间延迟非恒定；当前实现下必须失败 （参照 src/humanize/mouse-path.ts:1-136 + cdp-util.ts:176-207；缺弧线/过冲/落点抖动/帧间抖动 — 见 oracle.md ①） <!-- aidcp-edge 3a1b2b3 actuation_pointer.rs::a_click_moves_frame_by_frame_instead_of_teleporting_to_the_target 断言移动帧 > 1 且移动全在按下之前 -->
+- [x] 1.1 为「时间指令被丢弃」写失败优先的测试，两个字段按各自实际转发面分开断言：携带动作前犹豫值的开帖 / 点赞 / 收藏 / 关注 / 评论命令在首条影响页面的输入前有可观测等待；携带离页停留值的关帖 / 返回命令在离开内容前补足停留（该字段转发面只有 feed 翻页、关帖、返回、看图、滚评论五条，返回类命令不携带犹豫值）；当前实现下必须失败 （参照 src/browse/browse-session.ts:504-556；缺犹豫/详情停留/feed 停留三段接线 — 见 oracle.md ⑩） <!-- aidcp-edge 306410b 用例单独一提交先行、实测红（TS 10 例 4 绿 6 红），实现在 e748a56；「先红后绿」的观察窗口这次真的保留了（1.3 / 1.4 丢掉的正是这个窗口） -->
+  - 落点（2026-07-30）：`test/native-page-engine/pacing-consumption.test.ts` —— 16 条带犹豫值的命令逐条断言「首条影响页面的输入之前真的等了一段抖动后的时长」（`:227`）、3 条带停留值的命令逐条断言「以内容开始展示的时刻为锚补足」（`:253`）、登记为不消费停留的命令断言「一步都不等、同一锚点对关帖仍有效」（`:274`）。判据一律由「真的等了多久」派生，不由任何表证明。
+  - 偏离说明（2026-07-30）：停留值的转发面是 5 条、消费面只有 3 条 —— 看图与滚评论两条**声明但不消费**，理由已按 4.6 具名登记（翻图 / 滚评论不离开内容，没有「离页」时刻可锚）。所以本条的停留断言覆盖 3 条而非 5 条，这是有意的切分，不是漏测。
+- [x] 1.2 为「转发未消费」写一条对照测试：把 `src/native-page-engine/command-mapper.ts` 允许字段表里出现时间字段的命令集合，与 Native 侧消费点集合做集合相等断言；当前实现下必须失败并列出差集 （参照 src/native-page-engine/command-mapper.ts:53-69 转发面 vs Rust 侧零读取点 — 见 oracle.md ⑩） <!-- aidcp-edge 306410b 三腿对照（Rust 声明面 / 宿主转发面 / 宿主消费面）+ 两条植入验证；实测红并点名唯一差集：引擎声明了一个宿主从不转发的死字段（关帖的犹豫值） -->
+  - 偏离说明（2026-07-30，与 §4 落点裁定连带）：任务字面要的是「与 **Native 侧**消费点集合」做集合相等；因 §4 落点被主控裁定改到宿主层（见 4.1），消费面那一腿也落在宿主、由「真的等了多久」派生，Rust 侧只留声明面一腿（靠拒绝未知字段的反序列化行为得到恒真判据）。三腿经跨语言登记表 `native/page-engine/command-timing.json` 传递性给出等价判据，但「Rust 侧消费点集合」这个字面对象在本波结束时并不存在。
+  - 口径说明：集合相等被落成「消费 ∪ 未消费 恰好切分声明，且未消费的每一条必须写明理由」（`pacing-consumption.test.ts:211`），不是「声明即必须消费」的严格相等 —— 否则看图 / 滚评论那两条无法诚实登记，只能靠删声明把门禁喂绿。全程**不做源码文本计数**（注释、错误文案与「构造时写空值」的死写都会把文本计数喂绿）。
+- [x] 1.3 为「按下失败时抬起不发」写一条 Rust 假 CDP 测试：让按下事件返回错误，断言序列里仍出现抬起事件；当前实现下必须失败 （参照 src/browse/cdp-util.ts:242-260 commitLeftClick 的 try/finally 补发 — 见 oracle.md ②） <!-- aidcp-edge 4a2c8d4 新增 native/page-engine/tests/actuation_pointer.rs::a_failed_press_still_dispatches_its_release_and_never_reports_not_started：假 CDP 拒绝按下，断言抬起仍派发且紧随按下，并断言错误文案带「已派发、不得当未开始重投」 -->
+- [x] 1.4 为「点击是坐标瞬移」写一条 Rust 假 CDP 测试：断言一次点击派发的移动事件数 > 1 且帧间延迟非恒定；当前实现下必须失败 （参照 src/humanize/mouse-path.ts:1-136 + cdp-util.ts:176-207；缺弧线/过冲/落点抖动/帧间抖动 — 见 oracle.md ①） <!-- aidcp-edge 4a2c8d4 actuation_pointer.rs::a_click_moves_frame_by_frame_instead_of_teleporting_to_the_target 断言移动帧 > 1 且移动全在按下之前 -->
   - 偏离说明（2026-07-29）：判据被**拆到两层**。假 CDP 层只断言「多帧且移动在按下之前」——CDP 记录里没有可靠的墙钟间隔可读，在假 CDP 上断言「帧间延迟非恒定」等于断言测试机的调度抖动。「帧间延迟非恒定」改由轨迹生成层的单测承担（`input.rs` 的 `pointer_frame_delays_are_not_constant`，64 个种子逐个断言同一条轨迹内至少两帧延迟不同且全部落在 [3, 26] ms）。两层合起来覆盖本条字面；单看假 CDP 那一条不足。
   - 另注（1.3 / 1.4 共同）：两条用例与实现落在**同一个提交**，未经历「先红后绿」的观察窗口。它们的判据是反证式的（多帧 / 抬起必发），把实现回退即会转红，但「失败优先」这一工序本身本轮**未走**。
 - [ ] 1.5 为「对齐滚动是单帧精确位移 + 固定间隔」写一条 Rust 假 CDP 测试：断言首页点赞前的对齐滚动派发多帧滚轮且两轮之间的等待不相等；当前实现下必须失败 （参照 src/facebook/viewport-scroll.ts:50-107；现状 feed_like.rs:263-274 单帧精确位移 + 固定 250ms — 见 oracle.md ⑧）
   - 进度说明（2026-07-29）：**未做**。3.1 / 3.2 的实装已落（见那两条），但**点赞前的对齐滚动没有任何假 CDP 用例**——`fake_cdp.rs` 里唯一的多帧滚轮断言是 feed 翻页（`facebook_feed_scroll_dispatches_a_humanized_multi_frame_wheel_gesture`，本轮之前就有）与 Reels 兜底滚轮（本轮改的那两条）。对齐滚动这条路径目前**只有实现、没有回归保护**，实现被改回单帧固定间隔不会有任何测试变红。
 - [ ] 1.6 为「单次尝试即报升级」写一条仓内合约测试（测试落本 change 的测试目录、不改被测文件）：断言生产步骤执行路径不存在「升级结论 + 尝试次数为 1」的组合；当前实现下必须失败（现状在 `native/page-engine/src/xhs-command-router.js:242`） （参照 src/locating/engine.ts:247-264：escalated 的前提是连续 maxAttempts=3 次校验失败 — 见 oracle.md ⑮）
-- [ ] 1.7 为「云端已下发时长被二次乘档位」写一条测试：断言给定同一 dwell/think 值时，改变生效档位不改变等待中心值（防照搬退役 Facebook 会话的 double-count） （参照 browse-session.ts:514-535；反例 4f04e9c^:facebook-session.ts L722/L738 二次乘档位 — 见 oracle.md 开头补注二）
+- [x] 1.7 为「云端已下发时长被二次乘档位」写一条测试：断言给定同一 dwell/think 值时，改变生效档位不改变等待中心值（防照搬退役 Facebook 会话的 double-count） （参照 browse-session.ts:514-535；反例 4f04e9c^:facebook-session.ts L722/L738 二次乘档位 — 见 oracle.md 开头补注二） <!-- aidcp-edge 306410b 用例、e748a56 实现；断言落在 pacing-consumption.test.ts:295：同一云端时长在 1.0 档与 1.6 档下等待中心值逐字相等，只有本地采样兜底那一支随档位成比例放大 -->
+  - 另附两条同族回归（本波自主追加）：中途档位刷新只改档位、绝不清掉离页停留锚点（`:320`）；重连重注入的每类操作 floor 区间真的被本地兜底采纳（`:340`）。
 
 ## 2. aidcp-edge — Native 指针原语与原子区
 
-- [x] 2.1 在 `native/page-engine/src/input.rs` 新增指针原语：多帧轨迹（起点可由调用方指定）、帧间非恒定延迟、路径抖动、可选过冲回拉、落点停顿。只**新增**函数，不动既有文本 / 滚轮原语（该文件与 `harden-native-engine-runtime-contracts` 重叠） （参照 src/humanize/mouse-path.ts:1-136；缺法向弧线/过冲回拉/落点抖动/逐帧延迟四样 — 见 oracle.md ①③） <!-- aidcp-edge 3a1b2b3 新增 dispatch_pointer_click + PointerClickOptions/PointerPoint/PointerInputFailure/PointerRhythm 与三阶贝塞尔轨迹生成；四样齐备：法向偏移弧线（控制点 1/3、2/3 处 ± U(0.1,0.3)×距离）、15% 过冲回拉（5~15px，末帧恒为落点）、落点 ±3px 抖动、逐帧对数正态延迟（中心 8ms、裁进 [3,26]）；既有文本 / 滚轮原语未动，只新增函数与常量 -->
+- [x] 2.1 在 `native/page-engine/src/input.rs` 新增指针原语：多帧轨迹（起点可由调用方指定）、帧间非恒定延迟、路径抖动、可选过冲回拉、落点停顿。只**新增**函数，不动既有文本 / 滚轮原语（该文件与 `harden-native-engine-runtime-contracts` 重叠） （参照 src/humanize/mouse-path.ts:1-136；缺法向弧线/过冲回拉/落点抖动/逐帧延迟四样 — 见 oracle.md ①③） <!-- aidcp-edge 4a2c8d4 新增 dispatch_pointer_click + PointerClickOptions/PointerPoint/PointerInputFailure/PointerRhythm 与三阶贝塞尔轨迹生成；四样齐备：法向偏移弧线（控制点 1/3、2/3 处 ± U(0.1,0.3)×距离）、15% 过冲回拉（5~15px，末帧恒为落点）、落点 ±3px 抖动、逐帧对数正态延迟（中心 8ms、裁进 [3,26]）；既有文本 / 滚轮原语未动，只新增函数与常量 -->
   - 偏离说明（2026-07-29）：另加两样不在字面里的——① 时间参数走 ease-in-out（起步慢 / 中段快 / 逼近再慢，配 Fitts 形态，有单测 `pointer_path_accelerates_then_decelerates`）；② 极近距离（≤2px）或帧预算只剩 1 时退化为单帧，不画无意义曲线。伪随机源是 xorshift + splitmix 混合，种子 = 墙钟毫秒 **异或** 一个进程内自增序号乘黄金比例常数——单靠墙钟会让同一毫秒内的多次调用完全相同（这正是 3.5 要拆掉的那种「假随机」）。
-- [x] 2.2 在指针原语内实现按下 / 抬起配平：按下之后无论成功失败都尝试抬起，抬起失败不覆盖原始错误，按下未完成不得返回已作用结果 （参照 cdp-util.ts:251-260：try/finally 补发，补发失败吞掉、原异常原样上抛 — 见 oracle.md ②） <!-- aidcp-edge 3a1b2b3 press 与 release 都先 await 拿到 Result，再判：pressed 出错就返回 SubmitDispatched(原错误)、release 的失败被丢弃不覆盖；pressed 成功才把 release 的失败上抛。假 CDP 用例 1.3 钉住「拒绝按下时抬起仍派发」 -->
-- [x] 2.3 把取消与截止检查全部前置到按下之前；按下到抬起之间不留任何提前返回路径，取消只在抬起之后生效 （参照 cdp-util.ts:233-237；注意接管检查须排在死线之前，写反=接管被报成超预算 — 见 oracle.md ②） <!-- aidcp-edge 3a1b2b3 ensure_pointer_input_active() 先查取消再查死线（顺序与 oracle 一致），逐帧前、瞄准停顿后、按下前各调一次；press 到 release 之间无 `?`、无 return、无 await 于取消通道 -->
-- [x] 2.4 让原语默认起点取会话内最近一次真实落点（无历史落点时才回落随机偏移），并把真实落点回报给调用方，使同一次互动内的连续点击形成连续光标轨迹 （参照 cdp-util.ts:186-192 默认起点 + :238 返回真实落点供下点继承 — 见 oracle.md ①③） <!-- aidcp-edge 3a1b2b3 LAST_POINTER_LANDING 记住上次真实落点，起点优先级为「调用方显式指定 → 上次落点 → 目标左上方 U(40,160)px 随机偏移」；dispatch_pointer_click 返回 PointerPoint 落点，dispatch_facebook_click_with 透传给调用方 -->
+- [x] 2.2 在指针原语内实现按下 / 抬起配平：按下之后无论成功失败都尝试抬起，抬起失败不覆盖原始错误，按下未完成不得返回已作用结果 （参照 cdp-util.ts:251-260：try/finally 补发，补发失败吞掉、原异常原样上抛 — 见 oracle.md ②） <!-- aidcp-edge 4a2c8d4 press 与 release 都先 await 拿到 Result，再判：pressed 出错就返回 SubmitDispatched(原错误)、release 的失败被丢弃不覆盖；pressed 成功才把 release 的失败上抛。假 CDP 用例 1.3 钉住「拒绝按下时抬起仍派发」 -->
+- [x] 2.3 把取消与截止检查全部前置到按下之前；按下到抬起之间不留任何提前返回路径，取消只在抬起之后生效 （参照 cdp-util.ts:233-237；注意接管检查须排在死线之前，写反=接管被报成超预算 — 见 oracle.md ②） <!-- aidcp-edge 4a2c8d4 ensure_pointer_input_active() 先查取消再查死线（顺序与 oracle 一致），逐帧前、瞄准停顿后、按下前各调一次；press 到 release 之间无 `?`、无 return、无 await 于取消通道 -->
+- [x] 2.4 让原语默认起点取会话内最近一次真实落点（无历史落点时才回落随机偏移），并把真实落点回报给调用方，使同一次互动内的连续点击形成连续光标轨迹 （参照 cdp-util.ts:186-192 默认起点 + :238 返回真实落点供下点继承 — 见 oracle.md ①③） <!-- aidcp-edge 4a2c8d4 LAST_POINTER_LANDING 记住上次真实落点，起点优先级为「调用方显式指定 → 上次落点 → 目标左上方 U(40,160)px 随机偏移」；dispatch_pointer_click 返回 PointerPoint 落点，dispatch_facebook_click_with 透传给调用方 -->
   - 偏离说明（2026-07-29）：落点记忆是**进程内的 `static Mutex<Option<PointerPoint>>`**，不是会话对象上的字段；依据是「引擎进程同一时刻只服务一个会话」，已写进代码注释。若将来一个进程同时服务多会话，这个静态会把 A 会话的光标位置泄漏给 B 会话（不是安全问题，是轨迹连续性会失真）。另：落点在**按下之前**就被记住，因此按下失败的那次也会留下落点——这是有意的（光标物理上确实到了那里）。
-- [x] 2.5 把 `native/page-engine/src/facebook/shared.rs` 的点击出口改为调用该原语：原有两参调用形态对全部 11 处调用点行为等价（**新增可选的起点与禁过冲入参**，默认值等价于今天的调用），11 处的结果取值集合不变 （参照 cdp-util.ts:219-240 dispatchClick 的「逐帧移动 + 提交式左键」两段结构 — 见 oracle.md ①②） <!-- aidcp-edge 3a1b2b3 dispatch_facebook_click 两参形态签名不变、内部转调新增的 dispatch_facebook_click_with(…, PointerClickOptions::default())；新入口返回真实落点。逐处核对：comment.rs:123/176、feed.rs:367、feed_like.rs:131/185/201、publish.rs:396/549/880、reels.rs:123、runtime.rs:375、shared.rs:468 共 12 处两参调用全部原样保留、无一处改签名 -->
+- [x] 2.5 把 `native/page-engine/src/facebook/shared.rs` 的点击出口改为调用该原语：原有两参调用形态对全部 11 处调用点行为等价（**新增可选的起点与禁过冲入参**，默认值等价于今天的调用），11 处的结果取值集合不变 （参照 cdp-util.ts:219-240 dispatchClick 的「逐帧移动 + 提交式左键」两段结构 — 见 oracle.md ①②） <!-- aidcp-edge 4a2c8d4 dispatch_facebook_click 两参形态签名不变、内部转调新增的 dispatch_facebook_click_with(…, PointerClickOptions::default())；新入口返回真实落点。逐处核对：comment.rs:123/176、feed.rs:367、feed_like.rs:131/185/201、publish.rs:396/549/880、reels.rs:123、runtime.rs:375、shared.rs:468 共 12 处两参调用全部原样保留、无一处改签名 -->
   - 实测订正（2026-07-29）：任务里写的「全部 **11** 处调用点」与代码对不上——改动前 `dispatch_facebook_click(session, …)` 实际有 **12** 处（清单见上一行）。本轮 `reels.rs` 里原本裸写三条鼠标事件的「下一个」按钮也改走了这个出口（见 3.5），故改动后为 **13** 处。
   - 偏离说明（2026-07-29）：结果取值集合的口径要说清——① 错误码集合不变：新增的两个失败态（取消 / 超死线）在 Facebook 调用点上**不可达**（`dispatch_facebook_click_with` 传的是 `None` 与 `u64::MAX`，见 2.6 / 3.3 的同一处缺口）；移动失败仍原样上抛原错误。② **有一处文案变了**：按下 / 抬起阶段的失败改带「已派发、不得当未开始重放」的措辞（这是 2.8 要的），错误码不变。③ 落点从「精确几何中心」变成「中心 ±3px」，已有一条既有夹具（`facebook_comment_entry.rs` 按 y 归属计数）因此加了 8px 容差——入口与编辑框相距 40px，仍分得开。
 - [ ] 2.6 为需要保持指针走廊的两处反应浮层提交调用点（`facebook/feed_like.rs:123`、`:193`）显式传入帖级 react 控件坐标作为起点并禁用过冲，满足已归档 `facebook-note-scoped-targeting` 对该路径的要求；加事件序列断言，断言移动路径未越出走廊 （参照 like-executor.ts:360-387 与 reels-reader.ts:531-536：浮层项必须坐标点击、overshoot=false、定位限定浮层内 — 见 oracle.md ⑪）
-  - 部分完成（2026-07-29，`aidcp-edge 3a1b2b3`；**走廊模式落在了第三处、任务点名的那两处没落，故不勾选**）：已落——① 走廊入参 `PointerClickOptions::from_corridor(起点)`（显式起点 + `allow_overshoot=false`）已实现；② `dispatch_facebook_picker_click`（`feed_like.rs:448`，唯一调用点在 `:358`，首页两步点赞的浮层提交）已改用它，起点取帖级 react 控件坐标；③ 事件序列断言已加——`actuation_pointer.rs::the_reaction_picker_commit_stays_inside_the_control_to_flyout_corridor` 断言移动多帧、全程落在「控件→浮层」两点外接框加一圈余量内、末帧不越过浮层项落点。
+  - 部分完成（2026-07-29，`aidcp-edge 4a2c8d4`；**走廊模式落在了第三处、任务点名的那两处没落，故不勾选**）：已落——① 走廊入参 `PointerClickOptions::from_corridor(起点)`（显式起点 + `allow_overshoot=false`）已实现；② `dispatch_facebook_picker_click`（`feed_like.rs:448`，唯一调用点在 `:358`，首页两步点赞的浮层提交）已改用它，起点取帖级 react 控件坐标；③ 事件序列断言已加——`actuation_pointer.rs::the_reaction_picker_commit_stays_inside_the_control_to_flyout_corridor` 断言移动多帧、全程落在「控件→浮层」两点外接框加一圈余量内、末帧不越过浮层项落点。
   - 未落的部分：任务点名的两处（改动前的 `feed_like.rs:123`、`:193`，现为 `:131`、`:201`）**仍是默认两参调用**——起点走「上次落点」的隐式回落而非显式传入，且**过冲仍然允许**。这两处都在 `execute_facebook_reel_like` 里（短视频点赞的浮层提交），而该路径的主控件提交走的是注入路由、不是 CDP 指针，所以浮层那次点击之前**根本没有留下落点**，起点会回落到「目标左上方随机偏移」，与帖级 react 控件坐标无关。过冲甩出浮层 hover 区致其收起，正是 7.4 真机项点名的那条唯一有理由怀疑会新增失败的路径。**收口前必须把这两处也改成 `from_corridor`。**
   - 实测订正（2026-07-29）：本条的调用点清单**既漏了一处也定位偏了一处**。① 任务点名的 `:123` / `:193` 都在 **`execute_facebook_reel_like`（短视频点赞）** 里，不在首页 feed 点赞路径上；② **首页 feed 点赞的浮层提交是第三处**，走的是 `dispatch_facebook_picker_click`（改动前 `feed_like.rs:333` 调用、`:421` 定义），它**本来就带 `from_x` / `from_y` 显式起点**，本轮改的正是它。所以现状是「首页那条已进走廊、短视频那两条还没进」，与任务字面正好相反。
-- [x] 2.7 核算指针帧预算与各命令现有截止预算的关系，超预算时缩减帧数而非跳过配平；记录取值依据 （参照 mouse-path.ts：点数=距离/8 裁进 [15,60]；缩帧不得跳过配平 — 见 oracle.md ①） <!-- aidcp-edge 3a1b2b3 拟人化只吃剩余预算的 1/4（POINTER_FRAME_BUDGET_SHARE=4），按帧间中心值折算成帧数上限；帧数 = 距离/8 裁进 [15,60] 再与预算取小，恒 ≥ 1；瞄准停顿也按「预算减去已花」裁剪。单测 pointer_frame_budget_shrinks_with_the_remaining_deadline + pointer_path_degenerates_… 钉住「预算耗尽也只缩到 1 帧，绝不跳过按下/抬起」 -->
+- [x] 2.7 核算指针帧预算与各命令现有截止预算的关系，超预算时缩减帧数而非跳过配平；记录取值依据 （参照 mouse-path.ts：点数=距离/8 裁进 [15,60]；缩帧不得跳过配平 — 见 oracle.md ①） <!-- aidcp-edge 4a2c8d4 拟人化只吃剩余预算的 1/4（POINTER_FRAME_BUDGET_SHARE=4），按帧间中心值折算成帧数上限；帧数 = 距离/8 裁进 [15,60] 再与预算取小，恒 ≥ 1；瞄准停顿也按「预算减去已花」裁剪。单测 pointer_frame_budget_shrinks_with_the_remaining_deadline + pointer_path_degenerates_… 钉住「预算耗尽也只缩到 1 帧，绝不跳过按下/抬起」 -->
   - 偏离说明（2026-07-29）：取值依据落在代码常量的文档注释里（1/4 份额、帧数 = 距离/8 裁进 [15,60]、帧延迟中心 8ms），**但「与各命令现有截止预算的关系」这一半是空的**——Facebook 的点击调用点目前传的死线是 `u64::MAX`（见 3.3 的同一处缺口），预算裁剪在生产上恒不生效，缩帧路径只有单测覆盖。等 3.3 / 4.x 把死线透传下来后须复核这条份额取值。
 - [ ] 2.8 让「按下之后才置位的取消」回报为「已派发、结果待定」而非「未开始」，并加断言防止它被当成可安全重放的失败 （参照 cdp-util.ts:236 的「按下即将派发」诚实置真钩子，防云端按提交前失败重投致双发 — 见 oracle.md ②）
-  - 部分完成（2026-07-29，`aidcp-edge 3a1b2b3`；**真相只到错误文案、没到阶段字段，故不勾选**）：已落——原语层区分出 `PointerInputFailure::SubmitDispatched`，其转成的引擎错误带显式文案「按下已派发、点击可能已生效、MUST NOT 被当成未开始重放」；假 CDP 用例 `a_failed_press_still_dispatches_its_release_and_never_reports_not_started` 断言这两句话都在。
+  - 部分完成（2026-07-29，`aidcp-edge 4a2c8d4`；**真相只到错误文案、没到阶段字段，故不勾选**）：已落——原语层区分出 `PointerInputFailure::SubmitDispatched`，其转成的引擎错误带显式文案「按下已派发、点击可能已生效、MUST NOT 被当成未开始重放」；假 CDP 用例 `a_failed_press_still_dispatches_its_release_and_never_reports_not_started` 断言这两句话都在。
   - 未落的部分：**命令层仍把任何带错误的写一律记成「未开始」**（该判定在引擎主干里，本轮未动那个文件）。所以「已派发」目前只由一句错误文案承载，**没有反映到回执的效果阶段字段上**——云端读到的仍是「未开始」，重投防线实际上还没建立。用例里已就地标注了这个缺口。另注：本原语把取消检查全部前置到按下之前，因此「按下之后才置位的取消」在结构上不会发生，本条的现实形态就是「按下 / 抬起阶段的 CDP 失败」。
-- [ ] 2.9 【本轮未做，`engine.rs` 未在 `3a1b2b3` 的改动面内】验证码协助的落点循环（现状 `native/page-engine/src/engine.rs:1283-1297`：一帧移动 + 按下 + 抬起 + 固定 80 毫秒）改为调用 2.1 的指针原语，并给该路径单列一档高审查节奏：移动到位后、按下之前插入瞄准停顿，点与点之间改用对数正态停顿，开启逐帧延迟抖动与落点抖动，上一点的真实落点作下一点起步点 （参照 captcha-assist.ts:73-79 专用档常量、:158-167、:320-341 合成注入循环 — 见 oracle.md ③）
+- [ ] 2.9 【本轮未做，`engine.rs` 未在 `4a2c8d4` 的改动面内】验证码协助的落点循环（现状 `native/page-engine/src/engine.rs:1283-1297`：一帧移动 + 按下 + 抬起 + 固定 80 毫秒）改为调用 2.1 的指针原语，并给该路径单列一档高审查节奏：移动到位后、按下之前插入瞄准停顿，点与点之间改用对数正态停顿，开启逐帧延迟抖动与落点抖动，上一点的真实落点作下一点起步点 （参照 captcha-assist.ts:73-79 专用档常量、:158-167、:320-341 合成注入循环 — 见 oracle.md ③）
 - [ ] 2.10 为验证码协助回执的诚实性加一条仓内合约测试（测试落本 change 的测试目录、不改被测文件）：断言宿主向引擎投影验证码点击参数时不得静默丢弃云端携带的轨迹字段（丢弃必须留下可观测记录），且回执里的回放模式不得写成常量。实现点在 `src/main.ts:992-1001`（手工枚举转发、`payload.trajectory` 被丢且无日志）与 `:1014`（回放模式硬编码为合成），该文件归 `restore-native-xiaohongshu-session-guards`：**本 change 不改该文件**，只与其属主对齐落地方式，并把结论与对应 sha 写回本清单 （参照 captcha-assist.ts:300-318「轨迹无效即如实标注回落、绝不谎称用了轨迹」 — 见 oracle.md ④）
-  - 进度说明（2026-07-29）：**未做**，无结论也无 sha。第二波 `3a1b2b3` 只含 Rust 改动，**没有新增任何 TypeScript 用例**，本条要的仓内合约测试不存在；也未与 `restore-native-xiaohongshu-session-guards` 的属主就 `src/main.ts` 的落地方式对齐。两处实现点（轨迹字段被静默丢弃、回放模式硬编码为合成）现状未变。
+  - 进度说明（2026-07-29）：**未做**，无结论也无 sha。第二波 `4a2c8d4` 只含 Rust 改动，**没有新增任何 TypeScript 用例**，本条要的仓内合约测试不存在；也未与 `restore-native-xiaohongshu-session-guards` 的属主就 `src/main.ts` 的落地方式对齐。两处实现点（轨迹字段被静默丢弃、回放模式硬编码为合成）现状未变。
 
 ## 3. aidcp-edge — 拟人滚轮扩到写动作前置手势
 
-- [x] 3.1 把 `native/page-engine/src/facebook/feed_like.rs` 的对齐滚动改为共享拟人手势的有界步进：每轮一次手势、手势后重新解析目标与控件、达到可视带即停（轮次结构与每轮重解析**已存在**，只换手势） （参照 viewport-scroll.ts:50-107 + humanize/scroll-physics.ts:1-98：8~15 帧钟形包络、总位移 ±20% — 见 oracle.md ⑧） <!-- aidcp-edge 3a1b2b3 单帧 dispatch_wheel 换成共享的 dispatch_wheel_humanized（8~15 帧钟形包络、基线 ±20%、滚前先把光标移到落点）；基线位移仍按控件偏移算并保持 ±620 裁剪；轮次结构与每轮 probe_facebook_feed_like_target 重解析原样保留 -->
-- [x] 3.2 用随机化的等待取代对齐滚动后的固定 250 毫秒重探间隔 （参照 scroll-physics.ts：帧间 16~60ms 不均匀延迟 — 见 oracle.md ⑧） <!-- aidcp-edge 3a1b2b3 新增 sample_pause_ms()（围绕中心值的对数正态采样，裁进中心值的 0.55~1.8 倍），重探间隔改为 sample_pause_ms(250.0)，中心值不变 -->
+- [x] 3.1 把 `native/page-engine/src/facebook/feed_like.rs` 的对齐滚动改为共享拟人手势的有界步进：每轮一次手势、手势后重新解析目标与控件、达到可视带即停（轮次结构与每轮重解析**已存在**，只换手势） （参照 viewport-scroll.ts:50-107 + humanize/scroll-physics.ts:1-98：8~15 帧钟形包络、总位移 ±20% — 见 oracle.md ⑧） <!-- aidcp-edge 4a2c8d4 单帧 dispatch_wheel 换成共享的 dispatch_wheel_humanized（8~15 帧钟形包络、基线 ±20%、滚前先把光标移到落点）；基线位移仍按控件偏移算并保持 ±620 裁剪；轮次结构与每轮 probe_facebook_feed_like_target 重解析原样保留 -->
+- [x] 3.2 用随机化的等待取代对齐滚动后的固定 250 毫秒重探间隔 （参照 scroll-physics.ts：帧间 16~60ms 不均匀延迟 — 见 oracle.md ⑧） <!-- aidcp-edge 4a2c8d4 新增 sample_pause_ms()（围绕中心值的对数正态采样，裁进中心值的 0.55~1.8 倍），重探间隔改为 sample_pause_ms(250.0)，中心值不变 -->
 - [ ] 3.3 把取消信号与绝对截止透传进对齐循环（共享手势的入参要求），不得把一段不可打断的等待塞进本可让位的路径 （参照 viewport-scroll.ts:50-107「输入异常不中断 browse loop」：派发失败只中止本轮、绝不抛出 — 见 oracle.md ⑧）
   - 进度说明（2026-07-29）：**未做**。3.1 换手势时给对齐滚动传的是 `None` 与 `u64::MAX`（代码里已就地写明原因：取消信号与绝对截止止步于命令分发层，那几个文件不在本轮改动面内）。后果有两条：① 对齐循环里的等待仍不可打断，本可让位的路径继续占着；② 手势的取消 / 超死线两条失败分支在这里**恒不可达**，所以 3.4 说的「结果取值集合不变」是靠「新分支到不了」成立的，而不是靠语义等价。这与 2.5 / 2.7 记的是**同一处缺口**，提交信息也把它列为「Not yet wired」之一。
-- [x] 3.4 保留现有轮次上限与不可见时的诚实结论（`target_not_visible` + 未开始），确认改动后结果取值集合不变 （参照 like-executor.ts:346-356：滚够回合仍不可见即诚实报不可见，绝不改点当前居中卡 — 见 oracle.md ⑧） <!-- aidcp-edge 3a1b2b3 逐处核对：FACEBOOK_FEED_SCROLL_ROUNDS 轮次上限未动、滚够回合仍不可见仍回 target_not_visible + 未开始、未新增任何「改点居中卡」的兜底 -->
+- [x] 3.4 保留现有轮次上限与不可见时的诚实结论（`target_not_visible` + 未开始），确认改动后结果取值集合不变 （参照 like-executor.ts:346-356：滚够回合仍不可见即诚实报不可见，绝不改点当前居中卡 — 见 oracle.md ⑧） <!-- aidcp-edge 4a2c8d4 逐处核对：FACEBOOK_FEED_SCROLL_ROUNDS 轮次上限未动、滚够回合仍不可见仍回 target_not_visible + 未开始、未新增任何「改点居中卡」的兜底 -->
   - 偏离说明（2026-07-29）：结果取值集合「不变」的前提是 3.3 那两条新失败分支不可达（见上条）。等取消 / 死线真透传下来，对齐循环就会多出两种终局，本条须重新核对。
-- [x] 3.5 把 `native/page-engine/src/facebook/reels.rs` 的兜底滚轮改为共享拟人手势（含滚前光标移动），距离改由手势自身在基线附近采样，去掉墙钟毫秒求余 （⚠️ 旧 Reels 实现本身也是单帧滚轮+裸事件，**不可照抄** reels-reader.ts:353-373；应改指 viewport-scroll.ts:50-107 — 见 oracle.md ⑨） <!-- aidcp-edge 3a1b2b3 `70.0 + (unix_time_ms() % 31)` 删除，改基线常量 85px 交给 dispatch_wheel_humanized 采样（±20% 落回原 70~100 区间）；滚前光标移动由手势自带；这一处**真把 cancellation 与 deadline 传了下去**（与 3.3 的对齐循环不同）。夹具 fake_cdp.rs 三处随之改判据：单帧改 8~15 帧、单帧位移改总位移区间、并新增「首个移动事件必须早于首个滚轮事件」断言 -->
+- [x] 3.5 把 `native/page-engine/src/facebook/reels.rs` 的兜底滚轮改为共享拟人手势（含滚前光标移动），距离改由手势自身在基线附近采样，去掉墙钟毫秒求余 （⚠️ 旧 Reels 实现本身也是单帧滚轮+裸事件，**不可照抄** reels-reader.ts:353-373；应改指 viewport-scroll.ts:50-107 — 见 oracle.md ⑨） <!-- aidcp-edge 4a2c8d4 `70.0 + (unix_time_ms() % 31)` 删除，改基线常量 85px 交给 dispatch_wheel_humanized 采样（±20% 落回原 70~100 区间）；滚前光标移动由手势自带；这一处**真把 cancellation 与 deadline 传了下去**（与 3.3 的对齐循环不同）。夹具 fake_cdp.rs 三处随之改判据：单帧改 8~15 帧、单帧位移改总位移区间、并新增「首个移动事件必须早于首个滚轮事件」断言 -->
   - 偏离说明（2026-07-29）：同一函数里「下一个」按钮那三条裸鼠标事件也一并改走了共享指针出口 `dispatch_facebook_click`（原来按下失败就早返回、抬起永不发出）。这条不在 3.5 字面里，属 2.2 配平红线的同一类缺口，故就地一并修，它也是 2.5 调用点从 12 增到 13 的那一处。另：假 CDP 的应答脚本因多帧手势改成了「输入事件透明放行、脚本只对下一条非输入请求生效」（新增 `respond_to_call_capture_all`）——**这是夹具编码了旧的单帧行为**，不是放松断言：帧数改成区间判据、并补了新的顺序断言。
-- [x] 3.6 确认兜底滚轮改动后仍保留位移实测校验，未测到移动不得报成推进 （参照 viewport-scroll.ts「只在前后都量到位置且完全没动时才兜底一次」，避免部分滚轮已生效再补第二段 — 见 oracle.md ⑧） <!-- aidcp-edge 3a1b2b3 手势之后仍走 wait_for_facebook_reel_movement 实测位移，未测到移动才继续往下一档兜底；no_target 分支与「测不到移动不得报推进」的口径原样保留 -->
-- [ ] 3.7 【本轮未做，`facebook-router/00-shared.js` 未在 `3a1b2b3` 的改动面内】Facebook 共享注入脚本的通用点击助手（现状 `native/page-engine/src/facebook-router/00-shared.js:34-38`：点击前先 `scrollIntoView({block:'center'})`）去掉这次瞬移——需要把目标带进视野时由 Rust 侧先走 3.1 的共享拟人手势，点击助手本身不得移动页面；并加一条对该脚本文本的静态契约检查，断言助手内不再出现瞬移滚动。消费面为 `facebook-router/90-dispatch.js` 的看图 / 点赞 / 关注 / 评论提交 / 评论点赞五个分支，改动后逐分支确认结果取值集合不变；对已被 Rust 侧截走、实际不可达的分支只记录不改 （参照 test/facebook/like-executor.test.ts:193-225『点击脚本里绝不能再有 scrollIntoView 瞬移』断言 — 见 oracle.md ⑪）
+- [x] 3.6 确认兜底滚轮改动后仍保留位移实测校验，未测到移动不得报成推进 （参照 viewport-scroll.ts「只在前后都量到位置且完全没动时才兜底一次」，避免部分滚轮已生效再补第二段 — 见 oracle.md ⑧） <!-- aidcp-edge 4a2c8d4 手势之后仍走 wait_for_facebook_reel_movement 实测位移，未测到移动才继续往下一档兜底；no_target 分支与「测不到移动不得报推进」的口径原样保留 -->
+- [ ] 3.7 【本轮未做，`facebook-router/00-shared.js` 未在 `4a2c8d4` 的改动面内】Facebook 共享注入脚本的通用点击助手（现状 `native/page-engine/src/facebook-router/00-shared.js:34-38`：点击前先 `scrollIntoView({block:'center'})`）去掉这次瞬移——需要把目标带进视野时由 Rust 侧先走 3.1 的共享拟人手势，点击助手本身不得移动页面；并加一条对该脚本文本的静态契约检查，断言助手内不再出现瞬移滚动。消费面为 `facebook-router/90-dispatch.js` 的看图 / 点赞 / 关注 / 评论提交 / 评论点赞五个分支，改动后逐分支确认结果取值集合不变；对已被 Rust 侧截走、实际不可达的分支只记录不改 （参照 test/facebook/like-executor.test.ts:193-225『点击脚本里绝不能再有 scrollIntoView 瞬移』断言 — 见 oracle.md ⑪）
 
 ## 4. aidcp-edge — Native 消费云端时间指令
 
-> 进度说明（2026-07-29）：本节 **4.1–4.7 全部未开工**。第二波提交 `3a1b2b3` 只动了 Rust 的 `input.rs` / `locating.rs` / `facebook/{shared,feed_like,reels}.rs` 与四个测试文件，**未碰** `command.rs`、`runtime.rs`、`engine.rs` 的命令执行路径，也未碰宿主 `src/native-page-engine/browse-session.ts`。云端下发的动作前犹豫值与离页停留值在 Native 侧仍是零消费点。
+> ~~进度说明（2026-07-29）：本节 **4.1–4.7 全部未开工**。~~（第二波 `4a2c8d4` 时的状态，已被第三波取代。）
+>
+> 进度说明（2026-07-30，取代上一条）：本节 **4.1–4.7 全部落地**，提交 `aidcp-edge 306410b`（用例先行、实测红）+ `e748a56`（实现）。
+>
+> **⚠️ 落点层级偏离 —— 主控具名推翻 `design.md` D1（2026-07-29）**：本节字面写的是「在 Rust 命令执行路径上」加消费点，实际落在**宿主 TypeScript 层**。三条理由：
+> ① `design.md` D1 的第二条否决理由（「宿主统一等待会与引擎已有的截止预算相互挤压」）**与代码事实相反** —— 宿主等待发生在**死线计算之前**，完全不占引擎预算；反倒是把等待放进 Rust 才会挤压预算，一次 20s 的离页停留会把上限 45s 的翻页命令直接挤成超时。
+> ② 平行 change `restore-native-facebook-inline-expand-read`（`aidcp-edge 90e093c`）已把同一形状落进主干并带 7 条测试，现役样板就是它；再在 Rust 侧另做一份等于两处等待相加。
+> ③ D1 的第一条理由（「宿主不知道命令内部真正的动作时刻」）在犹豫值上确实成立，但代价是「等待错放在整条命令之前」而不是「静默不等」；相比零消费点，这是可接受的近似，且离页停留那一半用**锚点**解决了同一问题（锚在本批卡到达 / 内容开始展示的时刻，不是命令开始的时刻）。
+> **`design.md` D1 正文与「被否决的替代」小节由主控另改，本条只作台账记录，不代改 design。**
 
-- [ ] 4.1 在 Rust 命令执行路径上为携带动作前犹豫值的命令加入消费点：在该命令第一条影响页面的输入之前等待抖动后的时长 （参照 browse-session.ts:504-512 thinkBefore + :599-614 动作前统一闸 — 见 oracle.md ⑩）
-- [ ] 4.2 在 Rust 命令执行路径上为携带离页停留值的命令加入消费点：以内容开始展示的时刻为锚点补足抖动后的停留，已达标不再叠加 （参照 browse-session.ts:514-535/:537-556：以详情打开或本批卡到达时刻起算、只补差额 — 见 oracle.md ⑩）
-- [ ] 4.3 明确不对云端已下发的值二次乘以风控档位；只在本地采样兜底时按档位放大（依据：`command-pacing`「云端已下发 dwellMs 不再叠 tempo」；**不得**照搬退役 Facebook 会话 `4f04e9c^:src/facebook/facebook-session.ts` L722/L738 的二次放大） （参照 browse-session.ts:527 注释；反例 4f04e9c^:facebook-session.ts L722/L738 — 见 oracle.md 开头补注二）
-- [ ] 4.4 恢复 `src/native-page-engine/browse-session.ts` 的节奏接线：`:121` 改为在本地应用节奏更新而非直接 return，`:213` 的空方法体改为真的保存并应用档位与每类操作 floor 区间。**不改 `src/main.ts`**——其三处快照注入点（`:588`/`:732`/`:1422`）已存在，且该文件归 `restore-native-xiaohongshu-session-guards` （参照 browse-session.ts:470-502：重连重注入清间隔锚点 vs 中途升档只改档位不清锚点 — 见 oracle.md ⑩）
-- [ ] 4.5 把 1.2 的集合相等对照做成常驻门禁，新增命令时缺消费点即失败 （参照 command-mapper.ts:53-69 转发白名单：16 条带犹豫、5 条带停留 — 见 oracle.md ⑩）
-- [ ] 4.6 逐条列出仍无消费点的命令与理由（若有），写进本清单而不是留空 （对照 oracle.md ⑩ 列出的「14 个命令的犹豫值一路解析进结构体后无人使用」清单）
-- [ ] 4.7 登记本 change **不覆盖**的两条 `command-pacing` 已生效义务作为残留缺口（最小间隔 gating 的单调锚点与「与犹豫取 max 不相加」、兜底采样用反射而非硬裁），写清现状为零实现、并在 `docs/real-machine-acceptance-backlog.md` 或后继 change 提案里留名，不得因本 change 落地而被当成已覆盖 （参照 browse-session.ts:568-597 + humanize/timing.ts:113-126：反射采样消竖直左壁尖峰、间隔与犹豫取 max 不相加 — 见 oracle.md ⑩）
+- [x] 4.1 在 Rust 命令执行路径上为携带动作前犹豫值的命令加入消费点：在该命令第一条影响页面的输入之前等待抖动后的时长 （参照 browse-session.ts:504-512 thinkBefore + :599-614 动作前统一闸 — 见 oracle.md ⑩） <!-- aidcp-edge e748a56 落点为宿主的动作前统一闸（browse-session.ts:594，读云端中心值 → 叠抖动 → 可中断等待，无平台 / 无命令类型过滤）；覆盖转发面全部 16 条，由 1.1 的门禁逐条钉住 -->
+  - **归属订正（必须记，2026-07-30）**：动作前犹豫的消费点**不是本 change 落的** —— 它由平行 change `restore-native-facebook-inline-expand-read`（`aidcp-edge 90e093c`）先落地。本波在这一条上只做了三件事：补一行有界诊断（此前节奏层在日志上完全不可见）、把它纳入常驻门禁（16 条逐条断言真的等）、按 4.3 核对未被二次乘档位。台账不要把这条记成本 change 的功劳。
+  - 落点层级偏离见本节头部（主控具名推翻 `design.md` D1）。
+- [x] 4.2 在 Rust 命令执行路径上为携带离页停留值的命令加入消费点：以内容开始展示的时刻为锚点补足抖动后的停留，已达标不再叠加 （参照 browse-session.ts:514-535/:537-556：以详情打开或本批卡到达时刻起算、只补差额 — 见 oracle.md ⑩） <!-- aidcp-edge e748a56 把「仅 Facebook 翻页」的 ensureScrollDwell 泛化成平台无关、按锚点类别分派的 ensureContentDwell（browse-session.ts:617）：翻页锚在本批卡到达时刻（与就地读地板取 max、绝不相加）、关帖 / 返回锚在内容开始展示的时刻；只补差额，已达标不再叠加 -->
+  - 两态分开：**锚点缺席即不补停留**（`:640`）—— 「读不到锚点」与「停留不足」不压成一态。云端缺中心值时走本地区间采样兜底，仍然非零（治秒退）。
+  - 自主追加（超出任务字面，已做突变验证）：锚点在**等完之后**才消费（`:670`）。原写法在等待之前就清锚点，一次接管会把紧随其后的返回命令变成秒退 —— 而那正是本段要治的形态。突变验证：把清点移回等待之前 → `pacing-consumption.test.ts:378` 当场转红，且只有它红。
+  - **行为面新增（须真机确认）**：翻页停留与详情停留此前**只在 Facebook** 生效，泛化后小红书侧每次翻页 / 关帖 / 返回都会新增一段等待，而小红书真机验收自迁移以来一次都没做过。已登记进 §9 待登记真机项。
+- [x] 4.3 明确不对云端已下发的值二次乘以风控档位；只在本地采样兜底时按档位放大（依据：`command-pacing`「云端已下发 dwellMs 不再叠 tempo」；**不得**照搬退役 Facebook 会话 `4f04e9c^:src/facebook/facebook-session.ts` L722/L738 的二次放大） （参照 browse-session.ts:527 注释；反例 4f04e9c^:facebook-session.ts L722/L738 — 见 oracle.md 开头补注二） <!-- aidcp-edge e748a56 云端中心值三处（犹豫 / 翻页停留 / 详情停留）只叠抖动、裸中心值；唯一乘档位的是本地采样兜底那一支；既有的就地读地板仍乘档位（本地兜底，方向正确、未改反）；断言 pacing-consumption.test.ts:295 -->
+- [x] 4.4 恢复 `src/native-page-engine/browse-session.ts` 的节奏接线：`:121` 改为在本地应用节奏更新而非直接 return，`:213` 的空方法体改为真的保存并应用档位与每类操作 floor 区间。**不改 `src/main.ts`**——其三处快照注入点（`:588`/`:732`/`:1422`）已存在，且该文件归 `restore-native-xiaohongshu-session-guards` （参照 browse-session.ts:470-502：重连重注入清间隔锚点 vs 中途升档只改档位不清锚点 — 见 oracle.md ⑩） <!-- aidcp-edge e748a56 节奏更新不再整条丢弃（此前收下即扔，云端以为已降速、边缘仍按原速跑）→ 改走 applyTempoUpdate（:489）；快照真的存下详情停留区间（:469，逐字段回落，任一端非正即整体判无效并保留现值，绝不回落到 0）；两个入口语义在文档注释里显式分开：重连快照可连带清锚点、中途刷新绝不碰。`src/main.ts` 一字未改 -->
+  - 偏离说明（2026-07-30）：**其余每类操作的 floor 区间故意不存** —— 最小间隔 gating 那一整层在 Native 路径上缺席（见 4.7(a)），存下来就是死字段、并会让按「已存下」计数的检查喂绿。越界档位被拒时留痕，「云端没下发」与「下发了但越界」两态分开、前者不留痕。
+- [x] 4.5 把 1.2 的集合相等对照做成常驻门禁，新增命令时缺消费点即失败 （参照 command-mapper.ts:53-69 转发白名单：16 条带犹豫、5 条带停留 — 见 oracle.md ⑩） <!-- aidcp-edge 306410b（门禁三腿 + 植入验证）+ e748a56（消费面那一腿随实现补齐）：腿① Rust 声明面由「注入字段再反序列化、靠拒绝未知字段」派生；腿② 宿主转发面直接读许可字段表；腿③ 宿主消费面由「真的等了多久」派生。交汇点是跨语言登记表 native/page-engine/command-timing.json -->
+  - 两条**植入验证**防门禁自身恒真：TS 侧对三种漂移各点名一次（转发一个未登记字段 / 登记一条不存在的命令 / 删掉一处已登记的转发），Rust 侧两个方向各一条。
+- [x] 4.6 逐条列出仍无消费点的命令与理由（若有），写进本清单而不是留空 （对照 oracle.md ⑩ 列出的「14 个命令的犹豫值一路解析进结构体后无人使用」清单） <!-- aidcp-edge e748a56 清单落在 command-timing.json 的 unconsumed[]，并由 pacing-consumption.test.ts:211 强制「必须写理由、且消费与未消费恰好切分声明」；下面是清单正文 -->
+  - **看图命令 / 滚评论命令的离页停留值**：翻图与滚评论**不离开内容**，没有「离页」时刻可锚；退役 TS 实现同样只消费犹豫值、不消费停留值。**已声明缺席，非遗漏。**
+  - **关帖命令的动作前犹豫值：字段已删**（`native/page-engine/src/command.rs`）。该参数结构体全仓只被关帖一个命令使用，而宿主转发面从不投影它 —— 它唯一的作用就是把按「声明面」计数的检查喂绿。**这一条是行为收紧、须记一句**：引擎侧拒绝未知字段，所以今后任何**塞了该犹豫值字段的关帖请求会变成非法请求、命令根本不下发**。现网云端本就不发这个字段，故无现网路径；真机跑一轮浏览闭环确认无非法请求，已登记进 §9。
+  - 另注：oracle ⑩ 说的「14 个命令的犹豫值解析进结构体后无人使用」**已过期** —— 犹豫值现已 16 条全消费（消费点来自 `90e093c`，见 4.1 的归属订正）。
+- [x] 4.7 登记本 change **不覆盖**的两条 `command-pacing` 已生效义务作为残留缺口（最小间隔 gating 的单调锚点与「与犹豫取 max 不相加」、兜底采样用反射而非硬裁），写清现状为零实现、并在 `docs/real-machine-acceptance-backlog.md` 或后继 change 提案里留名，不得因本 change 落地而被当成已覆盖 （参照 browse-session.ts:568-597 + humanize/timing.ts:113-126：反射采样消竖直左壁尖峰、间隔与犹豫取 max 不相加 — 见 oracle.md ⑩） <!-- aidcp-edge e748a56 两条缺口按「零实现」登记如下；**backlog / 后继 change 里的留名仍未做**，随 7.9 / 7.18 一并收口 -->
+  - **(a) 最小间隔 gating 的单调锚点 + 「与犹豫取 max 不相加」：Native 路径整体缺失、零实现。** 证据：宿主 `src/native-page-engine/` 下没有 floor 表、没有单调锚点、没有 max 折叠。连带缺「重连清锚点 vs 中途刷新不清锚点」这对区分里的**间隔锚点**那一半 —— 本波只把两个入口的语义分开了，锚点本身随 gating 留到后继。
+  - **(b) 兜底采样用反射而非硬裁：零覆盖。** 反射采样在 `src/native-page-engine/` 下零引用；本波详情停留兜底用的是普通区间采样，与退役实现同口径（退役侧反射采样**只**用于间隔 floor）。**这不构成对 (b) 的部分覆盖，别写成「已覆盖一半」。**
 
 ## 5. aidcp-edge — Native 定位三道闸
 
 - [ ] 5.1 在 Native 侧建立共享的解析—执行—后置校验编排：写动作后按同一绑定目标读回业务结果，无证据只报诚实的未开始 / 不确定 （参照 src/locating/engine.ts:213-235 执行后重取根再校验；判据分家见 flows/like-post.ts:27-75、publish-post.ts:203-251 — 见 oracle.md ⑫⑬）
-  - 部分完成（2026-07-29，`aidcp-edge 3a1b2b3`；**模块已建但零接线，故不勾选**）：新增 `native/page-engine/src/locating.rs`（348 行）与 `tests/locating_gates.rs`（12 例）。已落——① `LocatingSteps` 三段接口（解析 / 执行 / 后置校验）重建了「可换的页面来源与执行层」这条缝，使判据能脱离浏览器被断言（这正是 7.17 里「在 Native 侧重建可替换缝」那个选项）；② `run_locating_gates` 每一轮**重新解析**、不复用上一轮活引用；③ 终局四态 `Confirmed / NoTarget / Ambiguous / Escalated`，无证据只回诚实的未开始或不确定，绝不回落成已确认。
+  - 部分完成（2026-07-29，`aidcp-edge 4a2c8d4`；**模块已建但零接线，故不勾选**）：新增 `native/page-engine/src/locating.rs`（348 行）与 `tests/locating_gates.rs`（12 例）。已落——① `LocatingSteps` 三段接口（解析 / 执行 / 后置校验）重建了「可换的页面来源与执行层」这条缝，使判据能脱离浏览器被断言（这正是 7.17 里「在 Native 侧重建可替换缝」那个选项）；② `run_locating_gates` 每一轮**重新解析**、不复用上一轮活引用；③ 终局四态 `Confirmed / NoTarget / Ambiguous / Escalated`，无证据只回诚实的未开始或不确定，绝不回落成已确认。
   - 未落的部分：**该模块没有被任何平台命令调用**（提交信息自己写明「Not yet wired」）。所以现役的写动作一条也没有因此获得后置校验，本条要的「在 Native 侧建立编排」目前只是「有了一个可用的编排原语」。收口前须至少接一条真实命令，否则这三道闸在生产上等于不存在。
 - [ ] 5.2 实现有界重试与升级：可重放的写在未达上限时继续尝试；不可重放的写一经派发即停手报不确定、绝不重放；升级结论只在上限耗尽时给出 （参照 engine.ts:137-264：3 轮重试 + no_target / systemic_revision / llm_unavailable 三态终局 — 见 oracle.md ⑮）
-  - 部分完成（2026-07-29，`aidcp-edge 3a1b2b3`；同 5.1，**逻辑齐备但零接线，故不勾选**）：`locating.rs` 里三条判据都在且都有用例——上限默认 3 轮（与退役实现同）、只有上限耗尽才给升级结论、且升级分「一次都没写下去（`NoTarget`）」与「写下去了但结果始终没发生（`SystemicRevision`）」；解析来源本身不可用（`SourceUnavailable`）**立刻升级、不再重试**，与「平台改版」分开；不可重放的写一经派发即停手回 `Ambiguous`，绝不重放（用例 `a_dispatched_non_replayable_write_is_never_retried`）。未落的仍是接线。
+  - 部分完成（2026-07-29，`aidcp-edge 4a2c8d4`；同 5.1，**逻辑齐备但零接线，故不勾选**）：`locating.rs` 里三条判据都在且都有用例——上限默认 3 轮（与退役实现同）、只有上限耗尽才给升级结论、且升级分「一次都没写下去（`NoTarget`）」与「写下去了但结果始终没发生（`SystemicRevision`）」；解析来源本身不可用（`SourceUnavailable`）**立刻升级、不再重试**，与「平台改版」分开；不可重放的写一经派发即停手回 `Ambiguous`，绝不重放（用例 `a_dispatched_non_replayable_write_is_never_retried`）。未落的仍是接线。
 - [ ] 5.3 升级语义与尝试计数的实现点在 `native/page-engine/src/xhs-command-router.js`，该文件是并行 change `restore-native-xiaohongshu-action-honesty` 的单写区：**本 change 不改该文件**，只与其属主对齐落地方式（在文件内修正、或以删除该 v1 分支达成），并把结论与对应 sha 写回本清单；1.6 的合约测试按属主落地后的形态转绿 （参照 locating/types.ts:138-148 的升级三态枚举；旧口径下 escalated 须连续 3 次校验失败 — 见 oracle.md ⑮）
   - 对账结果（2026-07-29，属主已落地，**但两个选项都没选，故本条不勾选**）：属主 `restore-native-xiaohongshu-action-honesty` 在 `aidcp-edge 19d4872` 里就其 2.8 做了决策——**保留 v1 分支、走「补测量」**（实读云端 CLI 与规划器后确认该路径仍有活跃产出方，删除即删活路径）。属主只改了 `page.scroll` 那一支（改按实测位移回报），**click / input 两支的 `outcome:'escalated', attempts:1` 原样保留**。因此：本条要的「在文件内修正升级语义」与「删除该 v1 分支」两个选项**都未发生**，`xhs-command-router.js` 里「升级结论 + 尝试次数为 1」的组合**依然存在**，1.6 的合约测试按现状仍会红（1.6 本身也还没写）。下一步须与属主重新对齐：要么把这两支的 `escalated` 降级为 `ambiguous`/`no_target` 之类如实取值，要么给 v1 兼容路径真做有界重试。
 - [ ] 5.4 实现锚点暂存区与晋升阈值：非确定性来源得到的新锚点先暂存，连续确认成功达阈值才进主缓存 （参照 cache.ts:89-116 暂存/阈值 2/晋升；⚠️ 旧缓存纯进程内、snapshot 零调用方，持久化须重新设计 — 见 oracle.md ⑯⑲）
-  - 部分完成（2026-07-29，`aidcp-edge 3a1b2b3`；**7.16 明令「裁定前不得按已实现勾掉」，故不勾选**）：`locating.rs` 的 `AnchorCache` 实现了主缓存 + 暂存区两层、可配置的连续确认阈值、三种运行模式（读写 / 只读 / 只写）、快照进出（畸形快照整体拒绝、绝不半载入），并明确「只有**非确定性**来源的锚点才进暂存区」。用例覆盖晋升、阈值、锚点变更即重置确认计数、确定性锚点永不进暂存。**但暂存区在当前引擎里恒为空**——每个定位器都是编译进二进制的固定选择器，没有任何非确定性来源，`stage_non_deterministic` 在生产上不会被调用。实装方就此加了一条测试把「空转」这件事钉死，以免被读成「定位自愈已恢复」。裁定见 7.16。
+  - 部分完成（2026-07-29，`aidcp-edge 4a2c8d4`；**7.16 明令「裁定前不得按已实现勾掉」，故不勾选**）：`locating.rs` 的 `AnchorCache` 实现了主缓存 + 暂存区两层、可配置的连续确认阈值、三种运行模式（读写 / 只读 / 只写）、快照进出（畸形快照整体拒绝、绝不半载入），并明确「只有**非确定性**来源的锚点才进暂存区」。用例覆盖晋升、阈值、锚点变更即重置确认计数、确定性锚点永不进暂存。**但暂存区在当前引擎里恒为空**——每个定位器都是编译进二进制的固定选择器，没有任何非确定性来源，`stage_non_deterministic` 在生产上不会被调用。实装方就此加了一条测试把「空转」这件事钉死，以免被读成「定位自愈已恢复」。裁定见 7.16。
 - [ ] 5.5 实现反污染丢弃：任一次后置校验失败即把相关暂存锚点丢弃，且不得被后续解析当作已确认复用 （参照 cache.ts:119-121 dropStaged + engine.ts:238-243「校验失败即丢弃且强制换路径」 — 见 oracle.md ⑯）
-  - 部分完成（2026-07-29，`aidcp-edge 3a1b2b3`；同 5.4，受 7.16 阻断故不勾选）：`record_failure` 当场 `staged.remove(key)` 并给主缓存记一次失败；用例 `a_failed_validation_drops_the_staged_anchor_for_good` 断言丢弃后不再被当已确认复用。同样受「暂存区恒为空」这个前提影响：逻辑正确，但在生产上无事可做。
+  - 部分完成（2026-07-29，`aidcp-edge 4a2c8d4`；同 5.4，受 7.16 阻断故不勾选）：`record_failure` 当场 `staged.remove(key)` 并给主缓存记一次失败；用例 `a_failed_validation_drops_the_staged_anchor_for_good` 断言丢弃后不再被当已确认复用。同样受「暂存区恒为空」这个前提影响：逻辑正确，但在生产上无事可做。
 - [ ] 5.6 逐条盘点当前 Native 命令面，标出哪些已具备后置校验、哪些暂不具备并注明原因；不具备的不得默认返回成功 （参照 engine.ts:39-41 校验器是接口式强制、缺判据即编译不过；判据强度反例见 oracle.md ⑬⑭）
 - [ ] 5.7 **只读**确认 `scripts/prune-production-dist.mjs` 的禁入表未被放宽（该文件归 `enforce-native-engine-artifact-gates`，本 change 不改一行），退役的 TypeScript 定位层与锚点缓存仍不进生产产物
   - 进度说明（2026-07-29）：**未做**，且现在更该做了。属主 change `enforce-native-engine-artifact-gates` 已在同一分支的 `aidcp-edge be0a8be` 落地，**把该脚本整体重写**（242 行改动，同批还新增了 `scripts/gate-native.mjs`、`scripts/native-engine-inventory.cjs` 与 `test/native-page-engine/artifact-gates.test.ts`）。本条的只读确认必须**以 `be0a8be` 之后的脚本为准**重做一次：禁入表在重写中是否仍覆盖退役的 TypeScript 定位层与锚点缓存，尚无人核对。本 change 不改该文件一行的纪律不变。
@@ -88,18 +113,27 @@
 
 - [ ] 6.1 运行 Rust 单测与假 CDP 测试（`cargo test --locked`），记录通过数
   - 阶段性记录（2026-07-29，change 未收口故不勾选）：Rust 门禁 `npm run gate:native` **通过**（toolchain `1.97.1-aarch64-apple-darwin`，steps = fmt, clippy, test），本条要的 `cargo test` 被它涵盖。本波新增 Rust 用例：`tests/actuation_pointer.rs` 3 例（假 CDP：按下失败仍补发抬起 / 点击非瞬移 / 浮层提交不越出走廊）、`tests/locating_gates.rs` 12 例、`input.rs` 单测 7 例。**逐项通过数未单独记录**（门禁只报总体通过），收口时须单跑 `cargo test --locked` 补上精确计数。
+  - 第三波补充（2026-07-30，仍不勾选）：`gate:native` 每一轮均通过；末轮实测**18 个测试二进制 / 269 条全绿**（其中库内单测 149 条）。本波新增 Rust 用例（在 `master` 上逐文件点过数）：`tests/xhs_actuation_typing.rs` **23 例**（新建）、`tests/xhs_actuation_scroll.rs` **17 例**（新建）、`src/input.rs` 库内单测 **13 → 26**（+13：输入原语不变量、封顶只缩往返、归尾两态、降级判据与记账、5 条时间下界守卫）、`command.rs` 门禁 **2 例**。既有夹具 `tests/xhs_session_guard_write_protection.rs` 订正两条（把「必须调用页面规则」改成顺序不变量、把否定式改成穷举计数 —— 引擎特化后那条页面规则本来就不再被调用，原断言会连同缺陷一起变绿）。
 - [ ] 6.2 运行 `cargo fmt --check` 与 `cargo clippy -- -D warnings`
   - 阶段性记录（2026-07-29，同上不勾选）：两者都被 `npm run gate:native` 的 steps 涵盖并**通过**。注：本轮按并行纪律**禁止单独跑 `cargo fmt`**（会重写全部 Rust 文件、砸掉并行流），故只经门禁校验、未单独执行。
 - [ ] 6.3 运行 `npm run test:acceptance`（安全红线 `AC-PROTO-*` / `AC-PUB-*` / `AC-RISK-*` 必须全过）
   - 阶段性记录（2026-07-29，同上不勾选）：**30 / 30 全过、0 失败**（1 条 gated 跳过 = 需真机的 E2E）。
+  - 第三波补充（2026-07-30）：每一轮均 **30 / 30 全过、0 失败**（`AC-PROTO-*` / `AC-PUB-*` / `AC-RISK-*` 全过，gated E2E 跳过）。
 - [ ] 6.4 运行 `npm test` 全量与 `npm run typecheck`
+  - 第三波补充（2026-07-30，仍不勾选）：`npm test` 逐轮 **2708 → 2713 → 2718 → 2720 → 2725**，末轮 **2725 例 / 2724 绿 / 0 红 / 1 跳过**（跳过的是 gated 真机 E2E）；`npm run typecheck` 每轮通过。本波另订正三处「夹具编码了假话」：受回执出处字段（5 处出处串在特化后已成假话，该字段只被断言长度非零、不订正也不会红）、周期观测测试夹具透传探针间隔（2 处）。
   - 阶段性记录（2026-07-29，同上不勾选）：`npm test` **2630 例 / 2629 绿 / 0 红 / 1 跳过**；`npm run typecheck` **通过**。本波改了三个既有 Rust 夹具（`fake_cdp.rs` 的两条 Reels 滚轮用例、`facebook_comment_entry.rs` 的按点位计数助手），**均为夹具编码了旧的缺陷形态**（「鼠标事件恰好三条」「兜底滚轮恰好一帧」「落点必须精确等于几何中心」），改法是把常量判据换成不变量判据（按下/抬起各一次且成对、帧数落在分布区间、落点带容差）并**新增**顺序断言，**没有放松任何安全断言**。
 - [ ] 6.5 运行 `npm run build:dist` 并确认生产产物剪枝检查通过、禁入表未放宽
   - 进度说明（2026-07-29）：**本轮未跑**。
+  - 第三波补充（2026-07-30，仍不勾选：本条还要求确认「禁入表未放宽」，而本波**恰恰改了那两个属他人单写区的脚本**，须由属主复核 —— 见 §9「跨属主越界」）：实跑通过，末轮输出 `reachable=77 removed=68 legacy_page_rules=absent page_rule_fragments_guarded=17 source_maps=absent`。**分片守卫计数 11 → 17 是有意的收紧**：泄漏闸原先由 Facebook 有序清单派生，结构上覆盖不到本波新增的小红书分片；改由目录结构派生后新覆盖 6 个明文页面规则语料（含两个明文选择器文本）。新增任何分片自动进闸，无需登记、无处手抄。
+  - **反面教训值得记一句**：前一波曾按「计数未变 = 无需改动」下过结论，**这个结论是反的** —— 突变实跑证明：把派生方式退回清单派生后，旧的那条「每个已登记分片都被两道泄漏闸覆盖」照样绿。数字不变从来不是覆盖的证据。
 - [ ] 6.6 记录 Edge 与控制仓的提交 sha、偏离说明、与并行 change 的重叠文件（sha 必须取自已推送的提交）
-  - 进度说明（2026-07-29，**分波回写中，change 未收口故不勾选**）：Edge 侧本波 sha = `3a1b2b3`（分支 `native-migration-repair`），已逐条落在各任务行尾；**控制仓 sha 待本文件提交后补**。重叠文件实测：本波碰的是 `native/page-engine/src/{input.rs,locating.rs,lib.rs,facebook/{shared,feed_like,reels}.rs}` 与四个 Rust 测试文件；design 重叠表点名的五处里，`input.rs` **碰了**（只新增函数与常量，未动既有文本 / 滚轮原语），`browse-session.ts` / `command.rs` / `runtime.rs` / `engine.rs` **一处都没碰**。与并行 change `restore-native-xiaohongshu-action-honesty`（本波 `a45fc81` / `19d4872`）在本波**零文件交叉**——它动的是 xhs 路由、probe 与宿主两个 TS 文件。
+  - 第三波补充（2026-07-30，仍不勾选）：Edge 侧本波 sha **10 个、全部已推送到 `master`**（线性、无 merge 提交）：`306410b`（1.1/1.2/1.7 失败优先用例）、`e748a56`（§4）、`1b890ea`（§8 输入半边）、`25fa1c3`（§8 滚动半边 + 宿主周期观测重排闸）、`92f7882`（四条诚实性缺陷 + 两处合并期语义陷阱）、`f652786`（六条诚实性缺陷）、`17892c2`（三态分支守卫 6 条）、`044f103`（五处折叠守卫 + 轮次下界订正）、`4593922`（两条回执语义守卫）、`c7c9ea8`（时间下界守卫 5 条）。跨属主越界与重叠文件清单见 **§9**。控制仓 sha 待本文件提交后补。
+  - **sha 订正（2026-07-30，全文 27 处）**：第二波原先记的 `3a1b2b3` 是**未推送的本地 sha**（rebase 前的形态），在 `master` 上**不存在** —— 按台账纪律「sha 必须取自已推送的提交」，全文已改为它推送后的等价提交 **`4a2c8d4`**（同一提交标题、同一文件清单；rebase 解冲突把假 CDP 夹具多带了一段，故 patch-id 不同，属正常）。这类错落无法机械发现：控制仓对 `3a1b2b3` 全文 grep 命中 27 次，而 edge 仓对它 `git cat-file` 也**能查到**（本地对象库还留着），只有 `git merge-base --is-ancestor <sha> master` 才会揭穿。**回写台账时该用后者判定，不是「能不能 show 出来」。**
+  - 进度说明（2026-07-29，**分波回写中，change 未收口故不勾选**）：Edge 侧第二波 sha = `4a2c8d4`（分支 `native-migration-repair`），已逐条落在各任务行尾；**控制仓 sha 待本文件提交后补**。重叠文件实测：本波碰的是 `native/page-engine/src/{input.rs,locating.rs,lib.rs,facebook/{shared,feed_like,reels}.rs}` 与四个 Rust 测试文件；design 重叠表点名的五处里，`input.rs` **碰了**（只新增函数与常量，未动既有文本 / 滚轮原语），`browse-session.ts` / `command.rs` / `runtime.rs` / `engine.rs` **一处都没碰**。与并行 change `restore-native-xiaohongshu-action-honesty`（本波 `a45fc81` / `19d4872`）在本波**零文件交叉**——它动的是 xhs 路由、probe 与宿主两个 TS 文件。
 - [ ] 6.7 集成前按 design 的重叠文件表逐行核对：`input.rs` / `browse-session.ts` / `command.rs` / `runtime.rs` / `engine.rs` 五处属多流共写，先 fetch + rebase 到各属主最新提交再跑 6.1–6.5；push 遇 non-ff 一律 rebase 重来，绝不 force
   - 进度说明（2026-07-29）：**未做**（两波都还在同一条 `native-migration-repair` 分支上串行落地，尚未做跨属主的 fetch + rebase 核对）。
+  - 第三波补充（2026-07-30，仍不勾选）：集成**已发生** —— 并行的会话守卫流先落，本流 10 个提交 rebase 到它之上、线性推到 `master`（`git log --merges` 在本波区间为空）。集成前做过一次只读冲突侦察：会话守卫流对主干零冲突，本流与它在两个 Rust 文件上有**纯相邻插入**式冲突（两段都留即可，枚举与函数体本身自动合好），且顺序无关 —— 先落会话守卫流是零判断成本的一步。侦察还点出一类**文本不冲突但语义冲突**的陷阱（提交窗口预算手抄常量 vs 主干已把上限抬到 45s，两边都取的常规解法会把旧数字原样留下、毫无提示），已在 `92f7882` 改成派生消除。
+  - **仍缺的一半、收口时必须补**：各波门禁都是在**该波自己的分支树**上跑的；rebase 到最终位置后是否在**合并后的树**上重跑全套 6.1–6.5，本次回写**无证据**。收口前须在 `master` 的 `c7c9ea8` 上重跑一次并把数字记回 6.1–6.5。
 
 ## 7. 验证与验收
 
@@ -111,7 +145,8 @@
 - [ ] 7.6 【真机验收项 / 未坐实】"当前节奏与手势特征已被平台判别"这一因果无法在代码里坐实，只能通过真机上的限流信号频次做前后对照观察；本 change 只按已归档的节奏与反检测规格恢复应有行为，不主张判别因果
 - [ ] 7.7 【真机验收项 / 未坐实】锚点暂存与晋升在 Native 侧恢复后，实际能带来多少定位命中率提升无线上数据支撑；上线后按定位失败原因分布做一次前后对照
 - [ ] 7.8 记录本 change 明确未做的事：未打安装包、未部署 dev/ol、未改云端节奏中心值、未代改迁移主 change 的 tasks.md
-  - 阶段性记录（2026-07-29，change 未收口故不勾选）：本波**未打安装包、未部署（dev / ol 都没碰）、未替换运行中的桌面客户端、未做任何真机动作、未改云端节奏中心值（未碰 `aidcp-cloud` 仓）、未代改任何他人 change 的 tasks.md**。另未碰：`openspec/specs/`、`docs/real-machine-acceptance-backlog.md`、`design.md`、协议四处同步文件、`facebook-router/**` 注入脚本、宿主 TS 全部文件。分支 `native-migration-repair` 本波提交为 `3a1b2b3`，**未合入 master**。
+  - 阶段性记录（2026-07-29，change 未收口故不勾选）：第二波**未打安装包、未部署（dev / ol 都没碰）、未替换运行中的桌面客户端、未做任何真机动作、未改云端节奏中心值（未碰 `aidcp-cloud` 仓）、未代改任何他人 change 的 tasks.md**。另未碰：`openspec/specs/`、`docs/real-machine-acceptance-backlog.md`、`design.md`、协议四处同步文件、`facebook-router/**` 注入脚本、宿主 TS 全部文件。分支 `native-migration-repair` 第二波提交为 `4a2c8d4`，**未合入 master**。
+  - 第三波补充（2026-07-30，仍不勾选）：同样**未打安装包、未部署（dev / ol 都没碰）、未替换运行中的桌面客户端、未做任何真机动作、未改云端节奏中心值（未碰 `aidcp-cloud` 仓）、未代改任何他人 change 的 tasks.md**。与第二波不同的三点：① 本波 10 个提交**已合入并推送 `master`**（HEAD `c7c9ea8`）；② **动了宿主 TS**（节奏消费、提交窗口预算表、周期观测重排闸）与**两个属他人单写区的产物脚本**（分片泄漏闸，收紧方向）—— 见 §9；③ `design.md` 仍**一字未改**，而本波带着一条**具名推翻 design D1** 的裁定（见 §4 头部）——**design 正文的更正由主控另做，这是一笔已知的未收口债**。
 - [ ] 7.9 把 7.2–7.7 的真机项登记进 `docs/real-machine-acceptance-backlog.md` 的对应簇
 - [ ] 7.10 登记 **运营真机鼠标轨迹回放通道** 为本 change 范围外项，已在 design.md Non-Goals 具名交接给 **需新立 change**（本 change 只做 2.10 的「丢弃可观测 + 回放模式不得硬编码」那一半）
 - [ ] 7.11 登记 **小红书注入路由的通用点击助手（瞬移滚动 + 伪造指针移动）** 为本 change 范围外项，已在 design.md Non-Goals 具名交接给 **restore-native-xiaohongshu-action-honesty**（该文件的单写区属主；本 change 只在规格层立跨平台要求并改 Facebook 那一半）
@@ -120,20 +155,131 @@
 - [ ] 7.14 登记 **语义类名白名单的词边界匹配与匹配唯一性闸** 为本 change 范围外项，已在 design.md Non-Goals 具名交接给 **需新立 change**（与匹配唯一性闸同批）
 - [ ] 7.15 登记 **按边缘标识派生的每机节奏偏置** 为本 change 范围外项，已在 design.md Non-Goals 具名交接给 **harden-native-engine-runtime-contracts**（会话身份入参的属主）
 - [ ] 7.16 【阻塞：待裁定 P1】锚点暂存区的前提在新引擎里不成立（无任何非确定性锚点来源），裁定「保留空结构 / 改判据 / 暂不做」之前，5.4 / 5.5 与 `native-locating-gates` 的锚点要求不得开工，也不得按「已实现」勾掉；裁定结论写回 design.md「待裁定」小节
-  - 实装侧的处置（2026-07-29，`aidcp-edge 3a1b2b3`；**这是实现选择，不是裁定，故本条仍不勾选**）：`3a1b2b3` 事实上走了「**保留空结构**」这一支——`locating.rs` 把暂存区与晋升阈值整套实现出来，同时明确写下「暂存区在当前引擎里恒为空（每个定位器都是编译进二进制的固定选择器，`stage_non_deterministic` 生产上不会被调用）」，并**专门立了一条测试把这件事钉死**，以免被读成「定位自愈已恢复」；模块头注释也直接指回本条「待裁定 P1」。
+  - 实装侧的处置（2026-07-29，`aidcp-edge 4a2c8d4`；**这是实现选择，不是裁定，故本条仍不勾选**）：`4a2c8d4` 事实上走了「**保留空结构**」这一支——`locating.rs` 把暂存区与晋升阈值整套实现出来，同时明确写下「暂存区在当前引擎里恒为空（每个定位器都是编译进二进制的固定选择器，`stage_non_deterministic` 生产上不会被调用）」，并**专门立了一条测试把这件事钉死**，以免被读成「定位自愈已恢复」；模块头注释也直接指回本条「待裁定 P1」。
   - 为什么仍不算裁定：① 本条要求的「裁定结论写回 design.md『待裁定』小节」**未发生**——`design.md` 本波一字未改；② 三个选项里「改判据 / 暂不做」是否更划算，取决于要不要在 Native 侧重新引入非确定性锚点来源（那是产品与架构取舍，不是实现细节），**裁定权仍在人**。实装选择只是把「暂不做」的成本降到最低（结构在、空转可证、被误读的风险已被测试封住），**并没有替代那次裁定**。下一步：由人在 design.md 里落一句结论，然后 5.4 / 5.5 才可按结论收口。
 - [ ] 7.17 【阻塞：待裁定 P2】可换的页面来源与执行层两个接口在迁移中消失，1.3 / 1.4 / 1.5 与 5.1–5.5 的断言方式取决于裁定结果（在 Native 侧重建可替换缝 / 接受退化为真机验收）；裁定前不得把这些任务的验证方式定稿，也不得默认它们能脱机跑；裁定结论写回 design.md「待裁定」小节
-  - 实装侧的处置（2026-07-29，`aidcp-edge 3a1b2b3`；同 7.16，**未写回 design.md，故不勾选**）：事实上走了「**在 Native 侧重建可替换缝**」这一支，且两条缝各自落地形态不同——① 定位层用 `LocatingSteps` 三段接口（解析 / 执行 / 后置校验）重建可替换缝，`tests/locating_gates.rs` 的 12 例全部脱机跑、不起浏览器；② 指针 / 输入层**没有**新建接口，改用假 CDP 服务端（`tests/actuation_pointer.rs`、`fake_cdp.rs`）在协议层替换，1.3 / 1.4 就是这么断言的。所以「能不能脱机跑」这个问题现在有了肯定答案，但**验证方式尚未定稿**：1.5（对齐滚动）至今没有任何用例（见 1.5 进度说明），而 5.1–5.5 的接线一条都没做，脱机断言目前只覆盖原语本身、不覆盖任何真实命令路径。裁定结论仍须由人写回 design.md。
+  - 实装侧的处置（2026-07-29，`aidcp-edge 4a2c8d4`；同 7.16，**未写回 design.md，故不勾选**）：事实上走了「**在 Native 侧重建可替换缝**」这一支，且两条缝各自落地形态不同——① 定位层用 `LocatingSteps` 三段接口（解析 / 执行 / 后置校验）重建可替换缝，`tests/locating_gates.rs` 的 12 例全部脱机跑、不起浏览器；② 指针 / 输入层**没有**新建接口，改用假 CDP 服务端（`tests/actuation_pointer.rs`、`fake_cdp.rs`）在协议层替换，1.3 / 1.4 就是这么断言的。所以「能不能脱机跑」这个问题现在有了肯定答案，但**验证方式尚未定稿**：1.5（对齐滚动）至今没有任何用例（见 1.5 进度说明），而 5.1–5.5 的接线一条都没做，脱机断言目前只覆盖原语本身、不覆盖任何真实命令路径。裁定结论仍须由人写回 design.md。
 - [ ] 7.18 把 8.6 的真机复核项与 7.16 / 7.17 裁定后新增的真机项一并登记进 `docs/real-machine-acceptance-backlog.md`
 
 ## 8. aidcp-edge — 小红书写动作接上已有的 Native 拟人原语
 
 > 本节只做**原语接线**：Rust 侧已有与退役实现参数逐项一致的逐字输入原语（`native/page-engine/src/input.rs:93-137`）与惯性滚轮原语（`:43-65`、`:269-310`），小红书路径完全没有接线到它们。接线方式为在 `native/page-engine/src/engine.rs` 的小红书分发里**新增命令特化分支**（该函数末尾的通配分支才落到注入路由），**不改 `native/page-engine/src/xhs-command-router.js`**——引擎侧特化截走命令后其对应分支不可达，删除由单写区属主 `restore-native-xiaohongshu-action-honesty` 处置。本节**不动**小红书的回执口径与后置判据（属该 change）。`engine.rs` 的小红书执行入口为三流共写，集成须串行。
 
+> 进度说明（2026-07-30）：本节 **8.2 / 8.3 / 8.4 / 8.5 / 8.7 已落地**，主提交 `aidcp-edge 1b890ea`（输入半边）+ `25fa1c3`（滚动半边），另经四轮修缺陷与补守卫：`92f7882`（四条诚实性缺陷 + 两处合并期语义陷阱）、`f652786`（六条诚实性缺陷）、`17892c2` / `044f103` / `4593922` / `c7c9ea8`（三态分支 / 五处折叠 / 两条回执语义 / 时间下界，共 13 条守卫）。**8.1 只做了 5 个消费点里的 2 个、8.6 的真机复核未做，两条均不勾。** 接线方式按节首约定：引擎侧新增命令特化分支，`xhs-command-router.js` **两波全程零改动**（其死分支的删除仍归单写区属主，见 8.7）。
+
 - [ ] 8.1 小红书全线文本输入改走硬件级逐字输入原语：评论提交、发布填写、话题 / 提及候选、定时设置、遗留步骤路径的输入步，全部不再用「属性描述符 setter 一次性写 value / 对可编辑元素整段赋 textContent + 手动派发合成事件」 （参照 humanize/keyboard-rhythm.ts:22-81 + cdp-util.ts:310-340；现状 `xhs-command-router.js:34-44` 的输入助手及其 5 个消费点 — 见 oracle.md ⑤）
-- [ ] 8.2 长正文加往返与停顿双封顶（写入次数上限、总停顿预算），红线是**所有字符都必须写入**——封顶只缩时间与往返、不得丢内容；核算封顶值与云端单步超时的余量并记录依据 （参照 publish-command-handlers.ts:758-791 的分块突发式输入与「不逐字到底」的理由 — 见 oracle.md ⑤）
-- [ ] 8.3 正文换行拆成两类原语：文本写入一律不携带回车符，换行改为独立的裸回车按键（让编辑器自己执行段落拆分，带回车字符的形态只用于搜索框）；每次回车后做有界归尾确认——已写前缀仍在 + 换行数达标 + 光标位于末端，且须连续两次命中才算稳定，探针发现选区偏移时就地折叠到末尾再确认下一轮；上限与轮询间隔取有界值，超时即清空正文并诚实失败，不留下逐渐积累的文末尾字 （参照 publish-command-handlers.ts:793-816/:818-864/:866-892 与 dev record #153 的段落重排抢跑 — 见 oracle.md ⑥）
-- [ ] 8.4 逐字输入的取消缝落在「这一字符的等待已结束、它的写入尚未发出」那一瞬；已写入的部分留在编辑器里并由调用方负责清场，接管异常须原样穿出、不得被吞成普通失败 （参照 cdp-util.ts:310-340 的取消缝位置与「接管优先于死线」的顺序 — 见 oracle.md ⑤②）
-- [ ] 8.5 小红书滚动改走共享惯性滚轮手势（含滚前把光标移到可滚区中心）：feed 翻页与详情页评论滚动都不再用页面内平滑滚动，帧间延迟与总位移由手势自身采样；派发失败只中止本轮滚动、绝不抛出（一次瞬时超时不得终结整个浏览循环） （参照 humanize/scroll-physics.ts:1-98 + feed-scroller.ts:176-212；现状 `xhs-command-router.js:158`、`:213` — 见 oracle.md ⑦）
+  - 部分完成（2026-07-30，`aidcp-edge 1b890ea`；**5 个消费点只做了 2 个，故不勾选**）：已落 —— ① 评论提交与 ② 发布字段填写改走硬件级逐字 / 分块输入原语；页面判据全部经新建的混淆分片 `native/page-engine/src/xhs-input-targets.js`（8 类目标 × 4 种操作，**Rust 里一个选择器都没写**）；落焦与提交改走拟人指针轨迹（此前是页面侧直接聚焦）。
+  - 未落的三个消费点：**话题 / 提及候选**（还需一套「候选项定位 + 点击 + 回读」的分片能力）、**遗留步骤路径的输入步**（结构上必须把整条步骤循环搬进引擎，不能只截一个步骤）、**定时设置**（见下条裁定请求）。三者现状仍走注入路由的合成事件赋值。
+  - **待主控裁定：定时设置不该逐字打。** 实证：退役实现对定时字段用的就是原生 value setter、从未逐字打；那是分段日期时间控件，灌整串不等价、大概率把定时功能打坏。任务 8.1 字面点名了它，**照做会是一次功能回归**。三个选项：逐字打 / 保持 setter / 走键盘分段输入。
+  - **⚠️ 评论路径同批发生一次真实的能力回退**（富文本评论框 + 联系方式串码从此是诚实失败），完整登记见 **§9.1 第一条** —— 那是本波唯一一处「以前能做、现在不做」的改动，不要被当成纯收紧读过去。
+- [x] 8.2 长正文加往返与停顿双封顶（写入次数上限、总停顿预算），红线是**所有字符都必须写入**——封顶只缩时间与往返、不得丢内容；核算封顶值与云端单步超时的余量并记录依据 （参照 publish-command-handlers.ts:758-791 的分块突发式输入与「不逐字到底」的理由 — 见 oracle.md ⑤） <!-- aidcp-edge 1b890ea 每次写入前按「剩余字符数 / 剩余预算 / 实测单次往返成本」现算块大小与停顿中心值，往返成本按实测单调抬升（保守方向：只会让后续块更大，绝不因低估而写不完）；封顶只作用于块大小与停顿，预算耗尽即清场 + 诚实失败，**绝不截断内容**；退役的 50 次 / 12s 明确没抄，不照抄的理由写在常量注释里 -->
+  - 余量核算（任务要求「记录依据」）：评论收尾留 6s、发布字段留 3.5s；归尾确认总量再限死在「扣掉收尾后」的一半以内并均摊到每个换行，单个换行有上下限；摊到低于下限即**开工前零派发**诚实拒绝，而不是开写到一半超时。
+  - <!-- aidcp-edge f652786 降级不再静默：块过大即标记为降级，写入器累计降级次数 / 最大块长 / 收敛后的实测往返成本，两个调用方各发一行有界记账，记账同时指向放大器（往返成本的单调抬升）—— 那才是真机上要查的东西 -->
+  - 偏离说明（2026-07-30）：复审曾要求「给块数留下限」，实装方**裁定不做并给了理由**（任务授权它裁）：那个下限是**终止性保证**，抬成「至少分 N 块」会让每次重算只吃掉剩余的 1/N —— 字符按几何级数递减、预算按线性递减，结果是写到九成撞死线、清场、诚实失败，把一次「像机器但内容完整」的成功换成一次失败，并蹭到本条红线（封顶只许缩时间与往返）。改为「降级留痕 + 记账指向放大器」。另一条把范围收窄的事实：初始往返估值下，第一步只有在剩余预算不足两个往返时才会降级，而那之前零派发拒绝已经先生效 —— 所以降级只可能发生在**尾巴**上，「整篇正文一次灌进去」结构上到不了。
+  - **弃守登记**：降级记账那一行**到不了运营视野**，见 §9「显式弃守 ②」。
+- [x] 8.3 正文换行拆成两类原语：文本写入一律不携带回车符，换行改为独立的裸回车按键（让编辑器自己执行段落拆分，带回车字符的形态只用于搜索框）；每次回车后做有界归尾确认——已写前缀仍在 + 换行数达标 + 光标位于末端，且须连续两次命中才算稳定，探针发现选区偏移时就地折叠到末尾再确认下一轮；上限与轮询间隔取有界值，超时即清空正文并诚实失败，不留下逐渐积累的文末尾字 （参照 publish-command-handlers.ts:793-816/:818-864/:866-892 与 dev record #153 的段落重排抢跑 — 见 oracle.md ⑥） <!-- aidcp-edge 1b890ea 「文本写入不带回车符」由**类型系统**承载：唯一构造器带否定检查，没有「发现带回车就过滤掉」的兜底；换行归一后按行拆，文本片段结构上不可能含回车；富文本走裸回车 + 有界归尾确认（读到 + 已写前缀仍在 + 换行数达标 + 光标在末端四条同时成立才算一次命中，任一不满足清零、**连续两轮**才收敛，**按迭代次数限界 19 轮**而非墙钟裸跑）；探针发现选区偏移就地折叠到末尾；失败即清空正文 + 诚实失败；「探针读不到」与「读到过但没稳住」分两态上报 -->
+  - <!-- aidcp-edge f652786 归尾预算改按「实际已花」判：原先只算睡眠、没算每轮探针往返，实花超过分配的两倍；迭代硬上限原样保留。另自查补一处：排不下下一轮时也先走一次**零等待**的接管 / 死线检查再收尾，免得「最后一轮读完时接管已置位」被本地的「没稳住」结论盖掉 -->
+  - <!-- aidcp-edge 92f7882 段落数这条结构证据原先只在**受控框**上比（唯一不走裸回车、最不可能丢段的分支），而富文本才是正文默认形态、也是唯一走裸回车那条路；其余两道文本比对（空白归一、汉字档）都对换行免疫，于是「段落全丢」以确认回报。闸改成按期望段落数判、与编辑器形态无关，「读不到段落数」与「段落数不够」分列上报、读不到不放行；分片同步改成按可见文本数段（`<br>` 分隔 / 裸首段两类真实结构原先被读成 1 段，会把一次成功写入误判成丢段） -->
+  - <!-- aidcp-edge 17892c2 / 044f103 / c7c9ea8 三轮补守卫：段落证据读不到（发布与评论两条路各一条）、归尾最后一轮那次零等待接管检查、清场自称成功但落焦回读撞见残文时的零派发拒绝、以及**逐字节奏的时间下界** -->
+  - **c7c9ea8 那条值得单独记**：此前全仓所有涉及停顿量级的断言都是**上界或自指**（「停顿 × 次数 ≤ 预算一半」、「紧预算 ≤ 宽预算」这类 `0 ≤ 0` 也满足，或「停顿中心值 ≤ 上限常量」拿被测常量当尺子），**没有任何一处给时间设下界** —— 于是六种「把拟人化整个关掉」的改法都能让 18 个测试二进制全绿，而回执照样诚实报「写了 N 个字符、已确认」。这正是本流存在的理由那一族缺陷，落在本流自己的头号特性上。补的五条守卫门槛全是独立写死的「人类量级」声明、不引用被测常量。
+- [x] 8.4 逐字输入的取消缝落在「这一字符的等待已结束、它的写入尚未发出」那一瞬；已写入的部分留在编辑器里并由调用方负责清场，接管异常须原样穿出、不得被吞成普通失败 （参照 cdp-util.ts:310-340 的取消缝位置与「接管优先于死线」的顺序 — 见 oracle.md ⑤②） <!-- aidcp-edge 1b890ea 取消缝在「这一块的停顿已结束、写入尚未发出」那一瞬（复用先查取消、后查死线的等待原语 —— 接管优先于死线）；已写入部分留在编辑器里由调用方清场；接管原样穿出，其余失败走回执。另：小红书这两条特化路径给指针出口传的是**真实**取消信号与死线，不是空值 / 无穷大（与 3.3 / 2.6 记的那处 Facebook 缺口不同） -->
+  - 同族红线：**提交点之后不再把取消当「没提交」** —— 提交已派发即回「不确定 + 未确认提交」，绝不回「未开始」（回未开始等于上游重投等于重复评论）。
+  - <!-- aidcp-edge 92f7882 打字之后的 5 个提前返回出口原先沿途零清场：现场后果是运营人员接管时，页面上正躺着一条填好、只差点一下发送的评论。把回读与提交目标定位收进两个辅助函数（自身不清场），调用方对「打字之后的每一个出口」统一清场，`?` 抛出的路径不可能再绕过清场 -->
+- [x] 8.5 小红书滚动改走共享惯性滚轮手势（含滚前把光标移到可滚区中心）：feed 翻页与详情页评论滚动都不再用页面内平滑滚动，帧间延迟与总位移由手势自身采样；派发失败只中止本轮滚动、绝不抛出（一次瞬时超时不得终结整个浏览循环） （参照 humanize/scroll-physics.ts:1-98 + feed-scroller.ts:176-212；现状 `xhs-command-router.js:158`、`:213` — 见 oracle.md ⑦） <!-- aidcp-edge 25fa1c3 feed 翻页三条命令与详情页评论滚动改走共享惯性滚轮手势；滚前把光标移到**实测**可滚区中心（分片先认「真·可滚」内层容器 —— 同时判内容溢出与该轴 overflow 是滚动语义，认不出才回落窗口；坐标取「该可滚元素矩形 ∩ 视口」的中心，不取矩形几何中心：内层容器常比视口高，几何中心可能落在视口外，滚轮派到视口外等于没派；也绝不照抄别的平台的落点常量）；帧间延迟与总位移由手势自身采样 -->
+  - 「派发失败只中止本轮、绝不抛出」的落法：取消原样穿出；死线 / 瞬时 CDP 失败只中止本轮，随后**照常读一次位置、按实测位移如实回报**，没有任何上抛。「派发失败」与「页面没动」两态经诊断通道分开记，回执形状零变化（回执字段的细分归属见 8.7）。翻页前先关详情浮层，「浮层不在」与「浮层在但关闭控件没认出来」分两态。
+  - <!-- aidcp-edge 92f7882 「有界等位移落定」原先实为「等到第一次位移就返回」：手势把 8~15 帧全部派完才返回，所以派完后的第一次探针必然读到变化 ⇒ 恒在一次探针后收工并立刻重扫；而 feed 是滚动触发懒渲染的，重扫拿到的还是滚动前那一屏 ⇒ 反复选中已访问笔记 ⇒「只刷不点」活锁，且回执全程诚实、没有任何错误码指向这里。判据改成「位置不再变化」（连续两次读数相同），并给「还没开始动」单列最小耐心轮次，不与「不会动了」压成一态 -->
+  - <!-- aidcp-edge 044f103 / 4593922 五处三态守卫 + 两条回执语义：①「这一轮读不到」不得计入落定（现场铺成「读到、读不到、读到」，两个折叠方向都能杀）②最小耐心轮次钉下界（原用例削到 4 轮仍静默照绿）③评论行数读不到必须回「读不到」，MUST NOT 顶成 1（红线点名的那种「拿请求值充实测值」）④浮层判定读不到不得当成「浮层不在」⑤到底判定三态按云端真正看到的那份 JSON 断言、双向可杀；另钉两条语义：到底判定必须取滚动**后**那次读数（取滚前会让到底检测系统性推迟一条命令，页面刷新回顶时又提前收工），位移「动过」按**双向**计（回退也算动过 —— 折成只计正向会把懒渲染换容器 / 刷新回顶的真实位移谎报成没动，配合上游「到底且没动就收工」变成提前收工；注意退役 TS 路径用的恰是单向，所以「对齐旧实现」这种看起来合理的改法本来没有任何用例会拦） -->
+  - 范围说明：任务字面点的是「feed 翻页与详情页评论滚动」，两者都已落。**未做**：遗留步骤路径里的滚动步（结构上必须把整条步骤循环搬进引擎，与 8.1 同一门槛）、通知清零里的第四处页面内滚动（主控明令不扩范围）。两处现状仍是页面内平滑滚动。
 - [ ] 8.6 【真机验收项】feed 单次位移口径改回「约半屏、保留相邻两次扫描的可见卡片重叠」，并真机复核旧注释的两条结论在当前布局上是否仍成立：宽 / 窄两套布局的可滚元素不同、页面内滚动在窄布局上是空操作；**未复核前不得把「小红书 feed 已因此永不推进」当作既成事实** （参照 feed-scroller.ts:177-184/:191-194 的三重理由与 500px 口径 — 见 oracle.md ⑦）
-- [ ] 8.7 记录本节与 `restore-native-xiaohongshu-action-honesty` 的分工结论与对应 sha：本节只接线原语，其回执口径、后置判据、去重键、遗留分支删除均归该 change；两侧对 `engine.rs` 小红书分发的改动按 6.7 的串行集成纪律处理
+  - 进度说明（2026-07-30，`aidcp-edge 25fa1c3`；**代码口径已落、真机复核未做，故不勾选**）：单次位移改为「视口高的一半、裁进 [360,700]」，±20% 由手势自身叠。理由写在常量注释里：约半屏才保留相邻两次扫描的可见卡片重叠，注入路由的 0.78 屏把重叠吃掉了；不照抄退役的 500px 定值是因为桌面端视口高度跨机器能差一倍，定值在小屏上又变成整屏。评论滚动仍取 500px（评论行比 feed 卡矮，半屏口径不适用）。
+  - 旧注释的两条结论**一个字都没写进代码 / 回执** —— 代码只写「实测解析」（认内层容器 / 认不出回落窗口，两态都处理），未把「小红书 feed 已因此永不推进」当既成事实。真机复核项已登记进 §9。
+- [x] 8.7 记录本节与 `restore-native-xiaohongshu-action-honesty` 的分工结论与对应 sha：本节只接线原语，其回执口径、后置判据、去重键、遗留分支删除均归该 change；两侧对 `engine.rs` 小红书分发的改动按 6.7 的串行集成纪律处理 <!-- aidcp-edge 1b890ea / 25fa1c3（+ 92f7882 / f652786 / 17892c2 / 044f103 / 4593922 / c7c9ea8）；xhs-command-router.js 全程零改动，已按 git diff 文件清单核对 -->
+  - 分工结论：本节**只接线原语**；**回执口径 / 后置判据 / 去重键 / 遗留分支删除均归 `restore-native-xiaohongshu-action-honesty`**。
+  - 交给该属主的待办（本波**一条没删、也没加任何注释标记** —— 那正是被禁的骗正则做法）：删注入路由里已被引擎特化截走的死分支 —— 评论提交、发布字段填写、三条翻页命令的滚动段（**只读初始扫描那一行 MUST 保留**，引擎在用它拿卡片）、评论滚动整段；并同批删对应的 TS 直测用例（行为对等测试与发布原子测试里共 6 条）。它们现在测的是引擎已不再走的分支 = 死码喂绿。
+  - 新增回执原因码须与该属主对齐：本波新增 **16 条**打字 / 落焦 / 归尾 / 预算类终局 + **9 条**「读不到」病因码；**注入路由原有的原因码逐字保留**；新增的全部是旧机制根本产生不了的新终局（旧路径没有打字，就不会有打字超时）。已 grep 确认宿主侧无任何代码按这些字符串分支；**云端侧尚未登记消费**（回执理由是裸串、两侧无机械对账），真机上先当排障 token 用。
+  - 回执两态未细分的一处：滚动的「派发失败」与「页面到底了」在**回执字段上**仍是一态（只在诊断日志里分开）。这是按主控指示办的（回执字段不改）；若属主要细分病因，本波两个诊断串已备好。
+  - 集成实况：本波与该属主在**本波零文件交叉**；真正的并行相邻方是 `restore-native-xiaohongshu-session-guards`（详见 §9「跨属主越界与串行集成」）。
+
+## 9. 第三波（2026-07-29 → 07-30）交付登记：具名偏离 / 跨属主越界 / 显式弃守 / 残留与待登记真机项
+
+> 本节不含任务项（无勾选框），只是台账。逐条偏离的正文已就地写在对应任务行下，这里收拢那些**跨任务、或不属于任何单条任务**的登记。
+> Edge 侧 10 个提交全部已推送（清单见 6.6）；本波未打包、未部署、未做任何真机动作。
+
+### 9.1 具名偏离
+
+- **[能力回退 · 本波唯一一处，必须显式登记] 富文本评论框 + 联系方式串码从此是诚实失败**（`aidcp-edge f652786`）。
+  - 落法两道：① 串码在场且评论框是富文本形态 ⇒ **零派发的结构性拒绝**（一个字符不写、一次点击不派、一次回车不按）；形态**读不到**时同样零派发拒绝。② 受控框那一支也可能吞掉那条换行，而两道文本比对对换行免疫（归一会把换行折成空格），故回读增加段落数三态判据，**在提交被点之前**拒绝并清场。
+  - **理由（这是有意的判断，不是遗漏）**：评论框里的**裸回车就是提交**。若真按编辑器形态分派换行写法，富文本框上会把只写了一半的评论原样发出去 —— 不可逆，且比「丢一条换行」严重一个数量级。所以这里落的不是「按形态分派」，而是「形态不支持就不做」。
+  - **为什么算能力回退而不是纯收紧**：此前这条路径会「成功」，只是发出去的内容少了分隔换行；现在它不发、如实报失败。**恢复这条能力的前置是真机确认小红书评论框对 Shift+Enter 的绑定（软换行还是提交）**，确认为软换行后才可加一种「软换行按键」形态并按形态分派。实装方明确拒绝在桩上赌这一条 —— 赌错的后果是发出半条评论。真机项见 9.4 B-5。
+- **提交窗口预算改成从命令上限常量派生**（`1b890ea` 抬值 + `92f7882` 改派生）。
+  - 原状是评论提交窗口写死 4s。实测确认：预算打穿的后果**不是写入被拒发**，而是窗口**静默过期** —— 过期之后没有任何接口会拒绝任何东西，它只是不再挡抢占。（真正的「拒发」只发生在另一种情形：标签不在宿主白名单里。）所以真实危害是**抢占会落在提交那一刻**，把一条可能已经发出的评论当成没发生 ⇒ 上游重投 ⇒ 重复评论。据此抬到命令墙钟上限，引擎侧与宿主侧同一提交。
+  - **关键在于最终形态不是手抄数字，而是从命令上限常量派生**：合并时主干已把上限从 30s 抬到 45s，派生**自动跟随**；另加一条**编译期恒等式**与一条宿主侧门禁断言，镜像门禁的正则也改成能解析常量引用并回查引擎侧，解析不出即响亮失败（悄悄跳过等于把那条窗口从对账表里抹掉）。若当初手抄 45s，这处漂移**零文本冲突**、不会有任何提示 —— 这正是集成侦察点出的那类「文本不冲突、语义冲突」陷阱。
+  - 边界说明（两处都已就地写明）：这不等于「整条评论命令禁抢占 45s」—— 宿主在命令结束时就释放窗口，预算只是兜底上限。
+- **分片泄漏守卫的覆盖面从「只数 Facebook 有序清单」改成按目录派生，计数 11 → 17**（`f652786`）。有序清单继续管拼接顺序，并与目录派生做交叉对账（对不上即响亮失败）；新增任何分片自动进闸，无需登记、无处手抄。详见 6.5 的记录（含「计数不变不是覆盖的证据」那条反面教训）。**注意这动了属他人单写区的两个脚本**，见 9.2。
+- 其余偏离索引（正文在任务行下）：§4 头部的**落点层级裁定**（具名推翻 design D1）· 4.1 的**归属订正**（犹豫值消费点不是本 change 落的）· 4.4 的「其余每类操作 floor 故意不存」· 4.6 的**关帖死字段删除属行为收紧** · 1.1 / 1.2 的断言口径 · 8.1 部分完成 + 定时设置待裁定 · 8.2「不给块数留下限」的裁定 · 8.5 的范围说明。
+
+### 9.2 跨属主越界 / 重叠文件（集成已完成，**属主追认未做**）
+
+| 文件 | 属主 | 本波改动 | 性质 |
+|---|---|---|---|
+| `scripts/native-engine-inventory.cjs` · `scripts/prune-production-dist.mjs` · `test/native-page-engine/artifact-gates.test.ts` | `enforce-native-engine-artifact-gates` | 泄漏闸改由目录派生，11 → 17 | **与本 change 5.7「不改该文件一行」的纪律直接冲突**，方向是收紧，但须属主追认 |
+| `test/native-page-engine/runtime-contracts-command-receipts.test.ts` | `harden-native-engine-runtime-contracts` | 修一处被本 change 波及的**门禁失效**：它用源码文本切片取「已路由命令集合」，本 change 把那张表改名导出后切出空串、对账退化成「空集 == 空集」（这次是运气好才红，换个写法就是静默恒真）；改成直接 import 那张表。另 5 处出处串订正 | 方向与本 change 一致（源码文本扫描换成真实产物派生），仍属越界 |
+| `test/native-page-engine/runtime-contracts-commit-window.test.ts` | 同上 | 新增「窗口预算 ≥ 命令墙钟上限」断言，镜像门禁正则改为可解析常量引用 | 同上 |
+| `native/page-engine/src/facebook/comment.rs` · `facebook/publish.rs` | Facebook 侧各流 | 各 1 行穷举分支 + 1 行注释（新增失败变体导致三处匹配非穷举，**编译器强制**；映射到该路径既有的失败原因，不是占位宏） | 不可避免 |
+| `native/page-engine/src/{engine.rs,input.rs}` · `src/native-page-engine/{browse-session.ts,client.ts}` | design 重叠表点名的多流共写 | §4 与 §8 主实现 | 已 rebase 集成；与会话守卫流的冲突是**纯相邻插入**，按「两段都留」解 |
+| `test/native-page-engine/xhs-session-guard-blocking.test.ts` · `native/page-engine/tests/xhs_session_guard_write_protection.rs` | `restore-native-xiaohongshu-session-guards` | 新增 / 订正断言（详见 6.1、6.4） | 须与该属主对齐 |
+
+- **另一条不属于本 change 任何任务、由主控指派的跨流修复（编号 W1）**：宿主周期观测的重排闸补「已请求停手」判据（`25fa1c3`），以及配套的**恢复入口自行复位该标志**（`92f7882`）。前者治「停手后一个在途探测的收尾分支会重新武装定时器、对已断开的连接空轮询到进程退出」；后者治「显式重新武装入口被停手闸拦成空操作 ⇒ 传感层全灭而外部一切正常」。两条都落在会话守卫流的地盘上，须与该属主对齐 —— **本 change 的 tasks.md 里没有它们的条目，别在收口时把它们算进本 change 的完成度。**
+
+### 9.3 显式弃守（有理由、已写进提交信息，不是遗漏）
+
+1. **7 个「读不到」原因码不逐条补用例**（`17892c2`）。判据是**方向性**：这 7 处全部走同一个三态闸辅助函数，而「读到确定的坏消息」与「读不到」**两条路都是拒绝**。折叠的代价是回执里的病因写错（真机上会照着一个不存在的现场去查，这有成本），**但它不构成假成功**、不是红线；那个三态闸本身已有一条现成用例守着。逐个补 7 条几乎一模一样的用例，买到的是字符串同一性、不是安全性。**已覆盖的 5 个原因码有一个共同点**：它们的三态**改变判决方向**（放行 vs 不放行、确认 vs 不确定、零派发 vs 开写），不只是换个标签。
+2. **逐字输入降级的「响亮痕迹」上报通路目前根本不存在，本波不建，须单独起 change**（`17892c2`）。链路查到底：引擎是宿主起的子进程，其错误输出既不继承也不落盘；宿主只把它收进一个 2048 字符的滚动尾缓冲；该缓冲**只在构造进程级失败时**才挂到错误对象上；而全仓除协议客户端自己之外**没有任何一处读它**。关键错配是 —— **降级是一条成功路径**：命令成功返回、进程正常退出 ⇒ 上面那一步永不触发 ⇒ 记账行写进滚动缓冲、被后续输出挤掉、随进程退出丢弃。**没有任何人看得到它。** 所以为这一行写用例＝断言一个运营侧读不到的字符串确实存在，属自我安慰，故本波**没有**为它写用例。两条可行改法都不是一行（走协议加一条诊断记录 ⇒ 跨边界四处同步 + 一个消费端 + 牵动就绪握手；或宿主把错误输出转进日志 ⇒ 给纯协议客户端注入日志出口并一路穿下来），**应各自起一个 change 带自己的用例**。降级判据的**可达性**那一半仍有覆盖，缺的只是「记账行到得了人眼前」这一段。
+
+### 9.4 真机项（共 22 条 —— **已于 2026-07-30 落入 backlog**）
+
+> **已并入** `docs/real-machine-acceptance-backlog.md` **簇 123**（23 条 = 本节 22 条 + 一条「位置回退在真机是否可达」，
+> 那条是本波把滚动回执语义钉成「回退也算动过」时唯一没被观测坐实的前提）。
+> 与会话守卫流的**簇 122** 是同一台机器、同一个分身，**一次真机 session 连着验**；
+> 并簇后**验收状态以 backlog 为准**，本节只保留上下文。
+> **小红书真机验收自 Native 迁移（2026-07-22）以来一次都没做过** —— 这两簇同时是那次迁移的第一次真机复核。
+
+**A. 由 §4 引入（4 条）**
+1. **7.2 的口径须改写**：宿主层等待落在死线**之外**，**不会**拉长单命令墙钟，但**会**拉长命令间隔 ⇒ 影响的是会话看门狗的 **idle 判定**，不是单命令超时。观测对象应是 idle 间隔分布，不是单命令耗时分布（诊断依据已就位：节奏层两行有界日志）。
+2. **小红书侧首次开始等待**：翻页 / 关帖 / 返回的停留此前只在 Facebook 生效，泛化后小红书每次都会新增一段等待，而小红书真机验收自迁移以来一次都没做过。属行为面新增，须确认不触发看门狗。
+3. **关帖不再接受犹豫值字段**：现网云端本就不发；若某个未知路径发了，命令会变成非法请求**根本不下发**。跑一轮浏览闭环确认无非法请求。
+4. **兜底档**：旧云端 / 断连时详情停留走本地采样兜底并乘档位，确认断连恢复后不会叠出异常长停留。
+
+**B. 由 §8 输入半边引入（9 条）**
+5. **[能力回退的解锁前置] 小红书评论框对 Shift+Enter 的绑定**：软换行还是提交。确认为软换行后才可恢复 9.1 第一条那项能力。
+6. **评论框形态**：评论路径当前一律按普通字符写换行（受控框口径）；分片已能区分两态，但评论路径当前不据此分流。
+7. **单次往返成本的真实值**：初始估值之后由实测单调抬升。确认长正文（≥3000 字）的实际写入次数与总耗时，据此复核往返上限与停顿上限。
+8. **降级记账的真实频次**：需真机跑长正文才知道降级多频繁、往返成本被抬到多高（受 9.3-2 制约：这条记账目前到不了运营视野，观测须直接看子进程输出）。
+9. **提交窗口抬到命令墙钟上限后的抢占影响**：确认抢占方不会等太久 / 不触发重排风暴。
+10. **预算前置拒绝会不会误伤真稿**：换行极多的正文会在**开工前**零派发拒绝，按预算推算约在 40 段以上触发，确认实际稿件不会撞上。
+11. **拟人点击落在编辑器上**：评论与发布字段的落焦改成真实指针轨迹点击（此前是页面侧聚焦），确认落点几何在真实布局上确实命中编辑器、不会点到遮挡层。
+12. **定时设置的定论**（同 8.1 的裁定请求，需真机验证分段控件的输入形态）。
+13. **9 个「读不到」原因码在云端侧尚未登记消费**（回执理由是裸串、两侧无机械对账）；真机上先当排障 token 用，顺带确认控制台对未知理由串的展示不退化成空白。
+
+**C. 由 §8 滚动半边引入（9 条）**
+14. **8.6 的两条旧结论**（任务点名）：宽 / 窄两套布局的可滚元素是否真的不同、页面内滚动在窄布局上是否真是空操作。实现对两态都作了处理，真机确认它在两套布局上各自解析到哪个元素。
+15. **可滚区选择器命中面**：确认命中的是真正的滚动容器，而不是某个内容溢出但 overflow 语义不是滚动的壳（代码已加语义判据，需验证判据够不够）。
+16. **半屏位移是否够 / 是否过密**：确认相邻两次扫描的可见卡片确实有重叠，且没有密到把同一批卡反复评估。
+17. **落点几何是否命中可滚区**：确认没落在悬浮头部 / 侧栏 / 广告位上（那会让滚轮作用在错误的滚动容器上）。
+18. **翻页前关浮层的控件识别**：确认小红书详情浮层的关闭控件真能命中；命中不到时当前行为是照常去滚（位移会诚实报，但 feed 不会推进）。
+19. **懒渲染换掉滚动容器那一拍**是否真会让分片读不到可滚区（本波是按分片代码路径推的现场，未在真页面上观测过）。
+20. **最小耐心轮次是否覆盖真机 feed 平滑滚动的起步延迟上限** —— 这是唯一能把那个经验值变成有依据的数字的办法。
+21. **到底判定「读不到」的真实成因与频率**（分片在解析成功时恒带该字段，这一态在真机上是否可达未证）。
+22. **滚动「派发失败」的真实频次**：收集诊断串出现频次，判断它在生产里是否常见到值得升级成独立回执理由。
+
+### 9.5 残留与新发现（只登记，本波未动手）
+
+1. **搜索路径的归因折叠**：搜索输入判据把「读不到」折成「读到了一个否」。失败方向是诚实的（不会假成功），但搜索是写动作，这正是本波在小红书写动作上删掉的那种折叠。**未动的原因**：`git diff` 证实这段不在本 change 的改动范围内（迁移期就有的代码），且改它要动回执理由词表（云端可能有映射），另一条流可能正压着这块。建议另起 change 或并入会话守卫流。
+2. **两处同族折叠当前不可达，留作记录**：评论残文复核里「读不到就当干净」（好消息方向 —— 但上一道闸先拦，且分片每条分支都无条件带该字段）、发布回读里「读不到就当空」（比对不中 ⇒ 拒绝，fail-closed）。改了反而会引入跑不到的理由码。
+3. **滚动的「派发失败」与「页面到底了」在回执字段上仍是一态**（只在诊断日志分开），归属属主，见 8.7。
+4. **往返成本的单调抬升是个放大器**，本波只点名未动：它是有意的保守选择（宁可高估往返、少分块，也不因低估把内容写不完），改成窗口 / 衰减估值会反转这条既定取舍 —— 应由真机数据（9.4 B-7 / B-8）驱动，不由实装方在收尾轮翻案。
+5. **两条既有 flaky（非本波引入）**：① Facebook 短视频滚轮那条假 CDP 用例在门禁满载并行下偶发红（约 1/5，单独连跑全绿）—— 夹具写死的命令预算可能在负载下不够，但只有「负载下红、空载全绿」这一条证据，改预算有掩盖真实缺陷的风险，故未动；② Facebook 发帖提交那条用例把 50ms 死线与 35–180ms 的随机瞄准停顿耦合在一起，判定落在随机量两侧，负载重时可能翻面。建议后续把死线与停顿量级解耦。
+   - **① 已由对面流在 `bed0e83` 修掉，别重复修**（2026-07-30 收口时对账）：真因不是「夹具死线不够」，而是**假会话的默认超时把有效预算恒定卡在 2 秒** —— 有效预算取「命令死线」与「会话超时」的较小者，故**只抬死线是一次空操作**（当时「连跑 6 次 + 8 次全绿」只是抽样太小）。两个上限同时抬到 90s 后，独立 target 全量连跑 **25 次 0 红**（修前同树 14 次红 2 次 ≈ 14%）。
+   - **另有第三条 flaky，仍在，且主干自身就是坏的**：`fake_cdp.rs` 三条 Facebook feed-recovery 用例**共用同一个落点坐标 (540, 330)**，而输入原语里的「上一次点击落点」是**进程级全局**、被并发测试互相污染 ⇒ 谁后跑起点就已在目标上 ⇒ 距离为零 ⇒ 路径塌成单帧 ⇒「不得瞬移」断言当场红。**实测主干 8 次全量红 4 次（≈50%），本波分支同率。** 注意**单独跑该文件永远全绿**，历史上多次「无抖动」结论都是这么自证出来的、不成立。三个候选修法与倾向见 `docs/native-migration-repair-handoff.md` §4.5；**生产语义不需要改**（一个引擎进程只驱动一个浏览器、命令串行）。
+6. **瞄准停顿本身仍无时间下界守卫**：它与本波已守住的停顿采样共用同一个离散度参数（该参数归零已被守卫捕获），但若单独把瞄准停顿的三个常量压成 0，仍无任何用例会喊。同族缺口、量级更小，登记备查。
+7. **五条时间下界守卫的门槛是经验值**：若日后有人**合理地**把停顿量级整体调小一个档，长尾那条门槛会开始咬人 —— 那时该重新论证的是「新的量级还算不算像人」，而不是直接调阈值。
