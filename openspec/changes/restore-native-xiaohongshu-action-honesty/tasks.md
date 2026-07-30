@@ -132,3 +132,20 @@
   - 进度说明（2026-07-29，**分波回写中，change 未收口故不勾选**）：Edge 侧 sha 已逐条落在各任务行尾。截至第二波，本 change 在 `native-migration-repair` 上的提交为 —— 第一波 `552eda1`（1.1–1.3 / 1.12 用例与夹具）、`8b99183`（2.1 / 2.2）；第二波 `a45fc81`（1.13–1.19 用例）、`19d4872`（2.3–2.15 / 3.2）。**控制仓 sha 待本文件提交后补**。重叠文件实测：本 change 碰了 `native/page-engine/src/{engine.rs,model.rs,probe.rs,xhs.rs}` 与宿主 `src/native-page-engine/{browse-session.ts,client.ts}`，前四者中 `engine.rs` 与 `restore-native-xiaohongshu-session-guards` 共写、后两者是该 change 的单写区边缘（见 6.5）；`input.rs` / `facebook/**` 与并行 change `restore-native-actuation-humanization-and-locating` 的改动面在本波**零交叉**（该 change 的 `3a1b2b3` 只动 Rust 的 input/locating/facebook 三处，与本 change 的 xhs 路由与 probe 不相交）；协议四处同步文件、Facebook 路由、微信适配器**全程未碰**。
 - [ ] 6.5 与 `restore-native-xiaohongshu-session-guards` 再对两处集成边界（本次覆盖漏洞收口新增）：① 2.9 若落在 `xhs-page-probe.js` / `probe.rs`，与该 change 的 1.2 / 1.3（周期探针平台化、按页面类型分类）读同一份探针输出，字段增删须同时过它们的判据；② 2.11 若走宿主补发回执，与该 change 的 4.1（`src/native-page-engine/browse-session.ts` 逐命令诊断改平台中立）同文件。集成前 `git fetch` + rebase，跑 `cargo test` 与 `npm test` 后再合，在此记录对账结果
 - [ ] 6.6 在本清单记录本次「参照书覆盖漏洞」收口的处置结论：就地补任务 = 1.13–1.19 / 2.9–2.15 与新增真机项 5.8–5.10；范围外具名交接 = 4.5（承接方 `restore-native-xiaohongshu-session-guards`）；通电对账 = 4.6。三类都必须有结论，不得留空
+
+## 边缘诚实性缺口清单（2026-07-30 用户裁定「要做」，本 change 是主要属主）
+
+> 全文见控制仓 `docs/edge-honesty-gap-inventory.md`（12 条经对抗复验确认成立，带 `文件:行`、
+> 今天回报什么、为什么错、真机最坏后果）。**12 条里有 9 条落在本 change 的单写区
+> `native/page-engine/src/xhs-command-router.js`**，因此归属本 change，不由他流代改。
+
+- [ ] H.1 按清单逐条判「修 / 显式弃守」，结论回写清单与本节（**MUST NOT 静默跳过**）
+- [ ] H.2 优先处置**会错报成功**的那几条（自证循环、判据过宽里判正证据的那些）；
+      只会**错报失败**的可降级排期 —— 红线针对的是静默假成功，方向诚实的悲观回执危害小得多
+- [ ] H.3 清单里标注「今天不可达、通电即生效」的潜伏项（评论点赞、通知分栏、设为封面），
+      处置时 MUST NOT 因「现在跑不到」就当已解决；入口白名单已放行，生产者一补就生效
+- [ ] H.4 共享判据 `active()` / `selected()` 的裸子串匹配是**扇出点**（8 个决策点据此回 ok=true），
+      修它的收益最大；但要先确认各消费点的正确判据各是什么，不能一刀切
+- [ ] H.5 复验只覆盖了 69 条候选里的 16 条，**余下 53 条未复验**。收口前补跑一轮，
+      或显式记录「不再扩大清单」并说明理由
+
