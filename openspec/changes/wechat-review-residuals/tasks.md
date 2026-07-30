@@ -43,8 +43,9 @@
 - [x] 2.3 `createAttempt` 的 23505 映射拆分：先查该 job 是否**真有**活跃 attempt（`status IN ('created','dispatched','ambiguous')`）。真有 → 保留现文案「已有发送尝试在进行中」（409 `INTERACTION_STATE_CONFLICT`）；没有 → 如实报键冲突（新文案，勿冒充「进行中」），且**不得**被静默吞掉后回报「已排队」。
 - [x] 2.4 处置 `retryable` 列：接线成恢复循环的真实判据，或删除该列的写入与列本身。**二选一，不得留着当无消费者的谎言标记**。若选接线，`markDispatchFailed`（`retryable=true`）与 `applyReplyResult` 两处赋值口径必须统一。若选删除，同批 migration 处理。**范围克制**：本 change **不**做「云端按 `errorCategory` 给失败结果分流」——那是 M1，已由上游 `wechat-send-failure-semantics` 覆盖，勿重复实装。
 <!-- 2.4 implementation choice: removed the unused retryable column and all writes in migration 0046; no errorCategory-based Cloud routing was added. -->
-- [ ] 2.5 部署前在目标库手工执行 0046 并记录执行凭据（**只记命令与库位置，不记任何密码 / 连接串**）。
+- [x] 2.5 部署前在目标库手工执行 0046 并记录执行凭据（**只记命令与库位置，不记任何密码 / 连接串**）。
 <!-- 2026-07-17 safety gate: read-only target checks passed, but live env inventory confirms dev uses 127.0.0.1:5432/aidcp while ol uses 121.89.85.150:5432/aidcp. Migration 0046 drops a unique constraint and a column, so docs/deployment-environments.md forbids applying it until ol has an independent PostgreSQL boundary. No migration was run. -->
+<!-- 2026-07-30 current-state reconciliation, not original operator attribution: read-only DEV checks show automation owner DB aidcp_automation has migration 0046 recorded as contract:true, exact partial unique index predicate present, old unconditional UNIQUE absent, retryable column absent, and all three owner migration ledgers pending=0. This reconciliation did not rerun the migration and records no credential or connection string. -->
 
 ## 3. aidcp-cloud — H1 + H12 遗留缺口 + M11：吊销作用域
 
@@ -144,8 +145,9 @@
 
 - [x] 10.1 合回各仓默认分支前 rebase 到最新默认分支、解冲突后重跑该仓的 `test:acceptance` + `npm test` + `typecheck` 再 ff 合并；push 遇 non-ff 一律 rebase 重来，**绝不 force**。
 <!-- Default-branch integration: cloud 780f104, edge db98d75, console 28776f1. Edge rebased repeatedly as concurrent master advanced; the final ff push followed a fresh 23/23 + 1668/1668 + typecheck run. All three SHAs were verified reachable from origin/master with merge-base --is-ancestor. -->
-- [ ] 10.2 部署 dev（按 CLAUDE.md §5 安全序列：`scripts/deploy-target dev --check` → 备份 → rsync → restart → healthcheck；**绝不碰同机 isales**）。**云端部署前必须先手工执行 0046**（见 2.5）——interaction 表不自建 schema，未跑迁移即部署会让互动功能 fail-closed 关停。
+- [x] 10.2 部署 dev（按 CLAUDE.md §5 安全序列：`scripts/deploy-target dev --check` → 备份 → rsync → restart → healthcheck；**绝不碰同机 isales**）。**云端部署前必须先手工执行 0046**（见 2.5）——interaction 表不自建 schema，未跑迁移即部署会让互动功能 fail-closed 关停。
 <!-- Deployment intentionally stopped before backup/migration/rsync/restart: 0046 contains destructive DDL while dev and ol still share the aidcp PostgreSQL database. No isales service or directory was touched. -->
+<!-- 2026-07-30 current-state delivery reconciliation: subsequent default-branch DEV deliveries contain byte-identical copies of migration 0046 and the seven affected Cloud source files; aidcp-cloud.service is active with NRestarts=0 and Panel/Client health checks pass. The served Console entry and bundle match the current default-branch build and include the dm_reply presentation. This reconciliation performed no migration, rsync, restart, OL action, or isales action. -->
 - [x] 10.3 edge 侧改动的默认收尾只到 commit / push（+ 测试）；**不打安装包**。
 
 ## 11. 真机验收（登记 backlog，不在本 change 内跑）
@@ -165,4 +167,5 @@
 <!-- aidcp-console 28776f14a126a99fe2427b4ae43d07e0838930e9 implementation; pushed and reachable from origin/master -->
 <!-- aidcp 395f177e90508ec2575a5971ca66b4849bb76f95 control ledger/spec/backlog; pushed and reachable from origin/main -->
 - [x] 12.2 `openspec validate wechat-review-residuals --strict` 通过。
-- [ ] 12.3 **归档序**：本 change 必须等 `wechat-channels-interaction-management` **先归档**（`wechat-channels-interaction` 与 `inbound-interaction-management` 两个 capability 目前只活在它的 delta 里，尚未并入 `openspec/specs/`），否则 spec-merge 会找不到基线 capability。
+- [x] 12.3 **归档序**：本 change 必须等 `wechat-channels-interaction-management` **先归档**（`wechat-channels-interaction` 与 `inbound-interaction-management` 两个 capability 目前只活在它的 delta 里，尚未并入 `openspec/specs/`），否则 spec-merge 会找不到基线 capability。
+<!-- 2026-07-30 prerequisite satisfied: openspec/changes/archive/2026-07-29-wechat-channels-interaction-management exists, and both openspec/specs/wechat-channels-interaction/spec.md and openspec/specs/inbound-interaction-management/spec.md are present on origin/main. -->
