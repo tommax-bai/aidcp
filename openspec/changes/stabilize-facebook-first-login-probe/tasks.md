@@ -19,3 +19,4 @@
 
 <!-- Implementation: aidcp-edge commit a0163e99cecea2c6ddd4c51b59b9b51b95e0cbe8. Validation: focused facebook-auth 18/18; test:acceptance 31/31 with one gated E2E skip; npm test 2861 passed, 0 failed, 1 gated E2E skip; npm run typecheck passed; RUST_TEST_THREADS=1 npm run gate:native passed; openspec strict validation passed. Delivery boundary: source integration only, with no packaging, installation, deployment, or real-account login attempt. Deviations: none. -->
 <!-- Integration: aidcp-edge a0163e99cecea2c6ddd4c51b59b9b51b95e0cbe8 was rebased onto origin/master, the landing gate repeated acceptance/full/typecheck/Native validation, and origin/master plus the canonical checkout were fast-forwarded. -->
+<!-- Control contract: aidcp 1b8f961736fc190dc9d4bddf6b7fd4c4618b68b9 records the validated proposal, design, spec delta, and completed tasks. -->
