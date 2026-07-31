@@ -15,4 +15,5 @@
   <!-- Focused TypeScript auth/router/assembly tests passed 43/43; Edge typecheck passed; focused Native seven-second receipt-window test passed 1/1. -->
 - [x] 3.2 Run the applicable acceptance, full Edge, and Native gates plus strict OpenSpec validation; investigate any failure without weakening fail-closed assertions.
   <!-- Acceptance passed 31/31; full Edge tests passed 2868 with 0 failures and 1 gated E2E skip; Native fmt/clippy/test passed with 168 unit tests plus integration suites; staged Native artifact verification and strict OpenSpec validation passed. -->
-- [ ] 3.3 Record repo commits, validation evidence, integration/push status, and the no-package/no-live-account boundary in this task file.
+- [x] 3.3 Record repo commits, validation evidence, integration/push status, and the no-package/no-live-account boundary in this task file.
+  <!-- aidcp-edge 11b1984010ba1ea93da6571377f19f49c472720b and aidcp 1e939c1d were integrated and pushed to origin/master and origin/main respectively after all task 3.1/3.2 gates passed. This closeout record lands in a follow-up control-only commit. No desktop package/install and no live-account action were performed. -->
