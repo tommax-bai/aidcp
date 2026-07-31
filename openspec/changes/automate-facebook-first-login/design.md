@@ -89,6 +89,12 @@ The document generation remains part of every actionable signal id because a sta
 
 Inside an already confirmed Facebook 2FA context, the Native router may recognize a visible editable text input from the exact labels associated by the browser's `HTMLInputElement.labels` relation. This covers both `label[for]`/`input[id]` and a wrapping `label` without hard-coding Facebook's dynamic ids. Nearby or page-wide text is not an association. The candidate must still be unique and topmost; no candidate or multiple matching candidates fails closed.
 
+### 8. Retained manual-login sessions keep one authentication consumer
+
+`credential_fill_unavailable` moves the owned browser into a controlled manual-login wait, but it does not prove that every later authentication stage requires manual handling. While the same core still owns the same browser/CDP generation and retains fresh-start policy evidence, the manual wait periodically gives the existing authentication coordinator one bounded opportunity to consume a newly supported signal before performing the next read-only identity check. A transition from the login page to the supported 2FA page can therefore resume TOTP entry and submission without a restart, takeover, focus click, or a second DOM consumer.
+
+The manual wait and the coordinator run serially under the same lifecycle cancellation. There is never a background auth watcher racing the identity loop, and a manual result on an unchanged login page produces no action and returns to the existing wait cadence. Unsupported, ambiguous, CAPTCHA, stale-policy, action-failure, and lifecycle-interruption results retain their existing fail-closed handling. Stable identity remains the only authority to leave startup and begin account-scoped work.
+
 ## Risks / Trade-offs
 
 - **Facebook markup or wording changes** → Exact structural detection fails closed and reports a safe reason; no generic text guessing or fallback click is added.
@@ -100,6 +106,7 @@ Inside an already confirmed Facebook 2FA context, the Native router may recogniz
 - **AdsPower or Chromium exposes placeholder auth-cookie entries** → The auth probe applies the same numeric `c_user` validity rule as stable identity and additionally requires a non-empty `xs`; cookie names alone never suppress login assistance.
 - **Facebook emits long page-controlled checkpoint queries** → Document generations stay fixed-size and retain full URL-state sensitivity without returning the raw query through the Native protocol.
 - **The 2FA input exposes meaning only through an associated label** → Native reads the browser-defined label relation only inside the confirmed 2FA context and still requires one visible, editable, topmost candidate.
+- **Manual credential handling advances to a supported 2FA page later** → The retained owner serially re-enters the existing coordinator so the new signal has one consumer; it does not create a parallel watcher or transfer fresh-start proof.
 
 ## Migration Plan
 

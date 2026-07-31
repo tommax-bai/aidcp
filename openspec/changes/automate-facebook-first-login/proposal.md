@@ -5,6 +5,7 @@ Facebook environments created from imported AdsPower account material can still 
 ## What Changes
 
 - Add a bounded Facebook first-login state machine before identity resolution for imported AdsPower profiles.
+- Keep the same single authentication consumer eligible while a retained manual-login session waits for identity, so a later supported 2FA signal can re-enter the bounded coordinator instead of becoming orphaned.
 - Let AdsPower perform first-open credential filling, submit the Facebook login form through Native CDP input, and verify each navigation before continuing.
 - Generate TOTP only from the profile's in-memory 2FA key, synchronize against Facebook server time, and wait for the next 30-second window when less than 10 seconds remain before input.
 - Structurally handle only the observed non-CAPTCHA transitions: the automated-behavior warning, the Facebook push-notification blocker, and Facebook's `Remember Password` prompt.

@@ -75,6 +75,20 @@ TOTP assistance SHALL use a fresh Facebook server-time observation and a 30-seco
 - **THEN** Native recognizes that input through the `HTMLInputElement.labels` association, including `for`/`id` or a wrapping label, without hard-coding a dynamic id
 - **AND** it emits an entry signal only when the matching input is unique and topmost
 
+#### Scenario: Retained manual login advances to supported 2FA
+- **WHEN** missing AdsPower credential fill has placed the same owned fresh-start browser in controlled manual-login wait and that page later presents a supported unique 2FA signal
+- **THEN** edge serially re-enters the existing Facebook authentication coordinator in the same core and browser generation so that signal has exactly one consumer
+- **AND** TOTP entry and submission retain their existing fresh-probe, signal-id, server-time, ten-second floor, and one-action-per-observation requirements
+
+#### Scenario: Manual wait does not create a second auth consumer
+- **WHEN** the retained browser remains on the unchanged login page or the next identity poll is due
+- **THEN** edge runs authentication reconciliation and identity reading serially under the same lifecycle cancellation
+- **AND** it dispatches no login action for another `manual_login_required` result and does not start a parallel DOM watcher
+
+#### Scenario: Retained session lacks current mutation authority
+- **WHEN** the retained core no longer owns the browser generation, fresh-start policy evidence is unavailable, or the page presents CAPTCHA, ambiguity, or an unsupported checkpoint
+- **THEN** edge performs no automated authentication input and preserves the existing honest manual or terminal outcome
+
 #### Scenario: Nearby text does not label an input
 - **WHEN** 2FA wording is present elsewhere on the page but is not browser-associated with a visible editable input, or more than one associated input matches
 - **THEN** Native emits no actionable TOTP input signal and dispatches no input
