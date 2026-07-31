@@ -42,11 +42,14 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > **dev 已部署第九批 = `3fe4b94`**（单体形态，零新增迁移，三属主 migrate status 均「待应用 0」，
 > healthcheck 全过、2 分钟 soak 错误 0、isales 未触碰）。ol 仍一次没动。
 >
-> **2026-07-31 再更新**：cloud 到 `e9925f7`（task 2.4c，结清接线欠账三条），**dev 第十批已部署**。
-> 六仓：cloud `e9925f7` / kernel `aa48c29` / transport `39b3c2c` / api `9920ecd` /
-> automation `6da0e74` / content `eb56863`；测试 cloud 4024 / api 493 / automation 1961 /
+> **2026-07-31 再更新（两批）**：
+> ① `e9925f7`（task 2.4c，结清接线欠账三条）→ dev 第十批；
+> ② `b7f24a0`（task 2.4b 精选写口 + 撤掉 `content-role-factories`）→ dev 第十一批。
+> 六仓：cloud `b7f24a0` / kernel `dbd2cbd` / transport `5e7c394` / api `5ee761e` /
+> automation `2fbb9eb` / content `ae7be94`；测试 cloud 4029 / api 494 / automation 1964 /
 > content 439 / kernel 59 / transport 36，全 0 fail；六仓对账零漂移。
-> tasks.md `57/111`。**门仍是 12。**
+> tasks.md `59/113`。
+> **⚠️ 门 12 → 11**——本 change **第一条真靠接线消掉的**（前两条撤条一条是记错属主、一条是重复计数）。
 
 **2026-07-30 17:00 实测期望值：**
 
@@ -95,8 +98,8 @@ rsync → `migrate status`（待应用恰好 3 条）→ `migrate up`（0100/010
 
 | | 现值 | 它衡量什么 |
 | --- | --- | --- |
-| tasks.md 条数 | 55/108 | **「查清了多少」，不是「交付了多少」。** 分母会随勘察长大——最近两批往里加了 7 条实测发现的新任务 |
-| **那张清单（门）** | **12 条** | **真正的交付物。** 从 14 降到 12，而**两条都是撤的、不是干活减的**：一条被算了两遍（1.7b），一条记错了属主（2.9）。**真正靠接线减掉的，到现在是 0 条。** |
+| tasks.md 条数 | 59/113 | **「查清了多少」，不是「交付了多少」。** 分母会随勘察长大——最近几批往里加了十来条实测发现的新任务 |
+| **那张清单（门）** | **11 条** | **真正的交付物。** 14 → 11：**前两条是撤的、不是干活减的**（一条被算了两遍 1.7b，一条记错了属主 2.9）；**第三条（`content-role-factories`，2026-07-31）是本 change 第一条真靠接线消掉的**——0.7 改判归属 + 2.4b 把最后一个 content 符号换成 kernel 写口 |
 
 **收工的判据是门清零，不是 tasks.md 打完勾。** 两者不是同一把尺，别拿后者当进度终点。
 
@@ -105,7 +108,7 @@ rsync → `migrate status`（待应用恰好 3 条）→ `migrate up`（0100/010
 
 ---
 
-## 3. 门：12 条逐条现状
+## 3. 门：11 条逐条现状
 
 | id | 组 | 卡在哪 |
 | --- | --- | --- |
@@ -113,11 +116,10 @@ rsync → `migrate status`（待应用恰好 3 条）→ `migrate up`（0100/010
 | `feishu-operator-delegated-card-actions` | 指令 | 同上（注入同一个端口即同时点亮它与自由文本那条） |
 | `feishu-operator-dispatch-start-stop` | 指令 | **只接了服务端**；api 侧卡在签名（面板的状态灯是同步布尔，远端读是异步三态）——见 tasks 1.3a，需拍板 |
 | `content-concept-write-authority` | 内容 | **生产消费者已补齐**（`3fe4b94`，task 2.4a）：只差 §3 段的 `main()` 把客户端喂进去。**撤条属第 4 段**，见下 |
-| `content-curated-write-authority` | 内容 | 读那一半同上；**写那一半没做**：召回端口只有两条读方法，覆盖不了 dispatcher 的 Sink 句柄、`markBotAction`、能力在场判定（task 2.4b / 2.5） |
+| `content-curated-write-authority` | 内容 | **读写两半的通道都已就位**（`b7f24a0`：新 kernel 写口 5 方法 + 传输三件套 + content 侧注册 + 组装根四处按模式注入）；同概念池那条，只差 §3 段的 `main()` |
 | `content-facebook-publish-media-authority` | 内容 | 契约已写，**路由未注册、未接线** |
 | `content-token-usage-authority` | 内容 | 契约已写，**路由未注册、未接线**；端口是「提交已合并的增量」而非逐条上报，**属主今天没有这个方法** |
 | `content-textcard-transcription-authority` | 内容 | 能力二态端口已写，未接线 |
-| `content-role-factories` | 内容 | 待岔口 B 落地（tasks 2.5） |
 | `content-generic-llm-authority` | 内容 | 待岔口 A 落地（tasks 2.5） |
 | `content-reply-generation-authority` | 内容 | 未开工（tasks 2.6） |
 | `automation-production-runtime-composition-unwired` | 组装 | 就是那个空壳入口本身；前两组不清完写不了 |
@@ -304,19 +306,19 @@ systemd 只有 `Restart=on-failure` / `RestartSec=5`、无 OnFailure、机器上
 旧版这里写「2.5 裁决早拍过了，是落地不是决策」。**对 A 半成立，对 B 半已过期**，且几条的依赖关系
 与原先记的不同。实读后的真实顺序：
 
-1. **2.4b · 精选写口**——**它是 `content-curated-write-authority` 与 `content-role-factories`
-   两条台账的共同前置**，做完才谈得上清它们。所需写面已数清（`upsertObservation` /
-   `refreshReferenceImages` / `getTextCardContext` / `archiveComment` + `markBotAction`
-   + 一个在场判定）。形态照刚做完的读端口，模板齐全。
-2. **2.4d · 结清接线欠账剩下的七条**。两组分开：**FB 发帖素材组纯 cloud 侧、可直接做**；
+1. ~~**2.4b · 精选写口**~~ ✅ **已做**（`b7f24a0`）：kernel 五方法写口 + 传输三件套 + content 侧注册
+   + 组装根四处按模式注入，**并据此撤掉了 `content-role-factories`**（门 12 → 11）。细节见 tasks 2.4b / 2.4b-1。
+2. **2.4d · 结清接线欠账剩下的七条**（`CONTENT_MEDIA_USAGE_WIRING_DEBT`，已结清的三条在 `_CLOSED` 里）。
+   两组分开：**FB 发帖素材组纯 cloud 侧、可直接做**（三条：静默 `return` 换响亮取用闸、
+   写失败后素材永久卡保留态、组装根那处直调不走窄口）；
    **用量记账组先要两个决定**（属主补方法还是交适配对象、automation 侧合并缓冲落在哪），
-   债⑥自己写着「落点由接线方裁定」⇒ 那是决策不是落地。
-3. **2.5 的 A 半**（模型出口进 `aidcp-transport`）——与 B 半互不依赖，可单独开。
+   债⑥自己写着「落点由接线方裁定」⇒ 那是决策不是落地，且带硬约束：**传输失败 MUST NOT 重投**。
+3. **2.5 的 A 半**（模型出口进 `aidcp-transport`）——B 半已随 0.7 + 2.4b 全部了结，本条只剩 A 半。
    **动手前先读 design §5.5.8**：裁决成立，但 0.4 记的理由有一条是错的。
    注意这是本仓最热的一条路径，且要动 transport 名册 + 三仓 pin。
 4. **2.6**（`ReplyWorkflow` 的 content 属主具体类实参）、**2.7**（传递性检查，特别点名 optional 参数）。
 
-> **2.5 的 B 半（四个角色工厂）现状，务必先读**：归属改判**早已由 task 0.7 全部落地**——
+> **2.5 的 B 半（四个角色工厂）已于 2026-07-31 了结**，下面这段保留供追溯：归属改判**早已由 task 0.7 落地**——
 > 六个文件在归属表里已是 automation，也都进了 `aidcp-automation/src/`，design §2 点名要一并修的
 > 「假消边残留」也已消。剩下的**不是落地既有裁决，是一个新问题**：那条台账的证据符号
 > `CONTENT_ROLE_FACTORIES` 今天**只剩一个 content 符号**，就是窄化那一步里的 `CuratedContentStore`
