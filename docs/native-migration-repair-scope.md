@@ -118,6 +118,10 @@ Facebook 发帖填充时限、以及几条差 1–2 项收口的。
 
 ## 5. 交接给下一个 session 时要知道的
 
+> **接手请先读 `docs/native-migration-repair-handoff-2026-07-31.md`**——那份是最新的一次交接，
+> 含①②两块的完整勘察结论与实装边界、本轮已落地的 sha、以及分诊查出的几处台账记错。
+> 本节以下为更早的通用注意事项，仍然有效。
+
 - **起手校验照 `docs/native-migration-repair-handoff.md` §2 跑**，别信正文里的计数。
 - **Rust 工具链不在默认 PATH**：`export PATH="$HOME/.rustup/toolchains/1.97.1-aarch64-apple-darwin/bin:$PATH"`。
 - **主干 Rust 门禁仍不是稳定绿的**：`publish_tests.rs` 三条绝对墙钟死线用例约 12% 概率红

@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Reproduce a "only red under concurrent load" flaky test, and prove a fix.
+#
+# Why this exists: a test that is green when you run it alone tells you nothing
+# about a flake that only appears when several test binaries share the machine.
+# "Green after my change" is not evidence unless the SAME harness turns the
+# unmodified build red. Always measure the baseline first.
+#
+# Works on any compiled test binary that exits non-zero on failure (Rust's
+# `cargo test` binaries do). Build one with:
+#     cargo test --no-run          # prints the executable paths
+# then copy the binary somewhere stable BEFORE you change the source, or the
+# next build overwrites it. Two builds of the same crate keep the same file
+# name, so copy them to distinct paths and `cmp` them - if they are identical,
+# one side did not recompile and the whole measurement is worthless.
+#
+# usage: flake-probe <test-binary> [rounds] [parallel] [test-threads]
+#   rounds       how many batches to run           (default 5)
+#   parallel     copies running at once per batch  (default 8; try 2x cores)
+#   test-threads threads inside each copy          (default 4)
+#
+# Reports how many whole runs went red and which tests failed at least once.
+
+set -uo pipefail
+
+bin="${1:-}"
+rounds="${2:-5}"
+par="${3:-8}"
+threads="${4:-4}"
+
+[ -n "$bin" ] || { echo "usage: flake-probe <test-binary> [rounds] [parallel] [test-threads]" >&2; exit 2; }
+[ -x "$bin" ] || { echo "not an executable test binary: $bin" >&2; exit 2; }
+
+names="$(mktemp)"
+trap 'rm -f "$names"' EXIT
+
+fail=0
+total=0
+
+for round in $(seq 1 "$rounds"); do
+  pids=""
+  outs=""
+  for _ in $(seq 1 "$par"); do
+    out="$(mktemp)"
+    outs="$outs $out"
+    "$bin" --test-threads "$threads" >"$out" 2>&1 &
+    pids="$pids $!"
+  done
+
+  index=0
+  for pid in $pids; do
+    index=$((index + 1))
+    out="$(echo "$outs" | cut -d' ' -f$((index + 1)))"
+    if wait "$pid"; then :; else
+      fail=$((fail + 1))
+      echo "--- red: round $round job $index ---"
+      awk '/^failures:$/{seen=1;next} seen && /^ +[A-Za-z_]/{print $1}' "$out" | sort -u | tee -a "$names" | sed 's/^/    /'
+    fi
+    total=$((total + 1))
+  done
+  rm -f $outs
+done
+
+echo
+if [ -s "$names" ]; then
+  echo "tests that went red at least once:"
+  sort -u "$names" | sed 's/^/  /'
+fi
+echo "RESULT: $fail red / $total runs  (binary=$(basename "$bin") parallel=$par test-threads=$threads)"
+[ "$fail" -eq 0 ]
