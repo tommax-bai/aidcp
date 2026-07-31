@@ -97,17 +97,20 @@
   - 专用变体 `TextInputFailure::GuardUnreadable` 本轮 defer：新增枚举变体会打断三处穷举 match 的编译（`engine.rs:782-791/1348-1351`、`facebook/comment.rs:221-232`、`facebook/publish.rs:612-619`），四个文件均在其他单写区。
 - [x] 7.5 加回归：① 取用函数收到空 root → 回可归因的空结果、不抛（写命令路径因此不会被判 `Ambiguous`，对照 `engine.rs:532-543` 的「写 + 任何规则错误 → Ambiguous」）；② 导航瞬间无有效根 → `note_open` 回未开始而非抛；③ 非 Facebook 平台解码失败 → 携带同级诊断；④ 守卫求值失败 → 与目标丢失是两个不同结论 <!-- aidcp-edge 74eaf41 四条全落地：runtime-contracts-page-rules.test.ts 3 tests（null/{}/字符串/0 全回空、有效根照旧、jsdom 摘 body 后 note_open 回 target_not_found）+ runtime_contracts_decode_diagnostics.rs 3 tests（含「诊断绝不能带页面正文或凭据」：cookie 值 / 中文正文 / 带空格的伪标识符都不落盘，整串 ≤512 字节）+ input:: 焦点守卫 1 test -->
 
-## 8. aidcp-cloud — 评论预算传输而非重算
+## 8. aidcp-cloud — 评论预算传输而非重算 —— **已摘出本 change（2026-07-31 用户裁定）**
 
-> **整节本轮延后（2026-07-31，用户裁定；仍是待办，不弃守）。** 两份公式的后果是**错报失败**（长评论被判超时），
-> 方向诚实、危害小于本轮优先处置的静默假成功那批。且它必须边缘 + 云端同批改，跨仓协调成本高。
-> 留待下一轮，连同 3.2 一起做——两条是同一件事的两半（预算的单一事实源）。
-
-- [ ] 8.1 确定评论提交预算的计算方（云端下发或边缘回报）并在该侧按「实际会被打进编辑器的完整串」计算，另一侧改为据传输值派生
-- [ ] 8.2 删除非计算方的常量副本（`aidcp-cloud/src/comment-agent/facebook-edge-steps.ts:46-57` 与 `aidcp-edge/src/native-page-engine/browse-session.ts:65-71` 其中一份）
-- [ ] 8.3 加回归：带群聊码后缀的评论上，判定方的等待窗口不短于执行方的命令预算；慢但成功的提交不会被判超时
-- [ ] 8.4 加回归：改动预算常量时只有一处声明变化，不存在第二份公式可以保留旧值
-  - 本轮未做（2026-07-29）：整节落 `aidcp-cloud`，本轮不碰该仓（三个提交全部落在 `aidcp-edge`）。需边缘侧 `browse-session.ts:65-71` 与云端 `facebook-edge-steps.ts:46-57` **同批**处置，归后续波次。
+> 整节四条落到 `docs/cloud-orchestration-residuals-descoped-2026-07-31.md` §B。
+>
+> **摘出的判据是「Rust 迁移碰过它没有」**：评论提交预算的公式云端与边缘各写了一份，
+> 这在 JS 时代就是两份，**迁移一行没碰过**。它的危害方向也是**诚实的**（错报失败：长评论被判超时），
+> 不是本批要处置的静默假成功 —— 这也是它此前被反复延后的真实原因。
+>
+> **摘出 ≠ 弃守**：零开工，缺陷仍在、立论仍成立，只是换了账本归属，待正式立项。
+>
+> **⚠️ 一个此前被写混的点，摘出时已澄清**：原抬头写「留待下一轮连同 3.2 一起做，两条是同一件事的两半」，
+> 这句**不准确**。§3 是**提交窗口**（引擎向宿主请求写窗口时长，纯边缘内部）；
+> 本节是**评论提交预算**（云端判定方的等待窗口 vs 边缘执行方的命令预算，跨仓）。
+> **不同的常量、不同的文件，只是主题相近。3.2 因此不受本次摘出影响，仍留在本 change。**
 
 ## 9. 验证 / 验收
 
@@ -117,7 +120,7 @@
   - 阶段性记录（2026-07-29）：`npm test` **2676 例 / 2675 绿 / 0 红 / 1 跳过**；`npm run typecheck` **通过**。另实测 `npm run build:dist` **通过**（`reachable=77 removed=68 legacy_page_rules=absent page_rule_fragments_guarded=11 source_maps=absent`）。change 未收口，本条不勾。
 - [ ] 9.3 `cd ../aidcp-edge/native/page-engine && cargo fmt --check && cargo clippy -- -D warnings && cargo test --locked`
   - 阶段性记录（2026-07-29）：`npm run gate:native` **通过**（fmt + clippy `-D warnings` + test），toolchain `1.97.1-aarch64-apple-darwin`。change 未收口，本条不勾。
-- [ ] 9.4 `cd ../aidcp-cloud && npm run test:acceptance && npm test && npm run typecheck`
+- [x] 9.4 `cd ../aidcp-cloud && npm run test:acceptance && npm test && npm run typecheck` <!-- 2026-07-31 **不适用**：本条存在的唯一理由是 §8 的云端改动，而 §8 已随本次裁定摘出（见该节抬头）。**本 change 至此零云端改动**，跑云端测试没有对象。若将来重新纳入云端工作，本条须跟着回来。 -->
   - 本轮不适用（2026-07-29）：第 8 节整节未做、`aidcp-cloud` 零改动，故未跑云端闸。第 8 节落地时补跑。
 - [x] 9.5 在本文件记录 1.2 对账检查的完整输出（命令名 + 不匹配回执名 + 结论），以及冻结清单的初始条目数；后续 change 只许该条目数下降 <!-- aidcp-edge 74eaf41 完整输出与冻结清单条目数如下 -->
 
