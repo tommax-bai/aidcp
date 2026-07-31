@@ -57,7 +57,8 @@
 - [x] 6.2 工具链或组件缺失时脚本 MUST 非零退出并写明「解析到哪个工具链、缺哪个组件」，MUST NOT 记为跳过或非阻断 <!-- aidcp-edge be0a8be 失败文案同时写明安装命令 -->
 - [x] 6.3 新增一条聚合脚本 `gate:native`，串起 6.1 三项，供集成闸单点调用 <!-- aidcp-edge be0a8be gate:native = fmt + clippy -D warnings + test -->
 - [x] 6.4 在 `.github/workflows/` 新增一个按 push / PR 触发的检查流水线，跑 `npm test`、`npm run typecheck`、`npm run gate:native`；现有 `build-desktop.yml` 保持手动触发的出包职责不变 <!-- aidcp-edge be0a8be 新增 checks.yml（typecheck / 验收 / 全量 / gate:native）；build-desktop.yml 职责不变，仅修其工具链安装方式（见 6.6 订正） -->
-- [ ] 6.5 在控制仓 `scripts/land-change`（当前第 38-42 行只跑 `test:acceptance` / `npm test` / `typecheck`）补上：当被集成的仓存在 `gate:native` 脚本时一并运行
+- [x] 6.5 在控制仓 `scripts/land-change`（当前第 38-42 行只跑 `test:acceptance` / `npm test` / `typecheck`）补上：当被集成的仓存在 `gate:native` 脚本时一并运行 <!-- aidcp 4d3afde5 抽出 has_script 判据，gate:native 跑在 typecheck 之后（它最慢）；失败文案改成点名三者 -->
+  - **首跑即证明它有用**：接线后第一次真集成（本 change 自己）就被它拦下——8.4 的改动没过格式检查。若没有这道闸，那次会直接合进默认分支。
   - ~~【阻塞】改动影响全车队的集成闸（控制仓 `scripts/land-change`），本轨未做。解锁条件：由主 session / fleet 层统一改并周知。~~ **已解除，2026-07-31 落地**：在 `test:acceptance` 的同款「有该脚本才跑」条件式后追加 `gate:native`，跑在 typecheck 之后（它最慢）；失败文案一并改成点名三者。**这是让整套门禁真正生效的最后一步**——在它落地前，6.1–6.4 只在 CI 与人工调用时生效，合并路径上不强制。
   - **⚠️ 排序红线（落地时踩过一次，写下来防复发）**：本条接线之后，**每一次 edge 集成都会跑 Rust 门禁**，于是 8.4 / 8.5 那族绝对墙钟用例的约 12% 假红**直接变成集成闸的假红**。
     因此 **8.4 / 8.5 必须先落**（或同批落），否则等于给自己装了一道随机拦路。本轮已把这两条排在第一批的最前面。
@@ -90,7 +91,19 @@
 - [ ] 8.1 **【显式弃守 2026-07-31，见本节抬头】** 给退役路径用例（当前抽样 6 个文件 4717 行：`test/flows/publish-command-handlers.test.ts`、`test/browse/browse-session.test.ts`、`test/locating/engine.test.ts`、`test/browse/note-extractor.test.ts`、`test/flows/like-runner.test.ts`、`test/integration/publish-e2e.test.ts`）加统一标记，标记依据为「其被测模块出现在生产剪枝黑名单里」，MUST NOT 用 skip
 - [ ] 8.2 **【显式弃守 2026-07-31，见本节抬头】** 让套件收尾分别报出「生产路径覆盖 / 退役路径覆盖」两个计数
 - [ ] 8.3 **【显式弃守 2026-07-31，见本节抬头】** 加一条对账断言：生产剪枝黑名单新增条目时，指向该模块的测试文件必须已被标记为退役覆盖，否则失败
-- [ ] 8.4 修 `native/page-engine/src/facebook/publish_tests.rs:1006-1035` 的截止期用例
+- [x] 8.4 修 `native/page-engine/src/facebook/publish_tests.rs:1006-1035` 的截止期用例 <!-- aidcp-edge 0b2501f 四条截止期用例改用两个分离量级的常量（余量 1200ms / 慢探测 2500ms）+ 编译期断言钉住二者关系；生产代码零改动 -->
+  - **修法与「单纯抬预算」的区别（动手前必看，正是本条子项④预警的那个坑）**：没有把预算调大——那只是把赌局挪个位置。改成**两个量级分离**：
+    ① `DEADLINE_HEADROOM_MS`（1200ms）给「不该被跨过」的前置步留出远超调度抖动的余量；
+    ② `SLOW_PROBE_DELAY_MS`（2500ms）让「该被跨过」的那一步由**假服务端自己的睡眠**跨过——睡眠只会随负载变长，方向永远站在断言这边。
+    ③ 加 `const _: () = assert!(SLOW_PROBE_DELAY_MS > DEADLINE_HEADROOM_MS)`，防止后人把两个数一起调回去。
+    子项④点名的「50ms 预算把帧预算算成 1、靠指针降级路径才过」也随之解除：提交那条现在跑正常多帧手势，仍只派发一次抬起。
+  - **归因验证（不是「改完全绿」，是「证明旧代码在同样负载下会红」）**：把改前 / 改后两个测试二进制各跑一遍同一套并发探针（
+    `flake-probe.sh`，N 路并发跑整个单测二进制、数整轮红）。**改前：8 路并发 40 跑红 10（25%）**，红的正好是本条点名的三条；
+    **改后：8 路 40 跑零红、16 路（2× 核数）48 跑零红**。两个二进制先 `cmp` 确认不同，排除「有一边没重编」这种自证。
+- [x] 8.5 ~~按同一模式清理 `native/page-engine/tests/fake_cdp.rs` 里的 `unix_time_ms() + N` 绝对墙钟截止期~~ <!-- aidcp-edge 实测确认无需改动；本条以实测结案，无代码提交 -->
+  - **实测结案（2026-07-31）**：本条针对的那一族已于 `aidcp-edge 7f9ea7f` 修掉（子项⑤已记）。用与 8.4 同一套并发探针复测该测试二进制：
+    **8 路并发 32 跑零红**。既然没有可复现的假红，就不做「按同一模式清理」的预防性改写——那会动一批本来稳定的用例、且没有任何判据能证明改对了。
+    若日后它开始红：机制与修法已写在 `publish_tests.rs` 顶部的注释里，照那个形态改即可。
   - **频率与范围实测（2026-07-30，由 `restore-native-actuation-humanization-and-locating` 的第五波回写；本条仍归本 change 处置）**：
     ① **范围比本条原文大**：不止 `:1022` 那一条。同族至少三条 —— `select_mode_reports_ambiguous_after_one_unconfirmed_click`（`:659`，`unix_time_ms() + 150`）、
     `select_mode_is_ambiguous_when_post_click_confirmation_crosses_the_deadline`（`:728`）、`submit_does_not_confirm_when_the_submitted_probe_crosses_the_deadline`（`:1007`，`+50`）。
