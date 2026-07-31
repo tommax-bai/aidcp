@@ -30,4 +30,5 @@
   <!-- Focused TypeScript auth/router/assembly tests passed 47/47; Native Facebook auth integration tests passed 5/5; Edge typecheck and Rust formatting checks passed. -->
 - [x] 5.2 Run focused Facebook auth tests, typecheck, acceptance, full Edge, Native, staged-artifact, and strict OpenSpec gates.
   <!-- Acceptance passed 31/31; full Edge tests passed 2888 with 0 failures and 1 gated E2E skip; Native fmt/clippy/test passed; the focused Native Facebook auth suite passed 5/5 after its final assertion; staged Native artifact verification and strict OpenSpec validation passed. -->
-- [ ] 5.3 Record follow-up commits, validation evidence, integration/push status, and the no-package/no-live-account boundary.
+- [x] 5.3 Record follow-up commits, validation evidence, integration/push status, and the no-package/no-live-account boundary.
+  <!-- aidcp-edge 0a211aa and aidcp 5c344dce were integrated and pushed to origin/master and origin/main respectively after all task 5.1/5.2 gates passed. This closeout record lands in a follow-up control-only commit. No desktop package/install and no browser input, lifecycle mutation, or live-account action were performed. -->
