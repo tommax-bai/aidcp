@@ -126,8 +126,11 @@
 - [x] 9.2 Run physical Edge dependency installation, focused tests, required safety acceptance suites, full tests, typecheck, and production build.
   <!-- aidcp-edge 317cd47: physical npm tree; focused 33/33, acceptance 29/29, rebased full 2235/2235, typecheck, build:dist, Rust 40/40, rustfmt, and clippy -D warnings passed. No live or packaged-app validation. -->
 - [ ] 9.3 Run package-input graph checks, packaged smoke tests, signature verification, and leakage scans for locally produced artifacts; record Windows and alternate-architecture CI evidence separately.
-- [ ] 9.4 Run the authorized read-only live Xiaohongshu matrix across home/explore/search/note/profile/notification/error/login-observable states and record exact post-conditions.
-- [ ] 9.5 Run live write/action validation only under separate target-specific authorization, covering interaction and publish ambiguity without broadening the authorized action scope.
+> **9.4 / 9.5 已移出本清单（2026-07-31 用户裁定）** —— 授权范围内的小红书只读实况矩阵与写 / 动作验收
+> 已收拢到 `docs/real-machine-acceptance-backlog.md` **簇 125**（125.1 / 125.2），不再计入本 change
+> 的任务数、不再阻塞归档。簇 125 与簇 122 / 123 共用同一台机器与分身，一次真机 session 连着验。
+> **口径不变**：登记 ≠ 已验证；小红书侧自 Native 迁移以来真机零覆盖。
+
 - [x] 9.6 Update this checklist with repository commits, validation evidence, deviations, and package availability; run `openspec validate native-page-engine-production-cutover --strict`.
   <!-- aidcp control + aidcp-edge 317cd47: checklist records completed source gates and explicitly leaves cache/humanization completeness, all-command fixtures, cross-target package/signature, live read/write, and installer release unchecked. Strict validation passed. -->
 - [x] 9.7 Integrate and push the clean control and Edge changes under the repository workflow. Build or publish a customer installer only after separate explicit release authorization.

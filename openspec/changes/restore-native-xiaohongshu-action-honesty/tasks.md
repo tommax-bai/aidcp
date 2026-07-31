@@ -86,7 +86,7 @@
   - 未落的那一项：**真正的逐字输入**。原因与 2.1 偏离说明②同源——逐字输入原语（`native/page-engine/src/input.rs`）是 CDP 层原语，只能从 Rust 平台语义臂调用，而 `publish_fill_field` 落在 `engine.rs` 的通配分支、整条命令在注入的页面 JS 里跑完。当前是「分块增量 + 合成 KeyboardEvent 回车」，不是硬件级按键。接线归并行 change `restore-native-actuation-humanization-and-locating` 的 8.1 / 8.3（其 8.3 对回车与归尾确认的要求比本条更严：连续两次命中才算稳定、超时清空正文）。**本条在那条接线落地前不得勾选**。
 - [x] 3.2 依据 `openspec/specs/publish-submit-integrity/spec.md`「成功判定锚定真实成功信号」，把提交成功判据从全页文本/地址正则改为绑定本次草稿的真实成功信号；已派发未确认回 ambiguous 并记录已派发（参照 flows/publish-command-handlers.ts:1332-1432；穿闭合 shadow 定位 + 只认成功文案 + no_target 时 submitDispatched 保持假 — 见 oracle.md ③） <!-- aidcp-edge 19d4872 地址判据删除；只认成功文案且先记点击前的同款文案基线（陈旧文案不算本次证据）；15s 有界轮询；找不到/禁用/点不动三态 submitDispatched 保持假 + not_started，已派发未确认回 ambiguous 且 submitDispatched=true -->
   - 偏离说明（2026-07-29）：① **穿闭合 shadow 定位未做**（oracle ③ 里的那一条）：目标改为「文案恰为『发布』或『定时发布』、排除暂存/离开/草稿、只取叶子、同时命中多个取最靠右」，未做 shadow 穿透。若真机上发布按钮落在闭合 shadow 里会退化为 `publish_submit_not_found`（诚实未命中、`submitDispatched` 保持假，不会假成功），需真机复核后再决定是否补。② 成功文案词库为 `发布成功|发布中|笔记已发布|笔记发布成功|成功发布|稍后可在`，中文单语；未确认的错误码用 `post_validate_failed`。
-- [ ] 3.3 更新 `docs/real-machine-acceptance-backlog.md` 中「小红书逐字输入辅助未受影响」这条已失效的记述所在条目（70.6），改为指向本 change 的真机验收项；不改动该文件其他簇
+- [ ] 3.3 更新 `docs/real-machine-acceptance-backlog.md` 中「小红书逐字输入辅助未受影响」这条已失效的记述所在条目（70.6），改为指向本 change 的真机验收项；不改动该文件其他簇 <!-- 2026-07-31 指针订正：本 change 的真机验收项已按用户裁定移出本 tasks.md，现落在同一文件的**簇 125**（小红书 Native 切换）。本条要改的 70.6 指向应写簇 125，不再写本清单的 5.x 编号 -->
   - 进度说明（2026-07-29）：本轮**未做**。该文件在控制仓、不在本轮 edge 提交面内；且 3.1 的「逐字」那一半尚未落地，条目 70.6 的记述要指向的真机项此刻还不完整，宜与 3.1 一并收口。
 
 ## 4. aidcp-edge — 验证（代码级）
@@ -108,19 +108,17 @@
 - [ ] 4.6 通电对账（承接方不落地即不算修好）：确认小红书未读信号在运行路径上确有发送方——当前边缘全仓仅协议定义（`src/comm/protocol.ts:110/1965`）与验收测试出现 `notification.detected`，而云端整条巡视链的唯一触发源就是它（`aidcp-cloud/src/agents/notification-gatekeeper.ts:48`、`src/orchestrator/role-dispatcher.ts:2062`）。未落地则在此记录为阻断依赖，并明确写下「通知抽取 / 清零 / 计数类修复已实装但生产未通电」，**不得按已生效结案**
   - 进度说明（2026-07-29）：本条**仍未达成，且现在有了确切的阻断形状**。2.9 落地后，未读读数在页面规则与 Rust 探针与宿主解析三层都已具备（`19d4872`），但宿主 `client.ts` **只加了类型与解析、没有任何调用点**，周期探针的平台化放开归承接方 `restore-native-xiaohongshu-session-guards`（其 1.2）。因此：**「通知抽取 / 清零 / 计数 / 未读读数」四类修复均已实装，但生产未通电**——边缘全仓仍无 `notification.detected` 的发送方，云端整条巡视链的唯一触发源仍悬空。本条按阻断依赖登记，**不得按已生效结案**。
 
-## 5. 真机验收项（必须真机才能定论，不得当成已确认事实）
+## 5. 真机验收项 —— **已移出本清单（2026-07-31 用户裁定）**
 
-- [ ] 5.1 **开帖是否真的落到错误页**：在 dev、tom 分组账号上从首页封面开一篇笔记，记录开帖后地址是否带访问令牌、返回详情正文是否为空。若单页应用拦截了程序化点击、导航仍走内部路由，则本条降级为指纹问题，2.2 的证据要求不变；若确认落错误页，追加实装任务：开帖改用可信指针输入触发就地弹层（参照 docs/xhs-layout-states.md:58-62 与 oracle.md ①：裸链 300031 结论出自 2026-06-27，Native 路径未复核）
-- [ ] 5.2 **看图挂起是否复现**：真机跑一次详情深读，确认是否出现「看图这一步一直挂着直到会话看门狗杀场」的实例。复现则登记独立跟进项：云端深读等待表加有界超时（`aidcp-cloud/src/agents/deep-reader.ts`）；未复现则记录为未复现，不做云端改动（参照 oracle.md ⑤：旧实现两种出口都是 action.completed，深读挂起源于回执缺失）
-- [ ] 5.3 **点赞类翻转窗口**：真机测量点赞 / 收藏 / 关注的状态翻转耗时分布，确认 2.6 的有界窗口上限足够；记录实测值，不写进 spec（参照 oracle.md ⑥a：旧注释实测翻转 300–600ms、上限 1500ms，可作窗口起点）
-- [ ] 5.4 **通知去重折叠的真实规模**：真机跑一次含同一发送者多条通知的巡视，确认修复前后处理条数差异；当前只有代码与旧注释对照，无线上数据（参照 oracle.md 去重键条：主页链 per-user 折叠 + 云端两条消费路径受影响不同）
-- [ ] 5.5 **通知行选择器**：在真机上 dump 一次通知页结构，确认 2.7 采用的容器结构与当前平台一致；结构若已变，以本次 dump 为准并记录（参照 oracle.md 行选择器条：`.tabs-content-container > .container` 与 `note-id` 属性出自 2026-06-24 dump，须重测）
-- [ ] 5.6 **评论合成文本的编辑器行为**：真机发一条含联系方式串码的评论，确认合成后的完整文本被平台原样接受（不被自动补全劫持、不被截断）（参照 oracle.md ②：串码 verbatim 整段插入、不 trim、避开 @/# 补全劫持）
-- [ ] 5.7 把 5.1–5.6 按共享真机环境聚成簇，登记进 `docs/real-machine-acceptance-backlog.md`，并在登记时标注与 `native-page-engine-production-cutover` 真机验收项 9.4 / 9.5 的依赖关系（该 change 的 `tasks.md` 由其属主更新，本 change 不改）
-
-- [ ] 5.8 **未读角标判据是否仍成立**：在宽（左侧栏）与窄（底部图标栏）两种布局各测一次，确认取到的是可见入口、无未读时不误报、数字角标与无数字红点都认出。判据出自 2026-06-23 校准、窄布局曾真机实测漏报 10 条未读，距今一月余，**不得当成已验证事实**（参照 oracle.md 未读监测体条的双布局遍历告警）
-- [ ] 5.9 **清零是否真收敛**：在真机上制造多于一屏的未读，确认 2.10 的滚到底循环 + 2.12 的真实角标计数合起来能让该栏计数真归零、三栏清零循环能正常结束；桩验不了平台的真实加载与角标更新（参照 `openspec/specs/notification-monitoring/spec.md`「循环直到三栏清零」）
-- [ ] 5.10 把 5.8–5.9 一并纳入 5.7 的簇登记（5.7 按原文只涵盖 5.1–5.6，本条补齐本次新增的两项，避免漏登）
+> 原 5.1–5.10 共 10 条已统一收拢到 `docs/real-machine-acceptance-backlog.md` **簇 125**
+> （小红书 Native 切换：只读矩阵与写动作验收），不再计入本 change 的任务数、不再阻塞归档。
+> 簇 125 与已有的**簇 122 / 123 是同一台机器、同一个分身**，三簇应在一次真机 session 里连着验。
+>
+> **原 5.1 里夹带的实装分支已随条目一并搬走**（簇 125.3）：若真机确认开帖落错误页，
+> 须追加「开帖改用可信指针输入触发就地弹层」的实装任务——这条不因本节移出而消失。
+>
+> **口径不变**：登记 ≠ 已验证。小红书侧自 Native 迁移以来**真机零覆盖**，
+> MUST NOT 因本 change 归档而读成「验过了」。
 
 ## 6. 控制仓收口
 
@@ -131,7 +129,7 @@
 - [ ] 6.4 在本清单回写 Edge 与控制仓的 commit sha、偏离说明，以及与并行 change 的重叠文件（Facebook 路由 / 微信适配器 / 协议四处同步文件本 change 不碰）
   - 进度说明（2026-07-29，**分波回写中，change 未收口故不勾选**）：Edge 侧 sha 已逐条落在各任务行尾。截至第二波，本 change 在 `native-migration-repair` 上的提交为 —— 第一波 `552eda1`（1.1–1.3 / 1.12 用例与夹具）、`8b99183`（2.1 / 2.2）；第二波 `a45fc81`（1.13–1.19 用例）、`19d4872`（2.3–2.15 / 3.2）。**控制仓 sha 待本文件提交后补**。重叠文件实测：本 change 碰了 `native/page-engine/src/{engine.rs,model.rs,probe.rs,xhs.rs}` 与宿主 `src/native-page-engine/{browse-session.ts,client.ts}`，前四者中 `engine.rs` 与 `restore-native-xiaohongshu-session-guards` 共写、后两者是该 change 的单写区边缘（见 6.5）；`input.rs` / `facebook/**` 与并行 change `restore-native-actuation-humanization-and-locating` 的改动面在本波**零交叉**（该 change 的 `3a1b2b3` 只动 Rust 的 input/locating/facebook 三处，与本 change 的 xhs 路由与 probe 不相交）；协议四处同步文件、Facebook 路由、微信适配器**全程未碰**。
 - [ ] 6.5 与 `restore-native-xiaohongshu-session-guards` 再对两处集成边界（本次覆盖漏洞收口新增）：① 2.9 若落在 `xhs-page-probe.js` / `probe.rs`，与该 change 的 1.2 / 1.3（周期探针平台化、按页面类型分类）读同一份探针输出，字段增删须同时过它们的判据；② 2.11 若走宿主补发回执，与该 change 的 4.1（`src/native-page-engine/browse-session.ts` 逐命令诊断改平台中立）同文件。集成前 `git fetch` + rebase，跑 `cargo test` 与 `npm test` 后再合，在此记录对账结果
-- [ ] 6.6 在本清单记录本次「参照书覆盖漏洞」收口的处置结论：就地补任务 = 1.13–1.19 / 2.9–2.15 与新增真机项 5.8–5.10；范围外具名交接 = 4.5（承接方 `restore-native-xiaohongshu-session-guards`）；通电对账 = 4.6。三类都必须有结论，不得留空
+- [ ] 6.6 在本清单记录本次「参照书覆盖漏洞」收口的处置结论：就地补任务 = 1.13–1.19 / 2.9–2.15 与新增真机项 5.8–5.10；范围外具名交接 = 4.5（承接方 `restore-native-xiaohongshu-session-guards`）；通电对账 = 4.6。三类都必须有结论，不得留空 <!-- 2026-07-31 指针订正：文中的「新增真机项 5.8–5.10」已移出本 tasks.md，现落在 `docs/real-machine-acceptance-backlog.md` **簇 125.9 / 125.10**（原 5.10 是登记动作、随移出一并关闭）。记处置结论时按簇号写 -->
 
 ## 边缘诚实性缺口清单（2026-07-30 用户裁定「要做」，本 change 是主要属主）
 
