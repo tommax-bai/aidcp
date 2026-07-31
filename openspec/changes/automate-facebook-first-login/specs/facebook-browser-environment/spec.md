@@ -46,6 +46,11 @@ The first-login reconciler MUST treat login submission, 2FA entry, 2FA submissio
 - **THEN** Native dispatches no new input for that observation
 - **AND** the coordinator MUST NOT replay the same signal id
 
+#### Scenario: Long page URL retains a bounded document generation
+- **WHEN** a supported Facebook page has a long page-controlled query string
+- **THEN** Native represents the document generation with a fixed bounded value whose size is independent of the raw URL length
+- **AND** the value remains stable for the unchanged document and URL state, changes after a full navigation or route/query transition, and does not expose the raw query
+
 #### Scenario: Login submission requires AdsPower-filled fields
 - **WHEN** the exact visible Facebook login form is uniquely identified
 - **THEN** Native MAY submit it only after confirming the username and password fields are non-empty and the submit target is topmost
@@ -64,6 +69,15 @@ TOTP assistance SHALL use a fresh Facebook server-time observation and a 30-seco
 - **WHEN** at least 10 seconds remain and a profile-bound TOTP code is available
 - **THEN** Native enters the code and verifies input readback as the only action for that observation
 - **AND** submission requires a later fresh `totp_submit_ready` observation
+
+#### Scenario: Associated label identifies the unique 2FA input
+- **WHEN** a confirmed Facebook 2FA page has one visible editable text input whose own attributes have no code meaning but whose browser-associated `label` has exact 2FA code meaning
+- **THEN** Native recognizes that input through the `HTMLInputElement.labels` association, including `for`/`id` or a wrapping label, without hard-coding a dynamic id
+- **AND** it emits an entry signal only when the matching input is unique and topmost
+
+#### Scenario: Nearby text does not label an input
+- **WHEN** 2FA wording is present elsewhere on the page but is not browser-associated with a visible editable input, or more than one associated input matches
+- **THEN** Native emits no actionable TOTP input signal and dispatches no input
 
 #### Scenario: Code becomes stale before submission
 - **WHEN** the 2FA submit signal is observed but fewer than 10 seconds remain or the server-time window differs from the entered-code window

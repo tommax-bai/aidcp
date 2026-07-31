@@ -83,6 +83,12 @@ Facebook's own push-notification alertdialog and Remember Password modal are pag
 
 The reconciler uses the existing startup login-wait budget and lifecycle cancellation. `authenticated` only ends assistance, and it may be emitted only when the Facebook cookie jar contains both a non-empty `xs` value and a numeric `c_user` value that satisfies the same Facebook-domain and stable-user-id checks as the identity reader. Cookie names, blank placeholder values, or a non-numeric `c_user` are not authentication evidence. The existing identity reader must still produce the stable account id, and existing override/mismatch rules still apply. CAPTCHA, unfamiliar checkpoints, missing credentials, rejected TOTP, ambiguous controls, timeout, and cancellation terminate honestly before Cloud connection or account-scoped work.
 
+### 7. Bound document generations and use explicit 2FA label associations
+
+The document generation remains part of every actionable signal id because a stable CDP target does not prove that the observed page or SPA route is unchanged. Its representation must therefore be stable for one unchanged document/URL state, change after a full navigation or route/query transition, and remain fixed-size regardless of page-controlled URL length. The Native router derives a bounded digest from the full origin, path, and query and combines it with the document time origin; it does not embed the raw query in the observation. The existing protocol size limit remains a defensive validation boundary rather than becoming dependent on Facebook URL length.
+
+Inside an already confirmed Facebook 2FA context, the Native router may recognize a visible editable text input from the exact labels associated by the browser's `HTMLInputElement.labels` relation. This covers both `label[for]`/`input[id]` and a wrapping `label` without hard-coding Facebook's dynamic ids. Nearby or page-wide text is not an association. The candidate must still be unique and topmost; no candidate or multiple matching candidates fails closed.
+
 ## Risks / Trade-offs
 
 - **Facebook markup or wording changes** → Exact structural detection fails closed and reports a safe reason; no generic text guessing or fallback click is added.
@@ -92,6 +98,8 @@ The reconciler uses the existing startup login-wait budget and lifecycle cancell
 - **A valid signal reappears later** → The new document/signal observation can be handled once; the same unchanged observation cannot be acted on twice.
 - **Server-time sampling fails** → TOTP assistance stops without falling back to unchecked local time.
 - **AdsPower or Chromium exposes placeholder auth-cookie entries** → The auth probe applies the same numeric `c_user` validity rule as stable identity and additionally requires a non-empty `xs`; cookie names alone never suppress login assistance.
+- **Facebook emits long page-controlled checkpoint queries** → Document generations stay fixed-size and retain full URL-state sensitivity without returning the raw query through the Native protocol.
+- **The 2FA input exposes meaning only through an associated label** → Native reads the browser-defined label relation only inside the confirmed 2FA context and still requires one visible, editable, topmost candidate.
 
 ## Migration Plan
 
