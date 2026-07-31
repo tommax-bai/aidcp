@@ -50,6 +50,11 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > content 439 / kernel 59 / transport 36，全 0 fail；六仓对账零漂移。
 > tasks.md `59/113`。
 > **⚠️ 门 12 → 11**——本 change **第一条真靠接线消掉的**（前两条撤条一条是记错属主、一条是重复计数）。
+>
+> **2026-07-31 第三批**：`e703b66`（task 2.4d 媒体半——FB 发帖素材接线 + 两条「没做成」变可数），
+> **dev 第十二批已部署**。六仓：cloud `e703b66` / kernel `ac98a30` / transport `259001b` /
+> api `8a67d1e` / automation `c2c6ff7` / content `ad6eeed`；测试 cloud 4037 / api 496 /
+> automation 1966 / content 439 / kernel 59 / transport 36，全 0 fail。tasks.md `61/115`。**门仍 11。**
 
 **2026-07-30 17:00 实测期望值：**
 
@@ -117,7 +122,7 @@ rsync → `migrate status`（待应用恰好 3 条）→ `migrate up`（0100/010
 | `feishu-operator-dispatch-start-stop` | 指令 | **只接了服务端**；api 侧卡在签名（面板的状态灯是同步布尔，远端读是异步三态）——见 tasks 1.3a，需拍板 |
 | `content-concept-write-authority` | 内容 | **生产消费者已补齐**（`3fe4b94`，task 2.4a）：只差 §3 段的 `main()` 把客户端喂进去。**撤条属第 4 段**，见下 |
 | `content-curated-write-authority` | 内容 | **读写两半的通道都已就位**（`b7f24a0`：新 kernel 写口 5 方法 + 传输三件套 + content 侧注册 + 组装根四处按模式注入）；同概念池那条，只差 §3 段的 `main()` |
-| `content-facebook-publish-media-authority` | 内容 | 契约已写，**路由未注册、未接线** |
+| `content-facebook-publish-media-authority` | 内容 | **已接线**（`e703b66`）：路由已注册、客户端按模式取、两个消费点都改指（含那处最容易漏的组装根直调）。同概念池/精选那两条，只差 §3 段的 `main()` |
 | `content-token-usage-authority` | 内容 | 契约已写，**路由未注册、未接线**；端口是「提交已合并的增量」而非逐条上报，**属主今天没有这个方法** |
 | `content-textcard-transcription-authority` | 内容 | 能力二态端口已写，未接线 |
 | `content-generic-llm-authority` | 内容 | 待岔口 A 落地（tasks 2.5） |
@@ -195,6 +200,19 @@ publishLog 4a 端口，而自动化根**已经**构造着它的客户端；那�
 ⇒ 「同一套逻辑只许有一份」这类不变量，**必须有结构断言**（取用方 MUST import 公共模块 +
 MUST NOT 自己定义同名函数），且要按**符号**判、不按文本片段判（后者换个函数名就绕过去了）。
 新增任何 content 属主端口三件套时，取用方一律取 `content-authority-wire.ts`，别复制第三份。
+
+### 4.2c 那份派生私有的分叉，2026-07-31 一天内咬了两次（§4.7 的具体验证）
+
+`aidcp-automation` 里带 `// aidcp:test-owner=derived` 的那份 `composition-root-4a-mode-wiring.test.ts`
+是**永久手写分叉**，中控侧的任何改动都到不了它。这一天它拦了两次，两次都不是靠什么机制提醒：
+
+- **撤台账那次**：它把台账条数**写死成 12**。撤条后它是唯一当场红的东西——
+  也就是说，如果那个数字当初没写死，三份台账会静静地对不上。
+- **同步别人的改动那次**：上游 kernel 契约新增了一个字段（另一路 change 的慢启动改动），
+  这份分叉里的手写夹具没跟上，**typecheck 碰巧接住了**。碰巧——它接住的是类型，
+  不是「这份分叉落后了」。
+
+⇒ 动中控侧的台账 / 契约 / 探针时，**当场去 automation 那份看一眼**，别指望它会自己报。
 
 ### 4.3 内容侧监听上还剩一处口径分裂
 
@@ -308,15 +326,15 @@ systemd 只有 `Restart=on-failure` / `RestartSec=5`、无 OnFailure、机器上
 
 1. ~~**2.4b · 精选写口**~~ ✅ **已做**（`b7f24a0`）：kernel 五方法写口 + 传输三件套 + content 侧注册
    + 组装根四处按模式注入，**并据此撤掉了 `content-role-factories`**（门 12 → 11）。细节见 tasks 2.4b / 2.4b-1。
-2. **2.4d · 结清接线欠账剩下的七条**（`CONTENT_MEDIA_USAGE_WIRING_DEBT`，已结清的三条在 `_CLOSED` 里）。
-   两组分开：**FB 发帖素材组纯 cloud 侧、可直接做**（三条：静默 `return` 换响亮取用闸、
-   写失败后素材永久卡保留态、组装根那处直调不走窄口）；
-   **用量记账组先要两个决定**（属主补方法还是交适配对象、automation 侧合并缓冲落在哪），
-   债⑥自己写着「落点由接线方裁定」⇒ 那是决策不是落地，且带硬约束：**传输失败 MUST NOT 重投**。
-3. **2.5 的 A 半**（模型出口进 `aidcp-transport`）——B 半已随 0.7 + 2.4b 全部了结，本条只剩 A 半。
+2. ~~**2.4d · FB 发帖素材组**~~ ✅ **已做**（`e703b66`）：路由注册 + 按模式注入 + 两个消费点改指，
+   并把两条「没做成」变成可数的（缺端口 / 写失败分开数）。**兜底回收扫描仍未做**（tasks 2.4d-回收）。
+3. **2.4d · 用量记账组**——**这一组是决策不是落地**：属主今天没有 `recordUsage`（补方法还是交适配对象？），
+   automation 侧还需要一个合并缓冲（落在哪？），债⑥自己写着「落点由接线方裁定」。
+   硬约束：可交换累加计数器，**传输失败 MUST NOT 重投**（重投即翻倍）。
+4. **2.5 的 A 半**（模型出口进 `aidcp-transport`）——B 半已随 0.7 + 2.4b 全部了结，本条只剩 A 半。
    **动手前先读 design §5.5.8**：裁决成立，但 0.4 记的理由有一条是错的。
    注意这是本仓最热的一条路径，且要动 transport 名册 + 三仓 pin。
-4. **2.6**（`ReplyWorkflow` 的 content 属主具体类实参）、**2.7**（传递性检查，特别点名 optional 参数）。
+5. **2.6**（`ReplyWorkflow` 的 content 属主具体类实参）、**2.7**（传递性检查，特别点名 optional 参数）。
 
 > **2.5 的 B 半（四个角色工厂）已于 2026-07-31 了结**，下面这段保留供追溯：归属改判**早已由 task 0.7 落地**——
 > 六个文件在归属表里已是 automation，也都进了 `aidcp-automation/src/`，design §2 点名要一并修的
