@@ -797,6 +797,36 @@
   <!-- 📌 **2.4 需要第三个工作区**（automation 的手写组装根，cloud 里根本没有这个文件）。
        派生仓的手写组装根从不同步，只能手工改 + 手工 land。 -->
 - [ ] 2.5 按岔口 A 的裁决落地模型调用出口；按岔口 B 的裁决落地四个角色工厂。
+  <!-- 📌 **2026-07-31 坐实现状，下一手别再按交接文档那句「裁决早拍过了，是落地不是决策」通读本条**——
+       那句话对 A 半成立，对 B 半**已经过期**。
+       **B 半（四个角色工厂）：归属改判早已由 task 0.7 全部落地。** 实测：
+       `concept-extractor-role` / `valuable-comment-archivist` / `curated-comment-evaluator` /
+       `curated-note-evaluator` / `content-role`（基类）/ `curated-gate` 六个文件在
+       `module-ownership.json` 里**已经是 automation**，且都已在 `aidcp-automation/src/` 里。
+       design §2 里点名要一并修的「假消边残留」也已消：`curated-note-evaluator.ts` 不再从
+       `cache/curated-content-store.js` 那个再导出壳取类型。
+       ⇒ **B 半剩下的不是「落地既有裁决」，是一个新问题**：`CONTENT_ROLE_FACTORIES`
+       （cloud `server.ts` 的模块级常量，也就是该台账条目的证据符号）今天**只剩一个 content 符号**——
+       `curatedStore as CuratedContentStore` 那一步窄化里的 `CuratedContentStore` 类型。
+       其余全部已归位：四个角色类与两个 Sink 类型属 automation，`TextCardTranscriber` 已取自 kernel。
+       **而那一步窄化的目标类型，正是 2.4b 要造的精选写口。**
+       ⇒ **`content-role-factories` 的前置是 2.4b，不是本条**；2.4b 落地后它才谈得上清。
+       （形态与 task 2.9 那条**像但不同**：2.9 是属主记错了、纯撤条；这条是真依赖，只是缩到了一个类型上。）
+       **A 半（模型调用出口进 transport）与 B 半互不依赖**，可单独开工；注意 §5.5.8 记着
+       「裁决成立、但 0.4 记的理由有一条是错的」，动手前先读那一段。 -->
+  <!-- ⚠️ **还有一层今天没人写下来的**：这套「opaque 句柄 + 注入工厂表」的存在理由是
+       **当时四个角色属 content、automation 不能静态 import 它们**。0.7 改判之后那个前提没有了——
+       角色调度器（automation）现在**可以**直接 import 这四个类。
+       所以将来可能不是「把工厂表搬进 automation 组装根」，而是**整层拆掉**。
+       但那会动掉 `RoleFactoryRegistry` 现在扛着的一道类型检查（工厂体 `new X(o)` 强制
+       「构造契约 → 角色真实构造签名」可赋值，2026-07-23 审计坐实过一次回归）。
+       **拆之前必须先想清楚那道检查搬去哪**，别顺手删。 -->
+  <!-- 📌 **本条今天不做的理由（明写，不是遗漏）**：B 半的前置是 2.4b（一个还没造的写口），
+       A 半是把模型出口整体搬进 `aidcp-transport` ——那是本仓最热的一条路径，
+       且要动 transport 名册 + 三仓 pin。两半都不适合塞在本轮尾巴上做。 -->
+
+  <!-- 以下两条为本轮实际落地的、2.5 之外的相邻工作，编号靠近以便追溯 -->
+
 - [x] 2.4a **落地位置已坐实（2026-07-30，接线批次之后顺带勘的；下一手照此开工，不必重查）。**
   <!-- aidcp-cloud 3fe4b94。segC 新增 `contentReadAuthority`：仅 `seamMode === 'automation'` 建
        `ConceptPoolAuthorityHttpClient` / `CuratedSelectionAuthorityHttpClient`（共用一个 InternalHttpClient
@@ -856,6 +886,56 @@
 - [ ] 2.4b **精选写口（`content-curated-write-authority` 剩下的那一半）**：为 `markBotAction`
   与精选能力在场判定补跨属主面，或明写它们由 2.5 的角色工厂岔口一并承接。
   **不能留空**——今天 segC 对属主实例的这两处用法没有任何端口覆盖，而条目名里的 write 指的正是它们。
+  <!-- 📌 **2026-07-31 坐实：这一条同时是 `content-role-factories` 的前置**（见 2.5 的注释）。
+       所需的写面已逐条数清（四个方法 + 一个在场判定）：
+       `CuratedNoteSink` 的 `upsertObservation` / `refreshReferenceImages` / `getTextCardContext`
+       （定义在 `src/agents/curated-note-evaluator.ts`，随 0.7 已归 automation）、
+       `CuratedCommentSink` 的 `archiveComment`（`src/agents/curated-comment-evaluator.ts`，同上）、
+       segC 的 `markBotAction`，外加 `curatedContentCapability` 那个在场判定。 -->
+- [x] 2.4c **结清 `CONTENT_MEDIA_USAGE_WIRING_DEBT` 里三条已可结清的**（接线的前置卫生）。
+  <!-- aidcp-cloud e9925f7 / transport 39b3c2c / automation 6da0e74 / api 9920ecd / content eb56863。
+       **债①（真做的）**：`content-authority-http.ts` 里那份与 `content-authority-wire.ts` 逐字相同的
+       私有译码副本已删、改指公共那一份，净减 141 行。
+       **结清前逐条比过两份实现：语义一致、尚未漂移** ⇒ 这次是防患不是修 bug，
+       而这恰恰说明为什么必须现在做——**行为测试永远发现不了它**（见下）。
+       只活在被删那份里的几句解释已折进保留的那份，一句没丢（kernel 对未知 reason 的规定、
+       在场探针为何只有属主侧有意义、`route_not_found` 为何是回落分支最现实的触发点、
+       版本不符为何刻意不判成能力缺口）。
+       **债⑧⑨（核对后发现早已做掉）**：两个 kernel 端口文件已在 `ownership-rules.json` 的
+       fileOverrides 与 `kernel-non-members.json` 的 kernelRoster 里；两个传输文件已在控制仓
+       `sync-split-repos` 的 TRANSPORT_MEMBERS 里。
+       三条**移入新的 `CONTENT_MEDIA_USAGE_WIRING_DEBT_CLOSED` 而不是删掉**（形态照
+       `operator-command-http.ts` 的同名清单）：删掉之后「做过了」与「从来没记过」长得一模一样，
+       而这三条里有两条落在别的文件里，下一个人无从判断该不该再做一遍。 -->
+  <!-- **变异实测，且这次的结论比用例本身更值得记**：在 `content-authority-http.ts` 里重新塞一份
+       私有 `ownerHasMethod` 副本 → **typecheck 绿、同文件五条往返用例全绿**，只有新加的那条结构守卫红。
+       ⇒ **复制出来的第二份在复制那一刻行为完全一致，行为测试原理上就看不见它**；
+       它要等到某天有人只改了其中一份、且**恰好在失败真发生的那一刻**才现形，
+       而失败路径正是最少被真跑到的那条。守卫按结构判（取用方 MUST import 公共模块 + MUST NOT
+       自己定义同名函数），不按文本片段判——后者换个函数名就绕过去了。用例注释写了「别当冗余删掉」。 -->
+  <!-- 六仓：cloud e9925f7 / kernel aa48c29（未动）/ transport 39b3c2c / api 9920ecd /
+       automation 6da0e74 / content eb56863。同步顺序照 §6.2：先 src、再 tests、最后按
+       kernel → transport → 业务仓抬 pin。测试：cloud 4024 / api 493 / automation 1961 /
+       content 439 / kernel 59 / transport 36，全 0 fail；六仓对账零漂移。
+       **content 仓这三个文件是零变更的**：它经 `aidcp-transport` **包**取注册函数，不自持副本；
+       自动化仓才是自持的那个（§6.3 的设计）。所以 content 只需抬 pin。 -->
+  <!-- 2026-07-31 15:28 已部署第十批（aidcp-cloud@e9925f7，仍是单体形态）。
+       备份 /opt/aidcp/cloud.bak.20260731-0010.tar.gz；package.json 零变更故未动 node_modules；
+       三属主 `migrate status` 均「待应用 0」，本批零新增迁移。
+       上机器逐条确认新代码真的到了（`content-authority-wire.js` 的 import 在、私有 `ownerHasMethod` 已不在）。
+       healthcheck 全过：active running、NRestarts=0；8787 / 8090 / 8091 三个监听全在；
+       三属主库各自 `select 1` 均回 1；飞书长连接已建立；ConceptStore / CuratedContentStore /
+       PublishScheduler / CommentScheduler / 面板 / 客户鉴权 全部打「已就绪」；
+       重启后错误行数 0，2 分钟 soak 后仍为 0。isales 四服务全程 active、未触碰。
+       **本批是纯结构收敛，现网行为逐位不变**（删的是一份与保留那份逐字相同的副本）。ol 未部署。 -->
+- [ ] 2.4d **接着结清 `CONTENT_MEDIA_USAGE_WIRING_DEBT` 剩下的七条**（真正的接线）。
+  两组分开做，依赖不同：
+  **FB 发帖素材组**（债②③④）纯 cloud 侧：`publish-dispatcher.ts` 的那个静默 `return` 换响亮取用闸、
+  写失败后素材永久卡保留态要补可计数信号或回收扫描、`server.ts` 那处直调 `releaseReservation`
+  一并改指端口（它不走下发器窄口，只改窄口会漏）。
+  **用量记账组**（债⑤⑥⑦）先要两个决定：属主补 `recordUsage` 还是交适配对象；
+  automation 侧的合并缓冲落在哪。**债⑥自己写着「落点由接线方裁定」** ⇒ 这一组是决策不是落地，
+  且带一条硬约束：可交换累加计数器，**传输失败 MUST NOT 重投**（重投即翻倍）。
   <!-- **消费面早就不是问题**：0.6c / 0.6e / 0.6g 那批已经把四个注入面全改成 kernel 端口类型
        （`ConceptStorePort` / `SchedulerConceptStore` / `CuratedSelectionPort`），
        所以剩下的**只是组装根按模式注入哪一个实现**——与刚做完的委托那条**同形**。
