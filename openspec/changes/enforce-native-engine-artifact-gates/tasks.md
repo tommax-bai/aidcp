@@ -42,7 +42,7 @@
 - [x] 5.3 确认 `scripts/ensure-native-page-engine-dev.mjs:19-28` 的「verify 成功即 return verified、不重建」在 5.2 之后自动变成「源码变了就重建」，不再需要额外分支；如需改动则一并落地 <!-- aidcp-edge be0a8be 开发态「已校验」分支改由源码摘要决定；校验失败理由原样带进重建日志、不吞 -->
 - [ ] 5.4 复现并消灭已知实证：`touch native/page-engine/src/facebook-router/00-shared.js` 后跑 `node scripts/ensure-native-page-engine-dev.mjs`，改造前输出 `OK: unsigned target artifact verified ...` 且不重建；改造后必须触发重建。把改造前后的实测输出记进本清单
   - 【部分完成】判定逻辑已由用例证明（摘要随分片内容变化、同输入稳定），但**改造前后的实测对照未取到**：本工作区产物目录为空，需先做一次完整 release 构建才能跑这条对照。按「不当既成事实」口径保持未勾。解锁条件：在有已构建产物的工作区跑一次 touch 分片 → `ensure-native-page-engine-dev.mjs` 的前后对照并把输出记进本条
-- [ ] 5.5 在 `src/electron/native-page-engine-artifact.cjs` 的打包态校验里同步接受并校验新字段（缺字段视为不兼容清单）
+- [x] 5.5 在 `src/electron/native-page-engine-artifact.cjs` 的打包态校验里同步接受并校验新字段（缺字段视为不兼容清单） <!-- 2026-07-31 用户裁定「不打客户端安装包；需要打一次客户端才能验证的功能一律不做」，本条只在打包态生效（开发态走另一条校验路径），不出包即不可达，显式弃守。**同批的开发态那一半（5.1–5.4 的源码摘要强制重建）不受影响、仍是待办**。**不是已验证无问题，是不打算验。** 将来若决定出安装包，本条须先回到待办。 -->
   - 【阻塞】需改 `src/electron/native-page-engine-artifact.cjs`，该文件在本轨可改文件白名单外。解锁条件：由白名单属主放行或该文件属主接手
   - 【实装实测注记 · 落地时必看】该打包态校验**硬校验清单版本号恒等于 1**。因此 5.1 只新增了 `sourceDigest` 字段、**没有抬版本号**——先抬版本会让打包在 5.5 落地之前就炸。落地 5.5 时必须「先接受新字段、再考虑是否抬版本」，两步不可颠倒
 
@@ -88,9 +88,9 @@
 > **8.4 / 8.5 不弃守、留在本轮**——那一族绝对墙钟用例让主干门禁约 12% 概率红，是每一轮集成都要付的成本，
 > 与「工程整洁」不是一回事。日后若退役用例的假红真的开始误导判断，再单独立项。
 
-- [ ] 8.1 **【显式弃守 2026-07-31，见本节抬头】** 给退役路径用例（当前抽样 6 个文件 4717 行：`test/flows/publish-command-handlers.test.ts`、`test/browse/browse-session.test.ts`、`test/locating/engine.test.ts`、`test/browse/note-extractor.test.ts`、`test/flows/like-runner.test.ts`、`test/integration/publish-e2e.test.ts`）加统一标记，标记依据为「其被测模块出现在生产剪枝黑名单里」，MUST NOT 用 skip
-- [ ] 8.2 **【显式弃守 2026-07-31，见本节抬头】** 让套件收尾分别报出「生产路径覆盖 / 退役路径覆盖」两个计数
-- [ ] 8.3 **【显式弃守 2026-07-31，见本节抬头】** 加一条对账断言：生产剪枝黑名单新增条目时，指向该模块的测试文件必须已被标记为退役覆盖，否则失败
+- [x] 8.1 **【显式弃守 2026-07-31，见本节抬头】** 给退役路径用例（当前抽样 6 个文件 4717 行：`test/flows/publish-command-handlers.test.ts`、`test/browse/browse-session.test.ts`、`test/locating/engine.test.ts`、`test/browse/note-extractor.test.ts`、`test/flows/like-runner.test.ts`、`test/integration/publish-e2e.test.ts`）加统一标记，标记依据为「其被测模块出现在生产剪枝黑名单里」，MUST NOT 用 skip
+- [x] 8.2 **【显式弃守 2026-07-31，见本节抬头】** 让套件收尾分别报出「生产路径覆盖 / 退役路径覆盖」两个计数
+- [x] 8.3 **【显式弃守 2026-07-31，见本节抬头】** 加一条对账断言：生产剪枝黑名单新增条目时，指向该模块的测试文件必须已被标记为退役覆盖，否则失败
 - [x] 8.4 修 `native/page-engine/src/facebook/publish_tests.rs:1006-1035` 的截止期用例 <!-- aidcp-edge 0b2501f 四条截止期用例改用两个分离量级的常量（余量 1200ms / 慢探测 2500ms）+ 编译期断言钉住二者关系；生产代码零改动 -->
   - **修法与「单纯抬预算」的区别（动手前必看，正是本条子项④预警的那个坑）**：没有把预算调大——那只是把赌局挪个位置。改成**两个量级分离**：
     ① `DEADLINE_HEADROOM_MS`（1200ms）给「不该被跨过」的前置步留出远超调度抖动的余量；
@@ -126,12 +126,12 @@
 > `platform` / `arch` / 可执行文件名对不上即抛错）。**触发条件**：第一次真的要在 macOS 上出 Windows 包时回到本节；
 > 在那之前它零影响。留在待办里只是账面噪音，会让「剩余多少」这个数长期失真。
 
-- [ ] 9.1 **【显式弃守 2026-07-31，见本节抬头】** 把 `package.json` 的 `build.extraResources` 里 `build/native-page-engine/${platform}-${arch}` 与 `build/gost/${platform}-${arch}` 的平台来源改为目标平台（electron-builder 的 `${platform}` 宏在 `node_modules/app-builder-lib/out/util/macroExpander.js:34-35` 返回 `process.platform`，即构建主机平台）
+- [x] 9.1 **【显式弃守 2026-07-31，见本节抬头】** 把 `package.json` 的 `build.extraResources` 里 `build/native-page-engine/${platform}-${arch}` 与 `build/gost/${platform}-${arch}` 的平台来源改为目标平台（electron-builder 的 `${platform}` 宏在 `node_modules/app-builder-lib/out/util/macroExpander.js:34-35` 返回 `process.platform`，即构建主机平台）
   - 【阻塞】两个待改文件（`package.json` 的 `build.extraResources`、分平台打包配置）虽在白名单内，但改法要动分平台打包配置、**本机无法验证**（需真出包才能确认目标平台解析路径正确）。解锁条件：拿到一次真出包（或跨平台打包）的验证机会，见 11.7
   - ⏸ **【降级为「按 case 处理」，2026-07-30，用户裁定】不做，后面看 case。****已确认这样做是安全的**：即便在 macOS 上打 Windows 包踩中这条，也是**响亮失败、不会静默出错包** —— `scripts/after-pack.cjs` 的打包后置校验按**目标平台**（`context.electronPlatformName`）取值，`src/electron/native-page-engine-artifact.cjs` 直接比对产物清单里的 `platform` / `arch` / 可执行文件名，对不上即抛错（清单实测带 `"platform":"darwin"`、`"arch":"arm64"`）。**触发条件**：第一次真的要在 macOS 上出 Windows 包时回到本条；在那之前它零影响、不可能悄悄发货。
-- [ ] 9.2 **【显式弃守 2026-07-31，见本节抬头】** 在拷贝/解析阶段即校验目标平台资源存在，失败时报错写明「目标平台/架构、主机平台/架构、实际解析到的目录」；保留 `scripts/after-pack.cjs:235-238` 现有的目标平台后置校验作为第二道
+- [x] 9.2 **【显式弃守 2026-07-31，见本节抬头】** 在拷贝/解析阶段即校验目标平台资源存在，失败时报错写明「目标平台/架构、主机平台/架构、实际解析到的目录」；保留 `scripts/after-pack.cjs:235-238` 现有的目标平台后置校验作为第二道
   - ⏸ **【降级为「按 case 处理」，2026-07-30，用户裁定】不做，后面看 case。****已确认这样做是安全的**：即便在 macOS 上打 Windows 包踩中这条，也是**响亮失败、不会静默出错包** —— `scripts/after-pack.cjs` 的打包后置校验按**目标平台**（`context.electronPlatformName`）取值，`src/electron/native-page-engine-artifact.cjs` 直接比对产物清单里的 `platform` / `arch` / 可执行文件名，对不上即抛错（清单实测带 `"platform":"darwin"`、`"arch":"arm64"`）。**触发条件**：第一次真的要在 macOS 上出 Windows 包时回到本条；在那之前它零影响、不可能悄悄发货。
-- [ ] 9.3 **【显式弃守 2026-07-31，见本节抬头】** 加一条不出包的用例：以目标平台 `win32` 求解资源路径，断言解析结果与主机平台无关
+- [x] 9.3 **【显式弃守 2026-07-31，见本节抬头】** 加一条不出包的用例：以目标平台 `win32` 求解资源路径，断言解析结果与主机平台无关
 
 ## 10. aidcp（控制仓）— 护栏与在途工作收口
 

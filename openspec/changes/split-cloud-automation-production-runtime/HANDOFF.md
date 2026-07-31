@@ -68,7 +68,31 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > 取消（`remaining_cancelled_by_user`）、不点则停在 `awaiting_confirmation` **不自作主张往下走**。
 > 卡在这里这么久的原因是**两个错叠在一起**，都已处置，见 §5 那段说明。
 
-> **2026-07-31 第五批（本 session 末批，接手请以这一组为准）**：
+> **2026-07-31 第六批（本 session 末批，接手请以这一组为准）**：
+> **六仓**：cloud `8848c56` / content `2d289d0` / automation `9ce3511` / transport `f7746bd` /
+> api `ac6789f` / kernel `ac98a30`；控制仓 `7d55b7c`。**共享包未动 ⇒ 无 pin 变更。**
+> 测试 cloud 4043 / content 439 / automation 1967，全 0 fail；acceptance 179/179；六仓对账零漂移。
+> tasks.md `64/118`。**dev 已部署到 `8848c56`（第十四批）**：零新增迁移（三属主待应用均 0）、
+> healthcheck 全过、2 分钟 soak 错误 0、重启计数 0、三属主库各自 `select 1` 通过、飞书长连接已建立。ol 仍一次没动。
+>
+> **task 2.4d-用量：属主那一半做完了，调用方那一半改归第 3 段。⚠️ 这条改变了第 2 段剩余工作的形状，别按旧描述开工。**
+> - **「属主补方法 vs 交适配对象」不是二选一**：适配对象只有两条路，两条都违反端口写死的 MUST
+>   （复制 SQL ⇒ 第二份落库实现；走 add+flush ⇒ 用自己的钟重算桶起点、且回不出行数）。已补 `recordUsage`，
+>   与 `flush()` 共用同一段逐行落库；`flush()` 行为逐位不变。
+> - **「合并缓冲落在哪」本轮不用定，因为调用方不存在了**：2.4e 把视觉调用搬出自动化段之后，
+>   `content-token-usage-authority` 在**自动化段一条证据都不剩**（只剩 segA 的 `new:TokenUsageStore`
+>   与 segD 的 `identifier-use`）。真实调用点是模型客户端的 `onCall`，而那个客户端建在 segA、segA 每个进程都跑。
+>   **⇒ 缓冲的家是 automation 自己的 `main()`（tasks 3.1）**，写 3.1 时必须带上两条硬约束
+>   （swap 快照后失败即丢不重投；占位值逐字沿用属主那四条）——细节全在 tasks 2.4d-用量。
+> - **路由「现在没人调也注册」是有意的**：不注册，第 3 段写 main() 时才会发现对面没这条路由。
+> - **E1 已裁定**：segD 那条证据由 segA/segD 三分承接，**不由这条 content 端口承接**（端口刻意不开 api 侧方法）。
+>
+> **⚠️ 一条「看着是偶发、其实不是」的用例已修**（同批）：`/task 前缀…` 在今天两次全量里各红一次、
+> 单独跑与重跑都绿。真因是它把同一句话解析两次再深比较，而解析器不传时钟时用 `Date.now()` 算截止时刻，
+> 两次调用跨过 1 毫秒就不等。**已实测坐实**（强制跨毫秒必红、喂固定时钟必绿）。
+> 别把那个固定时钟删回去；下次再见到「只在全量红」的用例，先查它自己带不带时钟。
+>
+> **2026-07-31 第五批**：
 > **六仓**：cloud `7d921f6` / transport `f7746bd` / automation `26914d7` / api `ac6789f` /
 > content `4ec2fa3` / kernel `ac98a30`（未动）；控制仓 `985fab9`。
 > 测试 cloud 4040 / api 496 / automation 1967 / content 439 / transport 36 / kernel 59，全 0 fail；

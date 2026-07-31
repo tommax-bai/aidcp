@@ -116,7 +116,7 @@
   <!-- aidcp-edge 228e3e9 + 317cd47 + 87cd1ab: locked host build stages outside ASAR with engine/protocol/adapter versions, capability digest, platform, arch, executable, and SHA-256; darwin-arm64 worktree b919422... and canonical recovery 952ce40... artifacts verified locally. No installer was built. -->
 - [x] 8.4 Package Native outside ASAR, resolve it from `process.resourcesPath`, and add installed-artifact startup/health/command/shutdown smoke tests.
   <!-- aidcp-edge d7e178f + 317cd47 + 87cd1ab: extraResources, startup checks, afterPack smoke, and Electron dev/OL verify-or-rebuild bootstrap are wired and contract-tested; rustup resolves the crate-pinned toolchain when Cargo is absent from PATH. Final installer execution remains release gate 9.3. -->
-- [ ] 8.5 Extend CI packaging and nested signing/notarization to the Native artifact for supported macOS architectures and Windows x64; fail packaging when a required artifact is missing or incompatible.
+- [x] 8.5 Extend CI packaging and nested signing/notarization to the Native artifact for supported macOS architectures and Windows x64; fail packaging when a required artifact is missing or incompatible. <!-- 2026-07-31 用户裁定「不打客户端安装包；需要打一次客户端才能验证的功能一律不做」，本条是打包链本身（CI 打包 + 嵌套签名公证），显式弃守。**不是已验证无问题，是不打算验。** 将来若决定出安装包，本条须先回到待办。 -->
 - [x] 8.6 Add final ASAR/resources leakage scans for legacy module paths, representative selectors/rules, source maps, debug fixtures, and unredacted diagnostics.
   <!-- aidcp-edge 317cd47: final ASAR scanner accepts a clean Native facade fixture and rejects legacy paths/markers/maps; production dist reports legacy_xhs=absent and source_maps=absent. -->
 
@@ -125,7 +125,7 @@
 - [ ] 9.1 Run Rust formatting, unit/integration/acceptance tests, clippy, and release builds for every locally supported target; record unsupported cross-target checks truthfully.
 - [x] 9.2 Run physical Edge dependency installation, focused tests, required safety acceptance suites, full tests, typecheck, and production build.
   <!-- aidcp-edge 317cd47: physical npm tree; focused 33/33, acceptance 29/29, rebased full 2235/2235, typecheck, build:dist, Rust 40/40, rustfmt, and clippy -D warnings passed. No live or packaged-app validation. -->
-- [ ] 9.3 Run package-input graph checks, packaged smoke tests, signature verification, and leakage scans for locally produced artifacts; record Windows and alternate-architecture CI evidence separately.
+- [x] 9.3 Run package-input graph checks, packaged smoke tests, signature verification, and leakage scans for locally produced artifacts; record Windows and alternate-architecture CI evidence separately. <!-- 2026-07-31 用户裁定「不打客户端安装包；需要打一次客户端才能验证的功能一律不做」，本条的打包态冒烟 / 签名验证 / 跨架构 CI 证据三项都以出包为前置，显式弃守。**注意仍然成立、且已在做的是另一件事**：打包输入图检查与泄漏扫描的**本地构建那一半**由 `npm run build:dist` 覆盖（生产剪枝 + 分片禁入表），那一半不依赖出包、继续有效。**不是已验证无问题，是不打算验。** 将来若决定出安装包，本条须先回到待办。 -->
 > **9.4 / 9.5 已移出本清单（2026-07-31 用户裁定）** —— 授权范围内的小红书只读实况矩阵与写 / 动作验收
 > 已收拢到 `docs/real-machine-acceptance-backlog.md` **簇 125**（125.1 / 125.2），不再计入本 change
 > 的任务数、不再阻塞归档。簇 125 与簇 122 / 123 共用同一台机器与分身，一次真机 session 连着验。
