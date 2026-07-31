@@ -835,6 +835,39 @@
   <!-- 📌 **2.4 需要第三个工作区**（automation 的手写组装根，cloud 里根本没有这个文件）。
        派生仓的手写组装根从不同步，只能手工改 + 手工 land。 -->
 - [ ] 2.5 按岔口 A 的裁决落地模型调用出口；按岔口 B 的裁决落地四个角色工厂。
+  <!-- 📌 **2026-07-31 第二次坐实（本条下面那两个注释块已部分过期，先读这一段）。**
+
+       **B 半已全部了结**：2.4b 已落地，`content-role-factories` 已于 2026-07-31 撤条，
+       同批还撤了 `content-textcard-transcription-authority`（2.4e）与 `content-reply-generation-authority`（2.6）。
+       下面那句「B 半剩下的是一个新问题」**已过期**，别照它开工。
+
+       **A 半：物理搬迁 0.8 已完整做完（qwen.ts + providers.ts 已在包里、pin 已抬），还剩 4 件：**
+       - **A-1 `aidcp-automation` 新增 `aidcp-transport` 依赖**（0.8i，今天只 pin 了 kernel）。
+         ⚠️ `src/llm/*` 归属表里是 content，派生器**不会**把它拷进 automation 的 src ⇒ **只能走包**。
+         **会动 §6.2 的 pin 链，务必按「先 src、再 tests、最后抬 pin」的顺序**，倒过来做整条要重抬。
+       - **A-2 automation `main()` 里构造模型出口**（0.8j）——**被 task 3.1 挡**（automation 今天没有真 `main()`）。
+         三条硬约束：`import` 走 `aidcp-transport/llm/qwen.js`（**不是** `./llm/index.js`，那个桶文件有意不进包）；
+         `apiKey` **MUST 显式传**（不传会静默落空串，且构造非 dashscope 厂商时也会去读 dashscope 那个 env）；
+         密钥经属主侧窄读口取、**MUST NOT 复刻四层回落逻辑**。只需给角色调度器注入 `{ complete }`。
+       - **A-3 补 api 手写 main 的两条 route 注册**（0.8g）——**不动 pin 链、可立刻做，且这是今天就在漏的活缺口**：
+         content 进程读库内密钥走客户端，对端没注册 ⇒ 必失败 ⇒ 调用点 `.catch(() => null)` 吞成
+         「本来就没配」、落 env 回退，**一行日志都没有**。传输层文件头明写「失败原样抛、绝不吞成没配」，
+         而调用侧的 catch 又吞回去了。修的时候连那个 catch 一起改成能区分「读失败」与「库内没配」。
+       - **A-4 撤条 `content-generic-llm-authority` —— ⚠️ 这一条有一个真未决点，别当例行公事。**
+         两个已有撤条判例都锚在「cloud 的自动化段不再点名任何 content 属主符号」这个可跑问题上，
+         **这两种手法在这一条上都用不了**：三条探针**永远命中**（segA 恒跑必须 new、单体下 segC/segD 就是用它），
+         而「qwen.ts 是 transport 成员」这个真正的理由**在 cloud 仓里没有任何可运行的锚**——
+         kernel 有名册镜像 + 门禁（`kernel-non-members.json` + `AC-BOUND-03`），**transport 没有对等物**，
+         名册只活在控制仓脚本里。三选一，需拍板：
+         ① cloud 的 import 改指包（「segA 不再 new 一个 content 属主类」就成了可跑事实，与判例同形；
+            代价是 cloud 要 pin transport，且那是最热的组装根）；
+         ② 在 cloud 补一份 transport 名册镜像 + 门禁，撤条锚在它上面；
+         ③ 只撤 automation 那份（它的判据是自己 docblock 写的「阻止本包交付完整生产进程」，
+            A-1/A-2 做完即不再 prevent）——**但 4.2 明写三份 MUST 同批一致，走这条要先改 4.2 的口径**。
+
+       **另一处已漂的记载**：design §5.5.8 引的行号（cloud `server.ts:2295-2297`/`:2337-2341`、
+       content `server.ts:421-428`）**全部失效**，按符号名定位。§5.5.8 的结论本身仍成立。 -->
+
   <!-- 📌 **2026-07-31 坐实现状，下一手别再按交接文档那句「裁决早拍过了，是落地不是决策」通读本条**——
        那句话对 A 半成立，对 B 半**已经过期**。
        **B 半（四个角色工厂）：归属改判早已由 task 0.7 全部落地。** 实测：
@@ -1150,7 +1183,29 @@
        门要减到 10 在第 4 段。
        六仓零漂移；测试 cloud 4040 / api 496 / automation 1967 / content 439 / transport 36 / kernel 59，全 0 fail。
        ⚠️ 跑全量时撞到一次 `/task 前缀…` 用例偶发红：单独跑过、重跑过、基线同条件也跑过，判定为并发偶发，非本条引入。 -->
-- [ ] 2.6 处置 `ReplyWorkflow` 的 content 属主具体类实参（与模型出口是两件事，单独处置）。
+- [x] 2.6 处置 `ReplyWorkflow` 的 content 属主具体类实参（与模型出口是两件事，单独处置）。
+  <!-- aidcp-cloud 2da39f6 / transport 40df6de / automation 7088c83 / api 3f2c6dd / content 9998290。
+       **与 2.4e 同形同因**，落法逐字照它：构造搬进内容段（`ctx.replyAi`）→ 内容侧注册三条路由
+       → 自动化段按模式取（automation ⇒ HTTP 客户端；跑过内容段 ⇒ 那个实例；两者皆非 ⇒ 响亮 drop）。
+       **先记一句好消息**：编排层一直只持 kernel 的 `ReplyAiPort`，所以这从来不是工作流的耦合，
+       只是组装根里一个 `new` 长错了段。搬完后那条唯一的探针自己停止匹配 ⇒ **第三条靠接线撤掉的**。
+
+       **「缺席就不组装」这一支是编译器逼出来的，别改成非空断言绕过去**：工作流第三个实参必填，
+       所以缺席时唯一诚实的处置就是不组装它（它本来就可选，下游两处内部 API 早有对应分支）。
+       塞空壳是这里最坏的选项——每一次分类 / 润色 / 风险复核都会静静回一个结构上合法的结果。
+
+       **回执守卫逐字校验 `fallback` 落在联合里，MUST NOT 只判 `typeof === 'string'`**：
+       那个字段带的是「这一步为什么没得到正常答案」，而 `value` 那半无论如何都是合法取值 ⇒
+       丢了它，一次超时会读成一次正常分类；任何默认值都会把它压成 `'none'`。
+
+       顺带把互动 AI 单步超时收成一个解析函数：两段各读一次同一个 env 就是两个会各自漂的默认值，
+       **漂了不报错**，只是两边对「多久算超时」看法不同。
+
+       撤条按 2.4e 的纪律走全套：重生成（cloud 台账 53→52）+ census 撤条说明 + content-owner 计数 7→6
+       + **两半复活断言**（自动化段 MUST NOT 再造 + 远端取用分支 MUST 还在）。
+       **automation 侧那份（门）仍未动、仍 11**——减门是第 4 段的事。
+       六仓零漂移；cloud 4044 / api 496 / automation 1967 / content 439 / transport 36，全 0 fail；acceptance 180/180。 -->
+
 - [ ] 2.7 **传递性检查**：逐个构造点核对跨属主实参，**特别点名 optional 参数**
   （`PublishDispatcher` 的 `FacebookPublishMediaStore` 漏传不报错、三个写静默消失）。
   写一条会红的用例钉住它。**同形共四层，逐层都要处置**（见 design.md §5.5.6）：
