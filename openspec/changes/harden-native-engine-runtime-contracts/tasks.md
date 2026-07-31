@@ -20,6 +20,10 @@
 
 ## 3. aidcp-edge — 提交窗口预算单一事实源
 
+> **3.2 本轮延后（2026-07-31，用户裁定；仍是待办，不弃守）。** 事实源已收口到宿主、引擎数字已降为「请求值」、
+> 机械对账用例已防漂——**危害已经消除**，剩下的是把线路上那个失效字段物理删掉，属整洁工作。
+> 且它要同时动四个文件的结构，收益与代价不成比例。留待下一轮连同 §8 一起做。
+
 - [x] 3.1 确定提交窗口标签与预算的单一事实源（宿主侧常量或命令清单产物二选一），删除另一侧的独立数字声明 <!-- aidcp-edge 74eaf41 事实源定为宿主 client.ts 的 NATIVE_COMMIT_WINDOW_BUDGETS；引擎侧降为「标签+镜像数字、运行期不作数」，新增机械对账用例：单边改一个数字仓库检查当场失败 -->
   - 决策记录（2026-07-29）：事实源选宿主常量而非清单产物，直接原因见 1.3 的跨 change 依赖——清单产物的摘要被 Electron 侧常量反向绑定，本 change 动不了。
   - 该表同时是**准入名单**：标签不在表内即拒发窗口。并行流在 b57d619 接上的五条小红书窗口请求，其标签在本提交内一并加入（`xhs_comment_submit`=4000 / `xhs_notification_comments`=20000 / `xhs_notification_likes`=20000 / `xhs_notification_follows`=20000 / `xhs_publish_submit`=15000）；对账用例同批扩到**同时读两份引擎源**（`facebook/capability.rs` + `commit_window.rs`），只读一份会让另一份完全没有闸。
@@ -43,6 +47,11 @@
   - 订正（2026-07-29）：**起草期描述比现状悲观**。`:19` 的 `EXPECTED_CAPABILITY_DIGEST` 确实仍是裸常量（实测值 `89c8488c…4b1c71`），但已有机械同步闸——`test/native-page-engine/build-contract.test.ts:79-88` 断言它等于清单实际 sha256。缺口从「无人对账」收窄为「**需人工改两处、漏改会被测试当场拦下**」。同一绑定即 1.3 的跨 change 依赖来源。
 
 ## 5. aidcp-edge — 引擎故障后的自愈
+
+> **5.1 / 5.3 本轮延后（2026-07-31，用户裁定；仍是待办，不弃守）。** 自愈的**主干已经在**：5.2 / 5.4 让「缓存句柄必须拿到
+> 存活肯定证据、拿不到就丢弃重开」生效，所以「引擎死了下一条命令还打在死句柄上」这条已经堵住。5.1 补的是另一条口子
+> （结束会话命令**自己**失败时收尾不执行），只有两行，但落点归 `browse-session.ts` 的单写者。
+> **本轮若因 §6 的接线工作打开了该文件，就顺手一并做掉并在此回写 sha**；否则留下一轮。
 
 - [ ] 5.1 把 `src/native-page-engine/browse-session.ts:141-142` 的会话结束收尾从成功路径移到 `finally`，使结束会话命令失败时收尾仍执行
   - 本轮未做（2026-07-29）：落点 `src/native-page-engine/browse-session.ts` 归并行流（该文件本轮被 b57d619 大改）。实读 HEAD 仍是 `await active;` 之后紧跟 `if (env.type === 'session.end') this.stop('cloud_session_end');`（:245-246），`finally` 块只复位 `active` / `activeAbort`——**命令失败时收尾仍不执行，缺口原样保留**。需在 browse-session.ts 的单写者手里落。
@@ -71,6 +80,10 @@
 
 ## 7. aidcp-edge — 取根、诊断与焦点守卫的诚实归因
 
+> **7.4 本轮延后（2026-07-31，用户裁定；仍是待办，不弃守）。** 三态判定**已经落成**（求值失败 / 输出缺失 / 真丢焦点已分开、
+> 13 条单测覆盖），诚实性缺口已消除；剩下的是把「读不到」这一态的外显原因码单独拉出来，属粒度问题不属真假问题。
+> 且新增枚举变体会打断三处穷举匹配的编译、牵动四个文件。留待下一轮。
+
 - [x] 7.1 在 `native/page-engine/src/facebook-router/00-shared.js:13-19` 的共享取用函数（`all` / `first`）里加空 root 防护，使传入空 root 时返回可归因于「无有效根」的空结果而非抛 `TypeError`（当前直接对传入 root 调 `querySelectorAll`，零防护） <!-- aidcp-edge 74eaf41 新增 rooted() 判据（必须是带 querySelectorAll 的对象），空根回空结果不抛；缺省参数语义不变 -->
 - [x] 7.2 修 `20-feed.js:253` 的 `currentDetail()`：`… || document.querySelector('main') || document.body` 之后无空判、直接进 `noteDetail(root, permalinkOf(root)…)`，是**当前唯一实读坐实会把空根交给遍历**的取根点（行号按 `aidcp-edge@9cd7691`；简报给的 `87,147,233` 已被 07-28 改动顶偏）。改为取不到有效根时返回诚实的未开始理由 <!-- aidcp-edge 74eaf41 currentDetail() 兜底链落空时回 action('open',false,'target_not_found')（现址 :254），不再把空根交给详情遍历；jsdom 摘掉 body 后先断言 document.body===null 再跑 note_open -->
 - [x] 7.2.1 交叉核对另 4 处 `|| document.body` 取根点（`20-feed.js:87,154,166` 与 `40-group-join.js:103`）：起草期实读结论是它们下游均空安全（`:87` 紧跟 `if(!scope)return`；`:154` 只进 `node&&…` 循环；`:166` 只以 `scope&&…` / `all(…,scope||document)` 使用；`40-group-join.js:103` 进 `targetGroupScope`，其 `:50-51` 首行即 `if(!groupId||!main)return`）。若实装期复读推翻某一处，按 7.2 同样处理并在此记录；结论不变则不改这 4 处，**不做空转补丁** <!-- aidcp-edge 74eaf41 逐处复读，起草期结论不变（现址 :86/:153/:165 与 40-group-join.js:103），按要求未做空转补丁 -->
@@ -83,6 +96,10 @@
 - [x] 7.5 加回归：① 取用函数收到空 root → 回可归因的空结果、不抛（写命令路径因此不会被判 `Ambiguous`，对照 `engine.rs:532-543` 的「写 + 任何规则错误 → Ambiguous」）；② 导航瞬间无有效根 → `note_open` 回未开始而非抛；③ 非 Facebook 平台解码失败 → 携带同级诊断；④ 守卫求值失败 → 与目标丢失是两个不同结论 <!-- aidcp-edge 74eaf41 四条全落地：runtime-contracts-page-rules.test.ts 3 tests（null/{}/字符串/0 全回空、有效根照旧、jsdom 摘 body 后 note_open 回 target_not_found）+ runtime_contracts_decode_diagnostics.rs 3 tests（含「诊断绝不能带页面正文或凭据」：cookie 值 / 中文正文 / 带空格的伪标识符都不落盘，整串 ≤512 字节）+ input:: 焦点守卫 1 test -->
 
 ## 8. aidcp-cloud — 评论预算传输而非重算
+
+> **整节本轮延后（2026-07-31，用户裁定；仍是待办，不弃守）。** 两份公式的后果是**错报失败**（长评论被判超时），
+> 方向诚实、危害小于本轮优先处置的静默假成功那批。且它必须边缘 + 云端同批改，跨仓协调成本高。
+> 留待下一轮，连同 3.2 一起做——两条是同一件事的两半（预算的单一事实源）。
 
 - [ ] 8.1 确定评论提交预算的计算方（云端下发或边缘回报）并在该侧按「实际会被打进编辑器的完整串」计算，另一侧改为据传输值派生
 - [ ] 8.2 删除非计算方的常量副本（`aidcp-cloud/src/comment-agent/facebook-edge-steps.ts:46-57` 与 `aidcp-edge/src/native-page-engine/browse-session.ts:65-71` 其中一份）

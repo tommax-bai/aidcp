@@ -35,11 +35,14 @@ if ! git -C "$wt" rebase "origin/$def"; then
   die "rebase 冲突。去 $wt 解决后 'git rebase --continue'，再重跑 land-change。"
 fi
 
-info "跑安全红线 + 全量 + typecheck（在 worktree 内；test:acceptance 仅在该仓存在时跑）..."
+has_script() { node -e "process.exit((require('./package.json').scripts||{})['$1']?0:1)" 2>/dev/null; }
+
+info "跑安全红线 + 全量 + typecheck + Native 门禁（在 worktree 内；后两者仅在该仓存在对应脚本时跑）..."
 ( cd "$wt" \
-  && if node -e "process.exit((require('./package.json').scripts||{})['test:acceptance']?0:1)" 2>/dev/null; then npm run test:acceptance; fi \
-  && npm test && npm run typecheck ) \
-  || die "测试/typecheck 未过——不合并。修好再来。"
+  && if has_script test:acceptance; then npm run test:acceptance; fi \
+  && npm test && npm run typecheck \
+  && if has_script gate:native; then npm run gate:native; fi ) \
+  || die "测试/typecheck/Native 门禁未过——不合并。修好再来。"
 
 ahead="$(git -C "$wt" rev-list --count "origin/$def..$name")"
 info "$name 领先 origin/$def $ahead 个提交。"

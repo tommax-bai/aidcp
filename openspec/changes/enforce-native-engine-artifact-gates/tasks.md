@@ -33,6 +33,10 @@
 
 ## 5. aidcp-edge — 产物校验绑定源码
 
+> **5.4 / 5.5 本轮延后（2026-07-31，用户裁定；仍是待办，不弃守）。** 判定逻辑已由 5.1–5.3 落地并单测覆盖，
+> 这两条差的是「实测对照」与「打包态同步接受新字段」，都不改变判定本身。本轮优先级让位给会说谎的那批。
+> **5.4 的解锁条件不变**（需要一个有已构建产物的工作区）；**5.5 的落地顺序红线不变**（先接受新字段、再谈抬版本号，颠倒即炸打包）。
+
 - [x] 5.1 在 `scripts/build-native-page-engine.mjs` 的 `build()` 里计算「引擎源码输入摘要」（Rust 源码树 + `src/facebook-router/` 全部分片与清单 + `build.rs` + `command-manifest.json`），写入 staged `manifest.json` 的新字段 <!-- aidcp-edge be0a8be 新字段 sourceDigest；输入集排除测试专用文件；只加字段、不抬清单版本号（理由见 5.5） -->
 - [x] 5.2 在同文件 `verify()`（72-113 行）里重算该摘要并比对，不一致即抛「产物相对源码已过期」；保留既有的哈希/清单/协议版本/能力摘要检查 <!-- aidcp-edge be0a8be 既有检查全部保留，摘要比对为新增的第五道 -->
 - [x] 5.3 确认 `scripts/ensure-native-page-engine-dev.mjs:19-28` 的「verify 成功即 return verified、不重建」在 5.2 之后自动变成「源码变了就重建」，不再需要额外分支；如需改动则一并落地 <!-- aidcp-edge be0a8be 开发态「已校验」分支改由源码摘要决定；校验失败理由原样带进重建日志、不吞 -->
@@ -44,17 +48,28 @@
 
 ## 6. aidcp-edge — Rust 门禁进标准环境与集成闸
 
+> **6.5 拉进本轮第一批（2026-07-31）**，不再延后。原记的阻塞是「等主 session / fleet 层统一改」——本轮就是那个位置，
+> 且它是让 6.1–6.4 在**合并路径上**真正生效的最后一步。本轮要连着落好几个 change，没有它，每次集成都不跑 Rust 门禁。
+> **6.6 本轮延后（仍是待办，不弃守）**：核查结论已坐实（那个组合确实会绕开钉死声明），差的是改出包 shell 脚本 + 写护栏文档，
+> 而更重的那处（CI 出包工作流盖掉钉死版本）已在 `be0a8be` 修掉，剩下这半条不影响运营真出包用的编译器。
+
 - [x] 6.1 新增 npm 脚本（如 `gate:native:fmt` / `gate:native:clippy` / `gate:native:test`），内部复用 `build-native-page-engine.mjs` 里 `resolveCargoBinary()` 的 rustup 解析思路（`rustup which ...`，`cwd: crateDir`），保证从仓根调用也解析到 `native/page-engine/rust-toolchain.toml` 钉死的工具链 <!-- aidcp-edge be0a8be scripts/gate-native.mjs + package.json 四条脚本；另断言解析到的工具链与钉死声明一致 -->
 - [x] 6.2 工具链或组件缺失时脚本 MUST 非零退出并写明「解析到哪个工具链、缺哪个组件」，MUST NOT 记为跳过或非阻断 <!-- aidcp-edge be0a8be 失败文案同时写明安装命令 -->
 - [x] 6.3 新增一条聚合脚本 `gate:native`，串起 6.1 三项，供集成闸单点调用 <!-- aidcp-edge be0a8be gate:native = fmt + clippy -D warnings + test -->
 - [x] 6.4 在 `.github/workflows/` 新增一个按 push / PR 触发的检查流水线，跑 `npm test`、`npm run typecheck`、`npm run gate:native`；现有 `build-desktop.yml` 保持手动触发的出包职责不变 <!-- aidcp-edge be0a8be 新增 checks.yml（typecheck / 验收 / 全量 / gate:native）；build-desktop.yml 职责不变，仅修其工具链安装方式（见 6.6 订正） -->
 - [ ] 6.5 在控制仓 `scripts/land-change`（当前第 38-42 行只跑 `test:acceptance` / `npm test` / `typecheck`）补上：当被集成的仓存在 `gate:native` 脚本时一并运行
-  - 【阻塞】改动影响全车队的集成闸（控制仓 `scripts/land-change`），本轨未做。解锁条件：由主 session / fleet 层统一改并周知。**这是让整套门禁真正生效的最后一步**——在它落地前，6.1–6.4 只在 CI 与人工调用时生效，合并路径上仍不强制
+  - ~~【阻塞】改动影响全车队的集成闸（控制仓 `scripts/land-change`），本轨未做。解锁条件：由主 session / fleet 层统一改并周知。~~ **已解除，2026-07-31 落地**：在 `test:acceptance` 的同款「有该脚本才跑」条件式后追加 `gate:native`，跑在 typecheck 之后（它最慢）；失败文案一并改成点名三者。**这是让整套门禁真正生效的最后一步**——在它落地前，6.1–6.4 只在 CI 与人工调用时生效，合并路径上不强制。
+  - **⚠️ 排序红线（落地时踩过一次，写下来防复发）**：本条接线之后，**每一次 edge 集成都会跑 Rust 门禁**，于是 8.4 / 8.5 那族绝对墙钟用例的约 12% 假红**直接变成集成闸的假红**。
+    因此 **8.4 / 8.5 必须先落**（或同批落），否则等于给自己装了一道随机拦路。本轮已把这两条排在第一批的最前面。
 - [ ] 6.6 记录一次性安装步骤（`rustup toolchain install` 需带 `components`），并检查 `scripts/build-desktop-macos-ol-arm64-common.sh` 里 `--profile minimal` + `export RUSTUP_TOOLCHAIN` 的组合是否会绕开 `rust-toolchain.toml` 的组件声明；若会，一并修正
   - 【部分完成】核查已完成并坐实：该组合确实会绕开钉死声明。安装命令已写进 gate 脚本的失败文案（6.2）。差两件：① 修 `scripts/build-desktop-macos-ol-arm64-common.sh`（补两个组件 + 停止覆盖钉死版本）——该文件在本轨可改文件白名单外；② 把一次性安装步骤写进护栏文档（`aidcp-edge/CLAUDE.md`，同 7.3 的白名单阻塞）
   - 【实装实测订正 · 原任务漏了同形态第二处且后果更重】原任务只点名了出包 shell 脚本。实测 **CI 出包工作流（`build-desktop.yml`）的两个作业用的工具链 action 会导出环境变量、盖掉钉死版本**——比 shell 脚本那处更重，因为它决定运营真出包用的编译器。已在 be0a8be 一并修正：改为按 `rust-toolchain.toml` 的声明显式安装该 channel，并带上静态检查与格式化组件
 
 ## 7. aidcp-edge — 混淆边界诚实化与密钥单一来源
+
+> **7.1 / 7.2 本轮延后（2026-07-31，用户裁定；仍是待办，不弃守）。** 三份密钥副本今天是**一致**的，
+> 收敛是防将来漂移，不是修一个现存缺陷；漂了也会响亮失败（解码不出来），不是静默假成功。故让位给会说谎的那批。
+> 7.3 / 7.4 属护栏文档，随本轮收尾一并批量落。
 
 - [ ] 7.1 把编码密钥收敛到单一定义，`native/page-engine/build.rs:7-9` 与三处运行时副本（`src/xhs.rs:23`、`src/facebook.rs:39`、`src/probe.rs:8`）共用同一来源；纯常量重定向，MUST NOT 改动任何解码语义
   - 【阻塞】需同时改三份运行时副本（`native/page-engine/src/xhs.rs`、`src/facebook.rs`、`src/probe.rs`），均在本轨可改文件白名单外，且其中一份归轨 A 占用。解锁条件：轨 A 收工后由白名单属主放行统一收敛（纯常量重定向，不改解码语义）
@@ -67,9 +82,14 @@
 
 ## 8. aidcp-edge — 测试信号分离与假失败消除
 
-- [ ] 8.1 给退役路径用例（当前抽样 6 个文件 4717 行：`test/flows/publish-command-handlers.test.ts`、`test/browse/browse-session.test.ts`、`test/locating/engine.test.ts`、`test/browse/note-extractor.test.ts`、`test/flows/like-runner.test.ts`、`test/integration/publish-e2e.test.ts`）加统一标记，标记依据为「其被测模块出现在生产剪枝黑名单里」，MUST NOT 用 skip
-- [ ] 8.2 让套件收尾分别报出「生产路径覆盖 / 退役路径覆盖」两个计数
-- [ ] 8.3 加一条对账断言：生产剪枝黑名单新增条目时，指向该模块的测试文件必须已被标记为退役覆盖，否则失败
+> **8.1–8.3 显式弃守（2026-07-31，用户裁定；不是待办）。** 这三条做的是测试信号分层，属工程整洁：
+> **不改变任何生产行为，也不消除任何一条假成功**。本轮范围收敛到「会说谎的那些」，故整组结案。
+> **8.4 / 8.5 不弃守、留在本轮**——那一族绝对墙钟用例让主干门禁约 12% 概率红，是每一轮集成都要付的成本，
+> 与「工程整洁」不是一回事。日后若退役用例的假红真的开始误导判断，再单独立项。
+
+- [ ] 8.1 **【显式弃守 2026-07-31，见本节抬头】** 给退役路径用例（当前抽样 6 个文件 4717 行：`test/flows/publish-command-handlers.test.ts`、`test/browse/browse-session.test.ts`、`test/locating/engine.test.ts`、`test/browse/note-extractor.test.ts`、`test/flows/like-runner.test.ts`、`test/integration/publish-e2e.test.ts`）加统一标记，标记依据为「其被测模块出现在生产剪枝黑名单里」，MUST NOT 用 skip
+- [ ] 8.2 **【显式弃守 2026-07-31，见本节抬头】** 让套件收尾分别报出「生产路径覆盖 / 退役路径覆盖」两个计数
+- [ ] 8.3 **【显式弃守 2026-07-31，见本节抬头】** 加一条对账断言：生产剪枝黑名单新增条目时，指向该模块的测试文件必须已被标记为退役覆盖，否则失败
 - [ ] 8.4 修 `native/page-engine/src/facebook/publish_tests.rs:1006-1035` 的截止期用例
   - **频率与范围实测（2026-07-30，由 `restore-native-actuation-humanization-and-locating` 的第五波回写；本条仍归本 change 处置）**：
     ① **范围比本条原文大**：不止 `:1022` 那一条。同族至少三条 —— `select_mode_reports_ambiguous_after_one_unconfirmed_click`（`:659`，`unix_time_ms() + 150`）、
@@ -88,12 +108,17 @@
 
 ## 9. aidcp-edge — 跨平台打包资源按目标平台解析
 
-- [ ] 9.1 把 `package.json` 的 `build.extraResources` 里 `build/native-page-engine/${platform}-${arch}` 与 `build/gost/${platform}-${arch}` 的平台来源改为目标平台（electron-builder 的 `${platform}` 宏在 `node_modules/app-builder-lib/out/util/macroExpander.js:34-35` 返回 `process.platform`，即构建主机平台）
+> **整节显式弃守（2026-07-31，用户裁定；不是待办）。** 2026-07-30 已裁为「按 case 处理」，本次结案，理由不变且已复核成立：
+> 在 macOS 上打 Windows 包踩中这条会**响亮失败、不会静默出错包**（打包后置校验按目标平台取值，产物清单的
+> `platform` / `arch` / 可执行文件名对不上即抛错）。**触发条件**：第一次真的要在 macOS 上出 Windows 包时回到本节；
+> 在那之前它零影响。留在待办里只是账面噪音，会让「剩余多少」这个数长期失真。
+
+- [ ] 9.1 **【显式弃守 2026-07-31，见本节抬头】** 把 `package.json` 的 `build.extraResources` 里 `build/native-page-engine/${platform}-${arch}` 与 `build/gost/${platform}-${arch}` 的平台来源改为目标平台（electron-builder 的 `${platform}` 宏在 `node_modules/app-builder-lib/out/util/macroExpander.js:34-35` 返回 `process.platform`，即构建主机平台）
   - 【阻塞】两个待改文件（`package.json` 的 `build.extraResources`、分平台打包配置）虽在白名单内，但改法要动分平台打包配置、**本机无法验证**（需真出包才能确认目标平台解析路径正确）。解锁条件：拿到一次真出包（或跨平台打包）的验证机会，见 11.7
   - ⏸ **【降级为「按 case 处理」，2026-07-30，用户裁定】不做，后面看 case。****已确认这样做是安全的**：即便在 macOS 上打 Windows 包踩中这条，也是**响亮失败、不会静默出错包** —— `scripts/after-pack.cjs` 的打包后置校验按**目标平台**（`context.electronPlatformName`）取值，`src/electron/native-page-engine-artifact.cjs` 直接比对产物清单里的 `platform` / `arch` / 可执行文件名，对不上即抛错（清单实测带 `"platform":"darwin"`、`"arch":"arm64"`）。**触发条件**：第一次真的要在 macOS 上出 Windows 包时回到本条；在那之前它零影响、不可能悄悄发货。
-- [ ] 9.2 在拷贝/解析阶段即校验目标平台资源存在，失败时报错写明「目标平台/架构、主机平台/架构、实际解析到的目录」；保留 `scripts/after-pack.cjs:235-238` 现有的目标平台后置校验作为第二道
+- [ ] 9.2 **【显式弃守 2026-07-31，见本节抬头】** 在拷贝/解析阶段即校验目标平台资源存在，失败时报错写明「目标平台/架构、主机平台/架构、实际解析到的目录」；保留 `scripts/after-pack.cjs:235-238` 现有的目标平台后置校验作为第二道
   - ⏸ **【降级为「按 case 处理」，2026-07-30，用户裁定】不做，后面看 case。****已确认这样做是安全的**：即便在 macOS 上打 Windows 包踩中这条，也是**响亮失败、不会静默出错包** —— `scripts/after-pack.cjs` 的打包后置校验按**目标平台**（`context.electronPlatformName`）取值，`src/electron/native-page-engine-artifact.cjs` 直接比对产物清单里的 `platform` / `arch` / 可执行文件名，对不上即抛错（清单实测带 `"platform":"darwin"`、`"arch":"arm64"`）。**触发条件**：第一次真的要在 macOS 上出 Windows 包时回到本条；在那之前它零影响、不可能悄悄发货。
-- [ ] 9.3 加一条不出包的用例：以目标平台 `win32` 求解资源路径，断言解析结果与主机平台无关
+- [ ] 9.3 **【显式弃守 2026-07-31，见本节抬头】** 加一条不出包的用例：以目标平台 `win32` 求解资源路径，断言解析结果与主机平台无关
 
 ## 10. aidcp（控制仓）— 护栏与在途工作收口
 
