@@ -55,6 +55,18 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > **dev 第十二批已部署**。六仓：cloud `e703b66` / kernel `ac98a30` / transport `259001b` /
 > api `8a67d1e` / automation `c2c6ff7` / content `ad6eeed`；测试 cloud 4037 / api 496 /
 > automation 1966 / content 439 / kernel 59 / transport 36，全 0 fail。tasks.md `61/115`。**门仍 11。**
+>
+> **2026-07-31 第四批（本 session 末批，接手请以这一组为准）**：
+> `bc520ac`（调度三态 + 飞书入站留痕）→ `f4c6a51`（逐条记子命令结果）→ `113c328`（剥 `/task` 前缀）。
+> **六仓**：cloud `113c328` / kernel `ac98a30` / transport `259001b` / api `4dcb4b3` /
+> automation `a9a1f9c` / content `ad6eeed`；**另有 console `ad5006e`**（本 change 第一次动到 console）。
+> 测试 cloud 4039 / api 496 / automation 1967 / content 439 / kernel 59 / transport 36，全 0 fail；
+> 六仓对账零漂移。tasks.md `61/116`。**门仍 11。dev 已部署到 `113c328`。ol 一次没动。**
+>
+> **✅ 飞书委托链路 2026-07-31 首次端到端跑通**（此前「一次都没真跑过」那条已消）：
+> 四条任务、三种终局全验到——确认→执行到底（`waiting_approval`，且真生成了候选稿 `publish:219`）、
+> 取消（`remaining_cancelled_by_user`）、不点则停在 `awaiting_confirmation` **不自作主张往下走**。
+> 卡在这里这么久的原因是**两个错叠在一起**，都已处置，见 §5 那段说明。
 
 **2026-07-30 17:00 实测期望值：**
 
