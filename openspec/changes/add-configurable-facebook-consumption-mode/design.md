@@ -14,14 +14,15 @@ The design must preserve these invariants:
 - `RiskController` remains the sole writer of final account risk state.
 - irreversible writes count only from truthful platform outcomes; ambiguous dispatch is never promoted to success or blindly retried.
 - DEV and OL runtime work is separated by `execution_target`.
-- mode and policy configuration is environment-scoped, while runtime facts remain account-scoped.
+- mode selection is environment-scoped; rule/consumption cadence defaults and cold-start numeric policy are target-global, optional cadence overrides remain environment-scoped, and runtime facts remain account-scoped.
 - the existing in-progress `environment-level-rule-mode-and-approval` migration remains the source of environment binding and approval-policy behavior; this change must not regress its ownership checks or approval work.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Provide one backend authority for the effective Facebook operation mode and typed rule/consumption cadence.
+- Provide one backend authority for the effective Facebook operation mode, target-global numeric defaults, and explicit environment cadence overrides.
+- Make cold-start duration and daily Facebook action caps configurable without resetting active progress or reviving graduated environments.
 - Add a restart-safe consumption state machine driven by confirmed new outcomes.
 - Make join-to-first-comment waiting product-configurable without conflating it with same-group re-comment cooldown.
 - Prevent persona time scheduling from initiating group joins in slow-start, rule, or consumption mode.
@@ -31,7 +32,7 @@ The design must preserve these invariants:
 **Non-Goals:**
 
 - A generic operator-authored action graph.
-- Changing daily risk quotas, approval rules, comment generation, or the semantics of rule mode's immediate pinned join-comment exception.
+- Changing the underlying account risk quotas, approval rules, comment generation, or the semantics of rule mode's immediate pinned join-comment exception. Configurable cold-start caps remain an additional `min` clamp and cannot widen those risk quotas.
 - Changing the Edge protocol, implementing policy counters on Edge, or producing an Edge installer.
 - Deploying to OL.
 - Treating an activity row, task completion, click, `already_liked`, or `already_member` as a newly produced platform outcome.
@@ -62,19 +63,40 @@ The persona/content active-week projection is not a mode selector. It MUST NOT d
 
 Alternative considered: store all four modes in a new table and duplicate slow-start state. Rejected because it creates two authorities for a lifecycle that already has active/graduated state and timing.
 
-### 2. Use a typed, revisioned environment policy
+### 2. Separate target-global numeric defaults from environment mode selection
 
-Add `facebook_operation_policy`, keyed by `env_key`, containing:
+Keep `facebook_operation_policy`, keyed by `env_key`, as the mode and effective-cadence snapshot. Add `cadence_source=global|environment` and keep the materialized rule/consumption values in the row so every runtime batch still references one immutable environment `policy_revision`.
+
+Add one `facebook_operation_global_policy` row per local `execution_target`, containing:
+
+- target-global rule parameters;
+- target-global consumption parameters;
+- cold-start `total_days`;
+- a complete day-indexed array of Facebook action caps;
+- monotonically increasing global revision and audit metadata.
+
+The configurable cold-start actions are `view`, `like`, `comment`, `follow`, `publish`, `search`, and `join_group`. Facebook-unsupported `collect`, `comment_like`, and `dm_reply` remain fixed at zero. `totalDays` is bounded to `1..30`. Each action cap is an integer from zero through the existing aggressive daily risk quota for that action (`300/100/15/30/2/20/5` respectively), because a larger cold-start value could never survive the final risk `min` clamp.
+
+Existing `facebook_operation_policy` rows migrate with `cadence_source=environment`, preserving the current independent values. A newly created environment policy uses `cadence_source=global` and materializes the current target-global values. Console can explicitly switch an environment between inheritance and independent configuration:
+
+- switching to `global` copies the current target-global cadence into a new environment revision;
+- switching to `environment` requires a complete in-bound rule and consumption payload and stores it in a new environment revision;
+- changing the target-global cadence creates a new revision for every inheriting environment, with its own audit entry, while independent overrides remain unchanged.
+
+This propagation is intentional: it preserves the existing runtime identity `account_id + execution_target + policy_revision`. A global change never mutates the meaning of an already collected counter under an old revision.
+
+The environment policy continues to contain:
 
 - `base_mode`;
-- rule parameters: `views_per_round`, `rounds_per_join_comment`;
+- `cadence_source`;
+- materialized rule parameters: `views_per_like`, `join_every_n_rounds`;
 - consumption parameters: `views_per_like`, `confirmed_likes_per_join`, `confirmed_joins_per_comment`;
 - monotonically increasing `policy_revision`;
 - audit metadata.
 
-All parameter sets remain stored when another mode is selected so switching back does not erase operator choices. Cloud validates strict integer bounds and returns those bounds and defaults in every read projection; Console does not duplicate them as independent constants.
+All parameter sets remain stored when another mode is selected so switching back does not erase operator choices. Cloud validates strict integer bounds and returns those bounds and defaults in every global and environment projection; Console does not duplicate them as independent constants.
 
-Writes require the complete typed payload plus `expectedRevision`. Unknown fields, stale revisions, invalid bounds, unsupported platforms, missing ownership, and binding conflicts fail before mutation. The configuration row and an append-only audit row containing before/after snapshots, actor, request ID, reason, and timestamp are written atomically. The response is a database readback, not the request echo.
+Environment writes require `expectedRevision`, mode, cadence source, and the complete typed cadence only when the source is independent. Global writes require the complete rule, consumption, and cold-start policy plus `expectedRevision`. Unknown fields, stale revisions, invalid bounds, missing day rows, unsupported platforms, missing ownership, and binding conflicts fail before mutation. Configuration and append-only audit rows containing before/after snapshots, actor, request ID, reason, and timestamp are written atomically. Responses are database readbacks, not request echoes.
 
 The customer-facing environment rule-toggle endpoint remains as an explicitly bounded compatibility adapter:
 
@@ -85,7 +107,33 @@ The customer-facing environment rule-toggle endpoint remains as an explicitly bo
 
 Alternative considered: add three numbers to `facebook_rule_mode_config` and a separate consumption table. Rejected because mode switches would require non-atomic coordination between mutually exclusive booleans and would leave scheduled-join admission without one authority.
 
-The new Edge client does not extend that Boolean compatibility adapter. It uses a customer-scoped unified policy route with `{ expectedRevision, mode }`, receives the committed full mode projection, and never sends cadence numbers. The legacy slow-start and rule routes remain only for already released clients.
+The new Edge client does not extend that Boolean compatibility adapter. It uses a customer-scoped unified policy route with `{ expectedRevision, mode }`, receives the committed full mode projection, and never sends cadence numbers or changes cadence source. The legacy slow-start and rule routes remain only for already released clients.
+
+### 2.1 Apply cold-start edits to the current day and preserve graduation
+
+Cold-start progress is still derived from the environment's server-day-aligned `slow_start_since`; a configuration edit does not rewrite that anchor. On every admission, Cloud resolves the current target-global cold-start policy and uses the cap for the derived current day. Therefore an environment on day 5 immediately uses the new day-5 cap after a save and continues to day 6 without a restart.
+
+Add `facebook_environment_slow_start_completion`, keyed by
+`env_key + execution_target`, as the sticky graduation authority. Keeping the
+marker target-scoped is required because DEV and OL share durable business data
+but have independent global numeric policy. Before increasing or replacing the
+local target's global duration, the write transaction marks every environment
+already graduated under that target's previous duration. After writing a
+shorter duration, it marks environments that now meet the new duration.
+Resolution rules for the current target are:
+
+- `slow_start_since=null` → off;
+- current-target completion row exists → graduated, regardless of a later duration increase;
+- otherwise, derived day greater than `totalDays` → graduated;
+- otherwise → active with the current day's configured caps.
+
+Explicitly enabling `slow_start` for an off or current-target graduated
+environment writes a fresh current server-day anchor and clears its completion
+rows, starting day 1. Re-selecting it while already active preserves the
+existing anchor. Repeated reads do not reset progress. Changing the total from
+7 to 14 while an environment is active on day 5 preserves day 5; an
+environment already graduated on day 10 remains graduated. Changing the total
+below an active current day graduates it immediately.
 
 ### 3. Freeze cadence interpretation by policy revision
 
@@ -98,6 +146,8 @@ When a policy changes:
 - a write already dispatched to the platform may settle truthfully under its original snapshot;
 - counters are not copied or arithmetically reinterpreted;
 - the new revision starts from zero and new content dedupe facts.
+
+A target-global cadence change follows the same rule by materializing a new environment policy revision only for environments whose `cadence_source=global`. Independent environments receive no revision and keep their counters. Cold-start-only changes do not create rule/consumption policy revisions or reset their counters; active cold start reads the current target-global cap independently.
 
 Rule definition identity becomes a stable algorithm identifier instead of encoding `5/2`; policy revision carries the configurable values. Historical definition/version rows remain readable for audit and are not rewritten.
 
@@ -175,6 +225,8 @@ Alternative considered: snapshot the 24-hour value into each consumption policy.
 Panel APIs:
 
 ```text
+GET /api/facebook/operation-global-policy
+PUT /api/facebook/operation-global-policy
 GET /api/environments/:envKey/facebook-operation-policy
 PUT /api/environments/:envKey/facebook-operation-policy
 GET /api/facebook/groups/comment-policy
@@ -191,11 +243,12 @@ POST /environment-provisioning/complete
 
 The customer GET returns only the owned environment key, configured/effective mode, revision, slow-start state and named blocker. The PUT accepts only `expectedRevision` plus one of `persona | slow_start | rule | consumption`; Cloud preserves the stored cadence values and performs the same audited transaction as Panel. A stale revision returns the current projection. Provisioning accepts one mutually exclusive `facebookOperationMode` and writes the environment plus initial policy snapshot atomically; mixing it with legacy slow-start/rule Boolean intents is rejected.
 
-The operation-policy response includes configured base mode, effective mode, slow-start projection, typed parameters, bounds/defaults, policy revision, binding state, and blocker. The content-schedule catalog adds read-only consumption/rule progress and current effective mode but does not accept policy writes.
+The global-policy response includes the local execution target, global revision, rule/consumption defaults, cold-start duration and daily caps, server bounds, audit metadata, and source. The environment operation-policy response includes configured base mode, effective mode, cadence source, effective typed parameters, bounds/defaults, policy revision, binding state, and blocker. The content-schedule catalog adds read-only consumption/rule progress and current effective mode but does not accept policy writes.
 
 Console:
 
-- `/environments` owns the mode and cadence editor;
+- `/environments` begins with the target-global rule/consumption/cold-start numeric editor;
+- each Facebook environment row owns mode selection plus an explicit `继承全局 / 独立配置` cadence source; numeric fields are editable only for independent configuration;
 - `/facebook-groups` owns the join-to-first-comment policy editor;
 - `/content-schedule` shows runtime progress and blockers only.
 
@@ -244,6 +297,8 @@ No metric or Console label collapses lease release, dispatch, or ambiguous recei
 - **[No group is eligible when the comment threshold is reached]** → Keep one durable `waiting_target` obligation and re-evaluate strict eligibility; never relax the warmup/cooldown.
 - **[Legacy rule and slow-start rows conflict during migration]** → Preserve slow-start precedence, keep the rule choice as resumable base, emit a migration/audit marker, and expose effective versus configured mode.
 - **[DEV configuration affects OL in the shared database]** → Scope the group timing row and all runtime work by `execution_target`; environment operation policy follows the existing shared business-config authority and runtime still filters its local target.
+- **[A longer cold-start duration revives graduated accounts]** → Persist a target-scoped completion row before changing duration and treat it as monotonic until an explicit re-enable clears it.
+- **[A global cadence edit reinterprets accumulated counters]** → Allocate and audit a new environment revision for each inheritor; do not touch independent overrides or copy old progress.
 - **[Console and Cloud deploy out of order]** → Cloud accepts the current rule-toggle compatibility API, while the new Console feature is hidden until the new read contract and bounds are present.
 - **[Large scheduler integration surface]** → Keep action execution behind existing join/comment executors and add focused acceptance tests for mode admission and outcome classification before full suites.
 
@@ -255,14 +310,17 @@ No metric or Console label collapses lease release, dispatch, or ambiguous recei
    - default other environments to `persona`;
    - add target-scoped group-comment policy with legacy fallback;
    - add empty consumption runtime tables.
+   - add target-global numeric policy and audit rows per `execution_target`;
+   - mark existing environment cadence as independent and default new policies to inheritance;
+   - add sticky environment slow-start graduation state.
 2. Deploy Cloud code that dual-reads existing rule configuration only when no new policy row exists, exposes the new APIs, and keeps the released rule-toggle adapter.
 3. Switch rule admission/runtime writes to policy revision and add consumption orchestration behind `mode=consumption`; default migration never enables consumption.
 4. Gate scheduled group joins on effective `persona` immediately before claim and dispatch.
-5. Deploy Console editors and runtime projection, then persist the DEV group-comment policy and verify write-after-read.
+5. Deploy Console editors and runtime projection, persist the DEV global numeric and group-comment policies, and verify inheritance, independent override, cold-start current-day behavior, and write-after-read.
 6. Run real DEV verification only on explicitly selected test environments/accounts: mode switch truth, no scheduled join outside persona, one confirmed consumption transition, strict no-eligible-group behavior, and ambiguous outcome non-counting. Do not perform additional platform writes beyond the approved probe.
 
 Rollback disables new admissions first, restores rule reads through the retained legacy row, and leaves additive policy/runtime/audit rows intact. Dispatched actions are allowed to settle; no rollback rewrites confirmed or ambiguous historical facts.
 
 ## Open Questions
 
-None. Product decisions are fixed for this change: confirmed-new outcome counting, no scheduled group joining outside persona mode, timestamp-only group eligibility, and current first-commentable-item semantics.
+None. Product decisions are fixed for this change: confirmed-new outcome counting, no scheduled group joining outside persona mode, timestamp-only group eligibility, current first-commentable-item semantics, target-global numeric defaults with retained environment overrides, and sticky cold-start graduation.

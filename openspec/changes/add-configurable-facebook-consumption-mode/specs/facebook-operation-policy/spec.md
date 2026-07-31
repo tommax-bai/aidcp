@@ -37,9 +37,11 @@ Every read and write MUST validate the environment's authoritative normalized pl
 - **THEN** the effective operation mode remains that configured base mode unless slow start or a named fail-closed blocker wins
 - **AND** Cloud MUST NOT fall back to persona behavior or its independent scheduled join source
 
-### Requirement: Operation policy parameters are typed and server-bounded
+### Requirement: Global numeric policy and environment cadence overrides are typed and server-bounded
 
-The operation-policy API SHALL expose a server-owned schema catalog and accept only the typed fields applicable to the selected mode. It MUST NOT accept a generic action graph, script, prompt, action list, arbitrary JSON parameters, account selector, execution target, or client-supplied bounds.
+Cloud SHALL persist one target-global Facebook numeric policy for each local `execution_target`. It SHALL contain the default rule cadence, default consumption cadence, cold-start total days, and a complete ordered daily-cap row for every cold-start day. The API SHALL infer the local target and MUST NOT accept a caller-selected execution target, generic action graph, script, prompt, arbitrary JSON parameters, account selector, or client-supplied bounds.
+
+Each environment policy SHALL declare `cadenceSource=global|environment`. Existing materialized environment policies SHALL migrate to `environment` so current independent values are preserved. A newly created environment policy SHALL default to `global`. Global-source reads SHALL return the values materialized from the current target-global policy; environment-source reads SHALL return the independent stored values.
 
 The initial server bounds and defaults SHALL be:
 
@@ -50,26 +52,80 @@ The initial server bounds and defaults SHALL be:
 | `consumption` | `viewsPerLike` | integer | 1..100 | 5 |
 | `consumption` | `confirmedLikesPerJoin` | integer | 1..20 | 2 |
 | `consumption` | `confirmedJoinsPerComment` | integer | 1..20 | 2 |
+| `slowStart` | `totalDays` | integer | 1..30 | 7 |
+| `slowStart.dailyCaps` | `view` | integer | 0..300 | current 7-day Facebook curve |
+| `slowStart.dailyCaps` | `like` | integer | 0..100 | current 7-day Facebook curve |
+| `slowStart.dailyCaps` | `comment` | integer | 0..15 | current 7-day Facebook curve |
+| `slowStart.dailyCaps` | `follow` | integer | 0..30 | current 7-day Facebook curve |
+| `slowStart.dailyCaps` | `publish` | integer | 0..2 | current 7-day Facebook curve |
+| `slowStart.dailyCaps` | `search` | integer | 0..20 | current 7-day Facebook curve |
+| `slowStart.dailyCaps` | `joinGroup` | integer | 0..5 | current 7-day Facebook curve |
 
-`persona` MUST NOT accept rule- or consumption-cadence fields. Missing values on creation SHALL be materialized from the server defaults into the immutable policy snapshot; reads MUST return the stored values, bounds, defaults, policy schema version, and revision. Invalid types, fractional values, unknown keys, out-of-range values, or fields belonging to another mode MUST reject the entire write without clamping or partial persistence. Join-to-first-comment waiting is governed by the separate Facebook group-comment policy and MUST NOT be copied into this cadence snapshot.
+Environment mode selection remains environment-scoped and independent of the global numeric revision. A global numeric write SHALL require a complete typed payload and global `expectedRevision`. An environment write selecting `cadenceSource=environment` SHALL require complete rule and consumption values; selecting `global` SHALL reject cadence values and materialize the current global values. Missing cold-start days, duplicate/non-contiguous day indexes, invalid types, fractional values, unknown keys, or out-of-range values MUST reject the entire write without clamping or partial persistence. Facebook-unsupported `collect`, `comment_like`, and `dm_reply` remain zero and MUST NOT be configurable. Join-to-first-comment waiting remains governed by the separate Facebook group-comment policy.
 
-#### Scenario: Consumption defaults are materialized
+#### Scenario: New environment inherits global values
 
-- **WHEN** a new consumption policy is created without explicit cadence overrides
-- **THEN** Cloud stores `viewsPerLike=5`, `confirmedLikesPerJoin=2`, and `confirmedJoinsPerComment=2`
-- **AND** the write-after-read response contains those stored values rather than client-computed defaults
+- **WHEN** a new Facebook environment policy is created while the target-global consumption cadence is `5/2/2`
+- **THEN** Cloud stores `cadenceSource=global` and materializes `viewsPerLike=5`, `confirmedLikesPerJoin=2`, and `confirmedJoinsPerComment=2`
+- **AND** the write-after-read response identifies inheritance rather than presenting the values as an environment override
 
-#### Scenario: Rule values are independently configurable
+#### Scenario: Existing and explicitly independent values are preserved
 
-- **WHEN** an operator writes a rule policy with in-range `viewsPerLike` and `joinEveryNRounds`
-- **THEN** Cloud stores those exact typed values in the new revision
-- **AND** it does not infer a consumption comment cadence or encode the numbers into an executable script
+- **WHEN** an existing policy migrates or an operator selects independent configuration with complete in-range rule and consumption values
+- **THEN** Cloud stores `cadenceSource=environment` and those exact values in a new environment revision
+- **AND** later target-global cadence changes do not change that environment revision or its runtime counters
 
-#### Scenario: Foreign or out-of-range parameter rejects atomically
+#### Scenario: Global cadence propagates through immutable environment revisions
 
-- **WHEN** a persona policy carries `viewsPerLike`, a rule policy carries `confirmedJoinsPerComment`, or any numeric value is fractional or outside its server bound
-- **THEN** Cloud rejects the whole request with a field-specific validation reason
-- **AND** the current policy revision remains byte-for-byte unchanged
+- **WHEN** an administrator commits a valid target-global rule or consumption cadence change
+- **THEN** Cloud creates one audited global revision and one new audited environment policy revision for every `cadenceSource=global` environment
+- **AND** each inheriting revision starts new runtime progress while independent environments remain byte-for-byte unchanged
+
+#### Scenario: Invalid global or override payload rejects atomically
+
+- **WHEN** a global payload omits a cold-start day, contains a cap above its server bound, or an environment inheritance write also carries cadence values
+- **THEN** Cloud rejects the complete write with a field-specific validation reason
+- **AND** no global revision, environment revision, audit success record, or partial propagation is created
+
+### Requirement: Cold-start configuration follows current day and graduation is sticky
+
+Cloud SHALL derive the current cold-start day from the environment's existing server-day-aligned `slow_start_since` and SHALL resolve the current target-global daily cap on each admission. Saving cold-start configuration MUST NOT reset or shift that anchor. The configured caps SHALL remain an additional element-wise minimum with the account's current risk quotas and MUST NOT widen risk, approval, session, or platform gates.
+
+Cloud SHALL persist sticky graduation keyed by `envKey + executionTarget`.
+Before replacing a longer or shorter target-global duration, it MUST preserve
+every environment already graduated under that target's prior duration; after
+a shorter duration is committed, any active environment now beyond the new
+duration SHALL graduate immediately for that target. A DEV duration change
+MUST NOT create or clear an OL completion fact, and vice versa. Once graduated
+for a target, an environment MUST NOT re-enter cold start there solely because
+`totalDays` later increases. Only an explicit operator selection or re-enable
+of `slow_start` for an off or graduated environment MAY clear graduation,
+write a fresh current server-day anchor, and start day 1; selecting it again
+while already active MUST preserve the current anchor.
+
+#### Scenario: Active day keeps its progress
+
+- **WHEN** an environment is active on cold-start day 5 and an administrator changes total days or day-5 caps
+- **THEN** the environment remains on day 5 and immediately uses the committed day-5 caps
+- **AND** no anchor, account identity, or prior-day progress is rewritten
+
+#### Scenario: Graduated environment is not revived
+
+- **WHEN** an environment graduated under a 7-day policy and the administrator later changes `totalDays` to 14
+- **THEN** that environment remains graduated
+- **AND** no slow-start action is admitted unless an operator explicitly re-enables slow start
+
+#### Scenario: Shorter duration graduates immediately
+
+- **WHEN** an active environment's derived current day is greater than a newly committed `totalDays`
+- **THEN** its slow-start state becomes graduated in the same policy transition
+- **AND** its resumable base mode becomes effective without resetting rule or consumption counters
+
+#### Scenario: Explicit re-enable starts a new lifecycle
+
+- **WHEN** an operator explicitly selects slow start for an off or graduated environment
+- **THEN** Cloud writes the current server-day anchor, clears the sticky graduation marker, and returns day 1
+- **AND** a repeated read or global policy edit does not perform that reset
 
 ### Requirement: Policy writes use compare-and-swap, immutable audit, and write-after-read truth
 
@@ -145,7 +201,7 @@ The unified projection SHALL accept `slow_start` as an explicit operator selecti
 
 ### Requirement: Console configuration and runtime projection have one authority
 
-The management Console SHALL edit Facebook operation policy only on `/environments`, addressed by `envKey`, using the server-provided schema, bounds/defaults, `expectedRevision`, pending state, conflict handling, and write-after-read response. It SHALL show configured base mode separately from effective runtime mode, the slow-start lifecycle projection, binding state, policy revision, current account when uniquely known, and named blockers. An unbound environment MAY be configured and SHALL be labelled as having no current execution object.
+The management Console SHALL edit the target-global Facebook numeric policy in one clearly labelled global card on `/environments`, using its own server-provided bounds, `expectedRevision`, pending state, conflict handling, and write-after-read response. Each Facebook environment editor SHALL remain addressed by `envKey`, show `继承全局 / 独立配置`, make numbers editable only for independent configuration, and separately show configured base mode, effective runtime mode, slow-start lifecycle, binding state, environment policy revision, current account when uniquely known, and named blockers. An unbound environment MAY be configured and SHALL be labelled as having no current execution object.
 
 `/content-schedule` SHALL expose only read-only effective-mode, progress, batch, and blocker projections for the currently bound account. It MUST NOT retain a rule/consumption mode switch, cadence editor, hidden mutation, or account-keyed fallback that creates a second configuration authority. Failed, stale, incomplete, or unavailable reads MUST render unknown/unavailable and MUST NOT fabricate `persona`, disabled, zero progress, or a successful write.
 

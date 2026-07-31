@@ -57,13 +57,16 @@
 
 `accounts` 21 · `client_users` 4 · `publish_log` 3 · `interaction_reply_config_scopes` 3 ·
 `delegated_tasks` 2 · `facebook_group_target` 2 · `account_facebook_publish_image` 2 ·
-`account_facebook_publish_image_set` 1 · `client_environments` 6 · `facebook_consumption_progress` 2 ·
+`account_facebook_publish_image_set` 1 · `client_environments` 7 · `facebook_consumption_progress` 2 ·
 `facebook_consumption_action` 1 · `persona_auto_fill_runs` 1 · `interaction_messages` 1 ·
 `interaction_reply_jobs` 1 · `interaction_threads` 1。
 
-本 change 新增两条 `client_environments` 外键，来自 `facebook_operation_policy.env_key` 与
-`facebook_operation_policy_audit.env_key`；配置、审计与环境台账均属 `aidcp-api`，物理拆库时 MUST
-保持同库迁移。`facebook_consumption_view_fact`、`facebook_consumption_action` 对
+本 change 新增三条 `client_environments` 外键，来自
+`facebook_operation_policy.env_key`、`facebook_operation_policy_audit.env_key` 与
+`facebook_environment_slow_start_completion.env_key`；配置、审计、按执行目标隔离的慢启动毕业事实
+与环境台账均属 `aidcp-api`，物理拆库时 MUST 保持同库迁移。该毕业事实即使按
+`execution_target` 分行，外键仍是数据库级约束：拆 schema 后成立，拆库后不成立。
+`facebook_consumption_view_fact`、`facebook_consumption_action` 对
 `facebook_consumption_progress` 的两条外键，以及 action result 对
 `facebook_consumption_action` 的一条外键，均处于 `aidcp-automation` 运行事实域，也 MUST 同库。
 若未来拆分这些属主内表，必须先改为持久命令/应用层存在性校验，并让孤儿引用 fail-closed。
