@@ -48,6 +48,12 @@ Resolution order is:
 2. authoritative slow-start state `active` → `slow_start`;
 3. otherwise → the stored base mode.
 
+An unbound environment has no effective runtime mode, so its projection keeps
+`effectiveMode=null`. That absence of an execution object MUST NOT erase the
+environment-level selection: a persisted active slow-start anchor is still
+projected as `slowStart.state=active`, and clients reconstruct the configured
+choice from the slow-start lifecycle before falling back to `baseMode`.
+
 Selecting `slow_start` through the unified backend API activates the existing slow-start lifecycle and sets the resumable base mode to `persona`. Selecting another mode disables active slow start and updates the base mode in one service transaction. Existing environments that already have both active slow start and rule enabled retain rule as their resumable base during migration, so current post-graduation behavior is not silently lost.
 
 Only effective `persona` admits the independent time-scheduled group-join trigger. Rule and consumption orchestration may call the same lower-level join executor, but never the time scheduler or its weekly/daily cadence. This is an admission decision made immediately before claiming work, not just a UI convention.

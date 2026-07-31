@@ -6,7 +6,7 @@
 - [x] 1.4 Add Panel `GET/PUT /api/environments/:envKey/facebook-operation-policy` routes and map the customer environment rule-toggle endpoint through its bounded `persona ↔ rule` compatibility contract.
 - [x] 1.5 Implement the target-scoped group-comment policy store and `GET/PUT /api/facebook/groups/comment-policy`, including `db → legacy_env → default` read source, CAS, audit, strict bounds, and write-after-read.
 - [x] 1.6 Add focused store/API tests for defaults, unbound environment writes, ownership/platform rejection, stale revisions, concurrent writes, audit atomicity, compatibility conflicts, and unavailable schema/storage.
-  <!-- aidcp-cloud: migrations 0100-0102; operation/group policy stores and Panel/customer routes; legacy rule compatibility uses exact-env slow-start arbitration, server-read CAS, transactional ownership recheck, and write-after-read binding truth. -->
+  <!-- aidcp-cloud: migrations 0100-0102; operation/group policy stores and Panel/customer routes; legacy rule compatibility uses exact-env slow-start arbitration, server-read CAS, transactional ownership recheck, and write-after-read binding truth. 2026-07-31 regression closure: unbound unified reads now project the committed environment slow-start anchor as active/off/graduated while retaining effectiveMode=null; focused Cloud policy/customer/composition tests passed 110/110. -->
 
 ## 2. Configurable rule-mode cadence
 
@@ -47,14 +47,14 @@
 - [x] 5.6 Extend atomic environment provisioning with mutually exclusive `facebookOperationMode`, initial policy/audit persistence and write-after-read truth while retaining released Boolean inputs only as compatibility.
 - [x] 5.7 Add the Edge client consumption entry to both Facebook environment creation and the existing-environment mode area, ordered after cold-start and rule, using only the unified Cloud projection and non-optimistic CAS writes.
 - [x] 5.8 Add Cloud customer-route/provisioning tests and Edge intent/IPC/renderer tests for mode ordering, priority, strict inputs, conflicts, offline/unavailable truth and absence of cadence numbers.
-  <!-- aidcp-edge: focused contract/receipt 28/28 plus renderer smoke, npm run typecheck, three node --check commands and git diff --check; no installer/package built. -->
+  <!-- aidcp-edge: focused contract/receipt 28/28 plus renderer smoke, npm run typecheck, three node --check commands and git diff --check; no installer/package built. 2026-07-31 regression closure: Edge renderer accepts baseMode=persona + slowStart.active + effectiveMode=null as an unbound configured slow-start receipt; Console keeps the same selection while showing no execution object. -->
 
 ## 6. Validation, integration and DEV delivery
 
 - [x] 6.1 Run Cloud focused acceptance tests for policy, rule, consumption, group coverage, scheduler, comment outcomes and risk honesty; record command, exit status and concise counts.
   <!-- `npx tsx --test --test-reporter=spec` over 13 focused policy/rule/consumption/group/scheduler/comment files: exit 0, 290/290. Boundary/schema ownership set: exit 0, 43/43. -->
 - [x] 6.2 Run Cloud full tests and typecheck, then Console and Edge focused tests/build/typecheck; resolve only failures caused by this change.
-  <!-- Cloud `npx tsx --test --test-reporter=dot 'test/**/*.test.ts'`: exit 0; `npm run typecheck`: exit 0. Console serial full suite: exit 0, 341/341 with 1 skipped; load-sensitive timeouts from the initial parallel run passed 33/33 serially. Console and Edge type/build evidence is recorded above. -->
+  <!-- Cloud `npx tsx --test --test-reporter=dot 'test/**/*.test.ts'`: exit 0; `npm run typecheck`: exit 0. Console serial full suite: exit 0, 341/341 with 1 skipped; load-sensitive timeouts from the initial parallel run passed 33/33 serially. Console and Edge type/build evidence is recorded above. 2026-07-31 regression closure: Cloud focused 110/110 + typecheck; Console environment tests 15/15 + typecheck + production build (3731 modules, existing chunk warning only); Edge operation-policy renderer/contract suites + typecheck passed. -->
 - [x] 6.3 Run `openspec validate add-configurable-facebook-consumption-mode --strict` and record implementation commits, validations, deviations and delivery evidence in this checklist.
   <!-- Rebased implementation commits before integration: aidcp-cloud f58c2d2, aidcp-console d3e6172 plus enum-safety fix a5edc54, aidcp-edge 992f1e4. Strict OpenSpec validation: exit 0. Deviation: bounded DEV behavior probes remain task 6.6 because no test environment was selected; no Edge package and no OL deployment. -->
 - [x] 6.4 Rebase and fast-forward integrate clean Cloud, Console and Edge default branches, push them and the control change, without modifying unrelated worktree changes.

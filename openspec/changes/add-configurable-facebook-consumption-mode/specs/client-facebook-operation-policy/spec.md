@@ -14,6 +14,12 @@ The PUT body SHALL accept exactly `expectedRevision` plus `mode=persona|slow_sta
 - **THEN** Cloud commits the next environment policy revision and returns `baseMode=consumption`
 - **AND** the response does not fabricate an execution object, action progress or successful platform work
 
+#### Scenario: Owned unbound environment retains its slow-start selection
+
+- **WHEN** a customer selects `slow_start` for an owned Facebook environment with no bound account and supplies the current revision
+- **THEN** Cloud commits the environment slow-start anchor and returns `baseMode=persona`, `slowStart.state=active`, and `effectiveMode=null`
+- **AND** clients present slow start as the configured choice without fabricating an account or active execution object
+
 #### Scenario: Customer mode write cannot smuggle cadence
 
 - **WHEN** a customer PUT includes `viewsPerLike`, `accountId`, an execution target or any field other than `expectedRevision` and `mode`
