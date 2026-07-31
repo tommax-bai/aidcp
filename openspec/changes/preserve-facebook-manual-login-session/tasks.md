@@ -18,4 +18,5 @@
   <!-- aidcp-edge 90106f1; focused suite 112 passed plus Native manual-login wire test. -->
 - [x] 3.2 Run focused tests, Facebook safety acceptance, full Edge tests, typecheck, Native gates, and strict OpenSpec validation.
   <!-- Post-rebase validation: focused 112/112; acceptance 31/31; full Edge 2857 passed, 1 gated skip, 0 failed; typecheck passed; Native fmt/clippy/test passed; strict OpenSpec passed. -->
-- [ ] 3.3 Record repo commits, validation evidence, integration/push status, and the no-installer delivery boundary.
+- [x] 3.3 Record repo commits, validation evidence, integration/push status, and the no-installer delivery boundary.
+  <!-- Integrated/pushed: aidcp-edge 90106f1 to master; aidcp 3db48344 to main. No deployment or Edge installer was requested or produced; installed clients remain unchanged. -->
