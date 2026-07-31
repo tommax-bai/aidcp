@@ -26,3 +26,31 @@ Before Native dispatches a Facebook login or 2FA submit action, the exact target
 - **WHEN** an already-dispatched Facebook 2FA submit control becomes temporarily non-topmost while the bound document is unchanged
 - **THEN** that cover does not prove the 2FA submit signal disappeared
 - **AND** Native preserves the same bounded, no-replay, fail-closed receipt behavior
+
+### Requirement: Facebook TOTP entry SHALL use one guarded CDP insertion
+
+For the Facebook TOTP field only, Native MUST bind one unique, visible, editable, topmost input in the current document, focus it through CDP, and insert the complete six-digit broker code with one CDP `Input.insertText` call. It MUST NOT assign the DOM value or synthesize JavaScript input or keyboard events. The input binding MUST remain stable across value-driven geometry changes, and Native MUST confirm an exact six-digit same-field readback before allowing submission.
+
+#### Scenario: Email login advances through a paste-like TOTP entry
+- **WHEN** a freshly started Facebook environment advances from the filled email/password login page to a supported empty TOTP page
+- **THEN** Native enters the complete broker code in one guarded CDP insertion
+- **AND** obtains an exact same-field readback before dispatching the bound Continue control
+
+#### Scenario: TOTP layout reflows after insertion
+- **WHEN** inserting the code changes the TOTP input's geometry without replacing the input or document
+- **THEN** the stable structural binding still identifies the same focused input
+- **AND** geometry change alone does not turn the confirmed full insertion into a one-digit or target-lost result
+
+### Requirement: Orphan TOTP text SHALL recover without unsafe submission or restart loops
+
+A TOTP value without the current coordinator's entered-window witness MUST NOT be submitted. On a proven fresh browser start, Native MAY clear the exact bound non-empty TOTP field and confirm it empty before requesting a new code. On an already-active browser without fresh-start authority, Edge MUST perform no TOTP mutation and SHALL retain the session as manual-required instead of terminating with a process error. Non-confirmed auth actions SHALL preserve their bounded Native receipt reason for diagnosis.
+
+#### Scenario: Fresh start finds a partial orphan code
+- **WHEN** a proven fresh browser start reaches a supported TOTP field containing residual text without a coordinator-owned entered window
+- **THEN** Native clears the exact field, confirms it empty, and obtains a fresh probe before any new code entry
+- **AND** never submits the residual value
+
+#### Scenario: Active browser finds orphan TOTP text
+- **WHEN** an already-active browser lacks fresh-start authority and contains residual TOTP text
+- **THEN** Edge performs no input or submit action
+- **AND** reports manual-required while retaining the browser instead of entering an abnormal restart loop
