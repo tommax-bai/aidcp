@@ -7,11 +7,13 @@ Updated: 2026-08-01 (Asia/Shanghai)
 This is the active implementation change:
 
 - Change: `add-managed-automation-task-channel-phase-1`
-- Progress: **19/39 tasks (49%)**
+- Progress: **21/39 tasks (54%)**
 - Control branch: `codex/add-managed-automation-task-channel-phase-1`
 - Control worktree: `/Users/baitianxing/codes/aidcp.wt/add-managed-automation-task-channel-phase-1`
 - Automation worktree: `/Users/baitianxing/codes/aidcp-automation.wt/add-managed-automation-task-channel-phase-1`
 - Kernel worktree: `/Users/baitianxing/codes/aidcp-kernel.wt/add-managed-automation-task-channel-phase-1`
+- Transport worktree: `/Users/baitianxing/codes/aidcp-transport.wt/add-managed-automation-task-channel-phase-1`
+- API worktree: `/Users/baitianxing/codes/aidcp-api.wt/add-managed-automation-task-channel-phase-1`
 
 At the start of a new session:
 
@@ -68,12 +70,13 @@ until the task 6.1 production-root gate closes.
 | Repo | Default baseline | Feature head at handoff | Default behind feature | Feature behind default |
 |---|---|---|---:|---:|
 | `aidcp` | `origin/main@d397aaa7` | handoff commit on this branch | feature commits only | 0 |
-| `aidcp-automation` | `origin/master@76aded7f` | `de602c7c` | 9 commits | 1, intentionally deferred to task 6.1 |
+| `aidcp-automation` | `origin/master@76aded7f` | `4b885a35` | 10 commits | 1, intentionally deferred to task 6.1 |
 | `aidcp-kernel` | `origin/master@9cfd1c98` | `2fe845ba` | 2 commits | 0 |
-| `aidcp-transport` | `origin/master@a2ffe054` | `faf78a15` | 1 commit | 0 |
+| `aidcp-transport` | `origin/master@a2ffe054` | `e031d6a5` | 2 commits | 0 |
+| `aidcp-api` | `origin/master@8c0ba78b` | `354dcc4` | 2 commits | 0 |
 
-Do **not** merge the phase-one branches into defaults yet. The change is incomplete, the API owner
-adapter/worker/production roots are not built, and guarded PostgreSQL integration has not run.
+Do **not** merge the phase-one branches into defaults yet. The change is incomplete, the managed
+worker/research executor/production roots are not built, and guarded PostgreSQL integration has not run.
 Before eventual integration, fetch/rebase each repo again, rerun the required suites, and use
 fast-forward-only history.
 
@@ -101,13 +104,27 @@ The old Qoder Cloud branch remains source material only:
 - The feature branch now ends at `2fe845b`, a merge of current `origin/master@9cfd1c9` into the
   already-pushed DTO commit. Kernel full tests are **73/73** and typecheck passes.
 
-### Transport (`faf78a1`)
+### Transport (`e031d6a`)
 
 - Exact closed JSON validators for Create/Cancel/Query envelopes and responses.
 - Authenticated `internal/managed-task/v1/*` Automation route registration and API HTTP client.
 - Deterministic auth/disabled-route/protocol/target rejection remains distinct from ambiguous
   timeout, disconnect, handler error, or malformed write response.
 - Ambiguous Create/Cancel returns `result_unknown` once with the original command id and no retry.
+- The HTTP boundary transparently re-exports the exact managed-task DTO/port types carried by its
+  kernel dependency; API therefore consumes one transport contract instead of defining a copy.
+
+### API (`19956bd`, branch head `354dcc4`)
+
+- API-owned adapter accepts only already-authenticated actor context, re-checks the live customer
+  enablement plus forward/reverse environment-account scope, and validates the exact account platform.
+- It injects contract version and server-selected target, creates canonical Create/Cancel payload
+  hashes, and calls only `ManagedTaskCommandPort`; it imports no Automation stores and has no Edge or
+  legacy delegated-task fallback.
+- Account denial stops before the Automation call. Cross-account Query returns common `not_found`;
+  authority read failure remains named `managed_task_authorization_unavailable`.
+- API absorbed concurrent `origin/master@8c0ba78b` with a normal merge after the feature branch had
+  been pushed. Kernel/transport now resolve to one exact instance (`2fe845b` / `e031d6a`).
 
 ### Automation
 
@@ -122,6 +139,7 @@ The old Qoder Cloud branch remains source material only:
 | `0a4ecbf` | bounded immutable PlanCompiler and StepExecutor contracts |
 | `e9bf456` | Create/Cancel/Query services, atomic command unit of work, safe projections |
 | `de602c7` | transport pin plus real owner-service HTTP/drift slice |
+| `4b885a3` | cancellation-before/after-dispatch reconciliation coverage |
 
 Important store guarantees already present:
 
@@ -140,11 +158,11 @@ Important store guarantees already present:
 
 Passed in `aidcp-automation`:
 
-- managed contract/registry/compiler/store/command/service/HTTP focused suite: **35/35**;
+- command/store/service/HTTP edge-case slice: **14/14**;
 - combined managed/schema/boundary focused run: **48/48**;
 - schema/owner focused suite: **25/25**;
 - acceptance suite: **145/145**;
-- full suite: **2075 pass / 0 fail / 4 guarded skips**;
+- full suite: **2076 pass / 0 fail / 4 guarded skips**;
 - boundary census: `source=282 ownership=282 unresolved=0 forbidden=0`;
 - `npm run typecheck`: pass.
 
@@ -153,6 +171,19 @@ Passed in `aidcp-transport`:
 - managed-task HTTP and drift focused suite: **10/10**;
 - full suite: **46/46**;
 - `npm run typecheck`: pass.
+
+Passed in `aidcp-api`:
+
+- managed-task API owner adapter: **7/7**;
+- acceptance suite: **3/3**;
+- full suite: **508/508**;
+- `npm run typecheck`: pass;
+- `npm ls`: one exact direct/transitive kernel instance and one transport instance.
+
+The inherited `boundaries:refresh` / `boundaries:census` package scripts in this API baseline point
+to a helper file that is not present in the split repository, so no API boundary-census pass is
+claimed. The new file is in the existing `src/client-auth/` `newFile=inherit` API-owner rule and its
+generated manifest entry was recorded explicitly; Automation's real boundary census remains green.
 
 Passed in `aidcp-kernel` after absorbing the concurrent E-2 baseline:
 
@@ -189,9 +220,8 @@ as no production composition-root file is wired.
 
 Recommended next order:
 
-1. Tasks 4.3-4.4: API authorization adapter plus command/route edge-case coverage.
-2. Tasks 5.2-5.6: lane arbiter, worker, research executor, dispatch adapter, vertical slice.
-3. Tasks 6.x only after the external production-root gate closes.
+1. Tasks 5.2-5.6: lane arbiter, worker, research executor, dispatch adapter, vertical slice.
+2. Tasks 6.x only after the external production-root gate closes.
 
 Do not extend task 4.2 by putting business services in kernel/transport or by reconnecting the old
 Cloud monolith. Do not infer lane availability from WebSocket/session mode.
