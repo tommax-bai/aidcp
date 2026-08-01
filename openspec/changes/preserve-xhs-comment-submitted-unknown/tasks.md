@@ -12,14 +12,15 @@
 
 ## 3. Delivery
 
-- [ ] 3.1 Record repository SHAs, validation evidence, deployment state, and deviations in this task ledger.
-- [ ] 3.2 Rebase onto current default branches, fast-forward integrate, and push control `main` plus Cloud `master` after all gates pass.
-- [ ] 3.3 Deploy the clean Cloud default branch to DEV, then verify the documented service, listener, health, and bounded logs without executing real-account actions.
+- [x] 3.1 Record repository SHAs, validation evidence, deployment state, and deviations in this task ledger.
+- [x] 3.2 Rebase onto current default branches, fast-forward integrate, and push control `main` plus Cloud `master` after all gates pass.
+- [x] 3.3 Deploy the clean Cloud default branch to DEV, then verify the documented service, listener, health, and bounded logs without executing real-account actions.
 
 <!-- Delivery evidence (updated 2026-08-02):
-- aidcp-cloud implementation worktree commit: 2875244.
+- Repositories: aidcp-cloud `2875244` on `master`; control contract/tasks `c8a704be` on `main` before this closeout-only ledger update.
 - Validation: focused 56 pass; acceptance 184 pass; full 4091 pass / 11 skip / 0 fail; typecheck exit 0.
 - OpenSpec: change strict valid; all strict 211 pass / 0 fail.
-- Deployment: pending clean-default integration.
+- DEV deployment: clean aidcp-cloud `master` `2875244`; backup `/opt/aidcp/cloud.bak.20260802-055654.tar.gz` plus `.env.bak.20260802-055654`; synced source hash matched; no dependency or migration-file delta; migrate status had 0 pending for content/automation/api; `.deployed-commit` now records the full SHA and timestamp.
+- DEV verification: `aidcp-cloud.service` active with `NRestarts=0`; 8787/8090/8091 listening; panel and client-auth health `ok:true`; PostgreSQL accepting connections; schema enforce passed at 0069/0106/0105; automation writer lock held for dev; Feishu `WSClient onReady`; external WebSocket handshake passed; startup failure count 0; four `isales-*` services remained active.
 - Deviation: added a targeted-comment regression after read-only adversarial review exposed the delegated retry path; no scope expansion beyond Cloud classification and tests.
 -->
