@@ -523,3 +523,69 @@
 **新登记的真机项**：backlog 簇 **123.29**（评论提交后平台清不清空评论框 —— **本簇优先级最高**，
 它不确认，H.1 的收益就只剩「不再自证」，代价却是全量回执降级）、**123.30**（轮询窗口够不够 /
 新原因码频次）；定时设置那条并进了既有的 **123.12**，没另开条目。
+
+
+---
+
+# 12. 第六轮（2026-08-01 收尾）—— 对账推广到其余五条线
+
+承 §11.1。把「delta 与实装逐条对账」推到本批其余 5 个活跃 change。**先说结论：确实是通病，
+但不是均匀分布 —— 集中在有弃守裁定的那两条线上。**
+
+## 12.1 分诊法（可复用）
+
+驱动判据不是通读，是**先找裁定**：`grep` 每个 change 的 `tasks.md` 找
+「显式弃守 / 具名弃守 / 具名收窄 / 已弃守 / 裁定…不做」，再拿这些条目去查
+**delta 里有没有一条 Requirement 在断言它们**。一条弃守裁定往往一次性作废整条 Requirement，
+所以这个方向查得又快又准。
+
+| change | Requirement 数 | 弃守类标记 | 结果 |
+| --- | --- | --- | --- |
+| `enforce-native-engine-artifact-gates` | 12 | **12** | **2 条命中，已修** |
+| `native-page-engine-production-cutover` | 20 | 4 | 逐条核过 —— **delta 干净**，1 条建议属主复核 |
+| `restore-native-xiaohongshu-action-honesty` | 17 | 2 | 重点条核过 —— **不构成命中**，1 条建议属主复核 |
+| `harden-native-engine-runtime-contracts` | 9 | 0 | **只做了标记扫描，未逐条读** |
+| `restore-native-facebook-residual-parity` | 15 | 0 | **只做了标记扫描，未逐条读** |
+
+## 12.2 修掉的两条（都在 `enforce-native-engine-artifact-gates`）
+
+1. **`edge-desktop-packaging` 的「双平台打包目标」MODIFIED —— 整段摘出。**
+   那次 MODIFY 只加了一样东西：平台相关资源**按目标平台解析暂存目录** + 跨平台失败时报错
+   须写明「目标 / 主机 / 实际解析目录」—— 也就是任务 **9.1–9.3**，而那一整节
+   2026-07-31 已**显式弃守**。留着它，归档会把三条没实装的 MUST 并进主 spec，
+   **而主 spec 里那条要求本来是干净的**。
+   ⚠️ 摘出时特别标注了一条：**MODIFY = 整块替换**，将来要恢复必须把主 spec 那条的
+   全部条款与 scenario 逐条抄回，只写新增段会**静默删掉**已有的双架构与 nsis 要求。
+2. **`native-engine-artifact-gates` 的「退役路径覆盖不得冒充生产覆盖」—— 整条摘出。**
+   整条对应 **8.1–8.3**，已显式弃守（做的是测试信号分层、属工程整洁）。
+   **摘出时写清了「弃守 ≠ 这件事不存在」**：拿退役路径用例给 Native 行为充覆盖这个坑是真的、
+   本批已经踩过（夹具编码了引擎不再走的分支＝死码喂绿），只是**它靠人读、不靠这条规格**。
+
+**⚠️ 这两处是跨属主编辑**（`enforce-native-engine-artifact-gates` 当前无人开工，
+但它不是本 session 认领的 change）。方向是**只减不增**、且防的是一次坏归档，
+但仍须该 change 的属主**追认**。
+
+## 12.3 两条建议属主复核（本轮不代改）
+
+- **`native-page-engine-production-cutover`**：`Existing Xiaohongshu safety and behavior contracts
+  MUST survive migration` 里点名了 `no-fake-success behavior`。而**这一整批修复 change 的存在
+  本身就说明它没完全 survive**。它们正在被修，所以这条不是「断言了没做的事」，
+  而是**口径问题**：归档时是按「迁移当时」读还是按「修完之后」读，须属主定。
+  另：该 change 的 3.2 整条显式弃守，`tasks.md` 里已自带一条写得很清楚的归档红线
+  （「规格只能写『已实现』那一列」）—— 实核之后 **delta 里并没有对应的定位类 Requirement**，
+  那条红线防的是任务清单被读成能力，delta 本身是干净的。
+- **`restore-native-xiaohongshu-action-honesty`**：`Unmeasured Xiaohongshu compatibility branches
+  are removed rather than left claiming success` **不构成命中** —— 它的 scenario 是 either/or
+  （「要么按实测位移回报、要么分支不存在」），而滚动步已改成按实测回报（2.8 已勾）。
+  但有一件相关的事该属主读一下：被引擎特化**截走的那批死分支**（评论提交 / 发布字段填写 /
+  三条翻页滚动段 / 评论滚动 / 现在加上话题）**至今一条没删**，它们现在测的是引擎已不再走的分支。
+
+## 12.4 没做完的那一半，说清楚
+
+`harden-native-engine-runtime-contracts`（9 条）与 `restore-native-facebook-residual-parity`（15 条）
+**只做了弃守标记扫描（0 命中），没有逐条读 delta**。
+
+**「0 标记」不等于「0 漂移」** —— 它只说明这两条线没用本批常见的那几个弃守措辞。
+漂移还可能来自「只做了一半」「实装偏离」这两类，那两类只有逐条读才看得见
+（本 change 自己的 13 条里就有 6 条属于「只做了一半」）。**这两条线仍需一次完整通读，
+不要因为本节列了它们就当已经核过。**

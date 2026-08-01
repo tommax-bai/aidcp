@@ -165,25 +165,16 @@ Project documentation SHALL state that the encoding applied to embedded page rul
 - **THEN** the build and every runtime consumer take the new value from the single definition
 - **AND** a decode assertion over the embedded content runs in the gate suite and fails if any consumer disagrees
 
-### Requirement: Retired-path coverage MUST NOT be presented as production coverage
-
-The Edge test suite SHALL distinguish tests whose subject is a module excluded from the production build from tests that cover production-reachable behavior, and SHALL report the two counts separately. A completion claim for behavior that now lives in the Native engine MUST NOT cite retired-path tests as its coverage. Retired-path tests MUST NOT be silently skipped or deleted as a way of resolving this distinction while they remain the only recorded behavior oracle for a not-yet-ported capability.
-
-#### Scenario: Suite reports both counts
-
-- **WHEN** the Edge test suite finishes
-- **THEN** it reports how many tests covered production-reachable modules and how many covered modules excluded from the production build
-
-#### Scenario: A native behavior claims coverage from a retired test
-
-- **WHEN** a change claims a Native engine behavior is covered, and the only failing-on-regression test targets a module on the production exclusion list
-- **THEN** that claim is rejected and the missing native coverage is recorded
-
-#### Scenario: A production module is added to the exclusion list
-
-- **WHEN** a module is newly excluded from the production build
-- **THEN** the tests targeting it are reclassified as retired-path coverage rather than left counted as production coverage
-
+> **「退役路径覆盖不得冒充生产覆盖」这条要求已从本 delta 摘出（2026-08-01，归档前对账）。**
+>
+> 它整条对应任务 **8.1–8.3**，而那三条已于 2026-07-31 **显式弃守**（用户裁定）：
+> 它们做的是**测试信号分层**，属工程整洁，不消除任何一条假成功。
+>
+> **弃守不等于这件事不存在** —— 「拿退役路径的用例给 Native 行为充覆盖」这个坑是真的，
+> 本批别的 change 已经踩过（夹具编码了引擎不再走的分支 = 死码喂绿）。只是**它靠人读、
+> 不靠这条规格**；把一条没人实装的分层要求并进主 spec，只会让下一个人以为套件真会分开报数。
+>
+> 真要做时连同 8.1–8.3 一并立项，届时把要求写回规格。
 ### Requirement: Engine gate tests MUST NOT fail from scheduling jitter alone
 
 Tests that exercise time-bounded engine behavior SHALL derive their deadlines from an injectable or test-controlled clock, or SHALL be given budgets that cannot be exhausted by ordinary scheduling and process-startup contention under the suite's default parallelism. A test MUST NOT compute an absolute wall-clock deadline at construction time with a margin smaller than the contention it will run under. Where a test genuinely requires exclusive timing, it SHALL be serialized explicitly rather than left flaky.
