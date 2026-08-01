@@ -68,7 +68,35 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > 取消（`remaining_cancelled_by_user`）、不点则停在 `awaiting_confirmation` **不自作主张往下走**。
 > 卡在这里这么久的原因是**两个错叠在一起**，都已处置，见 §5 那段说明。
 
-> **2026-08-01 批 C 记账半（接手请以这一组为准）**：automation `6958e55`，其余五仓未动。
+> **2026-08-01 批 D 前置（接手请以这一组为准，六仓全动了）**：
+> cloud `8d62dca` / kernel `27cbfc5` / transport `51e6351` / api `5d54143` / content `1ddb917` /
+> automation `f1b6a22`。pin 链按 kernel → transport → 三个业务仓抬完；
+> 测试 cloud 4064 / api 500 / content 441 / automation 2009 / kernel 70 / transport 36，全 0 fail。
+>
+> **出口闸的放行判定已析出 kernel**（`transport-gate-exemptions.ts`）：副本陈旧（`unknown`）时
+> 哪些信封仍必须放行。两个进程都要问这个问题，各写一份的现形方式不是报错，
+> 是**某一侧悄悄多扣住一类信封**——扣住租约归还 = 浏览器槽位永不释放，
+> 而调用方只看到「投递 0 个」，把在线的边缘误报成离线。
+> **写法上有一个坑**：kernel 准入正则禁模块级 `new Set`，`ReadonlySet` 的类型标注**救不了它**，
+> 已改成常量数组 + `includes`。
+>
+> **一条值得记的：同步读普查当场红了一条，那是它该做的。** 它钉的正是「这个同步读住在哪」，
+> 符号一搬就红。**改的是声明位置，不是放宽检查。**
+>
+> **⚠️ 并发状况**：另一路 session 在本轮期间连推了两批 Facebook 相关改动到 cloud master
+> （`46a7003` Reel 节奏、`534af19` 主浏览面）。前者已随本轮派生进子仓（它在 master 上，
+> 派生仓长期不同步是更大的风险，本仓测试全过）；**后者是刚推的，本轮没派生**——
+> 对账里剩下的「内容不同」全是它。
+>
+> **批 D 正文还没开工**，实读后的形状记在这里省下一手一次勘察：
+> 边-云服务端的构造**深度纠缠批 E/F**（`canPushToEdge` 出口闸、`onClose`、`onEdgeRegistered`
+> 三个闭包分别要连接运行时注册表、界面快照、互动存储）。**按 B/C 的办法处理**：
+> 那些取批 E/F 的东西一律做成**必填注入端口**，让编译器逼后面那两批面对，
+> 本批只把自己那几件（验证码协助与协调、指令定序器、租约客户端、消息处理器、
+> 边-云服务端、两个成对指令接收器）装配起来。
+> 验收别忘 `AC-PROTO-*`，以及 CLAUDE §2 那**第 4 处同步**（主动命令路由白名单，编译检查抓不到）。
+>
+> **2026-08-01 批 C 记账半**：automation `6958e55`，其余五仓未动。
 > acceptance 全过、全量 2010 pass / 0 fail、boundaries `forbidden=0`。
 > **批 B 那两个必填口至此都有真实现了**（配置副本陈旧 ← 3.1c 第 3 步；记账断链 ← 本条）。
 >
