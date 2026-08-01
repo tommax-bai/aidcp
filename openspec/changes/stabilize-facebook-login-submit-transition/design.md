@@ -6,6 +6,8 @@ Native already owns a bounded action-postcondition loop under a 30-second comman
 
 The follow-up installed-client run reached the TOTP page from the email/password login page but retained only one digit. The TOTP path currently re-evaluates a focus guard before every character and binds the input with evidence that includes its geometry. Facebook may reflow the form as soon as the first digit is inserted, so the same focused input can acquire a different geometry-derived key before the second character. The action then becomes ambiguous, while the outer protocol reduces every non-confirmed structured action to `probe_failed`. A restarted coordinator cannot reconstruct the prior in-memory TOTP window and therefore refuses the orphan partial value with `entered_totp_window_missing`.
 
+After atomic insertion shipped, a live run confirmed all six digits and then exposed a separate producer gap: Facebook had not rendered Continue by the next probe, so zero matching buttons became fatal `auth_target_not_found`. The resulting restart deliberately lost the in-memory entered-window witness. The new process therefore retained the unknown code, but an empty field in that unproven session would still become `failed(fresh_start_policy_unavailable)`, and the shell did not project either 2FA manual reason as a blocked state.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -17,6 +19,9 @@ The follow-up installed-client run reached the TOTP page from the email/password
 - Enter the complete six-digit TOTP value in one guarded CDP insertion and require exact same-field readback before submit.
 - Recover an orphan non-empty TOTP value only when fresh-start mutation authority is proven, while retaining unproven browsers for manual handling without a process-error loop.
 - Keep bounded Native action reasons visible through the coordinator.
+- Keep the coordinator alive while a confirmed, owned TOTP value waits for its Continue control to hydrate.
+- Make proven TOTP clearing retain clear-only semantics across the Native fresh probe and refuse if the observed field value changes.
+- Keep unproven stale and empty TOTP states manual-required and visible without weakening genuine failed-to-code-1 handling.
 
 **Non-Goals:**
 
@@ -56,6 +61,22 @@ A non-empty TOTP field without the current coordinator's entered-window witness 
 
 The router classifies both partial and six-digit orphan values as refresh-required when no entered-window witness is supplied. This classification authorizes only clearing; submission still requires the coordinator-owned entered window. The coordinator also prefers the bounded Native action receipt reason over the generic non-confirmed protocol envelope reason so future failures remain diagnosable.
 
+### 6. Treat a missing post-entry Continue control as hydration only
+
+Once Native has confirmed an exact six-digit readback and the coordinator supplies its entered-window witness, zero exact Continue controls is a non-actionable `none` observation. The existing bounded coordinator poll waits without input and preserves the entered window. If the control appears, the normal unique/topmost submit gate applies. If the code becomes stale first, the router emits refresh-required and the owned clear-and-reenter path runs.
+
+This exception applies only to zero controls in the supported TOTP context. Multiple matching controls remain ambiguous, and a unique covered control remains non-topmost and blocked. Missing controls are never treated as submission success.
+
+### 7. Keep clear-only freshness separate from submit authority
+
+A TOTP refresh signal id binds both the stable input identity and the current non-empty value inside the existing opaque composite digest; no standalone value or low-entropy code digest is exposed. Native re-probes a clear action without supplying an entered-window witness, so the same unchanged value remains refresh-required rather than being reclassified as submit-ready. The coordinator still decides whether clearing is authorized: either it owns the entered window or the browser has proven fresh-start mutation authority. Native clicks the rebound input, sends CDP key events, and confirms an empty same-field readback.
+
+Passing a synthesized current window into the clear fresh probe was rejected because six digits do not prove which TOTP window produced them; it can accidentally manufacture submit semantics. Omitting value binding was rejected because a user or page could replace the observed value before the clear action.
+
+### 8. Retain unproven TOTP sessions as explicit manual work
+
+An already-active browser without fresh-start authority never receives automatic TOTP input or clearing. Both a residual non-empty field and a subsequently empty TOTP field return manual-required rather than failed. During retained login waiting, Edge republishes a changed manual reason through the existing lifecycle event. Electron accepts only the enumerated credential, 2FA, and exhausted read-only probe manual reasons, releases the serial launch waiter, projects the browser as blocked, and renders `需处理`; unknown coordinator failures still terminate with code 1.
+
 ## Risks / Trade-offs
 
 - **A real blocking overlay appears immediately after click** → The verifier waits only within the 7-second receipt window and then returns ambiguous; it never clicks through or replays the signal.
@@ -63,6 +84,10 @@ The router classifies both partial and six-digit orphan values as refresh-requir
 - **A submit control is genuinely removed before navigation** → Structural disappearance remains valid confirmation, followed by a fresh probe before any later action.
 - **A TOTP insertion or exact readback is ambiguous** → The action remains unconfirmed and the code is never submitted from that receipt.
 - **An active browser contains orphan TOTP text** → No automatic mutation occurs; the retained session reports manual handling rather than repeatedly crashing.
+- **Facebook delays the Continue control after TOTP insertion** → The coordinator performs bounded read-only polling; ambiguity or occlusion still fails closed and no submit is replayed.
+- **The TOTP value changes between refresh observation and clear** → The value-bound signal id changes and Native refuses the stale clear action.
+- **An operator clears an orphan code in an active browser** → The empty TOTP page remains manual-required and does not turn into another abnormal child exit.
+- **Read-only auth probes exhaust their transient budget** → The retained browser becomes an explicit `需处理` state and releases the serial launch waiter; the known manual condition is not left as an indefinite `启动中` projection.
 
 ## Migration Plan
 

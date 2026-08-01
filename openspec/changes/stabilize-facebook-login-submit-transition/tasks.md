@@ -32,3 +32,23 @@
   <!-- Acceptance passed 31/31; full Edge tests passed 2888 with 0 failures and 1 gated E2E skip; Native fmt/clippy/test passed; the focused Native Facebook auth suite passed 5/5 after its final assertion; staged Native artifact verification and strict OpenSpec validation passed. -->
 - [x] 5.3 Record follow-up commits, validation evidence, integration/push status, and the no-package/no-live-account boundary.
   <!-- aidcp-edge 0a211aa and aidcp 5c344dce were integrated and pushed to origin/master and origin/main respectively after all task 5.1/5.2 gates passed. This closeout record lands in a follow-up control-only commit. No desktop package/install and no browser input, lifecycle mutation, or live-account action were performed. -->
+
+## 6. Live TOTP Hydration And Refresh Recovery
+
+- [x] 6.1 Classify zero Continue controls after confirmed owned TOTP entry as bounded hydration while preserving ambiguity and pre-action occlusion failures.
+- [x] 6.2 Bind refresh signals to the unchanged field value and keep Native clear fresh-probes clear-only, including complete six-digit orphan recovery under proven fresh-start authority.
+- [x] 6.3 Retain unproven empty TOTP pages as manual-required, republish changed manual reasons, and project enumerated 2FA or exhausted-probe reasons as desktop `需处理` state.
+
+## 7. Live Regression Coverage
+
+- [x] 7.1 Add router and coordinator coverage for delayed Continue hydration, expiry during hydration, safe clear, fresh code entry, and authenticated completion without duplicate broker or input actions.
+- [x] 7.2 Add Native coverage proving complete orphan clear uses CDP key events only, rejects changed-value stale signals, and confirms empty same-field readback.
+- [x] 7.3 Add retained-session and UI coverage proving stale, empty, and exhausted-probe manual states remain blocked while genuine failed results still map to code 1.
+
+## 8. Validation And Delivery
+
+- [x] 8.1 Run focused Facebook auth/router/Native/UI tests and Edge typecheck in the isolated worktree.
+  <!-- Focused TypeScript auth/router/coordinator/manual-session/UI tests passed 114/114 plus assembly 5/5; focused Native Facebook auth passed 6/6; Native fmt and Edge typecheck passed. -->
+- [x] 8.2 Run acceptance, full Edge, Native, staged-artifact, and strict OpenSpec gates without weakening fail-closed assertions.
+  <!-- Acceptance passed 31/31; full Edge passed 2892 with 0 failures and 1 gated E2E skip; Native fmt/clippy/all tests passed; the staged darwin-arm64 artifact verified at SHA-256 f281d16677df7d3661d77e654b810233ce0205512ee43ddb5175214325183945 after rebasing onto origin/master; strict OpenSpec validation passed. -->
+- [ ] 8.3 Record commits, validation evidence, integration/push status, and the no-package/no-browser-action boundary.

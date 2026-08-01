@@ -41,6 +41,16 @@ For the Facebook TOTP field only, Native MUST bind one unique, visible, editable
 - **THEN** the stable structural binding still identifies the same focused input
 - **AND** geometry change alone does not turn the confirmed full insertion into a one-digit or target-lost result
 
+#### Scenario: Continue hydrates after confirmed TOTP entry
+- **WHEN** Native has confirmed the complete six-digit value in the coordinator-owned window but zero exact Continue controls are currently rendered
+- **THEN** Edge performs no click and continues bounded read-only polling with the entered-window witness intact
+- **AND** a later unique topmost Continue may become actionable while ambiguity or occlusion remains blocked
+
+#### Scenario: TOTP expires while Continue is hydrating
+- **WHEN** the owned TOTP window becomes stale before a unique topmost Continue control appears
+- **THEN** Native clears the exact unchanged field through CDP, confirms it empty, and obtains a new broker code for a fresh window
+- **AND** no old code or submit action is replayed
+
 ### Requirement: Orphan TOTP text SHALL recover without unsafe submission or restart loops
 
 A TOTP value without the current coordinator's entered-window witness MUST NOT be submitted. On a proven fresh browser start, Native MAY clear the exact bound non-empty TOTP field and confirm it empty before requesting a new code. On an already-active browser without fresh-start authority, Edge MUST perform no TOTP mutation and SHALL retain the session as manual-required instead of terminating with a process error. Non-confirmed auth actions SHALL preserve their bounded Native receipt reason for diagnosis.
@@ -50,7 +60,22 @@ A TOTP value without the current coordinator's entered-window witness MUST NOT b
 - **THEN** Native clears the exact field, confirms it empty, and obtains a fresh probe before any new code entry
 - **AND** never submits the residual value
 
+#### Scenario: Fresh start finds a complete orphan code
+- **WHEN** a proven fresh browser start reaches a supported TOTP field containing six residual digits without a coordinator-owned entered window
+- **THEN** the clear action re-probes the same value as clear-only refresh evidence and never manufactures an entered-window submit witness
+- **AND** a changed value invalidates the observed clear signal before any key event
+
 #### Scenario: Active browser finds orphan TOTP text
 - **WHEN** an already-active browser lacks fresh-start authority and contains residual TOTP text
 - **THEN** Edge performs no input or submit action
 - **AND** reports manual-required while retaining the browser instead of entering an abnormal restart loop
+
+#### Scenario: Active-browser orphan field becomes empty
+- **WHEN** an already-active browser lacks fresh-start authority and its retained TOTP field becomes empty
+- **THEN** Edge still performs no automatic TOTP input and remains manual-required
+- **AND** the desktop reports a 2FA `需处理` state rather than exiting the child process with code 1
+
+#### Scenario: Read-only authentication probes remain unavailable
+- **WHEN** bounded transient authentication probes exhaust their retry budget and the retained browser requires inspection
+- **THEN** Electron accepts only the explicit probe-unavailable manual reason, releases the serial launch waiter, and reports `需处理`
+- **AND** unknown probe or coordinator failures remain outside the manual allowlist
