@@ -7,7 +7,7 @@ Updated: 2026-08-01 (Asia/Shanghai)
 This is the active implementation change:
 
 - Change: `add-managed-automation-task-channel-phase-1`
-- Progress: **21/39 tasks (54%)**
+- Progress: **26/39 tasks (67%)**
 - Control branch: `codex/add-managed-automation-task-channel-phase-1`
 - Control worktree: `/Users/baitianxing/codes/aidcp.wt/add-managed-automation-task-channel-phase-1`
 - Automation worktree: `/Users/baitianxing/codes/aidcp-automation.wt/add-managed-automation-task-channel-phase-1`
@@ -61,22 +61,22 @@ Runtime ownership is final-state ownership:
 
 ## 3. Current baselines and merge status
 
-The branches were refreshed on 2026-08-01. Because the pushed Control feature branch and
-`origin/main` both advanced during task 4.2, Control absorbed current main with a fast-forward-safe
-merge rather than rewriting published history. Kernel likewise absorbed the two new E-2 commits on
-its already-pushed feature branch. Automation remains intentionally one commit behind its default
-until the task 6.1 production-root gate closes.
+The branches were refreshed on 2026-08-01. Control was reconciled through `origin/main@0d283679`;
+the remote default later advanced to `ebd11a5e`, so this published docs branch is now three commits
+behind and intentionally remains unintegrated. Kernel already absorbed the two E-2 commits on its
+published feature branch. Automation remains intentionally two commits behind its default until the
+task 6.1 production-root gate closes.
 
 | Repo | Default baseline | Feature head at handoff | Default behind feature | Feature behind default |
 |---|---|---|---:|---:|
-| `aidcp` | `origin/main@d397aaa7` | handoff commit on this branch | feature commits only | 0 |
-| `aidcp-automation` | `origin/master@76aded7f` | `4b885a35` | 10 commits | 1, intentionally deferred to task 6.1 |
+| `aidcp` | `origin/main@ebd11a5e` | handoff commit on this branch | 15 commits | 3, deferred until the gated integration refresh |
+| `aidcp-automation` | `origin/master@ed2d32b1` | `77ea3af2` | 15 commits | 2, intentionally deferred to task 6.1 |
 | `aidcp-kernel` | `origin/master@9cfd1c98` | `2fe845ba` | 2 commits | 0 |
 | `aidcp-transport` | `origin/master@a2ffe054` | `e031d6a5` | 2 commits | 0 |
 | `aidcp-api` | `origin/master@8c0ba78b` | `354dcc4` | 2 commits | 0 |
 
-Do **not** merge the phase-one branches into defaults yet. The change is incomplete, the managed
-worker/research executor/production roots are not built, and guarded PostgreSQL integration has not run.
+Do **not** merge the phase-one branches into defaults yet. The production roots and legacy-side lane
+checks are not wired, and guarded PostgreSQL integration has not run.
 Before eventual integration, fetch/rebase each repo again, rerun the required suites, and use
 fast-forward-only history.
 
@@ -140,6 +140,11 @@ The old Qoder Cloud branch remains source material only:
 | `e9bf456` | Create/Cancel/Query services, atomic command unit of work, safe projections |
 | `de602c7` | transport pin plus real owner-service HTTP/drift slice |
 | `4b885a3` | cancellation-before/after-dispatch reconciliation coverage |
+| `7481dea` | durable account-lane arbiter and complete frozen legacy probe surface |
+| `cd19501` | default-off TaskRunWorker with lease recovery, retries, checkpoints, cancellation, and shutdown retention |
+| `c76c4c5` | four-capability read-only ResearchStepExecutor with evidence validation and dedupe tracing |
+| `dab3314` | exact-target, generation-bound connection dispatch adapter and reconnect target selection |
+| `77ea3af` | offline/reconnect, timeout, empty, dedupe, recovery, cancellation, and kill-switch vertical coverage |
 
 Important store guarantees already present:
 
@@ -149,7 +154,13 @@ Important store guarantees already present:
 - claims and renewals use CAS plus bounded leases;
 - command idempotency distinguishes duplicate from collision;
 - a managed account lane is retained while an Attempt is `dispatching` or `submitted_unknown`;
-- legacy lane acquisition requires concrete in-flight evidence.
+- legacy lane acquisition requires concrete in-flight evidence;
+- all nine legacy work sources are mandatory inputs; missing wiring remains explicit `unknown` and denies managed acquisition;
+- expired TaskRun leases are recovered by target-scoped `SKIP LOCKED` claim without repeating completed checkpoints;
+- dispatching or submitted-unknown Attempts are never inferred safe to retry, and graceful shutdown retains their lane;
+- an undeliverable exact target checkpoints `waiting_for_edge`, safely releases the lane, and re-resolves transport on the next bounded Attempt;
+- post-dispatch timeout stays `submitted_unknown`; reconnect receipts from an older connection generation cannot settle the Attempt;
+- disabling new worker claims during an in-flight Attempt retains the account exclusion until a proved safe checkpoint;
 - Create commits Task + Revision + Plan + Run + Trace + Receipt in one Automation transaction;
 - Cancel is CAS-guarded and remains available when new task creation is disabled;
 - Query returns only account-scoped customer projections and redacted trace summaries.
@@ -162,8 +173,11 @@ Passed in `aidcp-automation`:
 - combined managed/schema/boundary focused run: **48/48**;
 - schema/owner focused suite: **25/25**;
 - acceptance suite: **145/145**;
-- full suite: **2076 pass / 0 fail / 4 guarded skips**;
-- boundary census: `source=282 ownership=282 unresolved=0 forbidden=0`;
+- exact dispatch-adapter plus connection-runtime suite: **30/30**;
+- lane/executor/adapter/worker/connection focused suite: **54/54**;
+- TaskRunWorker lifecycle and vertical slice: **10/10**;
+- full suite: **2109 pass / 0 fail / 4 guarded skips**;
+- boundary census: `source=288 ownership=288 imports=813 unresolved=0 forbidden=0`;
 - `npm run typecheck`: pass.
 
 Passed in `aidcp-transport`:
@@ -198,8 +212,9 @@ Added but not actually executed against PostgreSQL:
   expired lane takeover, and unknown-Attempt lane retention/release.
 - Task 7.3 remains the authoritative requirement to run this test on an isolated test database.
 
-No production route registration, worker, root wiring, deployment, real Edge dispatch, or platform action has
-been claimed. All four rollout flags remain exact-lowercase-`true` opt-in and default false:
+No production route registration, atomic command-channel construction, worker/root wiring, deployment,
+real Edge dispatch, installed-client capability, or platform action has been claimed. All four rollout
+flags remain exact-lowercase-`true` opt-in and default false:
 
 - `AIDCP_MANAGED_TASK_API_ENABLED`
 - `AIDCP_MANAGED_TASK_CREATE_ENABLED`
@@ -220,8 +235,9 @@ as no production composition-root file is wired.
 
 Recommended next order:
 
-1. Tasks 5.2-5.6: lane arbiter, worker, research executor, dispatch adapter, vertical slice.
-2. Tasks 6.x only after the external production-root gate closes.
+1. Wait for the external production-root gate to close; refresh/rebase all owner worktrees under task 6.1.
+2. Then perform tasks 6.2-6.6 serially across the production roots and legacy dispatch hotspots.
+3. Run tasks 7.1-7.7 only after production wiring is complete; task 7.3 still requires a protected `aidcp_test*` database.
 
 Do not extend task 4.2 by putting business services in kernel/transport or by reconnecting the old
 Cloud monolith. Do not infer lane availability from WebSocket/session mode.
@@ -239,7 +255,12 @@ npx tsx --test \
   test/managed-automation/stores.test.ts \
   test/managed-automation/command-store.test.ts \
   test/managed-automation/task-command-service.test.ts \
-  test/managed-automation/task-command-http-drift.test.ts
+  test/managed-automation/task-command-http-drift.test.ts \
+  test/managed-automation/account-lane-arbiter.test.ts \
+  test/managed-automation/research-step-executor.test.ts \
+  test/managed-automation/connection-runtime-research-dispatch-adapter.test.ts \
+  test/managed-automation/task-run-worker.test.ts \
+  test/integration/connection-runtime.test.ts
 npm run typecheck
 npx tsx test/acceptance/helpers/boundary-record.ts census
 ```
