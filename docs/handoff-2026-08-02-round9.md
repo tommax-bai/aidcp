@@ -9,7 +9,26 @@
 
 ## 0. 最要紧的一件：dev 云端现在跑的是**回滚版本**，不是主干
 
-**当前状态（已实测，健康）**：
+> ⚠️ **23:45 更新：dev 又掉了，不是我弄的，也别急着回滚。**
+> 我在 23:39 回滚到 `534af19` 并验通（8787/8090 监听、WS 握手成功、飞书长连接、PG 就绪），
+> 但 **23:43 有另一个 session 覆盖部署了带批 E-2 的代码**（`.deployed-commit` 被抹掉、
+> `server.ts` 换新、启动即撞 §1 的第 ③ 条 DB 约束）。**那条流的属主正在活跃迭代**，
+> 此刻再回滚只会和他们打架。**接手时先看 `ss -ltnp | grep 8787` 判断当下状态**：
+> 若仍未监听且属主已收工，就照下面的方式回滚保服务。
+
+**回滚保服务的做法（我 23:39 用过、验通过）**：
+
+```bash
+cd ~/codes/aidcp-cloud            # 主 checkout，干净树
+STAGING=$(mktemp -d); git archive 534af19 | tar -x -C $STAGING
+rsync -az -e 'ssh -i ~/codes/dev-0722.pem' --exclude .env --exclude node_modules --exclude .git \
+  $STAGING/ root@121.89.85.150:/opt/aidcp/cloud/
+ssh -i ~/codes/dev-0722.pem root@121.89.85.150 \
+  'cd /opt/aidcp/cloud && npm install --no-audit --no-fund && systemctl restart aidcp-cloud.service'
+# 30s 后验：ss -ltnp | grep -E ":8787|:8090"   —— 必须两条都在
+```
+
+**23:39 那次回滚后的实测状态（可作为「好了长什么样」的参照）**：
 
 | 项 | 值 |
 | --- | --- |
@@ -47,11 +66,38 @@ dev 停了约一小时，先回滚保服务，主干的修复留给属主流。
    —— **这条最说明问题**：DB 侧那张检查点表的 `stream` 列有 CHECK 约束，
    **约束里没有 `facebook_operation_policy` 这个值**。
 
-**我的判断（供属主复核，未坐实到 SQL）**：三个错误是同一件事的三层皮 ——
-**新流在代码里加了，DB 侧没备好**。① 是名单没跟上，② 是载荷形状没对齐，
-③ 是这张表根本不接受这个流名。**先把 ③ 的迁移补上再谈 ① ②** 可能更省事。
-（我没能直接读到约束定义：ECS 上 `psql` 走 ident 认证、以 root 身份连不上，
-`.env` 里的连接串要按 `AIDCP_PG_AUTOMATION_URL` 取并带凭据，留给下一位。）
+### 根因已坐实：缺一条迁移
+
+`migrations/0083_automation_sync_read_consumer_checkpoint.sql` 建表时把 `stream` 列写成
+**枚举式 CHECK，硬列了 7 条流**：
+
+```
+'account_persona', 'client_environment_automation', 'automation_account_projection',
+'content_schedule', 'hot_lead_config', 'facebook_comment_config',
+'facebook_group_join_automation_config'
+```
+
+批 E-2 步骤 2 在代码里加了**第 8 条** `facebook_operation_policy`，
+**但没有配套迁移去扩这条约束**（`grep -rl facebook_operation_policy migrations/` 只命中
+`0100` / `0103`，那两条是策略配置表本身，与本约束无关）。
+于是自举一写检查点就被 DB 拒掉，启动路径当场抛错。
+
+**要做的**：加一条迁移，drop 掉 `automation_sync_read_consumer_checkpoint_stream_check`
+再按 8 条流重建（`api` 侧那张 `0082` 表同理，先确认它的名单要不要一起扩）。
+**迁移号别硬猜**：`0105` 是当前最大，但并行流手上可能已经占了 `0106`
+（`0082` 的文件头就记过一次「0081 被并行 change 占用」的先例），落号前先 `ls migrations/` 并对一遍在飞的分支。
+
+**注意这是共库操作**：按根 CLAUDE.md §2，DEV/OL 长期共用 PostgreSQL。
+扩 CHECK 是**加法、向后兼容**（只放宽允许值，OL 上跑的旧代码不会写这个流），
+但仍属 schema 变更，走迁移执行器、别手工 `ALTER`。
+
+**我没有代做这条迁移**，两个理由：它是 `split-cloud-automation-production-runtime` 的地界，
+且那条流的 session **今晚仍在活跃部署**（23:43 又部了一次、撞的正是这条约束）——
+此时插一条同域迁移，撞号与撞工作面的概率都高于收益。
+
+（顺带留个坑给下一位：ECS 上直接连库读约束**没走通** —— `psql` 与 node 两条路都被
+`Ident authentication failed for user "aidcp"` 挡住，说明应用的连法与我拼的不一样。
+真要读线上 schema，先弄清 `.env` 里那几个 PG 变量的实际组合方式。）
 
 ### 这里有一条比 bug 本身更值得记的
 
