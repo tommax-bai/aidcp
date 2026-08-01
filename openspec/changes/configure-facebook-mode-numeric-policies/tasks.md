@@ -34,6 +34,7 @@
 
 - [x] 5.1 Run focused Cloud tests, Cloud full tests/typecheck, Console focused/full tests/typecheck/build, and inspect any truncated failure before claiming success.
   <!-- Cloud: 4071 tests passed, 11 skipped, typecheck passed. Console: low-concurrency rerun 344 passed, 1 skipped, build passed; initial parallel-run timeouts were serially rerun and passed. -->
-- [ ] 5.2 Run `openspec validate configure-facebook-mode-numeric-policies --strict` and record commits, validation and deviations in this checklist.
+- [x] 5.2 Run `openspec validate configure-facebook-mode-numeric-policies --strict` and record commits, validation and deviations in this checklist.
+  <!-- Control/OpenSpec commit ba1f791f8b28f9dbd1cf7896c71b45667f99b8c1; strict validation passed. Deviation: Console has no tracked lockfile, so physical dependencies used npm install --prefer-offline --no-package-lock instead of npm ci. No Edge source or package changes. -->
 - [ ] 5.3 Rebase, fast-forward integrate and push clean Cloud, Console and control default branches with explicit path scope.
 - [ ] 5.4 Run DEV deployment preflight/checks and deploy Cloud/Console only if the shared schema gate proves compatible; do not deploy OL, package Edge or perform real Facebook actions without explicit authorization.
