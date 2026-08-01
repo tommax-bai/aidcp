@@ -92,6 +92,35 @@
 - [x] 4.5 Implement captcha-assistance capture/click page operations and allowlisted legacy plan steps while keeping authorization and envelope routing in Edge.
   <!-- aidcp-edge 317cd47: bounded screenshot ring, coordinate click, text entry/readback, and allowlisted plan execution are Native; authorization/Cloud envelopes remain Edge-owned. -->
 - [ ] 4.6 Add deterministic Native contract tests for every command and page-state transition in this section.
+  <!-- 2026-08-01 实测覆盖盘点 + 首批补测（`aidcp-edge 1ea3cb1`）。本条**仍不勾**，剩余缺口具名在下面。 -->
+  - **先做的是盘点，不是补测** —— 「every command」这句话此前没有任何人说得清覆盖到哪。
+    判据分两侧：Rust 侧数 `native/page-engine/tests/` 里出现的 `NativeCommand::` 变体；
+    TS 侧数 `test/native-page-engine/` 里出现的命令名，**并剔除三类不算行为测试的文件**——
+    `runtime-contracts-command-receipts.test.ts`（声明与可达发出点对账）、
+    `command-postconditions.test.ts` / `command-manifest.test.ts`（登记表）、
+    `pacing-consumption.test.ts`（测的是节奏字段消费，不是命令的页面效果）。
+  - **本节里有三条命令不该补测，因为它们在活路径上已经死了**：`browse_next` / `browse_scroll` / `plan_execute`。
+    判据不是「文档说 @deprecated」，是**云端根本发不出来** —— `aidcp-cloud/src/comm/command-bridge.ts`
+    的 `createEnvelope(...)` 出口逐条列举过，里面**没有** `browse.next` / `browse.scroll`；
+    `plan_execute` 属 v1 兼容路径（唯一产出方是云端联调脚本，且 `action.result` 云端无消费者）。
+    给它们补测＝在遗留路径上改代码，与根 CLAUDE.md §2 的「勿在遗留路径上改代码」直接冲突。
+    **这三条按「具名排除 + 理由」处理，不按「已覆盖」处理。**
+  - **活路径 14 条 + 验证码 2 条的实测结果**：`page_scroll` / `search_execute` / `note_open` /
+    `navigation_back` / `note_browse_images` / `note_scroll_comments` / `notification_open` /
+    `notification_browse_comments` / `notification_browse_likes` / `notification_browse_follows` /
+    `captcha_capture` / `captcha_click` 均有行为测试。
+  - **本轮补掉两条零覆盖的**（`test/native-page-engine/xhs-exit-command-contracts.test.ts`，10 例）：
+    `notification_back_home`（此前只有声明对账）与 `note_close`（**全仓零命中，连声明对账都没有**）。
+    两条都是**出口**命令：假成功不体现在自己身上，体现在它之后的每一条命令上（会话以为回到了列表，
+    实际还停在通知页 / 还开着详情浮层）。各锁三态：没找到即什么都不动 / 点了但页面没变即 ambiguous /
+    真变了才 confirmed；并锁住 `note_close` 回执的动作名是云端角色等的 `close`（协议第 5 处同步点）。
+    三次变异逐条归因：点了就算成功 → 两条红线用例；动作名改成 `note_close` → 两条 note_close 用例；
+    找不到控件就点浮层本身 → 无控件那条。
+  - **剩余两条具名缺口（本条因此不勾）**：
+    ① **`profile_open` 只有宿主路由层的用例**（`browse-session.test.ts`），**没有页面行为测试** ——
+       「打开了谁的主页」这件事今天没有任何脱机断言在守。
+    ② **`feed_refresh` 只有 Facebook 侧**（`facebook-router-contract.test.ts`），**小红书侧零覆盖**。
+       它是「刷新回顶换一批」，假成功会让上游以为换了批而其实没换（见 memory feed-refresh-on-depth-change）。
 
 ## 5. Interaction commands and effect honesty
 
