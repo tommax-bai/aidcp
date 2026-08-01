@@ -15,12 +15,12 @@
 
 ## 3. Add Automation-owned persistence
 
-- [ ] 3.1 Add target-scoped migrations for task authority, task revisions, immutable plans, task runs, and account lane state using the current Automation migration ledger.
-- [ ] 3.2 Add target-scoped migrations for step runs, intents, attempts, command receipts, and decision traces; register every table in Automation ownership manifests.
+- [x] 3.1 Add target-scoped migrations for task authority, task revisions, immutable plans, task runs, and account lane state using the current Automation migration ledger. <!-- done: repo=aidcp-automation sha=239bdbc validation="expand-only, migration-owner, schema-contract, boundary, schema-db-scope, and schema-ddl-owner 25/25; npm run typecheck 0" deployment="not deployed; migrations 0106-0109 are additive and feature flags remain false" -->
+- [x] 3.2 Add target-scoped migrations for step runs, intents, attempts, command receipts, and decision traces; register every table in Automation ownership manifests. <!-- done: repo=aidcp-automation sha=239bdbc validation="10 new Automation tables registered; derived module census source=267 ownership=267 unresolved=0 forbidden=0; owner lists regenerated" deployment="not deployed" deviation="regeneration also reconciled pre-existing stale generated lists: api +16 and automation +12 existing manifest entries; no ownership source decision changed" -->
 - [ ] 3.3 Port/adapt typed stores with capability probes, target filters, CAS transitions, bounded leases, stable command dedupe, collision detection, and terminal regression protection.
 - [ ] 3.4 Add account-lane store operations for managed acquisition, legacy observation, renewal, safe release, expired-lease recovery, and kill-switch retention.
 - [ ] 3.5 Add store unit tests and PostgreSQL integration tests for concurrent claim, duplicate/collision, lease takeover, terminal races, target isolation, and lane release with unknown Attempts.
-- [ ] 3.6 Update schema contract and migration-order/owner gates without making a default-disabled feature look production-ready when its runtime dependency is absent.
+- [x] 3.6 Update schema contract and migration-order/owner gates without making a default-disabled feature look production-ready when its runtime dependency is absent. <!-- done: repo=aidcp-automation sha=239bdbc validation="KNOWN_MAX=0109 matches migration ledger; REQUIRED remains 0102; focused schema/owner suite 25/25" deployment="not deployed; missing 0106-0109 disables managed-task capability rather than the whole Automation process" -->
 
 ## 4. Build the API-to-Automation task port
 
