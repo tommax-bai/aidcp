@@ -1464,6 +1464,34 @@
   现在那个 fail-closed 壳守的东西，接线后必须仍然守得住——为此写回归用例。
   <!-- 批 A 只做了「让编译器逼你面对」那一半：外壳的运行时依赖与业务入口都是必填参数、无缺省，
        配置缺项照旧具名抛错。真正的回归用例（台账非空时仍拒绝启动）属批 H，见 4.3。 -->
+- [ ] 3.1c **⚠️ 批 C 的一半被归属挡住了（2026-08-01 实读发现，别当例行搬运开工）。**
+  配置副本停手闸的**契约在 kernel**（`ConfigMirrorGatePort`），本仓的三个消费方
+  （消息处理器 / 角色调度器 / 风控控制器与注册表）都已经只持这个端口，形态是对的。
+  **但它的实现三件套全是 api 属主、且不在本仓**：`src/config-mirror-freshness.ts`、
+  `src/config/mirror-stop-work.ts`、`src/config/mirror-refresher.ts`（三份在 cloud 的归属表里都是 api）。
+  <!-- **为什么这不是「搬过来就行」**：
+       ① `isStale` 是**同步**读、且在每次动作准入的热路径上 —— 跨进程要一次 HTTP 就得改掉每个调用点的
+          签名，还给热路径加一跳网络。真要跨进程只能是「异步取源 + 本地镜像」（与角色模型解析同形）。
+       ② **本进程恰恰是 `automation_config_mirror_health` 这条属主流的发布方**
+          （见 `AUTOMATION_SYNC_READ_OWNER_STREAMS` 与 `AutomationRuntimeHandles.syncReadSources`）。
+          「健康报告的发布者拿不到新鲜度事实源」这件事本身就说明归属需要重判，不是接线不够。
+       ③ **今天的缺省正是批 B 拒绝接受的那种**：本仓消息处理器上写着
+          「未注入 = 恒不陈旧」。也就是说，不裁定就接线的话，自动化进程会静静地宣称
+          「配置副本永远新鲜」——不报错、只是把该停手的动作放过去。
+          批 B 已经把这条口做成**必填、无默认**（`mirrorStale`），所以这个洞今天是**编译期可见**的，
+          不会被悄悄跳过。
+       **三条路，需拍板（与 A-4 同一类问题：归属裁定，不是编码）**：
+       ① 把这三份（或其中的纯判定段）改判 / 析出到 automation 或 kernel；
+       ② 保留 api 属主，本仓按「异步取源 + 本地镜像」再加一条同步读镜像（形态照角色模型那条）；
+       ③ 由接口进程把停手结论随已有的某条通道推过来。
+       **MUST NOT 做的**：给 `mirrorStale` 一个恒 false 的实现把编译过掉。 -->
+- [ ] 3.1d 批 C 的**另一半可以先做**（不被 3.1c 挡）：记账 outbox 与对账器、风控指令消费者、
+  `event_outbox` 保留期剪裁、面板事件投递、配置面审计中继。
+  <!-- 这半边的料本仓都有（`src/risk/risk-accounting.ts`、`src/transport/event-outbox.ts`、
+       `risk-command-outbox.ts`、`eventbus-outbox-bridge.ts`、`outbox-health.ts`、`outbox-notify-listener.ts`）。
+       它供的是批 B 留下的另一个必填口 `accountingBlocked`。
+       **两个踩点照抄 §9.2**：`event_outbox` 是队列不是账本，剪裁不接就只进不出；
+       配置面审计中继写的是**接口属主表**，跨进程后必须走已有的那条通道，别直连。 -->
 - [ ] 3.4 持久任务仍按 `AIDCP_DEPLOY_ENV` 写 `execution_target`；target 缺失或非法时
   **不启动那个 worker**。
 - [x] 3.5 逐段对着 cloud `segCAutomation` 核对装配清单，确认没有「本进程里根本没有消费者」的对象
