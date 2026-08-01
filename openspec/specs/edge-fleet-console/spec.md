@@ -280,27 +280,30 @@ Edge 客户端 SHALL 在当前选中环境的主区域提供 Phase 1 快捷委�
 
 ### Requirement: Facebook 运行页顶栏区分代理配置与运行证据
 
-桌面主界面 SHALL 仅在当前选中环境为 Facebook 时，于顶栏账号身份区呈现紧凑代理状态入口；紧凑态 SHALL 显示诚实结论和“本次会话接收流量”，详情 SHALL 分别展示非密代理配置摘要、浏览器实际出口、本机出口、最后检测时间、接收流量及其统计口径。配置存在但浏览器证据缺失时 MUST NOT 显示“已验证”，代理密码 MUST NOT 进入运行页渲染数据，主环境列表 MUST NOT 铺开完整 IP。
+桌面主界面 SHALL 仅在当前选中环境为 Facebook 时，于顶栏账号身份区呈现紧凑代理状态入口；紧凑态 SHALL 显示代理配置、Facebook 可达性预检结论和“本次会话接收流量”。详情 SHALL 展示非密代理配置摘要、预检时间、接收流量及其统计口径，MUST NOT 展示或推断浏览器实际出口、本机直连出口或公网出口相等结论。代理密码 MUST NOT 进入运行页渲染数据，主环境列表 MUST NOT 铺开完整代理地址。
 
-#### Scenario: 已验证状态展示证据和流量
-- **WHEN** 当前选中 Facebook 环境的浏览器出口与本机出口均已取得且不同
-- **THEN** 顶栏显示“代理已验证”和格式化后的本次会话接收流量，详情分开展示两条出口、非密配置摘要与检测时间
+#### Scenario: 预检成功显示代理可用和流量
+- **WHEN** 当前选中 Facebook 环境的代理预检成功
+- **THEN** 顶栏显示“代理可用”和格式化后的本次会话接收流量，详情展示非密配置摘要与检测时间
+- **AND** MUST NOT 使用“代理已验证”或显示浏览器、本机公网出口
 
-#### Scenario: 同出口以异常态保持可见但不自动停机
-- **WHEN** 当前浏览器出口与本机出口相同
-- **THEN** 顶栏以明确异常视觉显示“疑似直连”，详情展示比对证据；首版 MUST NOT 仅因该状态自动停止、暂停或删除环境
+#### Scenario: Active 浏览器无预检也不伪造成功
+- **WHEN** 当前浏览器由 Active 直接接管且本次未运行代理预检
+- **THEN** 顶栏显示已有配置摘要、真实浏览器状态和流量
+- **AND** MUST NOT 因接管成功而伪造代理可达或公网出口验证
 
-#### Scenario: 配置存在但探测未知不显示成功
-- **WHEN** AdsPower 环境存在代理配置但浏览器探测尚未完成或失败
-- **THEN** 顶栏显示“待验证”或“无法确认”，MUST NOT 使用绿色已验证状态
+#### Scenario: 配置存在但预检未知不显示成功
+- **WHEN** AdsPower 环境存在代理配置但 Facebook 可达性预检尚未完成或失败
+- **THEN** 顶栏显示“待检测”“无法确认”或“代理不可用”的对应诚实状态，MUST NOT 使用绿色已验证状态
 
 #### Scenario: 非 Facebook 环境不出现代理入口
 - **WHEN** 当前选中环境平台不是 Facebook
 - **THEN** 顶栏隐藏该代理入口，不改变既有平台身份与健康状态布局
 
-#### Scenario: 详情只使用会话聚合数据
+#### Scenario: 详情只使用安全聚合数据
 - **WHEN** 运维打开代理详情
-- **THEN** 界面只展示配置类型/地址等非密摘要、两条出口 IP、检测时间与聚合接收字节，并说明该流量不是代理商计费口径；MUST NOT 展示 URL、Cookie、请求正文或代理密码
+- **THEN** 界面只展示配置类型/地址等非密摘要、预检时间与聚合接收字节，并说明该流量不是代理商计费口径
+- **AND** MUST NOT 展示公网出口、URL、Cookie、请求正文或代理密码
 
 ### Requirement: 左侧环境栏按平台筛选并约束批量启动范围
 
@@ -742,4 +745,55 @@ Edge 客户端 SHALL 在当前选中环境的主区域提供 Phase 1 快捷委�
 
 - **WHEN** 平台明确返回需要人工登录或验证码恢复
 - **THEN** UI 提供 `浏览器` 辅助操作，点击后打开浏览器完成验证，不得把该要求扩大到其他数据管理功能
+
+### Requirement: 自动登录与人工登录状态 SHALL 按用户是否需要介入区分
+
+客户端 SHALL 以当前登录协调器能否在无需用户输入的情况下继续推进作为环境登录分类依据，MUST NOT 仅因账号身份尚未最终确立而显示 `需要处理`。当协调器已结构化确认可自动提交现成账号密码、自动获取并输入 TOTP、提交验证，或正在其既有有界预算内等待这些已确认动作的页面过渡时，环境 SHALL 显示 `登录中` 并归入现有 `启动中` 分组；该状态 MUST NOT 冒充已有可执行任务证据的 `运行中`。
+
+只有当平台或协调器明确要求用户输入账号密码、扫码、处理验证码/安全检查，或自动登录已经终止且必须人工恢复时，环境 SHALL 进入 `需要处理`。同一保留会话从人工等待重新观察到可自动执行的登录信号时，Edge SHALL 以结构化生命周期事件立即撤销旧人工状态，MUST NOT 等到最终身份确立才清除，也 MUST NOT 依赖自然语言日志推断。终止的认证失败 SHALL 在核心退出后继续显示为需处理项，短状态显示 `异常` 并保留完整认证异常原因，MUST NOT 回落为普通 `离线`。
+
+#### Scenario: 现成账号密码由系统自动提交
+- **WHEN** 登录协调器结构化确认登录表单已有可用账号密码并开始自动提交
+- **THEN** 环境 SHALL 显示 `登录中` 并归入 `启动中`
+- **AND** MUST NOT 显示 `需要处理` 或 `运行中`
+
+#### Scenario: 自动 TOTP 与页面过渡仍属于启动
+- **WHEN** 登录协调器自动获取、输入或提交 TOTP，或在有界预算内等待已确认登录动作后的页面过渡
+- **THEN** 环境 SHALL 保持 `登录中` 的启动状态且不要求用户介入
+
+#### Scenario: 人工等待恢复为自动登录
+- **WHEN** 环境先因账号密码未填入而进入人工等待，随后同一保留会话结构化观察到可自动执行的登录信号
+- **THEN** Electron SHALL 立即撤销旧人工提示并改为 `启动中 · 登录中`
+- **AND** MUST NOT 等待最终账号身份读取成功才离开 `需要处理`
+
+#### Scenario: 扫码或人工输入才需要处理
+- **WHEN** 平台明确要求用户输入账号密码、扫码、处理验证码或完成安全检查，且协调器无法自行继续
+- **THEN** 环境 SHALL 进入 `需要处理` 并保留具体人工动作原因
+
+#### Scenario: 自动认证终止不得显示离线
+- **WHEN** 自动登录协调器以当前操作代的结构化失败原因安全停手并导致核心退出
+- **THEN** 环境 SHALL 进入 `需要处理`，短状态显示 `异常` 并保留完整认证异常安全原因
+- **AND** MUST NOT 因自动化进程已停止或存在更早的绑定未确认状态而回落为普通 `离线`
+
+#### Scenario: 正常任务运行证据仍独立
+- **WHEN** 环境仅处于自动登录过程且尚未确立稳定账号身份或获得当前可执行任务证据
+- **THEN** 环境 MUST NOT 显示 `运行中` 或 `待任务`
+
+### Requirement: Fleet UI SHALL expose the exact controlled Facebook manual-login state
+
+The Electron supervisor SHALL accept a generation-scoped local auth-required notification from the running core, retain the exact safe reason `credential_fill_unavailable`, and project the environment as requiring Facebook login while the browser remains controlled. The serial launch wait SHALL be released, but the browser execution slot SHALL remain occupied until login succeeds or browser close is confirmed.
+
+#### Scenario: Credential fill reason is visible
+- **WHEN** the core reports `manual_login_required` with reason `credential_fill_unavailable`
+- **THEN** the client shows “需要登录：AdsPower 未填充账号密码” for that environment
+- **AND** “显示浏览器” remains available
+
+#### Scenario: Waiting environment does not block serial launch startup
+- **WHEN** one environment enters controlled manual-login wait
+- **THEN** Electron releases that environment's serial launch-ready waiter so another admitted environment may start
+- **AND** it continues counting the retained browser as an occupied execution slot
+
+#### Scenario: Stable identity clears manual attention
+- **WHEN** the same core reports the existing stable account identity event
+- **THEN** Electron clears the manual-login reason and projects the normal authenticated startup state
 

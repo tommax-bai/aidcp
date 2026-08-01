@@ -3,26 +3,6 @@
 ## Purpose
 TBD - created by archiving change facebook-reels-random-like. Update Purpose after archive.
 ## Requirements
-### Requirement: Every unique active Facebook Reel receives one ordinary like draw
-
-When Edge reports exactly one active Facebook Reel through `page.cards` with `listKind:'reels'` and a canonical Facebook `/reel/<id>` identity, Cloud SHALL make at most one ordinary like decision for that identity in the active session. For an eligible decision with remaining like budget, Cloud SHALL select a like intent exactly when its injectable random value is strictly less than `0.25`. A value equal to or greater than `0.25` SHALL abstain without sending a like command. Duplicate reports of the same normalized Reel identity MUST NOT redraw.
-
-#### Scenario: Draw below the threshold selects a like intent
-- **WHEN** a unique canonical active Reel is reported and the injected random value is `0.249999`
-- **THEN** Cloud sends one existing note-scoped like command for that Reel, subject to the existing risk, cooldown, duplicate, and dispatch gates
-
-#### Scenario: Threshold value abstains
-- **WHEN** a unique canonical active Reel is reported and the injected random value is exactly `0.25`
-- **THEN** Cloud records an ordinary Reel probability abstention and sends no like command for that decision
-
-#### Scenario: Duplicate report does not redraw
-- **WHEN** the same normalized Reel identity is reported more than once in one active session
-- **THEN** Cloud performs only the first decision and sends at most one probability-selected like intent
-
-#### Scenario: Invalid Reel batch fails closed
-- **WHEN** the list is not marked `reels`, contains zero or multiple cards, belongs to another platform, or lacks a canonical Facebook Reel identity
-- **THEN** Cloud does not apply the Reel probability policy and sends no probability-selected like command
-
 ### Requirement: Reel probability is the sole ordinary interaction appraisal for the handled Reel
 
 After Cloud has handled a Reel through the probability policy, the later ordinary interaction appraiser MUST NOT call its LLM or emit another ordinary like or collect intent for that Reel. It SHALL emit an observable skip that preserves the existing browsing-loop completion. An explicit mandatory interaction rule SHALL be evaluated before this skip and MAY still force its required like.
@@ -50,4 +30,26 @@ A probability-selected like SHALL remain an intent until Edge executes the exist
 #### Scenario: Edge confirms the same Reel is liked
 - **WHEN** Edge returns `ok:true` with the existing same-Reel observation witness
 - **THEN** Cloud uses the existing action receipt path to account for and display the confirmed like exactly once
+
+### Requirement: Only ordinary persona mode applies the configurable Reel like cadence
+
+When the effective Facebook browse mode is ordinary persona, Cloud SHALL mark each eligible unique active Reel as handled by the ordinary Reel policy and SHALL select one like intent exactly on each configured `viewsPerLike` boundary. The default boundary SHALL be 4. A miss before the boundary SHALL NOT be followed by an LLM-selected ordinary like for the same Reel. Slow-start, rule, consumption, blocked and unsupported modes MUST NOT advance or execute this ordinary persona like cadence.
+
+This requirement applies only to canonical one-card Reel presentations. It MUST NOT count or change ordinary Feed, Feed-video or detail-page like behavior.
+
+#### Scenario: Fourth unique persona Reel selects the default intent
+
+- **WHEN** an ordinary persona session presents four distinct eligible Reels under the default policy
+- **THEN** the first three are handled without a like intent and the fourth selects exactly one existing note-scoped like intent
+
+#### Scenario: Slow-start does not reuse persona Reel likes
+
+- **WHEN** the same account's effective mode is slow-start and Reels are presented
+- **THEN** the persona Reel like counter does not advance and this policy sends no like command
+
+#### Scenario: Feed video remains outside the configurable Reel counter
+
+- **WHEN** an ordinary Feed video is presented between eligible Reels
+- **THEN** it does not advance the persona Reel counter
+- **AND** its existing independent policy is unchanged by this requirement
 

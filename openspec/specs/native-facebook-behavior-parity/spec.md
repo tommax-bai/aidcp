@@ -19,13 +19,19 @@ The Facebook Native-only adapter SHALL implement only commands covered by the Fa
 
 ### Requirement: Native Feed scanning preserves stateful continuation truth
 
-The Native Facebook session SHALL distinguish canonical cards, visible unreportable articles, loading, explicit empty, and exhausted Feed states. It SHALL use loading-aware card-set settling, continue downward for up to the established bounded rounds when visible articles lack trusted permalinks, filter canonical identities already reported by that session, and report `feed_exhausted` only after the established no-growth, near-bottom, consecutive-confirmation evidence. It MUST NOT authorize or perform a Reels transition merely because the current viewport has no reportable permalink.
+The Native Facebook session SHALL distinguish validated cards, visible unreportable articles, loading, explicit empty, and exhausted Feed states. A validated Feed identity SHALL be projected from the declared identity kind: absent or `permalink` kind requires the existing Facebook content-URL validation and uses the canonical Facebook post identity extracted by the existing permalink parser; explicit `content_ref` kind requires the existing exact `aidcp:facebook-group-feed-post:v1:<64 lowercase hex>` format and retains its type in the identity key. Native MUST NOT infer the identity kind from the value's shape. A malformed or kind/value-mismatched card has no validated identity.
+
+Native SHALL use that same typed projection for `page.cards` output, session seen deduplication, settle/bottom-confirmation identity vectors, and the command-local non-empty-feed witness. It SHALL report an unseen validated identity, including `content_ref`, before it may classify the viewport as exhausted. Only after the current observation contains no unseen validated card may Native consider the five-sample confirmation. The session seen set SHALL use the typed identity key, so a previously reported card is filtered consistently without a permalink-only side path. Existing `content_ref` capability and lifetime limits remain unchanged: it is session-scoped, list-surface/document-generation-bound, not persisted, not navigable, and not eligible for cross-session deduplication.
+
+Native SHALL use loading-aware card-set settling, continue downward for up to the established bounded rounds when visible articles lack a validated identity, filter validated identities already reported by that session, and report a previously non-empty canonical home Feed as `feed_exhausted` only after the fixed five-sample no-growth, near-bottom, same-document, no-new-card confirmation evidence. Near-bottom SHALL mean no more than one actual scrolling-container viewport of remaining distance; exact mathematical bottom is not required, and a nested feed scroller SHALL use its own client height rather than the browser-window height. It MUST NOT authorize or perform a Reels transition merely because the current viewport has no reportable permalink.
+
+The fixed confirmation samples SHALL occur at `t=0 / 5 / 7.5 / 10 / 12.5s`. Every sample SHALL remain on the same canonical home URL, the same non-zero document time origin, and the same document generation; keep `document_age_ms` from moving backward relative to the immediately preceding sample; remain non-loading and near-bottom using the actual scroll viewport; grow no more than 100px relative to the initial sample (`>100px` invalidates); and retain the same ordered validated Feed identity vector. Only the fifth valid structural sample SHALL confirm exhaustion. The adapter MAY retain `explicit_end` as bounded observation and diagnostic evidence, but a missing or unstable marker MUST NOT block structurally confirmed exhaustion only when the commanded list context began on home and this command observed a validated identity on the same home URL and document time origin. A `content_ref` may establish that witness only inside the command, URL, and document-time-origin window that observed it; a later command or replacement document MUST NOT inherit it. Marker-free structural confirmation MUST NOT extend to search/group contexts or to a search/group command redirected to home before confirmation.
 
 The bounded terminal taxonomy SHALL be identical for the startup Feed scan and for every Cloud-commanded Feed scroll. When a commanded scroll exhausts its bounded rounds without producing a reportable card, the Native session SHALL apply the same evidence ladder the startup scan applies before falling back to a bare no-target result: a confirmed home surface carrying physical card evidence, not loading and not blocked, SHALL be reported as the present-but-unreportable list state; an otherwise confirmed empty home SHALL be reported as the explicit empty list state. Only when neither ladder rung holds MAY the session return the loading / continuation-unconfirmed / no-target classification. A commanded scroll MUST NOT return a terminal result that leaves the account on the same viewport with no Cloud-consumable observation, because the sole remaining recovery would be the Cloud idle watchdog.
 
 Loading-aware card-set settling SHALL treat a zero-card viewport as unsettled. The settle loop MAY return early only once it has observed at least one extractable card in a stable, non-loading sample; a viewport that is merely stable at zero cards SHALL keep polling until its bounded budget is spent, so that lazy-loaded batches have time to render between scrolls.
 
-This requirement adds no new receipt reason code and no new protocol field: the present-but-unreportable and explicit-empty observations reuse the existing zero-card `page.cards` list states that Cloud already consumes.
+This requirement adds no new receipt reason code and no new protocol field: structurally confirmed exhaustion reuses `feed_exhausted`, while the present-but-unreportable and explicit-empty observations reuse the existing zero-card `page.cards` list states that Cloud already consumes.
 
 #### Scenario: Visible unreportable first viewport continues in Feed
 
@@ -39,13 +45,40 @@ This requirement adds no new receipt reason code and no new protocol field: the 
 
 #### Scenario: Recycled cards are not reported as new
 
-- **WHEN** virtualized Feed scrolling renders canonical post identities already reported in the same Native session
+- **WHEN** virtualized Feed scrolling renders permalink or `content_ref` typed identities already reported in the same Native session
 - **THEN** Native filters those identities and continues the bounded search for new cards
 
-#### Scenario: Exhaustion requires bounded structural evidence
+#### Scenario: A fresh validated content reference is reported before exhaustion
 
-- **WHEN** a scroll command finds no new canonical cards
-- **THEN** Native reports `feed_exhausted` only after document height stops growing, the page is near the bottom, and that state is confirmed in consecutive rounds
+- **WHEN** a Feed probe contains a card explicitly typed as `content_ref`, its value passes the existing strict prefix-and-digest validator, and its typed identity is not in the session seen set
+- **THEN** Native emits that card through the normal `page.cards` path, records the same typed key in session seen-state, and does not return `feed_exhausted` from that observation
+
+#### Scenario: A seen content reference remains command-local non-empty evidence
+
+- **WHEN** the same valid `content_ref` is observed again by a home scroll command on the same URL and non-zero document time origin after session deduplication filters it from new-card output
+- **THEN** Native MAY use it in that command's validated identity vector and non-empty witness
+- **AND THEN** Native reports exhaustion only if no unseen identity remains and the complete five-sample structural window succeeds
+
+#### Scenario: Malformed or mismatched typed identity fails closed
+
+- **WHEN** a card's declared kind and value disagree, or a declared `content_ref` fails the exact existing prefix, digest-length, or lowercase-hex validation
+- **THEN** Native neither reports nor records that value, excludes it from structural identity vectors, and does not let it establish an exhaustion witness
+
+#### Scenario: Home exhaustion requires the complete structural schedule
+
+- **WHEN** a commanded scroll whose list context began on home has observed a validated Feed identity on the same home URL and document time origin and all five fixed samples retain that non-zero origin and URL, keep adjacent document age nondecreasing, remain non-loading and within one actual scroll viewport of the bottom, grow no more than 100px, and retain the same ordered validated identity vector
+- **THEN** Native reports `feed_exhausted` only after the `t=12.5s` sample, whether or not `explicit_end` is present
+- **AND THEN** Native does not report exhaustion after any of the first four samples
+
+#### Scenario: Structural invalidation remains continuation
+
+- **WHEN** loading, growth above 100px, any ordered validated-identity-vector change, navigation, document-time-origin change, a backward adjacent document-age reset, generation change, surface change, or departure from near-bottom occurs before the fifth sample
+- **THEN** Native does not report `feed_exhausted` from that window and retains the existing bounded continuation or zero-card evidence path
+
+#### Scenario: A content-reference witness cannot cross a command or document
+
+- **WHEN** a valid `content_ref` was observed only by a prior command, another URL, or another document time origin and the current command has observed no validated identity in its current home document
+- **THEN** Native does not reuse that witness and MUST NOT report marker-free `feed_exhausted`
 
 #### Scenario: Commanded scroll exhausting its rounds over physical cards reports present-but-unreportable
 
@@ -60,7 +93,7 @@ This requirement adds no new receipt reason code and no new protocol field: the 
 #### Scenario: Blocked or non-home exhaustion keeps today's honest failure
 
 - **WHEN** a commanded scroll exhausts its rounds while the final observation is loading, login-like, captcha-like, consent-blocked, off the home surface, or carries no physical card evidence and fails explicit-empty confirmation
-- **THEN** Native returns the existing honest failure classification, reports neither present-but-unreportable nor explicit empty, and never transitions to Reels through this path
+- **THEN** Native returns the existing honest failure classification, reports neither present-but-unreportable nor explicit empty, and never transitions to Reels through the marker-free home path
 
 #### Scenario: Zero-card viewport is not settled by stability alone
 
@@ -288,4 +321,52 @@ The Native Facebook session SHALL count a Feed card as physical card evidence on
 
 - **WHEN** a card carries an author link or post-body marker but exposes no acceptable post permalink
 - **THEN** Native counts it as physical card evidence and the existing present-but-unreportable observation remains available
+
+### Requirement: Automatic Facebook scroll foreground activation is watchdog- or movement-scoped
+
+The Native Facebook runtime SHALL keep ordinary automatic list scrolling background-first. It MAY invoke `Page.bringToFront` for an automatic `page.scroll` in exactly two cases, and no others: when the reason is exactly `idle_recover_nudge`, or after a completed background Feed-list wheel has bounded same-document proof of no movement on a ready, scrollable, non-terminal surface. Each command MUST activate the exact already-bound target at most once and MUST NOT switch targets.
+
+**Reason alone never authorizes activation beyond the watchdog reason.** A `page.scroll` carrying `feed_scroll`, `search_scroll`, `resume_redrive`, `feed_continuation_unconfirmed`, any other non-watchdog reason, or no reason at all MUST NOT invoke `Page.bringToFront` on the strength of its reason, whether it reaches Feed, Search, Reels, a no-target result, a resume path, a continuation path, or another recovery path. The second case above is not a reason-based exception: it is earned only by measured proof of no movement after input was actually dispatched, and it MUST NOT be widened into a reason.
+
+No-target, pre-input rejection, loading, terminal, context-drift, and already-moved paths MUST remain background-only.
+
+This requirement applies only to automatic Facebook `page.scroll`. Explicit operator actions that show a browser, guided login, and non-Facebook commands retain their existing independent foreground behavior.
+
+#### Scenario: Watchdog recovery activates before input once
+
+- **WHEN** Native receives `page.scroll.reason = "idle_recover_nudge"`
+- **THEN** it activates the exact bound target once before scroll actuation
+- **AND** it does not switch to another target
+- **AND** any later no-movement classification in that command cannot activate it again
+
+#### Scenario: Routine scroll remains in the background on reason alone
+
+- **WHEN** Native receives a Facebook `page.scroll` with `feed_scroll`, `search_scroll`, `resume_redrive`, `feed_continuation_unconfirmed`, another non-watchdog reason, or no reason
+- **THEN** it preserves the existing bounded page inspection and input gates
+- **AND** it does not invoke `Page.bringToFront` on the strength of that reason, whether or not those gates ultimately dispatch input
+
+#### Scenario: Ordinary movement remains fully backgrounded
+
+- **WHEN** an ordinary Facebook list scroll completes with measured movement
+- **THEN** Native invokes no foreground activation for that command
+
+#### Scenario: Ordinary proven no-movement activates once after input
+
+- **WHEN** an ordinary background wheel completes and bounded readback proves eligible same-document no movement
+- **THEN** Native activates the exact bound target once before the single recovery wheel
+
+#### Scenario: Ordinary no-target result does not cover the desktop
+
+- **WHEN** a non-watchdog Facebook `page.scroll` resolves to no target or is rejected before input
+- **THEN** it invokes neither `Page.bringToFront` nor scroll input
+
+#### Scenario: No target or context drift never covers the desktop
+
+- **WHEN** an ordinary scroll has no target, dispatches no wheel input, or changes document or surface before recovery
+- **THEN** Native does not invoke `Page.bringToFront` through adaptive recovery
+
+#### Scenario: Explicit operator foreground action is unchanged
+
+- **WHEN** the operator explicitly requests to show a browser or enter guided login
+- **THEN** the existing explicit foreground behavior remains available independently of the automatic scroll rule and of `page.scroll.reason`
 

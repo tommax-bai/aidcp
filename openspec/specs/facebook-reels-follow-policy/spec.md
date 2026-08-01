@@ -3,31 +3,6 @@
 ## Purpose
 TBD - created by archiving change facebook-reels-random-follow. Update Purpose after archive.
 ## Requirements
-### Requirement: Every eligible active Facebook Reel receives one independent follow draw
-
-When an Edge connection that declares `facebook_reel_follow_v1` reports exactly one active Facebook Reel through `page.cards` with `listKind:'reels'`, a canonical Facebook `/reel/<id>` identity, and a non-empty current author, Cloud SHALL make at most one Reel-follow decision for that normalized identity in the active session. For a decision that passes existing quota and safety gates, Cloud SHALL select a follow intent exactly when its independent injectable random value is strictly less than `0.10`. A value equal to or greater than `0.10` SHALL abstain without sending a follow command. Duplicate reports MUST NOT redraw.
-
-#### Scenario: Draw below threshold selects a note-scoped follow intent
-- **WHEN** an eligible unique Reel is reported and the follow random value is `0.099999`
-- **THEN** Cloud sends one existing `interaction.follow` command containing that Reel `noteId` and its observed author
-- **AND** the existing 25% like decision remains independent
-
-#### Scenario: Threshold value abstains
-- **WHEN** an eligible Reel's follow random value is exactly `0.10`
-- **THEN** Cloud sends no probability-selected follow command for that decision
-
-#### Scenario: Duplicate report does not redraw
-- **WHEN** the same normalized Reel identity is reported more than once in one active session
-- **THEN** Cloud performs only the first follow decision and sends at most one probability-selected follow intent
-
-#### Scenario: Invalid or authorless Reel fails closed
-- **WHEN** the list is not Reels, has zero or multiple cards, lacks a canonical Facebook Reel identity, lacks a non-empty author, or belongs to another platform
-- **THEN** Cloud sends no probability-selected follow command
-
-#### Scenario: Old Edge does not receive follow
-- **WHEN** the connected Edge does not declare `facebook_reel_follow_v1`
-- **THEN** Cloud does not draw or send an automatic Reel follow command
-
 ### Requirement: Reel follow probability remains subordinate to every quota and safety gate
 
 Before drawing or dispatching an automatic Reel follow, Cloud SHALL reserve the Reel's one-time decision, require positive remaining session follow budget, require the authoritative RiskController to allow `follow` under its current minute/hour/day limits and risk state, and require the existing follow cooldown to pass. Dispatch SHALL continue through the existing comment-subline suppression and same-account `InteractionGuard`. A blocked decision MUST NOT send a command, consume successful-follow budget, or be presented as a successful follow.
@@ -60,4 +35,26 @@ A probability-selected follow SHALL remain an intent until Edge re-probes the sa
 #### Scenario: Follow cannot be verified
 - **WHEN** Edge returns shadow, no-target, ambiguous-target, state-unchanged, verify-indeterminate, or any other non-success result
 - **THEN** Cloud records no successful follow and the client shows no successful follow activity
+
+### Requirement: Every supported Facebook browse mode uses its own configurable Reel follow cadence
+
+For each active session, Cloud SHALL count eligible unique canonical Reels separately under the effective mode and SHALL select one follow intent on each configured `viewsPerFollow` boundary. Ordinary persona SHALL default to 10; slow-start, rule and consumption SHALL each default to 15. The four values SHALL be independently configurable in the target-global management policy. A Reel observed under one mode MUST NOT advance another mode's counter.
+
+Follow selection SHALL continue to require the current Reel's non-empty author and an Edge connection declaring `facebook_reel_follow_v1`. Missing author, old Edge, risk rejection, exhausted budget, cooldown or duplicate-author ownership MUST send no follow and create no success or action debt.
+
+#### Scenario: Default ordinary persona follow boundary
+
+- **WHEN** ordinary persona mode presents ten eligible unique Reels under the default policy
+- **THEN** the tenth selects at most one follow intent and the earlier nine select none
+
+#### Scenario: Default rule follow boundary is independent
+
+- **WHEN** rule mode presents fifteen eligible unique Reels after persona mode previously accumulated nine Reel visits
+- **THEN** rule mode selects its first follow intent only on its own fifteenth Reel
+- **AND** the persona counter does not affect that boundary
+
+#### Scenario: Old Edge fails closed at the boundary
+
+- **WHEN** the mode reaches its follow boundary but the connected Edge lacks `facebook_reel_follow_v1`
+- **THEN** Cloud sends no follow command, records no confirmed follow and carries no target debt
 

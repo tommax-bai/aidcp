@@ -312,40 +312,35 @@ AdsPower provider 在 `browser-profile/start` 明确返回目标 profile 被其�
 - **THEN** provider 不调用 profile 更新或读回
 
 ### Requirement: AdsPower proxy configuration SHALL be an execution copy of the frozen Cloud authority
-Before starting an AdsPower profile with a configured proxy, Edge SHALL write exactly one effective proxy into AdsPower `user_proxy_config`: the frozen Cloud original proxy in direct mode, or the current AIDCP/GOST loopback in double-hop mode. Edge SHALL read the profile back and stop before browser launch if the effective proxy was not adopted.
+Before starting an Inactive AdsPower profile with a configured proxy, Edge SHALL write exactly one effective proxy into AdsPower `user_proxy_config`: the frozen Cloud original proxy in direct mode, or the current AIDCP/GOST loopback in double-hop mode. Edge SHALL read the profile back and stop before browser launch if the effective proxy was not adopted. When AdsPower reports the profile Active, Edge SHALL attach directly without resolving, synchronizing, preflighting, or validating its proxy and SHALL NOT claim that the running browser matches Cloud authority.
 
 #### Scenario: Direct start uses original authority
-- **WHEN** system-upstream mode is disabled and the frozen Cloud authority is configured
+- **WHEN** system-upstream mode is disabled, the frozen Cloud authority is configured, and AdsPower reports the profile Inactive
 - **THEN** Edge SHALL write the original Cloud proxy to AdsPower before launch
 - **AND** SHALL not inject a competing browser proxy authority
 
 #### Scenario: Double-hop start uses only the GOST loopback
-- **WHEN** system-upstream mode is enabled and the frozen Cloud authority is configured
+- **WHEN** system-upstream mode is enabled, the frozen Cloud authority is configured, and AdsPower reports the profile Inactive
 - **THEN** Edge SHALL write only the current GOST loopback to AdsPower before launch
 - **AND** SHALL not retain or inject a second competing browser proxy authority
 
 #### Scenario: Effective proxy readback differs
-- **WHEN** AdsPower readback does not match the intended effective proxy
+- **WHEN** AdsPower reports the profile Inactive and readback does not match the intended effective proxy
 - **THEN** Edge SHALL stop startup and report the synchronization failure
 
-#### Scenario: Configured profile is already Active with matching egress
+#### Scenario: Configured profile is already Active
 - **WHEN** AdsPower reports a configured profile as Active
-- **AND** the browser's observed public egress exactly matches the egress observed through the frozen effective proxy
 - **THEN** Edge SHALL attach to and take over that Active browser without rewriting its running profile
-- **AND** SHALL NOT require a profile-generation marker or continue checking profile consistency after startup
+- **AND** SHALL NOT resolve Cloud proxy authority, prepare a proxy chain, run proxy preflight, probe public egress, compare proxy state, or require a profile-generation marker before takeover
 
-#### Scenario: Configured Active-browser egress is mismatched or unavailable
-- **WHEN** AdsPower reports a configured profile as Active
-- **AND** exact browser-versus-effective-proxy egress equality cannot be established
-- **THEN** Edge SHALL fail startup with a stable terminal reason
-- **AND** SHALL leave the pre-existing browser open and untouched
-- **AND** Electron SHALL NOT automatically respawn the same deterministic startup failure
+#### Scenario: Active-only observation races with browser close
+- **WHEN** Electron selected direct Active takeover but the child subsequently observes the profile as Inactive
+- **THEN** the child SHALL fail that takeover without starting a new browser
+- **AND** a future fresh start SHALL still pass the normal authority, preflight, synchronization, and readback gates
 
-#### Scenario: No-proxy Active browser keeps the existing path
-- **WHEN** AdsPower or Cloud authority is explicit `no_proxy`
-- **AND** AdsPower reports the profile as Active
-- **THEN** Edge SHALL bypass Cloud proxy resolution, proxy preflight, egress-equality takeover gating, profile mutation, and restore
-- **AND** SHALL preserve the existing no-proxy Active-browser takeover behavior
+#### Scenario: No-proxy Active browser uses the same direct path
+- **WHEN** AdsPower reports the profile as Active regardless of configured or explicit `no_proxy` state
+- **THEN** Edge SHALL use the same direct takeover behavior without proxy gates or mutation
 
 #### Scenario: Close restores the frozen original as fallback
 - **WHEN** a managed profile closes after an execution-copy override
@@ -369,4 +364,31 @@ Every AdsPower Local API request owned by one Electron desktop runtime SHALL pas
 - **WHEN** a managed child requests an unapproved endpoint, method, batch size, or another profile identifier
 - **THEN** Electron SHALL reject it before contacting AdsPower
 - **AND** SHALL NOT disclose the API key or proxy credentials in status or logs
+
+### Requirement: Managed AdsPower first-open policy separates credential filling from password saving
+
+For a fresh managed AdsPower profile start, edge SHALL send the AdsPower first-open policy that enables imported credential filling while disabling browser password saving. The start request MUST use `password_filling: "1"` and `password_saving: "0"` and SHALL retain the existing permission-denial launch policy. Enabling credential filling MUST NOT be treated as authority to read, log, persist, or type the stored password. Disabling password saving applies to browser chrome and MUST NOT suppress the separate Facebook Remember Password page signal.
+
+#### Scenario: Fresh AdsPower start applies the policy before Facebook loads
+- **WHEN** edge starts an inactive managed AdsPower profile
+- **THEN** the V2 start body contains `password_filling: "1"` and `password_saving: "0"`
+- **AND** its launch arguments retain permission-prompt suppression before the start URL loads
+
+#### Scenario: AdsPower fills a complete login form
+- **WHEN** the imported profile opens the exact Facebook login form and AdsPower has filled both credential fields
+- **THEN** the Facebook Native login handler MAY submit the form without receiving or typing a password
+
+#### Scenario: Credential filling is unavailable
+- **WHEN** either exact Facebook login field remains empty after the bounded fill observation
+- **THEN** edge reports `credential_fill_unavailable` and MUST NOT request the password, guess a value, or submit the incomplete form
+
+#### Scenario: Browser and Facebook remember-password layers remain distinct
+- **WHEN** login succeeds
+- **THEN** the browser Save Password bubble is suppressed by `password_saving: "0"`
+- **AND** a later Facebook Remember Password page modal, if present, remains eligible for its independent Native signal/action
+
+#### Scenario: Already-running profile lacks fresh-start evidence
+- **WHEN** AdsPower returns an already-active profile and edge cannot establish that the required password-saving policy was applied to that browser generation
+- **THEN** edge MUST NOT claim browser-chrome suppression or run first-login assistance that depends on it
+- **AND** an already-authenticated profile MAY still proceed through the ordinary stable-identity gate
 
