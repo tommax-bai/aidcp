@@ -38,19 +38,19 @@ python3 -c "import json;print(json.load(open('../aidcp-automation/boundaries/com
 cd ../aidcp && openspec validate split-cloud-automation-production-runtime --strict
 ```
 
-> **2026-08-01 夜 · 现状（这一段是当前事实，读它就够；逐批沿革移到文末 §10）**
+> **2026-08-02 · 现状（这一段是当前事实，读它就够；逐批沿革移到文末 §10）**
 >
-> **六仓**：cloud `534af19` / kernel `27cbfc5` / transport `e1499fc` / api `5f969ed` /
-> content `d68ee85` / automation `ac09a7f`；控制仓见 `git log`。
-> 共享包 pin 已按 kernel → transport → 三个业务仓抬完，六仓 pin 全对齐、**对账零漂移**。
-> **测试**：cloud 4064 / api 501 / content 441 / automation 2040 / kernel 70 / transport 36，全 0 fail。
+> **六仓**：cloud `f12181b` / kernel `9cfd1c9` / transport `a2ffe05` / api `8c0ba78` /
+> content `f060706` / automation `ed2d32b`；控制仓见 `git log`。
+> 共享包 pin 已按 kernel → transport → 三个业务仓抬完，**对账零漂移**。
+> **测试**：cloud 4084 / api 501 / content 441 / automation 2040 / kernel 70 / transport 36，全 0 fail。
 > **门 11 条**（运营指令 3 / 内容 7 / 组装 1）。**tasks.md 76/129。**
 >
 > **门为什么不动**：整个第 3 段它都会停在 11。撤条判据写在 automation 台账自己的 docblock 里
 > （「阻止本包交付完整生产进程的依赖」），而写 `main()`（3.1）排在清台账（4.1）之前。
 > **第 3 段的交付物是「让每条依赖变得可满足」，减门是第 4 段的事** —— 不是漏了。
 >
-> ### 第 3 段八批：A / A-1 / B / D / F / E-1 已落，C 落大半，**只剩 E-2 / G / H**
+> ### 第 3 段八批：A / A-1 / B / D / F / E-1 已落，C 落大半，**E-2 只剩步骤 3**
 >
 > | 批 | 状态 | 落点 |
 > | --- | --- | --- |
@@ -58,55 +58,53 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > | A-1 | ✅ | 首次依赖共享传输包 + 模型出口工厂（`c365b1a`） |
 > | B | ✅ | 风控单写者 + 告警底座（`4d3fb89`） |
 > | C | 大半 | 配置副本停手闸（`089e2cc`）+ 记账漏斗与 outbox 保留期（`6958e55`）；**剩三件**见下 |
-> | D | ✅ | 出口闸放行判定析出 kernel（`8d62dca`）+ 边缘接入正文（`ff44774`，`src/automation-edge-access.ts`） |
-> | F | ✅ | 发布下发与陪伴界面（`613338a`，`src/automation-publish-dispatch.ts`） |
-> | E-1 | ✅ | 每连接运行时注册表 + 冷却闸 + 互动守卫（`ac09a7f`，`src/automation-connection-runtime.ts`） |
-> | E-2 | ⬜ | **每连接角色调度器工厂** —— 勘察已完成、裁定已拍板，**可以开工**（见下「批 E-2 工单」） |
+> | D | ✅ | 出口闸放行判定析出 kernel（`8d62dca`）+ 边缘接入正文（`ff44774`） |
+> | F | ✅ | 发布下发与陪伴界面（`613338a`） |
+> | E-1 | ✅ | 每连接运行时注册表 + 冷却闸 + 互动守卫（`ac09a7f`） |
+> | **E-2** | **步骤 1/2 ✅、步骤 3 ⬜** | 四个业务配置的事实源**已全部就位**；剩工厂本体 |
 > | G / H | ⬜ | 未开工 |
 >
 > **形态在批 B 定下来了，后面每批照做**：写成**可单测的工厂**，不写进 `main()`。
-> 写进去就只能等 3.1，而这些装配本身与 `main()` 无关。最后 `main()` 只是把它们串起来。
 > **可执行入口在批 H 之前一律保持 fail-closed** —— 它是中间态的保护罩。
 >
-> ### 下一步 · 批 E-2 工单（勘察与裁定都已完成，照着做即可）
+> ### 批 E-2 · 步骤 1 与 2 已落（2026-08-02），**下一步是步骤 3：工厂本体**
 >
-> **别重查这一段** —— 结论全文在 tasks.md 的 **3.1e**，事实源裁定在
-> `docs/cloud-service-decomposition-proposal.md` §4.7（与停手闸那条并列）。
+> 工单原文与勘察结论仍在 tasks.md **3.1e**（连同这两步的落地注记）。**别重查。**
 >
-> **它是什么**：每连接角色调度器工厂。工厂本体约 400 行、向调度器传 **41 个顶层选项**
-> （另有 FB 规则模式 6 项 / FB 消费模式 6 项按条件展开）。调度器选项面本身
-> **70 余个字段、几乎全是可选** —— 这是 task 2.7 点名的「optional 参数是静默缺席主要来源」的最大一处，
-> 漏传任何一项都不报错。
+> **步骤 1**（cloud `bc690ce`）：排期 / 热帖阈值 / FB 评论配置三段「快照 + 账号 → 生效值」
+> 析出 kernel（新增 `content-schedule-resolution.ts`），存储残壳留 api、等值再导出，
+> 既有消费方一行未改。顺带结清三处**本来就存在**的第二份实现（面板目录投影里就地展开的掩码解析、
+> 同步读发布方自带的热帖回落与评论模式映射）。
 >
-> **✅ 用户 2026-08-01 已拍板：走「析出纯判定段进 kernel」**（与批 C 停手闸那次同一条路、有判例）。
+> **步骤 2**（cloud `f12181b`）：Facebook 运营基线判定析出 kernel，**并补上了它缺的那条同步读流**
+> `facebook_operation_policy`。**一个比原计划省事的形状**：载荷发的是属主**已合成好的逐环境基线投影**，
+> 不是那 8 张原始表 —— 发原始表等于逼消费方把「全局默认 ← 环境覆盖 ← legacy 回落」再实现一遍。
+> 发成品之后 kernel 里只剩三条具名 blocker 的判定，automation 侧一行判断都不用写。
 >
-> **三步，按此顺序**：
+> ⇒ **四个业务配置现在都有事实源了**，步骤 3 可以照批 D/F 的办法直接写工厂：
+> 四个业务配置与评论域（评论调度器 / 人审端口 / 免审通知 / 联系评论闸，均属批 G）
+> 一律做成**必填注入口**或**能力二态**，让编译器逼批 G 面对。
 >
-> 1. **前三个业务配置**（排期 / 热帖阈值 / FB 评论配置）——**事实源已在**
->    （本仓同步读消费流 `content_schedule` / `hot_lead_config` / `facebook_comment_config`），
->    缺的只是「给定快照 + 账号 → 有效值」那一段。析出进 kernel，
->    api 侧三份存储改为调它、**行为逐位不变、既有消费方一行不改**。照 3.1c 第 2 步的做法办。
-> 2. **FB 运营策略**（`src/config/facebook-operation-policy-store.ts`）——**析出之后仍拿不到输入**：
->    它**不在** `AUTOMATION_SYNC_READ_CONSUMER_STREAMS` 里，却读 8 张 api 属主表
->    （`accounts` / `client_environments` / `client_env_scope` / `facebook_operation_policy` /
->    `facebook_operation_global_policy` / `facebook_primary_browse_surface_policy` /
->    `facebook_rule_mode_environment_config` / `facebook_environment_slow_start_completion`）
->    **并写其中两张**。⇒ **要为它补一条同步读流**。这一件尚未开工，且它决定**整个 Facebook 浏览模式**。
->    **MUST NOT 给它一个恒 `unsupported` / `blocked` 的实现把编译过掉** ——
->    那不报错，只是让 FB 账号在本进程里**永远不开始浏览**。
-> 3. **工厂本体**照批 D/F 的办法写：四个业务配置与**评论域**（评论调度器 / 人审端口 / 免审通知 /
->    联系评论闸，均属批 G）一律做成**必填注入口**或**能力二态**，让编译器逼批 G 面对。
->    它今天是 `automation-connection-runtime.ts` 里 `buildDispatcher` 那个必填口 ——
->    不接，连接建得起来、握手也过，但**永远不开始浏览**。
+> ### ⚠️ 步骤 3 开工前必须知道的三件（都是这两步实读得到的）
 >
-> **第 1 / 2 步是跨仓改动**（kernel + 三仓 pin），按 §6.2 的顺序：先 src、再测试、最后抬 pin。
-> 一次 `npm install` 实测约 6 分钟 × 3 仓，排期时算进去。
+> 1. **评论模式有两套字面量，且 typecheck 抓不到。** 同步读快照上是**复数 `templates`**，
+>    领域类型是**单数 `template`**。顺手写 `mode === 'template'` 恒 false ——
+>    后果不是崩溃，是**运营配好的模板被静静换成 AI 生成正文**。
+>    已收成具名出口（`facebookCommentModeFromWire` / `ToWire`）并把快照字段类型收窄到线缆联合；
+>    **步骤 3 是这条通道的第一个消费方**，务必走出口、别比较字面量。
+> 2. **`aidcp-api` 手写入口还没构造 Facebook 运营策略存储**，今天供的是一个当场抛具名错误的实现。
+>    三进程真跑之前必须补上，否则 automation 拉这条流拿到的是 502 而不是基线。
+>    **MUST NOT 改成回落空表** —— 空表读起来是「这台机器没有任何 FB 环境」。
+> 3. **结构断言按「正向委托」写，别按「没有同名的本地定义」写。**
+>    第一版按后者写，**当场被变异绕过**：第二份改名成 `localResolveEffectiveContentActiveMask`
+>    就躲开了，8 条用例与 typecheck 全绿。判据要写成「这个取数口的方法体 MUST 调到那个符号」
+>    并按词边界匹配。§4.2b 记的那条判例是弱形式，照抄会漏。
 >
 > ### 其余可并行推进的
 >
 > - **批 C 剩的三件**（不阻塞 E-2）：面板事件投递客户端、配置面审计中继
 >   （**写的是接口属主表，跨进程后 MUST 走已有通道、别直连**）、风控指令消费者接线。
-> - **批 G**：各类调度器。E-2 会给它留一批必填口，届时照签名做。
+> - **批 G**：各类调度器。E-2 步骤 3 会给它留一批必填口，届时照签名做。
 >
 > ### 批 D 留下的三个必填口（批 E/F/G 的开工面）
 >
@@ -134,7 +132,8 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > - **批 B 留的两个必填口都已有真实现**（配置副本陈旧 ← C 镜像半；记账断链 ← C 记账半）。
 >   **但最后一跳没接**：把它们喂进批 B 的底座属批 H 的 `main()`。在那之前口仍是空的
 >   —— 而这正是当初做成必填无默认的价值：**缺实现是编译期可见的**。
-> - **dev 已是主干头 `534af19`，逐文件核过（542 个源文件差异 0 条）**，不需要部署。
+> - **dev 停在 `534af19`，而主干头已是 `f12181b`（批 E-2 步骤 1/2）⇒ 需要部署。**
+>   判据始终是「cloud 主干头有没有变」，不是「本轮谁改了什么」。
 >   ⚠️ **别按「本轮谁改了什么」推断部署状态**：本轮 cloud `src/` 确有真改动，
 >   我一度据此判定 dev 落后 —— 但另一路 session 已在 16:39 部署主干头，把这些改动一并带了过去。
 >   **判据只能是逐文件比对，不是推理。**
