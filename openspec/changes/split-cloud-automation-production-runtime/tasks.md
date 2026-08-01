@@ -1459,6 +1459,53 @@
 
 - [ ] 3.1 `aidcp-automation`：在 `createAutomationCompositionRoot` 之上写真 `main()`——
   边-云 WebSocket 服务端、事件总线 + 角色调度器、风控单写者、各调度器与监测体。
+- [ ] 3.1e **批 E 后半（每连接角色调度器工厂）撞到一个必须先裁定的归属问题 —— 与 3.1c 同形，
+  别当例行搬运开工。** 勘察已做完（2026-08-01，源 `aidcp-cloud@534af19` 实读），下面是结论。
+  <!-- **勘察结果（省下一手一次全量重查）**：
+       工厂本体 = `src/server.ts` 的 `buildDispatcher`，**约 400 行**、向调度器传 **41 个顶层选项**
+       （另有两组按条件展开：FB 规则模式 6 项、FB 消费模式 6 项）。
+       调度器选项面本身有 **70 余个字段、几乎全是可选** —— 这正是 task 2.7 点名的
+       「optional 参数是静默缺席的主要来源」的最大一处：漏传任何一项都不报错。
+
+       **能直接接的（供给方今天就在本仓 / 组装根）**：停手闸（批 C）、模型出口（A-1）、
+       节奏兜底与租约客户端与对边出口（批 D）、互动守卫与冷却闸（批 E 前半）、
+       风控闸与当日剩余与去重账本（批 B/C）、概念池 / 精选写口 / 图内文字转写（内容客户端，已接线）、
+       通知投递与联系人名册与联系评论台账（api 客户端）、单场与续场配置（本仓自有）、
+       人设绑定三态与账号昵称（同步读镜像 / 账号主数据窄口）。
+
+       **⚠️ 真正的坎：四个业务配置存储是 api 属主、且不在本仓**
+       （`content-schedule-store` / `hot-lead-config-store` / `facebook-comment-config-store` /
+       `facebook-operation-policy-store`，归属表逐条可查）。自动化段对它们有 **32 处引用**
+       （排期 11 / FB 运营策略 13 / FB 评论配置 5 / 热帖阈值 3），**全部是同步热路径读**
+       （`effectiveScheduleFor` / `resolveBaseForAccount` / `effectiveConfigFor` / `getGateConfig`）。
+
+       **前三个有事实源、缺的是「有效值」那一段**：本仓同步读镜像已带 `content_schedule` /
+       `hot_lead_config` / `facebook_comment_config` 三条消费流，但镜像给的是**快照**，
+       而调度器要的是**按账号解析后的有效值**（含全局回落与就绪判定），那段逻辑住在 api 属主的存储里。
+
+       **第四个连事实源都没有**：`facebook_operation_policy` **不在本仓的同步读消费流清单里**，
+       而它读 8 张 api 属主表（accounts / client_environments / client_env_scope /
+       facebook_operation_policy / facebook_operation_global_policy /
+       facebook_primary_browse_surface_policy / facebook_rule_mode_environment_config /
+       facebook_environment_slow_start_completion）**并写其中两张**
+       （慢启动完成、全局策略审计）。它驱动的 `resolveFacebookOperationDecision`
+       **决定整个 Facebook 浏览模式**——没有它，FB 账号会安静地永远不浏览。
+
+       **三条路，需拍板（与 3.1c 同一类问题：归属裁定，不是编码）**：
+       ① **析出纯判定段进 kernel**（3.1c 已走通的那条）：把「给定快照 + 账号 → 有效值」做成无状态函数，
+          存储残壳留 api。对前三个成立；对第四个还要先解决事实源。
+       ② **本仓按镜像自己再实现一遍解析** —— **MUST NOT**：这正是本 change 反复被咬的形态，
+          第二份在写出来那一刻行为完全一致，要等两份漂开、且恰好在该拦住的那一刻才现形。
+       ③ **跨进程问 api** —— 与 3.1c 的结论同理：同步热路径读，改成一次 HTTP 要动每个调用点的签名
+          并给热路径加一跳网络；真要跨进程只能是「异步取源 + 本地镜像」，
+          也就是给 `facebook_operation_policy` 补一条同步读流。
+
+       **MUST NOT 做的**：给 FB 运营决策一个恒 `unsupported` / `blocked` 的实现把编译过掉。
+       那不报错、只是让 Facebook 账号在本进程里永远不开始浏览 —— 本 change 红线点名的那种假成功。
+
+       **不被这条挡住、可以先做的**：工厂本体照批 D/F 的办法写出来，把四个业务配置
+       与评论域（评论调度器 / 人审端口 / 免审通知 / 联系评论闸，均属批 G）一律做成**必填注入口**
+       或**能力二态**，让编译器逼后面那批面对。裁定只决定「谁来喂这个口」，不阻塞工厂本身交付。 -->
   <!-- **批 E 前半已落**（aidcp-automation ac09a7f）：每连接运行时。落点
        `src/automation-connection-runtime.ts` —— 连接运行时注册表（握手准入 → 建私有总线 →
        解析可写控制器 → welcome 提交 → 断连拆除）、互动去重守卫注册表、动作冷却兜底闸。
