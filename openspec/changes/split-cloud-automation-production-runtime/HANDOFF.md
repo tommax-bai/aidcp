@@ -68,7 +68,57 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > 取消（`remaining_cancelled_by_user`）、不点则停在 `awaiting_confirmation` **不自作主张往下走**。
 > 卡在这里这么久的原因是**两个错叠在一起**，都已处置，见 §5 那段说明。
 
-> **2026-07-31 第八批（本 session 末批，接手请以这一组为准）**：
+> **2026-08-01 批 A（第 3 段切批方案的第一批，接手请以这一组为准）**：
+> **六仓**：cloud `f83e266` / automation `6035fa4` / api `3a75b0e` / content `f290a3c` /
+> kernel `ac98a30` / transport `40df6de`（**共享包与 api / content 都没动 ⇒ 无 pin 变更**）。
+> 测试 cloud 全量 4052 pass / 0 fail（acceptance 184/184）、automation 全量 1983 pass / 0 fail
+> （acceptance 89/89），两仓 typecheck 干净；六仓对账零漂移。tasks.md **72/124**（实测，别抄旧数）。
+> **门仍 11**（批 A 不搬业务代码，本来就不减门）。
+>
+> **交付两件：**
+> - **进程启动外壳**（automation `src/automation-service-entry.ts`）：读配置 → 建根 → **先监听**
+>   → 就绪闸 → 放行业务 → 优雅关停 → 信号处理。运行时依赖与业务入口都是**必填参数、无缺省**，
+>   批 B…G 补真实供给方时编译器会逼你面对。**可执行入口一个字没动，照旧 fail-closed。**
+> - **41 个导出面的判据清单**（automation `src/automation-segc-export-disposition.ts`）：
+>   **construct 34 / skip 2 / open 5**；预排批次 B 5 / C 1 / D 6 / E 2 / F 16 / G 6 / H 5。
+>
+> **⚠️ 下一手最该知道的四条（都是做的过程里坐实的）：**
+> 1. **判据是两个字段不是一个**。「本进程内有消费者」与「构造只为答别的进程」拆开，
+>    后者 MUST 显式声明。今天走这条例外的**只有 `dispatchActivityForPanel`** 一条。
+> 2. **`open` 那 5 条是真判不了，不是拖延**：本进程无消费者 + 去处在接口进程 + **通道今天不存在**。
+>    判 construct 是构造了没去处，判 skip 是这条能力消失。已开 task 3.5a 当批 H 的现成清单。
+> 3. **`skip` 那 2 条是照抄既有裁定**（`personaAutoFill` / `publishUiUpdateCommand` 在单体里的
+>    构造条件逐字写着「非自动化模式」）。改成构造 = 悄悄改变模式行为。
+> 4. **两条导出面今天没有任何读者**：`resolveController` / `triggerPublishDispatchOnApprove`
+>    ——接口服务段各有自己的本地实现。本包只要本地函数，不必再导出一遍。
+>
+> **本批新加的一道机械信号，位置是刻意选的**：cloud 的 `AC-SEGC-FACE`
+> （`test/acceptance/segc-export-face.test.ts` + `helpers/segc-export-face.ts`）现场解析自动化段
+> 导出面并与钉死名单比对。**放 cloud 不放 automation**，就是冲着 §4.7 那条教训去的——
+> 判据的来源只在 cloud 存在，派生仓的手抄件永远拿不到信号。它按路径读组装根 ⇒ 派生同步会
+> 自动把它判为「不可派生」而留守，想搬也搬不过来。**它红的时候要重判那条句柄的去处，
+> 不是改名单让它变绿。**
+>
+> **⚠️ 变异实测里最该记住的一条**：「关停不等在途放行落地」这个变异，**一开始 6 条用例全绿**——
+> 因为每条用例的放行都是瞬时完成的，根本没有「正在放行」那个窗口。补了一条会真触发的才显形
+> （真实后果：服务声称已关停，业务入口被丢在半途、它的 stop 永远不会被调用）。
+> 那条用例注释里写了「别当冗余删掉」。**再次印证 §6.5：要问「哪条抓住的」，不是「会不会红」。**
+>
+> **⚠️ 两个会绊住下一手的操作细节：**
+> - **worktree 的 `node_modules` 会带着过期的 kernel 装机**。本次接手时 automation worktree 的
+>   typecheck 报了 20 多条「模块找不到」，看着像工作区坏了 —— 实际是 `package.json` 的 pin 已对齐、
+>   而装进去的那份还是旧 sha（canonical checkout 同时是干净的）。**worktree ff 之后先 `npm install`。**
+> - **automation 新增顶层 `src/*.ts` 要动三处**，缺一处就红/漂：控制仓 `scripts/sync-split-repos`
+>   的 `DERIVED_COMPOSITION`（否则对账报「多出」并可能被 `--prune` 删）、automation
+>   `boundaries/ownership-rules.json` 的 `fileOverrides`（生成器**拒绝替你塞默认层**，会当场列名单）、
+>   以及判 `composition` 时还要进 `compositionWhitelist`。本批把外壳判 composition 并入白名单，
+>   **判据清单判 automation 且刻意不进白名单**——它不是组装根，塞进去会稀释那份白名单的含义。
+>
+> **本批 dev 未部署，且是有意的**：cloud 侧 diff **只有两个测试文件、`src/` 一行没动**，
+> 运行行为零变化；automation 侧不参与今天的单体部署（三进程形态还没开工）。
+> ⇒ **dev 仍是 `f489e5e`，与 master 的差别只有测试**。下一批只要动到 cloud `src/` 就照常部署。
+>
+> **2026-07-31 第八批**：
 > **六仓**：cloud `f489e5e` / api `3a75b0e` / automation `9d4c9a2` / content `f290a3c` /
 > kernel `ac98a30` / transport `40df6de`（**共享包两个都没动 ⇒ 无 pin 变更**）；控制仓 `f59999fb`。
 > 测试 cloud 4050 / api 499 / automation 1970 / content 441，全 0 fail；acceptance 182/182；
@@ -774,7 +824,7 @@ kernel 头一动，transport 与三个业务仓的 pin 全部作废，整条链�
 
 | 批 | 内容 | 段内行段（横幅定位） | 规模 | 依赖 |
 | --- | --- | --- | --- | --- |
-| **A** | 骨架 + 判据清单 | 不搬业务代码 | 小 | — |
+| ~~**A**~~ ✅ | 骨架 + 判据清单 | 不搬业务代码 | 小 | — |
 | **B** | 风控单写者 + 告警/指标底座 | `Block④ 三仓提取 · 批次 0d` → `自动化写者锁` | ~720 行 | A |
 | **C** | outbox 中继 + 配置镜像刷新 | `Block② 2e：拆段传输接线`、`event_outbox 保留期`、`记账 outbox + worker + 对账`、`配置面审计中继` | ~640 行 | B |
 | **D** | 边缘接入（含边-云服务端） | `配置镜像刷新器接线` 后半 + `多租户连接运行时` 前半 | ~550 行 | C |
@@ -785,13 +835,13 @@ kernel 头一动，transport 与三个业务仓的 pin 全部作废，整条链�
 
 ### 9.2 逐批说明
 
-**批 A · 骨架与判据（不搬业务代码）**
-在自动化仓 `createAutomationCompositionRoot` 之上写 `main()` 的**外壳**：
-读配置 → 建组装根 → 就绪闸 → 监听 → 优雅关停 → 信号处理。
-`AutomationRuntimeHandles` 此时仍是空的，**fail-closed 入口原样保留**。
-同时把判据 2 落成一份可跑的清单：逐条判 segC 那 41 个导出「本进程有无去处」，
-结论写进 tasks 3.5。**这份清单是后面每一批的尺子**，先有尺再搬。
-验收：自动化仓 typecheck + 全量测试全绿；入口仍拒绝启动且原因未变。
+**~~批 A · 骨架与判据（不搬业务代码）~~ ✅ 已做**（automation `6035fa4` / cloud `f83e266`）
+外壳与清单都已落地，验收全绿（详情见本文顶部 2026-08-01 那段）。下一手直接从 **A-1 或批 B** 开工。
+**两处与原计划不同，按实际的读：**
+- 判据清单**不只是「有无去处」一个布尔**：拆成「本进程内有消费者」+「构造只为答别的进程」两个字段，
+  后者必须显式声明。原文那句「本进程有无去处」照字面做会把 A-3 那类反例判错。
+- 清单里有 **5 条判不了**（无消费者 + 去处在接口进程 + 通道不存在），已具名排进批 H（task 3.5a）。
+  **别把它们当成漏判**——判 construct 是构造了没去处，判 skip 是能力消失，两条都错。
 
 **批 B · 风控单写者 + 底座**
 三个互动存储（点赞笔记 / 有价值评论 / 互动流）、告警存储、风控存储、风控注册表、自动化写者锁。

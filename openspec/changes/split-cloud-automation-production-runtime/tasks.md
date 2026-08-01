@@ -1410,15 +1410,67 @@
 
 - [ ] 3.1 `aidcp-automation`：在 `createAutomationCompositionRoot` 之上写真 `main()`——
   边-云 WebSocket 服务端、事件总线 + 角色调度器、风控单写者、各调度器与监测体。
-- [ ] 3.2 启动 readiness gate 与 api 同形：同步读镜像首次装载完成、readiness 到 `ready` 之前
+  <!-- aidcp-automation 6035fa4 批 A 已落**外壳**（`src/automation-service-entry.ts`）：
+       读配置 → 建根 → 先监听 → 就绪闸 → 放行业务 → 优雅关停 → 信号处理。
+       **本条仍未完成**：外壳里一行业务代码都没有，运行时依赖与业务入口是必填参数、
+       今天只有测试在喂。批 B…G 逐批补真实供给方（切批方案见 HANDOFF §9）。
+       可执行入口 `runAutomationEntry()` 一个字没动，照旧 fail-closed —— 保护罩留到批 H。 -->
+- [x] 3.2 启动 readiness gate 与 api 同形：同步读镜像首次装载完成、readiness 到 `ready` 之前
   **不放行业务入口**。
+  <!-- aidcp-automation 6035fa4 批 A。四个要点全落 + 各有用例：三条早退条件（正在关闭 /
+       已经启过 / readiness 不是 ready）、**在途 promise 去重**、周期表 unref、先 listen 再放行。
+       探活路由 `internal/automation/sync-read/readiness` 把「业务入口放行了没有」与就绪度**分开报**——
+       「监听着但没放行业务」这个中间态必须可观测，否则运维只看到端口通。
+       变异实测（哪条抓住的，不只是会不会红）：删就绪闸 → 2 条红；探活不报放行状态 → 2 条红；
+       **删在途去重只留布尔 → 只有专为它写的那条红**；**关停不等在途放行落地 → 一开始 6 条全绿**，
+       补了会真触发的那条才显形（注释里写明「别当冗余删掉」）。
+       **口径**：闸的形状与行为已交付并验过，被闸住的那个业务入口今天是注入进去的；
+       真业务入口到批 B…G 才有，届时不必重做本条，但要确认没被绕过。 -->
 - [ ] 3.3 缺依赖时**停在具名原因上**：MUST NOT 用空数组 / `false` / 未绑定 / 代码默认放行。
   现在那个 fail-closed 壳守的东西，接线后必须仍然守得住——为此写回归用例。
+  <!-- 批 A 只做了「让编译器逼你面对」那一半：外壳的运行时依赖与业务入口都是必填参数、无缺省，
+       配置缺项照旧具名抛错。真正的回归用例（台账非空时仍拒绝启动）属批 H，见 4.3。 -->
 - [ ] 3.4 持久任务仍按 `AIDCP_DEPLOY_ENV` 写 `execution_target`；target 缺失或非法时
   **不启动那个 worker**。
-- [ ] 3.5 逐段对着 cloud `segCAutomation` 核对装配清单，确认没有「本进程里根本没有消费者」的对象
+- [x] 3.5 逐段对着 cloud `segCAutomation` 核对装配清单，确认没有「本进程里根本没有消费者」的对象
   被顺带 new 出来（判据：先问它的结果在本进程有没有去处）。
+  <!-- aidcp-automation 6035fa4 + aidcp-cloud f83e266 批 A。
+       清单落在 `aidcp-automation/src/automation-segc-export-disposition.ts`，**41 条逐条判**，
+       源 `aidcp-cloud@f489e5e` 实读。结论：**construct 34 / skip 2 / open 5**。
+       预排批次：B 5 / C 1 / D 6 / E 2 / F 16 / G 6 / H 5。
+
+       **判据被拆成两个字段，不是一个**：「本进程内有消费者」与「构造只为答别的进程」。
+       后者 MUST 显式声明（`servesOtherProcess`），因为这两者不等价 —— A-3 已出过反例
+       （接口进程为答内容进程建了四个自己没消费者的读取器，那是对的）。
+       今天唯一走这条例外的是 `dispatchActivityForPanel`：本进程是那个布尔的唯一持有者，
+       接口进程只能问过来，通道（运营指令读写）已接线。
+
+       **skip 2 条不是省事，是照抄既有裁定**：`personaAutoFill` 与 `publishUiUpdateCommand`
+       在单体里的构造条件逐字写着「非自动化模式」，自动化进程从来就没有它们。改成构造
+       等于悄悄改变了模式行为。
+
+       **另记两条没人写下来的**：`resolveController` 与 `triggerPublishDispatchOnApprove`
+       的**导出面今天没有任何读者**（接口服务段各有自己的本地实现）⇒ 本包只要本地函数，
+       不必再导出一遍。
+
+       **机械信号刻意放在 cloud 侧**：`aidcp-cloud/test/acceptance/segc-export-face.test.ts`
+       （AC-SEGC-FACE）现场解析自动化段导出面并与钉死名单比对。理由是 §4.7 那条教训——
+       派生仓的手抄件拿不到中控侧任何信号；判据的来源只在 cloud 存在，闸就该在那边。
+       本包侧另有四条自洽不变量（construct 必须有去处 / skip 必须真没消费者 /
+       例外必须显式 / open 一律排批 H），变异逐条验过、各由对应那条抓住。
+       **两侧都证明不了那 41 条裁定本身对不对** —— 裁定是人读出来的，AC-SEGC-FACE 红的时候
+       要做的是重判那条句柄的去处，不是改名单让它变绿。 -->
+- [ ] 3.5a **批 H 的现成工作清单**：判据清单里 5 条 `open` 逐条裁定，一条都不许留空。
+  <!-- 五条同形：在自动化段装配、本进程一次都不读、只有接口服务段消费，而**通道今天不存在**。
+       `interactionCustomerApi` / `interactionInternalApi`（互动那两个 API 面，同形同因，一并裁）、
+       `interactionPermissionOverview`（倾向接口进程就地算，待确认互动授权那一半它读不读得到）、
+       `listAccountAutomationCatalog`（待确认它读的表归谁）、
+       `rolePromptProvider`（倾向接口进程按角色目录自建，待确认是否含运行时注册的角色）。
+       两条路都成立、都要拍板：① 开一条端口让接口进程取；② 装配整体移到接口进程。
+       **既不能判 construct（构造了没去处），也不能判 skip（那等于这条能力消失）。** -->
 - [ ] 3.6 `aidcp-automation`：`npm run typecheck` + 全量 `npm test` 全绿。
+  <!-- 批 A 当批实测：typecheck 干净；acceptance 89/89；全量 1983 pass / 0 fail。
+       本条是第 3 段的收尾闸，八批做完再勾。 -->
 
 ## 4. 台账清零与门禁
 

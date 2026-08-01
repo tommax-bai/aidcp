@@ -173,7 +173,13 @@ COMPOSITION = {'src/server.ts', 'src/index.ts'}
 # 派生仓可把手写入口再拆成仓私有的 composition helper；它没有 Cloud fact-source
 # 对应物，故只登记并排除于受管源码 census，绝不能被 --prune 当成“多出”删除。
 DERIVED_COMPOSITION = {
-    'aidcp-automation': {'src/automation-composition-root.ts'},
+    'aidcp-automation': {
+        'src/automation-composition-root.ts',
+        # 进程启动外壳（读配置 → 建根 → 先监听 → 就绪闸 → 放行业务 → 优雅关停 → 信号）。
+        'src/automation-service-entry.ts',
+        # 自动化段 41 个导出面的「本进程有没有去处」判据清单，批 B…H 的尺子。
+        'src/automation-segc-export-disposition.ts',
+    },
 }
 KERNEL_REPO = 'aidcp-kernel'
 
