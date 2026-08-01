@@ -7,10 +7,10 @@
 
 ## 2. Freeze phase-one contracts and registries
 
-- [ ] 2.1 Port and narrow the Task, TaskRevision, CapabilityScope, ExecutionPlan, TaskRun, StepRun, Intent, Attempt, DecisionTrace, reason-code, and action-classification contracts into their final owner/shared locations; exclude ManagedPlan/Cycle/Trigger contracts.
-- [ ] 2.2 Add canonical serialization, payload hash, version parsing, target validation, terminal-state guards, and customer-safe projection helpers with unit tests.
-- [ ] 2.3 Add versioned CreateTask, CancelTask, QueryTask, receipt, and error DTOs to the approved kernel/transport boundary without business execution code.
-- [ ] 2.4 Register and validate only `persona.research@1` and its bounded search→browse→assess→summarize read-only graph; prove every mutation capability is rejected.
+- [x] 2.1 Port and narrow the Task, TaskRevision, CapabilityScope, ExecutionPlan, TaskRun, StepRun, Intent, Attempt, DecisionTrace, reason-code, and action-classification contracts into their final owner/shared locations; exclude ManagedPlan/Cycle/Trigger contracts. <!-- done: repo=aidcp-automation sha=7d22a22 validation="npm run typecheck 0; scope grep found no ManagedPlan/ManagedCycle/TriggerBinding/session-mode" deployment="not deployed; additive pure contracts" deviation="rewritten as phase-one Automation-owned authority instead of copying old API-owned/global contracts" -->
+- [x] 2.2 Add canonical serialization, payload hash, version parsing, target validation, terminal-state guards, and customer-safe projection helpers with unit tests. <!-- done: repo=aidcp-automation sha=b27abc3 validation="managed-automation contracts 4/4; npm run typecheck 0" deployment="not deployed; additive pure helpers" -->
+- [x] 2.3 Add versioned CreateTask, CancelTask, QueryTask, receipt, and error DTOs to the approved kernel/transport boundary without business execution code. <!-- done: repo=aidcp-kernel sha=34d1b94 validation="managed-task-port 3/3; npm run typecheck 0" deployment="not deployed; kernel DTO/port only; HTTP route/client remains task 4.2" -->
+- [x] 2.4 Register and validate only `persona.research@1` and its bounded search→browse→assess→summarize read-only graph; prove every mutation capability is rejected. <!-- done: repo=aidcp-automation sha=0d1a048 validation="managed-automation registry 5/5; npm run typecheck 0; interaction/publish/reply/account_admin mutations all rejected" deployment="not deployed; registry has no production root call site" -->
 - [ ] 2.5 Add contract drift tests across API/Automation transport endpoints and prove unknown versions/capabilities fail honestly.
 
 ## 3. Add Automation-owned persistence
