@@ -25,12 +25,12 @@
 
 | | 值 |
 | --- | --- |
-| 活跃 change | 29（其中 ✓ Complete 待归档 **1**：`native-page-engine-production-cutover`） |
-| 已合并 spec | 182 |
+| 活跃 change | 29（其中 ✓ Complete 待归档 **1**：`native-page-engine-production-cutover`）→ **当晚归档两条后为 27** |
+| 已合并 spec | 182 → **183**（新增 `native-page-engine-production`） |
 | 未勾任务合计 | 465 |
 | 真机验收待验 | 936（`docs/real-machine-acceptance-backlog.md`） |
 
-三仓 head：控制仓 `b4ee0cd8` / edge `a65a28d` / cloud `534af19`。
+三仓 head：控制仓 `b4ee0cd8` / edge `a65a28d` / cloud `534af19`（**当晚推进后 edge 已到 `24131eb`**）。
 全库 `openspec validate --all` 本轮实测 211 项 0 失败。
 
 ---
@@ -77,7 +77,21 @@ edge 三个提交：`1ea3cb1` / `8bafe28` / `a65a28d`。
 
 ## 3. 下一步（按价值排序）
 
-### ① `native-page-engine-production-cutover` 归档 —— **但 MUST NOT 直接归档**
+> **① 与 ③ 已完成（2026-08-01 晚）。** 两条都已归档，结论摘在下面各自条目里。
+> **② 与 ④ 仍原样成立**，是下一轮的起点。
+
+### ~~① `native-page-engine-production-cutover` 归档~~ —— **已归档**（控制仓 `2c0ff416`）
+
+两项前置都做了。**整份 delta 通读只抓到一处**：打包那条要求写着「把产物纳入 **Windows 签名**流程」，
+而实读 edge 仓——macOS 侧全链是真的（嵌套二进制签名 + team id + 架构校验，app 与 dmg 都过公证与 stapler），
+**Windows 侧完全没有签名**（`win.signAndEditExecutable: false`、仓内只有 mac 证书、CI 那个作业默认关闭且自注 unsigned、
+`verifyPackagedNativePageEngineArtifact` 对非 darwin 直接抛「不支持」）。已按平台各写各的实情并补一条 Windows scenario ——
+**把假保证换成真保证，不是删掉了事**。跨 delta 对账干净（同批只此一条、零撞名）。
+20 条要求并入主规格。**留了一件没做、写在 tasks.md 里**：主 spec 此后已长出同一件事的
+Facebook / 微信半边，泄漏闸因此会有两条措辞不同的 MUST；收敛它要 MODIFY 本 change 范围外的 requirement，
+须另立一条规格归一的 change，别在别的 change 里顺手做。
+
+### ~~① 原文（保留供追溯）~~ —— **但 MUST NOT 直接归档**
 
 它满了，但它是**迁移主线**、中途有过**显式弃守裁定**，其 tasks.md 里自带一条归档红线警告：
 照原文归档 = 主规格声称系统具备"从未实现"那一列的能力。
@@ -97,11 +111,26 @@ edge 三个提交：`1ea3cb1` / `8bafe28` / `a65a28d`。
 **唯一硬依赖**：FB 残余对齐的收口需要 `bound-facebook-comment-migration-latch` 先落
 （那条线的 delta 里"迁移闩生命周期"两段已被摘出，等它承接）。
 
-### ③ 新立的四条 change 择一开工
+### ~~③ 新立的四条 change 择一开工~~ —— `extend-native-postcondition-coverage` **已 37/37 归档**
 
-四条都零开工、互不阻塞。若要挑一条最划算的：`extend-native-postcondition-coverage`
-——它的第 1 节（给盘点表补 below_bar 棘轮）是纯本地改动、当天可完成，且**做完之后才安全**：
-不补的话，后面读 16 条未读时，把 unread 改成 below_bar 就能让门禁变绿而风险不变。
+其余三条（`surface-native-engine-diagnostics` / `bound-facebook-comment-migration-latch` /
+`unify-facebook-comment-budget-source`）仍零开工、互不阻塞，可择一接着做。
+
+已归档那条的结果与**四条值得带走的结论**：
+
+- **盘点表现在是 37 达标 / 4 不达标 / 1 不适用 / 0 未读**（原 22 / 3 / 1 / 16）。两个方向都上了棘轮，
+  每条不达标都写明「谁来解、卡在什么前置上」。
+- **「登记比代码旧」是真事，会让人白做**：表里 `search_execute` 记着一条缺陷，而修它的提交比建表**早两天**，
+  提交注释逐字点名同一个机制。根因是登记正文照抄了另一份更早的登记。
+  **拿到任何已登记的待办，第一步是读代码确认它今天还成立。**
+- **变异「没红」的正确读法是判据没被覆盖，不是判据没问题**：上传那条的悲观默认第一次变异是绿的 ——
+  所有夹具都显式给了标志、缺省分支根本走不到。补了「标志缺席」那条用例它才咬住。
+- **归档前的 delta 对读又一次抓到东西**：规格写着「抬 below_bar 预算这个动作本身会被拒」，
+  而实装只拦了「不抬预算」那一种；真按规矩同时抬预算，门禁全绿而风险没变。已补齐。
+
+**留给单写区属主 `restore-native-xiaohongshu-action-honesty` 的三件**（都已具名登记、判据现成、非真机项）：
+E14（通知三条分类浏览点完即报成功，判据＝同文件已有的未读角标）、E13（feed 刷新，同族）、
+以及路由里那一行已不可达的上传分支（**只删那一行**，同 `if` 块里的设封面那半还活着）。
 
 ### ④ 出包 → 一次真机 session（**只有用户能做**）
 
