@@ -232,3 +232,50 @@
   <!-- aidcp control + aidcp-edge 317cd47: checklist records completed source gates and explicitly leaves cache/humanization completeness, all-command fixtures, cross-target package/signature, live read/write, and installer release unchecked. Strict validation passed. -->
 - [x] 9.7 Integrate and push the clean control and Edge changes under the repository workflow. Build or publish a customer installer only after separate explicit release authorization.
   <!-- aidcp-edge master 317cd47 pushed after fast-forward; this control evidence commit is the final fast-forward input for main. No customer installer was built or published. -->
+
+## 归档前对账（2026-08-01，执行 3.2 那条归档红线要求的两项前置）
+
+**① 整份 delta 通读（262 行 / 5 个 capability / 全 `ADDED`）对照「弃守与从未实现」边界。**
+
+- **3.2 的「从未实现」那一列，delta 里一条都没写** —— 可见性 / 几何 / 歧义拒绝下沉、匹配唯一性闸、
+  动作前守卫层、模型兜底、语义 class 白名单，全文零命中；三道闸与锚点暂存晋升也未被写成上线保证。
+  关键词扫描的命中项都是别的东西（`commandId` 唯一性、CDP 方法白名单、legacy plan 步骤白名单），三者均已实装。
+- **8.5 / 9.3 那两条弃守，delta 里踩中一处，已订正**：`edge-desktop-packaging` 的
+  「Nested Native artifacts MUST be signed and verified」原文写着「SHALL include the matching executable in
+  the **Windows signing**/package flow」与笼统的「Release validation MUST verify …」。**实读结论**：
+  macOS 那一半是真的（`scripts/after-sign.cjs` → `verify-signed-macos-artifacts.cjs` →
+  `verifyPackagedNativePageEngineArtifact` 校验嵌套二进制签名 + team id + 架构 + 逃逸出签名资源目录；
+  `scripts/build-desktop-macos.sh` 的 `verify_trust_gates` 走 codesign/spctl/stapler，app 与 dmg 都验），
+  **Windows 那一半完全不存在**（`package.json` 的 `win.signAndEditExecutable: false`、仓内只有 `MAC_CSC_*`
+  没有任何 Windows 证书或 signtool、`build-desktop.yml` 的 Windows 作业默认关闭且自注 "unsigned"，
+  且 `verifyPackagedNativePageEngineArtifact` 对非 darwin 直接抛「unsupported」）。
+  已按实测改写：macOS 侧照实写强判据，Windows 侧改成「只暂存架构匹配的产物、不签名、且未验签的产物
+  MUST NOT 被当成已签名发行物」，并补一条 Windows scenario。**把假保证换成真保证，不是删掉了事。**
+- **仍然保留、不算越权的两类**：(a) 打包/签名/泄漏扫描这批闸「代码在且有契约自测、但从未在真安装包上跑过」——
+  规格写的是构建必须满足的行为，钩子确实接在 `afterPack` / `afterSign` 上（打包态冒烟、依赖闭包、
+  app.asar 泄漏扫描），不属「从未实现」；**未经真机/真包验证这件事记在 backlog 簇 125 与 9.3 的弃守说明里，
+  不靠删规格来表达**。(b)「成功回执 MUST 有命令专属后置证据」这条 MUST 与现存缺口（后置校验盘点 16 条未读 /
+  3 条不达标、E13 的 feed 刷新无条件成功）并存 —— 那是**已登记缺陷相对于标准的偏离**，
+  删掉这条 MUST 反而会把 E13 的立论一起删掉。
+
+**② 跨 delta 对账。**
+
+- **同批只有本条**（`openspec list` 实测其余活跃 change 均未完成），不存在「同批两条 delta 互相看不见」的撞车。
+- **`### Requirement:` 名逐行精确比对：与主 spec 零撞名**，5 个 capability 里 4 个已存在、
+  `native-page-engine-production` 为新建；全 `ADDED` 故无「MODIFIED 目标不存在」风险。
+- **另有 4 条活跃 change 与本条共 capability**（`enforce-native-engine-artifact-gates` /
+  `publish-approval-signal-to-database` 动 `edge-desktop-packaging`，`browser-slot-scheduling` 动
+  `edge-task-execution-coordination`，`harden-native-engine-runtime-contracts` 动 `pluggable-browser-provider`），
+  逐条读过：它们 MODIFY 的都是**别的名字**，本条只新增，互不覆盖，归档先后无所谓。
+
+**③ 读出来但**故意**没改的一件事（留给后来人，别当漏网）**：本 delta 是迁移当时写的，主 spec 此后已长出
+**同一件事的 Facebook / 微信半边**——`edge-desktop-packaging` 的
+「Final packages exclude all migrated platform browser rules」（正文只列 FB 与微信）与
+「Expanded Native artifact is package-compatible」，以及 `edge-task-execution-coordination` 的两条
+`Cross-platform …`、`client-core-browser-executor-separation` 的
+「Migrated platforms share selector-free Native supervision」。它们与本 delta 的小红书半边
+**互补、不矛盾**，合并后覆盖面才完整。**没有把它们并成一条**，理由是那要 MODIFY 本 change 范围之外的
+requirement，而 `MODIFY = 整块替换`、越范围改块正是本仓刚踩过的坑（`enforce-native-engine-artifact-gates`
+在自己归档前对账时也是选择**摘出**越范围的 MODIFY，不是扩写）。**代价如实记**：泄漏闸这件事归档后在
+`edge-desktop-packaging` 里会有两条措辞不同的 MUST（一条管 FB/微信、一条管小红书），
+将来改其中一条容易漏掉另一条 —— 要收敛须另立一条规格归一的 change，别在别的 change 里顺手做。

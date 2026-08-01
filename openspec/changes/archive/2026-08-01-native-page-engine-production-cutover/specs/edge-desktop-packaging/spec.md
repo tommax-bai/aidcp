@@ -14,7 +14,9 @@ Every official package that advertises Xiaohongshu page automation SHALL include
 
 ### Requirement: Nested Native artifacts MUST be signed and verified
 
-Release construction SHALL sign the Native executable before signing/notarizing the containing macOS app and SHALL include the matching executable in the Windows signing/package flow. Release validation MUST verify the inner executable, outer application/installer, manifest hash, and packaged startup behavior; an unsigned local artifact MUST NOT be described or published as distributable.
+On macOS, release construction SHALL sign the Native executable as a nested binary of the application bundle before the bundle itself is signed, notarized, and stapled. Release validation on macOS MUST verify the nested executable's own signature and its team identity against the outer bundle, the outer application and disk image's notarization, the manifest hash, the executable's architecture, and packaged startup behavior; a nested binary that resolves outside the signed resources directory MUST be rejected.
+
+The Windows package flow SHALL stage the architecture-matched Native executable into the package, but it does not sign binaries and there is no nested-signature verification on that platform. Any artifact whose signature has not been verified — a Windows installer, or a local macOS build produced without Developer ID credentials — MUST be labelled by its actual signing state and MUST NOT be described or published as a signed distributable.
 
 #### Scenario: Signed macOS package passes release gates
 - **WHEN** the Native executable, app, and disk image have valid Developer ID signatures/notarization and the packaged smoke test starts the engine from resources outside ASAR
@@ -23,6 +25,11 @@ Release construction SHALL sign the Native executable before signing/notarizing 
 #### Scenario: Inner signature is missing
 - **WHEN** the outer app is signed but the nested Native executable fails signature verification
 - **THEN** the release job fails and MUST NOT upload a distributable artifact
+
+#### Scenario: Windows installer is produced
+- **WHEN** the Windows package flow stages the x64 Native executable and emits an installer
+- **THEN** the installer carries the architecture-matched executable
+- **AND** it is recorded as unsigned and MUST NOT be presented as a signed distributable
 
 ### Requirement: Packaging MUST exclude migrated Xiaohongshu JavaScript core
 

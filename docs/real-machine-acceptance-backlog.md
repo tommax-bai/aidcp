@@ -3180,6 +3180,11 @@ cloud master `7b316ce` 已部署 dev。**建议与簇 112 同一次真机 sessio
   **没有任何实机校准过的判据可移植**。要把它们也搬进引擎，前置是在真机上认出各自
   「真的选中了」的结构信号（提及 token / 地点入口回显 / 合集入口回显各是什么元素）。
   **桩为什么验不了**：这正是「在桩上现编一个选择器 = 拿运营机赌运气」那件事本身。
+  - **2026-08-01 补记（`extend-native-postcondition-coverage` §3.3 / §5.2，不新开簇）**：后置校验盘点
+    （`aidcp-edge native/page-engine/command-postconditions.json`）里 `publish_add_with_candidate` 现在
+    带**具名处置**，`blockedBy` 直指本条。处置正文同时钉住两句：标定前 **MUST NOT 记 confirmed**（无证据），
+    **也 MUST NOT 记 not_applicable** —— 它们结构上有可读回的业务结果，用「读不出来」冒充「本来就没有」
+    是另一种假成功。**本条一旦标定完成，去把那条盘点记录一并改掉**，否则处置会变成一条永远等不到的待办。
 
 ## 簇 124 — Native 引擎重连绑定：同机多环境并行下的端口回收行为
 
