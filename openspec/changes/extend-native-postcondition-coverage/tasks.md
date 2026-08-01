@@ -6,12 +6,39 @@
 
 ## 1. aidcp-edge — 盘点表的棘轮与处置（先做，防止后面一边读一边洗白）
 
-- [ ] 1.1 `native/page-engine/command-postconditions.json` 增 `belowBarBudget`，初值＝当前实际条数（3）
-- [ ] 1.2 `test/native-page-engine/command-postconditions.test.ts` 增断言：below_bar 条数 ≤ `belowBarBudget`，且 `belowBarBudget` **恰等于**实际条数（不留空位，与 unread 同构）
-- [ ] 1.3 盘点表增 below_bar 必填处置字段：消除动作，或具名例外（理由 + 前置 + 谁来解）；门禁断言缺失即失败
-- [ ] 1.4 给现存 3 条 below_bar 补处置：搜索输入＝属主待核（见 3.1）、上传配图＝可直接修（见 3.2）、候选项三支＝真机前置（指到 backlog 簇 123.34）
-- [ ] 1.5 门禁增断言：`unreadBudget` 归零后恒为 0，不得抬起（今天只断言「不许上调」，归零后语义更强）
-- [ ] 1.6 **让门禁先抓一次自己**：造一条「unread 改 below_bar 但不抬 belowBarBudget」的样本，确认门禁当场红；再造一条「below_bar 无处置」的样本，确认同样红。**首跑不红就说明断言写虚了**
+- [x] 1.1 `native/page-engine/command-postconditions.json` 增 `belowBarBudget`，初值＝当前实际条数（3）
+  <!-- aidcp-edge 72bc3d9 -->
+- [x] 1.2 `test/native-page-engine/command-postconditions.test.ts` 增断言：below_bar 条数 ≤ `belowBarBudget`，且 `belowBarBudget` **恰等于**实际条数（不留空位，与 unread 同构）
+  <!-- aidcp-edge 72bc3d9 -->
+- [x] 1.3 盘点表增 below_bar 必填处置字段：消除动作，或具名例外（理由 + 前置 + 谁来解）；门禁断言缺失即失败
+  <!-- aidcp-edge 72bc3d9：`disposition` 两形态——`kind:fix` 必填 `action` + `owner`，`kind:exception` 必填 `reason` + `blockedBy` + `owner`；字段规格同时写进表自己的 `invariants`，让读表的人不必去读门禁源码 -->
+  - **多加了一条原任务没要求、但同族的断言**：`disposition` 只许出现在 below_bar 上。判据修达标后
+    处置必须一并摘掉，否则表里会留下一条**永远等不到的待办**——那和「没有处置」是同一种失真的两面。
+- [x] 1.4 给现存 3 条 below_bar 补处置：搜索输入＝属主待核（见 3.1）、上传配图＝可直接修（见 3.2）、候选项三支＝真机前置（指到 backlog 簇 123.34）
+  <!-- aidcp-edge 72bc3d9 -->
+  - 搜索输入按 `fix` 记，处置正文写明「**『实现点在单写区属主处』这句登记本身就是待核项，不得照抄**」——
+    D5 点名的那个坑（等一个已经归档的属主）就藏在照抄里。
+  - 候选项三支按 `exception` 记，`owner` 一栏同时钉住「标定前 MUST NOT 记 confirmed（无证据），
+    也 MUST NOT 记 not_applicable（用『读不出来』冒充『本来就没有』是另一种假成功）」。
+- [x] 1.5 门禁增断言：`unreadBudget` 归零后恒为 0，不得抬起（今天只断言「不许上调」，归零后语义更强）
+  <!-- aidcp-edge 72bc3d9 -->
+  - **实装形态：上限字面量 `UNREAD_BUDGET_CEILING = 16` 钉在门禁一侧。** 理由：单文件断言看不见历史，
+    **一个被调高的预算和一个一直就是这么高的预算长得一模一样**；把上限放在测试里，调高预算就必须
+    同时改这个字面量，那是一次会出现在 diff 里的显式动作。
+  - **归零后的强语义是自动落地的、不需要再改一次门禁**：这个字面量降到 0 时，
+    `<= 上限` 与既有的「预算恰等于实际条数」两条合起来即为 D4 要的硬断言。
+- [x] 1.6 **让门禁先抓一次自己**：造一条「unread 改 below_bar 但不抬 belowBarBudget」的样本，确认门禁当场红；再造一条「below_bar 无处置」的样本，确认同样红。**首跑不红就说明断言写虚了**
+  <!-- aidcp-edge 72bc3d9：门禁 6 例 → 10 例 -->
+  - **做成了常驻自测，不是一次性变异。** 判据提成纯函数（`budgetProblems` / `dispositionProblems`），
+    每条新断言配一个会触发它的合成样本 + 一个「健康样本必须零问题」的正对照
+    （否则样本红了也说明不了什么）。一次性变异做完就没了，下一个人重构判据时不会再触发。
+  - **断言的是「恰好由哪条判据报错」，不是「有没有红」**：洗白样本断言 `problems.length === 2`
+    且两条都指名 `belowBarBudget`；上限样本断言 `length === 1`。**「有红」不等于「是这条抓住的」。**
+  - **另跑了一次真表变异证明接线是活的**（纯函数全对不等于真表那条线接通了）：把真表里一条 unread
+    改成 below_bar、附处置、并把 `unreadBudget` 16→15，**只有棘轮那条测试红，处置那条仍绿**——
+    与设计预期的洗白形态完全吻合。事后按备份拷回并核 sha 一致（`git checkout <file>` 会连未提交改动一起冲掉，不用）。
+- **本节验证**：验收 38/38、全量 2955 例（2954 通过 / 1 跳过 / 0 失败）、`typecheck` 干净、
+  `land-change` 的 Native 门禁（fmt + clippy -D warnings + Rust 测试）全过。已 ff 推 `origin/master`。
 
 ## 2. aidcp-edge — 16 条 unread 逐条读并分类
 
