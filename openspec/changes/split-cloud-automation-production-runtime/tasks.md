@@ -1555,7 +1555,31 @@
        CLAUDE §6.7 早写着「上机器逐条确认新代码真的到了」，这次是照着字面踩的。
        现在的做法是部署后逐个 marker `grep` 验内容。
 
-       **步骤 3（工厂本体）未开工。下面是逐项供给方分类（2026-08-02 实读 `buildDispatcher`
+       **步骤 3 已落**（automation `72373f4`，落点 `src/automation-connection-dispatcher.ts`）：
+       每连接角色调度器工厂，交付批 E-1 留下的那个必填口。
+       typecheck 干净；automation 2048 pass / 0 fail；边界普查 forbidden=0；六仓对账零漂移。
+
+       **保护线刻意画在本文件的依赖面上，不在调度器的选项面上** ——
+       `RoleDispatcherOptions` 200 余个字段几乎全可选（实测必填的只有 `llm` / `sendCommand` 等寥寥几个），
+       漏传不报错、只是能力安静消失。故 B 组 10 个口一律**必填字段或能力二态**，
+       `unavailable` MUST 带具名理由（用 `undefined` 会让「没接线」与「接了但今天不可用」同形）。
+
+       **两段析出成可单测纯函数**（都不是为了好看，是因为它们承载最容易被"顺手简化"掉的口径）：
+       - `mapRuleBatchTerminalStates`：降级正文 MUST 投影成 `confirmed_without_contact`
+         （投成 `confirmed` 是对人谎报「联系方式已发出」）；`no_targets` / `no_strong_candidate`
+         是**没开始**不是失败（记成失败会让重试与告警都走错分支）；
+       - `ruleBatchContactCommentOptions`：`contactFallback` 的审批模式与主审批模式是**两个独立字段**。
+
+       变异四个，逐条给出是哪条抓住的：免审外溢 → 两条行为用例红；「没有目标」记成失败 → 一条红；
+       降级投成 confirmed → 一条红；**动作闸里另算一遍浏览模式 → 只有那条结构断言红**。
+
+       **批 G 开工面**：`AutomationCommentPorts`（7 项）+ `AutomationFacebookRuntimePorts`（3 项），
+       签名都在该文件里，照着填即可；填不上的必须给 `unavailable` + 具名理由，别塞空实现。
+
+       **本批未做的一件**：把工厂接进组装根（`createAutomationCompositionRoot` 那一处）
+       —— 那要等批 G 把 10 个口填上，属批 H 的 `main()`。今天口是空的、且**编译期可见**。
+
+       下面是逐项供给方分类（2026-08-02 实读 `buildDispatcher`
        全 439 行得出），照它开工即可，不必重查。** 工厂本体 = cloud `src/server.ts` 的
        `buildDispatcher`（约 439 行、46 个顶层选项 + 8 个条件展开块）。
 
