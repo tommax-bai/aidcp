@@ -162,7 +162,7 @@ systemctl restart sshd
 
 | change | 差的那一步 | 现在的结论 |
 | --- | --- | --- |
-| `platform-specific-identity-commands` 15/16 | 4.5 部 dev 并验证 | **闸已解除**（23:48 主干已部 dev 并健康）——本条现在可以直接验证收口 |
+| `platform-specific-identity-commands` ~~15/16~~ | 4.5 部 dev 并验证 | ✅ **已 16/16 收口并归档**（控制仓 `8fe10155`）——逐项验过：双端口监听 / 真实 WS 握手 / 飞书 onReady / 三道 schema 契约门（content 0069、automation 0106、api 0105）/ 零启动失败 / isales 未受影响 |
 | `client-xhs-environment-schedule` 12/14 | 4.3 / 4.4 集成 + 部 dev | **部署这一半的闸已解除**；4.3 还含「集成 feature 分支」，先核那部分是否已完成 |
 | `fix-cloud-multi-service-deploy-script` 4/5 | 2.3 用三进程脚本部 dev | **主动不做，理由已坐实**：见下 |
 
@@ -194,8 +194,9 @@ systemctl restart sshd
 ## 6. 下一步（按价值）
 
 1. ~~让主干在 dev 上能起来~~ **已解决（23:48，属主流补了迁移 0106）。**
-2. **三条 change 的部署任务现在可以收口**（§4）：前两条的闸已解除，第三条（三进程）仍卡在
-   `aidcp-api` 那条 Facebook 运营策略存储没构造上，与本次停机无关。
+2. `platform-specific-identity-commands` **已收口归档**。
+   剩 `client-xhs-environment-schedule`（4.3 还含「集成 feature 分支」那半，先核是否已完成）；
+   第三条（三进程）仍卡在 `aidcp-api` 那条 Facebook 运营策略存储没构造上，与本次停机无关。
 3. 给「同步读自举」补一条能在 CI 里跑的用例（§1 末尾那段）—— 不补的话，
    下一批新流还会用同样的方式炸一次 dev。
 4. 迁移修复四条线继续（见上一轮 handoff §3②）。
