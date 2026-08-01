@@ -1438,6 +1438,12 @@
 
 - [ ] 3.1 `aidcp-automation`：在 `createAutomationCompositionRoot` 之上写真 `main()`——
   边-云 WebSocket 服务端、事件总线 + 角色调度器、风控单写者、各调度器与监测体。
+  <!-- **批 B 已落**（aidcp-automation 4d3fb89）：风控单写者与告警底座
+       （`src/automation-risk-foundation.ts`——写者锁 → 风控存储 → 注册表 → 三个互动存储 + 告警存储）。
+       **形态定了：每一批都写成可单测的工厂，不写进 `main()`。** 写进 main() 就只能等本条做完，
+       而这些装配本身与 main() 无关。批 E/F/G 照此办，最后 main() 只是把它们串起来。
+       两个刻意必填、无默认的口留给批 C（配置副本陈旧 / 记账断链）；
+       抢不到写者锁的具名错误留给批 H 映射成非零码退出。 -->
   <!-- aidcp-automation 6035fa4 批 A 已落**外壳**（`src/automation-service-entry.ts`）：
        读配置 → 建根 → 先监听 → 就绪闸 → 放行业务 → 优雅关停 → 信号处理。
        **本条仍未完成**：外壳里一行业务代码都没有，运行时依赖与业务入口是必填参数、

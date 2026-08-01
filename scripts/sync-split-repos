@@ -182,6 +182,8 @@ DERIVED_COMPOSITION = {
         # 文本模型出口的构造（本仓唯一一处从 aidcp-transport/llm/* 取东西的地方）。
         # Cloud 里这段活在组装根内联，没有对应文件。
         'src/automation-model-exit.ts',
+        # 风控单写者与告警底座的装配（批 B）。同样是 Cloud 组装根内联段的落点。
+        'src/automation-risk-foundation.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'

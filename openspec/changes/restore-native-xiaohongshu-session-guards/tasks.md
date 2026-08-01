@@ -8,7 +8,7 @@
 - [x] 1.3 实现小红书分类适配：`pageKind='captcha'` → `kind:'captcha'` 即时 fail-closed；`pageKind='login'` → 本地停手等登录、不发账号级阻断上报；其余 → 非阻断（参照 src/browse/overlay-monitor.ts:1-231 的五类优先级 + login-modal-watcher.ts:52-58 的 5 条强短语；登录判据已在 xhs-page-probe.js:12-21，只需接线勿重写 — 见 oracle.md） <!-- aidcp-edge 7b8d556 登录判据不重写、直接消费 xhs-page-probe.js 已产出的 pageKind；用例断言登录墙路径 sent 为空数组且 observationStatus().blockingKind==='login' -->
 - [x] 1.4 加断言：`pageKind='unknown'`（页面类型未识别）MUST NOT 产生任何阻断上报，也不得触发账号风控迁移（参照 oracle.md「不可照抄」第 2 条：旧 unknown 桶判据本身是误报源，声明缺席是正确处置） <!-- aidcp-edge 7b8d556 XIAOHONGSHU_BLOCKING_POLICY.classify 对 unknown 恒返 'none' 且 reportsUnknownBucket=false；用例断言零上报、blockingKind 仍 'none'、后续 page.scroll 正常派发 -->
 - [x] 1.5 加断言：从未上报过的阻断态自愈时不得发孤儿 `cleared`；已上报过的阻断态自愈必须发一次 `cleared`（参照 src/browse/overlay-report-gate.ts:43-63；缺 episode 世代号令在途确认作废 — 见 oracle.md） <!-- aidcp-edge 7b8d556 上报闸补 blockingEpisode 世代号（离开云端上报态即自增、令在途延后确认作废），清除只在 reportedBlockingKind 存在时发出；login→none 断言零 cleared，captcha→none 断言恰 1 条 -->
-- [ ] 1.6 小红书检出阻断后必须本地暂停普通浏览下发，并在清除后恢复；被暂停期间收到的浏览命令回诚实的未开始，不得静默丢弃（参照 src/browse/browse-session.ts:3391-3451；缺等待循环的三个出口，接管须抛出不可只 return，否则闭环死锁 — 见 oracle.md）
+- [x] 1.6 小红书检出阻断后必须本地暂停普通浏览下发，并在清除后恢复；被暂停期间收到的浏览命令回诚实的未开始，不得静默丢弃（参照 src/browse/browse-session.ts:3391-3451；缺等待循环的三个出口，接管须抛出不可只 return，否则闭环死锁 — 见 oracle.md） <!-- aidcp-edge 7b8d556 停手闸与两条用例随第一波同批落地（`waitWhileBlocked`，现位于 browse-session.ts:1184）；唯一待办的「有界预算档位人确认」已于 2026-07-31 裁定接受（见下），2026-08-01 据此勾选 -->
   - **偏离说明（2026-07-29）——实现里多一条任务正文没点名的正常路径，需人确认后再勾**：停手闸加了**有界等待预算**（`blockingWaitMs`，默认 15 000ms，可注入；轮询 250ms）。预算内清除就继续派发，等满仍阻断才回诚实未开始（`blocked_by_captcha` / `login_required`，沿用 Facebook 同名原因码）。**理由**：任务同时要求「阻断期间暂停」与「被暂停期间的命令回诚实未开始」，这两条只有加预算才同时成立——无预算则命令**无界挂在闸门里、云端等不到任何回执**，会被看门狗按空闲判死整场会话，那是另一种停摆。落点 `browse-session.ts:879-914`（`waitWhileBlocked`），常量 `DEFAULT_BLOCKING_WAIT_MS=15_000` / `DEFAULT_BLOCKING_POLL_MS=250`。若认为该档位应调整或去掉，只需改 `NativeBrowseSessionOptions.blockingWaitMs`。
   - 已落成部分：`onCloudCommand` 前置停手闸，阻断期间普通浏览命令**零派发**、回诚实未开始，清除后恢复下发；两条用例（captcha 与 login 各一）均断言 `executions.length === 0`。
   - **偏离已确认可接受（2026-07-31，本轮裁定）**：有界等待预算保留，默认 15 000ms 不动。理由是任务正文的两条要求本来就只有加预算才同时成立——
@@ -196,9 +196,17 @@
   - ~~**不勾的理由**：同 7.2。~~ **【已消解，第五波】** 另登记一条**不在本 change 可写范围**的既有墙钟敏感用例（`native/page-engine/src/facebook/publish_tests.rs` 的提交探针跨死线那条，8 核满载人造过载下 3 次红 2 次，正常负载 39 次全量从未红），来自 `restore-native-facebook-localized-action-parity`，判据同上，建议交由 Facebook 侧 change 处理。
   - **对上面那条墙钟用例的实测订正（2026-07-30，第五波）**：「正常负载 39 次全量从未红」**不成立**。干净主干 10 次全量里 **2 次**红，涉及三条而非一条：`select_mode_reports_ambiguous_after_one_unconfirmed_click`（`publish_tests.rs:659`）、`select_mode_is_ambiguous_when_post_click_confirmation_crosses_the_deadline`（`:728`）、`submit_does_not_confirm_when_the_submitted_probe_crosses_the_deadline`（`:1007`）。**红的那 2 次都落在有并发负载的时段**，随后 10 轮低负载配对测量里 0 次 —— 也就是说原结论多半是**在空载下取样**得出的，与本批反复踩的「单独跑那个文件永远全绿」是同一种自证。属主已明确为 `enforce-native-engine-artifact-gates` **8.4**；详细归因见 `restore-native-actuation-humanization-and-locating/tasks.md` §9.5 第 8 条。
   - **另一族抖动已在第五波修掉**（`aidcp-edge 7f9ea7f`）：`fake_cdp.rs` 三条 feed-recovery 用例共用落点导致的塌帧红，配对交错测量**修前 7/10 红 → 修后 0/10 红**。**本次 7.4 的绿灯是在该修复之后取得的** —— 在它之前，主干上这条门禁本身约 50% 红，任何「主干重跑通过」的声明都不可信。
-- [ ] 7.5 运行 `openspec validate restore-native-xiaohongshu-session-guards --strict`
+- [x] 7.5 运行 `openspec validate restore-native-xiaohongshu-session-guards --strict` <!-- aidcp 2026-08-01 收口重跑：`Change 'restore-native-xiaohongshu-session-guards' is valid` -->
   - 阶段性记录（2026-07-29 / 2026-07-30 各一次）：均输出 `Change 'restore-native-xiaohongshu-session-guards' is valid`。
-  - **不勾的理由（2026-07-30）**：change 仍未收口——**1.6 的有界预算档位待人确认**、**5.6 阻塞待人裁定**、7.2–7.4 待主干重跑、真机组整批零跑。本条留到收口时勾。
+  - ~~**不勾的理由（2026-07-30）**：change 仍未收口——1.6 的有界预算档位待人确认、5.6 阻塞待人裁定、7.2–7.4 待主干重跑、真机组整批零跑。~~
+  - **收口记录（2026-08-01）——四条阻塞全消，本条勾选**：
+    - 1.6 的有界预算档位已于 2026-07-31 裁定接受（见 1.6 下的确认段），本日据此勾选；
+    - 5.6 已于 2026-08-01 裁定（走法乙：正式声明不再需要，见 5.6 下的裁定段）；
+    - 7.2–7.4 的主干重跑已于第五波在 `aidcp-edge 7f9ea7f` 完成；本日在当前主干目标提交
+      `aidcp-edge a2edae8` 上另跑一次全量作为归档前的现状确认：`npm test` **2900 例 / 2900 绿 / 0 红 / 0 跳过**
+      （例数由 2792 涨到 2900 全部来自其间他轨合入主干，非本 change）；
+    - 真机组已整批移出本清单、只活在 `docs/real-machine-acceptance-backlog.md` 簇 122（2026-07-31 用户裁定），
+      **不再阻塞归档**——归档 MUST NOT 被读成「真机验过了」。
 - [x] 7.6 记录 edge 与控制仓的提交 sha、验证证据、偏离说明与热点文件重叠情况；明确写下未执行的动作（未出安装包、未部署、未做真机写动作） <!-- aidcp-edge 811edf2/7b8d556 + aidcp-edge a05bee9（跨 change 依赖）2026-07-29 第一波；aidcp-edge 3236d23…bed0e83 共 12 个提交 2026-07-30 第二波，记录如下 -->
 
   **⚠ sha 订正（2026-07-30，先读这条）**：本文件原先记的 `b57d619` / `813ff7c` / `74eaf41` 是**合并前 worktree 里的本地 sha，从未进入 `origin/master`**（`git cat-file` 有对象、但不是 `origin/master` 的祖先——它们只活在已删除的 worktree 分支上）。已全文换成落地后的等价提交：`b57d619 → 7b8d556`、`813ff7c → 811edf2`、`74eaf41 → a05bee9`（三者都在 `origin/master` 上；`a05bee9` 与 `74eaf41` patch-id 逐字相同，另两个的差异来自 rebase 冲突解决，`811edf2` 另多带一个夹具文件 `test/native-page-engine/lease-suppressed-command-receipt.test.ts`）。**教训与 memory `tasks-md-sha-must-be-pushed` 同款：台账 sha MUST 取自已推送提交，rebase 后必须回头对账**——否则台账指向的 sha 谁也 checkout 不出来，正是本批工作要根除的「台账说有、实际查不到」。
