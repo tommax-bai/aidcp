@@ -73,7 +73,10 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > kernel `ac98a30` / transport `40df6de`（**共享包两个都没动 ⇒ 无 pin 变更**）；控制仓 `f59999fb`。
 > 测试 cloud 4050 / api 499 / automation 1970 / content 441，全 0 fail；acceptance 182/182；
 > 六仓对账零漂移（只剩三个手写组装根「只报不改」，那是永久态）。tasks.md `69/122`。
-> **dev 未部署本批**（上次部署仍是第十五批 `2da39f6`）。ol 一次没动。
+> **dev 已部署第十六批 = `f489e5e`**：零新增迁移（本批 diff 只有 `src/` 5 个 + `test/` 5 个），
+> 从**目标提交新建的 clean worktree** rsync（并发常态下不从共享工作区上线），先备份再推、
+> `active` / 8787 与面板 8090 均在监听 / 飞书长连接已建立 / 三属主 store 全部报「已就绪」/
+> 重启计数 0 / 约 3 分钟窗口 error 级日志 **0 条**；isales 全程未触碰。ol 一次没动。
 >
 > **本批做完四件，都在第 2 段，第 2 段至此只剩 2.5 的 A 半：**
 > - **A-3 活缺口已修**（三仓）：接口进程补注册那两条窄读路由 + 两处 `catch` 改成能区分
