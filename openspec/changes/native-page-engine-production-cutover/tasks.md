@@ -47,12 +47,27 @@
   - **留在场上的**（弃守本条不等于这件事消失，只是不再由本 change 记账）：
     三道闸目前只覆盖一条命令。要推广到其余命令面，须另立 change —— 那是**覆盖面工作**，
     不是架构工作，因为可替换的缝与桩都已就位（见拟人化 7.17 的结论）。
-- [ ] 3.3 Implement Native pointer, wheel, keyboard, text, and file-input primitives with current humanization bounds and cancellation-safe atomic actions.
+- [x] 3.3 Implement Native pointer, wheel, keyboard, text, and file-input primitives with current humanization bounds and cancellation-safe atomic actions.
   <!-- Partial 2026-07-27, aidcp-edge 745b754: shared text input now preserves per-Unicode-scalar pacing, cancellation, and deadlines; captcha text uses bounded real keyDown/keyUp pairs with Shift cleanup. The broader pointer/wheel/file primitive task remains open. -->
   <!-- Partial 2026-07-28, aidcp-edge 02313f1: Facebook Feed and comment lazy-load wheel input now preserves the existing 650 px +/-20% distance across 8-15 frames with 16-60 ms inter-frame delays, an interior acceleration/deceleration peak, exact total distance, and cancellation/deadline checks. Rust unit/fake-CDP/full suites, clippy -D warnings, Edge acceptance/full tests, and typecheck passed. Pointer and file-input coverage remain open; no package, deployment, or live-account validation was performed. -->
   <!-- 承接边界登记（2026-07-30，由 restore-native-actuation-humanization-and-locating 的 5.8 回写；本条仍不勾） -->
   - **文件输入（file-input）这一半不在那条 change 内**，勿因其拟人化原语落地就把本条整条勾掉：
     那条 change 承接的是指针 / 滚轮 / 键盘 / 文本四类原语的拟人化边界，**file-input 原语仍属本 change**。
+  <!-- 收口（2026-08-01，实读现状后勾选；本条无新增代码改动，是「读出来它已经成立」而非「改到成立」） -->
+  - **file-input 两平台都已落地且同源**：小红书 `native/page-engine/src/engine.rs` 的 `PublishUploadImage` 分支、
+    Facebook `native/page-engine/src/facebook/publish.rs` 的同名分支。两者**共用同一个** `validate_publish_file`
+    （`engine.rs`，扩展名白名单 jpg/jpeg/png/webp + 绝对路径 + 是普通文件 + 元数据可读，任一不满足即
+    `InvalidRequest`「授权发布图不可用」），不存在两份各自漂移的校验。
+  - **「cancellation-safe atomic」如何成立**：附件写入是**单次 `DOM.setFileInputFiles`**，
+    没有可被打断的中间态 —— 原子性来自调用本身，不是靠额外的守卫。
+  - **「humanization bounds」在本原语上不适用，如实记而不是假装满足**：`setFileInputFiles` 不是用户手势，
+    CDP 上也没有第二条拟人路径可选（选文件对话框不可驱动）。**这一格是空的，不是漏的。**
+  - **上传后的校验是有界且诚实的**：小红书 `verify_uploaded_preview` 5s 上限 / 250ms 轮询，
+    超时回 `Ambiguous` 而非成功；Facebook 侧 `verify_facebook_uploaded_preview` 走命令死线。
+  - ⚠️ **判据强度另有归属，别读成本条已覆盖**：该校验只认「该序号位存在预览图」，
+    **不能把预览与本次上传绑定**（上一次残留的预览同样满足）。这条已登记在
+    `native/page-engine/command-postconditions.json` 的 `publish_upload_image`（状态 `below_bar`），
+    由 change `extend-native-postcondition-coverage` 的 3.2 承接。**本条勾的是原语已落地，不是判据已达标。**
 - [x] 3.4 Define bounded structured models for feed cards, search results, note details, profiles, notifications, interaction receipts, and publish receipts.
   <!-- aidcp-edge 804aadc: deny-unknown Rust command/result types cover the complete frozen command manifest; card/note/profile/notification/action/publish projections apply explicit text/list/URL/ID bounds. cargo test and clippy -D warnings passed. Command behavior remains sections 4-6. -->
 - [x] 3.5 Restore Native Facebook comment and Xiaohongshu search text entry to one humanized `Input.insertText` call per Unicode scalar, with pre-submit cancellation/deadline checks, exact readback, and cleanup before any failed commit.
@@ -134,7 +149,17 @@
 
 ## 9. Validation, evidence, and release gate
 
-- [ ] 9.1 Run Rust formatting, unit/integration/acceptance tests, clippy, and release builds for every locally supported target; record unsupported cross-target checks truthfully.
+- [x] 9.1 Run Rust formatting, unit/integration/acceptance tests, clippy, and release builds for every locally supported target; record unsupported cross-target checks truthfully.
+  <!-- 2026-08-01 实跑（`aidcp-edge` master `fcb1fd2` 工作树，`native/page-engine/`；工具链 1.97.1-aarch64-apple-darwin，
+       该 toolchain 不在默认 PATH，需 `export PATH="$HOME/.rustup/toolchains/1.97.1-aarch64-apple-darwin/bin:$PATH"`）：
+       · `cargo fmt --check` 通过
+       · `cargo clippy --all-targets -- -D warnings` 通过（无告警）
+       · `RUST_TEST_THREADS=1 cargo test --locked` **350 例通过 / 0 失败**（跨全部单测 + 集成 + fake-CDP 套件）
+       · `cargo build --release --locked` 通过
+       **跨目标一栏如实记：本机 `rustup target list --installed` 只有 `aarch64-apple-darwin` 一个目标，
+       所以「every locally supported target」在这台机器上就等于这一个。Windows / x86_64 等目标
+       未安装 std，本地无法构建，本条不对它们作任何断言** —— 与 9.3 弃守的跨架构 CI 证据是同一个缺口的两面，
+       别把「本地全绿」读成「全平台全绿」。 -->
 - [x] 9.2 Run physical Edge dependency installation, focused tests, required safety acceptance suites, full tests, typecheck, and production build.
   <!-- aidcp-edge 317cd47: physical npm tree; focused 33/33, acceptance 29/29, rebased full 2235/2235, typecheck, build:dist, Rust 40/40, rustfmt, and clippy -D warnings passed. No live or packaged-app validation. -->
 - [x] 9.3 Run package-input graph checks, packaged smoke tests, signature verification, and leakage scans for locally produced artifacts; record Windows and alternate-architecture CI evidence separately. <!-- 2026-07-31 用户裁定「不打客户端安装包；需要打一次客户端才能验证的功能一律不做」，本条的打包态冒烟 / 签名验证 / 跨架构 CI 证据三项都以出包为前置，显式弃守。**注意仍然成立、且已在做的是另一件事**：打包输入图检查与泄漏扫描的**本地构建那一半**由 `npm run build:dist` 覆盖（生产剪枝 + 分片禁入表），那一半不依赖出包、继续有效。**不是已验证无问题，是不打算验。** 将来若决定出安装包，本条须先回到待办。 -->
