@@ -36,5 +36,6 @@
   <!-- Cloud: 4071 tests passed, 11 skipped, typecheck passed. Console: low-concurrency rerun 344 passed, 1 skipped, build passed; initial parallel-run timeouts were serially rerun and passed. -->
 - [x] 5.2 Run `openspec validate configure-facebook-mode-numeric-policies --strict` and record commits, validation and deviations in this checklist.
   <!-- Control/OpenSpec commit ba1f791f8b28f9dbd1cf7896c71b45667f99b8c1; strict validation passed. Deviation: Console has no tracked lockfile, so physical dependencies used npm install --prefer-offline --no-package-lock instead of npm ci. No Edge source or package changes. -->
-- [ ] 5.3 Rebase, fast-forward integrate and push clean Cloud, Console and control default branches with explicit path scope.
+- [x] 5.3 Rebase, fast-forward integrate and push clean Cloud, Console and control default branches with explicit path scope.
+  <!-- Pushed defaults: aidcp-cloud/master 46a7003f3d8a2f9a91f53f2c6cddc89cb7263349; aidcp-console/master f35029c4ce65b5cde2721a01143eba7c5c3108d4; aidcp/main 656476384f698ee360c4f697335a723dd34b1e85. All canonical checkouts were clean and fast-forwarded. -->
 - [ ] 5.4 Run DEV deployment preflight/checks and deploy Cloud/Console only if the shared schema gate proves compatible; do not deploy OL, package Edge or perform real Facebook actions without explicit authorization.
