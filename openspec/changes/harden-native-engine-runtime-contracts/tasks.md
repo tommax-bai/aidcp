@@ -63,11 +63,15 @@
 > （结束会话命令**自己**失败时收尾不执行），只有两行，但落点归 `browse-session.ts` 的单写者。
 > **本轮若因 §6 的接线工作打开了该文件，就顺手一并做掉并在此回写 sha**；否则留下一轮。
 
-- [ ] 5.1 把 `src/native-page-engine/browse-session.ts:141-142` 的会话结束收尾从成功路径移到 `finally`，使结束会话命令失败时收尾仍执行
+- [x] 5.1 把 `src/native-page-engine/browse-session.ts:141-142` 的会话结束收尾从成功路径移到 `finally`，使结束会话命令失败时收尾仍执行 <!-- aidcp-edge 0a5167e 收尾移进 finally，位置在 active/activeAbort 复位之后（此刻命令已落定，停机的中止信号不会打到一条还在跑的命令上）。注释写明后果链：收尾不做 = owner 位不释放 + 周期观测不停 ⇒ 下次开始拿到的还是同一场死会话，而云端只看到一条普通失败、没有任何东西指向「这个环境已经变砖」 -->
   - 本轮未做（2026-07-29）：落点 `src/native-page-engine/browse-session.ts` 归并行流（该文件本轮被 b57d619 大改）。实读 HEAD 仍是 `await active;` 之后紧跟 `if (env.type === 'session.end') this.stop('cloud_session_end');`（:245-246），`finally` 块只复位 `active` / `activeAbort`——**命令失败时收尾仍不执行，缺口原样保留**。需在 browse-session.ts 的单写者手里落。
 - [x] 5.2 给 `src/native-page-engine/runtime.ts:128-131` 的会话缓存加存活判据（现为命中即返回、零判据）：返回缓存句柄前必须**取到存活的肯定证据**（如子进程未退出且通道可写），取不到即按已死处理、丢弃并重开——「没记到死讯」不算存活证据 <!-- aidcp-edge 74eaf41 client.ts 新增 NativeProcessTransport.isLive()（握手完成 + 未退出 + 未被 kill + exitCode/signalCode 均为 null + stdin.writable）与会话级 isLive()；runtime.ts 的 sessionFor 取不到证据即丢弃重开，新增 discardSession() 让收尾失败不堵住重建入口 -->
   - 非空转验证：把 `cached.session.isLive()` 临时短路成 `true` 后，会话自愈 3 条里有 2 条失败（随即还原并以 `git diff` 确认）。
 - [ ] 5.3 加回归：引擎进程已退出时下发结束会话 → 该命令失败，但 owner 被释放；随后一条命令能重建引擎并正常执行
+  - **未做（2026-08-01，如实登记）**：5.1 的行为改动已落地，**但这条护栏没写**。当前状态是「改对了但没有断言钉着」——
+    后人把收尾挪回成功路径不会有任何东西变红。**MUST NOT 因 5.1 已勾就顺手勾掉本条。**
+    真机侧的对照项在 `docs/real-machine-acceptance-backlog.md` 簇 124.2（杀一次引擎子进程验恢复），
+    但那是真机项、替代不了这条脱机回归。
   - 偏离说明（2026-07-29）：**只落了 runtime 层那一半**。已有用例「引擎已退出时释放 owner：收尾失败不堵住重建入口」（校验新旧引擎 pid 不同），`closeOwner` 打在已死句柄上不再把异常抛给调用方（调用点是 `void closeOwner(...)`，抛出去即未处理拒绝）。缺的是「**下发结束会话命令**」这条入口——它依赖 5.1，同属 browse-session.ts 单写区。
 - [x] 5.4 加回归：缓存会话的传输已死时，下一条命令走重建而不是立刻抛「引擎已退出」 <!-- aidcp-edge 74eaf41 runtime-contracts-session-recovery.test.ts 3 tests / 3 pass：传输已死走重建 + 外部 SIGKILL（宿主完全没机会记到死讯）后仍能重建 + 健康会话必须被复用（判据不许严到每条命令重开引擎） -->
 
@@ -101,7 +105,7 @@
 - [x] 7.2.1 交叉核对另 4 处 `|| document.body` 取根点（`20-feed.js:87,154,166` 与 `40-group-join.js:103`）：起草期实读结论是它们下游均空安全（`:87` 紧跟 `if(!scope)return`；`:154` 只进 `node&&…` 循环；`:166` 只以 `scope&&…` / `all(…,scope||document)` 使用；`40-group-join.js:103` 进 `targetGroupScope`，其 `:50-51` 首行即 `if(!groupId||!main)return`）。若实装期复读推翻某一处，按 7.2 同样处理并在此记录；结论不变则不改这 4 处，**不做空转补丁** <!-- aidcp-edge 74eaf41 逐处复读，起草期结论不变（现址 :86/:153/:165 与 40-group-join.js:103），按要求未做空转补丁 -->
 - [x] 7.3 给 `native/page-engine/src/xhs.rs:66-72` 与 `native/page-engine/src/probe.rs:89-98` 的结果解码入口补上与 `facebook.rs:607-620` 同级的有界解码诊断（阶段 / 字段路径 / 异常位置），且诊断保持有界、不含页面正文与凭据。**先核对**并行 change `restore-native-xiaohongshu-session-guards` 是否已把解码入口一并覆盖；已覆盖则划掉本条、不重复实现 <!-- aidcp-edge 74eaf41 先核对：并行 change 未覆盖（xhs.rs/probe.rs 仍是裸错误），故补上同级诊断（阶段/字段路径/异常类别与原因/标识符/行列）；构造函数只写一份放在 probe.rs 由 xhs.rs 共用 -->
   - 残留（2026-07-29）：诊断实现现为 **2 份覆盖 3 个入口**（原为 1 份覆盖 1 个）。`facebook.rs:911-1080` 里那份等价实现是私有函数，本轮不可编辑该文件；收口到 `error.rs` 留给后续。
-- [ ] 7.4 在 `native/page-engine/src/input.rs:108-128` 区分「焦点守卫求值失败或输出缺失」与「焦点确实丢了」两类结论（通道失败已单列为 `Engine`，保持不变）
+- [x] 7.4 在 `native/page-engine/src/input.rs:108-128` 区分「焦点守卫求值失败或输出缺失」与「焦点确实丢了」两类结论（通道失败已单列为 `Engine`，保持不变） <!-- aidcp-edge 0a5167e 新增只活在守卫路径上的失败类型，不往共享枚举里加变体。**理由值得留给后人**：那个共享枚举被 7 处穷举匹配消费、其中 5 处根本不带守卫，加变体会逼那 5 处各写一条「此路不可达」分支——每一条都是把「结构上不会发生」变成「发生了我就随便报一个」的机会。用类型把它圈在守卫路径里，不带守卫的调用方连看见它的机会都没有。通道失败仍单列，未动。配套用例断言「读不出焦点」与「读到焦点丢了」在回执上可分，停手行为两者完全一致——所以那条断言就是归因诚实本身 -->
   - 偏离说明（2026-07-29）：**三态判定已落成，但外显原因码尚未三分**。已落 `FocusGuardVerdict{Focused, Lost, Unreadable}`（`input.rs:139`）：页面抛异常 / 输出缺失 / kind 不对 / 布尔字段不是布尔 = `Unreadable`，只有守卫确实回「目标不在或没聚焦」才是 `Lost`；`cargo test --lib input::` 13/13 通过，含 `focus_guard_separates_unreadable_from_a_real_focus_loss`（1 正 3 反 5 未知）。**但 `Unreadable` 当前映射到 `TextInputFailure::Engine`**，与本条括注「通道失败已单列为 Engine，保持不变」的三分要求不符。
   - **可观察副作用（云端口径会变）**：Facebook 发帖填写这一支的失败原因码由 `composer_focus_lost` 变为 `engine_error`（**仅限守卫求值失败 / 输出缺失这一支**；守卫真回「没聚焦」仍是 `composer_focus_lost`）。这是有意为之——宁可粒度降级，也不把「不知道」说成「知道是坏的」。云端若曾按 `composer_focus_lost` 做过统计，口径会变。
   - 专用变体 `TextInputFailure::GuardUnreadable` 本轮 defer：新增枚举变体会打断三处穷举 match 的编译（`engine.rs:782-791/1348-1351`、`facebook/comment.rs:221-232`、`facebook/publish.rs:612-619`），四个文件均在其他单写区。
