@@ -1151,6 +1151,32 @@
 
 - [ ] 2.4d-回收 **FB 素材的兜底回收扫描**（债③剩下的那一半）：今天只有计数，
   漏掉的素材仍然停在 `reserved` 无人回收。计数面是 `getFacebookMediaSettleMisses()`。
+  <!-- 📌 **2026-07-31 坐实：这条不能按「加个 TTL 扫描」做，那样会重复用图。先读完再动手。**
+       **占用是怎么产生的**：`FacebookMediaSelectorRole` 在**生成期**调 `reserveNext`，
+       把素材组置 `reserved` + 写 `reserved_by` / `reserved_at`；解除只有一个出口——
+       `PublishDispatcher.settleFacebookMedia`，它在**下发期**按结局调 markUsed / quarantine /
+       releaseReservation。调度器自己那 6 条路径覆盖得很全（含 draft 缺图、抢占、提交未确认）。
+       **真正的洞在两头之外**：
+         ① 稿件被**否决 / 取消 / 到期从未下发** ⇒ 压根不会走到调度器 ⇒ 永久停在 reserved。
+            全仓 `releaseReservation` 只有调度器那一处调用点，没有第二条路。
+         ② 进程在「已保留、尚未下发」之间死掉 ⇒ 同上。
+       **为什么不能只按时间扫**：保留与结算之间**隔着审批等待**（人审 / 原生定时发布），
+       这段可以任意长。按 `reserved_at` 超时就回收，等于把一组正在等审批的图重新放回可用池，
+       于是同一组图被两条稿用掉——**这比停在 reserved 严重得多**。
+       **也不能用一条 SQL 解决**：判「这个保留还活着吗」要问稿件状态，而
+       `publish_log` 属 **api**、`account_facebook_publish_image_set` 属 **content**，
+       跨域直连数据库是本 change 的红线之一。
+       **三条候选（未拍板）**：
+         ① 在稿件走向终态的那几处也调一次 settle。最便宜、覆盖 ①，但覆盖不了进程死。
+            代价：保留信息藏在稿件的 `imageDirective` 里，终态路径在 api 侧，要多一跳取它。
+         ② content 侧扫 `reserved` 且够老的行，**逐条向 api 问一次「还有非终态稿件持有它吗」**，
+            答「没有」才回收。覆盖全，但要新增一条窄读端口。
+         ③ 保留改成带到期时间的租约，下发链路续租。最稳、最动骨头。
+       **倾向 ① + ②**：①先堵住绝大多数真实占用，②作兜底且**必须带那一问**，
+       绝不做成只看墙钟的扫描。**在②落地前，MUST NOT 上任何 TTL 回收。** -->
+  <!-- 现状事实供下一手直接用：状态全集 = available / reserved / used / disabled / deleted / quarantine；
+       `releaseReservation` 只在 `status='reserved'` 且 reservationId 匹配时才动行、返回真态 rowCount。
+       所以「回收」这个动作本身已经是幂等且安全的，缺的只是**谁在什么判据下调它**。 -->
   <!-- **消费面早就不是问题**：0.6c / 0.6e / 0.6g 那批已经把四个注入面全改成 kernel 端口类型
        （`ConceptStorePort` / `SchedulerConceptStore` / `CuratedSelectionPort`），
        所以剩下的**只是组装根按模式注入哪一个实现**——与刚做完的委托那条**同形**。
@@ -1275,7 +1301,32 @@
   所以 `server.ts:116` 那个条件展开的 false 分支**生产上从未走过**，
   **「漏传」这个失败态只可能由本次拆仓引入**，现有测试不可能覆盖它。
   新用例作 `AC-TCT-3` 加进 `test/acceptance/text-card-transcription-honesty.test.ts`。
-- [ ] 2.8 失败语义测试：写口只报真态行数；跨进程错误识别用**结构化守卫**，不用 `instanceof`。
+- [x] 2.8 **两条都已在前几批实装并有用例；本批只补了一道它们都依赖、却没人守的前提闸。**
+  <!-- aidcp-automation 9d4c9a2（本批唯一新增）。**先说核实结果，别重做**：
+       **（a）「写口只报真态行数」已成立。** 两条返回行数的写口都带具名守卫
+       （`isNonNegativeInteger`），文件头明写「读不到 MUST 抛、MUST NOT 取 0——
+       0 会被读成『对面明确说它一行都没写』，而真相是压根没问到对面」。
+       用例已在：`content-authority-http.test.ts:285/497/554/566`（含「属主报错」与
+       「属主答了但回执坏」两种**不同**的失败，刻意分开断言）、`content-media-usage-http.test.ts:286`。
+       属主侧那一半是 2.4d-用量 做的（部分落库如实返回、绝不重投）。
+       **（b）「用结构化守卫、不用 instanceof」已成立。** `isDelegatedTaskServiceError` 判的是
+       `name` + 具名字段，正反三条用例齐全（`delegated-task-http.test.ts:268/282/296`，
+       末一条钉「传输层自己的错误**不得**被还原成业务拒绝」）。
+       仓里余下的 `instanceof` 绝大多数是 `err instanceof Error ? err.message : String(err)` 这类取值，
+       且判别型的那些**全在客户端侧**——`InternalHttpClient` 收到线上错误后**在本地重新构造**
+       `InternalHttpError`，对象从未以对象形态过线，所以那些 `instanceof` 结构上成立。
+
+       **（c）本批新增的是上面那个「结构上成立」所依赖的前提**：它只在
+       **本进程里那些类只有一份**时才成立。automation 是 `src/transport/` 的属主（50 个文件），
+       同一批文件又被复制进 `aidcp-transport` 给另两家用；**两份行为逐字相同**，
+       所以装错一份不会崩——只会让跨两份的 `instanceof` 恒 false，把鉴权 / 版本 / target 不匹配
+       一起静默退化成兜底分支。故加一条闸：automation 的 `src/` MUST NOT 从
+       `aidcp-transport/transport/*` 取任何东西（显式放行 `aidcp-transport/llm/*`）。
+       **此刻是前瞻的**：今天一条都没有；但 A-1 马上要让本仓第一次 pin 这个包，
+       危险的不是 A-1 本身（模型出口闭包实测不含传输原语），是它之后那句
+       「反正已经依赖了，顺手也从包里取个 HTTP 客户端」——那一步零编译错误。
+       变异实测：塞一个从包里 import 传输原语的探针文件，当场红并点名说明符。 -->
+- [ ] 2.8-原文 失败语义测试：写口只报真态行数；跨进程错误识别用**结构化守卫**，不用 `instanceof`。
 - [x] 2.9 **`content-publish-rejection-evidence-authority` 已撤条：它是**记错了属主**，不是没做。**
   <!-- aidcp-cloud 9df5210 / aidcp-automation 86ccf18。门 13 → 12（content-owner 9 → 8）。
        **每一环都机械核过，不是论证出来的**：
