@@ -31,5 +31,12 @@
 - [x] 4.3 Run `openspec validate platform-specific-identity-commands --strict` and update all completed task evidence.
 - [x] 4.4 Commit, rebase, fast-forward integrate, and push control/Edge/Cloud changes through their eligible default branches without force.
 - [ ] 4.5 Deploy the integrated Cloud default branch to DEV only, verify service/listener/health/Feishu/PostgreSQL, and report that installed Edge clients remain unchanged until a separate package/release.
+  <!-- 2026-08-01 23:xx 实测：**尝试过，主干在 dev 上起不来，本条仍不勾。** -->
+  - 云端主干 `a0ee197` 启动即失败在同步读自举上（`facebook_operation_policy` 这条新流：
+    名单没跟上 → 载荷键集不匹配 → DB 检查点表的 stream CHECK 约束根本不接受这个值）。
+    **失败形态要记住：进程 `active`、日志在滚，但 8787 / 8090 从未监听** —— 闸在 `server.start()` 之前。
+  - dev 已回滚到 `534af19`（批 E-2 之前）保服务，现健康。**本条要等主干能起来**，
+    因为它要求的是「部署已集成的主干」，回滚版不满足。
+  - 完整时间线与根因分析见 `docs/handoff-2026-08-02-round9.md` §1。
 
 <!-- Validation: aidcp-cloud bbe0052 and aidcp-edge 785244d passed the checks recorded above; control 0a87371 passed strict OpenSpec validation. All three feature branches were rebased, fast-forward integrated, and pushed to their eligible defaults without force; DEV delivery remains pending. -->
