@@ -74,7 +74,9 @@ When the low-confidence bucket is absent for a platform, the delayed-confirmatio
 
 ### Requirement: High-risk Xiaohongshu actions SHALL re-check the blocking state immediately before dispatch
 
-A cached blocking state read by the pause gate can be up to one observation tick stale, and the human-like pause between the gate and the actual click is exactly where a challenge tends to appear. Therefore every high-risk Xiaohongshu action — like, collect, follow, comment submission — MUST perform a fresh blocking-state probe **immediately before dispatching** the action, in the runtime that dispatches it.
+A cached blocking state read by the pause gate can be up to one observation tick stale, and the human-like pause between the gate and the actual click is exactly where a challenge tends to appear. Therefore every high-risk Xiaohongshu action — like, collect, follow, comment submission, comment like — MUST perform a fresh blocking-state probe **immediately before dispatching** the action, in the runtime that dispatches it.
+
+The membership test is the act, not the list: an action belongs here when it spends quota, records a risk fact, or leaves a new trace under that account's name on the platform. A write that meets that test but is missing from the gate's table is an unguarded write, not an exempt one — the gate fails open for exactly the actions nobody remembered to enumerate.
 
 When that fresh probe classifies the page as a captcha/verification challenge or as a login wall, the action MUST NOT be dispatched at all (zero page writes) and the receipt MUST carry a truthful blocked reason distinguishing the two, reusing the existing reason vocabulary rather than inventing new codes.
 
@@ -172,7 +174,9 @@ edge 回执 SHALL 携带 `typeReport`：焦点分级、焦点元素 tag（供事
 
 **取证 MUST 由真正派发字符的执行体产出，MUST NOT 由请求载荷推断。** 无论键入由哪个运行时执行（TypeScript 或已编码的页面引擎），焦点分级、清空三态、实际派发字符数、回读三态与是否已提交这五类事实 MUST 从那一次执行里带出，并由宿主逐字段透传到回执。宿主 MUST NOT 用「请求里带了文本」之类的意图信号替代任何一项。
 
-**`inputMode:'click_type'` MUST 只在确有字符被派发时出现。** 下发了文本而执行体未回带任何键入取证时，edge MUST NOT 标 `click_type`——那会让云端「下发了文本却只点了击」的版本偏斜探测永久静默，把一次未执行的键入呈现成键入成功。此时如实回落到只点击的口径、让该探测器触发，是本条要求的正确结果。
+**`inputMode` 说的是「哪条执行路径驱动了这次协助」，MUST 只由回执里的取证支撑。** 下发了文本而执行体未回带任何键入取证时，edge MUST NOT 标 `click_type`——那会让云端「下发了文本却只点了击」的版本偏斜探测永久静默，把一次未执行的键入呈现成键入成功。此时如实回落到只点击的口径、让该探测器触发，是本条要求的正确结果。
+
+反过来，`inputMode` MUST NOT 被当成「有没有真派发成字符」的同义词：云端那道探测诊断的是**客户端太旧**（老边缘收到文本却整段忽略、只点了坐标）。把「派发了 0 个字符」也算进去，会让一个最新客户端「点位没点中输入框」的常见失败被呈现成「客户端太旧、请重装」，把排查指向完全错误的方向。**「有没有真派发」这一事实由 `typed` 单独承载**，云端本来就收得到；原始缺陷仍被治住——老边缘根本不产出取证。
 
 运营 MUST 能从回执区分「答案打错了」（`verified:'match'` + `still_blocked`）与「字根本没打进去」（`focus:'none'` 或 `verified:'unverifiable'`）。把不可验证抹平成成功，与静默假成功同罪。
 
@@ -192,6 +196,11 @@ edge 回执 SHALL 携带 `typeReport`：焦点分级、焦点元素 tag（供事
 - **WHEN** 云端下发了文本，但执行体回带的回执里没有任何键入取证
 - **THEN** edge MUST NOT 标 `inputMode:'click_type'`、MUST NOT 编造 `typeReport`
 - **AND** 云端「下发了文本却只点了击」的探测 MUST 触发，控制台如实告知键入未执行
+
+#### Scenario: 零派发不得被呈现成客户端太旧
+- **WHEN** 执行体真的走了键入路径并回带取证，但点位没点中输入框、实际派发字符数为 0
+- **THEN** 回执 MUST 仍标 `inputMode:'click_type'`、`typed === 0`，云端「客户端太旧」的版本偏斜探测 MUST NOT 触发
+- **AND** 这次失败 MUST 由 `focus` / `typed` 如实呈现，MUST NOT 被归因成客户端版本问题
 
 #### Scenario: 取证不得由请求推断
 - **WHEN** 请求携带文本且执行体真的派发了字符
