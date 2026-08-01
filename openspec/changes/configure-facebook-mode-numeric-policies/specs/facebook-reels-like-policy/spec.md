@@ -1,7 +1,7 @@
 ## RENAMED Requirements
 
-- FROM: `Every unique active Facebook Reel receives one ordinary like draw`
-- TO: `Only ordinary persona mode applies the configurable Reel like cadence`
+- FROM: `### Requirement: Every unique active Facebook Reel receives one ordinary like draw`
+- TO: `### Requirement: Only ordinary persona mode applies the configurable Reel like cadence`
 
 ## MODIFIED Requirements
 

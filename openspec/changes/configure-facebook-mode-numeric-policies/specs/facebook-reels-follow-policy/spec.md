@@ -1,7 +1,7 @@
 ## RENAMED Requirements
 
-- FROM: `Every eligible active Facebook Reel receives one independent follow draw`
-- TO: `Every supported Facebook browse mode uses its own configurable Reel follow cadence`
+- FROM: `### Requirement: Every eligible active Facebook Reel receives one independent follow draw`
+- TO: `### Requirement: Every supported Facebook browse mode uses its own configurable Reel follow cadence`
 
 ## MODIFIED Requirements
 
