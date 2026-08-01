@@ -32,7 +32,7 @@
 
 ## 5. Build the bounded execution runtime
 
-- [ ] 5.1 Port/adapt the immutable linear PlanCompiler and StepExecutor contracts; add deterministic plan-hash and bounds tests.
+- [x] 5.1 Port/adapt the immutable linear PlanCompiler and StepExecutor contracts; add deterministic plan-hash and bounds tests. <!-- done: repo=aidcp-automation sha=0a4ecbf validation="plan compiler 5/5; focused managed-automation plus boundary suite 26/26; npm run typecheck 0; boundary census source=278 ownership=278 unresolved=0 forbidden=0" deployment="not deployed; compiler and executor contracts have no production root call site" deviation="compiler is pure and service-level denial traces remain task 4.1; it hashes the frozen revision/authorization/graph/bounds artifact and rejects scope weakening" -->
 - [ ] 5.2 Implement the account lane arbiter over durable lane state plus a complete legacy-in-flight adapter; do not infer availability from socket mode.
 - [ ] 5.3 Implement TaskRunWorker claim, renew, step checkpoint, cancellation, retry, expiry recovery, terminalization, and graceful shutdown behavior behind a default-off gate.
 - [ ] 5.4 Implement `ResearchStepExecutor` for the four registered read-only steps with stable content-reference evidence, dedupe, bounded re-drive, and distinct empty/failed/unknown outcomes.
