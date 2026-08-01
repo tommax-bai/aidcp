@@ -6,7 +6,7 @@
 - [x] 1.4 Add customer-auth read/write support for the environment surface while preserving existing operation-mode and Console writes.
 - [x] 1.5 Add focused migration, store, provisioning, and customer API tests for Reels defaults, Feed override, stale revision, ownership/platform rejection, audit, and operation-progress isolation.
 
-<!-- 1.x: aidcp-cloud e61b8da; focused 188 pass, acceptance 184 pass, full 4064 pass/11 gated skips, typecheck pass; no deployment; no deviation. -->
+<!-- 1.x: aidcp-cloud 534af19; focused 190 pass, acceptance 184 pass, full 4069 pass/11 gated skips, typecheck pass; no deployment; migration renumbered to 0105 after upstream added 0104. -->
 
 ## 2. Cloud browse arbitration
 
@@ -15,7 +15,7 @@
 - [x] 2.3 Preserve Feed-primary evaluation and evidence-based Reels fallback behavior.
 - [x] 2.4 Add focused dispatcher tests across persona, slow-start, rule, and consumption modes, including non-empty/empty Feed suppression and reportable-Reel confirmation.
 
-<!-- 2.x: aidcp-cloud e61b8da; dispatcher coverage is included in focused/full results above; no deployment; no deviation. -->
+<!-- 2.x: aidcp-cloud 534af19; dispatcher coverage is included in focused/full results above; no deployment; no deviation. -->
 
 ## 3. Edge client and Reels execution
 
@@ -24,7 +24,7 @@
 - [x] 3.3 Route `facebook_reels_primary` to the existing `enterReels()` executor and preserve its route/card postconditions and honest pending/failure receipts.
 - [x] 3.4 Add focused Edge tests for creation defaults, read/write normalization, independent mode/surface edits, UI control wiring, and configured-primary Reels entry.
 
-<!-- 3.x: aidcp-edge 8290b5e; focused 176 pass, full 2902 pass/1 gated skip, typecheck and JS syntax checks pass; no package or deployment; no deviation. -->
+<!-- 3.x: aidcp-edge c4d8929; focused 176 pass, full 2915 pass/1 gated skip, typecheck and JS syntax checks pass; no package or deployment; no deviation. -->
 
 ## 4. Contracts and validation
 
@@ -32,5 +32,5 @@
 - [x] 4.2 Run Cloud focused acceptance tests and typecheck, then Edge focused tests and typecheck; serialize any load-sensitive Native retry.
 - [x] 4.3 Run `openspec validate configure-facebook-primary-browse-surface --strict`, record commits and validation evidence, and stop before packaging or deployment.
 
-<!-- 4.1-4.2: aidcp-cloud e61b8da and aidcp-edge 8290b5e; protocol docs updated in control; no Native retry was needed; no package or deployment. -->
-<!-- 4.3: aidcp f25d8e84, aidcp-cloud e61b8da, aidcp-edge 8290b5e; strict OpenSpec validation passed; package and deployment intentionally not run. -->
+<!-- 4.1-4.2: aidcp-cloud 534af19 and aidcp-edge c4d8929; protocol docs updated in control; no Native retry was needed; no package or deployment. -->
+<!-- 4.3: aidcp d5ca44fa, aidcp-cloud 534af19, aidcp-edge c4d8929; strict OpenSpec validation passed; package and deployment intentionally not run. -->
