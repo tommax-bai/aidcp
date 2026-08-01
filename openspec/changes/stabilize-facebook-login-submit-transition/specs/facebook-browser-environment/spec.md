@@ -46,6 +46,26 @@ For the Facebook TOTP field only, Native MUST bind one unique, visible, editable
 - **THEN** Edge performs no click and continues bounded read-only polling with the entered-window witness intact
 - **AND** a later unique topmost Continue may become actionable while ambiguity or occlusion remains blocked
 
+#### Scenario: Continue is outside the TOTP input form
+- **WHEN** the supported TOTP page contains one exact visible Continue control outside the input's nearest form and the control shares a non-root structural ancestor with that exact input
+- **THEN** Native may bind that page-wide unique visible control to the TOTP submit signal
+- **AND** it still requires enabled and topmost state before any CDP click
+
+#### Scenario: Hidden Continue template accompanies the visible action
+- **WHEN** one eligible visible Continue and one or more hidden exact-label templates exist in the current document
+- **THEN** hidden templates do not compete with the visible action candidate
+- **AND** post-action verification still inventories them so the original bound target becoming hidden cannot prove disappearance
+
+#### Scenario: Continue is not yet actionable
+- **WHEN** the unique structurally bound Continue control is hidden, native-disabled, has a `disabled` attribute, or declares `aria-disabled=true`
+- **THEN** Edge performs no click and treats the state as bounded hydration
+- **AND** a fresh enabled observation is required before Native may dispatch input
+
+#### Scenario: Out-of-form candidates remain fail-closed
+- **WHEN** visible exact Continue controls are multiple, the unique visible control is covered, belongs to another form or dialog, or shares only the page root with the TOTP input
+- **THEN** Native emits no actionable submit signal and performs no click
+- **AND** post-action observation cannot use that state or geometry-only movement as proof that a previously bound signal disappeared
+
 #### Scenario: TOTP expires while Continue is hydrating
 - **WHEN** the owned TOTP window becomes stale before a unique topmost Continue control appears
 - **THEN** Native clears the exact unchanged field through CDP, confirms it empty, and obtains a new broker code for a fresh window

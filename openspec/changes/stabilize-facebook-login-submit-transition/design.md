@@ -8,6 +8,8 @@ The follow-up installed-client run reached the TOTP page from the email/password
 
 After atomic insertion shipped, a live run confirmed all six digits and then exposed a separate producer gap: Facebook had not rendered Continue by the next probe, so zero matching buttons became fatal `auth_target_not_found`. The resulting restart deliberately lost the in-memory entered-window witness. The new process therefore retained the unknown code, but an empty field in that unproven session would still become `failed(fresh_start_policy_unavailable)`, and the shell did not project either 2FA manual reason as a blocked state.
 
+The next read-only live inspection separated recognition from actuation. The installed client confirmed TOTP entry and stopped on `auth_target_not_found`; no submit signal or click was ever emitted. The settled DOM then showed one enabled, topmost Continue control outside the input's nearest `form`, with both elements sharing a non-root `div` ancestor. The form-local lookup therefore remains permanently empty for this Facebook structure, while document-wide lookup without structural binding would be too broad. Review also showed that the auth resolver does not exclude native `disabled` or `aria-disabled` controls.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -22,6 +24,8 @@ After atomic insertion shipped, a live run confirmed all six digits and then exp
 - Keep the coordinator alive while a confirmed, owned TOTP value waits for its Continue control to hydrate.
 - Make proven TOTP clearing retain clear-only semantics across the Native fresh probe and refuse if the observed field value changes.
 - Keep unproven stale and empty TOTP states manual-required and visible without weakening genuine failed-to-code-1 handling.
+- Recognize a unique enabled Continue outside the input's nearest form only when it remains structurally bound to that exact TOTP context.
+- Wait without input while the unique bound Continue is disabled, and re-probe before any click.
 
 **Non-Goals:**
 
@@ -77,6 +81,14 @@ Passing a synthesized current window into the clear fresh probe was rejected bec
 
 An already-active browser without fresh-start authority never receives automatic TOTP input or clearing. Both a residual non-empty field and a subsequently empty TOTP field return manual-required rather than failed. During retained login waiting, Edge republishes a changed manual reason through the existing lifecycle event. Electron accepts only the enumerated credential, 2FA, and exhausted read-only probe manual reasons, releases the serial launch waiter, projects the browser as blocked, and renders `需处理`; unknown coordinator failures still terminate with code 1.
 
+### 9. Bind an out-of-form Continue without broad document clicking
+
+The TOTP submit resolver first requires the exact supported TOTP context and the already-bound six-digit input. It inventories every exact-label Continue control in the document but grants action authority only when exactly one is visible, so a hidden React template cannot make the real footer action ambiguous. That visible control must share a structural ancestor with the input below `body`/`html`, and it cannot belong to another form or dialog boundary. A control whose only common scope is the page root is out of scope and remains blocked.
+
+The bound control is actionable only when it is topmost and neither native-disabled nor marked `disabled`/`aria-disabled=true`. Zero visible controls, or one visible but disabled structurally bound control, is normal hydration: the coordinator performs no input and retains the entered TOTP window for the next bounded read-only probe. Multiple visible exact controls, a covered enabled control, a control owned by another form/dialog, or an unrelated-scope control remain fail-closed.
+
+The action probe and TOTP postcondition share the same candidate inventory and geometry-independent structural key. The action probe ignores hidden candidates when deciding visible uniqueness; the postcondition checks all structural candidates for the original key. After a click, layout movement or a still-present original control becoming hidden, disabled, covered, ambiguous, or temporarily out of scope is indeterminate and cannot prove signal disappearance, even if another Continue becomes visible. True document change or structural absence remains valid confirmation. Using unrestricted document lookup without a shared-scope gate was rejected because an unrelated Continue elsewhere on a checkpoint page must never gain click authority.
+
 ## Risks / Trade-offs
 
 - **A real blocking overlay appears immediately after click** → The verifier waits only within the 7-second receipt window and then returns ambiguous; it never clicks through or replays the signal.
@@ -88,6 +100,8 @@ An already-active browser without fresh-start authority never receives automatic
 - **The TOTP value changes between refresh observation and clear** → The value-bound signal id changes and Native refuses the stale clear action.
 - **An operator clears an orphan code in an active browser** → The empty TOTP page remains manual-required and does not turn into another abnormal child exit.
 - **Read-only auth probes exhaust their transient budget** → The retained browser becomes an explicit `需处理` state and releases the serial launch waiter; the known manual condition is not left as an indefinite `启动中` projection.
+- **Facebook renders Continue outside the input form** → Page-wide visible uniqueness plus a non-root shared ancestor binds the one exact action control without allowing arbitrary document-level clicks.
+- **Continue is visible but still disabled** → The coordinator waits read-only; Native fresh-probes again before any click, and disabled state never becomes action authority.
 
 ## Migration Plan
 

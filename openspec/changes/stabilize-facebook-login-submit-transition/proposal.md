@@ -6,6 +6,8 @@ A later installed-client run from the email/password login page exposed the next
 
 The next installed-client run confirmed the complete six-digit TOTP insertion, but the immediate fresh probe ran before Facebook rendered the Continue control. The router flattened that zero-button hydration gap to `blocked_unknown(auth_target_not_found)`, the coordinator exited with code 1, and both environments briefly displayed `异常`. Their restarted workers then attached to already-active browsers, correctly refused to mutate the orphan code, but repeated `totp_refresh_required` forever without an actionable UI state. Review also found that the proven-fresh orphan-clear action could reclassify a complete orphan code as submit-ready during its Native fresh probe, so the intended clear-and-reenter path was not end-to-end safe.
 
+A later read-only inspection of `Facebook import 1` proved the remaining structural gap. Native confirmed the six-digit insertion, then reported `auth_target_not_found` without ever producing a TOTP-submit signal or dispatching a click. Once Facebook finished updating, the page contained one visible, enabled, topmost Continue control, but it was outside the TOTP input's nearest `form`; the current router searches only that form. The same resolver also treats a visible disabled Continue as actionable because visibility does not imply enabled state.
+
 ## What Changes
 
 - Keep the existing pre-action rule that a login submit target must be visible, unique, and topmost before Native CDP input.
@@ -20,6 +22,8 @@ The next installed-client run confirmed the complete six-digit TOTP insertion, b
 - Treat a temporarily absent Continue control after confirmed full TOTP entry as bounded hydration, while keeping ambiguous or covered controls blocked before any click.
 - Keep TOTP clear-only observations bound to the exact non-empty value and re-probe them without manufacturing submit authority, so a proven clear cannot become an accidental submit and cannot erase a value changed after observation.
 - Keep an already-active browser in manual-required state when its stale TOTP field becomes empty, refresh the lifecycle reason during retained login waiting, and present enumerated 2FA or exhausted-probe states as `需处理` rather than a process error or an indefinitely occupied launch queue.
+- Bind TOTP submission to one page-wide unique visible Continue control that shares a non-root structural ancestor with the exact TOTP input, even when Facebook renders it outside the input's nearest form; hidden templates do not compete for action authority but remain visible to postcondition identity checks.
+- Treat a unique disabled or `aria-disabled` Continue as hydration rather than an actionable target, while preserving ambiguity, unrelated-scope, and occlusion as fail-closed blockers.
 
 ## Capabilities
 
@@ -34,6 +38,6 @@ None.
 ## Impact
 
 - Affected repo: `aidcp-edge`.
-- Affected areas: Native Facebook authentication postcondition probing, TOTP input/recovery, and focused router/action/coordinator regression tests.
+- Affected areas: Native Facebook authentication target binding and postcondition probing, TOTP input/recovery, and focused router/action/coordinator regression tests.
 - No Cloud API, protocol-v2, database, Console, proxy, TOTP generation, browser takeover, deployment, or installer change is intended.
 - Validation is code-level only unless the operator separately authorizes another real-account run or desktop packaging.

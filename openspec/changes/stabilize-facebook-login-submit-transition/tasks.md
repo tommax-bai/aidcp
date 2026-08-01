@@ -53,3 +53,22 @@
   <!-- Acceptance passed 31/31; full Edge passed 2892 with 0 failures and 1 gated E2E skip; Native fmt/clippy/all tests passed; the staged darwin-arm64 artifact verified at SHA-256 f281d16677df7d3661d77e654b810233ce0205512ee43ddb5175214325183945 after rebasing onto origin/master; strict OpenSpec validation passed. -->
 - [x] 8.3 Record commits, validation evidence, integration/push status, and the no-package/no-browser-action boundary.
   <!-- aidcp-edge 2c3aa5d and aidcp 9eef6758 were integrated and pushed to origin/master and origin/main respectively after all task 8.1/8.2 gates passed. This closeout record lands in a follow-up control-only commit. No desktop package/install and no browser input, lifecycle mutation, or live-account action were performed. -->
+
+## 9. Out-Of-Form TOTP Submit Binding
+
+- [x] 9.1 Resolve one page-wide unique visible Continue control that shares a non-root structural ancestor with the exact TOTP input instead of restricting submission to the input's nearest form, without letting hidden templates compete for action authority.
+- [x] 9.2 Require the bound Continue to be enabled and topmost; classify native-disabled, `disabled`, or `aria-disabled=true` as read-only hydration while preserving ambiguity, unrelated scope, and occlusion as blockers.
+- [x] 9.3 Reuse the same resolver in the TOTP postcondition so disabled, covered, ambiguous, or temporarily out-of-scope controls cannot prove signal disappearance.
+
+## 10. Structural Regression Coverage
+
+- [x] 10.1 Add router coverage for the observed input-form/outer-footer structure, hidden-template coexistence, disabled and `aria-disabled` hydration, page-wide visible ambiguity, unrelated root scope, and enabled transition.
+- [x] 10.2 Add Native action coverage proving a fresh re-probe that becomes disabled dispatches zero CDP input, while an enabled out-of-form control retains the existing one-click and bounded postcondition path.
+
+## 11. Validation And Delivery
+
+- [x] 11.1 Run focused Facebook auth router/Native tests and Edge typecheck in the isolated worktree.
+  <!-- Focused TypeScript auth/router/assembly/manual-session tests passed 54/54; focused Native Facebook auth passed 7/7; Edge typecheck passed after rebasing onto the latest origin/master. -->
+- [x] 11.2 Run acceptance, full Edge, Native, staged-artifact, and strict OpenSpec gates without weakening fail-closed assertions.
+  <!-- Acceptance passed 31/31; full Edge reported 2920 tests with 2919 passed, 0 failed, and 1 gated E2E skip; Native fmt/clippy/all tests passed serially with 179 unit tests plus every integration suite; the staged darwin-arm64 artifact verified at SHA-256 2455f172dadf7b3d0a060983d20381d40d9d112a31871e75d7044a79cbc3413a; strict OpenSpec validation passed. -->
+- [ ] 11.3 Record commits, integration/push status, and the explicit no-package/no-install/no-browser-action boundary.
