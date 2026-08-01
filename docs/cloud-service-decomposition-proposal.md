@@ -527,6 +527,31 @@ Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或
 
 **待定稿裁决（子仓已按最保守判据暂判并标注，`aidcp-cloud@89c286d`；归档本方案前 MUST 由本表 owner 复核并回写逐格数字）**：① ~~`src/schema/` 整目录暂判 `aidcp-automation`~~ —— **2026-07-26 结掉，见下方「§4.7.1 `src/schema/` 的裁决」**。原文保留供追溯：它含 SQL 字面量（`schema-capability.ts` / `pg-catalog.ts`），`AC-BOUND-03` 的 kernel「无 SQL」准入当场不过，故 MUST NOT 判 kernel；消除路径见子仓 `boundaries/`（可选：从 `schema-capability.ts` 析出无 SQL 的纯判定段后判 kernel，一次消除其带来的 21 条 import 豁免）。② `src/config-mirror-freshness.ts`、`src/db/environment-row-lock.ts`、`src/config/mirror-stop-work.ts`、`src/publish-agent/pending-dispatch-watchdog.ts` 四个文件判据两可，已按最保守暂判 api、`basis` 标「待定稿裁决」。子仓侧用 `fileOverride` 而非目录默认层接住，故不会静默落入默认层。
 
+**配置副本停手闸的裁决（2026-08-01 结掉上面 ② 里的两个配置镜像文件；change `split-cloud-automation-production-runtime`）**：
+`src/config-mirror-freshness.ts` 与 `src/config/mirror-stop-work.ts` **保持 `aidcp-api` 属主，整份不改判**——
+实测前者有 **7 个 api 属主消费方直接 import**（账号状态、客户身份存储、镜像刷新器、镜像描述表等），
+整份挪走会当场造出 7 条跨域 import，而 `AC-BOUND` 的棘轮只许下降；后者依赖 api 属主的镜像描述表
+（`src/config/mirror-registry.ts` 的 `CONFIG_MIRRORS`）。**挡住它们整份进 kernel 的具体理由也记下**：
+前者有模块级可变单例 `installedSource`（`AC-BOUND-03` 的 kernel 准入当场不过），后者依赖上述描述表。
+
+**但其中的纯判定段析出到 kernel**，理由与 `model-config-defaults.ts` 那次同形——**拆进程后出现了第二个读者**：
+自动化进程要判「配置副本陈旧了就停手」，而它够不着这两份 api 属主实现。析出的是一个**无状态工厂**：
+给定「一个新鲜度事实源（可为空）」+「本进程的闸门镜像键清单」，产出停手闸的四个方法，
+连同两条 fail-safe 策略（**未安装事实源 → fresh**：那种情形下根本不存在跨进程副本，镜像与库在同一次写入路径上，
+语义上就是权威本身；**事实源抛错 → 按 stale 收敛**：查询口在热路径上必须永不抛，而不敢断言新鲜时应偏向停手）。
+零 IO、零定时器、零 SQL、零模块级可变状态，`KERNEL_ADMISSION_CHECKS` 的真正则实跑通过。
+两份 api 文件保留属主并改为调用该工厂，**行为逐位不变、7 个 api 消费方一行不改**；
+ambient 槽位仍留 `config-mirror-freshness.ts`（它正是不能进 kernel 的那一部分）。
+
+**镜像键清单刻意按进程各自给、不做成共享常量**：拆进程后各进程持有的镜像本来就是不同子集
+（单体 15 处集中在一个进程，三等分后各自只有自己那部分），"两边不一致"在这里不是漂移、是事实。
+
+**`src/config/mirror-refresher.ts` 不在本次裁决范围内，保持 api**：它是 `config_mirror_stale_refusal`
+（本文档 §5 已判 api 单写）的唯一写入方。**由此带出一个必须显式登记的缺口**：自动化进程调
+`noteStaleRefusal` 时，那条按小时聚合的拒绝计数落在 api 属主表上，跨进程后**要么经已有通道过去、
+要么如实缺席**，MUST NOT 让它变成"记了但没人收"。它是可观测性、不是判定，故不阻塞停手本身，
+但按本仓「可观测性缺口要按链路每一跳补」的口径，接线时要当场给出结论。
+
 **kernel 花名册增量（change `lift-shared-contracts-to-kernel`，实测于 `aidcp-cloud@2a1905b`）**：本刀把 4 个**纯共享契约**文件经 `git mv` 抬进 kernel（各自本就是独立文件、满足本节下方「kernel 成员新增」三条通道 + §6.4 准入五条 + AC-BOUND-03 逐条断言），**kernel 花名册 4 → 8**（下方 line 482 的 4 文件 251 行名单相应扩为 8 文件 1186 行）：
 - `src/kernel/soul-types.ts`（119，原 `src/soul/types.ts`，消 16 条跨边界 import）；
 - `src/kernel/interaction-types.ts`（726，原 `src/interactions/types.ts`，消 9 条）；

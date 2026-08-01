@@ -68,7 +68,36 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > 取消（`remaining_cancelled_by_user`）、不点则停在 `awaiting_confirmation` **不自作主张往下走**。
 > 卡在这里这么久的原因是**两个错叠在一起**，都已处置，见 §5 那段说明。
 
-> **2026-08-01 批 B（接手请以这一组为准）**：automation `4d3fb89`，其余五仓未动
+> **2026-08-01 配置副本停手闸析出（接手请以这一组为准，六仓全动了）**：
+> cloud `391f77d` / kernel `6599b80` / transport `f11d9b6` / api `0ffac97` / content `70723b5` /
+> automation `ce95c9b`；控制仓见下。**pin 链已按 kernel → transport → 三个业务仓抬完，六仓对账零漂移。**
+> 测试：cloud 4059 / api 499 / content 441 / automation 1997 / kernel 66 / transport 36，全 0 fail；
+> cloud acceptance 184/184。
+>
+> **这是本 change 第一次改动事实源文档**（定稿 §4.7）。它结掉的是那条挂了很久的
+> 「【待定稿裁决】② 四个文件判据两可、已按最保守暂判 api」里的两个配置镜像文件。
+> **⇒ 不是推翻一条深思熟虑的裁定，是把一条一直挂着的临时判做完。**
+>
+> **裁决的形状（用户选路线 A，实读后只有「析出纯段」那一支成立）**：
+> 那两份 api 文件**留 api 是对的**——新鲜度查询口有 7 个 api 属主消费方直接 import，
+> 整份挪走当场造 7 条跨域边；停手判据依赖 api 属主的镜像描述表。
+> 挡住它们整份进 kernel 的东西也很具体：前者有模块级可变单例，后者依赖那张描述表。
+> **进 kernel 的只有「给定事实源 + 闸门键清单 → 四个方法」这一段。**
+>
+> **⚠️ 第 3 步还没做，别以为批 C 的镜像那半通了**：自动化侧**还没建自己的闸**。
+> 它缺的不是工厂（工厂已经在包里了），**是事实源** —— 本进程要有自己的镜像新鲜度来源，
+> 而刷新器留在 api（它是那张按小时聚合的拒绝计数表的唯一写入方）。
+> 批 B 留下的 `mirrorStale` 必填口**仍然是空的、仍然是编译期可见的**。
+>
+> **连带一个必须当场给结论的缺口**：`noteStaleRefusal` 落的是 api 属主表，跨进程后
+> 要么经已有通道过去、要么如实缺席，**MUST NOT 变成「记了但没人收」**。
+>
+> **两条别顺手做的**：① automation 那份 `kernel-non-members.json` 是 57 条 vs 单体 106 条的
+> **既有分叉**（已登记 0.7c），与本次无关，"对齐"它正是 §8.2 禁的整体重序列化；
+> ② 三个业务仓的 `ownership-rules.json` **不需要**加这条 —— kernel 文件不派生进业务仓，
+> 它们的生成器按本仓实际文件收窄。
+>
+> **2026-08-01 批 B**：automation `4d3fb89`，其余五仓未动
 > （cloud `f83e266` / api `3a75b0e` / content `f290a3c` / kernel `ac98a30` / transport `40df6de`）。
 > automation typecheck 干净、acceptance 103/103、全量 1997 pass / 0 fail；六仓对账零漂移。
 > **门仍 11**（第 3 段全程都会是 11，它等的是第 4 段）。
