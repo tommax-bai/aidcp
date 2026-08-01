@@ -195,6 +195,9 @@ DERIVED_COMPOSITION = {
         # 发布下发与陪伴界面的装配（批 F）：界面快照层 / 当日用量 / 浏览器待机提示 /
         # 发布下发器 / 定时发布对账器 / 下发触发受理口。同为组装根内联段的落点。
         'src/automation-publish-dispatch.ts',
+        # 每连接运行时的装配（批 E 前半）：连接运行时注册表 / 互动去重守卫 / 动作冷却兜底闸。
+        # 每连接角色调度器工厂是必填注入口，由批 E 后半供。同为组装根内联段的落点。
+        'src/automation-connection-runtime.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'

@@ -41,9 +41,9 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > **2026-08-01 夜 · 现状（这一段是当前事实，读它就够；逐批沿革移到文末 §10）**
 >
 > **六仓**：cloud `534af19` / kernel `27cbfc5` / transport `e1499fc` / api `5f969ed` /
-> content `d68ee85` / automation `613338a`；控制仓见 `git log`。
+> content `d68ee85` / automation `ac09a7f`；控制仓见 `git log`。
 > 共享包 pin 已按 kernel → transport → 三个业务仓抬完，六仓 pin 全对齐、**对账零漂移**。
-> **测试**：cloud 4064 / api 501 / content 441 / automation 2032 / kernel 70 / transport 36，全 0 fail。
+> **测试**：cloud 4064 / api 501 / content 441 / automation 2040 / kernel 70 / transport 36，全 0 fail。
 > **门 11 条**（运营指令 3 / 内容 7 / 组装 1）。**tasks.md 76/128。**
 >
 > **门为什么不动**：整个第 3 段它都会停在 11。撤条判据写在 automation 台账自己的 docblock 里
@@ -60,7 +60,9 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > | C | 大半 | 配置副本停手闸（`089e2cc`）+ 记账漏斗与 outbox 保留期（`6958e55`）；**剩三件**见下 |
 > | D | ✅ | 出口闸放行判定析出 kernel（`8d62dca`）+ 边缘接入正文（`ff44774`，`src/automation-edge-access.ts`） |
 > | F | ✅ | 发布下发与陪伴界面（`613338a`，`src/automation-publish-dispatch.ts`） |
-> | E / G / H | ⬜ | 未开工 |
+> | E-1 | ✅ | 每连接运行时注册表 + 冷却闸 + 互动守卫（`ac09a7f`，`src/automation-connection-runtime.ts`） |
+> | E-2 | ⬜ | **每连接角色调度器工厂**（整段最密的一处，见下） |
+> | G / H | ⬜ | 未开工 |
 >
 > **形态在批 B 定下来了，后面每批照做**：写成**可单测的工厂**，不写进 `main()`。
 > 写进去就只能等 3.1，而这些装配本身与 `main()` 无关。最后 `main()` 只是把它们串起来。
@@ -68,10 +70,12 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > ### 下一步（按依赖）
 >
-> 1. **批 E**（每连接运行时）。**它现在是第 3 段的关键路径**：批 D 与批 F 各留了必填口等它，
->    而批 G 的调度器又依赖它。**别低估体量** —— 实测它是整段最密的一块：
->    每连接调度器工厂一个函数就 400 余行，读写二十来个存储 / 配置 / 策略，
->    其中相当一部分的供给方要到批 G 才有。开工前先按批 D/F 的办法把「批 G 才有的」列成必填口。
+> 1. **批 E 后半：每连接角色调度器工厂**。前半（注册表）已落，批 D / 批 F 那两个必填口**已经填上**。
+>    剩下的这一件是整段最密的一处：一个函数 400 余行，读写二十来个存储 / 配置 / 策略，
+>    **其中相当一部分的供给方要到批 G 才有**。
+>    开工办法与前面几批一致：先把「批 G 才有的」逐个列成必填注入口，让编译器逼批 G 面对；
+>    本批只装配调度器自己那几件。它今天是 `automation-connection-runtime.ts` 里
+>    `buildDispatcher` 那个必填口 —— 不接，连接建得起来、握手也过，但永远不开始浏览。
 > 2. **批 C 剩的三件**（不阻塞 E）：面板事件投递客户端、配置面审计中继
 >    （**写的是接口属主表，跨进程后 MUST 走已有通道、别直连**）、风控指令消费者接线。
 >
@@ -82,7 +86,7 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > | 口 | 谁供 | 单体里对应什么 |
 > | --- | --- | --- |
-> | `runtime`（`busFor` / `onHandshake` / `controllerForSession` / `onDisconnect` / `onWelcomed` + 批 F 追加的 `sessionUsageForAccount` / `resumeGateForAccount`） | 批 E | `ctx.runtimes!` —— **那个 `!` 在本进程不成立**；后两个在单体里是 `?? null`，那条回落在本进程是常态 |
+> | `runtime`（`busFor` / `onHandshake` / `controllerForSession` / `onDisconnect` / `onWelcomed` + 批 F 追加的 `sessionUsageForAccount` / `resumeGateForAccount`） | ~~批 E~~ ✅ 已供（E-1） | `ctx.runtimes!` —— **那个 `!` 在本进程不成立**；后两个在单体里是 `?? null`，那条回落在本进程是常态 |
 > | `uiSnapshot`（`pushHelloSnapshot`） | ~~批 F~~ ✅ 已供 | `ctx.uiSnapshot?.pushHelloSnapshot` |
 > | `interaction`（**二态**：`wired` 带 port / `unavailable` 带具名理由） | 批 B/G | 收件箱 + 运行时开关 + 握手后恢复编排 |
 >
@@ -726,7 +730,7 @@ kernel 头一动，transport 与三个业务仓的 pin 全部作废，整条链�
 | ~~**B**~~ ✅ | 风控单写者 + 告警/指标底座 | `Block④ 三仓提取 · 批次 0d` → `自动化写者锁` | ~720 行 | A |
 | ~~**C**~~ 大半 | outbox 中继 + 配置镜像刷新 | `Block② 2e：拆段传输接线`、`event_outbox 保留期`、`记账 outbox + worker + 对账`、`配置面审计中继` | ~640 行 | B |
 | ~~**D**~~ ✅ | 边缘接入（含边-云服务端） | `配置镜像刷新器接线` 后半 + `多租户连接运行时` 前半 | ~550 行 | C |
-| **E** | 每连接运行时（总线 + 角色调度器） | `按连接多租户编排`、`精选准入文字卡识别/转写` | ~620 行 | D |
+| **E-1** ✅ / **E-2** ⬜ | 每连接运行时（总线 + 角色调度器） | `按连接多租户编排`、`精选准入文字卡识别/转写` | ~620 行 | D |
 | ~~**F**~~ ✅ | 发布下发 | `发布下发段` | ~624 行 | D、B |
 | **G** | 各类调度器 | `Facebook 定向评论…`、`内容排期调度器` 前半 | ~500 行 | E、F |
 | **H** | 导出面收口 → 交给第 4 段 | `内容排期调度器` 尾部那 28 条赋值 | ~200 行 | 全部 |
@@ -779,12 +783,25 @@ kernel 头一动，transport 与三个业务仓的 pin 全部作废，整条链�
 - **多装了三样单体里在别处的东西**，因为本进程里除处理器外无人消费它们：
   规划器、锚点缓存、节奏兜底配置（后两者 init 失败各自具名退化、不阻塞装配）。
 
-**批 E · 每连接运行时（浏览闭环真正跑起来的一批）**
-连接运行时注册表、动作冷却闸、互动守卫注册表、每连接私有事件总线与角色调度器。
+**批 E · 每连接运行时（浏览闭环真正跑起来的一批）—— 已切成两半**
+
+**~~E-1 · 注册表与两道闸~~ ✅ 已做完**（automation `ac09a7f`，落点 `src/automation-connection-runtime.ts`）
+连接运行时注册表、动作冷却兜底闸、互动去重守卫注册表。
+**它交付的正是批 D 与批 F 都在等的那个口**，那两批的必填口至此已填上。
+三处与原计划不同，按实际的读：
+- **切两半是实读后的决定，不是偷懒**：注册表自洽、约 200 行；调度器工厂一个函数 400 余行，
+  且相当一部分依赖的供给方要到批 G 才有。一次搬完必然停在编不过的中间态。
+- **调度器工厂做成必填注入口**，后半缺席是编译期可见的（同批 B 留给批 C 的办法）。
+  变异实测：改成可选后 7 条行为用例全绿、只有那条结构断言红 ——
+  「后半还没接」与「这个账号今天没排期」在行为上完全同形。
+- **账号平台的回落写在装配层，不写进属主口**：属主口如实答 `null`，
+  「不知道」与「就是小红书」在那一层必须分得开；别名归一取共用那一份，本仓不另写映射表。
+
+**E-2 · 每连接角色调度器工厂 ⬜ 未开工**
 **它是前面所有内容通道第一次被真的消费的地方**——概念池、精选、转写、回复生成
 那 4 条到这一批才有调用方。
-**踩点**：注册表要三样东西——控制器解析（批 B）、调度器工厂、关连接（批 D）。
-角色人设注入 MUST 走取值口而不是快照（构造期检查已在，漏传会当场抛）。
+**踩点**：角色人设注入 MUST 走取值口而不是快照（构造期检查已在，漏传会当场抛）。
+开工前先把「批 G 才有的」逐个列成必填注入口，让编译器逼批 G 面对。
 
 **~~批 F · 发布下发~~ ✅ 已做完**（automation `613338a`，落点 `src/automation-publish-dispatch.ts`）
 **三处与原计划不同，按实际的读：**
