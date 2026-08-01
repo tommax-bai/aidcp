@@ -1,12 +1,13 @@
 # `add-managed-automation-runtime` 下一 session 交接
 
-> 快照时间：**2026-07-30 17:36 +0800**。
+> 最近更新：**2026-08-01 18:51 +0800**（Cloud feature 已 rebase 最新主干并完成全量验证）。
 >
 > 这份文档用于继续现有 change 和两个现有 worktree。接手后先重跑 §0 的只读核查，
 > 不要把本文的 SHA、ahead/behind 或测试数字当成不会变化的事实。
 >
 > **当前边界不是“整个 change 已完成”**。Qoder 任务板所称“期 1 完成”表示第一批源码骨架和
-> 测试已形成 11 个 Cloud 提交；OpenSpec 的真实进度是 **3/111**，没有集成、推送或部署。
+> 测试已形成 11 个 Cloud 提交；OpenSpec 的真实进度是 **3/111**。feature 已同步并推送，
+> 但仍未合并到 `master`、未部署，生产 worker 也未接线。
 
 ---
 
@@ -41,13 +42,13 @@ sed -n '1,220p' openspec/changes/add-managed-automation-runtime/tasks.md
 for spec in openspec/changes/add-managed-automation-runtime/specs/*/spec.md; do
   sed -n '1,260p' "$spec"
 done
-sed -n '1,360p' openspec/changes/add-managed-automation-runtime/HANDOFF.md
+sed -n '1,500p' openspec/changes/add-managed-automation-runtime/HANDOFF.md
 ```
 
 注意：
 
-- canonical control repo 当前有用户文件
-  `tmp/add-managed-automation-runtime-cloud.diff`，不要删除、清理或覆盖。
+- canonical control repo 当前有用户修改
+  `openspec/changes/native-page-engine-production-cutover/tasks.md`，不要删除、清理或覆盖。
 - zsh 中不要把循环变量命名成 `path`；`path` 是 zsh 的特殊数组，会破坏 `PATH`，使循环里的
   `git` 变成 `command not found`。
 - 后续开发继续使用现有两个 worktree；不要在 canonical `main`/`master` 上直接开发。
@@ -85,15 +86,14 @@ sed -n '1,360p' openspec/changes/add-managed-automation-runtime/HANDOFF.md
 
 | 仓库/位置 | 分支与 HEAD | 快照状态 |
 | --- | --- | --- |
-| canonical control `/Users/baitianxing/codes/aidcp` | `main@747bc2e3` | 跟踪 `origin/main`；存在用户未跟踪 diff 文件，须保留 |
-| control worktree `/Users/baitianxing/codes/aidcp.wt/add-managed-automation-runtime` | `codex/add-managed-automation-runtime@b5e71b2b` | 干净；比远端同名分支 ahead 2 |
-| canonical Cloud `/Users/baitianxing/codes/aidcp-cloud` | `master@843bac61` | 跟踪 `origin/master`，未承载本 change 代码 |
-| Cloud worktree `/Users/baitianxing/codes/aidcp-cloud.wt/add-managed-automation-runtime` | `codex/add-managed-automation-runtime@db11692f` | 干净；相对 `origin/master` ahead 11、behind 5 |
+| canonical control `/Users/baitianxing/codes/aidcp` | `main@ae9b84f1` | 跟踪 `origin/main`；存在上面的用户修改，须保留 |
+| control worktree `/Users/baitianxing/codes/aidcp.wt/add-managed-automation-runtime` | `codex/add-managed-automation-runtime` | 本文与 task 证据所在分支；推送后应与远端同名分支对齐 |
+| canonical Cloud `/Users/baitianxing/codes/aidcp-cloud` | `master@534af192` | 跟踪 `origin/master`，未承载本 change 代码 |
+| Cloud worktree `/Users/baitianxing/codes/aidcp-cloud.wt/add-managed-automation-runtime` | `codex/add-managed-automation-runtime@4a921dc7` | 干净；已 rebase `origin/master@534af192`，ahead 11、behind 0 |
 
 截至快照：
 
-- Cloud 远端没有 `refs/heads/codex/add-managed-automation-runtime`；11 个 Cloud 提交仅在本地。
-- control 的 `d5785d58`、`b5e71b2b` 也尚未推送。
+- Cloud 与 control 的同名 feature branch 均已推送；后续禁止 force-push。
 - 没有 Edge、Console 实现提交。
 - 没有 merge 到 `main/master`。
 - 没有 DEV/OL 部署；更没有 Edge 安装包或客户端发布。
@@ -118,22 +118,22 @@ OpenSpec 条目已经完成。
 
 | SHA | 内容 |
 | --- | --- |
-| `9182968` | 冻结 contracts 与旧状态映射 |
-| `28bbfae` | migrations 0099–0102、8 张核心表、typed stores |
-| `0cde61b` | 线性 PlanCompiler、StepExecutor、TaskRunWorker 骨架 |
-| `0ec53d5` | `session.mode` 登记及 task-mode 调度排除 |
-| `9ca945a` | Create/Cancel/Query service、内部 HTTP 与组合根入口 |
-| `c5dd822` | Create/Cancel/Query service/transport tests |
-| `8b48f02` | `persona.research@1` 只读 TaskDefinition/Capability registry |
-| `de2fa75` | `ResearchStepExecutor` 与 `EdgeDispatchPort` |
-| `e40e00b` | registry 和 account binding 接到 CreateTask 组合根 |
-| `c1f4523` | 只读研究纵切 E2E 测试和 boundaries 登记 |
-| `db11692` | 默认关闭 API 时的启动日志由 warn 降为 info |
+| `1b1e590` | 冻结 contracts 与旧状态映射 |
+| `6ab3a8a` | migrations 0106–0109、8 张核心表、typed stores |
+| `791c2d1` | 线性 PlanCompiler、StepExecutor、TaskRunWorker 骨架 |
+| `19d5445` | `session.mode` 登记及 task-mode 调度排除 |
+| `89e203c` | Create/Cancel/Query service、内部 HTTP 与组合根入口 |
+| `0afda67` | Create/Cancel/Query service/transport tests |
+| `696ca1e` | `persona.research@1` 只读 TaskDefinition/Capability registry |
+| `afe243e` | `ResearchStepExecutor` 与 `EdgeDispatchPort` |
+| `ae2d484` | registry 和 account binding 接到 CreateTask 组合根 |
+| `bfe373c` | 只读研究纵切 E2E 测试和 boundaries 登记 |
+| `4a921dc` | 默认关闭 API 时的启动日志由 warn 降为 info |
 
 相对该 feature branch 与 `origin/master` 的 merge base，本批快照为：
 
 ```text
-65 files changed, 9310 insertions(+), 8 deletions(-)
+63 files changed, 9310 insertions(+), 8 deletions(-)
 ```
 
 Qoder 对话中显示的“15 个文件、+1527”只对应最早的 contracts 提交，不是整批最终规模。
@@ -210,21 +210,25 @@ review: 3-way review, 0 blocker / 0 major
 - lease takeover
 - execution-target isolation
 
-当前交接 session 额外重跑并确认：
+2026-08-01 rebase 后额外重跑并确认：
 
 ```text
+typecheck: 0
+focused: 72/72
+acceptance: 184/184
+full: 4159 discovered / 4144 passed / 0 failed / 15 skipped
 openspec validate add-managed-automation-runtime --strict
 => Change 'add-managed-automation-runtime' is valid
 ```
 
-当前 session 没有重复启动 Cloud 全量测试，也没有运行 DEV 数据库集成或真实账号 probe。
-分支 rebase 后，旧测试结果不能继续作为新 HEAD 的验证证据，必须重跑。
+15 个 skip 中仍包含需要 PostgreSQL 或显式环境的 gated 测试；4 个 managed-automation PG cases
+没有在本机执行。没有运行 DEV 数据库集成或真实账号 probe，不能把源码绿色外推成运行时绿色。
 
 ---
 
-## 6. 最高优先级集成阻塞
+## 6. 主干同步结果（原阻塞已解决）
 
-### 6.1 迁移编号已经冲突
+### 6.1 迁移编号冲突已经解决
 
 feature branch 基于旧 `master` 使用：
 
@@ -235,15 +239,19 @@ feature branch 基于旧 `master` 使用：
 0102_managed_automation_decision_traces
 ```
 
-但新的 `origin/master@843bac61` 已经增加：
+2026-08-01 fetch 后，`origin/master@534af192` 已包含 0099–0105；本 change 已 rebase，
+四个迁移顺延为：
 
 ```text
-0099_operator_command_receipt
+0106_managed_automation_task_authority
+0107_managed_automation_run_state
+0108_managed_automation_execution_ledger
+0109_managed_automation_decision_traces
 ```
 
-因此下一 session **不得直接合并后继续开发**。先 fetch 最新 `master`，计算当前最大迁移号，
-再把本 change 的四个 migration 连续重编号。若 `master` 仍以 0099 结尾，目标应为
-0100–0103；若 fleet 又有新迁移，则从新的最大号之后开始，不能照抄本文数字。
+`KNOWN_MAX_SCHEMA_VERSION=0109_managed_automation_decision_traces`；
+`REQUIRED_SCHEMA_VERSION` 保持主干 `0105_facebook_primary_browse_surface`，因为 managed-automation
+API/worker 默认关闭且 stores 自带精确 schema probe，不把未启用能力变成现役启动硬依赖。
 
 重编号必须同步更新所有事实引用，包括但不限于：
 
@@ -254,17 +262,17 @@ feature branch 基于旧 `master` 使用：
 - `test/schema/sync-read-checkpoint-migration.test.ts`
 - `test/managed-automation/stores-unit.test.ts`
 - `test/managed-automation/stores-pg.integration.test.ts`
-- 其他 `0099–0102` 注释、断言和文档
+- 其他迁移号注释、断言和文档
 
 用下面的命令找全，不能只改文件名：
 
 ```bash
 cd /Users/baitianxing/codes/aidcp-cloud.wt/add-managed-automation-runtime
-rg -n '0099|0100|0101|0102|KNOWN_MAX_SCHEMA_VERSION|REQUIRED_SCHEMA_VERSION' \
+rg -n '0106|0107|0108|0109|KNOWN_MAX_SCHEMA_VERSION|REQUIRED_SCHEMA_VERSION' \
   src test scripts migrations boundaries
 ```
 
-### 6.2 rebase 存在真实文本冲突和热点重叠
+### 6.2 rebase 文本冲突已经解决
 
 快照时两边共同改动 9 个文件：
 
@@ -280,10 +288,12 @@ src/server.ts
 test/schema/sync-read-checkpoint-migration.test.ts
 ```
 
-只读 `git merge-tree` 已确认至少 4 个会产生文本冲突：
+实际 rebase 解决了 6 个文本冲突：
 
 ```text
+boundaries/import-exemptions.json
 boundaries/table-ownership.json
+boundaries/table-write-exemptions.json
 scripts/db-split/owner-tables.automation.txt
 src/schema/schema-contract.ts
 test/schema/sync-read-checkpoint-migration.test.ts
@@ -304,17 +314,14 @@ test/schema/sync-read-checkpoint-migration.test.ts
 
 ## 7. 下一 session 建议任务顺序
 
-### 任务 A：准入、刷新与 rebase
+### 任务 A：准入、刷新与 rebase（2026-08-01 已完成）
 
-1. 跑 §0。
-2. fetch Cloud `origin/master`，记录新的 merge base/ahead/behind。
-3. 在现有 Cloud feature branch 上 rebase 最新 `origin/master`。
-4. 按 §6 重编号 migration、解四个文本冲突、人工审 9 个热点文件。
-5. 不要修改 canonical `master`，不要 force-push。
+结果：Cloud feature 已基于 `origin/master@534af192` 重放 11 个提交，ahead 11、behind 0；
+迁移号为 0106–0109，6 个文本冲突已按两边语义合并，canonical `master` 未修改。
 
-### 任务 B：rebase 后统一验证
+### 任务 B：rebase 后统一验证（2026-08-01 已完成）
 
-先跑 focused，再扩到 acceptance/full：
+已按 focused → acceptance/full 的顺序运行，结果见 §5。复跑命令：
 
 ```bash
 cd /Users/baitianxing/codes/aidcp-cloud.wt/add-managed-automation-runtime
@@ -415,15 +422,12 @@ openspec validate add-managed-automation-runtime --strict
 - control: /Users/baitianxing/codes/aidcp.wt/add-managed-automation-runtime
 - cloud: /Users/baitianxing/codes/aidcp-cloud.wt/add-managed-automation-runtime
 
-不要切 canonical 分支，不要清理用户文件，不要新建同名 worktree。第一优先级不是新增功能，
-而是 fetch/rebase 最新 origin/master，解决 master 的 0099_operator_command_receipt 与本 change
-0099–0102 的迁移编号冲突。以 fetch 后真实最大迁移号为准连续重编号，并更新 schema constant、
-store sinceVersion、ownership、tests 和所有引用。git merge-tree 已知至少四个文本冲突：
-table-ownership.json、owner-tables.automation.txt、schema-contract.ts、
-sync-read-checkpoint-migration.test.ts；server.ts 等 9 个热点文件必须人工语义复核。
+不要切 canonical 分支，不要清理用户文件，不要新建同名 worktree。2026-08-01 已把 Cloud feature
+rebase 到 origin/master@534af192，迁移已从旧 0099–0102 顺延为 0106–0109，验证为
+typecheck 0、focused 72/72、acceptance 184/184、full 4144 pass / 0 fail / 15 skip。
+接手仍须先 fetch 并检查是否出现新 drift；若主干又前进，按同样规则 rebase，不产生 merge commit。
 
-rebase 后依次跑 managed-automation focused tests、acceptance、full tests、typecheck 和 OpenSpec strict。
-本机没有 PG 时必须如实记录 4 个 PG tests 未运行。当前 TaskRunWorker、
+本机没有 PG 时必须如实记录 4 个 managed-automation PG cases 未运行。当前 TaskRunWorker、
 ResearchStepExecutor、CommEdgeDispatchAdapter 尚未进入生产 server 组合根，研究纵切只是源码/测试闭环，
 不是已部署/真实 Edge 闭环；在补齐运行时接线或明确延期前，不得宣称期 1 可运行。
 
@@ -435,6 +439,6 @@ ResearchStepExecutor、CommEdgeDispatchAdapter 尚未进入生产 server 组合�
 
 ## 9. 一句话状态
 
-**方向已经定稿，第一批地基代码已经在隔离 worktree 的本地 feature branch 成形并有测试证据；
-但它落后 master、迁移号冲突、尚未推送/集成/部署，生产 worker 也未接线。下一 session 应先完成
-rebase 与迁移重编号，再决定是否把只读研究从测试纵切补成真实运行时纵切。**
+**方向已经定稿，第一批地基代码已在隔离 worktree 的 feature branch 成形、同步最新 master、
+解决迁移冲突并通过源码门禁；但仍未合并/部署，生产 worker 也未接线。下一步是决定并补齐
+只读研究的生产运行时闭环，而不是继续重复主干同步工作。**
