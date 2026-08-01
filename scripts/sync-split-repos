@@ -189,6 +189,9 @@ DERIVED_COMPOSITION = {
         'src/automation-config-mirror-gate.ts',
         # 风控记账漏斗与 outbox 保留期（批 C 记账半）。同为组装根内联段的落点。
         'src/automation-risk-accounting.ts',
+        # 边缘接入的装配（批 D）：验证码协助与协调 / 指令定序器 / 边缘任务租约客户端 /
+        # 消息处理器 / 边-云 WebSocket 服务端。Cloud 里同为组装根内联段，无同名文件。
+        'src/automation-edge-access.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'
