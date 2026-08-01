@@ -27,7 +27,17 @@
 - [x] 3.1 确定提交窗口标签与预算的单一事实源（宿主侧常量或命令清单产物二选一），删除另一侧的独立数字声明 <!-- aidcp-edge 74eaf41 事实源定为宿主 client.ts 的 NATIVE_COMMIT_WINDOW_BUDGETS；引擎侧降为「标签+镜像数字、运行期不作数」，新增机械对账用例：单边改一个数字仓库检查当场失败 -->
   - 决策记录（2026-07-29）：事实源选宿主常量而非清单产物，直接原因见 1.3 的跨 change 依赖——清单产物的摘要被 Electron 侧常量反向绑定，本 change 动不了。
   - 该表同时是**准入名单**：标签不在表内即拒发窗口。并行流在 b57d619 接上的五条小红书窗口请求，其标签在本提交内一并加入（`xhs_comment_submit`=4000 / `xhs_notification_comments`=20000 / `xhs_notification_likes`=20000 / `xhs_notification_follows`=20000 / `xhs_publish_submit`=15000）；对账用例同批扩到**同时读两份引擎源**（`facebook/capability.rs` + `commit_window.rs`），只读一份会让另一份完全没有闸。
-- [ ] 3.2 改造引擎侧：按标签请求窗口，不再随请求发出自写的预算数字（`native/page-engine/src/facebook/capability.rs` 的 `JOIN_WINDOW` / `COMMENT_WINDOW` / `PUBLISH_WINDOW`）
+- [x] 3.2 改造引擎侧：按标签请求窗口，不再随请求发出自写的预算数字
+  - <!-- aidcp-edge (见集成后 sha) 引擎侧三个窗口常量的数字已删，线路上只剩标签；宿主 `client.ts` 的请求类型改为不含预算，按标签发放后再组装成带预算的形状——「谁说了算」因此在类型上就看得见。兼容性两个方向都不破（旧宿主收不到字段按自己的表发放，新宿主忽略旧引擎带的字段），故不动协议版本。 -->
+  - **具名能力去除（如实登记，非遗漏）**：本条同时去掉了「引擎可以要一个**更短**的写保护窗口」这个能力。
+    旧设计是宿主取 `min(引擎请求, 事实源)`，注释明写「引擎可以要更短，不能要更长」。
+    3.2 要求线路上不再有引擎自写的数字 —— 两者**物理上不可兼得**。
+    - **生产影响为零，且这是可核的而非假设的**：引擎原来发的三个数字（27750 / 30000 / 30000）
+      与宿主表里的三个**逐字一致**，所以取 min 与按标签发放对每个已存在的标签都返回同一个数。
+      测试夹具里那个 18500 是**刻意造的差异值**，只为让 min 这条路可观测。
+    - **是全量 TypeScript 测试抓出来的**：假引擎当时还在发那个字段、用例还在断言旧语义。
+      **`gate:native` 与 `test:acceptance` 都覆盖不到这条** —— 记下来，别把全量测试当可跳过的。
+（`native/page-engine/src/facebook/capability.rs` 的 `JOIN_WINDOW` / `COMMENT_WINDOW` / `PUBLISH_WINDOW`）
   - 偏离说明（2026-07-29）：**本轮只做到「宿主权威 + 引擎数字不作数 + 机械对账防漂」，线路上的 `budget_ms` 字段仍在**（现语义已从「声明」降为「请求值」，宿主按 `min(请求, 事实源)` 授予）。物理删除该字段要同时改 `commit_window.rs` 的请求结构、`protocol.rs` 的 `CommitWindowRequestRecord`、`main.rs` 的记录构造、`facebook/shared.rs` 的取用点——四个文件本轮均在其他并行流的单写区，未触碰。
 - [x] 3.3 改造宿主侧 `src/native-page-engine/client.ts`：以事实源为准给出预算并保留上限约束，取消对引擎自报预算的相等断言 <!-- aidcp-edge 74eaf41 parseCommitWindowRequest 只做结构校验；新增 grantCommitWindowBudget(label, requested)：标签不认识回 undefined，认识则授 min(requested, 事实源)，缺失/非法按事实源授；下发给窗口守卫的是授予值 -->
 - [x] 3.4 把「标签未知 / 预算不符事实源」的运行期处理从 `failProtocol` + `terminate()` 改为可归因的、绑定当前命令的契约违规结论，引擎进程不再被整体终止 <!-- aidcp-edge 74eaf41 新增 rejectCommitWindowContract：先发 accepted:false 否决这一次窗口（不可逆动作不会被按下），再把 commit_window_unavailable / effectPhase=not_started / reasonCode=commit_window_label_unknown 绑到当前命令；结构性坏记录仍走 failProtocol（那时连是哪条命令都读不出来） -->

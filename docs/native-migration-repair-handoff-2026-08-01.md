@@ -183,8 +183,13 @@
   `codex/<change-name>`，集成脚本按不带前缀的名字找，会报「分支不存在」。
   **但它此时已经做完 rebase 了** —— 手动收尾即可：确认 `git merge-base --is-ancestor origin/master HEAD`，
   再 `git push origin HEAD:master`，然后同步主 checkout。
-- ★ **全量 `npm test` 会卡。** 本轮跑了半小时未完（正常几分钟）。类型检查 + `gate:native` + `test:acceptance`
-  已能覆盖安全红线，卡住时别干等。
+- ★ **全量 `npm test` 很慢（本机十几分钟起），但 MUST NOT 因此跳过。**
+  本轮它抓到了一条**只有它能抓到**的失败：3.2 把预算字段从开窗请求上拿掉后，
+  假引擎还在发那个字段、用例还在断言旧的 `min(请求, 事实源)` 语义。
+  **`gate:native`（Rust 侧）与 `test:acceptance` 都覆盖不到这条。**
+  - **诊断姿势**：别用 `npm test | tail`——管道要等进程结束才吐，看着像卡死。
+    `npm test > /tmp/x.log 2>&1` 落盘再看，能实时看到跑到哪、有没有 `✖`。
+  - 单文件跑很快（十几秒到一分钟），定位到嫌疑文件后直接点名跑。
 - **Rust 变异检验要确认 `Compiling`**（见 1.3）。
 - **台账行号普遍已漂**，一律按符号名定位；本文件给的行号同样是快照。
 - **`land-change` 会跑 `gate:native`**，格式检查不过就不给合并。改 Rust 前先 `cargo fmt`。
