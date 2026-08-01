@@ -30,13 +30,20 @@
 - [x] 4.2 Run Edge focused acceptance, full tests, typecheck, Native Rust tests/Clippy, and Native/package-input verification; record the installer and real-account validation boundary.
 - [x] 4.3 Run `openspec validate platform-specific-identity-commands --strict` and update all completed task evidence.
 - [x] 4.4 Commit, rebase, fast-forward integrate, and push control/Edge/Cloud changes through their eligible default branches without force.
-- [ ] 4.5 Deploy the integrated Cloud default branch to DEV only, verify service/listener/health/Feishu/PostgreSQL, and report that installed Edge clients remain unchanged until a separate package/release.
-  <!-- 2026-08-01 23:xx 实测：**尝试过，主干在 dev 上起不来，本条仍不勾。** -->
-  - 云端主干 `a0ee197` 启动即失败在同步读自举上（`facebook_operation_policy` 这条新流：
-    名单没跟上 → 载荷键集不匹配 → DB 检查点表的 stream CHECK 约束根本不接受这个值）。
-    **失败形态要记住：进程 `active`、日志在滚，但 8787 / 8090 从未监听** —— 闸在 `server.start()` 之前。
-  - dev 已回滚到 `534af19`（批 E-2 之前）保服务，现健康。**本条要等主干能起来**，
-    因为它要求的是「部署已集成的主干」，回滚版不满足。
-  - 完整时间线与根因分析见 `docs/handoff-2026-08-02-round9.md` §1。
+- [x] 4.5 Deploy the integrated Cloud default branch to DEV only, verify service/listener/health/Feishu/PostgreSQL, and report that installed Edge clients remain unchanged until a separate package/release.
+  <!-- 2026-08-01 23:48 dev 已跑主干头 `aidcp-cloud c0de08b` 并逐项验过。
+       **部署动作不是本 change 做的**——是 `split-cloud-automation-production-runtime` 那条流部的；
+       本条勾的是「已部署 + 健康检查逐项通过」，如实记清是谁部的。 -->
+  - **逐项实测**：服务 `active`、`NRestarts=0`；**8787 与 127.0.0.1:8090 双端口监听**；
+    外部真实 WebSocket 握手成功；飞书长连接已建立（`WSClient onReady`）；PG 锚点缓存已就绪；
+    三道 schema 契约门全过（content `0069` / automation `0106` / api `0105`）；
+    本次启动**零失败行**；同机 isales 四个服务全程 `active`、未受影响。
+  - **Edge 客户端未变**：本轮未打任何安装包、未发版，装机客户端保持原样。
+  - ⚠️ **今晚这条一度不可能完成**：主干在 dev 上连着三次启动失败（自举名单漏一条流 →
+    载荷键集多两个键 → DB 检查点表 CHECK 约束不认新流名），dev 停了约一小时。
+    属主流在 23:44–23:48 三个提交修掉（`a0ee197` / `1fa71d2` / **`c0de08b` 补迁移 0106**）。
+    **失败形态值得记住：进程 `active`、日志在滚，但端口从未监听** —— 闸在 `server.start()` 之前，
+    所以 `systemctl is-active` 在那三次里全是绿的。**healthcheck 必须验端口 + 真握手。**
+    完整时间线见 `docs/handoff-2026-08-02-round9.md`。
 
 <!-- Validation: aidcp-cloud bbe0052 and aidcp-edge 785244d passed the checks recorded above; control 0a87371 passed strict OpenSpec validation. All three feature branches were rebased, fast-forward integrated, and pushed to their eligible defaults without force; DEV delivery remains pending. -->
