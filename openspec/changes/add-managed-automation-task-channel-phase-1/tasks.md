@@ -24,11 +24,11 @@
 
 ## 4. Build the API-to-Automation task port
 
-- [ ] 4.1 Implement Automation-owned CreateTask, CancelTask, and QueryTask services with authorization revision, account scope, registry, compiler, store, and readiness checks.
+- [x] 4.1 Implement Automation-owned CreateTask, CancelTask, and QueryTask services with authorization revision, account scope, registry, compiler, store, and readiness checks. <!-- done: repo=aidcp-automation sha=e9bf456 validation="command transaction/service 10/10; combined managed/schema/boundary run 48/48 after unique-race audit; npm run typecheck 0; boundary census source=282 ownership=282 unresolved=0 forbidden=0" deployment="not deployed; no route or production root call site" deviation="Create commits Task+Revision+Plan+Run+Trace+Receipt in one owner transaction; authorization remains a narrow injected projection port for task 4.3" -->
 - [ ] 4.2 Implement authenticated, versioned, target-bound Automation routes and transport clients with stable result-unknown behavior.
 - [ ] 4.3 Implement the API owner adapter that authorizes actor/account access and calls the Automation port without constructing Automation stores or calling Edge.
 - [ ] 4.4 Add command idempotency, collision, cancellation-before/after-dispatch, cross-account query privacy, malformed response, timeout, and disabled-route tests.
-- [ ] 4.5 Add safe task/run/reason/trace query projections that exclude secrets, raw private content, hidden model inputs, and unrelated account data.
+- [x] 4.5 Add safe task/run/reason/trace query projections that exclude secrets, raw private content, hidden model inputs, and unrelated account data. <!-- done: repo=aidcp-automation sha=e9bf456 validation="query projection test proves DecisionTrace input/evidence refs and correlation/causation IDs are absent; account-scoped task lookup precedes projection" deployment="not deployed; query route remains task 4.2" -->
 
 ## 5. Build the bounded execution runtime
 

@@ -7,7 +7,7 @@ Updated: 2026-08-01 (Asia/Shanghai)
 This is the active implementation change:
 
 - Change: `add-managed-automation-task-channel-phase-1`
-- Progress: **15/39 tasks (38%)**
+- Progress: **17/39 tasks (44%)**
 - Control branch: `codex/add-managed-automation-task-channel-phase-1`
 - Control worktree: `/Users/baitianxing/codes/aidcp.wt/add-managed-automation-task-channel-phase-1`
 - Automation worktree: `/Users/baitianxing/codes/aidcp-automation.wt/add-managed-automation-task-channel-phase-1`
@@ -65,7 +65,7 @@ advanced by six documentation/handoff commits.
 | Repo | Default baseline | Feature head at handoff | Default behind feature | Feature behind default |
 |---|---|---|---:|---:|
 | `aidcp` | `origin/main@0d283679` | handoff commit on this branch | feature commits only | 0 |
-| `aidcp-automation` | `origin/master@ac09a7f` | `0a4ecbf` | 7 commits | 0 |
+| `aidcp-automation` | `origin/master@ac09a7f` | `e9bf456` | 8 commits | 0 |
 | `aidcp-kernel` | `origin/master@27cbfc5` | `34d1b94` | 1 commit | 0 |
 
 Do **not** merge the phase-one branches into defaults yet. The change is incomplete, the HTTP
@@ -106,6 +106,7 @@ The old Qoder Cloud branch remains source material only:
 | `e493afc` | typed authority/run/ledger/trace/account-lane stores |
 | `db9a224` | guarded PostgreSQL concurrency/lease/target test |
 | `0a4ecbf` | bounded immutable PlanCompiler and StepExecutor contracts |
+| `e9bf456` | Create/Cancel/Query services, atomic command unit of work, safe projections |
 
 Important store guarantees already present:
 
@@ -116,12 +117,16 @@ Important store guarantees already present:
 - command idempotency distinguishes duplicate from collision;
 - a managed account lane is retained while an Attempt is `dispatching` or `submitted_unknown`;
 - legacy lane acquisition requires concrete in-flight evidence.
+- Create commits Task + Revision + Plan + Run + Trace + Receipt in one Automation transaction;
+- Cancel is CAS-guarded and remains available when new task creation is disabled;
+- Query returns only account-scoped customer projections and redacted trace summaries.
 
 ## 5. Validation evidence and honest gaps
 
 Passed in `aidcp-automation`:
 
-- managed contract/registry/compiler/store focused suite: **26/26**;
+- managed contract/registry/compiler/store/command/service focused suite: **32/32**;
+- combined managed/schema/boundary focused run: **48/48**;
 - schema/owner focused suite: **25/25**;
 - boundary census after compiler: `source=278 ownership=278 unresolved=0 forbidden=0`;
 - `npm run typecheck`: pass.
@@ -156,20 +161,13 @@ as no production composition-root file is wired.
 
 Recommended next order:
 
-1. Task 4.1: implement Automation-owned Create/Cancel/Query services.
-   - Introduce one atomic creation unit of work for Task + Revision + Plan + Run + command receipt;
-     do not compose five independent pool writes in the service.
-   - Validate local target before owner reads, verify the API-owned authorization projection,
-     validate payload hash/idempotency, registry, parameters, capability scope, schema readiness,
-     and feature gates.
-   - Append decision traces without allowing traces to become state authority.
-2. Task 4.2: implement authenticated versioned internal routes/client with stable
+1. Task 4.2: implement authenticated versioned internal routes/client with stable
    `result_unknown`; then task 2.5 contract drift tests.
-3. Tasks 4.3-4.5: API authorization adapter and customer-safe query projection.
-4. Tasks 5.2-5.6: lane arbiter, worker, research executor, dispatch adapter, vertical slice.
-5. Tasks 6.x only after the external production-root gate closes.
+2. Tasks 4.3-4.4: API authorization adapter plus command/route edge-case coverage.
+3. Tasks 5.2-5.6: lane arbiter, worker, research executor, dispatch adapter, vertical slice.
+4. Tasks 6.x only after the external production-root gate closes.
 
-Do not solve task 4.1 by putting business services in kernel/transport or by reconnecting the old
+Do not extend task 4.2 by putting business services in kernel/transport or by reconnecting the old
 Cloud monolith. Do not infer lane availability from WebSocket/session mode.
 
 ## 8. Closeout commands for the next session
@@ -182,7 +180,9 @@ npx tsx --test \
   test/managed-automation/contracts.test.ts \
   test/managed-automation/registry.test.ts \
   test/managed-automation/plan-compiler.test.ts \
-  test/managed-automation/stores.test.ts
+  test/managed-automation/stores.test.ts \
+  test/managed-automation/command-store.test.ts \
+  test/managed-automation/task-command-service.test.ts
 npm run typecheck
 npx tsx test/acceptance/helpers/boundary-record.ts census
 ```
