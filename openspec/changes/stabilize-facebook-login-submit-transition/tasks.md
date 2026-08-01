@@ -71,4 +71,5 @@
   <!-- Focused TypeScript auth/router/assembly/manual-session tests passed 54/54; focused Native Facebook auth passed 7/7; Edge typecheck passed after rebasing onto the latest origin/master. -->
 - [x] 11.2 Run acceptance, full Edge, Native, staged-artifact, and strict OpenSpec gates without weakening fail-closed assertions.
   <!-- Acceptance passed 31/31; full Edge reported 2920 tests with 2919 passed, 0 failed, and 1 gated E2E skip; Native fmt/clippy/all tests passed serially with 179 unit tests plus every integration suite; the staged darwin-arm64 artifact verified at SHA-256 2455f172dadf7b3d0a060983d20381d40d9d112a31871e75d7044a79cbc3413a; strict OpenSpec validation passed. -->
-- [ ] 11.3 Record commits, integration/push status, and the explicit no-package/no-install/no-browser-action boundary.
+- [x] 11.3 Record commits, integration/push status, and the explicit no-package/no-install/no-browser-action boundary.
+  <!-- aidcp-edge bccc8b019a8378a98c498675ed994d27142a93b8 and aidcp 5df7a22f50b755b74462e0a701692f1b25eaefec were integrated and pushed to origin/master and origin/main respectively after all task 11.1/11.2 gates passed. This closeout record lands in a follow-up control-only commit. No desktop package/install, browser input, lifecycle mutation, live-account action, or deployment was performed; the user will rebuild the package separately. -->
