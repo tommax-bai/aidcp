@@ -57,7 +57,7 @@
 
 `accounts` 21 · `client_users` 4 · `publish_log` 3 · `interaction_reply_config_scopes` 3 ·
 `delegated_tasks` 2 · `facebook_group_target` 2 · `account_facebook_publish_image` 2 ·
-`account_facebook_publish_image_set` 1 · `client_environments` 7 · `facebook_consumption_progress` 2 ·
+`account_facebook_publish_image_set` 1 · `client_environments` 9 · `facebook_consumption_progress` 2 ·
 `facebook_consumption_action` 1 · `persona_auto_fill_runs` 1 · `interaction_messages` 1 ·
 `interaction_reply_jobs` 1 · `interaction_threads` 1。
 
@@ -70,6 +70,11 @@
 `facebook_consumption_progress` 的两条外键，以及 action result 对
 `facebook_consumption_action` 的一条外键，均处于 `aidcp-automation` 运行事实域，也 MUST 同库。
 若未来拆分这些属主内表，必须先改为持久命令/应用层存在性校验，并让孤儿引用 fail-closed。
+
+`configure-facebook-primary-browse-surface` 另新增两条 `client_environments` 外键，分别来自
+`facebook_primary_browse_surface_policy.env_key` 与 `facebook_primary_browse_surface_policy_audit.env_key`。
+两表均属 `aidcp-api` 的环境配置及审计事实，拆 schema 后约束仍成立；若未来拆库，必须与
+`client_environments` 保持同库，或先改为 fail-closed 的应用层存在性校验。
 
 **指向 `accounts(account_id)` 合计 26 处**（迁移 21 + 源码 5），与 design.md 的总数一致。
 分项变化来自 ① 本 change 第 3 节补齐的迁移把两条既有外键写进迁移目录；② 源码旧盘点曾把
