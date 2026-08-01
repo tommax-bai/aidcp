@@ -24,17 +24,29 @@
 
 - [x] 3.1 Port page-state classification and URL compatibility for home, explore, `search_result_ai`, note detail, profile, notification, publish, login, error, and unknown states.
   <!-- aidcp-edge 372936c: encoded Native probe and typed projections cover every listed state; fixture/unit tests include search_result_ai compatibility, query redaction, login precedence, notification, creator publish, error, and unknown behavior. -->
-- [ ] 3.2 Port DOM-first locating with visibility, geometry, ambiguity rejection, bounded retry/escalation, post-action validation, and cache promotion only after repeated success.
-  <!-- 承接边界登记（2026-07-30，由 restore-native-actuation-humanization-and-locating 的 5.8 回写；本条仍不勾） -->
-  - **本条只被部分承接，勿整条勾掉。** `restore-native-actuation-humanization-and-locating` 只承接**三道闸**
-    （后置校验 / 有界重试与升级 / 反污染回写），已于 `aidcp-edge 4a2c8d4` 建 `native/page-engine/src/locating.rs`、
-    `55c9d2e` 接进第一条真实命令（Facebook 点赞在 Reels 面、`note_id` 非 `/reel/` 地址那条分支）。
-  - **仍未承接、仍属本 change**：可见性 / 几何 / 歧义拒绝归各平台的目标解析能力；匹配唯一性闸、守卫层、
-    模型兜底、语义 class 白名单、可换接口均不在那条 change 内（见其 5.8 与 oracle.md 覆盖漏洞一节）。
-  - **「cache promotion only after repeated success」这半条在生产上仍是空转**：晋升逻辑与阈值已实现，
-    但每个定位器都是编译进二进制的固定选择器、无任何非确定性锚点来源，暂存区恒空。
-    那条 change 的 7.16 正因此**待人裁定**，其 5.4 / 5.5 明令裁定前不得按已实现勾掉 —— 本条同理，
-    **MUST NOT 因为「模块已存在」就把这半条读成已完成**。
+- [x] 3.2 Port DOM-first locating with visibility, geometry, ambiguity rejection, bounded retry/escalation, post-action validation, and cache promotion only after repeated success.
+  <!-- 2026-08-01 **整条显式弃守（用户裁定）**。不是收窄、不是延后：本 change 不再承担这条。 -->
+  - **弃守的是「本 change 继续交付这件事」，不是抹掉已经做出来的东西。** 已落地且在生产上跑的部分
+    如实记在这里，归档时**必须**按这个边界写规格，别多写也别少写：
+    - **已实现**：三道闸编排（后置校验 / 有界重试与升级 / 反污染回写）落在
+      `native/page-engine/src/locating.rs`，判据以窄接口暴露、可脱离浏览器断言；
+      配套 `native/page-engine/tests/locating_gates.rs` **27 条脱机用例**。
+      判定是**三态**（读到确实发生 / 读到确实没发生 / **读不出来**），读不出来绝不当成成功。
+    - **生产覆盖面只有一条命令**：Facebook Reels 面点赞（`facebook/feed_like.rs`）。
+      **其余命令面尚未接入** —— 这是本条弃守后留在场上的真实缺口，见下方「留在场上的」。
+    - **从未实现、随本条一并弃守**：可见性 / 几何 / 歧义拒绝下沉到各平台的目标解析、
+      匹配唯一性闸、动作前守卫层、模型兜底、语义 class 白名单。
+    - **锚点暂存与晋升**：代码与 4 条用例都在（`locating.rs` 的暂存区 + 阈值晋升 + 失败即丢弃），
+      但**生产上恒空转** —— 每个定位器都是编译进二进制的固定选择器，没有任何非确定性锚点来源，
+      暂存区永远进不去东西。对应实装任务（拟人化 5.4 / 5.5）已于 2026-07-30 各自显式弃守。
+      **代码不删**：它不产生危害，且一旦将来引入非确定性来源（模型给锚点 / 启发式选择器 /
+      运行期学到的路径）就重新有意义；删了是净损失。
+  - **⚠️ 归档红线**：本 change 是迁移主线，归档时它的 delta 会**并进主规格**。
+    照原文归档 = 主规格声称系统具备上面「从未实现」那一列的能力，**把不打算做的事写成已上线保证**。
+    这正是产物门禁 10.4 要求「归档前先收口未勾任务」防的那类风险。**规格只能写「已实现」那一列。**
+  - **留在场上的**（弃守本条不等于这件事消失，只是不再由本 change 记账）：
+    三道闸目前只覆盖一条命令。要推广到其余命令面，须另立 change —— 那是**覆盖面工作**，
+    不是架构工作，因为可替换的缝与桩都已就位（见拟人化 7.17 的结论）。
 - [ ] 3.3 Implement Native pointer, wheel, keyboard, text, and file-input primitives with current humanization bounds and cancellation-safe atomic actions.
   <!-- Partial 2026-07-27, aidcp-edge 745b754: shared text input now preserves per-Unicode-scalar pacing, cancellation, and deadlines; captcha text uses bounded real keyDown/keyUp pairs with Shift cleanup. The broader pointer/wheel/file primitive task remains open. -->
   <!-- Partial 2026-07-28, aidcp-edge 02313f1: Facebook Feed and comment lazy-load wheel input now preserves the existing 650 px +/-20% distance across 8-15 frames with 16-60 ms inter-frame delays, an interior acceleration/deceleration peak, exact total distance, and cancellation/deadline checks. Rust unit/fake-CDP/full suites, clippy -D warnings, Edge acceptance/full tests, and typecheck passed. Pointer and file-input coverage remain open; no package, deployment, or live-account validation was performed. -->
