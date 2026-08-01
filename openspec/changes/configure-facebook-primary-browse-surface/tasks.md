@@ -30,6 +30,7 @@
 
 - [x] 4.1 Synchronize Cloud/Edge payload types, command reason documentation, and protocol acceptance coverage.
 - [x] 4.2 Run Cloud focused acceptance tests and typecheck, then Edge focused tests and typecheck; serialize any load-sensitive Native retry.
-- [ ] 4.3 Run `openspec validate configure-facebook-primary-browse-surface --strict`, record commits and validation evidence, and stop before packaging or deployment.
+- [x] 4.3 Run `openspec validate configure-facebook-primary-browse-surface --strict`, record commits and validation evidence, and stop before packaging or deployment.
 
 <!-- 4.1-4.2: aidcp-cloud e61b8da and aidcp-edge 8290b5e; protocol docs updated in control; no Native retry was needed; no package or deployment. -->
+<!-- 4.3: aidcp f25d8e84, aidcp-cloud e61b8da, aidcp-edge 8290b5e; strict OpenSpec validation passed; package and deployment intentionally not run. -->
