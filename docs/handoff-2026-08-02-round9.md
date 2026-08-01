@@ -176,6 +176,13 @@ internal HTTP route → automation client 能读到 `facebook_operation_policy`�
 error envelope，再由客户端抛 `InternalHttpError`，不是 literal HTTP 502。**这只关闭了旧归因，
 不等于三进程整体已验证**；2.3 仍须以真实拓扑、端口、schema、PostgreSQL、飞书和 isales 隔离证据收口。
 
+**当前真正的首个组合根阻塞已只读定位**：API 模式只跑 segA + segD、跳 segC，但 segD 在
+`startPanelApi()` 前仍同步要求 segC 才会构造的 automation `server`。异常被非致命捕获，所以
+8091 / 8094 能起、8090 不监听，正好解释 2026-07-26 现场。独立 API 还没有启动
+automation-owner 同步读 consumer，`ApiSyncReadMirrors` 目前只在单体自举里构造；因此不能只把
+`edgeServer` 改成 optional。下一实现应先建立独立 API 的 A3-A6 镜像消费生命周期，再让 panel
+从镜像解析账号→edge，并用随机端口做 automation route → consumer → api-mode panel 运行级验收。
+
 顺带：本轮只读核验的 **DEV 仍是健康单体**（`aidcp-cloud.service` 一个进程，`AIDCP_SERVICE`
 未设置）；`.deployed-commit` 缺失，不能声称确认了 deployed SHA。两个相关运行文件的 sha256
 与 `c0de08b` 一致、与只读核验时的 source master `8773130` 不一致。Cloud source master 随后
@@ -205,8 +212,9 @@ deployed content 必须分开写**。
 1. ~~让主干在 dev 上能起来~~ **已解决（23:48，属主流补了迁移 0106）。**
 2. `platform-specific-identity-commands` **已收口归档**。
    `client-xhs-environment-schedule` 也已在 control `4514e573` 归档（strict all 210/210）。
-   剩 `fix-cloud-multi-service-deploy-script` 2.3；先按同源 `aidcp-cloud` 路径核剩余组合根阻塞，
-   不再把 sibling `aidcp-api` 当成当前脚本前置。本地回环通过不代替 DEV 三进程验收。
+   剩 `fix-cloud-multi-service-deploy-script` 2.3；下一步先修独立 API 的 A3-A6 同步读 consumer
+   与 panel 组装依赖，不再把 sibling `aidcp-api` 当成当前脚本前置。本地 policy 回环通过不代替
+   api-mode panel 运行级验收，更不代替 DEV 三进程验收。
 3. 给「同步读自举」补一条能在 CI 里跑的用例（§1 末尾那段）—— 不补的话，
    下一批新流还会用同样的方式炸一次 dev。
 4. 迁移修复四条线继续（见上一轮 handoff §3②）。
