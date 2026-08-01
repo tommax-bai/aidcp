@@ -33,4 +33,4 @@
 - [x] 4.3 Run `openspec validate configure-facebook-primary-browse-surface --strict`, record commits and validation evidence, and stop before packaging or deployment.
 
 <!-- 4.1-4.2: aidcp-cloud 534af19 and aidcp-edge c4d8929; protocol docs updated in control; no Native retry was needed; no package or deployment. -->
-<!-- 4.3: aidcp d5ca44fa, aidcp-cloud 534af19, aidcp-edge c4d8929; strict OpenSpec validation passed; package and deployment intentionally not run. -->
+<!-- 4.3: aidcp ad4cc396, aidcp-cloud 534af19, aidcp-edge c4d8929; strict OpenSpec validation passed; package and deployment intentionally not run. -->
