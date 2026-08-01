@@ -41,7 +41,7 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > **2026-08-02 · 现状（这一段是当前事实，读它就够；逐批沿革移到文末 §10）**
 >
 > **六仓**：cloud `c0de08b` / kernel `9cfd1c9` / transport `a2ffe05` / api `8c0ba78` /
-> content `f060706` / automation `ed2d32b`；控制仓见 `git log`。
+> content `f060706` / automation `ed2d32b`；api 另有 `3e42bc0`（补运营策略存储接线）。控制仓见 `git log`。
 > 共享包 pin 已按 kernel → transport → 三个业务仓抬完，**对账零漂移**。
 > **测试**：cloud 4088 / api 501 / content 441 / automation 2040 / kernel 70 / transport 36，全 0 fail。
 > **dev 已部署到 `c0de08b` 并健康**（含迁移 0106）。
@@ -82,9 +82,18 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > 不是那 8 张原始表 —— 发原始表等于逼消费方把「全局默认 ← 环境覆盖 ← legacy 回落」再实现一遍。
 > 发成品之后 kernel 里只剩三条具名 blocker 的判定，automation 侧一行判断都不用写。
 >
-> ⇒ **四个业务配置现在都有事实源了**，步骤 3 可以照批 D/F 的办法直接写工厂：
-> 四个业务配置与评论域（评论调度器 / 人审端口 / 免审通知 / 联系评论闸，均属批 G）
+> ⇒ **四个业务配置现在都有事实源了**，步骤 3 可以照批 D/F 的办法直接写工厂。
+>
+> **勘察已做完（2026-08-02 实读 `buildDispatcher` 全 439 行）：46 个顶层选项 + 8 个条件展开块
+> 的逐项供给方分类写在 tasks 3.1e，照它开工、不必重查。** 结论是两组：
+> **A 组**供给方今天就在本仓（每连接 `ctx` / 批 D 的对边出口与租约 / E-1 的两道闸 /
+> 批 B-C 的风控与停手闸 / 内容与 api 客户端 / 本仓单场续场配置 / 步骤 1-2 刚补的五项）；
+> **B 组共 10 个口属批 G**（评论调度器、人审端口、免审通知、审批口径、强制评论通知、
+> 联系评论安全闸、FB 规则模式运行时、FB 消费模式运行时、消费协调器、优质评论语料），
 > 一律做成**必填注入口**或**能力二态**，让编译器逼批 G 面对。
+>
+> **另外 api 手写入口那条欠账已补上**（`3e42bc0`）：它现在真构造 Facebook 运营策略存储、
+> 发得出那条新流，不再是当场抛的桩。
 >
 > ### ⚠️ 步骤 3 开工前必须知道的三件（都是这两步实读得到的）
 >

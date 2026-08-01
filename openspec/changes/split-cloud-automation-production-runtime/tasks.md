@@ -1555,8 +1555,54 @@
        CLAUDE §6.7 早写着「上机器逐条确认新代码真的到了」，这次是照着字面踩的。
        现在的做法是部署后逐个 marker `grep` 验内容。
 
-       **步骤 3（工厂本体）未开工**，判据与踩点仍以下面这段勘察为准；
-       四个业务配置现在**都有事实源了**，工厂可以照批 D/F 的办法直接写。 -->
+       **步骤 3（工厂本体）未开工。下面是逐项供给方分类（2026-08-02 实读 `buildDispatcher`
+       全 439 行得出），照它开工即可，不必重查。** 工厂本体 = cloud `src/server.ts` 的
+       `buildDispatcher`（约 439 行、46 个顶层选项 + 8 个条件展开块）。
+
+       **A. 供给方今天就在本仓 —— 直接接（照批 D/F 的写法）**
+       - **每连接上下文 `ctx`（E-1 已给）**：`eventBus` / `accountPlatform` /
+         五个 `has*` 能力闸 / `getRiskStatus` / `getQuotaLevel` / `canInteract` /
+         `explainInteract` / `explainSearch` / `explainView` / `explainRuleJoin` /
+         `getCommentDailyRemaining` / `getCommentLikeDailyRemaining`；
+       - **批 D**：`pacingFloors`（节奏兜底）/ `edgeTaskLeases` / `sendCommand`
+         （`edgeCommandToEnvelope` + 服务端 `pushToEdges`，**按 edgeId 定向、不广播**）/
+         `isHardPaused`（服务端 `isEdgePaused`）；
+       - **批 E-1**：`interactionGuard`（按账号取）/ `cooldownGate`（**单例共享**，内部按账号分桶）；
+       - **批 B/C**：`configMirrorGate` / `hasCommentedForLead`（风控去重账本）/
+         `recordRiskFact` / `resolveController` / `ownership`（归属跟随 + 切换后驱逐控制器）；
+       - **A-1**：`llm`；
+       - **内容客户端（已接线）**：`conceptStore` / `curatedStore` / `textCardTranscriber`；
+       - **api 客户端**：`notifyComments`（结构化通知）/ 联系人名册 /
+         `automationConfigCommands`（联系评论尝试台账两条）/ `onSessionRejected`；
+       - **本仓自有**：`sessionLimitProvider`（单场）/ `resumeConfigProvider`（续场）/
+         `roleFactories`（`CONTENT_ROLE_FACTORIES`，0.7 已改判 automation）；
+       - **同步读镜像 / 账号窄口**：`personaBinding`（三态）/ `getNickname` / `setNickname`；
+       - **步骤 1 刚补上的**：`hotLeadGateConfig` / `isAutoContactEnabled` /
+         `activeWeekMaskFor` / 联系评论日上限 / `facebookRuleCommentBodyScheme`；
+       - **步骤 2 刚补上的**：`facebookRuleModeDecision`
+         （= 基线取用 + `decideFacebookBrowseMode` 纯函数 + 人设三态 + `ctx.controller.slowStartView()`）。
+
+       **B. 批 G 才有 —— 一律做成必填注入口或能力二态，让编译器逼批 G 面对**
+       | 口 | 单体里是谁 | 缺了会怎样（**都不是报错**） |
+       | --- | --- | --- |
+       | 评论调度器（`triggerManual` / `triggerTargeted`） | `commentScheduler` | 规则批次的加群+联系评论整段不发；热帖引流评论不触发 |
+       | 评论人审端口（**能力二态**） | `commentApproval` + `commentApprovalEnabled` | 单体里 env 未开就整体不注入、评论**诚实跳过**；用 `undefined` 会与「接了但今天不可用」同形 |
+       | 免审通知 | `notifyAutoApprovedComment` | 免审评论发出去但没人知道 |
+       | 评论审批口径 | `resolveEffectiveCommentApprovalMode` | 审批模式判定缺失 |
+       | 强制评论结果通知 | `notifyMandatoryCommentOutcome` | 同上 |
+       | 联系评论统一安全闸 | `triggerGatedAutoComment` | 子上限 / 尝试审计 / `record('comment')` 时机三件一起没了 |
+       | FB 规则模式运行时 | `facebookRuleModeRuntimeStore` | 规则批次视图与批次推进落不了账 |
+       | FB 消费模式运行时 | `facebookConsumptionModeRuntimeStore`（5 方法） | 消费模式认领 / 下发 / 结算全断 |
+       | FB 消费协调器 | `facebookConsumptionCoordinator` | 单体里缺它是**具名 throw**，照抄这个形状 |
+       | 优质评论语料（**能力二态**） | `valuableCommentStore` | 缺则不接线（单体即如此），别做成静默空实现 |
+
+       **三处开工即会撞上的踩点**：
+       ① **角色人设注入 MUST 走取值口而不是快照**（构造期检查已在，漏传当场抛）；
+       ② `facebookRuleModeDecision` 与规则批次的 `actionGate` **共用同一个决策闭包** ——
+          MUST 按引用共用，别在 `actionGate` 里再算一遍（那是本 change 反复被咬的第二份实现形态）；
+       ③ 规则模式那条降级（没配联系方式发普通评论）**放弃了两份已上线规格的 fail-closed 保证**、
+          由运营显式裁定，且 `contactFallback` 与主审批模式是**两个独立字段**
+          （沿用同一个等于把联系评论的免审外溢到普通评论正文）——搬运时逐字保留，别"顺手统一"。 -->
 
   别当例行搬运开工。** 勘察已做完（2026-08-01，源 `aidcp-cloud@534af19` 实读），下面是结论。
   <!-- **勘察结果（省下一手一次全量重查）**：
