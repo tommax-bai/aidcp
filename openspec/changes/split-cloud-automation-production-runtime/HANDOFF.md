@@ -68,7 +68,29 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > 取消（`remaining_cancelled_by_user`）、不点则停在 `awaiting_confirmation` **不自作主张往下走**。
 > 卡在这里这么久的原因是**两个错叠在一起**，都已处置，见 §5 那段说明。
 
-> **2026-08-01 配置副本停手闸析出（接手请以这一组为准，六仓全动了）**：
+> **2026-08-01 批 C 配置镜像半（接手请以这一组为准）**：automation `089e2cc`，其余五仓见下一段。
+> automation typecheck 干净、acceptance 109/109、全量 2003 pass / 0 fail。
+>
+> **⚠️ 本文上一段里那句「自动化侧缺新鲜度事实源」是错的，已更正**：
+> 本仓的同步读镜像**早就带了**一个按进程的事实源（`configFreshnessRuntime`，实现 kernel 的
+> `ConfigMirrorFreshnessSource`）。真实状况是**它建好了却零消费方**——全仓只有定义它的那个文件提到它。
+> **⇒ 根本不需要把 api 的刷新器搬过来。** 单体那套（版本表 + 轮询刷新器）解决的是
+> 「一个进程里的 15 份内存副本何时过期」；三等分之后，本进程持有的配置副本**就是**那几条
+> 同步读消费流，它们各自带 `freshUntil` 与就绪态。**这条教训值得记**：在这个项目里，
+> 「缺一个机制」的判断下之前先 grep 一遍——建好没人用的东西比缺东西更常见。
+>
+> **本进程的闸只做两件属于它的事**（判定策略在 kernel 工厂，与 api 侧同一份定义）：
+> 哪些键算闸门档、拒绝记账落哪。两件各有变异验过的用例；后者刻意接管了镜像自带的**静默 no-op**
+> 默认参数——那张按小时聚合的计数表属接口域，「记了但没人收」正是事实源文档点名要消灭的形态。
+>
+> **仍未接线的最后一跳**：把 `gate.isStale` 喂给批 B 那个必填口，属批 H 的 `main()`。
+> 在那之前，批 B 的口仍是空的、仍是编译期可见的。
+>
+> **⚠️ 另一路 session 的改动已进 cloud master（`46a7003` Facebook Reel 节奏）但尚未派生**：
+> 对账里 api 2 / automation 3 / transport 1 条「内容不同」全部来自它，**不是本轮的漂移**。
+> 派生它属那一路的收尾（本轮没碰，因为无法验证它那侧的测试状态）。
+>
+> **2026-08-01 配置副本停手闸析出（六仓全动了）**：
 > cloud `391f77d` / kernel `6599b80` / transport `f11d9b6` / api `0ffac97` / content `70723b5` /
 > automation `ce95c9b`；控制仓见下。**pin 链已按 kernel → transport → 三个业务仓抬完，六仓对账零漂移。**
 > 测试：cloud 4059 / api 499 / content 441 / automation 1997 / kernel 66 / transport 36，全 0 fail；

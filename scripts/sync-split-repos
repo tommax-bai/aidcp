@@ -184,6 +184,9 @@ DERIVED_COMPOSITION = {
         'src/automation-model-exit.ts',
         # 风控单写者与告警底座的装配（批 B）。同样是 Cloud 组装根内联段的落点。
         'src/automation-risk-foundation.ts',
+        # 本进程的配置副本停手闸（批 C）：判定在 kernel 工厂，这里只定「哪些键算闸门档」
+        # 与「拒绝记账落哪」。Cloud 里对应的是组装根内联的那个适配器，无同名文件。
+        'src/automation-config-mirror-gate.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'
