@@ -543,6 +543,36 @@ Edge 不负责客户业务数据管理、内容价值策略、跨会话编排或
 两份 api 文件保留属主并改为调用该工厂，**行为逐位不变、7 个 api 消费方一行不改**；
 ambient 槽位仍留 `config-mirror-freshness.ts`（它正是不能进 kernel 的那一部分）。
 
+**四个业务配置存储的裁决（2026-08-01，用户拍板走「析出纯判定段」；change `split-cloud-automation-production-runtime` 批 E 后半）**：
+`src/config/content-schedule-store.ts`、`src/config/hot-lead-config-store.ts`、
+`src/config/facebook-comment-config-store.ts`、`src/config/facebook-operation-policy-store.ts`
+**保持 `aidcp-api` 属主，整份不改判**；**其中「给定快照 + 账号 → 有效值」那一段析出到 kernel**。
+
+**为什么出现这个问题**：与上面停手闸那次**同形**——拆进程后出现了第二个读者。
+自动化段的每连接角色调度器对这四份有 **32 处同步热路径读**
+（排期 11 / FB 运营策略 13 / FB 评论配置 5 / 热帖阈值 3；
+`effectiveScheduleFor` / `resolveBaseForAccount` / `effectiveConfigFor` / `getGateConfig`），
+而自动化进程够不着这四份 api 属主实现。
+
+**为什么不是另外两条路**：
+- **自动化仓按镜像自己再实现一遍解析** —— 明确不做。第二份在写出来那一刻行为完全一致，
+  要等两份漂开、且**恰好在该拦住的那一刻**才现形；本 change 已因这一形态被咬过多次（§4.2b / §6.5）。
+- **跨进程问接口进程** —— 与停手闸那次同理：这些是**同步**热路径读，改成一次 HTTP 要动每个调用点的
+  签名并给热路径加一跳网络。真要跨进程只能是「异步取源 + 本地镜像」，也就是补同步读流。
+
+**⚠️ 前三个与第四个的处境不同，别混为一谈**：
+- **排期 / 热帖阈值 / FB 评论配置**：自动化进程**已有事实源**（同步读消费流 `content_schedule` /
+  `hot_lead_config` / `facebook_comment_config`），缺的只是「有效值」那一段 ⇒ 析出即可闭合。
+- **FB 运营策略：连事实源都没有。** 它**不在** `AUTOMATION_SYNC_READ_CONSUMER_STREAMS` 里，
+  而它读 8 张 api 属主表（`accounts` / `client_environments` / `client_env_scope` /
+  `facebook_operation_policy` / `facebook_operation_global_policy` /
+  `facebook_primary_browse_surface_policy` / `facebook_rule_mode_environment_config` /
+  `facebook_environment_slow_start_completion`）**并写其中两张**（慢启动完成、全局策略审计）。
+  ⇒ 析出纯段之后**仍需为它补一条同步读流**，否则自动化进程拿不到输入。**这一件尚未开工。**
+
+**MUST NOT**：给 FB 运营决策一个恒 `unsupported` / `blocked` 的实现把编译过掉。
+它驱动整个 Facebook 浏览模式——那样不报错，只是让 FB 账号在自动化进程里**永远不开始浏览**。
+
 **镜像键清单刻意按进程各自给、不做成共享常量**：拆进程后各进程持有的镜像本来就是不同子集
 （单体 15 处集中在一个进程，三等分后各自只有自己那部分），"两边不一致"在这里不是漂移、是事实。
 
