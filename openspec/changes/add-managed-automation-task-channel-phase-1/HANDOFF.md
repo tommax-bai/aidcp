@@ -7,7 +7,7 @@ Updated: 2026-08-01 (Asia/Shanghai)
 This is the active implementation change:
 
 - Change: `add-managed-automation-task-channel-phase-1`
-- Progress: **17/39 tasks (44%)**
+- Progress: **19/39 tasks (49%)**
 - Control branch: `codex/add-managed-automation-task-channel-phase-1`
 - Control worktree: `/Users/baitianxing/codes/aidcp.wt/add-managed-automation-task-channel-phase-1`
 - Automation worktree: `/Users/baitianxing/codes/aidcp-automation.wt/add-managed-automation-task-channel-phase-1`
@@ -59,17 +59,21 @@ Runtime ownership is final-state ownership:
 
 ## 3. Current baselines and merge status
 
-The branches were fetched on 2026-08-01. Control was rebased without conflict after `origin/main`
-advanced by six documentation/handoff commits.
+The branches were refreshed on 2026-08-01. Control was rebased again after this handoff update
+because `origin/main` advanced during task 4.2. Kernel also advanced during the session; its already
+pushed feature branch absorbed the two new E-2 commits with a fast-forward-safe merge rather than a
+history-rewriting force-push. Automation remains intentionally one commit behind its default until
+the task 6.1 production-root gate closes.
 
 | Repo | Default baseline | Feature head at handoff | Default behind feature | Feature behind default |
 |---|---|---|---:|---:|
-| `aidcp` | `origin/main@0d283679` | handoff commit on this branch | feature commits only | 0 |
-| `aidcp-automation` | `origin/master@ac09a7f` | `e9bf456` | 8 commits | 0 |
-| `aidcp-kernel` | `origin/master@27cbfc5` | `34d1b94` | 1 commit | 0 |
+| `aidcp` | `origin/main@d397aaa7` | handoff commit on this branch | feature commits only | 0 |
+| `aidcp-automation` | `origin/master@76aded7f` | `de602c7c` | 9 commits | 1, intentionally deferred to task 6.1 |
+| `aidcp-kernel` | `origin/master@9cfd1c98` | `2fe845ba` | 2 commits | 0 |
+| `aidcp-transport` | `origin/master@a2ffe054` | `faf78a15` | 1 commit | 0 |
 
-Do **not** merge the phase-one branches into defaults yet. The change is incomplete, the HTTP
-port/worker/production roots are not built, and guarded PostgreSQL integration has not run.
+Do **not** merge the phase-one branches into defaults yet. The change is incomplete, the API owner
+adapter/worker/production roots are not built, and guarded PostgreSQL integration has not run.
 Before eventual integration, fetch/rebase each repo again, rerun the required suites, and use
 fast-forward-only history.
 
@@ -89,11 +93,21 @@ The old Qoder Cloud branch remains source material only:
 - Old-branch and legacy-producer inventory.
 - Current progress evidence in `tasks.md`.
 
-### Kernel (`34d1b94`)
+### Kernel (contract commit `34d1b94`, branch head `2fe845b`)
 
 - Versioned Create/Cancel/Query DTOs and `ManagedTaskCommandPort`.
 - Actor, target, result, collision, unknown-result, and customer projection contracts.
 - DTO/port only; no business execution code.
+- The feature branch now ends at `2fe845b`, a merge of current `origin/master@9cfd1c9` into the
+  already-pushed DTO commit. Kernel full tests are **73/73** and typecheck passes.
+
+### Transport (`faf78a1`)
+
+- Exact closed JSON validators for Create/Cancel/Query envelopes and responses.
+- Authenticated `internal/managed-task/v1/*` Automation route registration and API HTTP client.
+- Deterministic auth/disabled-route/protocol/target rejection remains distinct from ambiguous
+  timeout, disconnect, handler error, or malformed write response.
+- Ambiguous Create/Cancel returns `result_unknown` once with the original command id and no retry.
 
 ### Automation
 
@@ -107,6 +121,7 @@ The old Qoder Cloud branch remains source material only:
 | `db9a224` | guarded PostgreSQL concurrency/lease/target test |
 | `0a4ecbf` | bounded immutable PlanCompiler and StepExecutor contracts |
 | `e9bf456` | Create/Cancel/Query services, atomic command unit of work, safe projections |
+| `de602c7` | transport pin plus real owner-service HTTP/drift slice |
 
 Important store guarantees already present:
 
@@ -125,10 +140,23 @@ Important store guarantees already present:
 
 Passed in `aidcp-automation`:
 
-- managed contract/registry/compiler/store/command/service focused suite: **32/32**;
+- managed contract/registry/compiler/store/command/service/HTTP focused suite: **35/35**;
 - combined managed/schema/boundary focused run: **48/48**;
 - schema/owner focused suite: **25/25**;
-- boundary census after compiler: `source=278 ownership=278 unresolved=0 forbidden=0`;
+- acceptance suite: **145/145**;
+- full suite: **2075 pass / 0 fail / 4 guarded skips**;
+- boundary census: `source=282 ownership=282 unresolved=0 forbidden=0`;
+- `npm run typecheck`: pass.
+
+Passed in `aidcp-transport`:
+
+- managed-task HTTP and drift focused suite: **10/10**;
+- full suite: **46/46**;
+- `npm run typecheck`: pass.
+
+Passed in `aidcp-kernel` after absorbing the concurrent E-2 baseline:
+
+- full suite: **73/73**;
 - `npm run typecheck`: pass.
 
 Added but not actually executed against PostgreSQL:
@@ -139,7 +167,7 @@ Added but not actually executed against PostgreSQL:
   expired lane takeover, and unknown-Attempt lane retention/release.
 - Task 7.3 remains the authoritative requirement to run this test on an isolated test database.
 
-No production route, worker, root wiring, deployment, real Edge dispatch, or platform action has
+No production route registration, worker, root wiring, deployment, real Edge dispatch, or platform action has
 been claimed. All four rollout flags remain exact-lowercase-`true` opt-in and default false:
 
 - `AIDCP_MANAGED_TASK_API_ENABLED`
@@ -161,11 +189,9 @@ as no production composition-root file is wired.
 
 Recommended next order:
 
-1. Task 4.2: implement authenticated versioned internal routes/client with stable
-   `result_unknown`; then task 2.5 contract drift tests.
-2. Tasks 4.3-4.4: API authorization adapter plus command/route edge-case coverage.
-3. Tasks 5.2-5.6: lane arbiter, worker, research executor, dispatch adapter, vertical slice.
-4. Tasks 6.x only after the external production-root gate closes.
+1. Tasks 4.3-4.4: API authorization adapter plus command/route edge-case coverage.
+2. Tasks 5.2-5.6: lane arbiter, worker, research executor, dispatch adapter, vertical slice.
+3. Tasks 6.x only after the external production-root gate closes.
 
 Do not extend task 4.2 by putting business services in kernel/transport or by reconnecting the old
 Cloud monolith. Do not infer lane availability from WebSocket/session mode.
@@ -182,7 +208,8 @@ npx tsx --test \
   test/managed-automation/plan-compiler.test.ts \
   test/managed-automation/stores.test.ts \
   test/managed-automation/command-store.test.ts \
-  test/managed-automation/task-command-service.test.ts
+  test/managed-automation/task-command-service.test.ts \
+  test/managed-automation/task-command-http-drift.test.ts
 npm run typecheck
 npx tsx test/acceptance/helpers/boundary-record.ts census
 ```
