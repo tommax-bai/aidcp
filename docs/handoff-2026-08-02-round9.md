@@ -158,20 +158,29 @@ systemctl restart sshd
 
 ## 4. 原本要收口的三条 change，现在各是什么状态
 
-三条都卡在「部署 dev」这一步，本轮**一条也没能勾掉**，但卡点从「没人试过」变成了具名原因：
+三条的当前状态如下；本节早先把 sibling 入口误当成当前部署脚本入口，订正在表后：
 
 | change | 差的那一步 | 现在的结论 |
 | --- | --- | --- |
 | `platform-specific-identity-commands` ~~15/16~~ | 4.5 部 dev 并验证 | ✅ **已 16/16 收口并归档**（控制仓 `8fe10155`）——逐项验过：双端口监听 / 真实 WS 握手 / 飞书 onReady / 三道 schema 契约门（content 0069、automation 0106、api 0105）/ 零启动失败 / isales 未受影响 |
-| `client-xhs-environment-schedule` 12/14 | 4.3 / 4.4 集成 + 部 dev | **部署这一半的闸已解除**；4.3 还含「集成 feature 分支」，先核那部分是否已完成 |
-| `fix-cloud-multi-service-deploy-script` 4/5 | 2.3 用三进程脚本部 dev | **主动不做，理由已坐实**：见下 |
+| `client-xhs-environment-schedule` 14/14 | 已集成、部 dev 并归档 | ✅ control `4514e573` 已归档，strict all **210/210** |
+| `fix-cloud-multi-service-deploy-script` 4/5 | 2.3 用三进程脚本部 dev | **仍未执行、未勾选**；旧阻塞理由已撤销，见下 |
 
-**三进程那条为什么不做**：`split-cloud-automation-production-runtime` 的 tasks.md 里明写
-「`aidcp-api` 的手写入口**还没构造** Facebook 运营策略存储，故它今天供的是一个当场抛具名错误的实现。
-**三进程真跑之前必须补上**，否则 automation 拉这条流会拿到 502」。
-今天切三进程 = 把这条流打成 502。**这个前置比「脚本能不能跑」更靠前，得先解。**
+**三进程阻塞说法订正**：`deploy-multi.sh` 同步并运行同一份 `aidcp-cloud`；三个 unit 都执行
+`/opt/aidcp/cloud/src/server.ts`，只用 `AIDCP_SERVICE=content|automation|api` 选择分段，
+**不会执行 sibling `aidcp-api/src/server.ts`**。后者的 store 接线欠账属于
+`split-cloud-automation-production-runtime` task 3.1e，且已在该 change 内补齐；它不是本脚本入口。
 
-顺带：**dev 当前是单体拓扑**（`aidcp-cloud.service` 一个进程带 8787 + 8090），
+Cloud `e7209bf` 已用 fake pool/store + 随机本地端口覆盖当前同源路径：API owner source →
+internal HTTP route → automation client 能读到 `facebook_operation_policy`；失败是 HTTP 200
+error envelope，再由客户端抛 `InternalHttpError`，不是 literal HTTP 502。**这只关闭了旧归因，
+不等于三进程整体已验证**；2.3 仍须以真实拓扑、端口、schema、PostgreSQL、飞书和 isales 隔离证据收口。
+
+顺带：本轮只读核验的 **DEV 仍是健康单体**（`aidcp-cloud.service` 一个进程，`AIDCP_SERVICE`
+未设置）；`.deployed-commit` 缺失，不能声称确认了 deployed SHA。两个相关运行文件的 sha256
+与 `c0de08b` 一致、与只读核验时的 source master `8773130` 不一致。Cloud source master 随后
+又集成到 `e7209bf`（包含 consumer 日志双向派生与本地回环证据），仍未部署；**source master 与
+deployed content 必须分开写**。
 多服务单元文件在 `aidcp-cloud/deploy/multi-service/` 里备着但没启用。
 那个脚本有 `check`（纯探测不改状态）/ `healthcheck` / `rollback` 三个安全子命令，探测过是好用的。
 
@@ -195,8 +204,9 @@ systemctl restart sshd
 
 1. ~~让主干在 dev 上能起来~~ **已解决（23:48，属主流补了迁移 0106）。**
 2. `platform-specific-identity-commands` **已收口归档**。
-   剩 `client-xhs-environment-schedule`（4.3 还含「集成 feature 分支」那半，先核是否已完成）；
-   第三条（三进程）仍卡在 `aidcp-api` 那条 Facebook 运营策略存储没构造上，与本次停机无关。
+   `client-xhs-environment-schedule` 也已在 control `4514e573` 归档（strict all 210/210）。
+   剩 `fix-cloud-multi-service-deploy-script` 2.3；先按同源 `aidcp-cloud` 路径核剩余组合根阻塞，
+   不再把 sibling `aidcp-api` 当成当前脚本前置。本地回环通过不代替 DEV 三进程验收。
 3. 给「同步读自举」补一条能在 CI 里跑的用例（§1 末尾那段）—— 不补的话，
    下一批新流还会用同样的方式炸一次 dev。
 4. 迁移修复四条线继续（见上一轮 handoff §3②）。

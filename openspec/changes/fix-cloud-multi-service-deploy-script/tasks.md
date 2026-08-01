@@ -10,16 +10,19 @@
 - [x] 2.1 Run the focused test, Bash syntax check, Cloud typecheck, and strict OpenSpec validation.
 - [x] 2.2 Commit, rebase, fast-forward integrate, and push Cloud and control changes.
 - [ ] 2.3 Deploy the integrated Cloud default branch to DEV with the three-process script and verify content, automation, API, ports, schema, PostgreSQL, Feishu, and unrelated-service isolation.
-  <!-- 2026-08-01 23:xx **主动不做，卡点已坐实（不再是「没人试过」）。** -->
-  - **前置未满足**：`split-cloud-automation-production-runtime` 的 tasks.md 明写
-    「`aidcp-api` 的手写入口**还没构造** Facebook 运营策略存储，故它今天供的是一个当场抛具名错误的实现。
-    **三进程真跑之前必须补上**，否则 automation 拉这条流会拿到 502」。
-    今天切三进程 = 把这条流打成 502，**那不是「脚本能不能跑」的问题，是上游能力缺口**。
-  - 脚本本身**探测过是好用的**：`deploy-multi.sh dev check`（纯探测、不改状态）通过，
-    报「SSH 可达、目录与 .env 就位、选择器已识别 automation / api」。
-  - **另一个必须先解的**：主干目前在 dev 上**单体形态都起不来**（同步读自举，见
-    `docs/handoff-2026-08-02-round9.md` §1），切拓扑之前先让单体能起。
-  - dev 当前 = 单体拓扑跑 `534af19`（回滚保服务），多服务单元文件已备但未启用。
+  <!-- 2026-08-02 现状订正：2.3 仍未执行、未勾选；本轮只做 DEV 只读 SSH 核验，未部署、写文件、改库或操作 systemd unit，未碰 OL。 -->
+  - **撤销旧阻塞归因**：本脚本同步并运行同一份 `aidcp-cloud`，三个 unit 都从
+    `/opt/aidcp/cloud/src/server.ts` 以不同 `AIDCP_SERVICE` 启动；它不会执行 sibling
+    `aidcp-api/src/server.ts`。后者的存储接线欠账属于 `split-cloud-automation-production-runtime`
+    task 3.1e，且已在该 change 内补齐；无论其当时状态如何，都不是本脚本的可执行入口。
+  - **本地前置证据**：Cloud `e7209bf` 用 fake pool/store 和随机端口覆盖真实生产装配 seam：
+    API owner source → internal HTTP route → automation client 可读取 `facebook_operation_policy`。
+    刷新失败按当前契约返回 HTTP 200 error envelope，再由客户端抛 `InternalHttpError`，不是
+    literal HTTP 502。该用例只证明这条通道，不证明三进程整体可部署。
+  - 本轮 `deploy-target dev --check` 通过；§1 的单体启动问题已由
+    Cloud `c0de08b` 修复。当前 DEV 是健康单体，但 `.deployed-commit` 缺失，不能声称确认了 deployed SHA；
+    只读核验时两个相关运行文件的 sha256 与 `c0de08b` 一致、与当时的 source master `8773130`
+    不一致；随后集成的 `e7209bf` 又只前移源码与本地回环证据，仍未部署。
 
 <!-- Validation: focused deployment contract 1/1, bash syntax and lexical scans, Cloud typecheck, and strict OpenSpec validation passed. Cloud b4694df and control 1fdb1fd were rebased, fast-forward integrated, and pushed without force. DEV deployment remains pending. -->
 
