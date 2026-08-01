@@ -51,4 +51,5 @@
   <!-- Focused TypeScript auth/router/coordinator/manual-session/UI tests passed 114/114 plus assembly 5/5; focused Native Facebook auth passed 6/6; Native fmt and Edge typecheck passed. -->
 - [x] 8.2 Run acceptance, full Edge, Native, staged-artifact, and strict OpenSpec gates without weakening fail-closed assertions.
   <!-- Acceptance passed 31/31; full Edge passed 2892 with 0 failures and 1 gated E2E skip; Native fmt/clippy/all tests passed; the staged darwin-arm64 artifact verified at SHA-256 f281d16677df7d3661d77e654b810233ce0205512ee43ddb5175214325183945 after rebasing onto origin/master; strict OpenSpec validation passed. -->
-- [ ] 8.3 Record commits, validation evidence, integration/push status, and the no-package/no-browser-action boundary.
+- [x] 8.3 Record commits, validation evidence, integration/push status, and the no-package/no-browser-action boundary.
+  <!-- aidcp-edge 2c3aa5d and aidcp 9eef6758 were integrated and pushed to origin/master and origin/main respectively after all task 8.1/8.2 gates passed. This closeout record lands in a follow-up control-only commit. No desktop package/install and no browser input, lifecycle mutation, or live-account action were performed. -->
