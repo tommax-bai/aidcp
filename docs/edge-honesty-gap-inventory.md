@@ -181,3 +181,14 @@
   登记 + 具名交接，**不含承接方已开工**）。**规格上无遗留** —— 已核对该 change 的 delta 里
   没有任何一条要求断言降级留痕，所以交接不会在主 spec 上留下一条实装违反的 MUST。
 - **阻塞**：「降级痕迹到得了人眼前」这条通路整体不存在（该 change §9.3 弃守项②：引擎子进程错误输出只在进程级失败时挂出，降级是成功路径 ⇒ 记账行随进程退出丢弃）；input.rs 属串行热点区
+
+### E13. 小红书 feed 刷新点完**无条件回确认**：既不取刷新前的批次基线、也不校验批次真换了，点到一个长得像刷新的控件（或点了但页面没重载）会把**原样的旧卡片**当成新一批回报（`native/page-engine/src/xhs-command-router.js:456-460`）
+
+- **类型**：静默假成功（无后置校验）　**落点**：`native/page-engine/src/xhs-command-router.js:456-460`　**体量**：small
+- **今天回报什么**：`findByWords(['刷新','refresh'])` 找控件 → 找不到诚实回 `fail('refresh','refresh_control_not_found')`；找到就 `click()`、睡 900ms、**直接 `done(cards())`**。整条路径上**没有任何一处**读「刷新前是什么」或「现在是不是换了」。
+- **为什么是错的**：这条命令的业务结果不是「点了刷新按钮」，是「feed 换了一批」。今天回报的是前者、声称的是后者。三条都会静默兑现成假成功：① 文字匹配点到别的东西（`findByWords` 依次扫 `button/[role=button]/a` → `span` → `div`，任何含「刷新」二字的元素都算）；② 点着了但页面没重载（慢网、平台限流软阻断）；③ 重载了但内容没变（平台就是没有新内容）。三种情况一律回 `confirmed` + 当前卡片。**上游据此认为「已换新批」**，于是重复读同一批内容、按新批扣预算，而去重与深度阈值都以为自己在前进。
+- **判据现成、不需要新证据**：`cards()` 已经带 `noteId`，取一次点击前的 id 集合、点击后再取一次做比较即可。这与同文件里其他写动作的口径一致（滚动按实测位移、点赞按状态翻转），**唯独刷新这一条没做**。
+- **真机最坏后果**：不产生错误的写操作，也不多发内容 —— 危害是**浏览闭环空转且看不出来**：feed 到阈值触发刷新 → 刷新其实没换批 → 下一轮扫到同一批卡 → 去重后无可读内容 → 再次触发刷新，如此往复直到会话看门狗判空转。日志里每一条都是成功。参见 memory `feed-refresh-on-depth-change`（「feed 阈值点刷新回顶换新批；**须防假成功**」——立项时就点名过这条风险，实装没做）。
+- **属主**：`restore-native-xiaohongshu-action-honesty`（`xhs-command-router.js` 的单写区属主，2026-08-01 复核该 change 仍活跃 40/56）。**本轮不代改**：发现它的是 `native-page-engine-production-cutover` 的 4.6 覆盖盘点（补测时读到判据缺失），补测方无权改属主文件。
+- **阻塞**：none —— 判据所需的数据（`cards()` 的 `noteId`）已经在手，是一次纯本地改动。
+- **登记来源**：2026-08-01，`native-page-engine-production-cutover` 4.6 的实测覆盖盘点。该任务同批补掉了 `notification_back_home` / `note_close` / `profile_open` 三条零覆盖命令的行为契约（`aidcp-edge` `test/native-page-engine/xhs-navigation-command-contracts.test.ts`），**唯独 feed_refresh 补不了**：它没有可断言的后置判据，写出来的用例只能断言「点了就成功」，等于把缺陷锁进测试。

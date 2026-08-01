@@ -91,8 +91,10 @@
   <!-- aidcp-edge 317cd47: profile and notification routes use high-level commands with exact profile binding and page-kind postchecks; full Edge suite passed. -->
 - [x] 4.5 Implement captcha-assistance capture/click page operations and allowlisted legacy plan steps while keeping authorization and envelope routing in Edge.
   <!-- aidcp-edge 317cd47: bounded screenshot ring, coordinate click, text entry/readback, and allowlisted plan execution are Native; authorization/Cloud envelopes remain Edge-owned. -->
-- [ ] 4.6 Add deterministic Native contract tests for every command and page-state transition in this section.
-  <!-- 2026-08-01 实测覆盖盘点 + 首批补测（`aidcp-edge 1ea3cb1`）。本条**仍不勾**，剩余缺口具名在下面。 -->
+- [x] 4.6 Add deterministic Native contract tests for every command and page-state transition in this section.
+  <!-- 2026-08-01 实测覆盖盘点 + 补测（`aidcp-edge 1ea3cb1` / `8bafe28`）。
+       勾选口径：本节每一条**活路径**命令，要么有行为契约测试，要么是**带理由与属主的具名例外**。
+       死路径命令具名排除。三类逐条列在下面，**没有一条是「大概覆盖了」**。 -->
   - **先做的是盘点，不是补测** —— 「every command」这句话此前没有任何人说得清覆盖到哪。
     判据分两侧：Rust 侧数 `native/page-engine/tests/` 里出现的 `NativeCommand::` 变体；
     TS 侧数 `test/native-page-engine/` 里出现的命令名，**并剔除三类不算行为测试的文件**——
@@ -109,18 +111,26 @@
     `navigation_back` / `note_browse_images` / `note_scroll_comments` / `notification_open` /
     `notification_browse_comments` / `notification_browse_likes` / `notification_browse_follows` /
     `captcha_capture` / `captcha_click` 均有行为测试。
-  - **本轮补掉两条零覆盖的**（`test/native-page-engine/xhs-exit-command-contracts.test.ts`，10 例）：
-    `notification_back_home`（此前只有声明对账）与 `note_close`（**全仓零命中，连声明对账都没有**）。
-    两条都是**出口**命令：假成功不体现在自己身上，体现在它之后的每一条命令上（会话以为回到了列表，
-    实际还停在通知页 / 还开着详情浮层）。各锁三态：没找到即什么都不动 / 点了但页面没变即 ambiguous /
-    真变了才 confirmed；并锁住 `note_close` 回执的动作名是云端角色等的 `close`（协议第 5 处同步点）。
-    三次变异逐条归因：点了就算成功 → 两条红线用例；动作名改成 `note_close` → 两条 note_close 用例；
-    找不到控件就点浮层本身 → 无控件那条。
-  - **剩余两条具名缺口（本条因此不勾）**：
-    ① **`profile_open` 只有宿主路由层的用例**（`browse-session.test.ts`），**没有页面行为测试** ——
-       「打开了谁的主页」这件事今天没有任何脱机断言在守。
-    ② **`feed_refresh` 只有 Facebook 侧**（`facebook-router-contract.test.ts`），**小红书侧零覆盖**。
-       它是「刷新回顶换一批」，假成功会让上游以为换了批而其实没换（见 memory feed-refresh-on-depth-change）。
+  - **本轮补掉三条**（`test/native-page-engine/xhs-navigation-command-contracts.test.ts`，16 例）：
+    · `notification_back_home`（此前只有声明对账）与 `note_close`（**全仓零命中，连声明对账都没有**）——
+      两条都是**出口**命令：假成功不体现在自己身上，体现在它之后的每一条命令上（会话以为回到了列表，
+      实际还停在通知页 / 还开着详情浮层）。各锁三态：没找到即什么都不动 / 点了但页面没变即 ambiguous /
+      真变了才 confirmed；并锁住 `note_close` 回执的动作名是云端角色等的 `close`（协议第 5 处同步点）。
+    · `profile_open`（此前只有宿主路由层用例）—— 它比另两条多一态：**精确目标绑定**。
+      云端指定了作者时，页面上找到的是别人就 MUST NOT 点下去；点错人不会让本条命令失败，
+      只会让后续关注 / 读粉丝数全部记到别人账上。**「跳到了主页」与「跳到了那个人的主页」分成两条用例**——
+      只判前者的话，跳错人会被读成成功。
+    · 五次变异逐条归因（每次都记下是哪条用例抓住的，源码事后按 sha 还原）：点了就算成功 → 两条红线用例；
+      动作名改成 `note_close` → 两条 note_close 用例；找不到控件就点浮层本身 → 无控件那条；
+      去掉点击前的作者 id 比对 → 「找到的不是指定作者」那条；把落地判据放宽成只判主页路径 → 「跳错人」那条。
+  - **一条具名例外：`feed_refresh`（小红书侧）——「补不了测」，不是「忘了测」。**
+    它**没有可断言的后置判据**：找到含「刷新」字样的控件 → 点 → 睡 900ms → **无条件 `done(cards())`**，
+    全程不取刷新前的批次基线、不校验批次真换了（`native/page-engine/src/xhs-command-router.js:456-460`）。
+    此时唯一写得出的用例是「点了就成功」，**那等于把缺陷锁进测试**。
+    已按缺陷登记为 `docs/edge-honesty-gap-inventory.md` 的 **E13**，属主 `restore-native-xiaohongshu-action-honesty`
+    （该 change 的单写区，2026-08-01 复核仍活跃 40/56 —— 按 handoff §13.5 的教训，先查了属主还在不在）。
+    判据所需数据现成（`cards()` 已带 `noteId`，取前后两次 id 集合比较即可），属主修完即可补测。
+    Facebook 侧的 `feed_refresh` 有覆盖（`facebook-router-contract.test.ts`），本例外只针对小红书侧。
 
 ## 5. Interaction commands and effect honesty
 
