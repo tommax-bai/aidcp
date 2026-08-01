@@ -59,11 +59,11 @@ Runtime ownership is final-state ownership:
 
 ## 3. Current baselines and merge status
 
-The branches were refreshed on 2026-08-01. Control was rebased again after this handoff update
-because `origin/main` advanced during task 4.2. Kernel also advanced during the session; its already
-pushed feature branch absorbed the two new E-2 commits with a fast-forward-safe merge rather than a
-history-rewriting force-push. Automation remains intentionally one commit behind its default until
-the task 6.1 production-root gate closes.
+The branches were refreshed on 2026-08-01. Because the pushed Control feature branch and
+`origin/main` both advanced during task 4.2, Control absorbed current main with a fast-forward-safe
+merge rather than rewriting published history. Kernel likewise absorbed the two new E-2 commits on
+its already-pushed feature branch. Automation remains intentionally one commit behind its default
+until the task 6.1 production-root gate closes.
 
 | Repo | Default baseline | Feature head at handoff | Default behind feature | Feature behind default |
 |---|---|---|---:|---:|
