@@ -154,6 +154,7 @@
           §3.2 走引擎特化落地（edge `20fc70a`），**本 change 的路由文件一行未碰**。
           留给本 change 的只有清理：路由里 `if(kind==='publish_upload_image')return done(action('upload_image',true));`
           这一行现已不可达，**只删这一行**——同 `if` 块里 `publish_set_cover` 那半仍然活着。
+          <!-- aidcp-edge e2f3886：已将路由块限定为 publish_set_cover，并删除不可达的 publish_upload_image 恒真回执；新增直接路由回归，要求该命令返回 not_started + unsupported_command。验证：focused router 8/8、xhs_publish_upload_binding 4/4、acceptance 38/38、全量 2964 pass / 0 fail / 1 skip、typecheck 与 git diff --check 均通过。未打包、未部署、未真机。 -->
         · **顺带修正了清单自身的两处失真**（都只能靠实读判据代码发现）：
           ① 后置校验盘点表把 `feed_refresh` 记成**达标**、证据栏写「按实测结果回报」，而实现是点完睡一觉无条件回报；
           ② 缺口清单里 **E13 / E14 是 E3 / E5 的重复登记**（新登记时没通读整张清单）。已合并并订正头部计数。
