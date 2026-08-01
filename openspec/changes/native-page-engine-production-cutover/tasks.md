@@ -153,7 +153,28 @@
   <!-- aidcp-edge 317cd47: schedule setup/readback and scheduled capture require exact target time; focused exact-evidence tests passed. -->
 - [x] 6.4 Implement submit, post-id capture, scheduled capture, and reconciliation with `ambiguous` handling that forbids blind resubmission.
   <!-- aidcp-edge 317cd47: submit/capture/reconcile are atomic Native commands with independent evidence and no write replay after dispatch; Rust effect tests passed. -->
-- [ ] 6.5 Port the existing publish safety and integrity fixtures into Native acceptance tests.
+- [x] 6.5 Port the existing publish safety and integrity fixtures into Native acceptance tests.
+  <!-- aidcp-edge a65a28d：新增 `test/acceptance/native-publish-image-integrity.test.ts`，7 例 AC-PUB-N01..N07。
+       验收套件 31 → 38 例。 -->
+  - **补的是发布红线缺的那一半。** 既有 `AC-PUB-*` 守的是「未获授权绝不发布」；
+    **「即使已授权，也只发本来该发的那份内容」这一半此前没有任何验收用例**。
+  - **为什么这半边全压在宿主身上**（实读链路后确定的落点）：引擎侧 `validate_publish_file`
+    只按**扩展名 + 绝对路径 + 普通文件 + 体积**放行，而那个扩展名是**宿主按下载字节嗅探后自己写下的**
+    （`src/native-page-engine/publish.ts` 的 `imageExtension`），不是调用方给的。
+    所以引擎那道闸的强度**上限就是宿主这一段的强度** —— 而宿主这一段此前一条用例都没有
+    （`publish-executor.test.ts` 覆盖的是上传顺序与封面绑定）。
+  - **五条不变量**：① 只走 https（挡住「把本机任意文件当配图发出去」，`file:` / `http:` / `data:` /
+    `ftp:` 一律在发请求前拒）；② 不跟随重定向（否则一次 302 就绕开第 ①）；
+    ③ 体积上限查两次（声明的 `content-length` 会撒谎，实际流也必须查）；
+    ④ 扩展名只由字节内容决定，认不出就诚实拒绝、**绝不回落成默认扩展名**；
+    ⑤ 任一不通过时**引擎侧一条命令都不下发**。
+  - **四次变异逐条归因**：去掉 https 闸 → N01；改成跟随重定向 → N03；嗅探失败回落成 png → N04；
+    只信声明的 content-length → N06 后半（那一格正是为「声明值会撒谎」而存在的）。源码事后按 sha 还原。
+  - **N05 值得单记**：地址以 `.png` 结尾、字节却是 JPEG 时，落盘按字节判成 `.jpg`，
+    且交给引擎的是宿主自己的临时文件绝对路径 —— **不由调用方地址拼出**。
+  - **本条未覆盖、如实记**：引擎侧 `validate_publish_file` 自身仍**零测试**（Rust `pub(crate)`，
+    集成测试跨 crate 调不到，要测须动 `engine.rs` 的内联测试模块 —— 那是并行开发的热点文件）。
+    宿主这一段守住后它是第二道闸，但「第二道闸没测」这件事不该被本条的绿色遮住。
 - [x] 6.6 Implement the legacy whole-publish transaction through the same Native primitives or retire its registration and callers under an explicit protocol-compatible migration; no JavaScript whole-publish path may remain packaged.
   <!-- aidcp-edge 317cd47: obsolete publish.request handler is unregistered; retained publish.command atoms route only to Native, with tombstone metadata preserved for protocol compatibility. -->
 
