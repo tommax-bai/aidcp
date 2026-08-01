@@ -68,7 +68,35 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > 取消（`remaining_cancelled_by_user`）、不点则停在 `awaiting_confirmation` **不自作主张往下走**。
 > 卡在这里这么久的原因是**两个错叠在一起**，都已处置，见 §5 那段说明。
 
-> **2026-08-01 批 A（第 3 段切批方案的第一批，接手请以这一组为准）**：
+> **2026-08-01 A-1（接手请以这一组为准）**：automation `c365b1a`，其余五仓未动
+> （cloud `f83e266` / api `3a75b0e` / content `f290a3c` / kernel `ac98a30` / transport `40df6de`）。
+> automation typecheck 干净、acceptance 95/95、全量 1989 pass / 0 fail；六仓对账零漂移。
+> tasks.md **75/125**。**门仍 11。**
+>
+> **A-1 原本只是「加一条 pin」，本次没有那样做，理由值得记**：只加 pin 而不做消费者，
+> 等于给包也犯一遍批 A 刚立的那条判据的错——装了个本进程没有去处的东西。
+> 所以把 A-2 里**不被 task 3.1 挡住的那一半**一起做完了：模型出口的构造抽成可单测的工厂
+> （`src/automation-model-exit.ts`），**批 E 只剩「调它 + 把 client 注入角色调度器」**。
+> 另：transport 本身没改，所以 pin 直接等于它 master 头，**不需要重抬整条 pin 链**。
+>
+> **对账输出少了一条预期噪声**：automation 那行从「未 pin aidcp-transport」变成
+> **「aidcp-transport pin 对齐（40df6de）」**——这条 pin 从此进棘轮，以后 transport 一动它就得跟。
+>
+> **⚠️ 那道传输单份闸从今天起不再是前瞻的**，且当场验过一次：把工厂里那条本地
+> `./transport/internal-http.js` 改成从包里取，`transport-single-copy` 立刻红并点名说明符。
+> **但有一条别记反的偶然**：那次 `typecheck` **也**红了，只因为 `InternalHttpClient` 恰好带 private
+> 字段（两份名义不兼容）。**换成没有 private 成员的类、或函数 / 错误类，typecheck 就是绿的**，
+> 只有那道闸会说话。别据此以为编译器能接住这一类。
+>
+> **四条纪律的变异实测（都问了「哪条抓住的」）**：删掉显式 `apiKey` → 2 条红；
+> 回落改成所有厂商都读 dashscope 那个 env → 1 条红；密钥读失败吞成 null → 1 条红；
+> 保守默认改成本仓自写字面量 → 1 条红。
+>
+> **写用例时自己中过一次、已消**：凭据字段名一开始写死成猜的 `ark_api_key`，**用例照样全绿**
+> （替身按 key 查表、查不到返回 null，看着就像「库里没配」），真跑起来会去问属主侧不认的字段。
+> 现在字段名从 kernel 注册表取。**同形的坑对任何「按名字查表的替身」都成立。**
+>
+> **2026-08-01 批 A（第 3 段切批方案的第一批）**：
 > **六仓**：cloud `f83e266` / automation `6035fa4` / api `3a75b0e` / content `f290a3c` /
 > kernel `ac98a30` / transport `40df6de`（**共享包与 api / content 都没动 ⇒ 无 pin 变更**）。
 > 测试 cloud 全量 4052 pass / 0 fail（acceptance 184/184）、automation 全量 1983 pass / 0 fail
@@ -895,6 +923,9 @@ kernel 头一动，transport 与三个业务仓的 pin 全部作废，整条链�
 - 自动化仓今天**一条共享传输包的 import 都没有**，且已有闸挡住它再取第二份传输原语
   （两份会让基于类型的错误判别静默失效）。批 D 搬传输相关代码时会撞到这道闸——
   **那是设计好的**：本仓是传输目录的属主，要用就用自己 `src/transport/` 里那份。
-- A-1（自动化仓第一次依赖共享传输包，为的是模型调用出口）**不属于上面任何一批**，
-  它动的是版本链，必须**单独一次**做完（顺序：先源码、再测试、最后抬版本 pin）。
-  建议排在批 A 与批 B 之间——那时还没有别的改动跟它抢。
+- ~~A-1（自动化仓第一次依赖共享传输包，为的是模型调用出口）~~ ✅ **已做完**（automation `c365b1a`）。
+  **两处与原计划不同，按实际的读**：① **没有只加 pin**——同批做了消费者（模型出口工厂），
+  否则等于装了个本进程没有去处的东西，正好犯批 A 刚立的那条判据；② **没动版本链**——
+  transport 自身没改，pin 直接等于它 master 头即可，「先源码、再测试、最后抬 pin」那套是给
+  共享包**自己也改了**的情形准备的，这次用不上。
+  批 E 接手时只剩「调工厂 + 注入 client + 把用量记账挂 `onCall`」。

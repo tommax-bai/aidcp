@@ -428,11 +428,16 @@
        六仓全绿：cloud 全量 / api 470 / automation 1888 / content 436 / kernel 57 / transport 36。 -->
   <!-- 0.4 的裁决实质成立且已实跑核过：qwen.ts 548 行、SQL/池/存储引用零命中、import 只指 kernel。
        但 0.4 记的理由有一条是错的，见 0.8a。落点闭包见 0.8b/0.8c。 -->
-- [ ] 0.8a **更正 0.4 的密钥口径**：0.4 写的「密钥各自从 env 读」与生产事实不符——真实做法是
+- [x] 0.8a **更正 0.4 的密钥口径**：0.4 写的「密钥各自从 env 读」与生产事实不符——真实做法是
   **库内优先、env 回退**（`server.ts:2295-2297` / `:2337-2341` 走 `credentialStore.getSecretForRuntime`），
   content 手写 main 已改成经属主侧窄读口取（`aidcp-content/src/server.ts:421-428`）。
   **按字面实施会让后台「厂商密钥」页对 automation 进程彻底失效且无任何信号。**
   照 content 的做法接窄读口，**MUST NOT 复刻四层回落逻辑**（复刻正是两侧悄悄不一致的来源）。
+  <!-- aidcp-automation c365b1a（A-1）：automation 侧也接上了同一条窄读口，两侧同形。
+       四层回落一行都没复刻——角色 → 厂商/模型/温度/思考全查本地镜像，保守默认取 kernel 那个常量。
+       变异实测：把保守默认改成本仓自写的字面量，当场红。
+       **另一半同样重要、且容易只做一半**：读失败与「库里没配」分开记（前者说明属主侧那条 route
+       不可达、本次走的是 env 回退）。变异：吞成 null → 那条用例当场红。 -->
 - [x] 0.8b **错误族抬进 kernel**（已完成，见下方原文与 <!-- --> 记录）
   <!-- aidcp-cloud 1d31c30。新建 src/kernel/llm-errors.ts，5 个符号整体搬入（原处已删定义、非复制），
        连同它们的私有格式化闭包；formatLlmMeta 提升为 export——留在 qwen.ts 的 LlmTimeoutError
@@ -491,13 +496,33 @@
   kernel 同步 + `aidcp-kernel` 提交 + 三仓与 transport 的 kernel pin 上抬**之后**。
   否则 transport 编译当场 `TS2307`（找不到 `aidcp-kernel/kernel/llm-errors.js`）。
   **这次是编译期就红，反而是好事**——它是 pin 漂移那类「编译照过、只有真跑才炸」的镜像版本。
-- [ ] 0.8i **automation 第一次真需要 `aidcp-transport` 依赖**：它今天没 pin
+- [x] 0.8i **automation 第一次真需要 `aidcp-transport` 依赖**：它今天没 pin
   （对账工具明确打「未 pin aidcp-transport（用得上它的仓才需要）」），因为它自己是 `src/transport/` 属主、
   一直用本地副本。而 `src/llm/*` **不是** automation 属主，只能走包。接线时要新增这条 pin。
-- [ ] 0.8j **`qwen.ts` 有一个静默兜底，automation 的 main MUST 显式传 key 绕开它**：
+  <!-- aidcp-automation c365b1a（A-1）。pin = transport master 头 40df6de；对账已从「未 pin」
+       变成「pin 对齐」——**这条 pin 从此进棘轮**，以后 transport 一动它就要跟。
+       **没有只加 pin**：只加 pin = 装了个本进程没有去处的东西，正好犯批 A 刚立的那条判据。
+       同批做了消费者（见 0.8j）。
+       **这道闸从今天起不再是前瞻的**（task 2.8 的 `transport-single-copy`）：当场验了一次
+       「反正已经 pin 了，顺手从包里取个 HTTP 客户端」，闸当场红并点名说明符。
+       ⚠️ **一条别记反的偶然**：那次 typecheck 也红了，但只因为 `InternalHttpClient` 恰好有 private
+       字段（两份名义不兼容）。**换成没有 private 成员的类、或函数 / 错误类，typecheck 就是绿的**，
+       只有那道闸会说话——闸的 docblock 说的仍然成立，别据此以为编译器能接住这类事。 -->
+- [x] 0.8j **`qwen.ts` 有一个静默兜底，automation 的 main MUST 显式传 key 绕开它**：
   `this.apiKey = options.apiKey ?? process.env.DASHSCOPE_API_KEY ?? ''`——不传 key 时既不报错也不抛，
   直接落成空串；**更坏的是构造非 dashscope 厂商的出口时也会去读 `DASHSCOPE_API_KEY`**。
   content 的 main 是显式传的，automation 照抄。
+  <!-- aidcp-automation c365b1a（A-1）。落在 `src/automation-model-exit.ts`：
+       **不是写在 main() 里，而是抽成可单测的工厂**——写在 main() 里就只能等 task 3.1，
+       而这几条纪律本身与 main() 无关。批 E 只剩「调它 + 把 client 注入角色调度器」。
+       传的是**显式空串而不是省略**：空串不是 nullish ⇒ 那条 `??` 短路 ⇒ env 读根本不发生。
+       变异实测：删掉那一行 → 2 条用例红。 -->
+- [ ] 0.8j-剩余 **A-2 的另一半仍被 task 3.1 挡着**：批 E 的 `main()` 里
+  `await createAutomationModelExit({ apiHttp })` 并把 `client` 注入角色调度器，关停路径调 `stop()`。
+  <!-- 工厂已经把「怎么构造」全部封住了，剩下的纯粹是接线。两处别漏：
+       ① `apiHttp` 传组装根**已有的那个**（再 new 一个不报错，只是多一份会漂的基址）；
+       ② 用量记账挂 `onCall`（合并缓冲的家是 automation 自己的 main，见 2.4d-用量）——
+          工厂只留了缝，没实现缓冲。 -->
 - [ ] 0.8k **归属不变意味着派生栈里会有两份模型客户端实现**（content 的 `src/llm/` 本地副本 + 包里那份）。
   今天不致命（错误族已抬 kernel，跨副本 `instanceof` 问题已消），但两份各带一份默认 base URL
   与 env 读取默认值，**会悄悄漂**。建议让 content 的手写 main 改指包里那份
@@ -859,13 +884,16 @@
        下面那句「B 半剩下的是一个新问题」**已过期**，别照它开工。
 
        **A 半：物理搬迁 0.8 已完整做完（qwen.ts + providers.ts 已在包里、pin 已抬），还剩 4 件：**
-       - **A-1 `aidcp-automation` 新增 `aidcp-transport` 依赖**（0.8i，今天只 pin 了 kernel）。
-         ⚠️ `src/llm/*` 归属表里是 content，派生器**不会**把它拷进 automation 的 src ⇒ **只能走包**。
-         **会动 §6.2 的 pin 链，务必按「先 src、再 tests、最后抬 pin」的顺序**，倒过来做整条要重抬。
-       - **A-2 automation `main()` 里构造模型出口**（0.8j）——**被 task 3.1 挡**（automation 今天没有真 `main()`）。
-         三条硬约束：`import` 走 `aidcp-transport/llm/qwen.js`（**不是** `./llm/index.js`，那个桶文件有意不进包）；
-         `apiKey` **MUST 显式传**（不传会静默落空串，且构造非 dashscope 厂商时也会去读 dashscope 那个 env）；
-         密钥经属主侧窄读口取、**MUST NOT 复刻四层回落逻辑**。只需给角色调度器注入 `{ complete }`。
+       - **A-1 ✅ 已做完（2026-08-01，automation `c365b1a`）**：pin 已加且对账已从「未 pin」变成
+         「pin 对齐」。**没有只加 pin**——只加 pin 等于装了个本进程没有去处的东西，
+         同批把 A-2 里不被 3.1 挡的那一半（构造）一起做了，见下。
+         **实际不需要重抬 pin 链**：transport 本身没改，pin 直接等于它 master 头即可。
+       - **A-2 一半已做完，另一半仍被 task 3.1 挡着**（0.8j）。
+         三条硬约束**已全部落在 `automation-model-exit.ts` 这个可单测工厂里**、各有变异验过的用例：
+         `import` 走 `aidcp-transport/llm/qwen.js`（不是桶文件）；`apiKey` 显式传（**空串而非省略**，
+         空串让客户端那条 `??` 短路、env 读根本不发生）；密钥经属主侧窄读口取、四层回落一行没复刻。
+         **剩下的纯接线**：批 E 的 `main()` 里调工厂、把 `client` 注入角色调度器、关停调 `stop()`，
+         并把用量记账挂在 `onCall` 上（工厂只留了缝、没实现缓冲）。见 0.8j-剩余。
        - **A-3 ✅ 已做完（2026-07-31，见 0.8g 的 <!-- --> 记录）**：api 两条 route 已无条件注册，
          content 与 billing 两处裸 catch 已改成能区分「读失败」与「库内没配」。
          **一条比预期多出来的代价记在这里**：api 手写 main 为此首次构造了四张属主表的 store，

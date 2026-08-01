@@ -179,6 +179,9 @@ DERIVED_COMPOSITION = {
         'src/automation-service-entry.ts',
         # 自动化段 41 个导出面的「本进程有没有去处」判据清单，批 B…H 的尺子。
         'src/automation-segc-export-disposition.ts',
+        # 文本模型出口的构造（本仓唯一一处从 aidcp-transport/llm/* 取东西的地方）。
+        # Cloud 里这段活在组装根内联，没有对应文件。
+        'src/automation-model-exit.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'
