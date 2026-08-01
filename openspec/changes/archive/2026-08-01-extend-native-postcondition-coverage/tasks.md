@@ -89,7 +89,22 @@
   - **剩下的一处不改，如实记**：`unwrap_or(false)` 本身还在，但只有「页内脚本返回结构漂移」这一**假想态**
     才折叠，而该脚本（`xhs-search-input-geometry.js:28/41`）每条返回分支都带齐 found / focused / value。
     为一个假想态去动 `engine.rs`（并行开发点名的热点文件）不划算。
-- [ ] 3.2 `publish_upload_image`：判据由「该序号位有预览图」改为按**本次上传**的标识回读，须能区分「本次产生的」与「之前就在的」；残留预览不得再满足判据（design D6）
+- [x] 3.2 `publish_upload_image`：判据由「该序号位有预览图」改为按**本次上传**的标识回读，须能区分「本次产生的」与「之前就在的」；残留预览不得再满足判据（design D6）
+  <!-- aidcp-edge 20fc70a -->
+  - **改法**：写文件**之前**先取一份预览位身份基线，写之后有界轮询（5s / 250ms）等目标序号位出现
+    **基线里没有的**身份。身份 = 图片地址的长度 + FNV-1a 摘要，在页内算好，**地址本身不过 IPC**
+    （调用方只需要判等）。摘要碰撞会把新图读成旧图 —— 悲观方向，造不出假成功。
+  - **四种终局四个原因码，一条都不压成另一条**：基线读不到（**在写文件之前**停手，回 not_started）/
+    那一位一直没出现 / 出现了但身份读不出来 / 出现了但还是基线里那张（后三者 ambiguous）。
+    身份标志缺席时按「读不出来」算，绝不当成新图。
+  - **⚠️ 这条不是原任务假设的「纯本地小改」，实读之后换了落法。** 判据原文在
+    `xhs-command-router.js:985-988`，而那是 `restore-native-xiaohongshu-action-honesty` 的**单写区**，
+    且属主已经改过**同一个 `if` 块**的设封面那半（`52a2110`）。所以走本仓现成的第三条路
+    ——**引擎特化**：`engine.rs` 截走这条命令，共享读数落在特化支撑分片 `xhs-input-targets.js`
+    （其属主 change 已归档、无活写者），**属主文件一行没碰**。与评论提交 / 正文填写 / 话题三条同族。
+  - **交给属主的待办（本轮没删，也没加任何注释标记）**：路由里
+    `if(kind==='publish_upload_image')return done(action('upload_image',true));` 这一行现已不可达。
+    **只删这一行** —— 同一个 `if` 块里 `publish_set_cover` 那半仍然活着，整块删掉会把设封面一起删没。
 - [x] 3.3 `publish_add_with_candidate` 的 mention / location / collection 三支：结构接受信号需真机标定（backlog 簇 123.34）。标定前保持 below_bar 带具名处置，**不得记 confirmed**（无证据）、**也不得记 not_applicable**（它们结构上有可读回的业务结果，用「读不出来」冒充「本来就没有」是另一种假成功）（design D7）
   <!-- aidcp-edge 72bc3d9（处置落表）+ 控制仓 backlog 123.34 补了反向指针 -->
   - 处置按 `kind:exception` 记，`blockedBy` 直指 backlog 簇 123.34；`owner` 一栏把「两个都不许记」那句
@@ -107,22 +122,61 @@
 
 ## 4. aidcp-edge — 验证
 
-- [ ] 4.1 每条改动过判据的命令补 / 改脱机用例：断言「读不到」与「读到否」两态可分、断言证据与本次动作绑定
-- [ ] 4.2 变异检验：对 3.2 的「绑定本次」判据做一次变异（退回成「有预览图即可」），确认有用例红，并记下**是哪一条**抓住的
+- [x] 4.1 每条改动过判据的命令补 / 改脱机用例：断言「读不到」与「读到否」两态可分、断言证据与本次动作绑定
+  <!-- aidcp-edge 20fc70a：新增 `native/page-engine/tests/xhs_publish_upload_binding.rs`，5 例 -->
+  - 两态可分那条钉了**三个**终局而不是两个：显式「身份读不出来」/ 身份标志**缺席** / 那一位确实没有，
+    三者原因码互不相同。绑定那条同时断言**附件确实写下去了**——否则「不确定」会被误读成「没开始」。
+- **本节口径说明**：§2 是只读通读、没改任何命令的判据，§3.1 判定不改，§3.3 / §3.4 转交属主，
+  所以「改动过判据的命令」实际只有 3.2 一条。**写出来是为了让下一个人知道这不是漏了。**
+- [x] 4.2 变异检验：对 3.2 的「绑定本次」判据做一次变异（退回成「有预览图即可」），确认有用例红，并记下**是哪一条**抓住的
+  <!-- aidcp-edge 20fc70a：做了三次，逐条归因；源码事后按备份拷回并核 sha 一致 -->
+  - ① 删掉「与基线比对」那一支（退回成「有预览图即可」）→ 残留预览那条红。
+  - ② 身份标志缺席时的默认由悲观改成乐观 → 两态那条红。
+  - ③ 基线读不到时不停手、继续用空基线写下去 → 「写之前停手」那条红。
+  - **② 第一次跑是绿的，这件事比三条都红更值得记**：那个悲观默认当时**一处都不承重**——
+    所有夹具都显式给了标志，缺省分支根本走不到。补了「标志缺席」那条用例之后它才咬住。
+    **变异要问「哪条用例抓住的」，不能只问「有没有红」**；而「没红」的正确读法是
+    **判据没被覆盖**，不是「判据没问题」。
+  - Rust 侧每次都确认输出里出现 `Compiling`，否则测的是编辑之前的旧二进制。
 - [x] 4.3 门禁自检回归：1.6 的两条负样本保留为常驻用例，防止棘轮日后被改松
   <!-- aidcp-edge 72bc3d9 立、9ecab93 加固：4 条常驻自测（1 正对照 + 3 负样本），且负样本带**自己的**上限，
        真上限 16→0 之后仍然承重。原任务要求两条，实装 3 条负样本（多的那条：判据修达标后处置没摘掉） -->
-- [ ] 4.4 全量闸：`cargo test --locked` / `cargo fmt --check` / `clippy -D warnings` / `npm run gate:native` / `npm run typecheck` / `npm run test:acceptance` / `npm test`
+- [x] 4.4 全量闸：`cargo test --locked` / `cargo fmt --check` / `clippy -D warnings` / `npm run gate:native` / `npm run typecheck` / `npm run test:acceptance` / `npm test`
+  <!-- aidcp-edge 20fc70a：Rust 355 例 0 失败（`RUST_TEST_THREADS=1 cargo test --locked`）、
+       `cargo fmt --check` 通过、`clippy --all-targets -- -D warnings` 无告警、
+       验收 38/38、全量 2955 例（2954 通过 / 1 跳过 / 0 失败）、`typecheck` 干净；
+       `land-change` 的 `gate:native` 同批全过。工具链 1.97.1-aarch64-apple-darwin（不在默认 PATH） -->
 
 ## 5. aidcp-edge — 收口
 
-- [ ] 5.1 提交 + 推送 `aidcp-edge` master；本仓 tasks.md 按 `<!-- <repo> <sha> 备注 -->` 回写（sha 取自**已推送**提交）
+- [x] 5.1 提交 + 推送 `aidcp-edge` master；本仓 tasks.md 按 `<!-- <repo> <sha> 备注 -->` 回写（sha 取自**已推送**提交）
+  <!-- 四次落地，均已 ff 推 origin/master：72bc3d9（§1 棘轮与处置）/ 7355bb1（§2 分类，纯读）/
+       9ecab93（§3.1 改判 + §3.4 转交）/ 20fc70a（§3.2 绑定本次上传）。四个 sha 都取自已推送提交 -->
 - [x] 5.2 真机项登记到 `docs/real-machine-acceptance-backlog.md`：候选项三支的结构接受信号标定（并入簇 123.34，不新开簇）
   <!-- 控制仓：123.34 已存在且覆盖这三支，按要求**未新开簇**，只补了指回盘点表的反向指针 -->
 - [x] 5.3 真机项登记：§2 读出的、只有真机能判定的判据（若有），按面归入既有簇
   <!-- 无新增真机项：§2 的 16 条全部在代码上判得出来（13 条判据够强、3 条判据缺失且判据所需读数已在同文件内）。
        **「没有」也要写出来**，否则下一个人无从分辨是「查过了没有」还是「忘了查」 -->
-- [ ] 5.4 归档前按 handoff §12.1 逐条对读 delta 与实装，**至少读两遍、第二遍在修完之后**
-- [ ] 5.5 开工前与收口前各跑一次 `openspec list`，核对 `engine.rs` / `facebook/auth.rs` 有无并行流压着（这两个是点名热点，须串行）
-  <!-- 开工前已跑（2026-08-01）：两个热点文件本 change 一行未改（§2 是只读通读，§3.1 判定不改）。
-       收口前那一次待 §3.2 完成后补跑 -->
+- [x] 5.4 归档前按 handoff §12.1 逐条对读 delta 与实装，**至少读两遍、第二遍在修完之后**
+  <!-- aidcp-edge 24131eb（对读发现的那处缺口的修复）+ 本次回写 -->
+  - **对读抓到一处实装没跟上，已补**：delta 那条 scenario 写的是「把 unread 改成 below_bar 时，
+    **抬 below_bar 预算这个动作本身会被拒**」，而实装只给 unread 加了上限字面量。
+    后果是：真按规矩同时把 below_bar 预算加一，两个预算都还等于各自实际条数、门禁全绿，
+    而那条命令的风险一点没变 —— **正是这条要求要堵的那条路，换了个更体面的走法**。
+    已补上 below_bar 的上限字面量（与 unread 同构，design D2 要的就是同构），
+    并加了一条「按规矩抬预算」的负样本，由上限那条单独抓住。
+  - **其余逐条对得上**：机械覆盖全部写命令（恰好相等）/ 四态之分 / 两个预算都不留空位 /
+    处置必填与两种形态 / 具名例外指向**具体**真机条目（簇 123.34，不是泛指真机）/
+    未读归零后恒零。三条 scenario 各有常驻样本承重。
+  - **MODIFIED 目标名按 §5 的判据逐行精确核过**：
+    `grep -qxF "### Requirement: Native page writes MUST be validated against the acted-upon target"`
+    在主 spec 命中（注意 `### Requirement:` 后面那个空格，少算一格会全体误报）。
+- [x] 5.5 开工前与收口前各跑一次 `openspec list`，核对 `engine.rs` / `facebook/auth.rs` 有无并行流压着（这两个是点名热点，须串行）
+  <!-- 开工前 + 收口前各跑一次（2026-08-01） -->
+  - `facebook/auth.rs`：**一行未改**（§2 对那 7 条只做通读）。
+  - `engine.rs`：§3.2 改了（新增上传特化 + 两个辅助函数，替掉原 `verify_uploaded_preview`）。
+    落地前核过：点名共写它的两条活跃 change（`restore-native-facebook-residual-parity` /
+    `harden-native-engine-runtime-contracts`）改的是 Facebook 与运行时契约两块，与小红书发布分支不重叠；
+    `land-change` 的 rebase 也无冲突。
+  - **`xhs-command-router.js` 才是本轮真正的串行约束**（原任务没点名它）：它是
+    `restore-native-xiaohongshu-action-honesty` 的单写区，本 change **一行未碰**，见 3.2 与 3.4。
