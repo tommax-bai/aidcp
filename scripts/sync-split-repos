@@ -198,6 +198,9 @@ DERIVED_COMPOSITION = {
         # 每连接运行时的装配（批 E 前半）：连接运行时注册表 / 互动去重守卫 / 动作冷却兜底闸。
         # 每连接角色调度器工厂是必填注入口，由批 E 后半供。同为组装根内联段的落点。
         'src/automation-connection-runtime.ts',
+        # 每连接角色调度器工厂（批 E 后半 = 批 E-2 步骤 3）：它交付的正是上面那个必填口。
+        # 批 G 才有的供给方（评论域 / FB 两套运行时）在此做成必填字段或能力二态。
+        'src/automation-connection-dispatcher.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'
