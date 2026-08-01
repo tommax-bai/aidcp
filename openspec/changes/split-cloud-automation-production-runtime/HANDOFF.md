@@ -41,9 +41,9 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > **2026-08-01 夜 · 现状（这一段是当前事实，读它就够；逐批沿革移到文末 §10）**
 >
 > **六仓**：cloud `534af19` / kernel `27cbfc5` / transport `e1499fc` / api `5f969ed` /
-> content `d68ee85` / automation `ff44774`；控制仓见 `git log`。
+> content `d68ee85` / automation `613338a`；控制仓见 `git log`。
 > 共享包 pin 已按 kernel → transport → 三个业务仓抬完，六仓 pin 全对齐、**对账零漂移**。
-> **测试**：cloud 4064 / api 501 / content 441 / automation 2024 / kernel 70 / transport 36，全 0 fail。
+> **测试**：cloud 4064 / api 501 / content 441 / automation 2032 / kernel 70 / transport 36，全 0 fail。
 > **门 11 条**（运营指令 3 / 内容 7 / 组装 1）。**tasks.md 76/128。**
 >
 > **门为什么不动**：整个第 3 段它都会停在 11。撤条判据写在 automation 台账自己的 docblock 里
@@ -59,7 +59,8 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > | B | ✅ | 风控单写者 + 告警底座（`4d3fb89`） |
 > | C | 大半 | 配置副本停手闸（`089e2cc`）+ 记账漏斗与 outbox 保留期（`6958e55`）；**剩三件**见下 |
 > | D | ✅ | 出口闸放行判定析出 kernel（`8d62dca`）+ 边缘接入正文（`ff44774`，`src/automation-edge-access.ts`） |
-> | E / F / G / H | ⬜ | 未开工 |
+> | F | ✅ | 发布下发与陪伴界面（`613338a`，`src/automation-publish-dispatch.ts`） |
+> | E / G / H | ⬜ | 未开工 |
 >
 > **形态在批 B 定下来了，后面每批照做**：写成**可单测的工厂**，不写进 `main()`。
 > 写进去就只能等 3.1，而这些装配本身与 `main()` 无关。最后 `main()` 只是把它们串起来。
@@ -67,10 +68,11 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > ### 下一步（按依赖）
 >
-> 1. **批 E 与批 F 可并行** —— 整个第 3 段唯一一处能并行的缝，别浪费。两者都只依赖 D 与 B。
->    **它们各自要填的口批 D 已经用编译器钉住了**（见下「批 D 留下的三个必填口」），
->    照着签名做即可，不必再去 cloud 组装根里重新勘察边界。
-> 2. **批 C 剩的三件**（不阻塞 E/F）：面板事件投递客户端、配置面审计中继
+> 1. **批 E**（每连接运行时）。**它现在是第 3 段的关键路径**：批 D 与批 F 各留了必填口等它，
+>    而批 G 的调度器又依赖它。**别低估体量** —— 实测它是整段最密的一块：
+>    每连接调度器工厂一个函数就 400 余行，读写二十来个存储 / 配置 / 策略，
+>    其中相当一部分的供给方要到批 G 才有。开工前先按批 D/F 的办法把「批 G 才有的」列成必填口。
+> 2. **批 C 剩的三件**（不阻塞 E）：面板事件投递客户端、配置面审计中继
 >    （**写的是接口属主表，跨进程后 MUST 走已有通道、别直连**）、风控指令消费者接线。
 >
 > ### 批 D 留下的三个必填口（批 E/F/G 的开工面）
@@ -80,8 +82,8 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > | 口 | 谁供 | 单体里对应什么 |
 > | --- | --- | --- |
-> | `runtime`（`busFor` / `onHandshake` / `controllerForSession` / `onDisconnect` / `onWelcomed`） | 批 E | `ctx.runtimes!` —— **那个 `!` 在本进程不成立** |
-> | `uiSnapshot`（`pushHelloSnapshot`） | 批 F | `ctx.uiSnapshot?.pushHelloSnapshot` |
+> | `runtime`（`busFor` / `onHandshake` / `controllerForSession` / `onDisconnect` / `onWelcomed` + 批 F 追加的 `sessionUsageForAccount` / `resumeGateForAccount`） | 批 E | `ctx.runtimes!` —— **那个 `!` 在本进程不成立**；后两个在单体里是 `?? null`，那条回落在本进程是常态 |
+> | `uiSnapshot`（`pushHelloSnapshot`） | ~~批 F~~ ✅ 已供 | `ctx.uiSnapshot?.pushHelloSnapshot` |
 > | `interaction`（**二态**：`wired` 带 port / `unavailable` 带具名理由） | 批 B/G | 收件箱 + 运行时开关 + 握手后恢复编排 |
 >
 > **第三个刻意不是 `undefined` 可选**：互动能力在单体里本来就会因 schema 不可用而整体缺席，
@@ -725,7 +727,7 @@ kernel 头一动，transport 与三个业务仓的 pin 全部作废，整条链�
 | ~~**C**~~ 大半 | outbox 中继 + 配置镜像刷新 | `Block② 2e：拆段传输接线`、`event_outbox 保留期`、`记账 outbox + worker + 对账`、`配置面审计中继` | ~640 行 | B |
 | ~~**D**~~ ✅ | 边缘接入（含边-云服务端） | `配置镜像刷新器接线` 后半 + `多租户连接运行时` 前半 | ~550 行 | C |
 | **E** | 每连接运行时（总线 + 角色调度器） | `按连接多租户编排`、`精选准入文字卡识别/转写` | ~620 行 | D |
-| **F** | 发布下发 | `发布下发段` | ~624 行 | D、B |
+| ~~**F**~~ ✅ | 发布下发 | `发布下发段` | ~624 行 | D、B |
 | **G** | 各类调度器 | `Facebook 定向评论…`、`内容排期调度器` 前半 | ~500 行 | E、F |
 | **H** | 导出面收口 → 交给第 4 段 | `内容排期调度器` 尾部那 28 条赋值 | ~200 行 | 全部 |
 
@@ -784,11 +786,17 @@ kernel 头一动，transport 与三个业务仓的 pin 全部作废，整条链�
 **踩点**：注册表要三样东西——控制器解析（批 B）、调度器工厂、关连接（批 D）。
 角色人设注入 MUST 走取值口而不是快照（构造期检查已在，漏传会当场抛）。
 
-**批 F · 发布下发**
-下发器、UI 快照服务、定时发布对账器、待下发看门狗、草稿精修工作器、发布 UI 更新接收器。
-**可与 E 并行**（两者都只依赖 D 与 B，互不依赖）——**唯一一处可以并行的缝，别浪费**。
-**踩点**：下发器的素材端口是**可选参数**，漏传会让三个写静默消失；
-2.4d 已补计数与具名 error，搬的时候别把那一支丢了。
+**~~批 F · 发布下发~~ ✅ 已做完**（automation `613338a`，落点 `src/automation-publish-dispatch.ts`）
+**三处与原计划不同，按实际的读：**
+- **原文列的六样里有两样本进程不构造**：待下发看门狗与草稿精修工作器的构造条件在单体里
+  就写着「非自动化模式」，由接口进程承担。同批还查出另两样同形（发布授权 outbox 中继、
+  客户端内审批与删图处理器）—— 后者在本进程的调用点已按模式改指接口进程的远程口。
+  **这不是能力消失**，是属主在接口进程。
+- **素材端口那条踩点做成了「能力二态」**，不是传个可选参数了事：
+  `unavailable` 必须带具名理由。另外它有**两条调用路径**——下发器那个窄口，
+  以及驳回时组装根直调的那一处；只顾窄口会让驳回后的素材永久卡在 reserved 上。
+- **发布调度器（`publishScheduler`）不在本批**：判据清单把它排在 F，但它实际住在
+  「内容排期调度器」那一段，随批 G 一起搬更自然。清单自己写着「这是排期，不是契约」。
 
 **批 G · 各类调度器**
 评论调度器、发布调度器、加群调度器、内容排期调度器、消费模式协调器、委托任务工作器。

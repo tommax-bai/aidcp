@@ -192,6 +192,9 @@ DERIVED_COMPOSITION = {
         # 边缘接入的装配（批 D）：验证码协助与协调 / 指令定序器 / 边缘任务租约客户端 /
         # 消息处理器 / 边-云 WebSocket 服务端。Cloud 里同为组装根内联段，无同名文件。
         'src/automation-edge-access.ts',
+        # 发布下发与陪伴界面的装配（批 F）：界面快照层 / 当日用量 / 浏览器待机提示 /
+        # 发布下发器 / 定时发布对账器 / 下发触发受理口。同为组装根内联段的落点。
+        'src/automation-publish-dispatch.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'
