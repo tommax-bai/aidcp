@@ -28,3 +28,9 @@
   <!-- After rebasing onto Edge master@52cd8d9, full `npm test` passed 3036/3036 with 1 gated skip; Acceptance passed 38/38. Typecheck, diff check, and strict OpenSpec validation passed. -->
 - [x] 5.3 Record repo/commit/validation evidence, commit and push the isolated control/Edge branches, then serially integrate eligible default branches without packaging or deployment.
   <!-- Edge was rebased, revalidated, and fast-forward integrated to master at aidcp-edge@cff5a19. The control record was rebased onto current origin/main for fast-forward integration. No package, installation, or deployment was performed. -->
+
+## 6. Nickname Selection Regression
+
+- [x] 6.1 Add renderer coverage proving a nickname single-click selects without browser control, then replace the stale deleted row-activation callback while preserving nickname double-click editing.
+  <!-- Edge regression reproduced `onRailRowActivate is not defined`, then passed 2/2 focused nickname gesture tests after routing the delayed single-click to `selectEnv`; no stale handler references remain. -->
+- [ ] 6.2 Run focused renderer validation, Edge typecheck, and strict OpenSpec validation; record the repair commits and delivery boundary without packaging or installation.
