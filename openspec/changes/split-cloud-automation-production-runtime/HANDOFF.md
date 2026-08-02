@@ -44,7 +44,7 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > | 项 | 值 |
 > | --- | --- |
-> | 六仓 | cloud `c394f36` / api `35c63ba` / **automation `0044881`** / **content `f8b714d`** / kernel `6101b1e` / transport `1444d59` |
+> | 六仓 | cloud `c394f36` / api `35c63ba` / **automation `0044881`** / **content `7305b46`** / kernel `6101b1e` / transport `1444d59` |
 > | 工作区 | 六仓全干净、全已推、**对账零漂移**、两个共享包 pin 全对齐 |
 > | 测试 | cloud 4115 / api 502 / **automation 2148** / **content 442** / kernel 70 / transport 36，全 0 fail |
 > | 门（真交付物） | **11 条**（运营指令 3 / 内容 7 / 组装 1） |
@@ -79,8 +79,10 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > 一起跑起来才 404。而那是**跨进程**的 404：调用方读到的是「对面不支持这个方法」，
 > 一个本该留给「对面版本落后」的具名原因，被一次纯接线遗漏冒名顶替。
 >
-> content 侧已补三组（属主实例本来就在，只差注册）并加了**只许下降的清单闸**（`f8b714d`）：
+> content 侧已补**四组**（三组属主实例本来就在、只差注册；回复生成顺手把属主实例也建了）
+> 并加了**只许下降的清单闸**（`f8b714d` + `7305b46`）：
 > 共享包导出的每个内容属主 registrar MUST 在清单里 —— **漏登记是静默的，比漏注册更危险**。
+> **只剩文字卡转写一条 pending**（还缺视觉客户端与形态判别器两样料）。
 > api 那条只记不修（要先把内容排期器接进接口进程），见 tasks 3.5j。
 >
 > ⇒ **下一批凡新接一个跨进程客户端，先去对面 `main()` 里确认那条路由真被注册了。**
