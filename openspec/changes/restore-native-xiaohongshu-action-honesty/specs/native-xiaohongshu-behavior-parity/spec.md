@@ -167,6 +167,36 @@ Moving Xiaohongshu publish execution into the Native engine MUST NOT exempt it f
 - **THEN** the submit atom does not report a confirmed publish
 - **AND** an unverified dispatched submit is reported as ambiguous with the dispatch recorded
 
+### Requirement: Native Xiaohongshu scheduled submit remains bound to confirmed platform mode
+
+The Native Xiaohongshu `set_schedule` atom SHALL preserve the established scheduled-publish contract through the irreversible submit. It MUST read the real schedule switch before acting, MUST leave an already-enabled switch untouched, and MUST confirm an initially disabled switch became enabled within a bounded window before writing the target time. An unreadable switch state MUST NOT be treated as disabled or enabled. After writing, success requires the platform surface to keep the switch enabled, expose the exact Beijing target minute, and expose an exact leaf submit control labelled `定时发布`; an hour-only prefix match or the value just assigned without the other platform signals MUST NOT confirm the atom.
+
+The Native session SHALL remember whether the current publish page was confirmed for immediate mode or for one exact scheduled target. That state MUST be derived from a confirmed publish-page navigation and a successful `set_schedule`, not from a cloud assertion or a page-script marker. Immediately before `submit_publish`, the adapter MUST re-read the platform mode and require it to match the remembered state. A scheduled submit MUST also re-read the exact target minute and actuate only the exact `定时发布` submit control; an immediate submit MUST require the switch to be explicitly off and actuate only the exact `发布` submit control. Unknown or mismatched state MUST terminate before dispatch with `submitDispatched=false`.
+
+#### Scenario: Already-enabled schedule is idempotent
+
+- **WHEN** `set_schedule` reads the real schedule switch as enabled before actuation
+- **THEN** it does not click the switch again
+- **AND** it proceeds only after the exact target minute and the exact `定时发布` submit control are confirmed
+
+#### Scenario: Minute coercion fails before submit
+
+- **WHEN** the platform keeps the schedule enabled but coerces or rejects the requested minute
+- **THEN** `set_schedule` returns a non-success result
+- **AND** the publish sequence stops before `submit_publish`
+
+#### Scenario: Scheduled state is lost before submit
+
+- **WHEN** `set_schedule` previously succeeded but the platform switch is off, the exact target minute changed, or only an immediate `发布` control is available at submit time
+- **THEN** `submit_publish` does not actuate any submit control
+- **AND** it returns a not-started receipt with `submitDispatched=false`
+
+#### Scenario: Immediate submit does not cross an enabled schedule
+
+- **WHEN** the Native session expects immediate mode but the platform schedule switch is enabled
+- **THEN** the adapter does not choose a submit control by text order or horizontal position
+- **AND** it returns a not-started receipt with `submitDispatched=false`
+
 ### Requirement: Unmeasured Xiaohongshu compatibility branches are removed rather than left claiming success
 
 Any retained Xiaohongshu command branch that reports a page effect SHALL report it from measured evidence. A scroll step MUST report measured displacement rather than an unconditional confirmation. A compatibility branch that cannot produce such evidence MUST be removed once no live producer of its command exists; leaving it in place with a fabricated confirmation MUST NOT be accepted as harmless because it is believed to be unreachable.
