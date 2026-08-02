@@ -33,4 +33,5 @@
 
 - [x] 6.1 Add renderer coverage proving a nickname single-click selects without browser control, then replace the stale deleted row-activation callback while preserving nickname double-click editing.
   <!-- Edge regression reproduced `onRailRowActivate is not defined`, then passed 2/2 focused nickname gesture tests after routing the delayed single-click to `selectEnv`; no stale handler references remain. -->
-- [ ] 6.2 Run focused renderer validation, Edge typecheck, and strict OpenSpec validation; record the repair commits and delivery boundary without packaging or installation.
+- [x] 6.2 Run focused renderer validation, Edge typecheck, and strict OpenSpec validation; record the repair commits and delivery boundary without packaging or installation.
+  <!-- Edge master@3cd60bf passed nickname gestures 2/2, fleet console 95/95, renderer smoke 104/104, syntax/stale-reference checks, typecheck, and diff check. Control evidence began at ba9d75b4 and strict OpenSpec validation passed. Edge master was pushed; no package, installation, client restart, Cloud deployment, or live-account action was performed. -->
