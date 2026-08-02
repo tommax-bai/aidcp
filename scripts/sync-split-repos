@@ -205,6 +205,8 @@ DERIVED_COMPOSITION = {
         'src/automation-facebook-runtime.ts',
         # 批 G 第二片：评论域审批与通知五个口（含语料口，复用批 B 底座实例）。
         'src/automation-comment-approval.ts',
+        # 批 C 最后一件：互动配置面审计中继（outbox → 接口属主表，经已有跨进程通道）。
+        'src/automation-config-audit-relay.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'
