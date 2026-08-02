@@ -15,7 +15,7 @@
 - [x] 3.1 Extend Console API types, policy summary, draft validation and write payload with `reels.slowStart.viewsPerLike`.
 - [x] 3.2 Add the cold-start Reel like frequency input beside the existing follow frequency while preserving total-days resizing and per-day cap editing.
 - [x] 3.3 Add Console tests for load, edit/save, validation, stale revision preservation and the unchanged “copy last day” behavior.
-  <!-- Console commit ac0ce49; the global editor keeps the complete slowStart cadence in every CAS write. -->
+  <!-- Console commit f8d7df2; rebased onto 9e8bd69 and keeps the complete slowStart cadence in every CAS write. -->
 
 ## 4. Validation and delivery record
 
