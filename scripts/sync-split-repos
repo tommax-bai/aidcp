@@ -211,6 +211,8 @@ DERIVED_COMPOSITION = {
         'src/automation-comment-scheduler.ts',
         # 批 G 第四片：Facebook 消费模式协调器（填满 10 个口的最后一个）。
         'src/automation-facebook-coordinator.ts',
+        # 批 H 第一片：四个业务配置取值口的实现（镜像取快照 → 喂 kernel 判定，本文件零解析逻辑）。
+        'src/automation-business-config.ts',
         # 批 C 最后一件：互动配置面审计中继（outbox → 接口属主表，经已有跨进程通道）。
         'src/automation-config-audit-relay.ts',
     },
