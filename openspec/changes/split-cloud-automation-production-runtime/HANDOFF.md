@@ -40,10 +40,10 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 
 > **2026-08-02 深夜 · 现状（这一段是当前事实，读它就够；逐批沿革移到文末 §10）**
 >
-> **六仓**：cloud `66c88f8` / api `85d7416` / automation `1de0876` / content `c175a3e` /
-> kernel `b4cc9a2` / transport `cca7fff`；控制仓见 `git log`。
+> **六仓**：cloud `f7e9043` / api `f622d12` / automation `697823c` / content `b156714` /
+> kernel `12154e1` / transport `2e08ec6`；控制仓见 `git log`。
 > 六仓全干净、全已推、**对账零漂移**、pin 全对齐（kernel 与 transport 本轮都动了、四仓 pin 已抬）。
-> **测试**：cloud 4103 / api 502 / automation 2116 / content 441 / kernel 70 / transport 36，全 0 fail。
+> **测试**：cloud 4108 / api 502 / automation 2116 / content 441 / kernel 70 / transport 36，全 0 fail。
 > **门 11 条**（运营指令 3 / 内容 7 / 组装 1）。**tasks.md 77/129。**
 >
 > **门为什么不动**：整个第 3 段它都会停在 11。撤条判据写在 automation 台账自己的 docblock 里
@@ -140,7 +140,12 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > - **批 B 留的两个必填口都已有真实现**（配置副本陈旧 ← C 镜像半；记账断链 ← C 记账半）。
 >   **但最后一跳没接**：把它们喂进批 B 的底座属批 H 的 `main()`。在那之前口仍是空的
 >   —— 而这正是当初做成必填无默认的价值：**缺实现是编译期可见的**。
-> - **dev 已在 2026-08-02 深夜二次部署到 cloud `66c88f8`**（即当前主干头，含环境流补的环境键）：
+> - **dev 已在 2026-08-02 深夜三次部署到 cloud `f7e9043`**（即当前主干头，含新接的两条 api 属主口）：
+>   备份 `cloud.bak.20260802-114620.tar.gz` → 干净快照 rsync → marker 逐条验过 →
+>   三属主库无待应用迁移 → 重启。健康检查全过（`active`、重启计数 0、三口在听、error 0 行、
+>   飞书长连接已建立、面板 API 200、isales 四服务未触碰）。
+>   上一次（`66c88f8`）的记录保留在下面：
+> - **dev 曾于同日部署到 cloud `66c88f8`**（含环境流补的环境键）：
 >   备份 `cloud.bak.20260802-110132.tar.gz` → `git archive HEAD` 干净快照 rsync → marker 逐条验过 →
 >   三属主库均无待应用迁移 → 重启。健康检查全过（`active`、重启计数 0、8787/8090/8091 三口在听、
 >   error 0 行、飞书长连接已建立、面板 API 200、isales 四服务未触碰）。
