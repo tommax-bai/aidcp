@@ -25,6 +25,7 @@
 - [x] 1.20 为 E4 增加失败优先用例：① 开关已开启时 `set_schedule` 不得再点；② 开关明确关闭时须点击并有界确认开启；③ 状态读不到、开关不翻转、分钟被平台吸附/驳回、缺精确「定时发布」提交控件任一成立均不得回成功；④ scheduled / immediate 两种 `submit_publish` 都必须在点击前复读平台模式，模式或目标分钟不符时零点击且 `submitDispatched=false`；⑤ Native 会话状态只能由确认进入发布页与成功 `set_schedule` 推进，unknown 不得提交（依据 `xhs-native-scheduled-publish`「定时设置是提交关键步骤并具有正证据校验」及 E4） <!-- aidcp-edge fd3ee6a：xhs-publish-atoms 新增 11 条 E4 行为例；失败优先首跑明确复现已开仍点 / 未翻转仍成功 / 分钟只比小时 / 缺定时提交按钮仍成功 / 跨模式选错按钮 / scheduled 漂成 off 仍提交六类红；随后补齐读不到、点击不翻转、submit 前分钟漂移三条同族护栏。最终该文件 17/17；Rust 新增会话三态与内部参数注入 3 条单测，gate:native:test 全绿。 -->
 - [x] 1.21 为 H.5 第二轮复验新增失败优先用例：① `notification_back_home` 不得把 `/explore/<noteId>` 详情链接当首页入口或返回后置证据；② session 获取失败仍是零派发 / not_started，命令记录写入后丢终局才是 ambiguous；③ `submit_publish` 记录已写入后 timeout / process exit 保守携带 `submitDispatched=true`，写入前失败不得携带；④ search 的 `page_cards` 观测不得把 non-confirmed execution 升成成功回执；⑤动作 / 发布失败保留最具体 Native reason；⑥ submit 与三条发布身份抓取命令拒绝 generic `action_receipt` 成功升级；⑦点击后只有无关 body 区域新增「发布中」或点击前已有陈旧成功 toast 时不得确认本次提交 <!-- aidcp-edge 0e8e4b9：首红分别为宿主 browse/pacing/publish 48 绿 5 红、transport client 13 绿 2 红；旧 Rust 会把 4 条 typed publish 命令全部由 generic action receipt 升级；页面层复现详情链冒充首页、旧 toast 与无关 body 进行态冒充本次提交。修复后 H.5 focused 118/118、registry 11/11，Rust typed receipt 5/5。 -->
 - [x] 1.22 为 E7 发布身份绑定新增失败优先用例：①立即抓取不得用全页第一条旧帖或 creator URL 任意 `id` 参数冒充本稿；②只有本次提交后新增 / 变化的成功结果作用域内唯一笔记身份可绑定，旧节点、全页列表、两条候选均不得猜；③公开 `postUrl` 只接受匹配该 id 且含非空 `xsec_token` 的 HTTPS 小红书详情链接；④定时句柄按内部 id 优先、否则冻结标题 + 完整北京时间日期分钟 + 定时态合取后唯一匹配，不得用泛 `data-id`；⑤到期对账把仍定时明确回 `scheduled_pending`，只有已发布唯一行同时给真实公开 id 与 tokenized URL 才成功；⑥缺身份时三条命令仍返回 typed publish receipt，而非 generic receipt / Rust invalid-result <!-- aidcp-edge 2f143e4：旧 router failure-first 同时把三条反例误报 ok=true：全页旧帖 `old`、前一天同标题同分钟定时稿 `old-scheduled`、仍待发布行 `scheduled-target`；新建 xhs-publish-identity 8 例并在 xhs-publish-atoms 加 4 条 fresh-result / token / 唯一性 / 仿冒域反例，Rust 会话加 3 例 record 绑定与 URL 纪律。 -->
+- [x] 1.23 为 E2 未校准候选新增失败优先用例：① location 候选自身只新增 `aria-selected`；② mention 候选点击后正文只含本命令刚写入的 `@Alice`；③ collection 点击后入口只回显候选文案。三者均不得确认平台实体已绑定；另钉住入口 / 候选找不到或点不着时保留具体 `not_started` 原因 <!-- aidcp-edge ea2c4c9：旧码三条反例均误报 confirmed；修后 focused 20/20、与库存门合跑 31/31。 -->
   - 进度说明（2026-07-29，取代 07-28 那条）：1.13–1.19 的失败优先用例**已进提交** `a45fc81`（`test/native-page-engine/xhs-notification-parity.test.ts`，405 行 / 13 例，落笔时 11 红 2 绿）。07-28 记的「未追踪状态、未进任何提交、集成前须由属主提交」这一风险**已消解**，覆盖不会再随分支合并丢失。13 例与 1.13–1.19 逐条对得上（未读读数 3 / 两类回执 3 / 清零循环 2 / per-tab 计数 3 / 严格叶子分类栏 1 / code-point 截断 1 / 禁自造批次序号 1），故本轮据实勾选；13 例已全部由 2.9–2.15 的实装（`19d4872`）转绿。
 
 ## 2. aidcp-edge — 恢复动作诚实（两条 critical 优先）
@@ -84,46 +85,55 @@
 
 ## 3. aidcp-edge — 发布原子回到既有契约
 
-- [ ] 3.1 依据 `openspec/specs/publish-pipeline/spec.md`「边缘指令运行时逐条执行并每条后置校验如实回报」，在 Native 小红书正文填写上恢复逐字增量输入、每个换行独立派发真实 Enter、有界确认段落数/已写前缀/光标归尾、语义相似度 ≥ 0.90 放行、失败清场
+- [x] 3.1 依据 `openspec/specs/publish-pipeline/spec.md`「边缘指令运行时逐条执行并每条后置校验如实回报」，在 Native 小红书正文填写上恢复逐字增量输入、每个换行独立派发真实 Enter、有界确认段落数/已写前缀/光标归尾、语义相似度 ≥ 0.90 放行、失败清场
   - 部分完成（2026-07-29，`aidcp-edge 19d4872`；**五项里四项已落，「逐字」那一项未落，故不勾选**）：已落——① 增量写入（按 24 个 code point 分块追加、块间留 20ms，取代一次性整段赋值）；② 每个换行独立派发一次回车键事件，派发后立刻复读、换行没落进内容就补写一个（宁可段落结构不理想也不丢正文）；③ 有界确认（2000ms / 80ms 步进）三条判据齐备——已写内容以目标开头、受控框语义下段落数达标、相似度（字符二元组 Dice）≥ 0.90；④ 确认不过即**清场**并回 `ambiguous / publish_field_readback_mismatch`，确认通过后光标归尾。新增 `test/native-page-engine/xhs-publish-atoms.test.ts` 三例覆盖（多段各一次回车 + 增量事件数、编辑器吞写入时清场失败、无害标点改写不误杀）。
   - 未落的那一项：**真正的逐字输入**。原因与 2.1 偏离说明②同源——逐字输入原语（`native/page-engine/src/input.rs`）是 CDP 层原语，只能从 Rust 平台语义臂调用，而 `publish_fill_field` 落在 `engine.rs` 的通配分支、整条命令在注入的页面 JS 里跑完。当前是「分块增量 + 合成 KeyboardEvent 回车」，不是硬件级按键。接线归并行 change `restore-native-actuation-humanization-and-locating` 的 8.1 / 8.3（其 8.3 对回车与归尾确认的要求比本条更严：连续两次命中才算稳定、超时清空正文）。**本条在那条接线落地前不得勾选**。
+  - 收口复核（2026-08-02）：该接线已由 edge `1b890ea` 落地，后续 `92f7882` 补齐富文本段落证据与所有打字后失败出口清场，`f652786` 把归尾轮询收紧到真实耗时预算。现役 `PublishFillField` 在 Rust 特化分支内走 CDP `Input.insertText`，每个换行独立派发 `rawKeyDown/keyUp Enter`；有界复读前缀 / 段落 / 光标归尾并要求 Dice bigram 相似度 ≥ 0.90，失败先清场。复跑 `xhs_actuation_typing` 29/29、`xhs-input-targets` 14/14；这是源码与假 CDP / jsdom 证据，真机仍归 backlog 簇 125。
 - [x] 3.2 依据 `openspec/specs/publish-submit-integrity/spec.md`「成功判定锚定真实成功信号」，把提交成功判据从全页文本/地址正则改为绑定本次草稿的真实成功信号；已派发未确认回 ambiguous 并记录已派发（参照 flows/publish-command-handlers.ts:1332-1432；穿闭合 shadow 定位 + 只认成功文案 + no_target 时 submitDispatched 保持假 — 见 oracle.md ③） <!-- aidcp-edge 19d4872 地址判据删除；只认成功文案且先记点击前的同款文案基线（陈旧文案不算本次证据）；15s 有界轮询；找不到/禁用/点不动三态 submitDispatched 保持假 + not_started，已派发未确认回 ambiguous 且 submitDispatched=true -->
   - 偏离说明（2026-07-29）：① **穿闭合 shadow 定位未做**（oracle ③ 里的那一条）：目标改为「文案恰为『发布』或『定时发布』、排除暂存/离开/草稿、只取叶子、同时命中多个取最靠右」，未做 shadow 穿透。若真机上发布按钮落在闭合 shadow 里会退化为 `publish_submit_not_found`（诚实未命中、`submitDispatched` 保持假，不会假成功），需真机复核后再决定是否补。② 成功文案词库为 `发布成功|发布中|笔记已发布|笔记发布成功|成功发布|稍后可在`，中文单语；未确认的错误码用 `post_validate_failed`。
-- [ ] 3.3 更新 `docs/real-machine-acceptance-backlog.md` 中「小红书逐字输入辅助未受影响」这条已失效的记述所在条目（70.6），改为指向本 change 的真机验收项；不改动该文件其他簇 <!-- 2026-07-31 指针订正：本 change 的真机验收项已按用户裁定移出本 tasks.md，现落在同一文件的**簇 125**（小红书 Native 切换）。本条要改的 70.6 指向应写簇 125，不再写本清单的 5.x 编号 -->
+- [x] 3.3 更新 `docs/real-machine-acceptance-backlog.md` 中「小红书逐字输入辅助未受影响」这条已失效的记述所在条目（70.6），改为指向本 change 的真机验收项；不改动该文件其他簇 <!-- 2026-07-31 指针订正：本 change 的真机验收项已按用户裁定移出本 tasks.md，现落在同一文件的**簇 125**（小红书 Native 切换）。本条要改的 70.6 指向应写簇 125，不再写本清单的 5.x 编号 -->
   - 进度说明（2026-07-29）：本轮**未做**。该文件在控制仓、不在本轮 edge 提交面内；且 3.1 的「逐字」那一半尚未落地，条目 70.6 的记述要指向的真机项此刻还不完整，宜与 3.1 一并收口。
+  - 收口（2026-08-02）：70.6 已改为明确指向簇 125，不再宣称逐字输入「未受影响」；E2 的结构信号校准仍由既有 123.34 承接。
 - [x] 3.4 修复 E4 定时模式绑定：`publish_set_schedule` 先读真实开关三态，已开幂等、已关才点击并有界确认；时间按北京时间精确到分钟回读，并同时要求开关仍开与精确「定时发布」叶子提交控件存在。Native 会话保存 unknown / immediate / scheduled(target minute) 真态，`publish_submit` 在点击前复读平台模式与分钟、只点击对应的精确模式按钮；unknown / 漂移 / 缺证据均 `submitDispatched=false`，不得按横坐标或泛文案退成立即发布。不得改 Cloud 协议、不得以页面自造 marker 作为证据 <!-- aidcp-edge fd3ee6a：页面规则拆开 schedule label / true switch / submit leaf 三种目标；set_schedule 只在明确 off 时点击、按 Asia/Shanghai 精确分钟 + switch on + 唯一定时提交按钮三证合取。EngineSession 新增 unknown/immediate/scheduled(target epoch)；确认进入新发布页置 immediate，set_schedule 成功才置 scheduled，重连 / 新稿 / 已派发或不明 submit 撤销旧证明；submit 只注入 Native 内部期望、点击前复读模式与分钟。未改 Cloud 命令 schema / protocol，未写页面 marker。 -->
 - [x] 3.5 修复 H.5 第二轮复验命中的现役诚实性缺口：`notification_back_home` 目标与后置均严格限定 feed；宿主只在 Native 命令记录实际写入后标记 dispatch；发布提交丢终局时按是否写入和显式 effectPhase 保守投影 `submitDispatched`；search / 通用动作 / 发布回执不得把 non-confirmed 升级成功或丢具体原因；Rust 输出边界拒绝用 generic action receipt 合成 submit / capture 的 typed publish terminal；提交成功只认结果 / 提示作用域内相对点击前基线新增的终态正证据，不认全页文案与进行态「发布中」。不得改 Cloud / automation 三进程代码 <!-- aidcp-edge 0e8e4b9：页面规则、Rust typed-output 与宿主 transport/runtime/browse/publish 同批收紧；未改 Cloud、automation、协议或 Facebook。命令已写入但终局丢失时宁可进入人工确认，也不允许不可逆发布安全重投。 -->
 - [x] 3.6 修复 E7 发布身份绑定：立即发布身份只从本次 submit 的 fresh success 结果作用域提取并由 Native session 以 `recordId` 持有，后续 `capture_postId` 只消费该证据；定时内部句柄与到期公开身份拆开判据，按内部 id 或冻结标题 + 完整北京时间日期分钟唯一匹配，泛 UI `data-id` 不得充当平台身份；公开 URL 必须是 HTTPS 小红书详情链接、id 一致且含非空 `xsec_token`。抓不到保持 submitted / scheduled pending，不得猜旧帖。Edge-only，不扩 Cloud 协议，不写页面 marker <!-- aidcp-edge 2f143e4：submit fresh scope 唯一身份 → Rust session(recordId) → capture typed receipt；新稿 / 新 submit 清旧代际。scheduled capture 与 reconcile 分支拆开，完整 Asia/Shanghai 日期分钟、正面状态、平台具名 id、公开 token URL 分层校验。Cloud / protocol / Facebook / automation 均未改。 -->
+- [x] 3.7 修复 E2 未校准候选的假阳性：topic 保持现役 Rust 特化与真 token 精确判据；mention / location / collection 在真机结构接受信号完成标定前不得以正文自写字面值、候选自身 selected 外观或入口文案回显确认。入口 / 候选未命中或未派发保留具体 `not_started`，候选已点击但无独立证据固定回 `ambiguous / publish_candidate_unconfirmed`；不扩 Cloud / 协议 <!-- aidcp-edge ea2c4c9：registry 42 = confirmed 41 / n/a 1 / below_bar 0 / unread 0；恢复正向确认仍待 backlog 123.34。 -->
 
 ## 4. aidcp-edge — 验证（代码级）
 
-- [ ] 4.1 运行 `npm run test:acceptance`，记录安全红线用例（协议不漂移 / 未授权不发布 / 风控不自残）全过
+- [x] 4.1 运行 `npm run test:acceptance`，记录安全红线用例（协议不漂移 / 未授权不发布 / 风控不自残）全过
+  - 收口记录（2026-08-02，E2 `ea2c4c9`）：`npm run test:acceptance` **38 / 38 全过、0 失败**（真机 E2E 仍由环境门跳过）；未改协议、Cloud、automation 或三进程拆分。
   - 阶段性记录（2026-08-02，E7 `2f143e4`）：`npm run test:acceptance` **38 / 38 全过、0 失败**；未改协议消息类型、Cloud 或 automation 三进程代码。
   - 阶段性记录（2026-08-02，H.5 `0e8e4b9`）：`npm run test:acceptance` **38 / 38 全过、0 失败**；本 slice 未改 Edge / Cloud 协议，也未触碰 Cloud automation 三进程拆分。
   - 阶段性记录（2026-08-02，E4 `fd3ee6a`）：`npm run test:acceptance` **38 / 38 全过、0 失败**（1 条 gated E2E 以 Node test skip 计在 suite 外）。协议 94 种消息与未授权不发布红线全绿；E4 未扩协议。
   - 阶段性记录（2026-07-28，2.1 / 2.2 落地后跑；本条为 change 收口门，余下 slice 落地后须重跑，故不勾选）：`npm run test:acceptance` **30 / 30 全过、0 失败**（1 条 gated 跳过 = AC-E2E 真机联调，需 `AIDCP_E2E=1`）。安全红线三族全过：AC-PROTO-01～20b（协议版本 2、消息类型 94、两端不漂移）、AC-PUB-01～07（未授权绝不静默发布）、风控不自残族在 edge 侧无用例（属 cloud）。
   - 阶段性记录（2026-07-29，第二波 `19d4872` + 并行 change 的 `3a1b2b3` 落地后重跑；3.1 / 3.3 / 4.5 / 4.6 未收口，故仍不勾选）：`npm run test:acceptance` **30 / 30 全过、0 失败**（1 条 gated 跳过 = 需真机的 E2E）。本轮新增的输出 kind `action_receipt_with_observation` 未触发任何协议红线失败——它是引擎内部的命令输出形状，不进 `src/comm/protocol.ts`，`action.completed` 载荷不变。
-- [ ] 4.2 运行全量 `npm test` 与 `npm run typecheck`，记录通过数与因夹具修正（1.12）新暴露的既有失败
+- [x] 4.2 运行全量 `npm test` 与 `npm run typecheck`，记录通过数与因夹具修正（1.12）新暴露的既有失败
+  - 收口记录（2026-08-02，E2 `ea2c4c9`）：最终精确源码 `npm test` **3006 tests / 3005 pass / 0 fail / 1 skip**（gated 真机），`npm run typecheck` 通过；1.12 夹具订正最终未留下既有失败。
   - 阶段性记录（2026-08-02，E7 `2f143e4`）：最终精确源码 `npm test` **3000 tests / 2999 pass / 0 fail / 1 skip**（gated 真机）；`npm run typecheck` 通过。E7 focused **12 / 12**，后置库存门 **11 / 11**。
   - 阶段性记录（2026-08-02，H.5 `0e8e4b9`）：`npm test` **2988 tests / 2987 pass / 0 fail / 1 skip**（gated 真机）；`npm run typecheck` 通过。H.5 页面 / 宿主 focused **118 / 118**，后置库存门 **11 / 11**。
   - 阶段性记录（2026-08-02，E4 `fd3ee6a`）：`npm test` **2976 tests / 2975 pass / 0 fail / 1 skip**（gated 真机）；`npm run typecheck` 通过。E4 focused `xhs-publish-atoms` 17/17，连同 `xhs-state-evidence` / `router-contract` 的邻接回归已过。
   - 阶段性记录（2026-07-28，同上不勾选）：`npm test` **2583 例 / 2556 绿 / 26 红 / 1 跳过**；`npm run typecheck` **通过**。26 条红**全部**是失败优先的表征用例、按设计留红等后续 slice：`xhs-behavior-parity.test.ts` 15 条（1.4→2.3、1.5→2.3、1.6→2.4、1.7→2.5、1.8→2.6、1.9→2.7、1.10→2.4a、1.11→2.3a）+ `xhs-notification-parity.test.ts` 11 条（1.13–1.19，并行 session 的未追踪文件）。**本轮零新增失败**：上一阶段基线 30 红 → 现 26 红，净转绿 4 条正是 1.1 + 1.2（两条）+ 1.3。**夹具修正（1.12）未暴露任何既有失败**：`router-contract.test.ts` 单跑 7 / 7 全过。
   - 阶段性记录（2026-07-29，同上不勾选）：`npm test` **2630 例 / 2629 绿 / 0 红 / 1 跳过**；`npm run typecheck` **通过**。**表征用例全部转绿**：上一阶段的 26 红（`xhs-behavior-parity` 15 + `xhs-notification-parity` 11）已由 2.3–2.15 的实装清零，本轮零遗留红。例数从 2583 涨到 2630，增量来自本 change 新增的 `xhs-plan-compat.test.ts`（3 例）、`xhs-publish-atoms.test.ts`（5 例）与并行 change 的用例。
-- [ ] 4.3 运行 Rust 侧 `cargo test` 与 `cargo fmt --check`，记录通过数
+- [x] 4.3 运行 Rust 侧 `cargo test` 与 `cargo fmt --check`，记录通过数
+  - 收口记录（2026-08-02，E2 `ea2c4c9`）：`npm run gate:native:test` 退出 0（全部 unit / integration / doc tests 同门通过）；`npm run gate:native:clippy`（`-D warnings`）与 `npm run gate:native:fmt` 均退出 0。
   - 阶段性记录（2026-08-02，E7 `2f143e4`）：`npm run gate:native:test` 退出 0（单元层 **185 / 185**，全部集成与 doc tests 同门通过）；`gate:native:clippy`（`-D warnings`）与 `gate:native:fmt` 均通过。
   - 阶段性记录（2026-08-02，H.5 `0e8e4b9`）：`npm run gate:native:test` 退出 0（单元层 **182 / 182**，全部集成与 doc tests 同门通过）；`gate:native:clippy`（`-D warnings`）与 `gate:native:fmt` 均通过。
   - 阶段性记录（2026-08-02，E4 `fd3ee6a`）：仓内钉死工具链 `1.97.1-aarch64-apple-darwin`；`npm run gate:native:test` 退出 0（单元层 182/182，全部集成与 doc tests 同门通过），`gate:native:clippy` 通过（`-D warnings`），`gate:native:fmt` 通过。
   - 阶段性记录（2026-07-28，同上不勾选）：`cargo test` **138 通过 / 0 失败**（单元 100 + 集成 34 + 2 + 1 + 1，doc-test 0）；`cargo fmt --check` **干净、退出码 0**。本轮 **Rust 零改动**，仅 `build.rs` 重新嵌入改后的页面规则 JS。⚠ 上一阶段首跑时 `facebook::publish::tests::submit_does_not_confirm_when_the_submitted_probe_crosses_the_deadline` 红过一次、单跑与复跑全绿，判为并发负载下的 deadline 计时 flaky，与本 change 无关；本轮复跑未复现。
   - 阶段性记录（2026-07-29，同上不勾选）：Rust 门禁 `npm run gate:native` **通过**（toolchain `1.97.1-aarch64-apple-darwin`，steps = fmt, clippy, test）——本条要求的 `cargo test` 与 `cargo fmt --check` 都被该门禁涵盖并通过，另多跑一道 clippy。**本轮 Rust 有改动**（与上一阶段不同）：`model.rs` 新增 `ObservedActionReceipt`、`engine.rs` 新增 `CommandOutput` 一臂、`xhs.rs` 新增 typed_output 分支、`probe.rs` 新增未读三态与严格映射；新增集成测试 `tests/xhs_observed_receipt.rs`（3 例）与 `probe.rs` 单测 1 例。逐项通过数未单独记录（门禁只报总体通过），收口时若需精确计数须单跑 `cargo test`。
-- [ ] 4.4 明确记录本次**未做**的门：未打安装包、未部署、未替换运行中的桌面客户端、未做任何真机写动作
+- [x] 4.4 明确记录本次**未做**的门：未打安装包、未部署、未替换运行中的桌面客户端、未做任何真机写动作
+  - 收口记录（2026-08-02）：**未打安装包、未部署 dev / ol、未替换运行中的桌面客户端、未做任何真机读写动作**。本轮结果只证明 source / 桩 / 假 CDP，不代表已安装 0.3.25 或真实小红书账号。
   - 阶段性记录（2026-08-02，E7 `2f143e4`）：**未打安装包、未部署 dev / ol、未替换运行中的桌面客户端、未做任何真机读写动作**。结果页身份、管理页状态 / 日期 / 内部句柄 / 公开链接的真实结构已并入 backlog 125.2，桩层通过不得报成平台已验证。
   - 阶段性记录（2026-08-02，H.5 `0e8e4b9`）：**未打安装包、未部署 dev / ol、未替换运行中的桌面客户端、未做任何真机读写动作**。这里只证明源代码、jsdom / 假 CDP 与 Rust 边界；平台真实 toast / 首页链接结构仍须由既有真机簇验证。
   - 阶段性记录（2026-08-02，E4 `fd3ee6a`）：**未打安装包、未部署 dev / ol、未替换运行中的桌面客户端、未做任何真机读写动作**。因此这里只能确认源代码与桩 / 假 CDP 门禁；安装客户端上的定时控件结构、组件是否接受分钟值、闭合 shadow 按钮是否可达仍归 backlog 125.2，MUST NOT 报成已在平台验证。
   - 阶段性记录（2026-07-28，change 未收口故不勾选）：本轮**未打安装包、未部署（dev / ol 都没碰）、未替换运行中的桌面客户端、未做任何真机写动作**。另未碰：Rust 源码（无新输出 kind）、宿主 `src/native-page-engine/browse-session.ts`（属 session-guards 单写区）、云端仓、协议四处同步文件、`openspec/specs/`。分支 `native-migration-repair` 已推 origin（`552eda1` / `8b99183`），**未合入 master**。
   - 阶段性记录（2026-07-29，change 未收口故不勾选）：第二波同样**未打安装包、未部署（dev / ol 都没碰）、未替换运行中的桌面客户端、未做任何真机写动作**。与上一阶段的差别：本轮**碰了 Rust 源码**（新输出 kind + 未读三态，见 4.3）与**宿主 `src/native-page-engine/browse-session.ts` / `client.ts`**——前者只加了一个 case 并把既有回执处理抽成私有方法（口径一字未改），后者只加类型与解析、**未加任何调用点**；两处都在 `restore-native-xiaohongshu-session-guards` 的单写区边缘，集成前须按 6.5 对账。仍未碰：云端仓、协议四处同步文件、`openspec/specs/`、`docs/real-machine-acceptance-backlog.md`。分支 `native-migration-repair` 本波提交为 `a45fc81`（1.13–1.19 用例）与 `19d4872`（2.3–2.15 / 3.2 实装）。
 
-- [ ] 4.5 登记「未读监测体的宿主周期装配与未读信号发送方（含单调翻转批次序号的持有位置）」为本 change 范围外项，已在 design.md「覆盖漏洞的范围外交接」具名交接给 `restore-native-xiaohongshu-session-guards`（其 1.2 周期探针按平台分类适配、6.1 恒假装配块逐条对账、6.4 退役监测体去留结论）。登记时须写明：`src/browse/notification-monitor.ts` 在 `src/` 里只被恒假块引用，按 6.4 的三分类会落进「仅恒假块引用」，**若按孤儿删除则本 change 的通知类修复永久不通电**——该项要的是恢复而不是清理
+- [x] 4.5 登记「未读监测体的宿主周期装配与未读信号发送方（含单调翻转批次序号的持有位置）」为本 change 范围外项，已在 design.md「覆盖漏洞的范围外交接」具名交接给 `restore-native-xiaohongshu-session-guards`（其 1.2 周期探针按平台分类适配、6.1 恒假装配块逐条对账、6.4 退役监测体去留结论）。登记时须写明：`src/browse/notification-monitor.ts` 在 `src/` 里只被恒假块引用，按 6.4 的三分类会落进「仅恒假块引用」，**若按孤儿删除则本 change 的通知类修复永久不通电**——该项要的是恢复而不是清理
+  - 对账结论（2026-08-02）：具名交接与“恢复而非孤儿删除”的保留结论已由归档 `2026-08-01-restore-native-xiaohongshu-session-guards` 写明（control `04295ae6`）；Edge `811edf2` 删除恒假旧宿主块但保留 `notification-monitor.ts`。本项只代表交接完成，**不代表发送方已通电**，实际阻断见 4.6。
 - [ ] 4.6 通电对账（承接方不落地即不算修好）：确认小红书未读信号在运行路径上确有发送方——当前边缘全仓仅协议定义（`src/comm/protocol.ts:110/1965`）与验收测试出现 `notification.detected`，而云端整条巡视链的唯一触发源就是它（`aidcp-cloud/src/agents/notification-gatekeeper.ts:48`、`src/orchestrator/role-dispatcher.ts:2062`）。未落地则在此记录为阻断依赖，并明确写下「通知抽取 / 清零 / 计数类修复已实装但生产未通电」，**不得按已生效结案**
+  - 阻断复核（2026-08-02，当前 edge `ea2c4c9`）：生产 `src/` 中仍无 `CdpNotificationMonitor` 实例、`nextEpoch()` 消费或 `notification.detected` 发送方；该字符串仅见协议定义与验收测试。三态未读读数已由 page probe 生产并跨 Rust / TS 解析，通知 items / action receipt adapter 也已接通，但 `browse-session` 没有消费 `notificationUnread` 并发出巡视触发。故结论仍是：**通知抽取 / 清零 / 计数类修复已实装，但生产巡视入口未通电**。这是当前唯一具名阻断，不得勾选本条。
   - 进度说明（2026-07-29）：本条**仍未达成，且现在有了确切的阻断形状**。2.9 落地后，未读读数在页面规则与 Rust 探针与宿主解析三层都已具备（`19d4872`），但宿主 `client.ts` **只加了类型与解析、没有任何调用点**，周期探针的平台化放开归承接方 `restore-native-xiaohongshu-session-guards`（其 1.2）。因此：**「通知抽取 / 清零 / 计数 / 未读读数」四类修复均已实装，但生产未通电**——边缘全仓仍无 `notification.detected` 的发送方，云端整条巡视链的唯一触发源仍悬空。本条按阻断依赖登记，**不得按已生效结案**。
 
 ## 5. 真机验收项 —— **已移出本清单（2026-07-31 用户裁定）**
@@ -140,14 +150,19 @@
 
 ## 6. 控制仓收口
 
-- [ ] 6.1 运行 `openspec validate restore-native-xiaohongshu-action-honesty --strict`，记录输出
+- [x] 6.1 运行 `openspec validate restore-native-xiaohongshu-action-honesty --strict`，记录输出
+  - 2026-08-02 收口：退出 0，`Change 'restore-native-xiaohongshu-action-honesty' is valid`。
   - 阶段性记录（2026-07-28，change 未收口故不勾选）：输出 `Change 'restore-native-xiaohongshu-action-honesty' is valid`，退出码 0。
-- [ ] 6.2 运行 `openspec show restore-native-xiaohongshu-action-honesty` 自查能力与要求条数
-- [ ] 6.3 与同批 `restore-native-xiaohongshu-session-guards` 对账集成顺序：两者共写 `native/page-engine/src/engine.rs` 的小红书执行入口与 `test/native-page-engine/` 目录。集成前 `git fetch` + rebase 到最新 `master`，跑 `cargo test` 与 `npm test` 后再合；并核对该 change 的「小红书评论提交须开提交窗口」与本 change 的「评论提交合成完整文本」两条同时生效（窗口在外、写入在内），后落地的一方在此记录核对结果（参照 oracle.md 提交窗口条：xhs 四处窗口预算在 317cd47^ 已逐处坐实，勿照抄 Facebook 值）
+- [x] 6.2 运行 `openspec show restore-native-xiaohongshu-action-honesty` 自查能力与要求条数
+  - 2026-08-02 收口：1 个新增能力 `native-xiaohongshu-behavior-parity` 共 22 条 ADDED requirements；1 个既有能力 `notification-monitoring` 共 1 条 MODIFIED requirement；合计 23 条 requirement deltas。命令退出 0。
+- [x] 6.3 与同批 `restore-native-xiaohongshu-session-guards` 对账集成顺序：两者共写 `native/page-engine/src/engine.rs` 的小红书执行入口与 `test/native-page-engine/` 目录。集成前 `git fetch` + rebase 到最新 `master`，跑 `cargo test` 与 `npm test` 后再合；并核对该 change 的「小红书评论提交须开提交窗口」与本 change 的「评论提交合成完整文本」两条同时生效（窗口在外、写入在内），后落地的一方在此记录核对结果（参照 oracle.md 提交窗口条：xhs 四处窗口预算在 317cd47^ 已逐处坐实，勿照抄 Facebook 值）
+  - 对账结论（2026-08-02）：honesty `b550f1e` 先落，session guards `7b8d556` 后落且以前者为祖先；现役 `engine.rs` 在命令 match / 写入前进入 `xiaohongshu_commit_window`，窗口放行后才执行完整评论输入。`xhs_session_guard_write_protection` 8/8，最终全量 JS 3006 / Native gate 全绿，窗口在外、写入在内同时生效。
 - [ ] 6.4 在本清单回写 Edge 与控制仓的 commit sha、偏离说明，以及与并行 change 的重叠文件（Facebook 路由 / 微信适配器 / 协议四处同步文件本 change 不碰）
   - 进度说明（2026-07-29，**分波回写中，change 未收口故不勾选**）：Edge 侧 sha 已逐条落在各任务行尾。截至第二波，本 change 在 `native-migration-repair` 上的提交为 —— 第一波 `552eda1`（1.1–1.3 / 1.12 用例与夹具）、`8b99183`（2.1 / 2.2）；第二波 `a45fc81`（1.13–1.19 用例）、`19d4872`（2.3–2.15 / 3.2）。**控制仓 sha 待本文件提交后补**。重叠文件实测：本 change 碰了 `native/page-engine/src/{engine.rs,model.rs,probe.rs,xhs.rs}` 与宿主 `src/native-page-engine/{browse-session.ts,client.ts}`，前四者中 `engine.rs` 与 `restore-native-xiaohongshu-session-guards` 共写、后两者是该 change 的单写区边缘（见 6.5）；`input.rs` / `facebook/**` 与并行 change `restore-native-actuation-humanization-and-locating` 的改动面在本波**零交叉**（该 change 的 `3a1b2b3` 只动 Rust 的 input/locating/facebook 三处，与本 change 的 xhs 路由与 probe 不相交）；协议四处同步文件、Facebook 路由、微信适配器**全程未碰**。
-- [ ] 6.5 与 `restore-native-xiaohongshu-session-guards` 再对两处集成边界（本次覆盖漏洞收口新增）：① 2.9 若落在 `xhs-page-probe.js` / `probe.rs`，与该 change 的 1.2 / 1.3（周期探针平台化、按页面类型分类）读同一份探针输出，字段增删须同时过它们的判据；② 2.11 若走宿主补发回执，与该 change 的 4.1（`src/native-page-engine/browse-session.ts` 逐命令诊断改平台中立）同文件。集成前 `git fetch` + rebase，跑 `cargo test` 与 `npm test` 后再合，在此记录对账结果
-- [ ] 6.6 在本清单记录本次「参照书覆盖漏洞」收口的处置结论：就地补任务 = 1.13–1.19 / 2.9–2.15 与新增真机项 5.8–5.10；范围外具名交接 = 4.5（承接方 `restore-native-xiaohongshu-session-guards`）；通电对账 = 4.6。三类都必须有结论，不得留空 <!-- 2026-07-31 指针订正：文中的「新增真机项 5.8–5.10」已移出本 tasks.md，现落在 `docs/real-machine-acceptance-backlog.md` **簇 125.9 / 125.10**（原 5.10 是登记动作、随移出一并关闭）。记处置结论时按簇号写 -->
+- [x] 6.5 与 `restore-native-xiaohongshu-session-guards` 再对两处集成边界（本次覆盖漏洞收口新增）：① 2.9 若落在 `xhs-page-probe.js` / `probe.rs`，与该 change 的 1.2 / 1.3（周期探针平台化、按页面类型分类）读同一份探针输出，字段增删须同时过它们的判据；② 2.11 若走宿主补发回执，与该 change 的 4.1（`src/native-page-engine/browse-session.ts` 逐命令诊断改平台中立）同文件。集成前 `git fetch` + rebase，跑 `cargo test` 与 `npm test` 后再合，在此记录对账结果
+  - 对账结论（2026-08-02）：page probe 的 `notificationUnread` 已由 JS 产出、Rust 严格映射、TS 解析，并与平台化 blocking probe 共存；2.11 采用页面产 typed observation + receipt，`browse-session` 先转发 items 再转发 action receipt，与平台中立诊断 / 周期 guard 共存。focused TS 55/55 + probe / assembly 15/15 + Rust 8/8、7/7，最终全量门全绿。
+- [x] 6.6 在本清单记录本次「参照书覆盖漏洞」收口的处置结论：就地补任务 = 1.13–1.19 / 2.9–2.15 与新增真机项 5.8–5.10；范围外具名交接 = 4.5（承接方 `restore-native-xiaohongshu-session-guards`）；通电对账 = 4.6。三类都必须有结论，不得留空 <!-- 2026-07-31 指针订正：文中的「新增真机项 5.8–5.10」已移出本 tasks.md，现落在 `docs/real-machine-acceptance-backlog.md` **簇 125.9 / 125.10**（原 5.10 是登记动作、随移出一并关闭）。记处置结论时按簇号写 -->
+  - 处置结论（2026-08-02）：就地补任务 1.13–1.19 / 2.9–2.15 均已落地；原 5.8–5.10 已按用户裁定移至 backlog 125.9 / 125.10。4.5 的范围外交接与保留结论已完成；4.6 实读后确认仍缺生产发送方，已作为具名阻断保留，不把通知修复报成已通电。三类均有结论，无静默留空。
 
 ## 边缘诚实性缺口清单（2026-07-30 用户裁定「要做」，本 change 是主要属主）
 
@@ -155,7 +170,7 @@
 > 今天回报什么、为什么错、真机最坏后果）。**12 条里有 9 条落在本 change 的单写区
 > `native/page-engine/src/xhs-command-router.js`**，因此归属本 change，不由他流代改。
 
-- [ ] H.1 按清单逐条判「修 / 显式弃守」，结论回写清单与本节（**MUST NOT 静默跳过**）
+- [x] H.1 按清单逐条判「修 / 显式弃守」，结论回写清单与本节（**MUST NOT 静默跳过**）
       - 进度（2026-07-31）：清单已加「处置状态」表，12 条**首次逐条过了一遍**。
         **已修 4 条**（E6 评论点赞 / E8 共享判据扇出 7 处 / E10 设为封面 / E11 兼容步骤两处，均 edge `52a2110`）。
         **余 8 条仍是「未判」而非「不做」**：E2 / E7 / E9 属主已明列本轮范围外；E12 落点不在本清单主属主
@@ -196,6 +211,12 @@
         `capture_postId` 不再扫全页、取第一条旧帖或读 creator query `id`。定时内部句柄与到期公开身份已拆开：
         完整北京时间日期分钟 + 状态 + 平台具名 id 唯一匹配；仍待发布回 `scheduled_pending`，公开确认还须同 id
         的 tokenized HTTPS 小红书详情 URL。**仍未判只剩 E2**，它受 backlog 123.34 真机结构标定阻断，故 H.1 继续不勾。
+      - 收口（2026-08-02，`aidcp-edge ea2c4c9`）：**E2 已判为修复，H.1 的 12 条已全部裁定**。
+        topic 保持 Rust 特化的真 token 精确判据；mention / location / collection 不再以正文自写字面值、
+        候选自身 selected 外观或入口回显自证。结构信号未标定前，候选已派发只回
+        `ambiguous / publish_candidate_unconfirmed`，零派发保留具体 `not_started`。这是修掉假阳性，
+        **不是宣称三支功能已真机恢复**；恢复 positive confirmation 仍待 backlog 123.34。最终结论：
+        E1–E11 中 11 条已修，E12 已具名转给独立诊断通路后继；没有静默跳过或“本轮范围外”残项。
 - [x] H.2 优先处置**会错报成功**的那几条（自证循环、判据过宽里判正证据的那些）；
       只会**错报失败**的可降级排期 —— 红线针对的是静默假成功，方向诚实的悲观回执危害小得多
       <!-- aidcp-edge 52a2110 三条最狠的已修：① 发布布尔选项期望「关」时「读不到 = 达成」、连点都不点（删掉 `||row` 兜底，找不到真开关改诚实失败）；② 设封面往上找容器停在轮播「当前显示」层、连按钮都不点（去掉任意 div 兜底、改有界回溯只认图片项容器，证据必须封面专属，删掉「已…封面」文本兜底）；③ 搜索筛选误判后既不点也进不了未确认分支、把未筛选结果当筛过的返回（改成只有明确「是」才跳过点击、点后有界轮询每轮重解析、确认不上即 unconfirmed 且不返回卡片）。另修一条清单外的：兼容路径的评论输入框此前判据里硬写 `|| 是评论框` = 无条件回成功，改读焦点落位 -->
@@ -207,7 +228,7 @@
       <!-- aidcp-edge 52a2110 两个判据合并成一个三态 `stateOf`（'on' / 'off' / '' = 读不到），读不到**绝不塌成 off**；类名支改整词匹配（token 按 -/_ 分段）+ 否定形拒绝（分隔式 not-selected / 粘连式 unliked 均判 off）+ 计数容器（liked-count）判读不到；真表单控件 checked 位 > 属性白名单 > 类名逐层短路。**扇出点实测是 7 个不是 8 个**（穷举核对，本文件之外零扇出），逐点改法见 H 收口记录 -->
 - [x] H.5 复验只覆盖了 69 条候选里的 16 条，**余下 53 条未复验**。收口前补跑一轮，
       或显式记录「不再扩大清单」并说明理由
-      <!-- 2026-08-02 current-surface rerun + aidcp-edge 0e8e4b9：初始 53 条逐项原始明细从未保留，不能伪造逐项勾销；改按当前仍可执行边界重新穷举。页面规则 16 个源文件 / 174 个终局与确认候选并与 42 条 may-write registry 对账；Rust 扫 72 个行级候选，70 个排除、余 2 个相连命中归并为 1 个 typed-output 缺口；宿主 TS 扫 20 个转换点，7 个排除、13 个复核，坐实 5 类共享边界缺口。XHS / shared-host 命中均由 1.21 / 3.5 修复；另发现 Facebook composer-marker 命中，具名转给 restore-native-facebook-residual-parity，不在本 change 越界修改。当前 registry 42 = confirmed 40 / below_bar 1 / n/a 1 / unread 0。H.5 完成当时原清单剩 E2 / E7；后续 E7 已由 2f143e4 修复，当前只剩 E2 未裁定。 -->
+      <!-- 2026-08-02 current-surface rerun + aidcp-edge 0e8e4b9：初始 53 条逐项原始明细从未保留，不能伪造逐项勾销；改按当前仍可执行边界重新穷举。页面规则 16 个源文件 / 174 个终局与确认候选并与 42 条 may-write registry 对账；Rust 扫 72 个行级候选，70 个排除、余 2 个相连命中归并为 1 个 typed-output 缺口；宿主 TS 扫 20 个转换点，7 个排除、13 个复核，坐实 5 类共享边界缺口。XHS / shared-host 命中均由 1.21 / 3.5 修复；另发现 Facebook composer-marker 命中，具名转给 restore-native-facebook-residual-parity，不在本 change 越界修改。E7 后续由 2f143e4 修复，E2 由 ea2c4c9 fail-closed；最终 registry 42 = confirmed 41 / below_bar 0 / n/a 1 / unread 0，原缺口清单无未裁定项。 -->
 
 
 ### H 收口记录（2026-07-31 · aidcp-edge `52a2110`）

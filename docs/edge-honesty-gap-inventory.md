@@ -42,10 +42,10 @@
 
 | 层 | 当前复验面 | 结论 |
 | --- | --- | --- |
-| 小红书页面规则 | 16 个源文件、174 个唯一终局 / 确认候选 | 修复详情链接冒充首页、陈旧 toast / 全页进行态冒充本次发布成功；后续 E7 已修，原台账只剩 E2 未裁定 |
+| 小红书页面规则 | 16 个源文件、174 个唯一终局 / 确认候选 | 修复详情链接冒充首页、陈旧 toast / 全页进行态冒充本次发布成功；E7 已绑定本次发布身份，E2 未标定分支已 fail-closed，原台账无未裁定项 |
 | Rust 输出转换 | 72 个行级候选；70 个排除，余 2 个相连命中归并为 1 个缺口 | submit 与三条发布身份命令拒绝 generic action receipt 升级成 typed publish terminal |
 | Native 宿主 TS | 20 个转换点；7 个排除、13 个复核 | 修复 5 类 session / transport dispatch、终局丢失、非确认观测与具体原因保真缺口 |
-| may-write 后置库存 | 42 条：confirmed 40 / below_bar 1 / n/a 1 / unread 0 | 唯一 below_bar 是 E2 的 mention / location / collection 候选支，仍待真机校准；没有未读写命令 |
+| may-write 后置库存 | 42 条：confirmed 41 / below_bar 0 / n/a 1 / unread 0 | topic 以真 token 确认；mention / location / collection 未标定前没有 confirmed 出口。仍待真机校准以恢复正向确认，但库存已无假成功 / below-bar / 未读写命令 |
 
 上述 XHS / shared-host 命中由 edge `0e8e4b9` 修复。复验另发现 Facebook composer-marker 判据缺口，
 已具名转给 `restore-native-facebook-residual-parity`；本 change 不越界修改 Facebook，也不触碰 Cloud / automation 三进程拆分。
@@ -71,7 +71,7 @@
 | **E10** 设为封面判据过宽且自证 | ✅ **已修** | 往上找容器改有界回溯、去掉任意 `div` 兜底；证据须封面专属；删掉「已…封面」文本兜底。**注：单侧依赖见属主 tasks.md，云端未同批改前不得接回封面** |
 | **E11** 兼容步骤两处欠诚实 | ✅ **已修** | 评论输入框改读焦点落位（不再无条件成功）；输入步对非可编辑元素直接拒绝（旧写法整段赋值后回读必然一致 = 纯自证） |
 | **E1** 评论提交后置判据 | ✅ **已修**（edge `d7dc24b`，由已归档 `restore-native-actuation-humanization-and-locating` 落地） | 页面判据同时要求正文出现在评论区与编辑器被平台清空，并排除编辑器自身、子树及祖先容器的自证文本；Rust 按 8 × 250ms 有界轮询，只有两条证据都成立才确认，没清空 / 没出现 / 读不到均保持可区分的 ambiguous。桩层：JS 14/14、Rust 29/29、库存门 11/11；真机仍待 backlog 123.29 / 123.30，代码已修不等于平台行为已确认。 |
-| **E2** 发布加话题 / @提及自证 | ⬜ 未判 | 属主明确列为本轮范围外 |
+| **E2** 发布加话题 / @提及自证 | ✅ **已修**（2026-08-02，edge `ea2c4c9`） | topic 由现役 Rust 特化按真 token 精确确认；mention / location / collection 在结构信号标定前不再接受正文自写字面值、候选 selected 外观或入口文案回显，候选已点只回 ambiguous，零派发保留具体 not_started。真机 123.34 用于恢复正向确认，不再阻断诚实性收口 |
 | **E3** feed 刷新三条出口无条件确认 | ✅ **已修**（2026-08-01，edge `c0bdc34`） | 点前记批次首部 id 序列、点后有界轮询 3s 等它变；没变 = ambiguous + `refresh_batch_unchanged`，读不到卡片另有原因码，两态都不回成功。**E13 是本条的重复登记**（同一落点同一形态），见下 |
 | **E4** 发布定时开关不读状态 | ✅ **已修**（2026-08-02，edge `fd3ee6a`） | `set_schedule` 先读真实开关三态，已开幂等、已关才点击并等翻转；北京时间精确到分钟，并与开关仍开、唯一「定时发布」提交按钮三证合取。Native 会话持 unknown / immediate / scheduled(target minute)，submit 前复读平台模式与分钟、只点对应按钮；unknown / 漂移零点击且 `submitDispatched=false`。未扩 Cloud 协议、未用页面 marker 自证；未打包 / 未真机，结构复核仍待 backlog 125.2 |
 | **E5** 通知分栏无正面证据 | ✅ **已修**（2026-08-01，edge `c0bdc34`） | 三条平台产出的证据任一成立才算切过去：叶子分类栏激活态（走 E8 收紧后的三态判据、只读叶子，包裹容器不算数并有用例钉住）/ 该类角标由非零归零 / 可见列表换批；证不出来 = not_started。评论类另加「没确认切栏就不回 items」。**E14 是本条的重复登记**，见下 |
@@ -84,9 +84,8 @@
 1. **✅ 只代表「不再错报成功」，不代表「这条路径已在真机上验过」**。护栏来自桩层用例；
    小红书侧自 Native 迁移以来真机零覆盖，真机项见
    `docs/real-machine-acceptance-backlog.md` 簇 125。
-2. **⬜ 不是「不做」，是「还没判」**。H.1 要求逐条判「修 / 显式弃守」且 MUST NOT 静默跳过——
-   当前只剩 E2 未判；E12 已具名转出，其余 10 条已修。H.1 仍未勾，别把「受真机标定阻断」
-   读成「决定不做」。
+2. H.1 已逐条裁定：E1–E11 共 11 条已修，E12 已具名转给独立诊断通路后继；没有静默跳过项。
+   E2 的“已修”只表示不再错报成功，mention / location / collection 的 positive confirmation 仍待真机 123.34 标定。
 
 ---
 
@@ -109,6 +108,7 @@
 - **真机最坏后果**：真机最坏：XHS 带话题发布时，这条命令先把整段正文用空白归一化后的纯文本副本 + " #话题" 整体覆盖回编辑器（contenteditable 走 `textContent=` 赋值，tiptap/ProseMirror 语义下还可能根本不进编辑器文档模型），随后只要该话题词落在某个可见元素前 100 字符内（正文短、或话题词出现在正文开头），第三级 `div` 回落就命中正文编辑器自身、点它、读回自己刚写的值 → 回执 ok:true。云端据此判该步成功、继续提交：**发出去的笔记正文里躺着一串纯文本 #标签（不是真话题实体，拿不到任何话题流量），正文段落结构可能被压成一行，两侧都没有任何运营可见的降级痕迹**——诚实失败那条路也只落一行服务端 warn（command-sequencer.ts:316），且 add_with_candidate 属 best-effort（:251）不阻断发布。若反过来 findByWords 没命中，回执是 `publish_candidate_not_found` + `not_started`，但正文里那串裸 "#话题" 已经写进去且照样随稿发出——按「零副作用」读这条回执会读错。不存在「其实无后果」的解读：这是错报成功 + 内容被污染 + 相位撒谎三件事叠在一条命令上。
 - **属主**：restore-native-xiaohongshu-action-honesty（文件单写区属主；判据要求来自 restore-native-actuation-humanization-and-locating 5.
 - **阻塞**：修法与 actuation 8.1 的「话题 / 提及候选改走真实键入原语」耦合（该条 5 个消费点里这一个未落），建议同批
+- **处置（2026-08-02，edge `ea2c4c9`）**：已修掉假阳性。topic 已由 Rust 特化按编辑器中的真话题 token、隐藏后缀剔除与精确相等确认；mention / location / collection 没有可移植的真机结构接受信号，因此未编造新选择器，而是在候选点击后固定保持 `ambiguous / publish_candidate_unconfirmed`。编辑器 / 入口 / 候选未命中或点击未派发仍保留具体 `not_started` 原因。该裁定会增加悲观回执，但不会阻断 Cloud 的 best-effort 发布；正向确认能力仍待 backlog 123.34 标定后恢复。
 
 ### E3. feed 刷新既按文本找一个图标控件、又点完不回头看：三条出口（点空 / 点错元素 / 换批失败）全部无条件把当前页当成新一批以 confirmed 相位上报；无换批证据、无回顶证据、无页面上下文闸。云端消费者是三个（深度阈值 / 搜索行程结束回首页 / feed 到底自愈），不是两个；边缘对 re
 

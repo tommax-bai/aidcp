@@ -400,6 +400,28 @@ Notification text fields SHALL be truncated on code-point boundaries and MUST NO
 - **WHEN** notification content, sender name, and note title are reported
 - **THEN** each is capped at its own field-scoped limit rather than a shared row-sized limit
 
+### Requirement: Native Xiaohongshu publish candidates never self-confirm from command-authored text
+
+`publish_add_with_candidate` SHALL report success only from a platform-produced structural signal that is independent of the text or candidate row used by the command itself. A topic MAY confirm from the calibrated topic-token structure. Until equivalent structures are calibrated for mention, location, and collection, those branches MUST NOT treat the command-authored literal, the candidate's own selected appearance, or an entry-label echo as confirmation. A missing or non-actuated editor, entry, or candidate SHALL remain `not_started` with its specific reason; an actuated candidate without independent acceptance evidence SHALL remain ambiguous.
+
+#### Scenario: Mention literal is not an account binding
+
+- **WHEN** the command writes `@name`, clicks a matching candidate, and the only readable result is the same literal in the editor
+- **THEN** the result is `ambiguous` with `publish_candidate_unconfirmed`
+- **AND** it is not promoted to a confirmed mention
+
+#### Scenario: Candidate appearance is not location or collection binding
+
+- **WHEN** a location or collection candidate becomes selected or its label is echoed into the entry after the click
+- **AND** no calibrated independent binding structure is available
+- **THEN** the result remains `ambiguous` rather than confirmed
+
+#### Scenario: Zero-actuation candidate failure keeps its exact phase
+
+- **WHEN** the required editor, entry, or candidate cannot be found or a click cannot be dispatched
+- **THEN** the command remains `not_started` with the corresponding specific reason
+- **AND** it is not collapsed into post-dispatch ambiguity
+
 ### Requirement: Native Xiaohongshu captured publish identity is bound to the current submission
 
 An immediate publish identity SHALL be derived only from a unique note identity exposed by a success-result surface that became new or changed after the current submit actuation. A page-wide first-link scan, a stale result node, the creator page URL, or an arbitrary `id` query parameter MUST NOT be promoted to the published note. The Native session SHALL bind the captured identity to the current publish `recordId`; `capture_postId` MUST NOT recover an unbound identity from whatever note happens to be visible later. A public `postUrl`, when present, MUST be an HTTPS Xiaohongshu detail URL whose path identity equals the captured post id and whose query carries a non-empty `xsec_token`. Missing identity evidence SHALL leave the already-submitted record unconfirmed rather than attaching another note's identity.

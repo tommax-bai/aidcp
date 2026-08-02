@@ -203,6 +203,14 @@ D6 当时把 `src/native-page-engine/browse-session.ts` 交给并行的 session-
 
 定时内部句柄仍属于“待发布记录”，按平台内部 id 优先，否则冻结标题 + Asia/Shanghai 完整日期分钟 + 定时态合取后唯一匹配；泛 `data-id` 不是平台证据。到期 reconciliation 先判仍在定时并回 pending，再判已发布唯一行；只有公开 post id 与同 id、含非空 `xsec_token` 的 HTTPS 小红书详情 URL 同时存在才确认。该收紧会增加诚实的 pending / submitted-unconfirmed，但不会导致自动重投或丢稿，也不需要扩 Cloud 协议。
 
+### D13. E2 在真机结构未标定前 fail-closed，不在桩上发明成功判据
+
+`topic` 已有迁移前实机校准过的结构信号，并由现役 Rust 特化按真实话题 token、隐藏后缀剔除与精确相等确认；`mention` / `location` / `collection` 没有同等级证据。退役实现对后三支也只使用通用锚点与页面子串，照搬或在 jsdom 里现编一个 token 类名，只会把一个自证循环换成另一个自证循环。
+
+选：保留三支的候选定位与一次点击，但在独立平台接受信号完成真机标定前移除所有 confirmed 出口。编辑器 / 入口 / 候选未命中或点击未派发，仍按零派发事实回具体 `not_started`；候选点击已经派发但结果无法独立确认，固定回 `ambiguous / publish_candidate_unconfirmed`。Cloud 将该原子视为 best-effort，故稿件仍可继续提交；代价是候选即使真实绑定也会得到悲观回执。这一代价优于把裸 `@`、候选自身 selected 外观或入口回显报成平台实体已绑定。
+
+backlog 123.34 因此从“阻断诚实性收口”改为“恢复 positive confirmation 的真机标定”。标定完成后只能以真实页面结构信号恢复成功出口，并补相应 failure-first 夹具；不得把本次 fail-closed 解释为三支功能已真机恢复。
+
 ## Risks / Trade-offs
 
 - **真机结论与规格假设不符**（开帖并未落错误页）→ 规格只要求正面详情证据，这一半在任何情况下都成立；执行方式的选择留在实装任务里按真机结论决定，不需要改规格。
@@ -212,6 +220,7 @@ D6 当时把 `src/native-page-engine/browse-session.ts` 交给并行的 session-
 - **一个 290 行文件承载全部命令面，改动面集中** → 本 change 只出规格；实装阶段建议按命令族分批提交并各自带失败优先的表征测试，避免一次大改盖掉语义冲突。
 - **测试仍是 jsdom 桩** → 桩只能证明目标绑定与编排，证明不了真实页面事件行为；凡桩验不了的一律转真机验收项，规格里不写成已验证。
 - **定时控件或提交按钮落在闭合 shadow 内** → 本轮 E4 只恢复状态与模式绑定；当前 3.2 已登记的闭合 shadow 定位偏离仍然存在。命中不了会在提交前诚实失败，不会退化为立即发布；是否补 CDP DOM 穿透仍由真机簇 125 的结构复核决定。
+- **未标定候选可能真实生效但统一回 ambiguous** → 这是 E2 的有意失败方向：三支属于 Cloud best-effort，不阻断稿件发布，但会失去正向元数据确认。恢复 confirmed 必须先完成 backlog 123.34 的真机结构标定，不能用桩造证据换取绿回执。
 
 ## Rollback
 
