@@ -21,4 +21,5 @@
 
 - [x] 4.1 Commit the isolated Edge change, integrate it through the fast-forward workflow, push `master`, and record the Edge commit and validation evidence here.
   <!-- aidcp-edge c8e26e435aa6929f610bec73a2f496da95276f30; pushed to master by fast-forward. After the final rebase, 159 relevant Facebook/router tests, typecheck, 84 Native Facebook library tests, and 7 Native Facebook auth integration tests passed. The preceding final-base gate passed Native fmt, clippy, and all Native tests; focused auth remained 52/52 and acceptance remained 38 passed with the gated real E2E not run. -->
-- [ ] 4.2 Commit and push the control-repo OpenSpec artifacts with explicit pathspecs while preserving unrelated files; record that no desktop package, installation, deployment, or real-account action was performed.
+- [x] 4.2 Commit and push the control-repo OpenSpec artifacts with explicit pathspecs while preserving unrelated files; record that no desktop package, installation, deployment, or real-account action was performed.
+  <!-- Control artifacts were committed and pushed in aidcp 2e2a6f11. The unrelated `scripts/sync-split-repos` modification was preserved. No desktop package, installation, deployment, or real-account action was performed; installed AIDCP 0.3.25 was not changed or retested. -->
