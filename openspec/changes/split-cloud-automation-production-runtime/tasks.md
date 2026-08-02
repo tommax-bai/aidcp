@@ -2525,10 +2525,29 @@
          **委托任务那条的尺寸已实读定过（2026-08-04），下一手照这个开工、不必再推一遍**：
          接收方本身只要两样（`service` 允许缺席 + `ledger` 幂等台账，PG 实现与迁移 0099 都在本仓），
          `DelegatedTaskService` 的依赖表也很薄（`store` + `listAccounts` + 三个可选钩子）。
-         **真正的拦路石是那三个「可选」钩子里的 `prepareTarget` / `validateTarget`**：
-         单体那两段要按 `curatedContentStore.getOneForAccount(curatedId, accountId)` 校验精选目标，
-         而**那个方法今天没有任何跨进程端口**（kernel 的精选召回口与写口都没有它）。
-         ⇒ 这不是接线，是要**新开一条 content 属主读端口**（kernel 端口 + 传输三件套 + content 侧注册）。
+         **要点在那三个「可选」钩子里的 `prepareTarget` / `validateTarget`**：
+         单体那两段要按 `curatedContentStore.getOneForAccount(curatedId, accountId)` 校验精选目标。
+
+         ⚠️ **本条 2026-08-04 当天自我更正过一次，两句都留着，因为错的那句更有教训**：
+         先写的是「**那个方法今天没有任何跨进程端口**，⇒ 要新开一条 content 属主读端口」。
+         **错了** —— 我只 grep 了 kernel 的精选召回口与写口，没 grep 传输目录。
+         事实是 `curated-content/get-one-for-account` **这条路由早就存在**，
+         automation 侧有现成客户端（`CuratedContentHttpClient.getOneForAccount`），
+         **且 content 进程的手写入口已经在注册它**（`registerCuratedContentRoutes`）。
+         ⇒ 又一次「文档里写着『今天没有 X』，动手前先 grep 事实源在谁那儿」，
+         而这次那句错话是**我自己上一轮刚写进文档的**。
+
+         **所以真正要裁的是走哪条路，不是「有没有路」**：
+         - **A｜用既有那条**：今天就能接，零新增端口。代价是它是**裸形态**
+           （`server.register` 而非 `registerBearer`：无鉴权、无信封、**无 executionTarget 校验**）——
+           正是 §4.3 登记的那笔债（`CONTENT_AUTHORITY_WIRING_DEBT` 第 6 条，「同一个域两套鉴权口径」）。
+           ⚠️ **无 target 校验这一条不只是风格问题**：DEV/OL 长期共库，跨 target 读得出来。
+           接之前必须先确认精选表到底是不是 target-scoped。
+         - **B｜给 kernel 的精选端口补一个受鉴权的读方法**：口径统一、顺手还掉第 6 条债，
+           代价是 kernel → cloud（事实源）→ sync → transport pin → 三仓 pin → `npm install` 整条链。
+
+         **建议 B**，但这是一次要花成本的裁决，别顺手选 A 了事：A 会把一条无鉴权、
+         无 target 校验的读路径变成委托任务链上的**承重**依赖，而它今天只是个遗留旁路。
 
          **MUST NOT 省掉这两个钩子把服务先接上**：它们是「目标到底存不存在 / 是不是待审 /
          是不是这个账号的」三问的唯一执行点。省掉之后确认卡照发、任务照建，
