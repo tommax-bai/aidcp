@@ -222,6 +222,15 @@ DERIVED_COMPOSITION = {
         # 门的实现 `src/schema/schema-gate.ts` 是同步来的，这里只有本进程那一句怎么调：
         # 只判 automation 一个属主 + 不包 try/catch + 发一张启动外壳必填的回执。
         'src/automation-schema-gate-startup.ts',
+        # 批 H 第五片：真装配与 main()（门 → 属主池 → 镜像 → 组装根 → 十二个工厂 →
+        # 业务入口 → 启动外壳）。三处真环用晚绑定薄壳破。Cloud 里对应的是组装根自动化段，
+        # 但那一段的启动顺序与本进程**正好相反**（单体先开边缘口、后装同步读），
+        # 所以本文件是新写的、不是搬运，永远不会有同名的 cloud 文件可同步。
+        'src/automation-main.ts',
+        # 批 H 第五片顺带：人设在本进程的唯一取用口（绑定三态 + 人设本体）。
+        # 事实源在接口域、本进程只有同步读副本；收成一份是因为至少三个取用点要问同一个问题，
+        # 而「第二份实现」在行为测试上原理不可见（本 change 已实测坐实两次）。
+        'src/automation-persona-view.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'
