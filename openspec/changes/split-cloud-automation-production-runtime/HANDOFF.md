@@ -48,7 +48,7 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > | 工作区 | 六仓全干净、全已推、**对账零漂移**、两个共享包 pin 全对齐（本轮走了一遍完整级联） |
 > | 测试 | **cloud 4118**（+11 skip）/ **api 504** / **automation 2161**（+3 skip，与基线同）/ **content 444** / kernel 70 / transport 36，全 0 fail |
 > | 门（真交付物） | **4 条**（运营指令 2 / 内容 1 / 组装 1）—— 08-04 三批撤条 **11 → 6 → 5 → 4** |
-> | tasks.md | **86/143**（这把尺量的是「查清了多少」，不是交付；分母会随勘察长大） |
+> | tasks.md | **88/145**（这把尺量的是「查清了多少」，不是交付；分母会随勘察长大） |
 > | 边界 | 跨域边 0，豁免 0；4a 方法槽 58、组数 21 |
 > | dev | 停在 cloud `c394f36`，主干头 `76afee0`。**差的那一个提交行为逐位不变**（新增一组零消费方的路由 + 一个类型别名，单体不注册它）⇒ 按既有口径不为它重启在跑的 dev 车队；下一批有真运行时改动时一并带上去 |
 >
@@ -57,7 +57,7 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > - **`main()` 写完了**（automation `0044881` 起）：schema 契约门 → 属主池 → 同步读镜像 →
 >   组装根 → 十二个工厂 → 业务入口 → 启动外壳，三处真环用晚绑定薄壳破。
 >   **可执行入口仍然 fail-closed**，切成真启动要等台账清零（4.3），有结构断言钉着。
-> - **门 11 → 6 → 5 → 4**（automation `5fe3f97` / `30d2cc3` / `8d67f5a`）：撤的七条全属**真靠接线消掉**。
+> - **门 11 → 6 → 5 → 4**（automation `5fe3f97` / `30d2cc3` / `8d67f5a`）：撤的**八条**全属**真靠接线消掉**。
 >
 > ---
 >
@@ -67,7 +67,7 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > | 条目 | 卡在哪 | 尺寸 |
 > | --- | --- | --- |
-> | `feishu-operator-natural-language-delegate` + `-delegated-card-actions` | 委托任务的路由本进程没注册；服务要 `prepareTarget`/`validateTarget` 两个目标校验钩子 | 大（**裁决已定，见下**） |
+> | `feishu-operator-natural-language-delegate` + `-delegated-card-actions` | 委托任务的路由本进程没注册；服务要两个目标校验钩子；**且要先补一条账号显示名读** | 大，且是**一个耦合单元、不能再拆**（裁决已定，见下） |
 > | `content-generic-llm-authority` | 本根至今没构造 `PublishGenerationHttpClient`；**且比字面大得多**——本进程连**发帖触发器**（`PublishScheduler`）都还没建，而它有十几个依赖 | 大 |
 > | `automation-production-runtime-composition-unwired` | 它就是空壳入口本身，等前面清完 | 收尾 |
 >
@@ -347,7 +347,7 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 | | 现值（快照，以 §1 跑出来的为准） | 它衡量什么 |
 | --- | --- | --- |
 | tasks.md 条数 | 88/145 | **「查清了多少」，不是「交付了多少」。** 分母会随勘察长大——最近几批往里加了十来条实测发现的新任务 |
-| **那张清单（门）** | **4 条** | **真正的交付物。** 14 → 4：**头两条是撤的、不是干活减的**（一条被算了两遍 1.7b，一条记错了属主 2.9）；**其余七条都是真靠接线消掉的** |
+| **那张清单（门）** | **4 条** | **真正的交付物。** 14 → 4：**头两条是撤的、不是干活减的**（一条被算了两遍 1.7b，一条记错了属主 2.9）；**其余八条都是真靠接线消掉的** |
 
 **收工的判据是门清零，不是 tasks.md 打完勾。** 两者不是同一把尺，别拿后者当进度终点。
 
@@ -365,7 +365,7 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 | `content-generic-llm-authority` | 内容 | 本根没构造 `PublishGenerationHttpClient`，且本进程连**发帖触发器**都还没建（比字面大） |
 | `automation-production-runtime-composition-unwired` | 组装 | 就是那个空壳入口本身；前面不清完写不了 |
 
-**已撤的七条**（全属真靠接线消掉）：`content-role-factories`（07-31）、概念池写 / 精选写 /
+**已撤的八条**（全属真靠接线消掉）：`content-role-factories`（07-31）、概念池写 / 精选写 /
 FB 发帖素材 / 用量记账 / 回复生成（08-04 `5fe3f97`）、调度启停（08-04 `30d2cc3`）、
 文字卡转写（08-04 `8d67f5a`）。
 **逐条的理由写在 `aidcp-automation/src/automation-composition-root.ts` 的原地注释里**——
