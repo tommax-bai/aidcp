@@ -2564,7 +2564,67 @@
 
        **状态**：automation 侧客户端**已到货、未接线**（main 里还没构造它）。
        接线属下面那条委托任务批次。 -->
-- [ ] 4.1b 余下 4 条的清零路径（各自的前置写在下面，别当成一批）。
+- [x] 4.1f **第四批撤条：4 → 2**（2026-08-03），撤的是**委托任务那两条**
+  （`feishu-operator-natural-language-delegate` + `feishu-operator-delegated-card-actions`），
+  第八、第九条真靠接线消掉的；operator-command 这一类**归零**。
+  <!-- cloud `0d507c5`（事实源）/ kernel `e8396ce` / transport `346d0c8` /
+       api `f69bfe0` / automation `6f1a544` / content `039cd26`。
+       六仓对账零漂移、两个共享包 pin 全对齐；测试 cloud 4121 / api 505 / automation 2167 /
+       content 444 / kernel 70 / transport 36，全 0 fail（cloud 另 11 skip、automation 3 skip，与基线同）。
+
+       **两条必须一起撤**：它们指向同一个 7+1 端口，注入那一个端口就同时点亮自由文本入口与
+       卡片按钮；分开撤只会留下一条假欠账。
+
+       ── 逐条落地（照 4.1b 那份清单，顺序有意从 ⓪ 起） ──────────────────────
+
+       **⓪ 账号显示名（本批新增面，此前整份计划都漏了它）**：4a 花名册组加第二个方法
+       `listAccountDirectory`，一次全量目录读，交 `{accountId, displayName, names, platform, status}`。
+       · 口径三条写死在 kernel 契约里：解析回落到裸 ID 时 `displayName` 交 `null`（裸 ID 不是名字）；
+         `names` 永不含账号 ID，空数组是合法值、含义是「今天没有可读名」；`platform` 归一。
+       · **与守卫花名册那条刻意分成两条路由**：那条契约要求列值原样、且背后有一张持久投影表，
+         往它的载荷上加字段就得连同投影一起动（判例 0091 / 0108 的镜像 cursor）。
+       · 属主实现**直读库、不读进程内那份显示名缓存**：缓存的新鲜度只由写路径维护，
+         而这条读的消费方是运营入口，拿落后的名字去匹配就是「改了别名却选不中」，且不报错。
+       · 目录行 → 候选的翻译**只有一份**（cloud `src/delegated-task/account-candidates.ts`，
+         automation 属主），单体组装根与自动化 `main()` 都取它。结构断言按**正向委托**写，
+         变异实测：把 map 内联回组装根 → 红；两处行为用例全绿。
+
+       **① ② 接线**：automation `main()` 新增 1i 段 —— 建委托任务存储（属主池，`await init()`）、
+       建服务（`store` + 共享候选清单 + 两个钩子）、建幂等台账、把接收方同时挂上
+       `registerDelegatedTaskRoutes`（7 方法）与 `registerDelegatedTaskTextCommandRoutes`（自由文本）。
+       台账**单独 try**（逐字照单体的裁定：它失败 MUST NOT 把只用版本号乐观锁的 7 方法一起掐掉）。
+
+       **③ 两个钩子**：候选稿三动作走 api 属主 publishLog 的 `loadForDispatch`（本根早有客户端、零新增）；
+       精选那半走 4.1e 那条**受鉴权**的读。错误分类是这条的红线，两个原因码分开：
+       `curated_content_unavailable`（可重试）vs `curated_target_unavailable` / `_changed`（这行不存在 / 已变）。
+       归类用 kernel 的 `curatedContentFailureReason`（**两类抛出物都认**），
+       认不出来的照原样抛 —— 逐字照单体，不把陌生错误压成一句「稍后重试」。
+
+       **④ api 侧**：两个客户端合成 7+1，**逐方法显式转调**；`delegate` 真调它；
+       `startIngress` 也收到那个端口（只接前者的话，卡片照常渲染出按钮、点了什么都不发生）。
+       幂等键取飞书消息 id，拿不到就拒发、不用随机数兜底。
+       变异实测两条都红：改成 `...seven` 展开 / 去掉 `delegatedTasks` 那一行。
+
+       **⑤ 探针自熄**：api 手写入口里那句 `automation_operator_command_unavailable:delegate`
+       整句消失（改成真调客户端），形态同调度启停那条 ⇒ **不必先裁定「探针分不出没通道 / 没配通道」**。
+       剩下的 `:publish` / `:comment` 属另一条已撤条目（1.7b），所在闭包在 api 模式下不可达。
+
+       ── 本批实测到的两件事（下一手照办） ────────────────────────────────
+
+       ⚠️ **4a 计数的手抄处是六处，不是五处**：那份「五处」清单漏了
+       `aidcp-cloud/test/transport/api-direct-inventory.test.ts`（两个测试名 + 三处写死 58）。
+       前五处逐处改完、单文件测试全绿，**只有跑全量才红**。
+
+       ⚠️ **`npm install` 跑到一半时的 typecheck 结果不可信**：并发装三个仓那次，automation 的
+       `node_modules/aidcp-transport/` 被清空又还没写回，typecheck 报了 8 条「找不到模块 /
+       隐式 any」，全部是幻影。装完复跑即全绿。**别去「修」这类错误**——照着改会真把代码改坏。
+
+       **诚实地记下没做到的**：飞书 `/delegate` 那条链**一次都没真跑过**（要真发一条飞书消息才触发），
+       按 5.5 登记 backlog 簇 60。本批交付的是「两端都真接上 + 结构上钉住 + 变异实测能红」。 -->
+- [ ] 4.1b 余下 **2** 条的清零路径（各自的前置写在下面，别当成一批）。
+  <!-- ⚠️ **2026-08-03 更新：运营指令那一组已全部清零**（调度启停见 4.1c，委托两条见 4.1f），
+       下面「运营指令 3 条」那一整段**只作追溯，别再当待办读**。仍未清的只剩：
+       内容生成链（`content-generic-llm-authority`）与组装根那条空壳入口。 -->
   <!-- · **运营指令 3 条 —— 前提 2026-08-04 被推翻，别照旧读**：原先记的是「接线早已完成，
          只卡在探针分不出『没有通道』与『没配置通道』」。**实读发现更前面还缺一步**：
          那四条路由（委托自由文本 / 手动发布 / 手动评论 / 调度启停）在单体里是**进程内直调**，
