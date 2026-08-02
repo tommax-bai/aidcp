@@ -195,6 +195,14 @@ E4 的危险不只在 `set_schedule` 自证：即使该原子当时读对，后�
 
 D6 当时把 `src/native-page-engine/browse-session.ts` 交给并行的 session-guards change；该 change 已于 2026-08-01 归档，当前无活跃单写者。本轮触碰的是 H.5 新坐实的共享诚实性边界，不重开其周期探针 / 装配范围，也不触碰 Cloud automation 三进程拆分。
 
+### D12. E7 把立即发布身份、定时内部句柄、到期公开身份拆成三种证据
+
+现役 `publish_capture_post_id` 从全页取第一条笔记链，拿不到再从 creator 地址任意 `id` 参数兜底；这不是抓本稿，而是在抓“此刻最先看见的某个 id”。定时 capture / reconcile 又共用同一条“含定时文案即成功”分支：旧日期同标题稿、UI `data-id` 可以冒充内部句柄，仍在待发布的行反而可被到期对账报成公开发布。这三种对象不能再共用一条宽松选择器。
+
+选：立即发布在 submit 点击前为成功提示节点建立基线，只从点击后新增 / 变化的成功结果作用域提取唯一笔记身份；Native session 以 `recordId` 持有该证据，下一条 `capture_postId` 只消费它，不再重新全页猜。页面 marker / sessionStorage 被否决，因为那是执行端自造证据且会跨稿陈旧。抓不到身份不会否定已经确认的提交，只让 Cloud 保持 `submitted_unconfirmed`。
+
+定时内部句柄仍属于“待发布记录”，按平台内部 id 优先，否则冻结标题 + Asia/Shanghai 完整日期分钟 + 定时态合取后唯一匹配；泛 `data-id` 不是平台证据。到期 reconciliation 先判仍在定时并回 pending，再判已发布唯一行；只有公开 post id 与同 id、含非空 `xsec_token` 的 HTTPS 小红书详情 URL 同时存在才确认。该收紧会增加诚实的 pending / submitted-unconfirmed，但不会导致自动重投或丢稿，也不需要扩 Cloud 协议。
+
 ## Risks / Trade-offs
 
 - **真机结论与规格假设不符**（开帖并未落错误页）→ 规格只要求正面详情证据，这一半在任何情况下都成立；执行方式的选择留在实装任务里按真机结论决定，不需要改规格。

@@ -400,6 +400,48 @@ Notification text fields SHALL be truncated on code-point boundaries and MUST NO
 - **WHEN** notification content, sender name, and note title are reported
 - **THEN** each is capped at its own field-scoped limit rather than a shared row-sized limit
 
+### Requirement: Native Xiaohongshu captured publish identity is bound to the current submission
+
+An immediate publish identity SHALL be derived only from a unique note identity exposed by a success-result surface that became new or changed after the current submit actuation. A page-wide first-link scan, a stale result node, the creator page URL, or an arbitrary `id` query parameter MUST NOT be promoted to the published note. The Native session SHALL bind the captured identity to the current publish `recordId`; `capture_postId` MUST NOT recover an unbound identity from whatever note happens to be visible later. A public `postUrl`, when present, MUST be an HTTPS Xiaohongshu detail URL whose path identity equals the captured post id and whose query carries a non-empty `xsec_token`. Missing identity evidence SHALL leave the already-submitted record unconfirmed rather than attaching another note's identity.
+
+#### Scenario: Old visible note is not the current publish
+
+- **WHEN** the page contains an older visible note link but the current submit result exposes no bound note identity
+- **THEN** `capture_postId` returns a typed non-success receipt
+- **AND** it does not return the old link or a creator-page query id
+
+#### Scenario: Fresh unique submit result binds the identity
+
+- **WHEN** the current submit creates or changes a success-result surface that exposes exactly one note identity
+- **THEN** that identity is bound to the current `recordId`
+- **AND** the following `capture_postId` returns only that bound identity
+
+#### Scenario: Public link requires a token and matching identity
+
+- **WHEN** the bound result exposes a bare detail link, a non-Xiaohongshu link, a tokenless link, or a link for a different note id
+- **THEN** it is not returned as `postUrl`
+- **AND** no URL is manufactured from the bare id
+
+### Requirement: Native Xiaohongshu scheduled capture and reconciliation use distinct identity states
+
+Capturing a scheduled submission SHALL identify one still-scheduled row by the platform internal id when available, otherwise by the conjunction of frozen title, the complete Asia/Shanghai calendar date and minute, and positive scheduled state. Generic UI `data-id` values MUST NOT be treated as platform note ids. Reconciliation after the target time SHALL distinguish a still-scheduled row from a published row: a still-scheduled match MUST return `scheduled_pending`; a published match SHALL be successful only when one unique row provides both a public post id and a usable tokenized public URL. Missing or multiple matches MUST remain pending or ambiguous rather than selecting the first row.
+
+#### Scenario: Same title and minute on another date is not the scheduled record
+
+- **WHEN** a visible scheduled row shares the frozen title and clock minute but displays another calendar date
+- **THEN** it is not captured as the target scheduled record
+
+#### Scenario: Still scheduled is pending, not published
+
+- **WHEN** reconciliation finds the uniquely bound record still in scheduled state
+- **THEN** it returns a typed non-success receipt with `scheduled_pending`
+
+#### Scenario: Published reconciliation requires complete public identity
+
+- **WHEN** reconciliation finds one published row with a public post id and a matching HTTPS Xiaohongshu detail URL carrying `xsec_token`
+- **THEN** it returns that id and URL as confirmed
+- **AND** an id without that URL remains unconfirmed
+
 ### Requirement: Native Xiaohongshu parity is protected by behavior-level regression tests
 
 The Edge repository SHALL contain focused Xiaohongshu Native tests derived from the retired TypeScript behavior for comment composition, note-open evidence, image-browsing receipts, navigation-back truth, comment-scroll measurement, interaction control resolution and confirmation, notification extraction, and publish atom contracts. Tests MUST assert externally meaningful outcomes and reason codes rather than only checking that a selector string exists or that a branch returns. Test fixtures MUST NOT globally pin element geometry in a way that makes the adapter's visibility judgement unconditionally true, because that silently disables the guard the tests are meant to protect.

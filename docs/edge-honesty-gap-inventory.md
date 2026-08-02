@@ -42,7 +42,7 @@
 
 | 层 | 当前复验面 | 结论 |
 | --- | --- | --- |
-| 小红书页面规则 | 16 个源文件、174 个唯一终局 / 确认候选 | 修复详情链接冒充首页、陈旧 toast / 全页进行态冒充本次发布成功；E2 / E7 仍按原台账未裁定 |
+| 小红书页面规则 | 16 个源文件、174 个唯一终局 / 确认候选 | 修复详情链接冒充首页、陈旧 toast / 全页进行态冒充本次发布成功；后续 E7 已修，原台账只剩 E2 未裁定 |
 | Rust 输出转换 | 72 个行级候选；70 个排除，余 2 个相连命中归并为 1 个缺口 | submit 与三条发布身份命令拒绝 generic action receipt 升级成 typed publish terminal |
 | Native 宿主 TS | 20 个转换点；7 个排除、13 个复核 | 修复 5 类 session / transport dispatch、终局丢失、非确认观测与具体原因保真缺口 |
 | may-write 后置库存 | 42 条：confirmed 40 / below_bar 1 / n/a 1 / unread 0 | 唯一 below_bar 是 E2 的 mention / location / collection 候选支，仍待真机校准；没有未读写命令 |
@@ -75,7 +75,7 @@
 | **E3** feed 刷新三条出口无条件确认 | ✅ **已修**（2026-08-01，edge `c0bdc34`） | 点前记批次首部 id 序列、点后有界轮询 3s 等它变；没变 = ambiguous + `refresh_batch_unchanged`，读不到卡片另有原因码，两态都不回成功。**E13 是本条的重复登记**（同一落点同一形态），见下 |
 | **E4** 发布定时开关不读状态 | ✅ **已修**（2026-08-02，edge `fd3ee6a`） | `set_schedule` 先读真实开关三态，已开幂等、已关才点击并等翻转；北京时间精确到分钟，并与开关仍开、唯一「定时发布」提交按钮三证合取。Native 会话持 unknown / immediate / scheduled(target minute)，submit 前复读平台模式与分钟、只点对应按钮；unknown / 漂移零点击且 `submitDispatched=false`。未扩 Cloud 协议、未用页面 marker 自证；未打包 / 未真机，结构复核仍待 backlog 125.2 |
 | **E5** 通知分栏无正面证据 | ✅ **已修**（2026-08-01，edge `c0bdc34`） | 三条平台产出的证据任一成立才算切过去：叶子分类栏激活态（走 E8 收紧后的三态判据、只读叶子，包裹容器不算数并有用例钉住）/ 该类角标由非零归零 / 可见列表换批；证不出来 = not_started。评论类另加「没确认切栏就不回 items」。**E14 是本条的重复登记**，见下 |
-| **E7** 抓已发布笔记身份 | ⬜ 未判 | 属主明确列为本轮范围外 |
+| **E7** 抓已发布笔记身份 | ✅ **已修**（2026-08-02，edge `2f143e4`） | 立即身份只从本次 fresh success 作用域唯一提取并由 Native session 按 recordId 绑定，capture 不再全页猜；定时内部句柄 / 到期公开身份拆开，完整北京时间日期分钟、正面状态、具名平台 id、tokenized 公开 URL 分层校验 |
 | **E9** 配图上传后置校验 | ✅ **已修**（2026-08-01，edge `20fc70a`，由 `extend-native-postcondition-coverage` §3.2 落地） | 写文件**之前**取预览位身份基线（地址长度 + FNV-1a 摘要，地址不出 IPC），写后有界轮询等目标位出现基线里没有的身份；残留预览不再满足。基线读不到即**在写文件之前**停手。走引擎特化落地，属主的路由文件一行未碰 |
 | **E12** 指针拟人轨迹静默降级 | 🔀 **已判：转出**（2026-08-01） | 原属 `restore-native-actuation-humanization-and-locating` 的 H.2，该 change 收口时**具名交接给「需新立 change（诊断通路本体）」**、并已归档。**不是弃守**：缺口仍在。交接理由是它要的不是「加一行记账」而是「那一行到得了人眼前」，而**那条通路整体不存在** —— 降级走的是成功路径，记账行随子进程退出丢弃，没有任何人看得到。同一条通路同时卡着逐字输入的降级记账，两者应同批解决 |
 
@@ -85,7 +85,7 @@
    小红书侧自 Native 迁移以来真机零覆盖，真机项见
    `docs/real-machine-acceptance-backlog.md` 簇 125。
 2. **⬜ 不是「不做」，是「还没判」**。H.1 要求逐条判「修 / 显式弃守」且 MUST NOT 静默跳过——
-   当前只剩 E2 / E7 未判；E12 已具名转出，其余 9 条已修。H.1 仍未勾，别把「本轮没做」
+   当前只剩 E2 未判；E12 已具名转出，其余 10 条已修。H.1 仍未勾，别把「受真机标定阻断」
    读成「决定不做」。
 
 ---
@@ -148,6 +148,8 @@
 - **阻塞**：none
 
 ### E7. 抓已发布笔记身份（xhs-command-router.js:737-738）：回报的链接不要求带访问令牌（相对退役实现与同批详情上报的真回退），且证据不与本次发布绑定——取页面第一条可见笔记链、并用 `[?&](?:note_id|id)=` 兜底把地址上任何 id 参数当笔记号（「取第一条」为长
+
+> **处置更新（2026-08-02，edge `2f143e4`）**：本节以下是修复前机制与最坏后果。现役实现已删除全页第一链与 query id 兜底；立即身份经 fresh submit result → Native session(recordId) → typed capture 三段绑定。定时 capture / reconcile 不再共用“含定时文案即成功”的分支；仍待发布明确 pending，公开确认须唯一公开 id + 同 id、非空 `xsec_token` URL。真实页面结构仍待 backlog 125.2，故这里只代表代码不再沿旧机制错报。
 
 - **类型**：判据过宽　**落点**：`native/page-engine/src/xhs-command-router.js:737`　**体量**：small
 - **今天回报什么**：取页面上第一个可见的笔记链（拿不到就退到当前地址栏），从里面解析出 id 就回 publish_receipt{ok:true, value:<id>, postUrl:<该链接或当前地址>}；解析不出才回 publish_evidence_not_found。
