@@ -44,9 +44,9 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > | 项 | 值 |
 > | --- | --- |
-> | 六仓 | cloud `c394f36` / **api `3159e10`** / **automation `8d67f5a`** / **content `e924e2a`** / kernel `6101b1e` / transport `1444d59` |
-> | 工作区 | 六仓全干净、全已推、**对账零漂移**、两个共享包 pin 全对齐 |
-> | 测试 | cloud 4115 / **api 504** / **automation 2158**（+3 skip，与基线同）/ **content 444** / kernel 70 / transport 36，全 0 fail |
+> | 六仓 | **cloud `76afee0`** / **api `00a4d72`** / **automation `14dc802`** / **content `09d1351`** / **kernel `b7aa4db`** / **transport `9e32c1f`** |
+> | 工作区 | 六仓全干净、全已推、**对账零漂移**、两个共享包 pin 全对齐（本轮走了一遍完整级联） |
+> | 测试 | **cloud 4118**（+11 skip）/ **api 504** / **automation 2161**（+3 skip，与基线同）/ **content 444** / kernel 70 / transport 36，全 0 fail |
 > | 门（真交付物） | **4 条**（运营指令 2 / 内容 1 / 组装 1）—— 08-04 三批撤条 **11 → 6 → 5 → 4** |
 > | tasks.md | **86/143**（这把尺量的是「查清了多少」，不是交付；分母会随勘察长大） |
 > | 边界 | 跨域边 0，豁免 0；4a 方法槽 58、组数 21 |
@@ -75,7 +75,15 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > `content-textcard-transcription-authority`（content `e924e2a` 建属主实例并注册路由；
 > automation 侧本来就齐了）。**两条的形态一样**：本包这边早就接好，缺的是**对面那一半**。
 >
-> **委托任务那条的裁决 2026-08-04 已定：走 B（给受鉴权的精选端口补一条读），A 不成立。**
+> **委托那条的前置已经做完了（tasks 4.1e）**：受鉴权的精选目标校验读
+> `content-authority/curated-target/v1/get-one-for-account` **端到端可用** ——
+> kernel 加了个 `Pick` 别名（不新开文件，省掉成员名册两处手抄）、transport 三件套、
+> content 已在服务它、automation 侧客户端**已到货但还没在 `main()` 里构造**。
+> 六仓级联（cloud → kernel → transport → 三仓 pin → `npm install`）已走完，对账零漂移。
+> **下一手直接照 tasks 4.1b 里那份逐条清单接线**（① 建客户端 ② 装配委托服务与两条路由
+> ③ 两个钩子 ④ api 侧两个客户端合成 7+1 ⑤ 撤两条），别再重推裁决。
+>
+> **裁决存档：走 B，A 不成立。**
 > 此前记的是「A 只是欠债、B 只是讲究」，实读后不对——那两个钩子必须分得出
 > 「精选库不可用」与「这行不存在」（单体代码明写着后者是**谎**），靠的是 kernel 那个按名字判的守卫；
 > 而裸那条路由的客户端是光秃秃的 `http.call`，跨进程后对面的缺表错误只剩一个普通传输错误，
@@ -330,7 +338,7 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 
 | | 现值（快照，以 §1 跑出来的为准） | 它衡量什么 |
 | --- | --- | --- |
-| tasks.md 条数 | 87/144 | **「查清了多少」，不是「交付了多少」。** 分母会随勘察长大——最近几批往里加了十来条实测发现的新任务 |
+| tasks.md 条数 | 88/145 | **「查清了多少」，不是「交付了多少」。** 分母会随勘察长大——最近几批往里加了十来条实测发现的新任务 |
 | **那张清单（门）** | **4 条** | **真正的交付物。** 14 → 4：**头两条是撤的、不是干活减的**（一条被算了两遍 1.7b，一条记错了属主 2.9）；**其余七条都是真靠接线消掉的** |
 
 **收工的判据是门清零，不是 tasks.md 打完勾。** 两者不是同一把尺，别拿后者当进度终点。

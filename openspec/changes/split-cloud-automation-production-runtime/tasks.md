@@ -2551,6 +2551,19 @@
        顺带两处：清单闸的登记表改成具名类型标注（pending 清零后 `as const` 会把联合收窄成一枝，
        读 `reason` 的那支变 never、只能靠强转硬撑，而那正是这条闸要防的）；
        去掉帖级形态档那处多余的非空断言（`senseAt` 早已是必选）。 -->
+- [x] 4.1e **委托那条的前置（裁决 B）已落地，端到端可用**：受鉴权的精选目标校验读
+  `content-authority/curated-target/v1/get-one-for-account`。
+  <!-- cloud `76afee0`（事实源）/ kernel `b7aa4db` / transport `9e32c1f` / content `09d1351` /
+       automation `14dc802` / api `00a4d72`。六仓对账零漂移，两个共享包 pin 全对齐。
+       kernel 只加了一个 `Pick` 别名（`CuratedTargetReader`），**不新开 kernel 文件** ——
+       省掉 `ownership-rules.json` fileOverrides + `kernel-non-members.json` 名册那两处手抄。
+       content 侧属主实例结构上即满足该端口，原样注入、零新增代码。
+
+       **那条只许下降的清单闸这次真的先红了一下**（共享包新增 registrar 而清单没登记），
+       先红、再登记 —— 这是它存在的理由，别反过来（先登记再写代码 = 闸失效）。
+
+       **状态**：automation 侧客户端**已到货、未接线**（main 里还没构造它）。
+       接线属下面那条委托任务批次。 -->
 - [ ] 4.1b 余下 4 条的清零路径（各自的前置写在下面，别当成一批）。
   <!-- · **运营指令 3 条 —— 前提 2026-08-04 被推翻，别照旧读**：原先记的是「接线早已完成，
          只卡在探针分不出『没有通道』与『没配置通道』」。**实读发现更前面还缺一步**：
@@ -2591,6 +2604,26 @@
            接之前必须先确认精选表到底是不是 target-scoped。
          - **B｜给 kernel 的精选端口补一个受鉴权的读方法**：口径统一、顺手还掉第 6 条债，
            代价是 kernel → cloud（事实源）→ sync → transport pin → 三仓 pin → `npm install` 整条链。
+
+         **✅ 裁决已执行完毕（4.1e）：那条受鉴权的读今天端到端可用。** 下面这段留作理由存档。
+         **下一手要做的是把它接上**，逐条清单（都已实读定过，别再推一遍）：
+         ① automation `main()`：建 `CuratedTargetAuthorityHttpClient`（`...contentArgs` 那一族）；
+         ② automation `main()`：建 `PgDelegatedTaskStore`（属主池，`await store.init()`）
+            + `DelegatedTaskService`（`store` + `listAccounts` + 两个目标校验钩子）
+            + 那个已经写好的接收方 + PG 幂等台账，并注册
+            `registerDelegatedTaskRoutes` 与 `registerDelegatedTaskTextCommandRoutes`；
+         ③ 两个钩子逐条照单体：候选稿那半走 **api 属主 publishLog 的 `loadForDispatch`**
+            （本根已有客户端，零新增），精选那半走 ①。
+            **错误分类是这条的红线**：`curated_content_unavailable`（可重试）与
+            `curated_target_unavailable`（这行不存在）MUST 分开；跨进程后前者到达时是
+            `ContentPortError`，判定用 kernel 的 `curatedContentFailureReason` / 两个守卫，
+            **MUST NOT 只认单体那个本地错误类**（跨进程恒 false）；
+         ④ api `main()`：建 `DelegatedTaskHttpClient` + `DelegatedTaskTextCommandHttpClient`，
+            按 7+1 合成一个端口 —— **逐方法显式转调，MUST NOT 用对象展开**（展开拿不到类实例
+            原型上的方法，那种错要真跑起来才现形；单体那处注释已写明）；
+            再把 `delegate` 与委托卡片动作两处接上（今天都还是 `throw …unavailable:*`）。
+         ⑤ 撤两条台账。**探针那一关这次大概率自熄**：接上之后 api 手写入口里那两句
+            `automation_operator_command_unavailable:delegate` 会整句消失，形态同调度启停那条。
 
          **⚠️ 2026-08-04 实读补一条决定性证据：A 其实不成立，别再当成「省事的那个选项」。**
          那两个钩子里对精选读的抛出物**必须分得出「库不可用」与「这行不存在」**——单体那两处
