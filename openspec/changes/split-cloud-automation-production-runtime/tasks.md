@@ -2612,6 +2612,19 @@
             + `DelegatedTaskService`（`store` + `listAccounts` + 两个目标校验钩子）
             + 那个已经写好的接收方 + PG 幂等台账，并注册
             `registerDelegatedTaskRoutes` 与 `registerDelegatedTaskTextCommandRoutes`；
+         ⓪ **先补一条 api 属主读：账号显示名。这一步 2026-08-04 实读补出来，此前整份计划都漏了它。**
+            `listAccounts` 要交的是 `{accountId, displayName, names, platform, status}`。
+            花名册客户端与账号投影镜像**都只有** `accountId / platform / groupLabel / createdAt / status`
+            —— **显示名与别名候选今天没有任何跨进程读**（kernel / transport / api 三处都 grep 过，
+            只活在 api 的 `src/account-store.ts`）。
+            缺了不是「差一点」：委托解析按昵称选账号，`names` 为空时每一条
+            「给<昵称>…」都会走进 `account_not_found` 并回一句「可用昵称：无可用昵称」——
+            响亮，但这条能力对运营等于不可用。
+            **⚠️ 它 MUST 与接线同批落，不能当独立前置先做**：4a 普查有一条
+            `PRODUCTION_CONSUMER_BINDINGS`（「每个方法槽都要有真实生产消费点」），
+            光加端口方法过不了；**单体那份 `listAccounts` 闭包也得同批改指这条端口**
+            （今天它直调 api 属主存储的 `listAll` + 两个显示名方法）。
+            连带那五处手抄计数（见本文件「动 4a 清单要改五处」那段）一并改。
          ③ 两个钩子逐条照单体：候选稿那半走 **api 属主 publishLog 的 `loadForDispatch`**
             （本根已有客户端，零新增），精选那半走 ①。
             **错误分类是这条的红线**：`curated_content_unavailable`（可重试）与
