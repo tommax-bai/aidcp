@@ -25,6 +25,6 @@
 - [x] 5.1 Run focused Electron renderer/main/core tests and fix regressions.
   <!-- Edge focused core/main/renderer coverage: 115/115 passed; coordinator 5/5, renderer smoke 103/103, companion UI 84/84, and nickname IPC 4/4 passed. -->
 - [x] 5.2 Run Edge acceptance, full tests, typecheck, diff check, and `openspec validate exclusive-browser-window-switching --strict`.
-  <!-- Acceptance: 38/38 passed with 1 gated E2E skip. Typecheck, diff check, and strict OpenSpec validation passed. Full `npm test` was rerun after scoped fixes and reached only the pre-existing `facebook_auth_start_ad_data_review` Native postcondition inventory failure; the same targeted failure reproduces on the unmodified Edge `master` at dfb57f1. -->
-- [ ] 5.3 Record repo/commit/validation evidence, commit and push the isolated control/Edge branches, then serially integrate eligible default branches without packaging or deployment.
-  <!-- Both isolated branches are committed and pushed; Edge implementation commit: aidcp-edge@9f27da5. Default-branch integration remains gated by the unrelated full-suite baseline failure; no package, installation, or deployment is in scope. -->
+  <!-- After rebasing onto Edge master@52cd8d9, full `npm test` passed 3036/3036 with 1 gated skip; Acceptance passed 38/38. Typecheck, diff check, and strict OpenSpec validation passed. -->
+- [x] 5.3 Record repo/commit/validation evidence, commit and push the isolated control/Edge branches, then serially integrate eligible default branches without packaging or deployment.
+  <!-- Edge was rebased, revalidated, and fast-forward integrated to master at aidcp-edge@cff5a19. The control record was rebased onto current origin/main for fast-forward integration. No package, installation, or deployment was performed. -->
