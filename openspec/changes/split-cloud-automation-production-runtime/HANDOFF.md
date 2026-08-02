@@ -44,10 +44,10 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > | 项 | 值 |
 > | --- | --- |
-> | 六仓 | cloud `c394f36` / **api `3159e10`** / **automation `30d2cc3`** / content `7305b46` / kernel `6101b1e` / transport `1444d59` |
+> | 六仓 | cloud `c394f36` / **api `3159e10`** / **automation `8d67f5a`** / **content `e924e2a`** / kernel `6101b1e` / transport `1444d59` |
 > | 工作区 | 六仓全干净、全已推、**对账零漂移**、两个共享包 pin 全对齐 |
-> | 测试 | cloud 4115 / **api 504** / **automation 2158**（+3 skip，与基线同）/ content 442 / kernel 70 / transport 36，全 0 fail |
-> | 门（真交付物） | **5 条**（运营指令 2 / 内容 2 / 组装 1）—— 08-04 两批撤条 **11 → 6 → 5** |
+> | 测试 | cloud 4115 / **api 504** / **automation 2158**（+3 skip，与基线同）/ **content 444** / kernel 70 / transport 36，全 0 fail |
+> | 门（真交付物） | **4 条**（运营指令 2 / 内容 1 / 组装 1）—— 08-04 三批撤条 **11 → 6 → 5 → 4** |
 > | tasks.md | **86/143**（这把尺量的是「查清了多少」，不是交付；分母会随勘察长大） |
 > | 边界 | 跨域边 0，豁免 0；4a 方法槽 58、组数 21 |
 > | dev | 仍停在 cloud `c394f36`。**本轮只动派生仓，与 dev 无关**（dev 上跑的是单体） |
@@ -57,22 +57,23 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > - **`main()` 写完了**（automation `0044881` 起）：schema 契约门 → 属主池 → 同步读镜像 →
 >   组装根 → 十二个工厂 → 业务入口 → 启动外壳，三处真环用晚绑定薄壳破。
 >   **可执行入口仍然 fail-closed**，切成真启动要等台账清零（4.3），有结构断言钉着。
-> - **门 11 → 6 → 5**（automation `5fe3f97` / `30d2cc3`）：撤的六条全属**真靠接线消掉**。
+> - **门 11 → 6 → 5 → 4**（automation `5fe3f97` / `30d2cc3` / `8d67f5a`）：撤的七条全属**真靠接线消掉**。
 >
 > ---
 >
-> ### 二、下一步：余下 5 条，逐条的障碍都已定位并定过尺寸
+> ### 二、下一步：余下 4 条，逐条的障碍都已定位并定过尺寸
 >
 > **别当成一批做。** 顺序上没有硬依赖（组装根那条除外），按成本挑即可。
 >
 > | 条目 | 卡在哪 | 尺寸 |
 > | --- | --- | --- |
 > | `feishu-operator-natural-language-delegate` + `-delegated-card-actions` | 委托任务的路由本进程没注册；服务要 `prepareTarget`/`validateTarget` 两个目标校验钩子 | 大（**裁决已定，见下**） |
-> | `content-textcard-transcription-authority` | **卡在 content 侧**：那边至今没构造转写器实例（清单闸里是 pending），automation 侧才谈得上接 | 中 |
-> | `content-generic-llm-authority` | 本根至今没构造 `PublishGenerationHttpClient`；**且比字面更大**——本进程连发帖触发器都还没建 | 中偏大 |
+> | `content-generic-llm-authority` | 本根至今没构造 `PublishGenerationHttpClient`；**且比字面大得多**——本进程连**发帖触发器**（`PublishScheduler`）都还没建，而它有十几个依赖 | 大 |
 > | `automation-production-runtime-composition-unwired` | 它就是空壳入口本身，等前面清完 | 收尾 |
 >
-> **`feishu-operator-dispatch-start-stop` 已清零**（automation `2f5f6a9` 服务端 + api `3159e10` 客户端）。
+> **两条已清零**：`feishu-operator-dispatch-start-stop`（automation `2f5f6a9` 服务端 + api `3159e10` 客户端）、
+> `content-textcard-transcription-authority`（content `e924e2a` 建属主实例并注册路由；
+> automation 侧本来就齐了）。**两条的形态一样**：本包这边早就接好，缺的是**对面那一半**。
 >
 > **委托任务那条的裁决 2026-08-04 已定：走 B（给受鉴权的精选端口补一条读），A 不成立。**
 > 此前记的是「A 只是欠债、B 只是讲究」，实读后不对——那两个钩子必须分得出
@@ -329,8 +330,8 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 
 | | 现值（快照，以 §1 跑出来的为准） | 它衡量什么 |
 | --- | --- | --- |
-| tasks.md 条数 | 86/143 | **「查清了多少」，不是「交付了多少」。** 分母会随勘察长大——最近几批往里加了十来条实测发现的新任务 |
-| **那张清单（门）** | **5 条** | **真正的交付物。** 14 → 5：**头两条是撤的、不是干活减的**（一条被算了两遍 1.7b，一条记错了属主 2.9）；**其余六条都是真靠接线消掉的**——`content-role-factories`（07-31）、08-04 那批五条、调度启停 |
+| tasks.md 条数 | 87/144 | **「查清了多少」，不是「交付了多少」。** 分母会随勘察长大——最近几批往里加了十来条实测发现的新任务 |
+| **那张清单（门）** | **4 条** | **真正的交付物。** 14 → 4：**头两条是撤的、不是干活减的**（一条被算了两遍 1.7b，一条记错了属主 2.9）；**其余七条都是真靠接线消掉的** |
 
 **收工的判据是门清零，不是 tasks.md 打完勾。** 两者不是同一把尺，别拿后者当进度终点。
 
@@ -339,18 +340,18 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 
 ---
 
-## 3. 门：5 条逐条现状（当前值以 §1 第 ④ 条跑出来的为准）
+## 3. 门：4 条逐条现状（当前值以 §1 第 ④ 条跑出来的为准）
 
 | id | 组 | 卡在哪 |
 | --- | --- | --- |
 | `feishu-operator-natural-language-delegate` | 指令 | 委托任务的路由本进程没注册；服务要两个目标校验钩子（裁决已定走 B），见文首「现状」二 |
 | `feishu-operator-delegated-card-actions` | 指令 | 同上（注入同一个端口即同时点亮它与自由文本那条） |
-| `content-textcard-transcription-authority` | 内容 | **卡在对面**：content 进程至今没构造转写器实例（清单闸里是 pending），它缺视觉客户端与形态判别器两样料 |
 | `content-generic-llm-authority` | 内容 | 本根没构造 `PublishGenerationHttpClient`，且本进程连**发帖触发器**都还没建（比字面大） |
 | `automation-production-runtime-composition-unwired` | 组装 | 就是那个空壳入口本身；前面不清完写不了 |
 
-**已撤的六条**（全属真靠接线消掉）：`content-role-factories`（07-31）、概念池写 / 精选写 /
-FB 发帖素材 / 用量记账 / 回复生成（08-04 `5fe3f97`）、调度启停（08-04 `30d2cc3`）。
+**已撤的七条**（全属真靠接线消掉）：`content-role-factories`（07-31）、概念池写 / 精选写 /
+FB 发帖素材 / 用量记账 / 回复生成（08-04 `5fe3f97`）、调度启停（08-04 `30d2cc3`）、
+文字卡转写（08-04 `8d67f5a`）。
 **逐条的理由写在 `aidcp-automation/src/automation-composition-root.ts` 的原地注释里**——
 那份台账是 Cloud 普查的永久手写分叉、拿不到任何机械信号，所以理由不放在这里。
 
