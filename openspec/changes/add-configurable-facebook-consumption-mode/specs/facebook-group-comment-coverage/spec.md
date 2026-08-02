@@ -93,7 +93,7 @@ Cloud SHALL persist one Facebook group-comment policy for each local `execution_
 
 During additive migration only, a missing database row SHALL fall back first to `AIDCP_FB_GROUP_COVERAGE_WARMUP_HOURS` and then to 24, while reporting the source. The fallback MUST NOT be treated as a committed revision and SHALL be removed only by a later explicit cleanup after each runtime target has a persisted row.
 
-The management Console SHALL provide this setting on `/facebook-groups` under the label “入群后首次评论等待（小时）”, display the independent same-group re-comment cooldown separately, use server-provided bounds and `expectedRevision`, and show only write-after-read truth. It MUST NOT call either value generically “群组冷却”.
+The management Console SHALL provide this setting inside the `/environments` Facebook global configuration editor, beside the consumption-mode cadence, under the label “入群后首次评论等待（小时）”. It SHALL display the independent same-group re-comment cooldown separately, use the group-comment policy's own server-provided bounds and `expectedRevision`, save it independently from the operation-global policy revision, and show only write-after-read truth. The `/facebook-groups` operational page SHALL NOT retain a duplicate timing editor, and neither value may be labelled generically as “群组冷却”.
 
 #### Scenario: Default and legacy source are explicit
 
@@ -114,9 +114,14 @@ The management Console SHALL provide this setting on `/facebook-groups` under th
 
 #### Scenario: Console distinguishes the two intervals
 
+- **WHEN** an operator opens the Facebook global configuration editor on `/environments`
+- **THEN** the Console presents join-to-first-comment waiting beside consumption cadence and labels same-group re-comment cooldown as a separate read-only concept
+- **AND** editing the wait uses its independent policy revision and does not claim to edit consumption cadence or the re-comment cooldown
+
+#### Scenario: Group operations page has no duplicate timing authority
+
 - **WHEN** an operator opens `/facebook-groups`
-- **THEN** the Console labels join-to-first-comment waiting and same-group re-comment cooldown as separate concepts
-- **AND** editing the former does not claim to edit the latter
+- **THEN** the page provides group targets and group operations without a second join-to-first-comment editor
 
 ### Requirement: Consumption opens the first commentable item from the top of the selected group
 

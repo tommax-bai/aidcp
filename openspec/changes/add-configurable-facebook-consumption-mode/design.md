@@ -249,7 +249,7 @@ Console:
 
 - `/environments` begins with the target-global rule/consumption/cold-start numeric editor;
 - each Facebook environment row owns mode selection plus an explicit `继承全局 / 独立配置` cadence source; numeric fields are editable only for independent configuration;
-- `/facebook-groups` owns the join-to-first-comment policy editor;
+- the `/environments` Facebook global editor also presents the join-to-first-comment policy beside consumption cadence, while saving it independently through the group-comment policy revision so the two authorities cannot partially impersonate one atomic write;
 - `/content-schedule` shows runtime progress and blockers only.
 
 All editors disable duplicate saves, send `expectedRevision`, refetch after success, preserve the form on failure, and visibly report conflicts or unknown server state. A stale GET is not shown as a successful save.
