@@ -40,10 +40,10 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 
 > **2026-08-02 深夜 · 现状（这一段是当前事实，读它就够；逐批沿革移到文末 §10）**
 >
-> **六仓**：cloud `7517307` / api `e941fce` / automation `33934fe` / content `f41ccde` /
-> kernel `d274199` / transport `9df8d12`；控制仓见 `git log`。
+> **六仓**：cloud `66c88f8` / api `85d7416` / automation `1de0876` / content `c175a3e` /
+> kernel `b4cc9a2` / transport `cca7fff`；控制仓见 `git log`。
 > 六仓全干净、全已推、**对账零漂移**、pin 全对齐（kernel 与 transport 本轮都动了、四仓 pin 已抬）。
-> **测试**：cloud 4100 / api 502 / automation 2103 / content 441 / kernel 70 / transport 36，全 0 fail。
+> **测试**：cloud 4103 / api 502 / automation 2116 / content 441 / kernel 70 / transport 36，全 0 fail。
 > **门 11 条**（运营指令 3 / 内容 7 / 组装 1）。**tasks.md 77/129。**
 >
 > **门为什么不动**：整个第 3 段它都会停在 11。撤条判据写在 automation 台账自己的 docblock 里
@@ -67,9 +67,14 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > **形态每批照做**：写成**可单测的工厂**，不写进 `main()`；**定时器不在构造期起**。
 > **可执行入口在批 H 之前一律保持 fail-closed** —— 它是中间态的保护罩。
 >
-> ### 下一步：批 H（`main()` + 就绪闸）
+> ### 下一步：批 H 续（`main()` + 就绪闸）
 >
-> 十个工厂全部就位、全部**没接进组装根**——那最后一跳就是批 H。骨架与模板见 design.md §4
+> **批 H 第一片已落**（automation `1de0876`）：四个业务配置取值口的实现
+> （落点 `src/automation-business-config.ts`，零解析逻辑、只做「取快照 → 喂判定」）。
+> 顺带补掉一处真缺口：那条环境流**此前不带环境键**，而 FB 基线解析第一跳就是「账号 → 环境键」
+> —— 补上之前自动化进程根本解析不出基线（下游即「这个账号永远不开始浏览」）。
+>
+> 剩下的：十个工厂 + 这一片全部就位、全部**没接进组装根**——那最后一跳仍是批 H。骨架与模板见 design.md §4
 > （监听先起、业务入口靠标志位 + 去重 promise、定时器 unref），
 > 判据清单里 5 条 `open` 逐条裁定见 tasks 3.5a。
 >
@@ -78,7 +83,7 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > | 口 | 谁留的 | 缺了会怎样 |
 > | --- | --- | --- |
 > | 配置副本陈旧判定 / 记账断链判定 | 批 B 的两个必填口 | 实现早已有（批 C 两半），只差喂进去 |
-> | 四个业务配置取值口 + `facebookCommentConfigFor` | 批 E-2 / 批 G-3 | 从同步读镜像 + kernel 判定现算 |
+> | ~~四个业务配置取值口 + `facebookCommentConfigFor`~~ | ✅ **已供**（批 H 第一片 `1de0876`） | 从同步读镜像 + kernel 判定现算 |
 > | `interaction`（收件箱 / 运行时开关 / 握手后恢复编排） | 批 D 留的第三个必填口 | 二态：`wired` 带 port / `unavailable` 带具名理由 |
 > | 风控的 `nurture`（养号事实） | 批 B 的可选口 | **不填 = 不叠爬坡 clamp**；慢启动决策靠它，`slowStartForAccount` 镜像口已在 |
 > | 群评论时序策略 / 账号暂停 / 排期名额回程 | 批 G-3、G-4 的三个二态口 | **这三个今天没有任何通道**，见下 |
@@ -135,7 +140,12 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > - **批 B 留的两个必填口都已有真实现**（配置副本陈旧 ← C 镜像半；记账断链 ← C 记账半）。
 >   **但最后一跳没接**：把它们喂进批 B 的底座属批 H 的 `main()`。在那之前口仍是空的
 >   —— 而这正是当初做成必填无默认的价值：**缺实现是编译期可见的**。
-> - **dev 已在 2026-08-02 深夜部署到 cloud `7517307`**（即当前主干头）：
+> - **dev 已在 2026-08-02 深夜二次部署到 cloud `66c88f8`**（即当前主干头，含环境流补的环境键）：
+>   备份 `cloud.bak.20260802-110132.tar.gz` → `git archive HEAD` 干净快照 rsync → marker 逐条验过 →
+>   三属主库均无待应用迁移 → 重启。健康检查全过（`active`、重启计数 0、8787/8090/8091 三口在听、
+>   error 0 行、飞书长连接已建立、面板 API 200、isales 四服务未触碰）。
+>   上一次（`7517307`）的记录保留在下面：
+> - **dev 曾于同日部署到 cloud `7517307`**：
 >   备份 `cloud.bak.20260802-103405.tar.gz` → 从 `git archive HEAD` 的干净快照 rsync →
 >   `migrate up`（三属主库均无待应用，dev 早已在 `0106`）→ 重启。
 >   健康检查全过：`active`、重启计数 0、8787/8090/8091 三口在听、自重启以来 error 0 行、
