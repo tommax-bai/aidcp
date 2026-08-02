@@ -215,6 +215,10 @@ DERIVED_COMPOSITION = {
         'src/automation-business-config.ts',
         # 批 C 最后一件：互动配置面审计中继（outbox → 接口属主表，经已有跨进程通道）。
         'src/automation-config-audit-relay.ts',
+        # 批 H 第二片：启动期 schema 契约门的调用点（本仓此前一个调用点都没有）。
+        # 门的实现 `src/schema/schema-gate.ts` 是同步来的，这里只有本进程那一句怎么调：
+        # 只判 automation 一个属主 + 不包 try/catch + 发一张启动外壳必填的回执。
+        'src/automation-schema-gate-startup.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'

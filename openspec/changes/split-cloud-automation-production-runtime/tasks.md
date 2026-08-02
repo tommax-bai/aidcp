@@ -2092,7 +2092,7 @@
        去掉属主池透传 → **只有**新写的那条红，**typecheck 全程绿**（该参数可选，编译器对此
        完全沉默）——这正是它必须配行为用例的理由。
        typecheck 干净；全量 2118 pass / 0 fail（基线 2116）。 -->
-- [ ] 3.5d **启动前置三件之三：schema 契约门**。⚠️ **自动化仓今天一个调用点都没有**
+- [x] 3.5d **启动前置三件之三：schema 契约门**。⚠️ **自动化仓今天一个调用点都没有**
   （`src/schema/schema-gate.ts:258` 有完整实现，两个测试文件在用，**`src/` 下零调用点**，已实测复核）。
   <!-- **照 content 办，MUST NOT 照 api 办**：
        - content `aidcp-content/src/server.ts:307-314` 把门放在**建池之前**，裸 await、无 try/catch，
@@ -2107,6 +2107,37 @@
        `boundaries/table-ownership.json`，默认基准 `src/schema/../..` 正好是仓根。
        **MUST NOT 包 try/catch**（文件头 :256 明写）。
        小坑：这份派生副本的日志前缀仍是 `[aidcp-cloud] schema 契约门…`（:284 / :316）。 -->
+  <!-- aidcp-automation 1e6d3b4（新增 `src/automation-schema-gate-startup.ts`）
+       + aidcp-cloud ad6c08b / aidcp-transport de3a45a（日志前缀参数化）
+       + aidcp-api e55ee0d / aidcp-content 6c5815f（transport pin）。
+       上面那段计划照做，另有**三件是落地时才定下来的**：
+
+       ① **落点问题：`main()` 还不存在（那是 3.5g）**，而门 MUST 早于池与那十几个工厂
+          （工厂在构造期就抢写者锁、起周期表，见 3.5c）。所以本片交付的不是「调用点」本身，
+          而是**让 3.5g 想漏也漏不掉**：门包成 `runAutomationStartupSchemaGate()`，返回一张
+          **品牌位不导出、外部造不出来**的回执；启动外壳把它做成**必填字段**。
+          ⇒ 想调外壳就必须先真调过门，而调外壳之前池和工厂都还没造 —— 顺序变成编译期可见的。
+          **为什么值得这么做**：这道门唯一的失效形态就是「没人调它」，而「没调」在行为上
+          什么都不表现（进程照起、日志照打、用例照绿），只有该拦的那一次才爆、且那时它不在场。
+          与 4.2b 同一条判据：**行为测试原理上看不见「某段代码不在场」**。
+       ② **外壳对回执做两件真事**，不是拿它当空令牌：核「门判过的属主集合 == 本进程建池的属主集合」
+          （对不上即拒绝启动 —— 单体侧同一条不变量是 `assertOwnerPoolsMatchProcessOwners`），
+          以及把结论打进启动日志那一行。属主名单只有 `AUTOMATION_PG_OWNERS` 这一份定义，
+          配了结构断言禁止就地再手写一遍（名单类常量在本 change 已咬过多次）。
+       ③ **那个「小坑」当真修了，代价是一串级联**：前缀写死 `[aidcp-cloud]` 的后果不是难看 ——
+          门刻意跑在任何存储 init 之前、无 try/catch，**它拒绝启动时那一行是 journal 里唯一的线索**，
+          打成别的服务名会把排查直接引偏。改成可选 `serviceLabel`（缺省仍是 `aidcp-cloud`
+          ⇒ 单体与现有消费方输出逐字节不变）。因为这份实现同时被派生进 automation 与打包进
+          transport，**改一处要走完 cloud → transport → 三仓 pin → npm install 这条链**
+          （sync 的 `--apply` 会自动改 pin，但装机要自己跑，否则 npm 静默装旧 sha）。
+
+       变异逐条给出是哪条抓住的：去掉属主收窄 → 新写的收窄用例 + 外壳那道属主集合闸
+       （9 条外壳用例一起红）；把门包进 try/catch 吞掉 → enforce 抛错用例 + 结构断言；
+       回执改成可选 → 结构断言。
+       另：新私有文件已登记控制仓 `scripts/sync-split-repos` 的 `DERIVED_COMPOSITION`
+       与本仓 `boundaries/ownership-rules.json` 的 fileOverride（后者不加，`boundaries:refresh` 直接抛）。
+       typecheck 干净；automation 2122 pass / 0 fail（基线 2118）；cloud 4108 / api 502 /
+       content 441 / transport 36 全 0 fail。 -->
 - [ ] 3.5e **Facebook 慢启动参数进同步读流**（**用户 2026-08-02 拍板：加进数据流，不走回落默认**）。
   <!-- 现状：风控的养号事实口有四项，前三项（平台 / 建号时间 / 慢启动起点与毕业时间）
        同步读镜像**已有现成取用口**（`transport/automation-sync-read-mirrors.ts` 的
@@ -2164,7 +2195,10 @@
        **红线：整体缺席，不得半截可用** —— 单体回落处（`server.ts:5455-5471`）是把八个变量
        **一起**置空的；半截可用会让下游能力位发得不一致。 -->
 - [ ] 3.5g **批 H 主体接线**：12 个工厂接进组装根，写 `main()`。
-  <!-- 实读得到的三件事，开工前必读（`aidcp-automation/src/` 相对路径）：
+  <!-- **`main()` 的第一句是 3.5d 那道门**（`runAutomationStartupSchemaGate()`），建池之前。
+       这条不靠记：启动外壳的 `schemaGate` 是必填、且回执外部造不出来 ⇒ 漏了编译期就红。
+
+       实读得到的三件事，开工前必读（`aidcp-automation/src/` 相对路径）：
 
        **① 14 个口今天还空着**（编译器点名 / 或必须由 `main()` 现造）：
        组装根的 `runtime.facebookScope` 与 `runtime.syncReadSources`（无任何工厂供给）、
