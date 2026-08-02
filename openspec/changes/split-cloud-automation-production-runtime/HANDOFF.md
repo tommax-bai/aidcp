@@ -44,11 +44,11 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > | 项 | 值 |
 > | --- | --- |
-> | 六仓 | cloud `c394f36` / api `35c63ba` / **automation `b9a2caf`** / **content `7305b46`** / kernel `6101b1e` / transport `1444d59` |
+> | 六仓 | cloud `c394f36` / api `35c63ba` / **automation `5fe3f97`** / **content `7305b46`** / kernel `6101b1e` / transport `1444d59` |
 > | 工作区 | 六仓全干净、全已推、**对账零漂移**、两个共享包 pin 全对齐 |
-> | 测试 | cloud 4115 / api 502 / **automation 2156** / **content 442** / kernel 70 / transport 36，全 0 fail |
-> | 门（真交付物） | **11 条**（运营指令 3 / 内容 7 / 组装 1） |
-> | tasks.md | **84/140**（这把尺量的是「查清了多少」，不是交付；分母会随勘察长大） |
+> | 测试 | cloud 4115 / api 502 / **automation 2157** / **content 442** / kernel 70 / transport 36，全 0 fail |
+> | 门（真交付物） | **6 条**（运营指令 3 / 内容 2 / 组装 1）—— 2026-08-04 首批撤条 11→6 |
+> | tasks.md | **85/142**（这把尺量的是「查清了多少」，不是交付；分母会随勘察长大） |
 > | 边界 | 跨域边 0，豁免 0；4a 方法槽 **58**、组数 21 |
 > | dev | 仍停在 cloud `c394f36`（本轮只动派生仓，dev 上跑的是单体，与本轮无关） |
 >
@@ -62,9 +62,10 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > | 4 | 互动能力接通 + 新 api 窄端口（4a 槽 57→58） | ✅ automation `173b234`（3.5f） |
 > | 5 | 12 个工厂接进组装根、写 `main()` | ✅ automation `0044881`（3.5g） |
 >
-> **门为什么还是 11**：整个第 3 段它都会停在 11。撤条判据写在 automation 台账自己的 docblock 里
-> （「阻止本包交付完整生产进程的依赖」），而写 `main()`（3.1）排在清台账（4.1）之前。
-> **第 3 段的交付物是「让每条依赖变得可满足」，减门是第 4 段的事** —— 不是漏了。
+> **门 11 → 6（2026-08-04，第 4 段起手）**：第 3 段把每条依赖变得可满足，第 4 段才减门 ——
+> `main()` 写完之后这一步就解锁了。撤的五条全属**真靠接线消掉**，
+> 且逐条的证据是**两端都查过**（客户端喂到了消费点 **+ 对面进程真在服务那条路由**）。
+> 余 6 条各自的前置写在 tasks 4.1b，**别当成一批**。
 >
 > ---
 >
