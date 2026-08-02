@@ -44,9 +44,9 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > | 项 | 值 |
 > | --- | --- |
-> | 六仓 | cloud `c394f36` / api `35c63ba` / **automation `5fe3f97`** / **content `7305b46`** / kernel `6101b1e` / transport `1444d59` |
+> | 六仓 | cloud `c394f36` / api `35c63ba` / **automation `2f5f6a9`** / **content `7305b46`** / kernel `6101b1e` / transport `1444d59` |
 > | 工作区 | 六仓全干净、全已推、**对账零漂移**、两个共享包 pin 全对齐 |
-> | 测试 | cloud 4115 / api 502 / **automation 2157** / **content 442** / kernel 70 / transport 36，全 0 fail |
+> | 测试 | cloud 4115 / api 502 / **automation 2158** / **content 442** / kernel 70 / transport 36，全 0 fail |
 > | 门（真交付物） | **6 条**（运营指令 3 / 内容 2 / 组装 1）—— 2026-08-04 首批撤条 11→6 |
 > | tasks.md | **85/142**（这把尺量的是「查清了多少」，不是交付；分母会随勘察长大） |
 > | 边界 | 跨域边 0，豁免 0；4a 方法槽 **58**、组数 21 |
@@ -85,6 +85,13 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > 共享包导出的每个内容属主 registrar MUST 在清单里 —— **漏登记是静默的，比漏注册更危险**。
 > **只剩文字卡转写一条 pending**（还缺视觉客户端与形态判别器两样料）。
 > api 那条只记不修（要先把内容排期器接进接口进程），见 tasks 3.5j。
+>
+> **2026-08-04 续：同一形态第四次撞见，这次撞的是本 change 自己刚写的那个入口。**
+> 自动化仓定义了四条运营指令路由（委托自由文本 / 手动发布 / 手动评论 / 调度启停），
+> `main()` **一条都没注册**；api 的手写入口也没构造任何对应客户端。
+> 单体里这一族是**进程内直调**，拆开之后才成为一跳 —— 所以谁都没被迫去注册它。
+> 这直接推翻了「运营指令 3 条只卡在探针」那个前提：**更前面还缺一步**。
+> 调度启停已接（`2f5f6a9`）；另三条要各自的处理器，不是一行注册。
 >
 > ⇒ **下一批凡新接一个跨进程客户端，先去对面 `main()` 里确认那条路由真被注册了。**
 > 别信「通道已就位」这类记载：本轮实测它指的往往是「单体里注册了」。
