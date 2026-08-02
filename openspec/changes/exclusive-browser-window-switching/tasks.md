@@ -27,4 +27,4 @@
 - [x] 5.2 Run Edge acceptance, full tests, typecheck, diff check, and `openspec validate exclusive-browser-window-switching --strict`.
   <!-- Acceptance: 38/38 passed with 1 gated E2E skip. Typecheck, diff check, and strict OpenSpec validation passed. Full `npm test` was rerun after scoped fixes and reached only the pre-existing `facebook_auth_start_ad_data_review` Native postcondition inventory failure; the same targeted failure reproduces on the unmodified Edge `master` at dfb57f1. -->
 - [ ] 5.3 Record repo/commit/validation evidence, commit and push the isolated control/Edge branches, then serially integrate eligible default branches without packaging or deployment.
-  <!-- Edge implementation commit: aidcp-edge@9f27da5. Default-branch integration remains gated by the unrelated full-suite baseline failure; no package, installation, or deployment is in scope. -->
+  <!-- Both isolated branches are committed and pushed; Edge implementation commit: aidcp-edge@9f27da5. Default-branch integration remains gated by the unrelated full-suite baseline failure; no package, installation, or deployment is in scope. -->
