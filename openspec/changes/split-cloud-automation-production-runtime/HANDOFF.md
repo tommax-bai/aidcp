@@ -40,15 +40,24 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 
 > **2026-08-03 · 现状（这一段是当前事实，读它就够；逐批沿革移到文末 §10）**
 >
-> **六仓**：cloud `ed78c2c` / api `7c0b4c0` / **automation `c18483d`** / content `1977374` /
-> kernel `36fea78` / transport `346b716`；控制仓见 `git log`。
+> **六仓**：cloud `c394f36` / api `35c63ba` / **automation `173b234`** / content `46c13f7` /
+> kernel `6101b1e` / transport `1444d59`；控制仓见 `git log`。
 > 六仓全干净、全已推、**对账零漂移**、pin 全对齐。
-> **测试**：cloud 4115 / api 502 / **automation 2132** / content 441 / kernel 70 / transport 36，全 0 fail。
-> **门 11 条**（运营指令 3 / 内容 7 / 组装 1）。**tasks.md 80/135。跨域边 0，豁免 0。**
+> **测试**：cloud 4115 / api 502 / **automation 2138** / content 441 / kernel 70 / transport 36，全 0 fail。
+> **门 11 条**（运营指令 3 / 内容 7 / 组装 1）。**tasks.md 81/135。跨域边 0，豁免 0。**
+> **4a 方法槽 57 → 58**（组数仍 21）。**dev 已部署到 cloud `c394f36`。**
 >
-> **上一手（2026-08-03 晚）做完的**：**批 H 主体第 2、3 两片**
-> （tasks 3.5d schema 契约门接线；tasks 3.5e Facebook 慢启动曲线进同步读流）。
+> **上一手（2026-08-03 晚）做完的**：**批 H 主体第 2、3、4 三片**
+> （3.5d schema 契约门接线；3.5e Facebook 慢启动曲线进同步读流；3.5f 互动能力接通）。
 > 再上一手：四路并行实读 + 第 1 片（`fc99d52`：关停真空 + 属主池透传）。
+>
+> **⚠️ 第 4 片推翻了计划注释里的一条行为判定，别照旧文档做**：3.5f 原写着「schema 半迁移」
+> 算 `unavailable` 理由之一 —— **不成立**。半迁移在单体里仍然组装收件箱与运行时开关、
+> 只关写开关（读是恢复的），判成整体缺席等于连读一起停掉，是行为回归。
+> 同一处还有一条容易漏的：写开关判定的**第三个实参是部署目标**，半迁移只在 dev 上仍允许写；
+> 漏传会让 dev 的写悄悄关掉 ——「看着更安全」的静默行为变更。
+> 连带更正：`unavailable` 的具名理由**实际只有两条真的**（schema / 回复生成），
+> 计划里说的另外三条在本进程的组装根里恒存在 ⇒ 写成分支就是死代码，做成必填参数由编译器保证。
 >
 > **⚠️ 第 3 片在 dev 部署时炸出一条硬依赖，凡改同步读载荷都适用**：
 > **改任何一条同步读流的载荷形状，必须同时推进那条流的镜像版本 cursor**（加一条
@@ -101,15 +110,25 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > **形态每批照做**：写成**可单测的工厂**，不写进 `main()`；**定时器不在构造期起**。
 > **可执行入口在批 H 之前一律保持 fail-closed** —— 它是中间态的保护罩。
 >
-> ### 下一步：批 H 主体，已切成 5 片，前 3 片已落
+> ### 下一步：批 H 主体，已切成 5 片，前 4 片已落
 >
 > | 片 | 内容 | 状态 |
 > | --- | --- | --- |
 > | **1** | 关停真空（业务入口加必填 `dispose()`）+ 属主池透传 | ✅ `fc99d52`（tasks 3.5c） |
 > | **2** | schema 契约门接线（+ 日志前缀参数化的跨仓级联） | ✅ `1e6d3b4`（tasks 3.5d） |
 > | **3** | Facebook 慢启动曲线进同步读流（+ cursor 推进迁移 0108） | ✅ cloud `0fac1ce`+`ed78c2c`（tasks 3.5e） |
-> | **4** | 互动能力二态口**接通**（用户裁定） | ⬜ **下一件** tasks 3.5f |
-> | **5** | 12 个工厂接进组装根、写 `main()` | ⬜ tasks 3.5g |
+> | **4** | 互动能力接通（+ 新 api 窄端口，4a 槽 57→58） | ✅ automation `173b234`（tasks 3.5f） |
+> | **5** | 12 个工厂接进组装根、写 `main()` | ⬜ **只剩这一片** tasks 3.5g |
+>
+> **前四片给第 5 片留下的现成东西**（都不必再推一遍）：
+> - `main()` 第一句是那道门，漏了编译期就红（回执必填、外部造不出来）；
+> - 养号事实第四项走 `AutomationSyncReadMirrors.facebookSlowStartPolicy()`，三态处置写在它的注释里；
+> - `interaction` 那个必填口由 `createAutomationInteraction()` 给，**它是异步工厂**
+>   （二态要由真实 schema 探测决定）；
+> - 它同时导出 `createLateBoundInteractionEdgeBinding()` —— **第 5 片破那三处真环的现成范式**：
+>   先建薄壳、把 `binding` 交给互动工厂，边缘服务端造好之后 `bind()` 一次。
+>   薄壳未绑定即具名抛错、重复绑定也抛，**绝不返回 0**。
+> - 互动工厂返回的 `start()` 要在**就绪闸放行之后**调（保留期清理表），`dispose()` 无条件调一次。
 >
 > **第 3 片给第 5 片留下的现成结论**（3.5g 不必再推一遍）：养号事实第四项的取用口是
 > `AutomationSyncReadMirrors.facebookSlowStartPolicy()`，三态处置写在它的文档注释里 ——
@@ -212,7 +231,15 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > - **批 B 留的两个必填口都已有真实现**（配置副本陈旧 ← C 镜像半；记账断链 ← C 记账半）。
 >   **但最后一跳没接**：把它们喂进批 B 的底座属批 H 的 `main()`。在那之前口仍是空的
 >   —— 而这正是当初做成必填无默认的价值：**缺实现是编译期可见的**。
-> - **dev 已于 2026-08-03 部署到 cloud `ed78c2c`**（当前主干头，含另一路 change 的 `93096b1`）：
+> - **dev 已于 2026-08-03 部署到 cloud `c394f36`**（当前主干头；本轮是第 4 片那条新 api 窄端口）：
+>   备份 `cloud.bak.deploy-c394f36.tar.gz` → `git archive HEAD` 干净快照 rsync → marker 逐条验过
+>   → 三属主库均无待应用迁移 → 重启。健康检查全过（`active`、重启计数 0、三口在听、
+>   error 0 行、飞书长连接已建立、面板 API 200、isales 四服务未触碰）。
+>   ⚠️ **但这条路径在 dev 上验不了**：dev 的互动 schema 本来就缺
+>   （`interaction_schema_missing_run_0042`，部署前 6 小时内已出现 7 次），单体那一侧互动域整段
+>   未启用 ⇒ 改指端口的消费方**根本不执行**。已按 5.5 登记 backlog 簇 60（与既有那条同环境前置）。
+>   上一次（`ed78c2c`）的记录保留在下面：
+> - **dev 曾于同日部署到 cloud `ed78c2c`**（含另一路 change 的 `93096b1`）：
 >   备份 `cloud.bak.deploy-0fac1ce.tar.gz` → `git archive HEAD` 干净快照 rsync → marker 逐条验过
 >   → **重启前先 `migrate up`（0107 / 0108 两条都真跑了）** → 重启。
 >   健康检查全过：`active`、重启计数 0、8787/8090/8091 三口在听、error 0 行、
@@ -396,7 +423,7 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > ### 对账输出里这几类是预期噪声，不是回归（省一次误排查）
 >
 > ① 「组装根不同 2」打印**三次**（每个业务仓一次，共 6 条 `⊘`）——组装根按设计从不同步；
-> ② automation 另有 **18 条 `⊙` 派生仓私有文件**（2026-08-03 实测；组装根 + 启动外壳 / schema 门调用点 / 判据清单 /
+> ② automation 另有 **19 条 `⊙` 派生仓私有文件**（2026-08-03 实测；组装根 + 启动外壳 / schema 门调用点 / 判据清单 /
 >    模型出口 / 风控底座 / 记账 / 停手闸 / 配置面审计中继 / 边缘接入 / 发布下发 / 每连接运行时 /
 >    每连接调度器 / FB 两套运行时 / 评论审批 / 评论调度器 / FB 协调器 / 业务配置）
 >    ——**这个数字会随每批增长，以当场跑一次为准**；**新增这类文件 MUST 登记进控制仓
@@ -408,7 +435,8 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > ### ⚠️ 手抄件：动 4a 清单要改**五处**，同步脚本一处都不管（2026-08-02 各咬一口）
 >
-> 加一条 api 属主口（组数 / 方法槽变化）时，机械普查那套计数散在五处，**逐处手改**：
+> 加一条 api 属主口（组数 / 方法槽变化）时，机械普查那套计数散在五处，**逐处手改**
+（2026-08-03 第 4 片又走了一遍，五处全中，另加 cloud 侧两个测试文件里写死的槽数）：
 > ① 中控 `boundaries/composition-root-4a-authority-surface.json`（组 + 方法 + 三个总数 + 方向计数）；
 > ② 中控 `src/kernel/api-direct-port.ts` 的 `API_DIRECT_PORT_INVENTORY`；
 > ③ 中控 `test/acceptance/helpers/composition-root-4a-census.ts` 的 `SURFACE_BINDINGS`
