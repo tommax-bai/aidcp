@@ -183,6 +183,18 @@ E4 的危险不只在 `set_schedule` 自证：即使该原子当时读对，后�
 
 否决 C：只把 `set_schedule` 的小时前缀改成分钟等值，不改 submit 绑定。理由：两条命令之间平台状态仍可能漂移，且提交路径依旧能按文本排序选中错误模式，未关闭不可逆风险。
 
+### D11. H.5 复验改按当前可执行边界穷举，并把“命令已交给运行时”拆成“会话获取”与“记录已写入”
+
+初始缺口清单只保留了“69 条候选、首轮复验 16 条、余 53 条”三个汇总数，**没有保留那 53 条的逐条原始明细**。因此本轮不能假装完成一次不存在的逐项勾销。可复核的替代口径是按当前可执行边界重新穷举：页面规则的所有终局、Rust typed-output 转换与会话状态、宿主 transport/runtime/browse/publish 的回执和重试转换点；并与 `command-postconditions.json` 已归零的写命令 unread 棘轮对账。这样覆盖的是今天仍可执行的表面，不把已经删除、重复登记或永远没有生产者的旧候选算成现役缺口。
+
+复验坐实了一个共享机制错误：宿主过去在调用 `runtime.execute()` 之前就把 `dispatch.started=true`，但运行时首先要启动进程并获取 session，之后才可能把 command record 写入 stdin。于是 session 获取失败这种零派发会被误报成 ambiguous；相反，发布命令记录已经写入后若进程超时 / 退出，异常又不携 `submitDispatched`，会被上游当作提交前失败并安全重试。两条方向相反，根因却是同一个事实边界没被表达。
+
+选：以 transport 的“命令记录写入成功”回调作为共享 dispatch 事实。回调之前的失败保持 not_started；回调之后丢失终局保持 ambiguous。对 `submit_publish` 再加不可逆写保护：除非 Native 明确返回 not_started，记录已写入后丢终局就保守投影 `submitDispatched=true`。这会把“引擎收到命令但尚未来得及点击就崩溃”的一小部分情况也归入禁止重投，代价是可能需要人工确认；相比双发不可逆内容，这是正确的失败方向。
+
+同批收紧三处转换边界：① search 的 page-card 观测不再自动等于成功动作；②动作 / 发布回执优先保留 Native 具体原因，而不是在跨层时改写成无信息的 generic ambiguity；③ submit 与三条发布身份抓取命令必须返回 typed publish receipt，generic action receipt 缺少 `submitDispatched` / identity / URL，不能由 Rust 机械补字段后当作成功。提交成功信号也只在结果 / toast / message 等提示作用域内，按 DOM 节点与可见文本建立点击前基线；只有新节点或同一节点发生终态成功变化才确认，陈旧 toast、全页正文与进行态「发布中」均不能证明本次提交。另把 `notification_back_home` 的目标与后置都从包含 `/explore` 收紧为精确 feed surface，避免详情页被当成回首页。
+
+D6 当时把 `src/native-page-engine/browse-session.ts` 交给并行的 session-guards change；该 change 已于 2026-08-01 归档，当前无活跃单写者。本轮触碰的是 H.5 新坐实的共享诚实性边界，不重开其周期探针 / 装配范围，也不触碰 Cloud automation 三进程拆分。
+
 ## Risks / Trade-offs
 
 - **真机结论与规格假设不符**（开帖并未落错误页）→ 规格只要求正面详情证据，这一半在任何情况下都成立；执行方式的选择留在实装任务里按真机结论决定，不需要改规格。

@@ -197,6 +197,51 @@ The Native session SHALL remember whether the current publish page was confirmed
 - **THEN** the adapter does not choose a submit control by text order or horizontal position
 - **AND** it returns a not-started receipt with `submitDispatched=false`
 
+### Requirement: Native dispatch and receipt truth survive host and transport failures
+
+The Edge host SHALL distinguish a command envelope that was never written to the Native process from one whose bytes were handed to that process. Engine startup, session acquisition, or pre-dispatch cancellation MUST remain `not_started`; entering a runtime method is not dispatch evidence. After the command record is written, a transport timeout, process exit, or unreadable terminal MUST be treated as an unknown effect unless the Native response explicitly proves `not_started`.
+
+For `submit_publish`, an unknown terminal after dispatch MUST preserve the possibility that the irreversible submit occurred by carrying `submitDispatched=true`; it MUST NOT be converted into an ordinary pre-submit failure that an upstream scheduler may safely retry. Conversely, a failure before the command record is written MUST NOT fabricate that flag. A publish submit or identity-capture command MUST produce the typed publish receipt required by its contract; a generic action receipt without `submitDispatched`, identity, or URL evidence MUST NOT be promoted into a successful publish receipt.
+
+The host SHALL also preserve the most specific Native reason available. A non-confirmed action receipt without its own reason MUST fall back to the execution reason, and a non-confirmed publish receipt's concrete error MUST NOT be overwritten by a generic ambiguity label. A search command that returns page cards with a non-confirmed execution MUST NOT be upgraded to a successful `action.completed` receipt merely because an observation payload exists.
+
+#### Scenario: Session acquisition fails before command dispatch
+
+- **WHEN** the Native process cannot start or the session cannot be acquired before the command record is written
+- **THEN** the host reports the command as not started with the original stable reason
+- **AND** it does not classify the action as dispatched or ambiguous
+
+#### Scenario: Publish terminal is lost after command dispatch
+
+- **WHEN** a `submit_publish` command record was written and the Native process times out or exits without a determinate terminal
+- **THEN** the publish result is non-success and carries `submitDispatched=true`
+- **AND** the result cannot enter a safe automatic retry path
+
+#### Scenario: Generic receipt cannot confirm a typed publish terminal
+
+- **WHEN** `submit_publish`, `capture_postId`, `capture_scheduled`, or `reconcile_scheduled` returns a generic action receipt
+- **THEN** the Native adapter rejects the output as invalid rather than synthesizing a successful publish receipt
+
+#### Scenario: Observation does not upgrade a failed search
+
+- **WHEN** a search execution carries page-card observations but its effect phase is not confirmed
+- **THEN** the host may preserve bounded observation evidence but does not emit a successful search completion
+- **AND** the failed completion carries the concrete Native reason
+
+### Requirement: Returning from notifications proves the feed surface, not merely an explore-shaped URL
+
+The Native Xiaohongshu `notification_back_home` command SHALL resolve a real home-feed entry and SHALL confirm the exact feed surface after actuation. A note-detail URL under `/explore/<noteId>` MUST NOT be accepted as the home entry or as the post-condition merely because its path contains `/explore`. If the exact feed surface is not confirmed, the command MUST remain non-success.
+
+#### Scenario: A note link is not a home entry
+
+- **WHEN** the notification page contains note links under `/explore/<noteId>` but no exact `/explore` home entry
+- **THEN** `notification_back_home` does not actuate a note link and report success
+
+#### Scenario: Detail navigation is not a confirmed return
+
+- **WHEN** a candidate home actuation lands on `/explore/<noteId>`
+- **THEN** the command returns an unconfirmed result rather than page cards for a confirmed feed return
+
 ### Requirement: Unmeasured Xiaohongshu compatibility branches are removed rather than left claiming success
 
 Any retained Xiaohongshu command branch that reports a page effect SHALL report it from measured evidence. A scroll step MUST report measured displacement rather than an unconditional confirmation. A compatibility branch that cannot produce such evidence MUST be removed once no live producer of its command exists; leaving it in place with a fabricated confirmation MUST NOT be accepted as harmless because it is believed to be unreachable.
