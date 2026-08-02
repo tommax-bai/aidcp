@@ -2138,7 +2138,7 @@
        与本仓 `boundaries/ownership-rules.json` 的 fileOverride（后者不加，`boundaries:refresh` 直接抛）。
        typecheck 干净；automation 2122 pass / 0 fail（基线 2118）；cloud 4108 / api 502 /
        content 441 / transport 36 全 0 fail。 -->
-- [ ] 3.5e **Facebook 慢启动参数进同步读流**（**用户 2026-08-02 拍板：加进数据流，不走回落默认**）。
+- [x] 3.5e **Facebook 慢启动参数进同步读流**（**用户 2026-08-02 拍板：加进数据流，不走回落默认**）。
   <!-- 现状：风控的养号事实口有四项，前三项（平台 / 建号时间 / 慢启动起点与毕业时间）
        同步读镜像**已有现成取用口**（`transport/automation-sync-read-mirrors.ts` 的
        `accountFor()` 与 `slowStartForAccount()`）；**第四项 `facebookSlowStartPolicy`
@@ -2175,6 +2175,44 @@
        养号事实 **MUST NOT 喂空**。喂空 = 告诉风控「这个号没在慢启动」，一个还在爬坡的
        新号会直接按满档跑且不报错。单体里的正解是接到停手闸上、取**最保守的第 1 天**
        （`risk-controller.ts:428,455`）。 -->
+  <!-- aidcp-cloud 0fac1ce（改动面）+ ed78c2c（**部署时炸出来的那条硬依赖，见 ④**）；
+       派生：kernel 36fea78 / transport 346b716 / api 7c0b4c0 / automation c18483d / content 1977374。
+       dev 已部署到 ed78c2c（含迁移 0107 / 0108）。
+
+       上面那张五处改动面表照做，另有**五件是落地时才定的 / 才发现的**：
+
+       ① **发布方从「两个取用口」收成「一个取用口」**（原计划是给基线口旁边再加一个曲线口）。
+          属主存储是「先刷新、再读内存」的形态 ⇒ 两个口就是两次取值，多出「基线取自刷新后、
+          曲线取自刷新前」这种错配，而且两边都不报错。一个口 = 一次刷新一次读，错配在结构上
+          不成立。代价是要改结构断言 ④ 记的符号名（`facebookOperationBaselines` →
+          `facebookOperationPolicy`）与 api 手写 `main()` 里那处装配（组装根从不同步、typecheck 顶出来的）。
+       ② **属主侧那条「缺配置回落编译默认」的回落，实读后判定保留、不改**。原注释担心它跨进程
+          后会变成「自动化侧收到一份看着正常的默认曲线」——但发布路径上 `refreshFromAuthority()`
+          是 await 的，读不到库当场抛、整条快照根本不发出；真回落到默认时，那个默认**也正是
+          属主自己在用的生效值**（单体里风控拿到的就是它），发过去逐位一致、零回归。
+       ③ **消费侧三态各自的处置写进取用口文档，别让 3.5g 再推一遍**：新鲜用它 / 陈旧**沿用上一份**
+          （参数档不是闸门档，回落写死默认很可能更松、方向反了）/ 一次都没收到过返回 null，
+          调用方 MUST **整个不提供** `facebookSlowStartPolicy` 这个方法。最后这条有硬约束：
+          契约上 `facebookSlowStartPolicy?()` 只允许「方法不在」这一种缺席表达，
+          返回 `undefined` 会让 `risk-controller.ts` 的 `.totalDays` 当场炸。
+       ④ **⚠️ 改任何同步读流的载荷形状，都必须同时推进该流的镜像版本 cursor —— 差点漏掉，
+          是 dev 部署当场炸出来的**：`automation_sync_read_apply_failed
+          stream=facebook_operation_policy reason=same_cursor_payload_drift`。
+          该流的 cursor 来自 `config_mirror_version`，**只在有人写配置时才动**；已持有 checkpoint
+          的消费方重启后在**旧 cursor 上看见不同的整份 payload**，按设计正确拒收 —— 而那条拒收
+          发生在单体启动路径上 ⇒ 起不来。判例现成：`0091_facebook_comment_config_snapshot_revision`
+          就是为这件事写的。本次加 `0108_…snapshot_revision`，REQUIRED 与 KNOWN_MAX 一并抬。
+          **它同时是另一路 change（`add-facebook-slow-start-reel-like-cadence`，cloud 93096b1）
+          的潜伏雷**：那一批也给同一条流的基线行加了字段、同样没推 cursor，只是还没轮到它部署。
+       ⑤ **顺带实测到 3.5d 注释里描述的那个「僵尸」形态，这次出在单体上**：`main()` 抛了，
+          但 config-mirror 的定时器还在跑 ⇒ 事件循环不空 ⇒ 进程不退出 ⇒ systemd 看到
+          `active (running)`，而 8787/8090/8091 一个都没在听、面板 502。
+          **「服务 active」在本系统里不构成「起来了」的证据**，健康检查必须看端口与错误行。
+
+       变异逐条给出是哪条抓住的：键集闸退回单键 → 属主真产出物过真校验器那条 + kernel 载荷用例
+       （共 5 条红）；逐日上限不查动作名单 → kernel 载荷用例；陈旧丢掉上一份 → 新写的镜像三态用例。
+       typecheck 干净；cloud 4115 pass / 0 fail（基线 4108）；api 502 / automation 2132 /
+       content 441 / kernel 70 / transport 36 全 0 fail。 -->
 - [ ] 3.5f **互动能力二态口接通**（**用户 2026-08-02 拍板：这一批就接通，不走具名缺席**）。
   <!-- 它是批 D 留在 `AutomationEdgeAccessOptions` 上的第三个必填口，二态：
        `wired` 带 port / `unavailable` 带具名理由。三个子件在单体里的锚点：

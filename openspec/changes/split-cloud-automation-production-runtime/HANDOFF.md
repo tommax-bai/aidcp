@@ -40,14 +40,30 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 
 > **2026-08-03 · 现状（这一段是当前事实，读它就够；逐批沿革移到文末 §10）**
 >
-> **六仓**：cloud `ad6c08b` / api `e55ee0d` / **automation `1e6d3b4`** / content `6c5815f` /
-> kernel `12154e1` / **transport `de3a45a`**；控制仓见 `git log`。
+> **六仓**：cloud `ed78c2c` / api `7c0b4c0` / **automation `c18483d`** / content `1977374` /
+> kernel `36fea78` / transport `346b716`；控制仓见 `git log`。
 > 六仓全干净、全已推、**对账零漂移**、pin 全对齐。
-> **测试**：cloud 4108 / api 502 / **automation 2122** / content 441 / kernel 70 / transport 36，全 0 fail。
-> **门 11 条**（运营指令 3 / 内容 7 / 组装 1）。**tasks.md 79/135。跨域边 0，豁免 0。**
+> **测试**：cloud 4115 / api 502 / **automation 2132** / content 441 / kernel 70 / transport 36，全 0 fail。
+> **门 11 条**（运营指令 3 / 内容 7 / 组装 1）。**tasks.md 80/135。跨域边 0，豁免 0。**
 >
-> **上一手（2026-08-03 晚）做完的**：**批 H 主体第 2 片**（tasks 3.5d，schema 契约门接线）。
+> **上一手（2026-08-03 晚）做完的**：**批 H 主体第 2、3 两片**
+> （tasks 3.5d schema 契约门接线；tasks 3.5e Facebook 慢启动曲线进同步读流）。
 > 再上一手：四路并行实读 + 第 1 片（`fc99d52`：关停真空 + 属主池透传）。
+>
+> **⚠️ 第 3 片在 dev 部署时炸出一条硬依赖，凡改同步读载荷都适用**：
+> **改任何一条同步读流的载荷形状，必须同时推进那条流的镜像版本 cursor**（加一条
+> `…_snapshot_revision` 迁移，判例 `0091`）。cursor 来自 `config_mirror_version`、
+> **只在有人写配置时才动**；已持有 checkpoint 的消费方重启后会在**旧 cursor 上看见不同的整份
+> payload**，按设计正确拒收（`same_cursor_payload_drift`）—— 而那条拒收落在单体启动路径上，
+> 直接起不来。本次补 `0108`，REQUIRED / KNOWN_MAX 一并抬。
+> **它同时是另一路 change（`add-facebook-slow-start-reel-like-cadence`）的潜伏雷**，
+> 那一批也改了同一条流的载荷、没推 cursor，只是还没轮到它部署。
+>
+> **⚠️ 同批实测：「systemd 说 active」不构成「起来了」**。上面那次启动失败后，`main()` 抛了，
+> 但 config-mirror 的定时器还在跑 ⇒ 事件循环不空 ⇒ 进程不退出 ⇒ systemd 显示
+> `active (running)`、重启计数 0，而 8787/8090/8091 一个都没在听、面板 502。
+> 这正是 3.5d 注释里描述的 api 入口那个「僵尸」形态，**这次是在单体上真见到了**。
+> **健康检查必须看端口在不在听 + 自重启以来的 error 行，别只看 `is-active`。**
 > **用户 08-03 拍板三件**：① 5 条 open 全部走「装配移到接口进程」；② 互动能力**这一批就接通**
 > （不走具名缺席）；③ Facebook 慢启动参数**加进同步读流**（不走回落默认）。
 >
@@ -85,15 +101,20 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > **形态每批照做**：写成**可单测的工厂**，不写进 `main()`；**定时器不在构造期起**。
 > **可执行入口在批 H 之前一律保持 fail-closed** —— 它是中间态的保护罩。
 >
-> ### 下一步：批 H 主体，已切成 5 片，前 2 片已落
+> ### 下一步：批 H 主体，已切成 5 片，前 3 片已落
 >
 > | 片 | 内容 | 状态 |
 > | --- | --- | --- |
 > | **1** | 关停真空（业务入口加必填 `dispose()`）+ 属主池透传 | ✅ `fc99d52`（tasks 3.5c） |
 > | **2** | schema 契约门接线（+ 日志前缀参数化的跨仓级联） | ✅ `1e6d3b4`（tasks 3.5d） |
-> | **3** | Facebook 慢启动参数进同步读流（用户裁定） | ⬜ **下一件** tasks 3.5e |
-> | **4** | 互动能力二态口**接通**（用户裁定） | ⬜ tasks 3.5f |
+> | **3** | Facebook 慢启动曲线进同步读流（+ cursor 推进迁移 0108） | ✅ cloud `0fac1ce`+`ed78c2c`（tasks 3.5e） |
+> | **4** | 互动能力二态口**接通**（用户裁定） | ⬜ **下一件** tasks 3.5f |
 > | **5** | 12 个工厂接进组装根、写 `main()` | ⬜ tasks 3.5g |
+>
+> **第 3 片给第 5 片留下的现成结论**（3.5g 不必再推一遍）：养号事实第四项的取用口是
+> `AutomationSyncReadMirrors.facebookSlowStartPolicy()`，三态处置写在它的文档注释里 ——
+> 新鲜用它 / 陈旧**沿用上一份** / 一次都没收到过就**整个不提供**那个方法
+> （契约上只允许「方法不在」这一种缺席表达，返回 `undefined` 会让调用点当场炸）。
 >
 > **第 2 片顺手修掉的那个「小坑」，代价值得记一笔**：门的日志前缀原先写死 `[aidcp-cloud]`。
 > 它不是难看的问题 —— 门刻意跑在任何存储 init 之前、无 try/catch，**它拒绝启动时那一行
@@ -191,7 +212,16 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > - **批 B 留的两个必填口都已有真实现**（配置副本陈旧 ← C 镜像半；记账断链 ← C 记账半）。
 >   **但最后一跳没接**：把它们喂进批 B 的底座属批 H 的 `main()`。在那之前口仍是空的
 >   —— 而这正是当初做成必填无默认的价值：**缺实现是编译期可见的**。
-> - **dev 已于 2026-08-03 部署到 cloud `ad6c08b`**（当前主干头；本轮 cloud 侧只有 schema 门
+> - **dev 已于 2026-08-03 部署到 cloud `ed78c2c`**（当前主干头，含另一路 change 的 `93096b1`）：
+>   备份 `cloud.bak.deploy-0fac1ce.tar.gz` → `git archive HEAD` 干净快照 rsync → marker 逐条验过
+>   → **重启前先 `migrate up`（0107 / 0108 两条都真跑了）** → 重启。
+>   健康检查全过：`active`、重启计数 0、8787/8090/8091 三口在听、error 0 行、
+>   飞书长连接已建立、面板 API 200、isales 四服务未触碰。
+>   ⚠️ **这次部署失败过一轮**（就是上面那条 cursor 硬依赖）：第一次重启时 `main()` 抛
+>   `same_cursor_payload_drift`，且**进程没退出**（定时器还在跑）⇒ `is-active` 说 active、
+>   实际三口全没在听。补 `0108` 后重来才真起来。
+>   上一次（`ad6c08b`）的记录保留在下面：
+> - **dev 曾于同日部署到 cloud `ad6c08b`**（那批 cloud 侧只有 schema 门
 >   日志前缀参数化那一处，缺省不变 ⇒ 对单体是零行为变更，但主干头动了就得部署）：
 >   备份 `cloud.bak.deploy-ad6c08b.tar.gz` + `.env.bak.20260803` → `git archive HEAD` 干净快照 rsync
 >   → marker 逐条验过（新符号在、旧写死前缀已消失）→ 三属主库待应用均为 0 → 重启。
