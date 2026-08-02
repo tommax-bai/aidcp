@@ -48,7 +48,7 @@
 - 不改云端选卡概率、配额、节奏系数、风控记账口径。
 - 不重写 `publish-pipeline` / `publish-submit-integrity` 已有的发布填写与成功判据契约，只约束它们在 Native 执行位上不得被豁免。
 - 不做 Facebook 侧的修复（简报 G11 第 ③ 条的轮播计数属 Facebook 路由，归 Facebook 平价 change）。
-- 不含实装、不含部署、不含安装包、不含真机写动作。
+- 不含 Cloud / automation 三进程改造，不含部署、安装包与真机动作。提案最初的 spec-only 边界已按用户“继续迁移修复”的明确裁定扩为 Edge 实装，偏离与提交逐项记录在 tasks 6.4。
 
 **分派简报里明确不纳入本 change 的条目（逐条给归宿，避免静默漏掉）**：
 
@@ -70,6 +70,8 @@
 | 云端深读等待表的超时兜底 | 已在 D3「否决 A」定性为给假成功加止血带，且属云端角色面 | 真机 5.2 复现后单独登记的跟进项（`aidcp-cloud/src/agents/deep-reader.ts`） | 看图回执若又回归缺失，深读会重新变成无上限等待（本 change 的 2.3 已从边缘侧堵住，云端兜底只是纵深） |
 
 上表第一行的**页面判据那一半留在本 change**（任务 2.9）：结构化角标读数、双布局取可见入口、读不到不得当「无未读」，这些都在页面规则里，与宿主周期无关。切分理由见 D8。
+
+**交接收口（2026-08-02）**：归档的 session-guards change 完成了周期探针平台化并删除恒假旧装配，但没有消费 `notificationUnread`。在该共享区已无活跃单写者后，本 change 以 Edge `a2d0c74` 在现役 `NativeBrowseSession.observeProbe` 上补齐发送方，不恢复 `CdpNotificationMonitor`、不新增第二套定时器；原交接事实保留，最终通电结论见 D14。
 
 ## Decisions
 
@@ -161,6 +163,8 @@
 
 否决 C：只在本 change 的规格里写「必须有未读检出」，不加对账门。理由：那正是「修了但不通电」的成因——页面判据齐备、无人周期取用，链路照样全黑，而任何机械手段都不会报错。故规格里显式写明「无人取用的读数不算满足契约」，任务里配一道对账门。
 
+**通电复核（2026-08-02）**：历史分工结论不变，但阻断已由 Edge `a2d0c74` 关闭。现役 lifecycle-managed `page_probe` 调用 `NativeBrowseSession.observeProbe`，后者只为小红书消费未读三态并发送 `notification.detected`；静态装配门同时钉死 `src/` 中恰有一个生产发送点且不实例化退役监测器。波次、账号、Cloud 会话与阻断顺序的细化见 D14。
+
 ### D9. 通知类退化按「Native 是既有契约的执行位」写，不重述已合并的通知规格
 
 已合并的 `openspec/specs/notification-monitoring/spec.md` 已经写死了三件事：监测体软中断 + fail-open + 绝不把未读重置为无、翻转只上报一次；「评论/@ 浏览滚到底 / 直到不再有新项或角标清零，不因固定屏数遗留未清未读」；分诊每处理完一类要重读三栏未读计数、循环到清零、有界且诚实放弃。本次查出的四条通知漏洞（滚到底循环消失、per-tab 计数退成整页正则、分类栏点击退成全页文本查找、截断退成 UTF-16 切片）都是**实现违反了已生效的规格**，不是规格缺口。
@@ -211,6 +215,16 @@ D6 当时把 `src/native-page-engine/browse-session.ts` 交给并行的 session-
 
 backlog 123.34 因此从“阻断诚实性收口”改为“恢复 positive confirmation 的真机标定”。标定完成后只能以真实页面结构信号恢复成功出口，并补相应 failure-first 夹具；不得把本次 fail-closed 解释为三支功能已真机恢复。
 
+### D14. 未读物理波次与 Cloud 投递状态分离，复用现役周期探针而不恢复第二套时钟
+
+选：`NativeBrowseSession` 只在小红书的现役 `page_probe` 结果中消费 `notificationUnread`。`clear -> unread` 才推进会话内单调的物理波次；`unread -> unread` 的数字变化不推进，`unreadable` / 缺字段保持 sticky，不把未知当清零。账号切换撤销旧账号的投递资格并为新账号重新建立状态，但波次序号在同一 Native 会话内保持单调。
+
+物理波次与 Cloud 投递分开记账：同一波次对当前 `client.getSessionId()` 最多发送一次；Cloud 重连后允许用**同一波次序号**向新会话补发一次，发送失败不记已投递、下一次探针重试。这样避免每个探针重复触发，也不谎称传输已经 exactly-once。缺 accountId、会话已 blocked / closed、观测暂停或停止中的晚到探针既不发送也不消费波次。
+
+验证码 / 登录阻断帧不得吞掉未读：阻断存在时先保持波次未消费；恢复帧先发配对的 `risk.captcha_cleared`，再发送 `notification.detected`，避免 Cloud Gatekeeper 仍处于 hard pause 时直接丢掉信号。实现复用 session-guards 已落地的 lifecycle-managed 定时器，不实例化退役 `CdpNotificationMonitor`，因此没有两个时钟竞争 sticky 状态或重复发信号。
+
+未解决边界也必须保留：`EdgeClient.send()` 没有 Cloud 应用层 ACK，无法证明 exactly-once；Cloud Gatekeeper 在 `selfCaptureInFlight` 等本地准入状态下仍可能无 ACK 地拒绝信号。当前实现通过发送失败重试与新 Cloud session 的同波次补发降低永久丢失，但不能把这些机制写成平台已处理或云端已接受。
+
 ## Risks / Trade-offs
 
 - **真机结论与规格假设不符**（开帖并未落错误页）→ 规格只要求正面详情证据，这一半在任何情况下都成立；执行方式的选择留在实装任务里按真机结论决定，不需要改规格。
@@ -221,10 +235,11 @@ backlog 123.34 因此从“阻断诚实性收口”改为“恢复 positive conf
 - **测试仍是 jsdom 桩** → 桩只能证明目标绑定与编排，证明不了真实页面事件行为；凡桩验不了的一律转真机验收项，规格里不写成已验证。
 - **定时控件或提交按钮落在闭合 shadow 内** → 本轮 E4 只恢复状态与模式绑定；当前 3.2 已登记的闭合 shadow 定位偏离仍然存在。命中不了会在提交前诚实失败，不会退化为立即发布；是否补 CDP DOM 穿透仍由真机簇 125 的结构复核决定。
 - **未标定候选可能真实生效但统一回 ambiguous** → 这是 E2 的有意失败方向：三支属于 Cloud best-effort，不阻断稿件发布，但会失去正向元数据确认。恢复 confirmed 必须先完成 backlog 123.34 的真机结构标定，不能用桩造证据换取绿回执。
+- **未读信号没有 Cloud 应用层 ACK** → Edge 只能证明发送尝试与按 Cloud session 去重，不能证明 Gatekeeper 已接纳；新连接的同波次补发会在“旧连接已接纳但 ACK 不可见”时产生至多一次跨会话重复。Cloud 的 `selfCaptureInFlight` 无 ACK 拒绝仍是后续准入 / receipt 风险，不在本 Edge-only 收口中改三进程代码。
 
 ## Rollback
 
-本 change 只新增 `openspec/changes/` 下的目录，回滚即删除该目录；不涉及数据、协议或部署迁移。实装阶段的回滚是对应 Edge 提交的 revert + 重建 Native 产物。
+本 change 不涉及数据、协议或部署迁移。规格回滚是回退本 change 的控制仓提交；实装回滚是对应 Edge 提交的 revert。已安装客户端若未来交付，还需要按桌面发布流程重建并替换产物；本次未打包或安装。
 
 ## Open Questions
 
@@ -232,4 +247,4 @@ backlog 123.34 因此从“阻断诚实性收口”改为“恢复 positive conf
 - 看图命令导致深读永久挂起、直到会话看门狗杀场，是从代码路径推出的，未在真机日志里确认过实例；云端等待表超时兜底是否需要，取决于该实例是否复现。
 - 通知去重键折叠与行选择器退化每天实际漏掉多少条通知，没有线上数据支撑，只有代码与旧注释的对照。
 - 未读入口的角标结构判据出自 2026-06-23 真机校准（窄布局曾实测漏报 10 条未读），分类栏与行结构出自 2026-06-24 dump，均距今一月余；本 change 只把它们当**待复核的起点**，真机项 5.8 / 5.5 未跑完前不得当已验证事实。
-- 未读检出的宿主侧半边由承接方落地（见交接表与 D8），承接与否本 change 决定不了；在它落地前，本 change 的通知类修复在生产上不通电，这一状态必须按任务 4.6 显式记录，而不是默认为「已修好」。
+- 未读信号发送方已由 Edge `a2d0c74` 在源码中通电，但已安装客户端与真实账号仍未验证；另外 `EdgeClient.send()` 无应用层 ACK、Cloud `selfCaptureInFlight` 可能无 ACK 拒绝的准入风险仍待后续 Cloud/receipt 设计裁定，不能把源码发送等同于巡视已被 Cloud 或平台接受。

@@ -256,9 +256,11 @@ Any retained Xiaohongshu command branch that reports a page effect SHALL report 
 
 The Native Xiaohongshu runtime SHALL provide a structural reading of the notification entry's unread badge. The reading MUST traverse both the wide and the narrow entry layouts and evaluate the visible entry, because both entries coexist in the DOM and reading the hidden one reports no unread while unread items exist. Unread MUST be judged as "a visible badge element inside the entry's badge container other than the always-present icon"; an always-present icon with an empty slot MUST NOT be judged as unread, and a dot badge without a number MUST still be judged as unread with the numeric count treated as supplementary only. When the entry or its badge container cannot be read, the reading MUST report an unknown state and MUST NOT report "no unread", because the monitoring contract forbids resetting a known unread to none.
 
-A reading that no live runtime path consumes MUST NOT be treated as satisfying the notification sweep contract: the sweep's only trigger is the unread signal, so an unread judgement that is never invoked leaves the whole notification chain dark and every notification-extraction fix unpowered. Where the periodic invocation and the signal emission live is an assembly concern, but the unpowered state MUST be recorded as an open dependency rather than reported as restored.
+A reading that no live runtime path consumes MUST NOT be treated as satisfying the notification sweep contract: the sweep's only trigger is the unread signal, so an unread judgement that is never invoked leaves the whole notification chain dark and every notification-extraction fix unpowered. The lifecycle-managed Native page probe MUST consume the Xiaohongshu reading and emit the unread signal without starting a second periodic monitor. The signal state MUST be scoped to the active Xiaohongshu account and Cloud session. A send failure MUST NOT mark the wave delivered; after a Cloud reconnect, the same physical wave MAY be replayed once to the new Cloud session with the same batch sequence, but repeated probes in one Cloud session MUST NOT emit it again.
 
-The unread batch sequence SHALL have exactly one source: the monotonic value taken when the unread state flips from none to present. Page rules MUST NOT mint a batch sequence of their own on notification list or notification home reports; a wall-clock timestamp per report is not a batch sequence, because every report of the same unread wave then carries a different value.
+The unread batch sequence SHALL have exactly one source: the session-monotonic value taken when the unread state flips from none to present. A numeric count change while unread remains present MUST NOT mint a new sequence. An unknown reading MUST preserve the prior state, and an account change MUST re-arm detection for the new account without reusing a prior sequence. Page rules MUST NOT mint a batch sequence of their own on notification list or notification home reports; a wall-clock timestamp per report is not a batch sequence, because every report of the same unread wave then carries a different value.
+
+Blocked, closed, observation-suspended, stopping, login-challenged, or captcha-challenged frames MUST NOT send or consume an unread wave. When a captcha clears, the paired risk-clear signal MUST be emitted before the unread signal so the cloud admission gate does not reject the unread signal against a stale hard pause.
 
 #### Scenario: Always-present icon alone is not unread
 
@@ -288,6 +290,36 @@ The unread batch sequence SHALL have exactly one source: the monotonic value tak
 - **WHEN** the runtime exposes an unread reading but no live path invokes it and no unread signal is emitted
 - **THEN** the notification sweep is treated as not yet restored and the dependency is recorded
 - **AND** the notification extraction fixes are not reported as effective in production
+
+#### Scenario: Live periodic probe emits once per physical wave
+
+- **WHEN** the lifecycle-managed Xiaohongshu page probe observes a transition from no unread to unread
+- **THEN** it emits one unread signal for the active account and Cloud session
+- **AND** later unread probes, including numeric count changes, do not emit another signal until a no-unread state is observed
+
+#### Scenario: Cloud reconnect replays the same wave once
+
+- **WHEN** the Cloud session changes while the same physical unread wave remains present
+- **THEN** the runtime may emit the unread signal once to the new Cloud session with the existing batch sequence
+- **AND** it does not mint a new physical wave or emit on every probe
+
+#### Scenario: Account rebind starts a separately scoped wave
+
+- **WHEN** the Native session changes from one Xiaohongshu account to another
+- **THEN** unread state and delivery ownership from the old account do not suppress the new account
+- **AND** a new unread wave uses the next session-monotonic batch sequence
+
+#### Scenario: Blocked frame does not consume unread
+
+- **WHEN** an unread reading arrives while login, captcha, lifecycle, or observation blocking is active
+- **THEN** the runtime neither emits nor consumes the unread wave
+- **AND** after captcha recovery the paired risk-clear signal precedes the unread signal
+
+#### Scenario: Failed send remains retryable
+
+- **WHEN** emitting the unread signal fails
+- **THEN** the Cloud session is not marked as having received that wave
+- **AND** a later eligible probe retries the same batch sequence
 
 #### Scenario: Page rules do not mint a batch sequence
 

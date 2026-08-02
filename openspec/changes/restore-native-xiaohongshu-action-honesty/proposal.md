@@ -15,6 +15,7 @@
 - 返回列表与滚动评论区的回执 `ok` 改为反映真实的页面结果，不再硬编码为真；评论区滚动按实测位移与实测候选条数回报，不得把请求值当实测值。
 - 点赞 / 收藏 / 关注改为结构化定位（互动条内具名控件、排除反向与汇总控件）+ 有界轮询等待状态翻转，未翻转诚实回不确定；不再以控件文本含「已」作为成功兜底。
 - 通知巡视的行选择器、正文抽取、去重键回到真机校准契约：行按已标定容器结构选取、正文只取正文容器且缺失即空串、去重键必须逐条稳定且不得使用按用户折叠的主页链。
+- 未读入口由现役 Native 周期探针读取；仅在可见入口从无未读翻到有未读时形成新的物理波次，并向当前 Cloud 会话发送一次 `notification.detected`。读不到、计数变化、阻断帧与发送失败不得被压成已消费。
 - v1 兼容分支（`plan_execute` 的滚动步骤）不得再无测量就写「已确认」：先判定是否仍有活跃产出方，无则连同分支一并删除，判不清或仍有产出方则改为按实测位移回报（判据与依据见 design D5 与 tasks 2.8）。
 - 补齐小红书 Native 的行为级回归测试，并修掉「测试里把元素几何全局钉死、可见性判断恒真」这类使保护失效的夹具写法。
 - 不改协议 v2、不改云端概率 / 配额 / 风控记账、不改命令信封与结果形状。
@@ -36,5 +37,5 @@
 - `aidcp-edge/test/native-page-engine/`（新增小红书行为平价测试，修 `router-contract.test.ts:37-39` 的几何钉死夹具；该目录同批另有 change 增删文件，按文件名分区）
 - 云端 `aidcp-cloud/src/agents/deep-reader.ts` 的等待表超时兜底（仅在真机确认深读挂起后作为独立跟进项，本 change 不含实装）
 - 覆盖漏洞收口（2026-07-28）新增的可能落点，按 tasks 2.9 / 2.11 的机制二选一确定，均需与 `restore-native-xiaohongshu-session-guards` 对账（tasks 6.5）：`aidcp-edge/native/page-engine/src/xhs-page-probe.js` 与 `probe.rs`（未读角标读数若挂在页面探针上，`StructuralSignals` 带 `deny_unknown_fields`，字段须两处同步）、`native/page-engine/src/model.rs` 与 `xhs.rs`（回执若要携带通知项）、`aidcp-edge/src/native-page-engine/browse-session.ts` 的输出路由（回执若由宿主补发）
-- 未读检出的**宿主侧**周期装配与未读信号发送方不在本 change：已具名交接给 `restore-native-xiaohongshu-session-guards`（见 design.md 交接表与 tasks 4.5 / 4.6），承接方未落地前本 change 的通知类修复在生产上不通电
-- 本 change **只产出规格**，不含代码实装、不含部署、不含 Edge 安装包打包 / 签名 / 发版、不含任何真机写动作，也不改 `openspec/specs/` 下任何已合并 spec 文件。
+- 未读检出的**宿主侧**周期装配最初具名交接给 `restore-native-xiaohongshu-session-guards`；该 change 完成周期探针平台化但没有消费小红书未读读数。最终由本 change 在归档后的现役 `NativeBrowseSession` 上补齐发送方（Edge `a2d0c74`），见 design D8 / D14 与 tasks 4.5 / 4.6。
+- 本 change 最初按 spec-only 提案，后续按用户“继续迁移修复”的明确裁定实装 Edge 并形成上述偏离记录；仍不含部署、Edge 安装包打包 / 签名 / 发版或任何真机动作，也不改 `openspec/specs/` 下任何已合并 spec 文件。

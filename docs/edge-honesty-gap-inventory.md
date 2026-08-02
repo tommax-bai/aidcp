@@ -74,7 +74,7 @@
 | **E2** 发布加话题 / @提及自证 | ✅ **已修**（2026-08-02，edge `ea2c4c9`） | topic 由现役 Rust 特化按真 token 精确确认；mention / location / collection 在结构信号标定前不再接受正文自写字面值、候选 selected 外观或入口文案回显，候选已点只回 ambiguous，零派发保留具体 not_started。真机 123.34 用于恢复正向确认，不再阻断诚实性收口 |
 | **E3** feed 刷新三条出口无条件确认 | ✅ **已修**（2026-08-01，edge `c0bdc34`） | 点前记批次首部 id 序列、点后有界轮询 3s 等它变；没变 = ambiguous + `refresh_batch_unchanged`，读不到卡片另有原因码，两态都不回成功。**E13 是本条的重复登记**（同一落点同一形态），见下 |
 | **E4** 发布定时开关不读状态 | ✅ **已修**（2026-08-02，edge `fd3ee6a`） | `set_schedule` 先读真实开关三态，已开幂等、已关才点击并等翻转；北京时间精确到分钟，并与开关仍开、唯一「定时发布」提交按钮三证合取。Native 会话持 unknown / immediate / scheduled(target minute)，submit 前复读平台模式与分钟、只点对应按钮；unknown / 漂移零点击且 `submitDispatched=false`。未扩 Cloud 协议、未用页面 marker 自证；未打包 / 未真机，结构复核仍待 backlog 125.2 |
-| **E5** 通知分栏无正面证据 | ✅ **已修**（2026-08-01，edge `c0bdc34`） | 三条平台产出的证据任一成立才算切过去：叶子分类栏激活态（走 E8 收紧后的三态判据、只读叶子，包裹容器不算数并有用例钉住）/ 该类角标由非零归零 / 可见列表换批；证不出来 = not_started。评论类另加「没确认切栏就不回 items」。**E14 是本条的重复登记**，见下 |
+| **E5** 通知分栏无正面证据 | ✅ **已修**（2026-08-01，edge `c0bdc34`；入口通电 `a2d0c74`） | 三条平台产出的证据任一成立才算切过去：叶子分类栏激活态（走 E8 收紧后的三态判据、只读叶子，包裹容器不算数并有用例钉住）/ 该类角标由非零归零 / 可见列表换批；证不出来 = not_started。评论类另加「没确认切栏就不回 items」。`a2d0c74` 另补现役 page probe 的唯一未读信号发送方；仍未安装 / 真机。**E14 是本条的重复登记**，见下 |
 | **E7** 抓已发布笔记身份 | ✅ **已修**（2026-08-02，edge `2f143e4`） | 立即身份只从本次 fresh success 作用域唯一提取并由 Native session 按 recordId 绑定，capture 不再全页猜；定时内部句柄 / 到期公开身份拆开，完整北京时间日期分钟、正面状态、具名平台 id、tokenized 公开 URL 分层校验 |
 | **E9** 配图上传后置校验 | ✅ **已修**（2026-08-01，edge `20fc70a`，由 `extend-native-postcondition-coverage` §3.2 落地） | 写文件**之前**取预览位身份基线（地址长度 + FNV-1a 摘要，地址不出 IPC），写后有界轮询等目标位出现基线里没有的身份；残留预览不再满足。基线读不到即**在写文件之前**停手。走引擎特化落地，属主的路由文件一行未碰 |
 | **E12** 指针拟人轨迹静默降级 | 🔀 **已判：转出**（2026-08-01） | 原属 `restore-native-actuation-humanization-and-locating` 的 H.2，该 change 收口时**具名交接给「需新立 change（诊断通路本体）」**、并已归档。**不是弃守**：缺口仍在。交接理由是它要的不是「加一行记账」而是「那一行到得了人眼前」，而**那条通路整体不存在** —— 降级走的是成功路径，记账行随子进程退出丢弃，没有任何人看得到。同一条通路同时卡着逐字输入的降级记账，两者应同批解决 |
@@ -130,6 +130,8 @@
 - **处置（2026-08-02，edge `fd3ee6a`）**：已修。页面规则不再复用全页文案查找：设置行标签、真开关与叶子提交按钮分开解析；开关明确 on 才幂等早退、明确 off 才点击并有界等 on、读不到不猜；时间以 Asia/Shanghai 格式化并逐字校验到分钟，且只有「开关仍 on + 分钟相等 + 唯一 `定时发布` 提交按钮」同时成立才回 set_schedule 成功。Rust `EngineSession` 保存 unknown / immediate / scheduled(target epoch) 三态，只由确认进入新发布页与成功 set_schedule 推进；重连、新稿及已派发 / 不明 submit 都撤销旧证明。submit 把该 Native 内部期望注入页面规则，点击前重新读开关与目标分钟，只解析对应模式的精确按钮；unknown / 模式漂移 / 分钟漂移均在不可逆点击前返回 `publish_mode_unconfirmed`、`submitDispatched=false`。Cloud 命令 schema / protocol 未改，页面不写自造 marker。失败优先与回归：E4 JS 11 例，Rust 会话 / 内部注入 3 例；全量 JS 2976 tests / 2975 pass / 0 fail / 1 gated skip，Acceptance 38/38，typecheck、Native test / clippy / fmt 全绿。**边界**：未打包、未替换安装客户端、未真机；真实自定义开关是否暴露当前结构、分钟是否按该事件序列被平台接受、闭合 shadow 提交按钮是否可达，仍待 backlog 125.2，代码已修不等于平台已确认。
 
 ### E5. 通知「赞和收藏」「新增关注」两栏：分类栏点得动就固定睡 500ms、回报 ok=true/'viewed'/confirmed，全程无任何正面证据（不读栏选中态、不读行集合换批、不读该栏角标归零）；同一路径还把栏没切过去时读到的行强行按请求分类打标送进云端名册。今天被「边缘无未读信号发送方」这道临时
+
+> **处置更新（2026-08-02）**：本节以下是修复前机制与最坏后果。分类栏动作证据已由 Edge `c0bdc34` 修复；未读生产入口随后由 Edge `a2d0c74` 通电，复用现役 Native `page_probe`，不恢复旧监测器或第二定时器。源码层现在会按账号、物理波次与 Cloud session 发 `notification.detected`，但未打包、未安装、未真机；`EdgeClient.send()` 无 Cloud 应用层 ACK，Cloud `selfCaptureInFlight` 也可能无 ACK 拒绝，因此不能把“源码发送”写成“云端已接纳 / 平台已处理”。
 
 - **类型**：无后置校验　**落点**：`native/page-engine/src/xhs-command-router.js:522`　**体量**：small
 - **今天回报什么**：在叶子分类栏集合里按严格文案挑中目标后点一下，只要点击派发成功就固定睡 500ms，然后回 action_receipt{action:'browse_notification_likes' / '_follows', ok:true, reason:'viewed'}，相位 confirmed；未命中分类栏与点不动这两态已经诚实分开（no_target / tab_not_actuated）。
