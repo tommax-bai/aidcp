@@ -4,6 +4,8 @@ The Native Reels continuation path currently requires the embedded router to pro
 
 The configured-primary entry uses the existing `page.scroll` wire command. Native currently maps the entry reason directly to `Page.navigate('/reels/')`, readiness wait, and canonical-card polling. The companion command diagnostic nevertheless renders every `page.scroll` as “页面滚动 / 滚动当前页面”. A successful first navigation must remain background-safe; only bounded proof that the entry did not take effect authorizes a foreground recovery.
 
+Live Suman verification after the first integration exposed a typed-contract gap before key dispatch. The router intentionally spreads `inputSafe` into both `reel_probe` and `reel_next_target`, but Native's strict `FacebookReelNextTarget` decoder omitted that field. The real safe observation was therefore rejected as an invalid bounded result before either direction key could run. Router-only tests asserted the field while Fake CDP and Rust decode fixtures omitted it, so the two halves passed independently without one end-to-end shape check.
+
 The completed `fix-native-facebook-primary-reels-routing` change remains the prerequisite that classifies `facebook_reels_primary` and `empty_feed_reels_fallback` as entry reasons. This change does not edit that prerequisite or broaden Cloud authority.
 
 ## Goals / Non-Goals
@@ -11,6 +13,7 @@ The completed `fix-native-facebook-primary-reels-routing` change remains the pre
 **Goals:**
 
 - Let verified keyboard navigation discover the working Reels direction even when DOM structure cannot classify an axis.
+- Preserve the latest `reel_next_target.inputSafe` observation through strict Native decoding and fail closed if focus becomes unsafe between probes.
 - Ensure one late transition suppresses every later key, wheel, or pointer write.
 - Preserve exact-target and canonical-identity success proof.
 - Recover one confirmed ineffective Reels entry with one exact-target foreground activation and at most one fresh navigation retry.
@@ -41,6 +44,10 @@ When both keyboard directions leave the same Reel unchanged, Native may use the 
 
 This keeps the existing trusted-input ladder available without allowing missing DOM structure to block keyboard discovery or allowing pointer ambiguity to become a blind click.
 
+### Keep router and Native next-target shapes identical
+
+`reel_next_target` is a fresh pre-dispatch observation, not merely a geometry hint. Its `inputSafe` field will be represented in `FacebookReelNextTarget` and required to remain safe before Native enters the key loop. Strict unknown-field decoding remains enabled; the fix synchronizes the declared shape rather than weakening the decoder. Regression fixtures will carry the same field emitted by the real router, and a captured live-shaped result will be decoded through the Rust boundary so router-only and Native-only tests cannot drift independently again.
+
 ### Recover only a proven ineffective Reels entry
 
 The first entry attempt remains background-first: issue `Page.navigate('/reels/')`, wait for readiness, and prove that the bound page changed onto a Reels route/surface. If that surface-transition postcondition succeeds, Native does not call `Page.bringToFront`; missing or still-hydrating canonical Reel cards are handled honestly after entry and do not authorize foreground activation.
@@ -56,6 +63,7 @@ The command-diagnostic builder already receives the decoded command payload befo
 ## Risks / Trade-offs
 
 - [The wrong first key seeks media or changes focus without navigating] → Only active-Reel identity change counts; prefer fresh structural or cached evidence, gate unsafe editor/dialog focus, and re-probe before the second key.
+- [Router and Native probe shapes drift] → Decode a real router-shaped `reel_next_target` fixture under the strict Rust type and include every safety field in Fake CDP responses.
 - [The first key moves late and the second key double-advances] → Fresh same-Reel pre-commit probing suppresses every later write after any observed transition.
 - [Both keys work on one Facebook layout] → The first verified transition completes the command; store only the working key used, not a universal visual-layout claim.
 - [Foreground recovery steals focus for a transient load] → Require bounded proof that the first navigation was ineffective, one exact target, no blocker, and a one-activation budget.

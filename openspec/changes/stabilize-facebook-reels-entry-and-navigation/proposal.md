@@ -5,6 +5,7 @@ The installed Facebook runtime can reach a Reels page whose active video is read
 ## What Changes
 
 - Make verified Reel identity transition, not pre-dispatch DOM axis classification, authoritative for selecting a working `ArrowRight` or `ArrowDown` actuator.
+- Keep the router `reel_next_target` input-safety field synchronized with Native's strict typed decoder so a valid safe target observation reaches keyboard probing, while a newly unsafe focus still blocks every key.
 - Bound active keyboard probing to one attempt per direction, re-probe the same Reel before every later write, stop after the first observed transition, and preserve ambiguous outcomes when no canonical next Reel is proven.
 - Keep DOM topology as an ordering hint and safe pointer-fallback locator rather than a prerequisite for keyboard input.
 - Keep the first configured-primary or evidence-based Reels entry navigation background-first. Only when bounded readback confirms that the exact target did not enter a ready Reels surface, activate that same target once, re-probe it, and retry the navigation at most once while retaining canonical-card postconditions.
