@@ -201,6 +201,8 @@ DERIVED_COMPOSITION = {
         # 每连接角色调度器工厂（批 E 后半 = 批 E-2 步骤 3）：它交付的正是上面那个必填口。
         # 批 G 才有的供给方（评论域 / FB 两套运行时）在此做成必填字段或能力二态。
         'src/automation-connection-dispatcher.ts',
+        # 批 G 第一片：Facebook 规则 / 消费两套运行时存储的装配（填调度器工厂的两个口）。
+        'src/automation-facebook-runtime.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'
