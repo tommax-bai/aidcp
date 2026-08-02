@@ -2755,6 +2755,21 @@
 - [ ] 5.2 六仓各自 typecheck + 全量测试；**红项不得写成绿色**，逐条说明是既有还是本 change 新增。
 - [ ] 5.3 **分层验收如实分开记**：loopback 契约测试证明 route/client；dev 单体部署只证明现网零回归；
   **三进程真跑属批次 5，本 change 不声称**。
+  <!-- 2026-08-03 00:47 已部署（aidcp-cloud@0d507c5，仍是单体形态）。
+       快照来源：从 canonical master 目标提交 `git archive` 出的干净快照，**不从任何 worktree 部署**。
+       备份 /opt/aidcp/cloud.bak.20260803-004717.tar.gz + .env.bak.20260803；
+       cloud 侧 package.json / package-lock.json 零变更，故未动 node_modules（事后确认 149 个包仍在）。
+       rsync 排除 .env / .env.bak.* / node_modules / .git，事后逐条确认 .env 与 node_modules 仍在。
+       **迁移：rsync 前后各查一次 `migrate status`，三个属主待应用均为 0**（本批不含新迁移；
+       账本最高版本 content 0069 / automation 0106 / api 0108）——按 §4.6 的硬顺序查过才重启。
+       healthcheck 全过：active running；8787 + 面板 8090 + 客户鉴权 8091 均在监听；
+       DelegatedTaskStore / 运营指令幂等台账 / DelegatedTaskWorker / RiskControllerRegistry /
+       CommentScheduler / PublishScheduler 全部就绪；飞书长连接已建立（WSClient onReady）；
+       重启后错误行数 0。isales 四服务重启前后均 active、全程未触碰。
+       **本批现网真正变的只有一处**：单体委托候选清单从「列暂停态 + 逐账号问显示名 / 问平台」
+       三件套改成一次全量目录读。**在机器上真验过那条读**：直查属主库的六列都在、且真有昵称数据
+       （所以 `names` 非空、`displayName` 解析到昵称）——不靠「rsync 没报错」推断。
+       仍是单体形态，**不证明三进程能跑**（5.3 的口径）。ol 未部署、用户未提。 -->
 - [ ] 5.4 dev 部署按 CLAUDE §5 安全序列（先备份 → rsync → restart → healthcheck → 失败即回滚）；
   **绝不碰同机 isales**。ol 一律等用户明确要求且走发布分支。
   <!-- 2026-07-29 22:08 已部署第一批（aidcp-cloud@b66c022，单体形态）。
