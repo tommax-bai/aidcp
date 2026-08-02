@@ -2023,13 +2023,163 @@
        **两侧都证明不了那 41 条裁定本身对不对** —— 裁定是人读出来的，AC-SEGC-FACE 红的时候
        要做的是重判那条句柄的去处，不是改名单让它变绿。 -->
 - [ ] 3.5a **批 H 的现成工作清单**：判据清单里 5 条 `open` 逐条裁定，一条都不许留空。
-  <!-- 五条同形：在自动化段装配、本进程一次都不读、只有接口服务段消费，而**通道今天不存在**。
-       `interactionCustomerApi` / `interactionInternalApi`（互动那两个 API 面，同形同因，一并裁）、
-       `interactionPermissionOverview`（倾向接口进程就地算，待确认互动授权那一半它读不读得到）、
-       `listAccountAutomationCatalog`（待确认它读的表归谁）、
-       `rolePromptProvider`（倾向接口进程按角色目录自建，待确认是否含运行时注册的角色）。
-       两条路都成立、都要拍板：① 开一条端口让接口进程取；② 装配整体移到接口进程。
-       **既不能判 construct（构造了没去处），也不能判 skip（那等于这条能力消失）。** -->
+  **✅ 裁定已由用户 2026-08-02 拍板：五条全部走路 ②（装配移到接口进程），自动化侧一律记
+  `skip`**，措辞照抄 `accountPersonaService` 判例（不是能力消失，是属主在接口进程）。
+  <!-- ⚠️ **先更正原注释里一条贯穿全清单、而且是错的前提**：原文写「通道今天不存在」——
+       **不成立**。两个方向的跨进程通道都早已存在且部署参数都配好了：
+       api → automation 见 `aidcp-cloud/src/server.ts:1888` `startAutomationInternalApi()`
+       （已注册约 15 组路由），客户端侧 `src/server.ts:8712`；automation → api 见
+       `src/server.ts:4404-4434` 的 15 个 HTTP 客户端。**真正缺的只是各自那一条 route。**
+       这条更正直接改变了两条路的成本对比 —— 而它正是「文档里的现状判断没有任何机械手段
+       会复核它」那条教训的第二次应验（第一次是协调器那条，见 HANDOFF 已作废段）。
+
+       **逐条依据（实读，`aidcp-cloud` 侧行号）**：
+
+       | 条目 | 读谁的数据 | 消费方 | 要不要本进程运行时状态 | 裁定 |
+       | --- | --- | --- | --- | --- |
+       | `interactionCustomerApi`（`server.ts:6272`） | automation 互动表 **+ api 的 `client_users`/`client_environments`** | 只有 `server.ts:10258` → client-auth（**目录只存在于 api 仓**） | 要（边-云服务端 + 风控 registry） | ② |
+       | `interactionInternalApi`（`server.ts:6264`） | 10 条路由里 8 条纯 api 属主配置表 | 只有 `server.ts:9516` → panel（**只在 api 仓**） | 只有一条运行控制下发 | ② |
+       | `interactionPermissionOverview`（`server.ts:6228`） | **零张表**（两个输入都是 env 纯解析） | 只有 `server.ts:9521` → panel | **完全不要** | ② |
+       | `listAccountAutomationCatalog`（`server.ts:4937`） | 混：5 张 api 属主表 + 4 类 automation 事实 | 只有 `server.ts:9688` → panel | 要三样，**其中两样已有端口** | ② |
+       | `rolePromptProvider`（`server.ts:8437`） | 几乎不读表；角色实例来自 automation、发布预览表在 **content** | 只有 `server.ts:9895` → panel | 要（但只是**预览专用**的独立实例，无副作用） | ②+① 混合 |
+
+       **三条是结构性不可行、不只是成本高**：`interactionCustomerApi` / `interactionInternalApi` /
+       `listAccountAutomationCatalog` 若留在自动化侧算，就要读 api 属主表 ⇒ 撞 `AC-OWN-06`，
+       而那条**没有豁免通道**（`import-exemptions.frozenTotal` 现为 0）。
+
+       **两条已有的现成判例，别重新发明**：`server.ts:9695-9706` 的 `setJoinGroupAutomation`
+       已经在接口段**纯用端口**算出了目录的单账号形态（批量形态就是它）；`server.ts:9458-9460`
+       已经写着「面板用户名单在 segB/segC 才解析 ⇒ api 模式就地按同一 env 重解析」，
+       与权限总览那条逐字同构。
+
+       **`interactionPermissionOverview` 零成本、可立刻清**：零表、零运行时状态，两个输入
+       （`AIDCP_PANEL_USERS` / `AIDCP_INTERACTION_PANEL_GRANTS`）都是三服务共用的同一份 `.env`。
+       **别跟互动那两条捆在一起**，捆了就被最重的那条拖住。
+
+       **`rolePromptProvider` 必须混合，纯 ② 会造成真能力消失**：角色目录 40 条里 20 条是浏览类，
+       其中**只有 1 条**在 api 侧有静态预览，另 19 条要真实角色实例去渲染，而那 48 个角色类
+       **只存在于 `aidcp-automation/src/agents/`**（api 仓 `agents/` 下只有一个文件）。
+       ⇒ 壳在接口进程，浏览那一支向自动化进程要「已渲染的预览」。**还有一个原清单没记的
+       第三方**：发布预览的两张 builder 表只存在于 `aidcp-content/src/` —— 这条句柄实际横跨
+       三个属主，接口进程要么再向 content 取一条 route，要么把那两张表另行归属。
+       与 `server.ts:8606-8607` 已写下的裁定一致（「它们构造时真依赖预览调度器 / 风控控制器 /
+       边缘服务端 —— 那些要走端口，不是搬家」）。
+
+       **两个附带的归属动作，别漏**：
+       ① `decideFacebookBrowseMode`（`src/orchestrator/facebook-rule-mode.ts:44`）判 automation
+          但是纯函数（入参全普通值、无 IO、无定时器）⇒ 按 §8.4 应析出 kernel，目录那条才算干净；
+       ② `prompts-preview.ts` 的两张 builder 表在 content（P4-7 只把它做成「组合根注入」，
+          单体里够用，拆进程后注入源没了）。
+
+       **⚠️ 落地时会当场变红的机械检查**：五条改判 `skip` 后，新加到自动化段导出面的那几个
+       端口句柄会让导出面从 41 条变化 ⇒ `aidcp-cloud/test/acceptance/segc-export-face.test.ts`
+       （AC-SEGC-FACE）当场红。**那时要做的是同步名单并重判新句柄的去处，不是改名单让它变绿。** -->
+- [ ] 3.5b **五条裁定的落地**（3.5a 只是裁定，这条是干活）：接口侧装配 + 四条新窄 route
+  + 两个附带归属动作。**权限总览那条零成本、可单独先清**，其余四条按上表分组。
+- [x] 3.5c **启动前置三件之二**（与裁定无关，先落）：关停真空 + 属主池透传。
+  <!-- aidcp-automation fc99d52。
+       ① **关停真空**：`stop()` 按约定只在业务放行过之后才跑，但三样东西在**工厂构造期**
+          就已占住资源——风控写者锁（靠会话保活）、记账漏斗三张周期表、模型出口的角色模型轮询。
+          「同步读一直不就绪 → 收到终止信号」这条路径上它们全部泄漏。写者锁最重：
+          下一个自动化进程等锁超时会**直接拒绝启动**，现象出在新进程、根因在上一个进程的
+          关停路径。业务入口因此加**必填** `dispose()`，无条件调用一次，排在 `stop()` 之后、
+          `root.close()` 之前（那三样用的是本进程的属主池与连接，晚于根关停就没得还了）。
+          必填无缺省的价值当场兑现：改完编译器点名三处内联夹具。
+       ② **属主池透传**：外壳此前不转发 `ownerPool` ⇒ 组装根必然自建一个池，而业务入口那
+          十几个工厂要的是**同一个**属主池。两条各自建池都能跑、都不报错、本仓零断言。
+          透传后关停责任随之转移（`ownsPool === false` ⇒ 根不再关它）。
+       变异逐条给出是哪条抓住的：归还改成「只在放行过之后才做」→ 3 条红（含新写的专用用例）；
+       去掉属主池透传 → **只有**新写的那条红，**typecheck 全程绿**（该参数可选，编译器对此
+       完全沉默）——这正是它必须配行为用例的理由。
+       typecheck 干净；全量 2118 pass / 0 fail（基线 2116）。 -->
+- [ ] 3.5d **启动前置三件之三：schema 契约门**。⚠️ **自动化仓今天一个调用点都没有**
+  （`src/schema/schema-gate.ts:258` 有完整实现，两个测试文件在用，**`src/` 下零调用点**，已实测复核）。
+  <!-- **照 content 办，MUST NOT 照 api 办**：
+       - content `aidcp-content/src/server.ts:307-314` 把门放在**建池之前**，裸 await、无 try/catch，
+         失败 → `process.exit(1)` → systemd 重启语义成立；
+       - api **没有这道门**，改用逐存储 schemaEnsurer，且在建池**之后**；更坏的是
+         `buildApiCompositionRoot()` 在 `:1531` 被裸 await 而 try/catch 从 `:1611` 才开始
+         ⇒ 关停不可达 ⇒ `:998` 建的池永不 `end()`，入口又只设 `exitCode` 不调 `exit`
+         ⇒ **进程很可能不退出**，systemd 看到的是 `active (running)` 的僵尸，既不服务也不重启。
+       落点：`main()` 第一句、建池之前。`runSchemaContractGate({ owners: ['automation'] })`
+       —— 本进程只连 automation 库，就没有立场声称别的库的 schema 对不对（`schema-gate.ts:274-276`）。
+       **不需要**像 content 那样显式传路径：本仓有自己的 `migrations/`（57 个）与
+       `boundaries/table-ownership.json`，默认基准 `src/schema/../..` 正好是仓根。
+       **MUST NOT 包 try/catch**（文件头 :256 明写）。
+       小坑：这份派生副本的日志前缀仍是 `[aidcp-cloud] schema 契约门…`（:284 / :316）。 -->
+- [ ] 3.5e **Facebook 慢启动参数进同步读流**（**用户 2026-08-02 拍板：加进数据流，不走回落默认**）。
+  <!-- 现状：风控的养号事实口有四项，前三项（平台 / 建号时间 / 慢启动起点与毕业时间）
+       同步读镜像**已有现成取用口**（`transport/automation-sync-read-mirrors.ts` 的
+       `accountFor()` 与 `slowStartForAccount()`）；**第四项 `facebookSlowStartPolicy`
+       （爬坡总天数 + 逐日上限）不在任何流的载荷里**——`facebook_operation_policy` 流发的是
+       逐环境基线投影，`reels.slowStart` 只有 `viewsPerFollow`。
+       属主侧有现成合成口 `facebook-operation-policy-store.ts:943` `slowStartRuntimePolicy()`，
+       符合「发成品不发原始表」的既有口径。
+       ⚠️ **形状要先想清楚**：那个合成口是**全局**的，而基线投影是**逐环境**的——
+       别顺手往每个环境行里塞一份重复值，先定它落在信封的哪一层。
+       ⚠️ **这是本 change 连挂三次的那类改动**（同一份名单散在多处手抄件、编译器一处都不管）。
+       动之前先读 HANDOFF 那张「第几次 / 哪份副本漏了」的表，把四处一起改。
+       ⚠️ **另一条方向性红线（与本条同一个口，别忘）**：镜像没到位 / 陈旧时，
+       养号事实 **MUST NOT 喂空**。喂空 = 告诉风控「这个号没在慢启动」，一个还在爬坡的
+       新号会直接按满档跑且不报错。单体里的正解是接到停手闸上、取**最保守的第 1 天**
+       （`risk-controller.ts:428,455`）。 -->
+- [ ] 3.5f **互动能力二态口接通**（**用户 2026-08-02 拍板：这一批就接通，不走具名缺席**）。
+  <!-- 它是批 D 留在 `AutomationEdgeAccessOptions` 上的第三个必填口，二态：
+       `wired` 带 port / `unavailable` 带具名理由。三个子件在单体里的锚点：
+       收件箱 `server.ts:5372-5388`、运行时开关 `server.ts:6044-6055`、
+       握手后恢复编排 `server.ts:6156-6180`（边缘注册回调内的那段）。
+       表基本都在 automation 属主（`interaction_feed` / `_reply_jobs` / `_offboards` /
+       `_runtime_controls` 等），照 `server.ts:5310-5388` + `6212-6224` 的顺序在本进程建。
+
+       **接通那一支要新建两样今天不存在的东西**：
+       ① `hasPendingRevocationHold` 读 `client_env_revocation_holds`（**api 属主**），
+          而 4a 端口清单里没有它 ⇒ 要新开一条 api 窄端口。**MUST NOT 直调属主存储**，
+          也 MUST NOT 吞成 false（`client-user-store.ts:3401-3405` 明写失败方向必须是抛）；
+       ② 回复生成能力只能从 content 客户端取，取不到则**整条不组装**
+          （单体 `server.ts:5345-5362` 就是这么写的，注释明写「塞空壳进去才是灾难」）。
+
+       **`unavailable` 分支仍必须保留且理由具名**，至少五个：schema 缺失 / schema 半迁移 /
+       回复配置解析器不可用 / 回复生成不可用 / 新端口缺席。
+       **红线：整体缺席，不得半截可用** —— 单体回落处（`server.ts:5455-5471`）是把八个变量
+       **一起**置空的；半截可用会让下游能力位发得不一致。 -->
+- [ ] 3.5g **批 H 主体接线**：12 个工厂接进组装根，写 `main()`。
+  <!-- 实读得到的三件事，开工前必读（`aidcp-automation/src/` 相对路径）：
+
+       **① 14 个口今天还空着**（编译器点名 / 或必须由 `main()` 现造）：
+       组装根的 `runtime.facebookScope` 与 `runtime.syncReadSources`（无任何工厂供给）、
+       边缘接入的 `interaction`（→ 3.5f）、发布下发的 `media`、调度器的 `textCardTranscriber` /
+       `roleFactories` / `sessionLimitProvider` / `resumeConfigProvider` / `isDispatchActive` /
+       `onSessionRejected`、业务配置的 `globalActiveWeekMask`、模型出口的 `apiHttp`
+       （组装根内部建了两个但都没暴露）、评论调度器的 `facebookStores` 四件与
+       `scheduledTaskFeedback`（**签名不匹配**：口要同步、客户端是异步 ⇒ 要写转接）、
+       两处的 `groupCommentPolicy`（**用户已裁定暂不接**，必须显式传具名缺席）。
+
+       **② 三处真环，不是排序能解决的**，一律用晚绑定薄壳破：
+       风控底座 ↔ 记账漏斗；边缘接入 ↔ 每连接运行时 ↔ 调度器工厂；组装根 ↔ 边缘/发布。
+       第三处尤其要注意：`syncReadSources` 是组装根的**构造入参**不是事后注入，
+       而它的五个供给方里有三个（发布在途 / 验证码可用性 / 配置副本健康）住在工厂身上。
+
+       **③ 两个工厂在构造期就起定时器**（与本 change「定时器不在构造期起」的约定不一致，
+       不是缺陷但必须知道）：记账漏斗三张、模型出口一张。它们的归还靠 3.5c 那个 `dispose()`。
+
+       **⚠️ 一个会静默吃掉能力的形状**：调度器那张依赖表里有 8~11 个字段写成裸
+       `RoleDispatcherOptions['x']`（不带 `NonNullable`）—— **编译器只逼你写出字段名、
+       不逼你给真值**，塞 `undefined` 全程绿灯，跑起来就是那条能力无声消失。逐条对着供需表核。
+
+       **⚠️ 两处重复实例风险**：发布下发工厂内部**私建**了一个会话配置存储且不对外暴露
+       （`automation-publish-dispatch.ts:365`），而 `sessionLimitProvider` 与
+       `globalActiveWeekMask` 要的是同一个实例；照现状接会让进程里存在两份、各持一套缓存，
+       **两边都不报错**。
+
+       **⚠️ 关停时逐条对着 close 语义表写**，关错打死整个进程：裸 `pool.end()` 那一族
+       （锚点缓存 / 群目标 / 群成员 / 加群审计 / 告警 / 点赞 / 有价值评论 / 互动 feed /
+       群路由 / 委托任务存储）**禁止调**；`ownsPool` / `ownedPool?` 守卫那一族安全。
+
+       **⚠️ 别照抄单体自动化模式的启动顺序**：单体是**先开边缘口、后装同步读**
+       （`server.ts:7628` vs `:1906`），与本 change 要求的顺序正好相反。这一段是**新写**，不是搬运。
+
+       **⚠️ 部署形态 MUST 是 stop→start，禁止滚动 / 蓝绿**：风控写者锁是会话级 advisory lock，
+       构造期就抢，两个进程重叠期间后起的那个会抢不到锁并拒绝启动。 -->
 - [ ] 3.6 `aidcp-automation`：`npm run typecheck` + 全量 `npm test` 全绿。
   <!-- 批 A 当批实测：typecheck 干净；acceptance 89/89；全量 1983 pass / 0 fail。
        本条是第 3 段的收尾闸，八批做完再勾。 -->
