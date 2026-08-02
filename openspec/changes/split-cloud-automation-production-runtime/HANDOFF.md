@@ -44,48 +44,47 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > | 项 | 值 |
 > | --- | --- |
-> | 六仓 | cloud `c394f36` / api `35c63ba` / **automation `2f5f6a9`** / **content `7305b46`** / kernel `6101b1e` / transport `1444d59` |
+> | 六仓 | cloud `c394f36` / **api `3159e10`** / **automation `30d2cc3`** / content `7305b46` / kernel `6101b1e` / transport `1444d59` |
 > | 工作区 | 六仓全干净、全已推、**对账零漂移**、两个共享包 pin 全对齐 |
-> | 测试 | cloud 4115 / api 502 / **automation 2158** / **content 442** / kernel 70 / transport 36，全 0 fail |
-> | 门（真交付物） | **6 条**（运营指令 3 / 内容 2 / 组装 1）—— 08-04 首批撤条 **11 → 6** |
-> | tasks.md | **85/142**（这把尺量的是「查清了多少」，不是交付；分母会随勘察长大） |
+> | 测试 | cloud 4115 / **api 504** / **automation 2158**（+3 skip，与基线同）/ content 442 / kernel 70 / transport 36，全 0 fail |
+> | 门（真交付物） | **5 条**（运营指令 2 / 内容 2 / 组装 1）—— 08-04 两批撤条 **11 → 6 → 5** |
+> | tasks.md | **86/143**（这把尺量的是「查清了多少」，不是交付；分母会随勘察长大） |
 > | 边界 | 跨域边 0，豁免 0；4a 方法槽 58、组数 21 |
 > | dev | 仍停在 cloud `c394f36`。**本轮只动派生仓，与 dev 无关**（dev 上跑的是单体） |
 >
-> **第 3 段（八批 A–H）全部落地，第 4 段已起手。** 两件里程碑：
+> **第 3 段（八批 A–H）全部落地，第 4 段在做。** 两件里程碑：
 >
 > - **`main()` 写完了**（automation `0044881` 起）：schema 契约门 → 属主池 → 同步读镜像 →
 >   组装根 → 十二个工厂 → 业务入口 → 启动外壳，三处真环用晚绑定薄壳破。
 >   **可执行入口仍然 fail-closed**，切成真启动要等台账清零（4.3），有结构断言钉着。
-> - **门 11 → 6**（automation `5fe3f97`）：撤的五条全属**真靠接线消掉**。
+> - **门 11 → 6 → 5**（automation `5fe3f97` / `30d2cc3`）：撤的六条全属**真靠接线消掉**。
 >
 > ---
 >
-> ### 二、下一步：余下 6 条，逐条的障碍都已定位并定过尺寸
+> ### 二、下一步：余下 5 条，逐条的障碍都已定位并定过尺寸
 >
-> **别当成一批做。** 顺序上没有硬依赖，按成本挑即可。
+> **别当成一批做。** 顺序上没有硬依赖（组装根那条除外），按成本挑即可。
 >
 > | 条目 | 卡在哪 | 尺寸 |
 > | --- | --- | --- |
-> | `feishu-operator-natural-language-delegate` + `-delegated-card-actions` | 委托任务的路由本进程没注册；服务要 `prepareTarget`/`validateTarget` 两个目标校验钩子 | **一次裁决 + 一批接线**，见下 |
-> | `feishu-operator-dispatch-start-stop` | automation 侧已接（`2f5f6a9`）；**api 侧还没构造客户端** | 小 |
-> | `content-textcard-transcription-authority` | content 进程还缺视觉客户端与形态判别器两样料，建不出转写器实例 | 中 |
-> | `content-generic-llm-authority` | 本根至今没构造 `PublishGenerationHttpClient`（内容生成链） | 中 |
+> | `feishu-operator-natural-language-delegate` + `-delegated-card-actions` | 委托任务的路由本进程没注册；服务要 `prepareTarget`/`validateTarget` 两个目标校验钩子 | 大（**裁决已定，见下**） |
+> | `content-textcard-transcription-authority` | **卡在 content 侧**：那边至今没构造转写器实例（清单闸里是 pending），automation 侧才谈得上接 | 中 |
+> | `content-generic-llm-authority` | 本根至今没构造 `PublishGenerationHttpClient`；**且比字面更大**——本进程连发帖触发器都还没建 | 中偏大 |
 > | `automation-production-runtime-composition-unwired` | 它就是空壳入口本身，等前面清完 | 收尾 |
 >
-> **委托任务那条要先裁一件事（本轮实读定过，别再推一遍）**：接收方只要 `service`（允许缺席）
-> + 幂等台账（PG 实现与迁移 `0099` 都在本仓），`DelegatedTaskService` 的依赖表也很薄。
-> 要点在两个目标校验钩子 —— 它们按「精选条目 + 账号」读一行精选内容。**那条读早就存在**
-> （`curated-content/get-one-for-account`，客户端现成，content 进程也在服务），
-> 所以要裁的是**走哪条**：
+> **`feishu-operator-dispatch-start-stop` 已清零**（automation `2f5f6a9` 服务端 + api `3159e10` 客户端）。
 >
-> - **A｜用既有那条** —— 今天就能接、零新增。但它是**裸形态**（`server.register` 而非
->   `registerBearer`：无鉴权、无信封、**无 executionTarget 校验**，而 DEV/OL 长期共库），
->   正是 §4.3 登记的第 6 条债。
-> - **B｜给 kernel 精选端口补一个受鉴权的读方法** —— 口径统一、顺手还债，代价是
->   kernel → cloud（事实源）→ sync → transport pin → 三仓 pin → `npm install` 整条链。
+> **委托任务那条的裁决 2026-08-04 已定：走 B（给受鉴权的精选端口补一条读），A 不成立。**
+> 此前记的是「A 只是欠债、B 只是讲究」，实读后不对——那两个钩子必须分得出
+> 「精选库不可用」与「这行不存在」（单体代码明写着后者是**谎**），靠的是 kernel 那个按名字判的守卫；
+> 而裸那条路由的客户端是光秃秃的 `http.call`，跨进程后对面的缺表错误只剩一个普通传输错误，
+> **守卫恒 false ⇒ 「库暂时不可用」被如实报成「目标不存在或不属于该账号」**，
+> 编译期与测试都看不见。受鉴权那一族本来就按码还原成 `ContentPortError`，kernel 的归因函数两类都认。
+> 选 A 还得自己再补一遍错误还原，省不下什么。逐条证据在 tasks 4.1b。
 >
-> **建议 B。** 选 A 会把一条无鉴权、无 target 校验的遗留旁路，变成委托任务链上的**承重**依赖。
+> **另一条实读补充（影响尺寸）**：那两个钩子读的不止精选，还有**候选稿**——三条候选稿动作要
+> 按 api 属主的 publishLog 端口校验归属 / 待审 / 版本，而自动化根**已经构造着那个客户端**，
+> 所以那一半零新增。这条的新增面只有精选那一读。
 >
 > **⚠️ MUST NOT 省掉那两个钩子把服务先接上**：它们是「目标存不存在 / 是不是待审 /
 > 是不是这个账号的」三问的唯一执行点。省掉之后确认卡照发、任务照建，
@@ -103,6 +102,15 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 > | content | 七组内容属主路由**只注册了两组** | 已补四组 + 只许下降的清单闸（`f8b714d` / `7305b46`） |
 > | api | `schedule-feedback` 一组 | 只记不修（要先把内容排期器接进接口进程），tasks 3.5j |
 > | automation | 四条运营指令路由**一条都没注册** | 调度启停已接（`2f5f6a9`），另三条要各自的处理器 |
+> | api | 四条运营指令**一个客户端都没建**（一律 `throw …unavailable:*`） | 调度启停已接（`3159e10`），委托两条随那条大批次 |
+>
+> **第五次撞见换了个形态，比前四次更该记：`aidcp-api` 的 master 头当时 typecheck 整个是红的。**
+> 上一次同步把「撤权保持读」并进了台账端口，端口与 api 属主存储都随同步进了本仓，
+> **而手写入口从不同步、没人跟着补** ⇒ 少一个方法、整仓编译不过。已按单体的接法修好
+> （读面委托客户花名册属主那一份，不抄第二条 SQL）并配正向委托断言。
+> ⇒ **同步之后 MUST 逐仓 typecheck**（5.1 / 5.2 本来就这么写着）：
+> 只跑 `sync-split-repos` 对账不跑编译，红会静静躺在派生仓的 master 上 ——
+> 对账只比文件，**它对「这个仓还编不编得过」一无所知**。（当时只有 api 红，另三仓都绿。）
 >
 > **零信号的原因**：客户端建得出来（构造函数只吃基址与令牌）、调用点编译得过
 > （类型描述形状、不描述「对面有没有这条路由」）、两仓测试各自全绿 —— 只有真把两个进程
@@ -319,10 +327,10 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 
 ### ⚠️ 两把尺，读错会高估进度
 
-| | 现值 | 它衡量什么 |
+| | 现值（快照，以 §1 跑出来的为准） | 它衡量什么 |
 | --- | --- | --- |
-| tasks.md 条数 | 81/135 | **「查清了多少」，不是「交付了多少」。** 分母会随勘察长大——最近几批往里加了十来条实测发现的新任务 |
-| **那张清单（门）** | **11 条** | **真正的交付物。** 14 → 11：**前两条是撤的、不是干活减的**（一条被算了两遍 1.7b，一条记错了属主 2.9）；**第三条（`content-role-factories`，2026-07-31）是本 change 第一条真靠接线消掉的**——0.7 改判归属 + 2.4b 把最后一个 content 符号换成 kernel 写口 |
+| tasks.md 条数 | 86/143 | **「查清了多少」，不是「交付了多少」。** 分母会随勘察长大——最近几批往里加了十来条实测发现的新任务 |
+| **那张清单（门）** | **5 条** | **真正的交付物。** 14 → 5：**头两条是撤的、不是干活减的**（一条被算了两遍 1.7b，一条记错了属主 2.9）；**其余六条都是真靠接线消掉的**——`content-role-factories`（07-31）、08-04 那批五条、调度启停 |
 
 **收工的判据是门清零，不是 tasks.md 打完勾。** 两者不是同一把尺，别拿后者当进度终点。
 
@@ -331,29 +339,29 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 
 ---
 
-## 3. 门：11 条逐条现状（与文首状态表同源）
+## 3. 门：5 条逐条现状（当前值以 §1 第 ④ 条跑出来的为准）
 
 | id | 组 | 卡在哪 |
 | --- | --- | --- |
-| `feishu-operator-natural-language-delegate` | 指令 | **已接线**（`319b0af`）：四个接线点全走取数聚合口、remote 指向 automation。**条目没清是因为探针分不出**，见下 |
+| `feishu-operator-natural-language-delegate` | 指令 | 委托任务的路由本进程没注册；服务要两个目标校验钩子（裁决已定走 B），见文首「现状」二 |
 | `feishu-operator-delegated-card-actions` | 指令 | 同上（注入同一个端口即同时点亮它与自由文本那条） |
-| `feishu-operator-dispatch-start-stop` | 指令 | **只接了服务端**；api 侧卡在签名（面板的状态灯是同步布尔，远端读是异步三态）——见 tasks 1.3a，需拍板 |
-| `content-concept-write-authority` | 内容 | **生产消费者已补齐**（`3fe4b94`，task 2.4a）：只差 §3 段的 `main()` 把客户端喂进去。**撤条属第 4 段**，见下 |
-| `content-curated-write-authority` | 内容 | **读写两半的通道都已就位**（`b7f24a0`：新 kernel 写口 5 方法 + 传输三件套 + content 侧注册 + 组装根四处按模式注入）；同概念池那条，只差 §3 段的 `main()` |
-| `content-facebook-publish-media-authority` | 内容 | **已接线**（`e703b66`）：路由已注册、客户端按模式取、两个消费点都改指（含那处最容易漏的组装根直调）。同概念池/精选那两条，只差 §3 段的 `main()` |
-| `content-token-usage-authority` | 内容 | 契约已写，**路由未注册、未接线**；端口是「提交已合并的增量」而非逐条上报，**属主今天没有这个方法** |
-| `content-textcard-transcription-authority` | 内容 | 能力二态端口已写，未接线 |
-| `content-generic-llm-authority` | 内容 | 待岔口 A 落地（tasks 2.5） |
-| `content-reply-generation-authority` | 内容 | 未开工（tasks 2.6） |
-| `automation-production-runtime-composition-unwired` | 组装 | 就是那个空壳入口本身；前两组不清完写不了 |
+| `content-textcard-transcription-authority` | 内容 | **卡在对面**：content 进程至今没构造转写器实例（清单闸里是 pending），它缺视觉客户端与形态判别器两样料 |
+| `content-generic-llm-authority` | 内容 | 本根没构造 `PublishGenerationHttpClient`，且本进程连**发帖触发器**都还没建（比字面大） |
+| `automation-production-runtime-composition-unwired` | 组装 | 就是那个空壳入口本身；前面不清完写不了 |
 
-**顺序是硬的**：指令组 + 内容组不清完，组装那条写不了。第 3 段 0/6 不是拖延，是前置没到。
+**已撤的六条**（全属真靠接线消掉）：`content-role-factories`（07-31）、概念池写 / 精选写 /
+FB 发帖素材 / 用量记账 / 回复生成（08-04 `5fe3f97`）、调度启停（08-04 `30d2cc3`）。
+**逐条的理由写在 `aidcp-automation/src/automation-composition-root.ts` 的原地注释里**——
+那份台账是 Cloud 普查的永久手写分叉、拿不到任何机械信号，所以理由不放在这里。
 
-> ### ⚠️ 指令那三条为什么接完了还挂着（tasks 1.3b）
+**顺序是硬的**：指令组 + 内容组不清完，组装那条写不了。
+
+> ### ⚠️ 指令那两条为什么「接完了也不一定能清」（tasks 1.3b）
 > 它们的证据是**文案探针**，钉在 `automation_operator_command_unavailable:*` 这类守卫串上。
 > 接线之后那些串**仍然合法存在**，只是含义变了——从「压根没有这条通道」变成
 > 「这个进程没配置这条通道」，而**探针分不出这两者**。
-> 要清得先裁定「这些串不再构成证据」，并配自熄断言；那属**第 4 段**，别顺手带过。
+> **调度启停那条是个反例、值得照办**：接线时那句字面串在 api 手写入口里**整句消失**了
+> （改成真调客户端），于是探针自熄、不必先裁定。能这么办的就这么办。
 > **另一个诚实的坎**：飞书 `/delegate` 那条链**一次都没真跑过**（要真发一条飞书消息才触发）。
 > 已按 5.5 登记 backlog 簇 60。
 
@@ -391,8 +399,10 @@ publishLog 4a 端口，而自动化根**已经**构造着它的客户端；那�
 
 ### 4.1 派生 api 仓的手写入口里有两处**已经写下的不诚实**，接线时别照抄
 
-- `dispatchActive: () => false` —— 把「不知道」答成「停着」。而 1.4a 刚把这个字段改成可选，
-  就是为了让它能**诚实缺席**。**建议直接省略不传**（类型上已允许）。
+- ~~`dispatchActive: () => false`~~ **已了结（api `3159e10`）**：先改成诚实缺席（省略不传 ⇒
+  回 null + 具名 `not_wired`），本轮进一步接上真客户端，现在原样回三态。留着这条是因为它的教训还成立：
+  **把「不知道」建模成一个真实取值，比写多少注释都管用**——类型一改成三态，那句 `() => false`
+  当场编译不过，是本 change 唯一一次类型系统主动抓住一处已写下的不诚实。
 - 幂等键里塞了 `randomUUID()` —— 每次重试新随机一个，**幂等键形同虚设**。
 - 都还没上生产（三进程在 dev 上没有 systemd 单元），但接线时照抄就会带进生产。
 - 出处**分开的**：`delegated-task-channel-adjudication.md` §3 步骤 0-b 只点了随机数那处，
