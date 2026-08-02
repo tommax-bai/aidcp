@@ -231,6 +231,10 @@ DERIVED_COMPOSITION = {
         # 事实源在接口域、本进程只有同步读副本；收成一份是因为至少三个取用点要问同一个问题，
         # 而「第二份实现」在行为测试上原理不可见（本 change 已实测坐实两次）。
         'src/automation-persona-view.ts',
+        # task 2.4d-用量：模型 token 用量的合并缓冲（自动化侧）。Cloud 里对应的是
+        # 属主存储自己那个内存合并 + 定时落库，跨进程之后合并留在调用方、跨界的只有结果，
+        # 所以本文件在 cloud 里没有对应物。
+        'src/automation-llm-usage-buffer.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'

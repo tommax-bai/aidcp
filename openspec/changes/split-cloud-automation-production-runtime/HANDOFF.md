@@ -44,11 +44,11 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > | 项 | 值 |
 > | --- | --- |
-> | 六仓 | cloud `c394f36` / api `35c63ba` / **automation `0044881`** / **content `7305b46`** / kernel `6101b1e` / transport `1444d59` |
+> | 六仓 | cloud `c394f36` / api `35c63ba` / **automation `b9a2caf`** / **content `7305b46`** / kernel `6101b1e` / transport `1444d59` |
 > | 工作区 | 六仓全干净、全已推、**对账零漂移**、两个共享包 pin 全对齐 |
-> | 测试 | cloud 4115 / api 502 / **automation 2148** / **content 442** / kernel 70 / transport 36，全 0 fail |
+> | 测试 | cloud 4115 / api 502 / **automation 2156** / **content 442** / kernel 70 / transport 36，全 0 fail |
 > | 门（真交付物） | **11 条**（运营指令 3 / 内容 7 / 组装 1） |
-> | tasks.md | **83/138**（这把尺量的是「查清了多少」，不是交付；分母会随勘察长大） |
+> | tasks.md | **84/140**（这把尺量的是「查清了多少」，不是交付；分母会随勘察长大） |
 > | 边界 | 跨域边 0，豁免 0；4a 方法槽 **58**、组数 21 |
 > | dev | 仍停在 cloud `c394f36`（本轮只动派生仓，dev 上跑的是单体，与本轮无关） |
 >
@@ -92,13 +92,14 @@ cd ../aidcp && openspec validate split-cloud-automation-production-runtime --str
 >
 > 第 3 段的接线做完了，**下一步是把门减下去**，路径是既有的那两条，按减门多少排：
 >
-> 1. **内容组 7 条**里还没接线的四条：`content-token-usage-authority`（属主今天**没有**
->    `recordUsage` 方法，且端口是「提交已合并的增量」而非逐条上报 ⇒ **这是决策不是落地**，
->    合并缓冲落在哪也要一起裁）、`content-textcard-transcription-authority`（端口已写、未接线）、
->    `content-generic-llm-authority`（待岔口 A，tasks 2.5 只剩 A 半）、
->    `content-reply-generation-authority`（未开工，tasks 2.6）。
->    另三条（概念池 / 精选 / FB 发帖素材）**通道都已就位**，`main()` 也已经把客户端喂进去了 ——
->    它们现在真正只差第 4 段去撤条。
+> 1. **内容组 7 条**：**六条的通道现在是真通的**（属主实现 + 内容进程真在服务那条路由 +
+>    自动化侧有真消费方），只差第 4 段去撤条 —— 概念池 / 精选 / FB 发帖素材 / 用量记账 /
+>    回复生成，以及待岔口 A 的通用模型出口（tasks 2.5 只剩 A 半）。
+>    **只剩 `content-textcard-transcription-authority` 一条真没接**：内容进程还缺
+>    视觉客户端与形态判别器两样料，不是补一行注册能解决的。
+>    ⚠️ **原先记的「用量记账是决策不是落地、属主今天没有 `recordUsage`」已过期**：
+>    两个决策都早有答案（属主早就补了方法；合并缓冲的家写在模型出口工厂的注释里），
+>    本轮已按契约那三条 MUST 实装 + 变异实测（automation `b9a2caf`）。
 > 2. **运营指令 3 条**：接线早已完成，卡在「探针分不出『没有这条通道』与『这个进程没配置它』」，
 >    要先裁定「那些文案串不再构成证据」并配自熄断言（属第 4 段，见下面 §3 那个框）。
 >
