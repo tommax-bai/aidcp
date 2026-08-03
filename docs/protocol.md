@@ -85,7 +85,7 @@
 
 | type | 方向 | 用途 |
 | --- | --- | --- |
-| `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll / idle_recover_nudge 等；Facebook Native 仅 `idle_recover_nudge` 可将精确 target 置前，其它自动滚动保持后台；Facebook 会话的主浏览入口为 Reels 时，Cloud 用 `facebook_reels_primary` 进入 Reels；Feed 为主入口时，仅首页显式空态、物理卡不可可靠上报或诚实 `feed_exhausted` 可用 `empty_feed_reels_fallback`；可选 `dwellMs`） |
+| `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll / idle_recover_nudge 等；Facebook Native 仅 `idle_recover_nudge` 可将精确 target 置前，其它自动滚动保持后台；主动续场、主入口恢复与 Feed→Reels 降级统一使用 `resume_redrive`，并携带 Cloud 当次选择的 `targetSurface: feed\|reels`；可选 `dwellMs`） |
 | `feed.refresh` | cloud → edge | 主 feed 浏览深度到阈值后，点右下「刷新」按钮回到顶部换出全新一批（`reason`: feed_refresh；可选 `thinkMs`；边缘诚实回执 `action.completed{action:'refresh'}`，非 feed 页 / 无按钮 / 点后未换新批均如实失败，绝不假成功） |
 | `pacing.update` | cloud → edge | 会话中途风控档位变化推送新 `tempo`（payload `{tempo}`）；边缘刷新兜底节奏（最小间隔 + 停留兜底）、**不重置**操作间隔锚点、不入队/不唤醒会话（change pacing-fallback-hardening） |
 | `interaction.like` | cloud → edge | 点赞指定笔记 |
@@ -608,8 +608,8 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 // page.scroll
 { "reason": "feed_scroll" }                  // feed_scroll | search_scroll
 { "reason": "feed_scroll", "dwellMs": 1350 } // feed 出新卡：翻页前按新卡数看一会（feed-scroll-card-floor）；返回未刷新则省略 dwellMs
-{ "reason": "facebook_reels_primary" }       // Cloud 已为本会话锁定 Reels 主入口；Edge 复用已有 Reels 进入与卡片确认
-{ "reason": "empty_feed_reels_fallback" }    // 仅 Cloud 收到 Facebook 首页 feed/empty 或 feed/present_unreportable 观察后授权一次；Edge 不得自行切列表
+{ "reason": "resume_redrive", "targetSurface": "reels" } // 统一主动重驱；Edge 现探页面，在 Reels 上继续，否则复用已验证进入路径
+{ "reason": "resume_redrive", "targetSurface": "feed" }  // 统一主动重驱；Edge 把临时 group/search active-list 纠正回 Facebook 首页后继续 Feed
 // feed.refresh（feed 浏览深度到阈值改点右下「刷新」回顶换新批，change feed-refresh-on-depth）
 { "reason": "feed_refresh", "thinkMs": 700 } // 边缘点后校验「回顶 + 首卡换新」才回 ok:true 并上报新一批 page.cards
 // interaction.like
@@ -724,19 +724,19 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
 
 Cloud 在 Facebook 会话开始时锁定环境主浏览入口。若为 Reels，首批 `listKind:'feed'` 观察无论含卡、
 `empty` 或 `present_unreportable`，Cloud 均在卡片身份收集、内容评估和浏览计数之前改发
-`page.scroll{reason:'facebook_reels_primary'}`。配置在本会话中不热切换，下一会话重新读取。Feed 为主入口时保持既有证据型降级逻辑。
+`page.scroll{reason:'resume_redrive',targetSurface:'reels'}`。配置在本会话中不热切换，下一会话重新读取。任务临时导航到群组或详情页也不改变本场钉住的目标；最终任务租约 release 回执确认后，Cloud 复用同一命令立即恢复。Feed 为主入口时保持既有证据型降级逻辑。
 
 Facebook 首页空态的兼容握手：Edge 必须先确认顶层 Facebook 首页、认证/主区域就绪、无登录/checkpoint/consent/captcha，
 且在同一 URL + `performance.timeOrigin` generation、document age ≥8s、无真卡/loading 时，同一紧凑容器的显式空态
 语义连续命中 3 次并通过最终复检，才可上报 `cards:[], listKind:'feed', listState:'empty'`。仅 Cloud 将该观察翻译为
-`page.scroll{reason:'empty_feed_reels_fallback'}`；普通 0 卡、加载中、未知布局及其它平台不得触发。Reels 卡仍以现有
+`page.scroll{reason:'resume_redrive',targetSurface:'reels'}`；普通 0 卡、加载中、未知布局及其它平台不得触发。Reels 卡仍以现有
 `page.cards → note.open{surface:'feed'} → note.detail → interaction.like/page.scroll` 链运行，`feed/detail` Surface union 不新增 `reels`。
 
 Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有规则连续滚动最多 8 轮；仍无可信卡片身份时，必须重新
 读取同一完整页面样本。仅在 canonical 首页、主壳就绪、无登录/checkpoint/consent/captcha/loading，且可见物理 Feed
 卡仍在场时，才可上报 `cards:[], listKind:'feed', listState:'present_unreportable'`（可携带 `startupId` 与
 `documentGeneration`）。Cloud 不把它送入内容评估，也不把它冒充空 Feed；仅复用同一
-`page.scroll{reason:'empty_feed_reels_fallback'}` 做本场单次 Reels 授权。页面仍在加载、未知或受阻时失败关闭。
+`page.scroll{reason:'resume_redrive',targetSurface:'reels'}` 做本场有界 Reels 授权。Cloud 只维护在途尝试和恢复次数，不把过去一次可读 Reel 记成当前页面；页面仍在加载、未知或受阻时失败关闭。
 
 **`note.detail`**——上报笔记详情
 ```jsonc
