@@ -32,14 +32,10 @@ Read on demand:
 
 ## 3. Design admission and OpenSpec
 
-- Before proposing, state the outcome, evidence, minimum behavior delta, and non-goals. Risk analysis does not authorize broad implementation.
-- Default to one existing path; unknown stops visibly. Retry, fallback, compatibility, knobs, new authority/schema, or repo/platform expansion require evidence/contract, an owner, observability, bounded exit/postcondition, the narrower alternative, and approval. Otherwise defer.
-- 30+ tasks, over three new states, multiple recovery paths, or over two code repos triggers review/split. Delete branches whose removal still meets the outcome. Validation proves consistency, not necessity or feasibility.
-- Behavior contracts, cross-repo/module work, protocol, risk, publish, deployment flow, and user-facing behavior changes use OpenSpec first. Start with `openspec list`; use `--specs` only for needed baselines.
-- Do not edit `openspec/specs/` directly for new behavior. Work in `openspec/changes/<change-name>/`, then implement in the owning sibling repo.
-- Reconcile `tasks.md` with source/deployment before using its progress. Completed items record repo, SHA, validation, deployment, and deviations.
-- Finish with `openspec validate <change-name> --strict`; archive only after required tasks and validation are complete.
-- Typos, comments, formatting, and guide/config-only edits may skip a change after confirming behavior and deployment semantics are unchanged.
+- State the outcome, evidence, minimum delta, and non-goals. Reuse one current path; unknown stops visibly.
+- Retry, fallback, compatibility, knobs, or authority/schema/repo/platform expansion need observed evidence/contract and approval after stating the owner, observability, exit/postcondition, cost/risk, and narrower alternative. Otherwise defer. Split work that cannot ship independently; delete branches not required by the outcome.
+- Behavior contracts, cross-repo/module work, protocol, risk, publish, deployment flow, and user-facing behavior changes use OpenSpec: start with `openspec list`, work in `openspec/changes/<name>/`, and never edit `openspec/specs/` directly. Guide/config-only edits may skip it when behavior and deployment are unchanged.
+- Reconcile `tasks.md` with source/deployment evidence; completed items record repo, SHA, validation, deployment, and deviations. Finish with `openspec validate <name> --strict`; archive only when required work is complete. Validation proves consistency, not necessity or feasibility.
 
 ## 4. Context and command-output budget
 
