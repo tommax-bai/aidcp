@@ -18,4 +18,6 @@
 
   <!-- aidcp-edge 67973b4: acceptance 39/39; full suite 3074 passed, 1 gated real-machine test skipped; typecheck passed; node --check passed for both CJS files. aidcp: strict OpenSpec validation passed. -->
 
-- [ ] 3.3 Record repository commits, validations, deviations, and the explicit no-package/no-install/no-deploy boundary.
+- [x] 3.3 Record repository commits, validations, deviations, and the explicit no-package/no-install/no-deploy boundary.
+
+  <!-- Repositories: aidcp-edge 67973b4; aidcp 1bd23c25 (OpenSpec artifacts). Validation: focused lifecycle/target/proxy tests, acceptance 39/39, full Edge 3074 passed with 1 gated real-machine skip, typecheck, two CJS syntax checks, diff checks, and strict OpenSpec all passed. Deviation: a narrow injectable child-startup helper makes ordering/error classification executable; design was updated accordingly. Boundary: no package, installer, local install, deployment, settings/profile deletion, or real-account action was performed. -->
