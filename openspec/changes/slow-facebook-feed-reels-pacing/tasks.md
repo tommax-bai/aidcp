@@ -19,8 +19,10 @@
 
 ## 4. Delivery
 
-- [ ] 4.1 Rebase, commit, push, and safely integrate the control, Cloud, and Edge changes into their default branches with explicit file scopes.
+- [x] 4.1 Rebase, commit, push, and safely integrate the control, Cloud, and Edge changes into their default branches with explicit file scopes.
 - [x] 4.2 Run the DEV deployment gates, deploy the integrated Cloud runtime, and verify deployed SHA, service/listener/health/log evidence without touching OL.
-- [ ] 4.3 Record commits, validation, DEV deployment evidence, deviations, and the explicit no-Edge-package/no-install/no-real-account boundary in this task file.
+- [x] 4.3 Record commits, validation, DEV deployment evidence, deviations, and the explicit no-Edge-package/no-install/no-real-account boundary in this task file.
 
 <!-- DEV Cloud deployment 2026-08-03: target preflight passed for 121.89.85.150. Backups are /opt/aidcp/cloud.bak.20260803-105522.tar.gz and /opt/aidcp/cloud/.env.bak.20260803-105522. A clean Cloud master archive was synced with local/remote registry sha256 a65a6129a2dbee7c06bf62ac3a5dce401a6ca53e05e052211596822f3244afda and .deployed-commit=f67aec9f4c2687c61b5a88379bc8c8c05e08f42a. Migration status reported content 20/20, automation 57/57, and api 68/68 applied with zero pending. DEV remains on the existing monolith topology because the separately tracked three-process API composition-root gate is still open; only aidcp-cloud.service was stopped then started. It is active with NRestarts=0, 8787/8090/8091 listen, panel and client-auth health return ok, enforce schema gates pass for content 0069 / automation 0106 / api 0108, the target=dev automation writer lock is held, and Feishu WSClient reached onReady. Unrelated isales unit states were unchanged. OL was not accessed. -->
+
+<!-- Delivery: control spec commit 766e75f2, Cloud f67aec9, and Edge 07495b1 were rebased, fast-forward integrated, and pushed to main/master without force. Cloud DEV runs f67aec9. Edge was not packaged or installed; /Applications/AIDCP.app remains version 0.3.25, so the wider Edge jitter is source-delivered but not installed-runtime truth. No real Facebook account action or platform-side acceptance was performed. The only delivery deviation is preserving the healthy DEV monolith instead of attempting the separately blocked three-process topology. -->
