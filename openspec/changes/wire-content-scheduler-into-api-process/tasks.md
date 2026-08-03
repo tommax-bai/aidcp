@@ -248,6 +248,12 @@
   <!-- 已改。原文「MUST 改为按排期表扫描、MUST NOT 以 Edge 在线为前置」与用户 2026-08-03 裁定相左，
        现改成「在线闸保留、经跨进程窄口问同一份清单；去掉的是浏览器环境绑定」，并写明裁定日期、
        同时把「问不到 MUST 整轮跳过、MUST NOT 回空清单」一并写进该条，不留两份互斥的权威。 -->
-- [ ] 8.8 `openspec validate wire-content-scheduler-into-api-process --strict` 通过后归档；
+- [x] 8.8 `openspec validate wire-content-scheduler-into-api-process --strict` 通过后归档；
   **归档前把仍未了的债搬进 backlog**——归档会把本文件埋进 archive 目录，
   只活在任务注释里的东西从此没有任何机制会提醒人。
+  <!-- validate --strict 通过。**归档前的债已全部搬走**：真机项 5 条进 backlog 簇 60（8.6）、
+       文档互斥已消（8.7）。另有两条只在本文件注释里、值得在归档前点名的**性质**，
+       它们不是待办而是判据，写进 backlog 那 5 条的措辞里了：
+       ① 六仓测试各自全绿**不等于**两个进程一起跑得通——这正是本 change 反复点名的事故现场；
+       ② 派生对账只比 src/：test/ 与 migrations/ 不参与，前者会静默陈旧（本批实测中了两次）、
+          后者要手工补（0109 差点漏进 api 仓）。 -->
