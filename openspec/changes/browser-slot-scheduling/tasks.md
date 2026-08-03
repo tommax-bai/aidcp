@@ -48,6 +48,7 @@
 - [x] 2.18 **终端退避文案区分容量与故障**：`start_queue_full` 显示「启动排队已满」，只有实际执行过浏览器唤醒且失败时才显示「唤醒失败」；不改变退避时序、槽位准入或前端状态，并补回归测试。<!-- aidcp-edge 000689f; focused 30/30; lifecycle 9/9; node --check and typecheck pass; OpenSpec strict pass -->
 - [x] 2.19 **客户端批量状态文案简化**：启动、排队、待槽位、未加入、完成、关闭与失败统一为「状态 + 计数」短分段，保留受理/终态与失败原因的真实边界；补精确文案回归。<!-- aidcp-edge 7e8b9bb; focused 97/97; node --check; typecheck pass; OpenSpec strict pass -->
 - [x] 2.20 **槽位释放到实际启动之间保持 FIFO 权威**：队头资格保留到启动 / 唤醒真正通过槽位准入，任何后来任务不得趁空位绕过队头；无浏览器控制面已确认身份或连接 Cloud 时如实显示「等待浏览器槽位」，不得冒充已开工。补两层队列交接与活动文案回归。<!-- aidcp-edge c036ec2; focused 60/60; node --check and typecheck pass; full suite one unrelated baseline failure manual-environment-nickname-ipc (master reproduces 3/4); OpenSpec strict pass -->
+- [x] 2.21 **客户端排队分组按权威位次排序**：环境栏「排队中」组按有效 `queuePosition` 升序展示；未知位次稳定置后，不再沿用与 `#1…#N` 冲突的花名册顺序。补视图模型回归测试。<!-- aidcp-edge ffc3004; focused 100/100, full suite exit 0, node --check and typecheck pass; ff-only pushed to master -->
 - [ ] 2.8 **手动任务策略未实装**：插队首 → 起浏览器 → 执行 → 完成后关闭归还槽位。队列已支持 `kind:'manual'` 优先级，但「跑完就关」这一段还没接（现在手动任务唤醒后走的是 1.9「重判待机」的通用逻辑）。
 - [ ] 1.9-b **「任务完成后重判待机」未单独实装**：目前依赖云端下一次的待机提示来重新停泊，而不是任务一结束就立刻判。行为正确（不会漏关），但会多占一小会儿槽位。
 
