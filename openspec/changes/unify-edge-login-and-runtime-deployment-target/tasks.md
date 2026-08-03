@@ -35,4 +35,5 @@
 - [x] 5.2 Run Edge acceptance/full tests and `npm run typecheck`, then fix only regressions caused by this change.
 - [x] 5.3 Run `openspec validate unify-edge-login-and-runtime-deployment-target --strict` and record validation plus the explicit no-package/no-install/no-deploy/no-OL boundary.
   <!-- Validation: focused target/auth/UI/package regressions passed 80/80; the full `aidcp-edge` suite passed 3070 with 1 gated real-device E2E skipped; `npm run typecheck`, `npm run verify:desktop-build-input`, syntax checks, `git diff --check`, and strict OpenSpec validation passed. No installer was packaged or installed, no service was restarted or deployed, no OL/DEV endpoint was contacted, and no real-account action was run. -->
-- [ ] 5.4 Commit Edge and control changes, rebase/fast-forward integrate into current defaults, rerun required validation, and push without force.
+- [x] 5.4 Commit Edge and control changes, rebase/fast-forward integrate into current defaults, rerun required validation, and push without force.
+  <!-- Evidence: `aidcp-edge` `9cc7b9cfa05a3cdaf3ae1f67121a5875f82d19b5` and control `988277e0` were confirmed current with `origin/master` and `origin/main`, rebased as no-ops, fast-forward integrated, and pushed without force. Post-rebase focused regressions passed 68/68, typecheck passed, and strict OpenSpec validation passed. -->
