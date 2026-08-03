@@ -46,6 +46,7 @@
 - [x] 2.16 **客户端排队文案收口**：`waiting_resource` 在主状态与环境栏统一显示「排队中」，不再显示「等待浏览器资源」；补回归测试。<!-- aidcp-edge 47f2559; focused 20/20; acceptance 26/26; full 2028/2028; typecheck pass; OpenSpec strict pass -->
 - [x] 2.17 **首次未绑定环境槽位满时保持排队**：无浏览器控制引导返回 `binding_unknown` 时保留 FIFO 资格、清除失败投影，客户端主状态与环境栏只显示「排队中」；槽位释放后自动继续真实浏览器启动并建立账号绑定。补 `binding_unknown + slots_full` 组合回归。<!-- aidcp-edge 265ade1; focused 81/81; acceptance 26/26; full 2041/2041; typecheck pass -->
 - [x] 2.18 **终端退避文案区分容量与故障**：`start_queue_full` 显示「启动排队已满」，只有实际执行过浏览器唤醒且失败时才显示「唤醒失败」；不改变退避时序、槽位准入或前端状态，并补回归测试。<!-- aidcp-edge 000689f; focused 30/30; lifecycle 9/9; node --check and typecheck pass; OpenSpec strict pass -->
+- [x] 2.19 **客户端批量状态文案简化**：启动、排队、待槽位、未加入、完成、关闭与失败统一为「状态 + 计数」短分段，保留受理/终态与失败原因的真实边界；补精确文案回归。<!-- aidcp-edge 7e8b9bb; focused 97/97; node --check; typecheck pass; OpenSpec strict pass -->
 - [ ] 2.8 **手动任务策略未实装**：插队首 → 起浏览器 → 执行 → 完成后关闭归还槽位。队列已支持 `kind:'manual'` 优先级，但「跑完就关」这一段还没接（现在手动任务唤醒后走的是 1.9「重判待机」的通用逻辑）。
 - [ ] 1.9-b **「任务完成后重判待机」未单独实装**：目前依赖云端下一次的待机提示来重新停泊，而不是任务一结束就立刻判。行为正确（不会漏关），但会多占一小会儿槽位。
 
