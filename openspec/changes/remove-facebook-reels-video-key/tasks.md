@@ -20,6 +20,7 @@
 - [x] 3.1 Run focused Edge tests plus Native acceptance/full tests and typecheck required by the owning repository
 - [x] 3.2 Run focused Cloud tests plus risk/protocol acceptance, full tests, and typecheck required by the owning repository
 - [x] 3.3 Record repository commits and validation evidence, then run `openspec validate remove-facebook-reels-video-key --strict`
-- [ ] 3.4 Integrate and push clean default branches; deploy Cloud to DEV with documented preflight and runtime verification, without packaging Edge
+- [x] 3.4 Integrate and push clean default branches; deploy Cloud to DEV with documented preflight and runtime verification, without packaging Edge
 
 <!-- Validation: Edge focused 134/134; npm test 3065 passed, 1 gated skip; npm run typecheck; npm run gate:native (fmt, clippy, full Rust tests). Cloud focused 34/34; npm test 4146 passed, 11 gated skips; npm run typecheck. OpenSpec strict validation passed. -->
+<!-- Delivery: aidcp-edge master e6cd4bc, aidcp-cloud master 622a1af, and aidcp main 8878383a were fast-forward pushed. Cloud DEV deployed from clean master 622a1af after backup /opt/aidcp/cloud.bak.20260803-164701.tar.gz plus target-local .env backup. No package/lock or migration changed. Post-deploy evidence: source hashes matched, .deploy-sha=622a1af, service active with NRestarts=0, 8787/8090/5432 listening, panel health ok, all three owner databases answered SELECT 1, schema enforce passed for content/automation/api, automation writer lock held target=dev, and Feishu WSClient reached onReady. Edge was not packaged; OL was untouched; no real-account action was performed. -->
