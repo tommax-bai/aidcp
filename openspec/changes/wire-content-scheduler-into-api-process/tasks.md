@@ -220,12 +220,23 @@
        · **单体层已证**：现网零回归（src/server.ts 一字未改，全量 4145/0）。
        · **三进程真跑本 change 不声称**：六仓测试各自全绿**不等于**两个进程一起跑得通；
          那属拆仓批次 5。真机项见 8.6。 -->
-- [ ] 8.5 dev 部署按安全序列（先备份 → rsync → restart → healthcheck → 失败即回滚）；
+- [x] 8.5 dev 部署按安全序列（先备份 → rsync → restart → healthcheck → 失败即回滚）；
   绝不碰同机 isales。
   **本批含一条迁移（1.4a），所以顺序是硬的**：rsync → `migrate status`（确认待应用条数、
   不盲目 apply）→ `migrate up` → 重启 → healthcheck。倒过来做的后果实测过：
   schema 门在 enforce 下抛出 → 进程 exit 1 → 每 5 秒静默重启的崩溃循环、零告警。
   补迁移**只能用 `migrate up`**，另一个执行器不写账本，用它补完「表明明建好了却照样判落后」。
+  <!-- 2026-08-03 已部署 dev（cloud `e82f1fe`）。顺序照办、每步都有回执：
+       备份 `/opt/aidcp/cloud.bak.20260803-132923.tar.gz` + `.env.bak.20260803`
+       → rsync（--exclude .env/node_modules/.git）
+       → `migrate status`：**待应用恰好 1 条**且正是 `0109_content_schedule_hour_claim_env_key_optional`（kind=expand），
+         content/automation 两个属主库各自 0 待应用（未盲目 apply，先看清才动）
+       → `migrate up`：applied 0109（3ms）
+       → restart → healthcheck：`active (running)`、8787 在听、飞书长连接已建、
+         启动日志「ContentScheduler 已启动（每分钟心跳、按账号错峰）」在场，近 4 分钟 error 计数 **0**。
+       同机 isales 三个服务（api / engine / scheduler）**全部照常 running，一根手指没碰**。
+       **部署的是单体**：本批对现网的实际影响只有「去掉自动发帖的浏览器环境绑定」+ 迁移 0109；
+       三进程形态的接线不参与本次运行（那属拆仓批次 5）。 -->
 - [x] 8.6 本地桩验不了的登记 `docs/real-machine-acceptance-backlog.md`（并入簇 60）：
   排期真到点触发一次、换环境后稿件真被投出、回程真归还小时格。
   <!-- 已并入 `docs/real-machine-acceptance-backlog.md` 簇 60，共 5 条：排期真到点触发一次 /
