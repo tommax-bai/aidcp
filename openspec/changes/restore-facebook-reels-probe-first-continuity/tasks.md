@@ -29,4 +29,5 @@
   <!-- repo=aidcp-edge commit=2bf56ce validation=router-107/107,acceptance-39/39,typecheck-pass,native-fmt-clippy-full-tests-pass deviations=none delivery=no-package-install-deploy -->
 - [x] 4.2 Run focused Cloud continuation tests and Cloud typecheck, confirming no runtime behavior change outside existing continuation.
   <!-- repo=aidcp-cloud commit=cb12a9d validation=focused-20/20,typecheck-pass,diff-check-pass deviations=test-only delivery=no-deploy -->
-- [ ] 4.3 Run `openspec validate restore-facebook-reels-probe-first-continuity --strict` and record repositories, commits, validation, deviations, and the explicit no-package/no-install/no-deploy boundary.
+- [x] 4.3 Run `openspec validate restore-facebook-reels-probe-first-continuity --strict` and record repositories, commits, validation, deviations, and the explicit no-package/no-install/no-deploy boundary.
+  <!-- repo=aidcp commit=3c8bacae repos=aidcp-edge@2bf56ce,aidcp-cloud@cb12a9d validation=openspec-strict-pass deviations=none delivery=source-push-only,no-package-install-dev-or-ol-deploy -->
