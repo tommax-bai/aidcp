@@ -119,6 +119,12 @@ TRANSPORT_MEMBERS = [
     # 客户端在同一文件：复制成两份两端路径会悄悄对不上，且两侧各自编译通过、各自
     # 测试通过，只有真跑起来才 404。零属主表 SQL。
     'src/transport/operator-command-http.ts',
+    # change wire-content-scheduler-into-api-process：内容排期调度器那一族窄口的 api→automation
+    # 传输三件套（在线账号清单 / 风控状态 / 三个「在不在跑」/ 委托占用 / 三类计数上限 / 三类扳机）。
+    # 与上面 operator-command 同形、同机制；服务端跑在 automation、客户端跑在 api，两端必须拿到
+    # **同一份**路由常量——复制成两份两端路径会悄悄对不上，而两侧各自编译通过、各自测试通过，
+    # 只有真把两个进程一起跑起来才 404。零属主表 SQL。
+    'src/transport/content-scheduling-http.ts',
     # change split-cloud-automation-production-runtime：automation→content 的概念池召回与
     # 精选库召回。服务端跑在 content、客户端跑在 automation，两端都要拿到同一份路由常量，
     # 所以必须在名单里——不进名单，content 仓根本拿不到注册函数。零属主表 SQL。
@@ -179,6 +185,10 @@ DERIVED_COMPOSITION = {
         'src/automation-service-entry.ts',
         # 自动化段 41 个导出面的「本进程有没有去处」判据清单，批 B…H 的尺子。
         'src/automation-segc-export-disposition.ts',
+        # 内容排期调度器的被调面（批 15c）：把本进程既有的在线清单 / 风控 / 三条管线 /
+        # 委托台账装成 kernel 那个窄口，由 main() 注册成路由。Cloud 里对应的是组装根内联的
+        # 几个闭包（排期器与它们同进程直调），没有同名文件。
+        'src/automation-content-scheduling.ts',
         # 文本模型出口的构造（本仓唯一一处从 aidcp-transport/llm/* 取东西的地方）。
         # Cloud 里这段活在组装根内联，没有对应文件。
         'src/automation-model-exit.ts',
@@ -235,6 +245,12 @@ DERIVED_COMPOSITION = {
         # 属主存储自己那个内存合并 + 定时落库，跨进程之后合并留在调用方、跨界的只有结果，
         # 所以本文件在 cloud 里没有对应物。
         'src/automation-llm-usage-buffer.ts',
+    },
+    'aidcp-api': {
+        # change wire-content-scheduler-into-api-process：内容排期调度器在本进程的装配工厂。
+        # Cloud 里对应的是组装根里那一大段内联闭包（排期器与它的依赖同进程直调），
+        # 跨进程之后依赖实现换了一整套，所以本文件是新写的、没有同名 cloud 对应物。
+        'src/api-content-scheduling.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'

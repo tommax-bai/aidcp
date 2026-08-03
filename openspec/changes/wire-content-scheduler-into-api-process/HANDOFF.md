@@ -1,6 +1,6 @@
 # 交接 · change `wire-content-scheduler-into-api-process`
 
-> **写于 2026-08-03。第 1 组（去环境绑定）已落地并推送，剩 7 组。**
+> **2026-08-03 更新。第 0–7 组与 8.1–8.4 / 8.6 / 8.7 全部落地并推送；只剩集成 + dev 部署（8.5）与归档（8.8）。**
 >
 > **怎么读**：跑 §1 那四条命令（文里的数字都会滞后，以你跑出来的为准）→ 读 §2 现状 → **动手前必读 §4**。
 >
@@ -17,8 +17,10 @@ cd /Users/baitianxing/codes/aidcp
 # ① 六个 canonical checkout 都必须停在默认分支（控制仓 main，其余 master）
 ./scripts/task-preflight
 
-# ② 本 change 的 worktree（代码在这里，不在 canonical checkout）
-git -C ../aidcp-cloud.wt/wire-content-scheduler-into-api-process log --oneline -3
+# ② 本 change 的六个 worktree（代码在这里，不在 canonical checkout）
+for r in aidcp-cloud aidcp-kernel aidcp-transport aidcp-api aidcp-automation; do
+  printf '%-18s ' "$r"; git -C "../$r.wt/wire-content-scheduler-into-api-process" log --oneline -1
+done
 
 # ③ 进度（这把尺量的是任务条数，交付判据见 §2 末）
 openspec validate wire-content-scheduler-into-api-process --strict
@@ -26,6 +28,10 @@ grep -c '^- \[x\]' openspec/changes/wire-content-scheduler-into-api-process/task
 
 # ④ 事实源仓是否被并发 session 推进（本 change 的分支要跟得上）
 git -C ../aidcp-cloud fetch origin master -q && git -C ../aidcp-cloud rev-parse --short origin/master
+
+# ⑤ 派生对账（src 应全 0；pin 过期是**预期**的，要等 kernel/transport 先合 master）
+#    从隔离 worktree 跑需要一个指向六个 worktree 的符号链接根，见 §2 三
+AIDCP_CODES_ROOT=<那个根> ./scripts/sync-split-repos --ref <cloud 分支头>
 ```
 
 ---
@@ -36,41 +42,51 @@ git -C ../aidcp-cloud fetch origin master -q && git -C ../aidcp-cloud rev-parse 
 
 | 项 | 值 |
 | --- | --- |
-| 代码位置 | **worktree** `../aidcp-cloud.wt/wire-content-scheduler-into-api-process`，分支同名，**已推 origin** |
-| 分支头 | `258f41a`（分出点 `648fb4d`），工作区干净 |
-| 控制仓 | `main` @ `cb93fe54`，四份产物 + tasks 回写都已推 |
-| 进度 | tasks **11/41**；第 0 组（勘察）与第 1 组（去环境绑定）完成 |
-| 验证 | cloud typecheck 干净；全量 **4133 pass / 0 fail / 11 skip**；本批改动文件强转数 **0** |
-| 派生仓 | **本批还没派生**（第 8 组才做）。api / automation 现在还是旧形状 |
-| dev | **未部署**，本批也不该部署——它带一条迁移且功能只做了一半 |
+| 进度 | tasks **39/41**。第 0–7 组与 8.1–8.4 / 8.6 / 8.7 全完，**只剩 8.5（dev 部署）与 8.8（归档）** |
+| 代码位置 | 六个 worktree，分支同名，**全部已推 origin**（下表） |
+| 验证 | 六仓 typecheck 全干净；cloud 4145/0/11skip + acceptance 186/186；api 522/0；automation 2175/0/3skip；content 444/0；kernel 70/0；transport 36/0 |
+| 派生对账 | `src/` 六个目标**逐字对齐**（`sync-split-repos --check` 全 0）；**pin 仍过期**，那是集成动作，见「三」 |
+| dev | **未部署**。本批带迁移 0109 且 REQUIRED 抬到 0109 ⇒ 部署顺序是硬的（§4.7） |
 
-### 二、第 1 组交付了什么
+| 仓 | 分支头 | 内容 |
+| --- | --- | --- |
+| `aidcp-cloud` | `e82f1fe`（分出点 `648fb4d`） | 契约 + 失败方向 + 调度器签名放宽 |
+| `aidcp-kernel` | `8aa66f7` | 派生：`content-scheduling-port.ts` + media `availableCount` |
+| `aidcp-transport` | `803664d` | 派生：`content-scheduling-http.ts` 三件套 |
+| `aidcp-automation` | `0203985` | 被调面 + 12 条路由注册 + 路由清单闸 |
+| `aidcp-api` | `9d021c8` | **真的构造并启动调度器** + 回程落点 + 迁移 0109 |
+| `aidcp-content` | — | 零改动（它的存储早就有 `availableCount`，main 直接把存储当端口传） |
 
-去掉自动发帖的**浏览器环境绑定**，三处一起（cloud `258f41a`）：
+### 二、这个 change 现在真的交付了什么
 
-- 调度器不再因「解析不出环境身份」跳过发帖；
-- 下发前的归属形状校验不再要求环境标识；
-- 下发时不再要求在线环境与触发时刻一致（改为环境不同时记一行 info，不参与判定）。
+- **接口进程真的构造并启动了排期器**（`api/src/api-content-scheduling.ts` + 组装根 + 与业务入口同起心跳）。
+- **回程有真落点**：与调度器**共用同一个方法**；没有调度器的进程上调用它响亮抛具名错误。
+- **每条跨进程取用的失败方向逐条定死**，五条方向四次变异实测、逐条说得出是哪条用例抓住的。
+- **触发语义改成「受不受理」**，终态卡移到自动化侧，调度器只对「未受理」回卡。
+- **单体零回归**：`cloud/src/server.ts` 一字未改（签名放宽向后兼容）。
 
-**部署目标（dev/ol）那道闸原样保留**，并已用变异实测证明它承重（§4 第 3 条）。
+### 三、下一步：集成 + 部署（8.5）→ 归档（8.8）
 
-带一条迁移 `0109`（放宽 `env_key` 的 NOT NULL，expand，属主 api），**REQUIRED 与 KNOWN_MAX 都抬到 0109**。
+**顺序是硬的，因为 pin 是派生事实**：三个业务仓的 `aidcp-kernel` / `aidcp-transport` pin MUST 恒等于
+对应仓 **master 的头**，而本批的 kernel / transport 改动还只活在分支上。所以：
 
-### 三、下一步：第 2 组
+1. `aidcp-kernel` → master（ff），`aidcp-transport` → master（ff）；
+2. `aidcp-cloud` → master（ff，rebase 后跑一遍 `test:acceptance` + `typecheck`）；
+3. 三个业务仓 bump pin 到新的 master 头 + `npm install` 更新 lock，再 → master；
+   **pin 漏 bump 的表现不是报错**：npm 装到旧 sha 照样编译过，跑的却是过期契约，路由名对不上只有真跑才 404。
+4. 跑一次 `AIDCP_CODES_ROOT=… scripts/sync-split-repos --check`，要求 pin 三行全「对齐」。
 
-**在接口仓的手写入口里真正构造并启动排期器。** 读部署目标 → 缺失或非法就不启动该定时器并留具名 fail-closed 日志（不许按默认目标降级跑）→ 合法则构造 + 启动心跳。
+**部署（8.5）只从主 checkout 的默认分支走**，且本批含迁移：
+`rsync → migrate status（确认待应用条数、不盲目 apply）→ migrate up → 重启 → healthcheck`。
+倒过来做的后果实测过：schema 门在 enforce 下抛出 → exit 1 → 每 5 秒静默重启的崩溃循环、零告警。
 
-接口侧现成的依赖先接上（排期配置现读、小时格占位、账号平台、已发数与在途自主草稿数、周历掩码），这些都在本仓、不走跨进程。跨进程那批留到第 3 组。
+**归档（8.8）前不用再补债**：真机项已并入 backlog 簇 60（5 条），文档冲突已消（§4.6.5 第 12 项）。
 
-**注意落点**：接口仓的 `src/server.ts` / `src/index.ts` 是**组装根，从不自动同步**，必须手改，不能指望从事实源仓派生过去。
+### 四、交付判据（未变）
 
-### 四、交付判据
+排期发帖 / 排期评论在三进程形态下**真的有进程在跑**，且「归还小时格」的回程有真落点 —— 已达成。
 
-**不是 tasks 打完勾。** 这个 change 交付的是：排期发帖 / 排期评论在三进程形态下**真的有进程在跑**，且那条「归还小时格」的回程有真落点。
-
-**它不声称三进程真跑通** —— 那属拆仓批次 5。分层验收口径写在 tasks 8.4。
-
----
+**它仍不声称三进程真跑通**：六仓测试各自全绿恰恰是这类事故的标准现场。那属拆仓批次 5，已登记 backlog。
 
 ## 3. 这个 change 在解决什么
 
