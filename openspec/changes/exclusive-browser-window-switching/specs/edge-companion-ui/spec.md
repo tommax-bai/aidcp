@@ -7,9 +7,9 @@
 
 ### Requirement: Environment rail separates selection from exclusive browser recall
 
-Clicking an environment's rail entry SHALL select that environment and highlight it with a distinct selected color; a single click MUST NOT show or re-park any browser. Double-clicking the environment avatar SHALL select that environment if necessary and request an exclusive browser recall: every other currently controllable environment browser SHALL be sent to its own configured parking position, then the target environment's fixed-size driven browser SHALL be centered on the AIDCP companion's current outer window bounds and the companion SHALL be restored above it. Repeating a double-click on the same avatar SHALL remain a recall intent and MUST NOT toggle the target back to parking. The shown target MUST be visually distinguishable from a merely selected environment. Nickname editing, persona controls, guided login, and explicit browser recovery MUST NOT be reinterpreted as this avatar gesture.
+Clicking an environment's rail entry SHALL select that environment and highlight it with a distinct selected color; a single click MUST NOT show or re-park any browser. Double-clicking an environment avatar that is not the shown target SHALL select that environment if necessary and request an exclusive browser recall: every other currently controllable environment browser SHALL be sent to its own configured parking position, then the target environment's fixed-size driven browser SHALL be centered on the AIDCP companion's current outer window bounds and the companion SHALL be restored above it. Double-clicking the avatar of the environment already shown behind AIDCP SHALL restore that exact browser to its configured parking position. The shown target MUST be visually distinguishable from a merely selected environment. Nickname editing, persona controls, guided login, and explicit browser recovery MUST NOT be reinterpreted as this avatar gesture.
 
-The exclusive recall SHALL use stable environment routing and bounded completion receipts. A failed target show MUST NOT advance the shown target. A superseded request MUST NOT overwrite a later request or display a stale failure. If the target is shown but one or more other controllable browsers fail to park, the client SHALL expose that incomplete parking result and MUST NOT claim that exclusivity was fully established.
+Exclusive recall and shown-target restore SHALL use stable environment routing, one latest-request-wins operation queue, and bounded completion receipts. A failed target show MUST NOT advance the shown target. A failed or timed-out restore MUST NOT clear the shown target. A superseded request MUST NOT overwrite a later request or display a stale failure. If the target is shown but one or more other controllable browsers fail to park, the client SHALL expose that incomplete parking result and MUST NOT claim that exclusivity was fully established.
 
 #### Scenario: Single click only selects
 
@@ -23,11 +23,17 @@ The exclusive recall SHALL use stable environment routing and bounded completion
 - **THEN** environment B becomes selected, environment A and every other controllable non-target browser are sent to their configured parking positions, and B is placed behind AIDCP
 - **AND** B becomes the only shown target in renderer state
 
-#### Scenario: Repeated target double-click is idempotent
+#### Scenario: Repeated target double-click restores the shown browser
 
 - **WHEN** the operator double-clicks the avatar of the environment already shown behind AIDCP
-- **THEN** the companion repeats or preserves that environment's recall placement
-- **AND** it emits no request to park that target as a toggle side effect
+- **THEN** the companion sends that exact environment to its configured parking position with a bounded completion receipt
+- **AND** it clears the shown target only after parking succeeds while leaving the environment selected
+
+#### Scenario: Shown-target restore failure remains visible
+
+- **WHEN** the operator double-clicks the shown environment but its configured parking action fails or times out
+- **THEN** the client keeps that environment represented as shown and exposes the restore failure
+- **AND** it MUST NOT claim that the browser was restored from command acceptance alone
 
 #### Scenario: Latest rapid double-click determines the final target
 
