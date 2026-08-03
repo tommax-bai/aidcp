@@ -65,3 +65,23 @@ Edge SHALL 在 `wakeAt - warmupMs`、或**更早的按需唤醒触发**（见「
 #### Scenario: 任务完成后重判待机
 - **WHEN** a woken environment finishes the task it was woken for
 - **THEN** edge re-evaluates the standby rule: it parks again if a long deterministic wait still applies, and otherwise keeps the browser open
+
+### Requirement: Cloud 浏览会话 SHALL 只在浏览器就绪后激活
+
+Cloud SHALL 把 Edge 传输连接与浏览会话视为两个独立生命周期。`hello` 明确声明浏览器 `absent` 时，Cloud SHALL 保留在线连接、账号路由与任务派发能力，但 MUST NOT 激活浏览角色、MUST NOT 启动页面空转看门狗、MUST NOT 因等待浏览器槽位而下发 `page.scroll` 或其它页面恢复命令。
+
+Cloud SHALL 在同一连接收到浏览器 `ready` 状态后才启动浏览会话。已启动的浏览会话收到 `absent` 后 SHALL 拆除浏览角色与页面看门狗；再次收到 `ready` 后 SHALL 按新一场启动。重复状态 MUST 幂等。旧 Edge 未声明浏览器状态时 SHALL 保持既有兼容行为。
+
+该闸只约束自动浏览会话。在线但浏览器缺席的 Edge 仍可接收需要浏览器的任务/发布租约，由 Edge 统一浏览器闸触发有界按需唤醒；Cloud MUST NOT 因 `absent` 将其误判为离线。
+
+#### Scenario: 等槽位期间不启动页面看门狗
+- **WHEN** edge is online with browser state `absent` because it is waiting in the browser-slot queue
+- **THEN** cloud keeps the transport online but does not arm the browse idle watchdog and emits no `session.idle_nudge` or `page.scroll`
+
+#### Scenario: 槽位放行后才开始浏览
+- **WHEN** the same edge connection reports browser state `ready` after slot admission and identity verification
+- **THEN** cloud starts exactly one browse session and arms its watchdog from that ready transition rather than from the earlier hello time
+
+#### Scenario: 活跃会话进入待机即拆看门狗
+- **WHEN** an active browse session reports browser state `absent`
+- **THEN** cloud tears down the browse roles and idle watchdog without sending a final page recovery command, while the transport remains online

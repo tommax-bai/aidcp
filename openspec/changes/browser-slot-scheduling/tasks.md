@@ -24,7 +24,7 @@
 - [x] 1.7 `cdp_unhealthy` 与「停泊缺席」分离。协调器新增 `browserAbsent` / `requestWake`；停泊走唤醒路径，唤不醒回**独立**的 `browser_wake_failed`。<!-- aidcp-edge ea0c979 -->
 - [x] 1.8 释放 ⊥ 在跑租约。`EdgeTaskCoordinator.hasActiveLease()`；冷待机据此拒绝进入（绝不把浏览器从正在执行的任务底下抽走）。<!-- aidcp-edge ea0c979 -->
 - [x] 1.9 待机排空改用**非终态**的 `stopAndWait()`（`closeAndWait()` 的 closing 是终态、唤醒后再也起不来）。<!-- aidcp-edge ea0c979 -->
-- [ ] 1.10 向云端如实上报「在线但浏览器缺席」。**未做**——实装中发现这条的紧迫性下降：边缘现在会**自己唤醒**，所以云端把停泊账号当可派发对象反而是**对的**。留作后续可观测性改进（运维界面区分「停泊」与「空闲就绪」）。
+- [x] 1.10 向云端如实上报「在线但浏览器缺席」：`hello` 携初始 `browserState`，同一连接内以 `browser.status` 上报 `absent ↔ ready` 变化；浏览器从未创建时不伪装成页面唤醒意图。旧 Edge 缺字段时保持兼容。<!-- aidcp-edge b5b9192; edge-client 51/51; acceptance 39/39; typecheck pass; full suite passes with the pre-existing manual-environment-nickname-ipc baseline failure excluded -->
 - [x] 1.11 单测：释放后页面命令响亮失败且不触发重连；重建保住实例身份与订阅、并换掉重连配置；重建失败回缺席态；停泊走唤醒 / 唤醒失败回 `browser_wake_failed` / 真故障仍回 `cdp_unhealthy` / 唤醒中重复请求不重复唤醒 / 租约互斥。<!-- aidcp-edge ea0c979 -->
 
 ## 2. aidcp-edge — 外壳：槽位池 + 串行启动队列
@@ -61,7 +61,7 @@
 - [x] 3.4-c **修异步终态回流重置预算的线上回归**：触发入口先返回已开跑时，不得清掉同小时已有重试预算；稍后 `reportNotStarted()` 必须继续递减，首次 + 5 次后放弃。<!-- aidcp-cloud fd32fcf: same-cell retry budget retained until terminal outcome -->
 - [x] 3.5-b **自动未开始结果卡去噪**：排期调度器已接管重试/放弃通知时，中间 `not_started` 不逐次发卡；预算用尽只由 `onCellAbandoned` 发一张，手动结果卡保持不变。<!-- aidcp-cloud fd32fcf: handled signal gates only automatic intermediate cards; missing/failed abandonment notifier falls back to the final immediate card -->
 - [x] 3.6-b 补异步终态回流、预算递减、整格单卡和手动卡不受影响的回归测试。<!-- aidcp-cloud fd32fcf; focused 131/131; acceptance 65/65; full 2807 with 2799 pass + 8 gated skips; typecheck pass -->
-- [ ] 3.1 / 3.2 「区分引擎在线与浏览器就绪 + 两段式派发」**未做，且大部分已自然消解**：边缘现在会自己唤醒，所以云端把停泊账号当可派发对象是**对的**——`acquire` 就是那个「先唤醒」信号。剩余价值只在可观测性（运维界面区分停泊 / 空闲就绪），随 1.10 一起做。
+- [x] 3.1 / 3.2 **区分引擎在线与浏览器就绪 + 两段式浏览会话激活**：明确 `absent` 时保留 transport/任务路由，但不启动浏览角色与 `SessionMonitorRole`；`ready` 后才开场，活动会话转 `absent` 时拆看门狗；重复状态幂等。补“排队超过 240 秒仍零 `page.scroll`”与 ready 后正常开场回归。<!-- aidcp-cloud 8990d48; focused 81/81; acceptance 186/186; full 4131 pass + 11 gated skips; typecheck pass -->
 
 ## 4. 验收与部署
 

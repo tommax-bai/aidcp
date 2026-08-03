@@ -60,6 +60,16 @@ Edge SHALL 保证「释放浏览器层」与「持有任务租约」两者**不�
 
 Edge SHALL 在其上报的状态中把「引擎在线（云端连接存活）」与「浏览器就绪（可立即执行页面动作）」表达为**两个独立的事实**。停泊中的环境 SHALL 呈现为**在线但浏览器缺席**，MUST NOT 与「完全就绪」压成同一个态。
 
+Edge SHALL 在 `hello` 中上报当刻的浏览器状态快照，并 SHALL 在同一 Cloud 连接内于浏览器状态发生变化后上报最新状态。状态上报只陈述 `absent | ready` 事实，MUST NOT 把「浏览器从未创建」表达成页面唤醒请求或伪造页面活动。重复上报同一状态 MUST 是幂等的。
+
 #### Scenario: 停泊环境的在线态如实可辨
 - **WHEN** an environment is parked in cold standby with an intact cloud connection
 - **THEN** cloud can distinguish it from a fully-ready environment, and the operator UI shows it as parked rather than idle-ready
+
+#### Scenario: 排队环境握手时浏览器从未创建
+- **WHEN** an environment completes Cloud hello/welcome while waiting for a browser slot and no browser has been created
+- **THEN** edge reports the engine as online and the browser as `absent`, without emitting a page wake intent or claiming page readiness
+
+#### Scenario: 同一连接内浏览器就绪
+- **WHEN** the slot queue releases the environment, the browser starts, and login plus account identity are verified without replacing the Cloud connection
+- **THEN** edge reports `ready` on that connection exactly as a state transition, and duplicate ready observations do not create duplicate browser sessions
