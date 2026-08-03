@@ -41,4 +41,5 @@
 - [x] 7.1 Revise the companion and fleet contracts so a repeated double-click on the shown environment restores that exact browser only after a correlated parking receipt.
 - [x] 7.2 Serialize shown-target restore with exclusive recall, expose the exact-target IPC, and update renderer/coordinator coverage for success, failure, and latest-intent ordering.
   <!-- Edge added correlated `browser:parkShown`, shared recall/restore generation ordering, and renderer toggle coverage. Focused coordinator 9/9, static IPC 1/1, and renderer toggle 3/3 tests passed; JS syntax and diff checks passed. -->
-- [ ] 7.3 Run focused renderer/main/core validation, Edge typecheck, and strict OpenSpec validation; record commits and delivery boundaries without packaging or installation.
+- [x] 7.3 Run focused renderer/main/core validation, Edge typecheck, and strict OpenSpec validation; record commits and delivery boundaries without packaging or installation.
+  <!-- Edge master@586b0b3 passed fleet console 97/97, renderer smoke 104/104, focused main/core 14/14, typecheck, syntax/diff checks, plus post-rebase coordinator 9/9 and toggle 3/3. Control evidence began at 56fd5f05 and strict OpenSpec validation passed. Edge master was pushed; no package, installation, client restart, Cloud deployment, or live-account action was performed. -->
