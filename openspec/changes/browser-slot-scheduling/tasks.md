@@ -24,7 +24,7 @@
 - [x] 1.7 `cdp_unhealthy` 与「停泊缺席」分离。协调器新增 `browserAbsent` / `requestWake`；停泊走唤醒路径，唤不醒回**独立**的 `browser_wake_failed`。<!-- aidcp-edge ea0c979 -->
 - [x] 1.8 释放 ⊥ 在跑租约。`EdgeTaskCoordinator.hasActiveLease()`；冷待机据此拒绝进入（绝不把浏览器从正在执行的任务底下抽走）。<!-- aidcp-edge ea0c979 -->
 - [x] 1.9 待机排空改用**非终态**的 `stopAndWait()`（`closeAndWait()` 的 closing 是终态、唤醒后再也起不来）。<!-- aidcp-edge ea0c979 -->
-- [x] 1.10 向云端如实上报「在线但浏览器缺席」：`hello` 携初始 `browserState`，同一连接内以 `browser.status` 上报 `absent ↔ ready` 变化；浏览器从未创建时不伪装成页面唤醒意图。旧 Edge 缺字段时保持兼容。<!-- aidcp-edge b5b9192; edge-client 51/51; acceptance 39/39; typecheck pass; full suite passes with the pre-existing manual-environment-nickname-ipc baseline failure excluded -->
+- [x] 1.10 向云端如实上报**已启动核心**的「在线但浏览器缺席」：`hello` 携初始 `browserState`，同一连接内以 `browser.status` 上报 `absent ↔ ready` 变化；该能力服务真实冷待机，不作为首次排队预启动核心的理由。旧 Edge 缺字段时保持兼容。<!-- aidcp-edge b5b9192; edge-client 51/51; acceptance 39/39; typecheck pass; full suite passes with the pre-existing manual-environment-nickname-ipc baseline failure excluded -->
 - [x] 1.11 单测：释放后页面命令响亮失败且不触发重连；重建保住实例身份与订阅、并换掉重连配置；重建失败回缺席态；停泊走唤醒 / 唤醒失败回 `browser_wake_failed` / 真故障仍回 `cdp_unhealthy` / 唤醒中重复请求不重复唤醒 / 租约互斥。<!-- aidcp-edge ea0c979 -->
 
 ## 2. aidcp-edge — 外壳：槽位池 + 串行启动队列
@@ -44,12 +44,13 @@
 - [x] 2.14 **「槽位被占」不再是失败原因——连带修掉三个把账号做成砖的 bug**（用户第二次纠偏：「有人等也应该是超过了上限才失败吧」）。2.13 按「有没有人在死线上等」分流（task/manual → 当场判失败）是错的：那是把**「有人在等」**误当成**「所以这次该失败」**，两者毫无因果关系。更糟的是那个「失败」是假的——外壳槽位拒绝时**一个字节都不回核心**（`wakeSettle` 要到发出 wake 命令之后才赋值），核心在浏览器闸上**干等满 180s** 唤醒死线，云端 acquire 早已超时走人；同时 ① 核心的唤醒闩 `coldStandbyWakeRequested` 置位后**从不复位**（该账号在本进程生命周期内再不请求唤醒）② `wakeColdStandby` 清掉待机定时器、失败路径**不还**（再无自唤醒路径）③ 环境不进等槽位队列（槽位空出来也没人叫它）——**净效果：先把调用方吊死三分钟，再对着空气宣布失败，顺手把这个账号做成一块砖**。现改为：**任何**槽位/内存拒绝一律进 FIFO 等槽位队列，谁都不判失败；**调用方的死线只决定「什么时候回话」，绝不决定「要不要把浏览器开起来」**——协调器把云端真实 `acquireTimeoutMs`（扣 5s 往返余量；云端在 push 前就 arm 了计时器，只准早答不准迟答）经核心传到外壳，外壳到点用私有 IPC `lifecycle.wake_denied`（父子进程消息，**非 WS 协议**，不触发五处同步）告诉核心「这次没轮到」→ 核心立刻诚实作答（云端已按可恢复处理：归还小时格 + 格内重试 ≤5 次），**但环境仍留在队列里、浏览器照常起**（撤销唤醒是双输：本次没做成、重试还得再付一次冷启；起好的浏览器正是下次重试要命中的）。剩余预算低于冷启地板（30s）→ **t=0 当场作答**，绝不让调用方空等。FIFO **严格无优先级车道**（带死线的唤醒是连续到达的，让它们插队 = 1:2 里多挂的那一半永远排不上、饿死）。唤醒失败后重挂自唤醒定时器（退避 1/2/5min）+ 复位唤醒闩。<!-- aidcp-edge 809e15d -->
 - [x] 2.15 **容量语义纠偏**：把「最多挂载账号数」改成「启动排队上限」，环境创建不再受容量限制；浏览器并发只限制同时执行数；内存自动推算只在 Edge 客户端启动时读取一次，任务启动热路径不得再次采样。补 UI、主进程准入与回归测试。<!-- aidcp-edge b822d75; acceptance 25/25; full 1838/1838; typecheck pass; OpenSpec strict pass -->
 - [x] 2.16 **客户端排队文案收口**：`waiting_resource` 在主状态与环境栏统一显示「排队中」，不再显示「等待浏览器资源」；补回归测试。<!-- aidcp-edge 47f2559; focused 20/20; acceptance 26/26; full 2028/2028; typecheck pass; OpenSpec strict pass -->
-- [x] 2.17 **首次未绑定环境槽位满时保持排队**：无浏览器控制引导返回 `binding_unknown` 时保留 FIFO 资格、清除失败投影，客户端主状态与环境栏只显示「排队中」；槽位释放后自动继续真实浏览器启动并建立账号绑定。补 `binding_unknown + slots_full` 组合回归。<!-- aidcp-edge 265ade1; focused 81/81; acceptance 26/26; full 2041/2041; typecheck pass -->
+- [x] 2.17 **首次未绑定环境槽位满时保持排队**：不启动核心、不预取账号绑定，直接保留 FIFO 资格、清除失败投影，客户端主状态与环境栏只显示「排队中」；槽位释放后再真实启动浏览器并建立账号绑定。<!-- 原实现 aidcp-edge 265ade1；本次由 2.23 收窄 -->
 - [x] 2.18 **终端退避文案区分容量与故障**：`start_queue_full` 显示「启动排队已满」，只有实际执行过浏览器唤醒且失败时才显示「唤醒失败」；不改变退避时序、槽位准入或前端状态，并补回归测试。<!-- aidcp-edge 000689f; focused 30/30; lifecycle 9/9; node --check and typecheck pass; OpenSpec strict pass -->
 - [x] 2.19 **客户端批量状态文案简化**：启动、排队、待槽位、未加入、完成、关闭与失败统一为「状态 + 计数」短分段，保留受理/终态与失败原因的真实边界；补精确文案回归。<!-- aidcp-edge 7e8b9bb; focused 97/97; node --check; typecheck pass; OpenSpec strict pass -->
-- [x] 2.20 **槽位释放到实际启动之间保持 FIFO 权威**：队头资格保留到启动 / 唤醒真正通过槽位准入，任何后来任务不得趁空位绕过队头；无浏览器控制面已确认身份或连接 Cloud 时如实显示「等待浏览器槽位」，不得冒充已开工。补两层队列交接与活动文案回归。<!-- aidcp-edge c036ec2; focused 60/60; node --check and typecheck pass; full suite one unrelated baseline failure manual-environment-nickname-ipc (master reproduces 3/4); OpenSpec strict pass -->
+- [x] 2.20 **槽位释放到实际启动之间保持 FIFO 权威**：队头资格保留到启动 / 唤醒真正通过槽位准入，任何后来任务不得趁空位绕过队头；首次排队只显示位次与引擎未连接，不冒充已确认身份、已连 Cloud 或已开工。<!-- aidcp-edge c036ec2; 本次由 2.23 收窄控制面部分 -->
 - [x] 2.21 **客户端排队分组按权威位次排序**：环境栏「排队中」组按有效 `queuePosition` 升序展示；未知位次稳定置后，不再沿用与 `#1…#N` 冲突的花名册顺序。补视图模型回归测试。<!-- aidcp-edge ffc3004; focused 100/100, full suite exit 0, node --check and typecheck pass; ff-only pushed to master -->
 - [x] 2.22 **修复当天环境目标统一改动触发的幽灵槽位回归**：连接回执核对本次 spawn 时冻结的认证目标，不因令牌刷新窗口重新读取易变会话状态而误杀同目标核心；OS 进程 `exit` 后立即归还执行槽位并推进 FIFO，`close` 只负责末尾日志归因且有界兜底，杜绝进程已消失但客户端永久显示 4/4。<!-- aidcp-edge d6dde80; focused 43/43; post-rebase full 3067 passed, 1 gated skip; node --check and typecheck pass; OpenSpec strict pass; no installer built or installed -->
+- [x] 2.23 **取消首次排队预启动控制核心**：自动启动和手动“打开浏览器”在槽位不足时都只登记外壳 FIFO，不 spawn 核心、不连接 Cloud；槽位放行后再完整启动核心与浏览器。启动排队已满同样不得创建控制核心。真实运行后进入冷待机的保留核心行为不变。补源码契约与 FIFO 回归测试。<!-- aidcp-edge d9821d8; focused 202/202; three JS syntax checks and typecheck pass; OpenSpec strict pass; no installer built or installed -->
 - [ ] 2.8 **手动任务策略未实装**：插队首 → 起浏览器 → 执行 → 完成后关闭归还槽位。队列已支持 `kind:'manual'` 优先级，但「跑完就关」这一段还没接（现在手动任务唤醒后走的是 1.9「重判待机」的通用逻辑）。
 - [ ] 1.9-b **「任务完成后重判待机」未单独实装**：目前依赖云端下一次的待机提示来重新停泊，而不是任务一结束就立刻判。行为正确（不会漏关），但会多占一小会儿槽位。
 
@@ -63,7 +64,7 @@
 - [x] 3.4-c **修异步终态回流重置预算的线上回归**：触发入口先返回已开跑时，不得清掉同小时已有重试预算；稍后 `reportNotStarted()` 必须继续递减，首次 + 5 次后放弃。<!-- aidcp-cloud fd32fcf: same-cell retry budget retained until terminal outcome -->
 - [x] 3.5-b **自动未开始结果卡去噪**：排期调度器已接管重试/放弃通知时，中间 `not_started` 不逐次发卡；预算用尽只由 `onCellAbandoned` 发一张，手动结果卡保持不变。<!-- aidcp-cloud fd32fcf: handled signal gates only automatic intermediate cards; missing/failed abandonment notifier falls back to the final immediate card -->
 - [x] 3.6-b 补异步终态回流、预算递减、整格单卡和手动卡不受影响的回归测试。<!-- aidcp-cloud fd32fcf; focused 131/131; acceptance 65/65; full 2807 with 2799 pass + 8 gated skips; typecheck pass -->
-- [x] 3.1 / 3.2 **区分引擎在线与浏览器就绪 + 两段式浏览会话激活**：明确 `absent` 时保留 transport/任务路由，但不启动浏览角色与 `SessionMonitorRole`；`ready` 后才开场，活动会话转 `absent` 时拆看门狗；重复状态幂等。补“排队超过 240 秒仍零 `page.scroll`”与 ready 后正常开场回归。<!-- aidcp-cloud 8990d48; focused 81/81; acceptance 186/186; full 4131 pass + 11 gated skips; typecheck pass -->
+- [x] 3.1 / 3.2 **区分引擎在线与浏览器就绪 + 两段式浏览会话激活**：真实冷待机 `absent` 时保留 transport/任务路由，但不启动浏览角色与 `SessionMonitorRole`；`ready` 后才开场，活动会话转 `absent` 时拆看门狗；重复状态幂等。首次本地排队不建立 transport。<!-- aidcp-cloud 8990d48 -->
 
 ## 4. 验收与部署
 
@@ -86,7 +87,7 @@
 > **必须先说破的结论**：2.14 让失败变得诚实、可恢复了，但**它不会让 12 个账号在 6 个槽位上真跑起来**。真正的病不在「怎么判失败」，在**槽位根本不轮转**。下面第 1 条才是那个杠杆。
 
 - [ ] 5.1 **供给侧：让待机提示覆盖「这账号接下来达到 Cloud 单一 5 分钟门槛、没有活可干」的所有情形**（纯云端，零协议改动，零边缘改动，不驱逐任何人）。今天 `aidcp-cloud/src/comm/browser-standby.ts` 的待机提示**只看浏览配额耗尽**（`RiskController.explain('view')`）；于是**活跃时段窗口关闭、周掩码关闭、日会话上限已满、账号 frozen、互动配额耗尽而浏览配额还有**——全都不产生提示，浏览器就那么开着、占 700MB、好几个小时什么都不干。协议里 `UiBrowserStandbyPayload.source` **早就声明了 `'session'` 这个来源、全仓无人产出**。复用现成的进入待机闸与唤醒链路即可，放出的「槽位·小时」比任何抢占方案多一个数量级。**这一条大概率把整个争用问题变成非问题。**
-- [ ] 5.2 **「未启动黑洞」：被槽位拒绝的环境对云端完全不可见**。槽位拒绝时外壳**根本不 spawn 核心** → 没有 WS 连接 → 云端 `onlineAccountIds()` 不含它 → 排期调度器从不评估它 → **不触发、不烧格、不发卡、云端零日志**。这是 12/6 机器上最大的一块静默丢失，也是「评论怎么没发出去」的主要成因。修法：被拒环境**以冷待机态出生**（核心起、云端连上、浏览器不开）。障碍是 hello 的身份闸要求先从**活的浏览器**读到登录身份才握手，需要花名册缓存身份 + 一个 `browser_absent` 能力位；**必须守住「未知≠否」**（见 memory `persona-bound-tristate`）。
+- [x] 5.2 **明确不做“首次排队控制核心”**：用户确认该方案把简单排队扩张为「核心在线 + 浏览器缺席 + 可唤醒 + 可关闭」的额外运行态，属于过度设计并已造成幽灵槽位。被槽位拒绝的首次启动环境保持本地排队与 Cloud 离线；轮到后再完整启动。排期只能在账号真实上线后评估，这是容量约束的诚实结果，不再用隐藏核心兜底。
 - [ ] 5.3 **cloud：`browser_wake_failed` 在发布链路被误报成「边缘离线」**（`publish-dispatcher.ts` 落进 `offline_requeued`）——边缘明明在线、浏览器只是停泊排队。运维据此去查一个根本没断的连接。加一档 `wake_failed_requeued`。
 - [ ] 5.4 **cloud：`edge-task-lease-client.ts` 的 `onReleased` 只硬匹配两个 reason**，新增任何终态 reason 都会让云端干等到 acquire 超时。改成一张 reason→code 全表（结构性的漏，顺手根治）。
 - [ ] 5.5 **暂停态环境白占 700MB**（浏览器开着、零工作、云端连接都断了）。回收它不涉及驱逐，但「暂停」的界面白纸黑字承诺「浏览器保持打开」——需要一个默认关闭的设置项 + 运营确认，不能偷偷改语义。

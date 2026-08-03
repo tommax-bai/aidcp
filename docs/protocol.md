@@ -242,7 +242,7 @@
 }
 ```
 
-该消息只承载同一 WebSocket 内浏览器执行层的真态变化，不是“唤醒意图”。排队中浏览器从未创建时上报 `absent`；槽位放行、浏览器启动且登录态/账号身份复核通过后上报 `ready`；冷待机释放浏览器层后再次上报 `absent`。Cloud 在 `absent` 时拆除或不启动浏览会话及 `SessionMonitorRole`，因此不得生成 `session.idle_nudge/page.scroll`；任务/发布租约仍可按在线 Edge 路由并由 Edge 统一浏览器闸执行按需唤醒。重复状态幂等。
+该消息只承载同一 WebSocket 内浏览器执行层的真态变化，不是“唤醒意图”。首次启动尚在 Electron 本地 FIFO 时没有核心和 WebSocket，因此不会上报 `browser.status`；槽位放行、浏览器启动且登录态/账号身份复核通过后上报 `ready`；已有核心进入冷待机并释放浏览器层后上报 `absent`。Cloud 在 `absent` 时拆除或不启动浏览会话及 `SessionMonitorRole`，因此不得生成 `session.idle_nudge/page.scroll`；任务/发布租约仍可按在线 Edge 路由并由 Edge 统一浏览器闸执行按需唤醒。重复状态幂等。
 
 **`welcome`**（cloud → edge）
 ```jsonc

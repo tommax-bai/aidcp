@@ -74,8 +74,10 @@ Cloud SHALL 在同一连接收到浏览器 `ready` 状态后才启动浏览会�
 
 该闸只约束自动浏览会话。在线但浏览器缺席的 Edge 仍可接收需要浏览器的任务/发布租约，由 Edge 统一浏览器闸触发有界按需唤醒；Cloud MUST NOT 因 `absent` 将其误判为离线。
 
-#### Scenario: 等槽位期间不启动页面看门狗
-- **WHEN** edge is online with browser state `absent` because it is waiting in the browser-slot queue
+本要求只适用于已经运行后进入冷待机的环境。首次启动仍在本地槽位队列中的环境 SHALL 保持核心未启动与 Cloud 离线，MUST NOT 为了复用该唤醒链路而预启动控制核心。
+
+#### Scenario: 冷待机期间不启动页面看门狗
+- **WHEN** an already-running edge enters cold standby and reports browser state `absent`
 - **THEN** cloud keeps the transport online but does not arm the browse idle watchdog and emits no `session.idle_nudge` or `page.scroll`
 
 #### Scenario: 槽位放行后才开始浏览
