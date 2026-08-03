@@ -2680,7 +2680,41 @@
        而且**连单体那句具名警告都没有**（单体缺 worker 时会 warn「任务可确认但不会执行」）。
        4.1f 撤的那两条锚的是**指令通道**（api → automation 那一跳），与执行侧是两件事；
        但「确认了却永远不跑、且不出声」本身就是红线形态，建工作器时一并把那句具名警告补上。 -->
-- [ ] 4.1b 余下 **2** 条的清零路径（各自的前置写在下面，别当成一批）。
+- [x] 4.1h **末两条一起清零：门 2 → 1 → 0**（2026-08-03）。
+  <!-- automation `d26205d`（生成链 + 委托执行器，2 → 1）与 `dc829c8`（入口切真启动，1 → 0）。
+       六仓对账零漂移、两个共享包 pin 全对齐；automation 测试 2170 pass / 0 fail（+3 skip，与基线同）。
+
+       **① `content-generic-llm-authority`（content-owner 类归零）**
+       · 对面那一半：内容进程手写入口**无条件注册** `registerPublishGenerationRoutes`（去它 main() 读过）；
+       · 本包这一半：建 `PublishGenerationHttpClient` → 喂 `PublishScheduler` → 喂**委托任务执行器**。
+       · ⚠️ **第三跳是必需的，不是顺手**：只加客户端 + 建 scheduler 的那一版被 **typecheck 当场以
+         「声明了没人读」拦下** —— 本进程当时没有任何东西能触发发帖。另两个候选都不可用：
+         排期 tick 属 api（本仓没有这个类，且 api 手写入口也没建它）、手动发布路由按 1.7b 刻意不接。
+       · **顺带补上一个现网缺口**：此前委托任务「能建、能确认、永远不跑」，且**连单体那句具名警告都没有**。
+         现在两种缺席各有一句（触发器缺席 / 按配置禁用），泵起在业务入口放行之后
+         （构造期起 = 让未放行的进程去认领任务，而认领带租约）。
+       · 授权决定写经 api 属主那条口（本进程不碰授权表），**批准与驳回两条都先比 contentVersion**
+         再写，防给旧稿盖章；变异实测：去掉任一条版本比较 → 结构断言红。
+
+       **② `automation-production-runtime-composition-unwired`（台账清零）**
+       · 它锚的就是空壳入口本身 ⇒ 撤条与「入口切真启动」是同一件事，同批做。
+       · **闸没删、只是不再恒真**：`assertAutomationRootReady` 析出成纯函数，
+         用例喂一个非空台账独立验它。**这一步是必需的**——台账清零之后「非空即拒」在生产路径上
+         恒真通过，「它还在不在」再没有任何机械手段能证明。
+       · 顺序钉成结构断言：**读配置 → 过闸 → 真装配**。反过来会让缺配置的进程先抢走
+         会话级风控写者锁再失败退出，下一个真进程要等它的会话结束。
+       · 可执行入口现在**起来之后不退出**，收到 SIGTERM / SIGINT 优雅关停一次并**等它做完**
+         （立刻退会把锁留给一个已不存在的会话）；失败事件名从 `startup_blocked` 改为 `startup_failed`
+         （壳没了之后，「被台账挡住」只是众多原因之一）。
+
+       **⚠️ 一处 TS 细节，别踩回去**：台账清零后 `as const satisfies` 会把元素类型收成 `never`，
+       每个读 `blocker.id` 的地方当场编译不过。改成显式注解 `readonly AutomationRootReadinessBlocker[]`
+       —— 既保住元素类型，也仍然逐条校验将来加回来的条目（`satisfies` 本来也只校验写下的那些）。
+
+       **⚠️ 交付口径（MUST NOT 读大）**：**台账清零 + 入口能真调起装配**。
+       **不声称三进程真跑通** —— `runAutomationMain()` 要真属主库（风控写者锁构造期就抢），
+       本地桩验不了，一次都没真跑过。真机验收属批次 5，已按 5.5 登记 backlog 簇 60。 -->
+- [x] 4.1b 余下 **2** 条的清零路径（各自的前置写在下面，别当成一批）。
   <!-- ⚠️ **2026-08-03 更新：运营指令那一组已全部清零**（调度启停见 4.1c，委托两条见 4.1f），
        下面「运营指令 3 条」那一整段**只作追溯，别再当待办读**。仍未清的只剩：
        内容生成链（`content-generic-llm-authority`）与组装根那条空壳入口。 -->
@@ -2786,8 +2820,9 @@
          **别按「构造一个客户端」估这条的工期**。
          而那条断言（`test/transport/publish-generation-http.test.ts`）正是防止「伪装成已接线」。
        · **组装根那条**：它就是空壳入口本身，按 §3 的口径要等前两组清完。 -->
-- [ ] 4.1 `aidcp-automation/src/automation-composition-root.ts` 的
+- [x] 4.1 `aidcp-automation/src/automation-composition-root.ts` 的
   `AUTOMATION_ROOT_READINESS_BLOCKERS` 逐条删除并同批下调；**只许下降，不留空位**。
+  <!-- 14 → 0 全程只降不升，逐批理由写在该常量的原地注释里（那份台账拿不到任何机械信号）。 -->
 - [ ] 4.2 `aidcp-cloud/boundaries/composition-root-independent-blockers.json` 同批收缩；
   **实为三份**（见 0.3a）：还有 `aidcp-automation/boundaries/composition-root-independent-blockers.json`
   那份已漂到 20 条的陈旧快照。
@@ -2800,8 +2835,10 @@
        ② **单体那份问的是另一个问题，按自己的节奏自熄**，MUST NOT 为了「凑齐三份」去手改它，
           也 MUST NOT 因为它没减而拖住自动化那两份。
        照原文办的具体危害：会逼人给单体那份发明假锚点（A-4 差点就走上这条路）。 -->
-- [ ] 4.3 台账清零后，`runAutomationEntry()` 从 fail-closed 切到真启动；
+- [x] 4.3 台账清零后，`runAutomationEntry()` 从 fail-closed 切到真启动；
   切换本身要有测试证明「台账非空时仍然拒绝启动」这条闸没被删掉。
+  <!-- automation `dc829c8`。闸析出成 `assertAutomationRootReady` 纯函数，用例喂非空台账独立验；
+       顺序（读配置 → 闸 → 装配）另有结构断言。详见 4.1h。 -->
 - [ ] 4.4 `npm run boundaries:refresh` + 逐条对账 `git diff boundaries/`；
   `crossBoundaryEdges` / `crossLayerReads` / `crossLayerWrites` / `exemptionEntries` 保持 0。
 - [ ] 4.5 acceptance 全过：`AC-PROTO-*`（两份 protocol.ts 不漂移）、`AC-PUB-*`（未授权绝不静默发布）、
