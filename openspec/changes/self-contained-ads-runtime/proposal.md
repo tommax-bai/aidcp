@@ -21,6 +21,8 @@ The intended self-contained model is now **proven feasible**: AdsPower ships an 
 - **Modified** — **create-env (and proxy/delete/reconcile/status read IPC) ensure the service first** (metadata-only, **never** the 735 MB kernel download), fixing the cold-start `fetch failed`. Only the **first browser launch** gates on the kernel.
 - **Modified** — a single `resolveAdsApiKey` resolver (precedence: form > settings > env > baked default) feeds `resolveAdsOpts`, `buildAdsProviderEnv` (so the core child gets the key even with zero operator input), and `ensureRuntime` → unattended cold start.
 - **Modified** — honest, actionable errors replace the raw `fetch failed`; minimal failure taxonomy for the shared-key seat/concurrency ceiling and kernel-download failures (stalled-vs-errored, disk-full, partial-file) without tripping the crash-loop give-up.
+- **Modified** — browser launch proves an already-installed pinned SunBrowser kernel from its local executable before consulting AdsPower's cloud kernel catalogue. A transient catalogue TLS/network failure therefore cannot block a locally runnable kernel; when the local kernel is absent, catalogue transport/timeout/empty/malformed failures remain distinct and actionable.
+- **Modified** — renderer status projection rejects older `updatedAt` snapshots, so an IPC response captured at queue admission cannot replay "已排队错峰启动" after newer runtime-start progress.
 - **Empirically pinned** — the LocalAPI does **not** check the key per request (`/api/v1/group/list` returns real data with no auth header); the key only authenticates `ads start` against AdsPower cloud. So injecting the baked key into the core is harmless even when adopting a daemon started under a different key.
 
 ## Capabilities

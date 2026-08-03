@@ -101,6 +101,14 @@ Every write path awaits `ensureAdsServiceOnce()` first (§3.4), so `adsServiceBa
 ### 3.6 Kernel gating
 Metadata (create-env/proxy/delete) → service only, never kernel. First browser launch → kernel via `ensureKernelOnce` after service-ensure, before `startEdge`, driven by `adsFingerprint.DEFAULT_KERNEL` with the existing determinate progress UI. One kernel serves all profiles.
 
+#### 3.6.1 Installed-kernel proof before cloud catalogue
+
+The cloud `get-kernel-list` endpoint is download discovery, not a prerequisite for executing a kernel already present on disk. Before calling it, `kernelDownloaded` SHALL check the pinned Chrome kernel's platform-specific executable under `~/.adspowerCli/chrome_<version>` and accept it only when the sentinel is a non-empty regular file and executable on POSIX. Unsupported kernel types or invalid version path components do not use this shortcut.
+
+If the local proof succeeds, launch proceeds without any catalogue request; a later `browser-profile/start` failure remains the honest runtime postcondition. If the proof fails, the existing catalogue/download flow remains authoritative. Its terminal error SHALL distinguish throttling, timeout, network/TLS transport failure, an empty valid list, malformed output, and a non-zero CLI exit without exposing raw vendor output or credentials.
+
+This intentionally permits an already-installed pinned kernel to keep working if the catalogue is temporarily unreachable or later delists that version. A missing kernel still fails closed when it cannot be discovered/downloaded.
+
 ### 3.7 V2 browser lifecycle and lost-registry reconciliation
 
 The bundled `adspower-browser@2.1.0` CLI exposes browser lifecycle through the V2 profile contract. Both lifecycle owners SHALL use the same contract against the authoritative `adsServiceBase`:
@@ -136,6 +144,11 @@ Rotation (no source edit): fleet-wide = edit `ads-runtime.json`, bump `version`,
 ### 4.3 Error messages (honest + actionable)
 - Launch path already actionable (`edgeFailurePatch` + `surfaceFailure`; retry via 启动) — unchanged.
 - create-env `fetch failed` is **designed out** by the ensure gate; on prep failure return `指纹浏览器运行时未就绪：<cause>` (retryable). Defense-in-depth: a genuine post-ready `/不可达|fetch failed/` remaps to "指纹浏览器服务连接中断，请重试" (raw cause stays in the edge log; don't leak the `group/create` endpoint). Genuine `code!==0` API errors keep honest messages.
+- Kernel catalogue failures expose only a safe class and retry guidance (for example `ECONNRESET` → "无法连接 AdsPower 内核服务，请检查网络后重试"). Raw stdout/stderr remains diagnostic return data and MUST NOT be copied into renderer logs because the vendor runtime may include credentials in its own diagnostics.
+
+### 4.4 Monotonic renderer status projection
+
+`status:update` pushes and lifecycle IPC return values can arrive in different orders. `routeStatus` SHALL compare parseable per-environment `updatedAt` values before replacing state or recording `lastMessage`; an older response is ignored. Missing/unparseable timestamps retain compatibility behavior. This prevents a queue-admission snapshot from overwriting newer "正在启动" progress while preserving genuine later re-entry into the queue.
 
 ## 5. Failure handling (must-handle → requirements)
 

@@ -77,3 +77,11 @@
 - [x] 10.3 Add bounded profile-cache `DevToolsActivePort` discovery in both lifecycle paths; adopt only when loopback `/json/version` exactly matches the recorded browser websocket path and port.
 - [x] 10.4 Cover normal V2-active adoption, V2-inactive validated orphan adoption, rejected stale/spoofed candidates, V2 start fallback, and V2 stop with focused tests.
 - [x] 10.5 Run focused tests, `npm run typecheck`, full Edge tests where practical, and strict OpenSpec validation.
+
+## 11. aidcp-edge — installed-kernel availability and monotonic startup status
+
+<!-- 2026-08-03 incident: the already-installed Chrome 148 kernel was blocked by an AdsPower catalogue TLS `ECONNRESET`; an older queue-admission IPC response also replayed the queue message after newer startup progress. This narrow section is explicitly re-authorized and does not revive the cancelled broad task 7 taxonomy. aidcp-edge commit 1e09769; validation: focused runtime/renderer 131/131, full Edge 3045 passed + 1 gated skip, acceptance 38/38, typecheck, live local Chrome 148 executable proof, and strict OpenSpec validation. No package/install/release performed. -->
+
+- [x] 11.1 Prove an installed pinned Chrome kernel from its non-empty platform executable before `get-kernel-list`; when local proof fails, classify throttle, timeout, network/TLS, empty, malformed, and CLI-exit failures without leaking raw vendor diagnostics.
+- [x] 11.2 Reject older parseable per-environment `updatedAt` snapshots in renderer `routeStatus` before replacing state or recording logs; retain compatibility for absent/unparseable timestamps.
+- [x] 11.3 Add focused runtime/renderer regressions, run focused tests, full Edge tests, acceptance, typecheck, and `openspec validate self-contained-ads-runtime --strict`; record commit and validation evidence.

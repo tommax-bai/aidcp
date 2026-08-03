@@ -72,6 +72,31 @@ LocalAPI 的**元数据类**操作（新建环境 / 代理编辑 / 删除环境�
 - **WHEN** 客户端调用 V2 `stop` 后 CDP 仍然可达
 - **THEN** 客户端保持既有的 CDP-dark 确认与补救流程，并在最终无法确认关闭时诚实失败
 
+### Requirement: 已安装内核不依赖云端目录且错误分类诚实
+
+浏览器启动前，客户端 SHALL 先通过平台特定的本地可执行文件证明固定版本 SunBrowser 内核已经安装；证明成功时 MUST NOT 再把 `get-kernel-list` 云端目录作为启动前置条件。只有本地证明失败时才查询目录并按需下载。目录查询的限流、超时、网络/TLS 失败、空列表、响应格式异常与 CLI 非零退出 SHALL 分别返回安全、可操作的错误，MUST NOT 把原始供应商输出或凭据写入 renderer 日志。
+
+#### Scenario: 已安装内核在云端目录暂时不可达时仍可启动
+
+- **GIVEN** 固定版本 Chrome 内核的本地可执行文件存在、非空且在 POSIX 上可执行
+- **WHEN** AdsPower 云端内核目录因 TLS reset 或网络不可达无法查询
+- **THEN** 客户端不调用 `get-kernel-list`，继续进入 `browser-profile/start`；只有真实启动后置条件失败时才诚实失败
+
+#### Scenario: 本地内核缺失且目录网络失败
+
+- **GIVEN** 固定版本内核没有通过本地可执行文件证明
+- **WHEN** `get-kernel-list` 最终以 `ECONNRESET`、TLS、DNS、拒绝连接或超时失败
+- **THEN** 客户端停止启动并提示内核服务网络/超时原因与重试建议，**MUST NOT** 误报为“无法解析内核列表”
+
+### Requirement: 环境状态投影按更新时间单调前进
+
+renderer 同时接收主进程 `status:update` 推送与生命周期 IPC 返回快照时，SHALL 按同一环境的可解析 `updatedAt` 拒绝较旧快照，避免旧的排队状态覆盖较新的运行时准备状态。缺少或无法解析时间戳的旧协议形状 SHALL 保持兼容。
+
+#### Scenario: 启动 IPC 的排队快照迟于进度推送到达
+
+- **WHEN** renderer 依次收到“排队”“正在启动浏览器”“正在启动内置运行时”，随后才收到时间更早的“排队”IPC 返回快照
+- **THEN** 最后一份旧快照被忽略，原始日志只保留第一次排队记录，当前状态仍是最新运行时准备状态
+
 ### Requirement: 内置密钥可轮换且不硬编码，失败诚实
 
 内置的共享 AdsPower API 密钥 SHALL 存放于随包**数据文件** `ads-runtime.json`，**MUST NOT** 硬编码进任何 `.cjs` 源码、**MUST NOT** 预置进 `settings.json`。密钥解析 SHALL 走单一解析器，优先级为 表单值 > 本机设置 > 环境变量 > 内置默认，并同时喂给主进程取参、核心子进程环境、运行时启动三处。密钥全缺失时 SHALL 诚实报「缺少 api-key」并停手，**MUST NOT** 静默假成功。
