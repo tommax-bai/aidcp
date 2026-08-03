@@ -2482,9 +2482,11 @@
 
        **与本 change 的关系**：它不阻塞门清零，也不阻塞第 4 段（那四类配置读得到、只是不热加载）。
        但它是三进程真跑之前必须有结论的一条，别让它只活在 3.5g 的注释里。 -->
-- [ ] 3.6 `aidcp-automation`：`npm run typecheck` + 全量 `npm test` 全绿。
+- [x] 3.6 `aidcp-automation`：`npm run typecheck` + 全量 `npm test` 全绿。
   <!-- 批 A 当批实测：typecheck 干净；acceptance 89/89；全量 1983 pass / 0 fail。
        本条是第 3 段的收尾闸，八批做完再勾。 -->
+  <!-- 2026-08-03 收尾复跑（automation `9371d59`）：typecheck 干净；
+       全量 2171 pass / 0 fail / 3 skip。3 条 skip 与批 A 基线同源、非本 change 新增。 -->
 
 ## 4. 台账清零与门禁
 
@@ -2823,7 +2825,7 @@
 - [x] 4.1 `aidcp-automation/src/automation-composition-root.ts` 的
   `AUTOMATION_ROOT_READINESS_BLOCKERS` 逐条删除并同批下调；**只许下降，不留空位**。
   <!-- 14 → 0 全程只降不升，逐批理由写在该常量的原地注释里（那份台账拿不到任何机械信号）。 -->
-- [ ] 4.2 `aidcp-cloud/boundaries/composition-root-independent-blockers.json` 同批收缩；
+- [x] 4.2 `aidcp-cloud/boundaries/composition-root-independent-blockers.json` 同批收缩；
   **实为三份**（见 0.3a）：还有 `aidcp-automation/boundaries/composition-root-independent-blockers.json`
   那份已漂到 20 条的陈旧快照。
   <!-- ⚠️ **口径更正（用户 2026-08-01 随 A-4 裁定；原文那句「三份 MUST 在同一批次内一致」是错的）**：
@@ -2835,22 +2837,80 @@
        ② **单体那份问的是另一个问题，按自己的节奏自熄**，MUST NOT 为了「凑齐三份」去手改它，
           也 MUST NOT 因为它没减而拖住自动化那两份。
        照原文办的具体危害：会逼人给单体那份发明假锚点（A-4 差点就走上这条路）。 -->
+  <!-- 2026-08-03 收尾实测，**按更正后的口径判完成**：
+       ① 自动化那两份（`src/automation-composition-root.ts` 的常量 + 同名 JSON 投影）
+          **都是 0**，deepEqual 断言在场；
+       ② 单体那份**留在 52 条**（4b-mirror 14 / operator-command 3 / content-owner 6 /
+          composition-root 29），**刻意不动** —— 它问的是「自动化段还碰不碰内容符号」，
+          与「本包缺不缺跨属主依赖」不是同一把尺，按自己的节奏自熄。
+       **别把 52 读成欠账**：为了凑齐三份去手改它，正是原文那句错口径会招来的假锚点。 -->
 - [x] 4.3 台账清零后，`runAutomationEntry()` 从 fail-closed 切到真启动；
   切换本身要有测试证明「台账非空时仍然拒绝启动」这条闸没被删掉。
   <!-- automation `dc829c8`。闸析出成 `assertAutomationRootReady` 纯函数，用例喂非空台账独立验；
        顺序（读配置 → 闸 → 装配）另有结构断言。详见 4.1h。 -->
-- [ ] 4.4 `npm run boundaries:refresh` + 逐条对账 `git diff boundaries/`；
+- [x] 4.4 `npm run boundaries:refresh` + 逐条对账 `git diff boundaries/`；
   `crossBoundaryEdges` / `crossLayerReads` / `crossLayerWrites` / `exemptionEntries` 保持 0。
-- [ ] 4.5 acceptance 全过：`AC-PROTO-*`（两份 protocol.ts 不漂移）、`AC-PUB-*`（未授权绝不静默发布）、
+  <!-- 2026-08-03 实测（cloud `f67aec9`）：
+       `AC-BOUND metrics` sourceFiles 545 / ownershipEntries 545 / **crossBoundaryEdges 0** /
+       involvingContent 0 / **exemptionEntries 0** / frozenTotal 0 / delta 0 / unplanned 0；
+       `AC-OWN metrics` knownTables 126 / writeSites 310 / readSites 245 /
+       **crossLayerWrites 0** / **crossLayerReads 0** / dmlViolations 0 / ddlViolations 0 /
+       exemptionEntries 0；`AC-LOCK` crossOwnerSites 0 / crossOwnerKeys 0 / exemptions 0。
+       `git diff boundaries/` 的**唯一**差异是两份豁免清单里的 `recordedAt` 日期戳
+       （08-02 → 08-03），三个计数与 `entries` 逐字未变 ⇒ 判为噪声、当场 checkout 还原，
+       **不把日期戳留进共享工作区**（cloud canonical checkout 是并发共用的）。 -->
+- [x] 4.5 acceptance 全过：`AC-PROTO-*`（两份 protocol.ts 不漂移）、`AC-PUB-*`（未授权绝不静默发布）、
   `AC-RISK-*`（绝不自残）、`AC-OWN-*`、`AC-BOUND-*`、`AC-SPLIT-CROSSSEG`。
+  <!-- 2026-08-03 实测（cloud `f67aec9`）：`npm run test:acceptance` **185 pass / 0 fail / 0 skip**。
+       点名的六族逐族在场（不是「总数绿了就算」）：AC-PROTO-01…20 全在、AC-PUB-01/07/08 +
+       AC-PUB-DETECH-01…03、AC-RISK-01…04、AC-OWN-*（含 06 无跨属主表读）、AC-BOUND-*、
+       AC-SPLIT-CROSSSEG（2 条）。 -->
 
 ## 5. 派生对账、验收与收尾
 
-- [ ] 5.1 `./scripts/sync-split-repos --ref <cloud sha> --apply --tests`；
+- [x] 5.1 `./scripts/sync-split-repos --ref <cloud sha> --apply --tests`；
   共享包 pin 按 kernel → transport → 三个业务仓的顺序快进，逐仓 `npm install` 刷 lock。
-- [ ] 5.2 六仓各自 typecheck + 全量测试；**红项不得写成绿色**，逐条说明是既有还是本 change 新增。
-- [ ] 5.3 **分层验收如实分开记**：loopback 契约测试证明 route/client；dev 单体部署只证明现网零回归；
+  <!-- 2026-08-03 收尾同步（源 `origin/master` = cloud `f67aec9`）。
+       **本轮同步的不是本 change 的改动**：接手时发现主干被两路并发 change 推进了两个提交
+       （FB 慢启动进度权威 `11197cf` + 浏览节奏 `f67aec9`），派生仓因此漂了 3 个 src 文件。
+       派生仓是纯派生物 ⇒ 照 §8.1 用脚本机械同步，**零手改**：
+       api 2 个（`client-auth-server.ts` / `facebook-operation-policy-store.ts`）+ 1 个测试文件；
+       automation 1 个（`platform/registry.ts`）+ 2 个测试文件；content / kernel / transport 零改动。
+       **pin 无级联**：kernel `e8396ce` / transport `346d0c8` 本轮未动，三仓 pin 早已对齐
+       ⇒ 不触发「kernel 一动全链作废」那条（本 change 前面栽过一次），也无需重跑 `npm install`。
+       落地：api `81dbc30` / automation `9371d59`，均已推 master。
+       复跑对账：六仓 `新增 0 · 内容不同 0 · 多出 0`、两个共享包 pin 全对齐，
+       只剩设计上必然存在的组装根噪声（每仓 2 条 ⊘）与 automation 22 条派生私有文件（⊙）。 -->
+- [x] 5.2 六仓各自 typecheck + 全量测试；**红项不得写成绿色**，逐条说明是既有还是本 change 新增。
+  <!-- 2026-08-03 收尾全量（六仓 typecheck **全部干净**，无一条红）：
+       cloud `f67aec9` 4126 pass / 0 fail / **11 skip**；
+       api `81dbc30` 507 pass / 0 fail / 0 skip；
+       automation `9371d59` 2171 pass / 0 fail / **3 skip**；
+       content `039cd26` 444 pass / 0 fail / 0 skip；
+       kernel `e8396ce` 70 pass / 0 fail；transport `346d0c8` 36 pass / 0 fail。
+       **零红项，所以没有「既有 vs 新增」要分**；两处 skip（cloud 11 / automation 3）
+       与本 change 前几批记录的基线逐字相同、非本轮新增。
+       **与文首快照的差值都有出处、不是漂**：cloud 4121 → 4126、api 505 → 507、
+       automation 2170 → 2171，多出来的用例全部随 5.1 那次同步从主干带进来
+       （并发那两路 change 自己的测试），不是本 change 加的。
+       **同步之后逐仓 typecheck 这一步没省**（HANDOFF §四那条：对账只比文件，
+       对「这个仓还编不编得过」一无所知；上一轮 api 的 master 就曾整仓红着躺在那里）。 -->
+- [x] 5.3 **分层验收如实分开记**：loopback 契约测试证明 route/client；dev 单体部署只证明现网零回归；
   **三进程真跑属批次 5，本 change 不声称**。
+  <!-- **归档口径，写死在这里，别读大。三层各自证明了什么、以及各自证明不了什么**：
+       ① **编译期 + 结构断言**：六仓 typecheck 干净；关停语义 / schema 门顺序 / 单份判定 /
+          正向委托等结构断言在场。**证明不了**运行期没有别的路径绕过它们
+          （结构断言只能证明代码里没写）。
+       ② **契约 / loopback 测试**：证明路由与客户端的**形状**逐字段往返、错误按码还原、
+          幂等键不退化成随机。**证明不了**「对面那个进程真的注册了这条路由」——
+          本 change 为此连撞五次，最后靠去对面 `main()` 里逐条核对才收住（§四）。
+       ③ **dev 部署（cloud `0d507c5`，2026-08-03 00:47）**：**只证明单体现网零回归**。
+          它跑的是单体形态，与三进程装配是两条代码路径。
+       ⇒ **本 change 从头到尾不声称「三进程能跑起来」。** `runAutomationMain()` 一次都没真跑过
+          （要真属主库，风控写者锁在构造期就抢，本地桩验不了）；飞书 `/delegate` 那条链
+          一次都没真跑过（要真发一条飞书消息才触发）。两条均按 5.5 登记 backlog 簇 60。
+       ⇒ **交付物是「门清零」**：本包不再缺任何跨属主依赖，且入口能真调起装配。
+          仅此而已，这也正是 §2「两把尺」那一节反复说的那把尺。 -->
   <!-- 2026-08-03 00:47 已部署（aidcp-cloud@0d507c5，仍是单体形态）。
        快照来源：从 canonical master 目标提交 `git archive` 出的干净快照，**不从任何 worktree 部署**。
        备份 /opt/aidcp/cloud.bak.20260803-004717.tar.gz + .env.bak.20260803；
@@ -2866,7 +2926,7 @@
        三件套改成一次全量目录读。**在机器上真验过那条读**：直查属主库的六列都在、且真有昵称数据
        （所以 `names` 非空、`displayName` 解析到昵称）——不靠「rsync 没报错」推断。
        仍是单体形态，**不证明三进程能跑**（5.3 的口径）。ol 未部署、用户未提。 -->
-- [ ] 5.4 dev 部署按 CLAUDE §5 安全序列（先备份 → rsync → restart → healthcheck → 失败即回滚）；
+- [x] 5.4 dev 部署按 CLAUDE §5 安全序列（先备份 → rsync → restart → healthcheck → 失败即回滚）；
   **绝不碰同机 isales**。ol 一律等用户明确要求且走发布分支。
   <!-- 2026-07-29 22:08 已部署第一批（aidcp-cloud@b66c022，单体形态）。
        快照来源：从 master 目标提交 `git archive` 出的干净快照，**不从任何 worktree 部署**。
@@ -3003,7 +3063,29 @@
        transport 与三个业务仓的 pin 全部作废，只能整条链重抬一遍。
        **正确顺序**：先 `--apply --prune`（src）+ `--apply --tests`（测试）**全部落完**，
        再按 kernel → transport → 三个业务仓抬 pin。 -->
-- [ ] 5.5 本地桩验不了的登记 `docs/real-machine-acceptance-backlog.md`（簇 60）。
+  <!-- 2026-08-03 收尾**不新部署，并且这是判断出来的、不是省事**：
+       本 change 的 cloud 足迹**停在 `0d507c5`**（00:47 那次已部署并逐条验过）。
+       此后主干只多了两路**并发 change** 的提交（`11197cf` / `f67aec9`），与本 change 无关；
+       本轮自己的改动**只落派生仓**（api `81dbc30` / automation `9371d59`），
+       而三进程在 dev 上**没有 systemd 单元** ⇒ 派生仓改动与 dev 上跑的东西零关系。
+       **上机器实测过现状，没靠推断**（10:57 探）：service `active`、
+       ActiveEnterTimestamp `2026-08-03 10:56:14 CST`、8787 + 面板 8090 + 客户鉴权 8091 三口在听、
+       自重启以来 error 行数 **0**。
+       两件按符号验的事实：① 本 change 的 `listAccountDirectory` 在机器上在场（5 个文件命中）
+       ⇒ 本 change 的代码确实在 dev 上；② FB 慢启动那批的符号**也已在场**
+       ⇒ **dev 已被另一路 session 部到比 `0d507c5` 更新的批次**，不是停在我这一批。
+       ⇒ 本条按「本 change 的 dev 义务已履行且现网健康」判完成；**它仍只证明单体零回归**（见 5.3）。
+       ol 未部署、用户未提。isales 全程未触碰（本轮根本没做部署动作）。 -->
+- [x] 5.5 本地桩验不了的登记 `docs/real-machine-acceptance-backlog.md`（簇 60）。
+  <!-- 簇 60 已含：`runAutomationMain()` 一次没真跑（四件按顺序验的事）、
+       飞书 `/delegate` 端到端、撤权 hold 走 4a 窄端口后的运行控制快照、四类限频配置热加载（3.5h）。
+       **2026-08-03 收尾补登两条**——它们此前**只活在 tasks.md 的注释里**，
+       归档之后就沉进 archive 目录、再没有任何机制会提醒人：
+       ① **排期发帖 / 排期评论在三进程形态下没有任何进程在跑**（tasks 4.1g）：
+          排期 tick 归 api、类也在 api 仓，但 api 的手写 `main()` 没构造它；
+          现象是「到点什么都不发生，且没有任何一行日志说为什么」。
+       ② **接口进程不服务 `schedule-feedback`，而自动化已经在调它**（tasks 3.5j）。
+       **两条是同一件事的两半，backlog 里已写明要一起解**，别当成两个独立小项分头修。 -->
 - [x] 5.6 回写 `docs/cloud-composition-root-trisection.md` §0.0 与
   `docs/cloud-split-next-session-handoff.md` §0.1/§0.2 的实测现状。
 - [ ] 5.7 `openspec validate split-cloud-automation-production-runtime --strict` 通过后归档；
