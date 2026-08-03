@@ -92,7 +92,7 @@
 
 当请求因启动排队已满而未获准入时，终端诊断 SHALL 明确显示「启动排队已满」及自动重试计划，MUST NOT 显示「唤醒失败」；只有浏览器启动、控制连接或登录核验已经实际执行且失败时，才可显示「唤醒失败」。
 
-槽位 SHALL **仅由冷待机自然释放**（长确定性等待 → 释放浏览器层）。外壳 MUST NOT 抢占、MUST NOT 踢掉正在运行的环境来腾槽位。
+槽位 SHALL **仅由冷待机自然释放**（长确定性等待 → 释放浏览器层）。外壳 MUST NOT 抢占、MUST NOT 踢掉正在运行的环境来腾槽位。核心 OS 进程已经退出时，该核心已不再执行浏览器工作，外壳 SHALL 立即停止把它计入已占槽位并推进 FIFO；终局原因 MAY 等待日志管道关闭后再分类，但该等待 MUST 有界且 MUST NOT 继续占用执行容量。
 
 #### Scenario: 执行满时进入有界启动队列
 - **WHEN** 一个开浏览器请求到来而浏览器并发已满、启动排队尚有容量
@@ -105,6 +105,10 @@
 #### Scenario: 停泊释放的槽位可被他人取用
 - **WHEN** an environment enters cold standby and releases its browser
 - **THEN** its slot returns to the pool and the next queued browser-opening action may take it
+
+#### Scenario: 核心已退出但日志管道延迟关闭
+- **WHEN** 核心 OS 进程已发出 `exit`，但继承的 stdout/stderr 管道尚未发出 `close`
+- **THEN** 公共槽位占用数立即减少并自动放行 FIFO 队头；外壳 MAY 在有界宽限内继续收集末尾日志，但 MUST NOT 把已退出的进程对象当作仍在执行，也 MUST NOT 因 `close` 缺席永久阻止同环境收尾或重启
 
 #### Scenario: 启动排队已满时不再接收等待项
 - **WHEN** 尚未执行的启动/唤醒请求数已达到启动排队上限
