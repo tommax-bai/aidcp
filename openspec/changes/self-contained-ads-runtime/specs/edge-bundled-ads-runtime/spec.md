@@ -2,118 +2,94 @@
 
 ## ADDED Requirements
 
-### Requirement: Windows local development uses the patched bundled runtime
+### Requirement: 托管运行时使用可写暂存副本和内容身份
 
-On a Windows development checkout, `npm run build:ads-runtime` SHALL stage `adspower-browser` without directly spawning `npm.cmd`, and `electron:dev` SHALL resolve the patched staged runtime before any raw npm package. This build-time use of the local Node/npm toolchain MUST NOT change the production runtime host: the AdsPower CLI SHALL still execute with Electron's bundled Node via `process.execPath` and `ELECTRON_RUN_AS_NODE=1`.
+在 `edge-desktop-packaging` 已提供随包 AdsPower CLI 模板的前提下，桌面外壳 SHALL 在使用前把模板暂存到 application `userData`。暂存身份 SHALL 同时包含应用版本、AdsPower CLI 包版本和模板内容身份。身份未变化 SHALL 复用现有副本；身份变化 SHALL 先复制候选、经 CLI 合同有界停止已登记 daemon、再原子替换。复制、停止或替换失败 SHALL 返回真实错误并保留或恢复上一副本，MUST NOT 继续使用身份不匹配的旧运行时。
 
-#### Scenario: Node 24 stages the runtime on Windows
-- **WHEN** a developer runs `npm run build:ads-runtime` on Windows with Node 24
-- **THEN** the staging script invokes `npm-cli.js` through the current build-time Node executable, completes without `spawnSync npm.cmd EINVAL`, and produces `build/ads-runtime/adspower-browser/cli/index.js`
+#### Scenario: 模板内容变化
 
-#### Scenario: Electron development resolves compatibility patches
-- **WHEN** both a patched `build/ads-runtime` tree and a raw `node_modules/adspower-browser` package are present
-- **THEN** the desktop runtime resolves the staged CLI first and executes it with Electron's bundled Node
+- **WHEN** 新安装包中的模板内容身份与已暂存副本不同
+- **THEN** 桌面外壳停止已登记 daemon、原子换入新副本并记录新身份
+- **AND** 任一步失败时保留可恢复副本并停止启动
 
-### Requirement: 随包内置指纹浏览器运行时，不依赖外部 AdsPower 客户端
+### Requirement: 托管 CLI 是服务生命周期和 base 的唯一权威
 
-edge 桌面客户端 SHALL 在安装包内随包分发 AdsPower CLI 运行时（`adspower-browser`）作为只读模板，并在需要时自行拉起该运行时提供本机 LocalAPI，**MUST NOT** 依赖运营机另行安装或运行 AdsPower 桌面客户端。原生模块（`node_sqlite3.node`）SHALL 置于 `app.asar` 之外（经 `extraResources` 落到 `Contents/Resources/adspower-browser`），因为原生 `.node` 无法从 asar 内 `dlopen`。指纹内核（SunBrowser）**MUST NOT** 打进安装包，SHALL 由运行时在首次启动浏览器时按需下载一次到用户可写目录。
+桌面外壳 SHALL 经随包 CLI 的 status/start/stop 合同管理本会话运行时。每个 Electron 会话第一次成功建立前 SHALL 至多一次有界重置 CLI 自身登记的旧 daemon，再以当前密钥启动托管 daemon。CLI 实际上报的 LocalAPI base SHALL 覆盖表单和 settings base，供主进程和核心子进程共同使用。
 
-#### Scenario: 冷机零输入启动
-- **WHEN** 一台从未装过 AdsPower 客户端 / CLI 的运营机安装本客户端并首次触发需要浏览器的操作
-- **THEN** 客户端先把随包模板暂存到用户可写目录，用内置密钥拉起 CLI 运行时（`ads start`），采用运行时实际上报的端口作为权威 base；首次启动浏览器时带确定性进度下载指纹内核，随后打开真实指纹浏览器——全程无需运营输入密钥、无需外部 AdsPower 客户端
+运行时建立 MUST NOT 通过任意 HTTP 应答方接管外部 AdsPower 桌面服务。运行时缺失、启动失败或端口冲突无法由托管 CLI 解决时 SHALL 明确失败。应用退出 SHALL 先有界停止核心/浏览器，再停止本会话管理的 CLI daemon。
 
-#### Scenario: 运行时缺失时诚实硬停
-- **WHEN** 解析随包 CLI 入口失败（包损坏 / 未随包）
-- **THEN** 客户端诚实报「未随包指纹浏览器运行时」并停手、弹窗提示，**MUST NOT** 回落去连 50325，**MUST NOT** 拉起注定失败的核心子进程
+#### Scenario: 托管运行时成功建立
 
-### Requirement: 硬切换——始终使用随包运行时，单一 base 权威
+- **WHEN** 首个需要 LocalAPI 的操作到达
+- **THEN** 桌面外壳暂存运行时、执行本会话至多一次的登记 daemon 重置、启动托管 CLI，并采用其上报 base
 
-运行时确保逻辑 SHALL 始终驱动**本客户端随包的** CLI（`ads status` 已在跑则复用、否则 `ads start -k <密钥>`），**MUST NOT** 探测 50325 并接管任意应答方（移除 external 模式与 none「继续尝试」分支）。运行时实际绑定的端口 SHALL 作为主进程所有 LocalAPI 读写（新建 / 状态 / 代理 / 删除 / 巡视）与全部核心子进程的**单一 base 权威**；主进程取参 SHALL 优先采用该 base 而非硬编码 50325。
+#### Scenario: 外部服务或端口冲突
 
-#### Scenario: 50325 被外部占用时不串台
-- **WHEN** 机器上有一个外部 AdsPower 桌面客户端占着 50325，本客户端拉起自己的运行时
-- **THEN** 本运行时取一个回落端口（如 50326），本客户端把该端口作为 base 用于新建 / 启动等所有调用，**绝不**驱动那个外部服务，也不会出现「主进程发去 50325、核心发去回落端口」的串台
+- **WHEN** 独立 AdsPower 桌面服务造成托管 CLI 无法建立
+- **THEN** 客户端报告冲突/启动失败并停止
+- **AND** 客户端不因一个可连接端口而接管外部服务或宣称托管运行时已就绪
 
-#### Scenario: 复用已在跑的运行时不重复起
-- **WHEN** 本客户端的运行时（或机器上兼容的全局 CLI）已在某端口运行
-- **THEN** `ads status` 命中即复用其上报端口，不重复起第二个 daemon；因 LocalAPI 不逐请求校验密钥，即使被复用的 daemon 是用不同密钥启动的，请求仍正常
+### Requirement: 服务确保与内核确保分离
 
-### Requirement: 新建环境只确保服务、不触发内核下载
+服务确保 SHALL 为 settle 后清除的全局 single-flight；内核确保 SHALL 按内核版本 single-flight。环境创建、代理、删除、状态和对账只需要服务，不得下载内核；启动浏览器前才确保该 profile 所需内核。任何确保失败 SHALL 阻止后续动作并返回真实失败。
 
-LocalAPI 的**元数据类**操作（新建环境 / 代理编辑 / 删除环境）SHALL 在调用前 `await` 服务确保（`ensureAdsServiceOnce`），但 **MUST NOT** 触发约 735MB 的指纹内核下载；只有**首次启动浏览器**才 `await` 内核确保。服务确保与内核确保 SHALL 各为独立单飞（single-flight），使并发的多环境启动最多触发一次内核下载。
+#### Scenario: 多环境并发需要同一内核
 
-#### Scenario: 冷机建环境不被内核下载拖住
-- **WHEN** 运营在一台尚未下过内核的机器上新建环境
-- **THEN** 客户端仅在数秒内确保 CLI 服务就绪即调用 `group/create`，**不**在建环境阶段下载 735MB 内核；建环境失败时返回可重试的诚实错误（不再是裸 `fetch failed`）
+- **WHEN** 多个环境并发启动且需要同一内核版本
+- **THEN** 它们共享一次该版本的内核确保
+- **AND** 不同版本不会共享或覆盖彼此的确保结果
 
-### Requirement: 浏览器生命周期统一使用 V2 并接管失联浏览器
+### Requirement: 已安装内核先由本地可执行文件证明
 
-核心 AdsPower provider 与 Electron 的手动检查、启动巡检 SHALL 统一使用随包 CLI 2.1.0 的 V2 profile 生命周期接口：`/api/v2/browser-profile/active`、`/api/v2/browser-profile/start`、`/api/v2/browser-profile/stop`。旧的 V1 `browser/start`、`browser/stop` 与全局 `browser/local-active` **MUST NOT** 再作为浏览器运行状态权威。Electron 巡检 SHALL 仅查询已知环境 roster 中的 profile id。
+浏览器启动前，客户端 SHALL 先检查目标版本的平台可执行文件。该文件只有在非空、为普通文件且 POSIX 下可执行时才证明内核已安装；证明成功时 MUST NOT 查询云端目录。证明失败时才允许有界查询 `get-kernel-list` 并按需下载。网络、限流、空列表、异常响应和 CLI 失败 SHALL 返回安全分类，原始供应商输出或凭据 MUST NOT 进入 renderer 日志。
 
-当 V2 因 daemon 重启而报告 `Inactive`、但对应 profile 的本地缓存仍记录一个活着的 SunBrowser 时，客户端 SHALL 在发起 V2 `start` 前尝试接管。接管 MUST 同时校验 `DevToolsActivePort` 中的端口和 browser websocket path 与 loopback `/json/version` 返回的 `webSocketDebuggerUrl` 完全一致；只看到端口、页面 target 或任意非 loopback 地址均不足以接管。没有通过校验的候选时 SHALL 回落到 V2 `start`，不得假成功。
+#### Scenario: 云端目录不可达但本地内核有效
 
-#### Scenario: V2 正常报告 profile 活跃
+- **WHEN** 固定版本的本地可执行文件证明成功且云端目录不可达
+- **THEN** 客户端跳过目录查询并继续 V2 browser start
 
-- **WHEN** `/api/v2/browser-profile/active` 对目标 profile 返回 `Active` 和有效 `debug_port`
-- **THEN** 客户端复用该端点，不发送重复的 `start`
+#### Scenario: 本地内核无效且目录不可达
 
-#### Scenario: daemon 丢失 registry 但浏览器仍活着
+- **WHEN** 本地证明失败且目录查询在有界重试后失败
+- **THEN** 客户端停止启动并返回安全、可操作的失败原因
 
-- **WHEN** V2 对目标 profile 返回 `Inactive`，且 `~/.adspowerCli/source/cache/<profile_id>_*/DevToolsActivePort` 的端口与 browser path 都和 loopback `/json/version` 完全匹配
-- **THEN** 客户端把该浏览器接管为正在运行，不启动第二个 SunBrowser，并记录失联接管日志
+### Requirement: 浏览器生命周期使用 V2 并严格接管失联浏览器
 
-#### Scenario: 缓存候选过期或不匹配
+核心 provider 与 Electron 检查/对账 SHALL 使用 V2 per-profile `active`、`start` 和 `stop`。V2 报告 `Inactive` 时，客户端只可检查该 profile 的缓存目录，并仅在 `DevToolsActivePort` 端口和 browser path 与 loopback `/json/version` 的 `webSocketDebuggerUrl` 完全一致时接管；否则 SHALL 调用 V2 `start`。停止后 SHALL 保留 CDP-dark 确认，未确认关闭不得报告成功。
 
-- **WHEN** `DevToolsActivePort` 不存在、端口不可达、地址非 loopback，或 websocket browser path/端口与 `/json/version` 不一致
-- **THEN** 客户端拒绝该候选并调用 V2 `start`，**MUST NOT** 仅凭一个可连接端口声明成功
+#### Scenario: 精确匹配的 registry-lost browser
 
-#### Scenario: 停止后仍可连接
+- **WHEN** V2 报告 `Inactive`，但 profile-scoped 缓存与 loopback `/json/version` 的端口和 browser path 完全一致
+- **THEN** 客户端接管该浏览器且不重复 start
 
-- **WHEN** 客户端调用 V2 `stop` 后 CDP 仍然可达
-- **THEN** 客户端保持既有的 CDP-dark 确认与补救流程，并在最终无法确认关闭时诚实失败
+#### Scenario: 缓存候选不匹配
 
-### Requirement: 已安装内核不依赖云端目录且错误分类诚实
+- **WHEN** 缓存缺失、地址非 loopback、端口不可达或 browser path 不一致
+- **THEN** 客户端拒绝接管并走 V2 start
 
-浏览器启动前，客户端 SHALL 先通过平台特定的本地可执行文件证明固定版本 SunBrowser 内核已经安装；证明成功时 MUST NOT 再把 `get-kernel-list` 云端目录作为启动前置条件。只有本地证明失败时才查询目录并按需下载。目录查询的限流、超时、网络/TLS 失败、空列表、响应格式异常与 CLI 非零退出 SHALL 分别返回安全、可操作的错误，MUST NOT 把原始供应商输出或凭据写入 renderer 日志。
+### Requirement: API key 使用单一解析器
 
-#### Scenario: 已安装内核在云端目录暂时不可达时仍可启动
+运行时启动、主进程 LocalAPI 调用和核心子进程 SHALL 使用同一 key 解析次序：当前表单值、settings、`AIDCP_ADS_API_KEY`、随包数据。密钥完全缺失 SHALL 阻止运行时启动。密钥或原始供应商诊断 MUST NOT 写入 renderer 日志。
 
-- **GIVEN** 固定版本 Chrome 内核的本地可执行文件存在、非空且在 POSIX 上可执行
-- **WHEN** AdsPower 云端内核目录因 TLS reset 或网络不可达无法查询
-- **THEN** 客户端不调用 `get-kernel-list`，继续进入 `browser-profile/start`；只有真实启动后置条件失败时才诚实失败
+#### Scenario: 没有本机覆盖值
 
-#### Scenario: 本地内核缺失且目录网络失败
+- **WHEN** 表单、settings 和环境变量都没有 key，但随包数据提供有效 key
+- **THEN** 运行时、主进程和核心子进程使用该 key，且不要求运营输入
 
-- **GIVEN** 固定版本内核没有通过本地可执行文件证明
-- **WHEN** `get-kernel-list` 最终以 `ECONNRESET`、TLS、DNS、拒绝连接或超时失败
-- **THEN** 客户端停止启动并提示内核服务网络/超时原因与重试建议，**MUST NOT** 误报为“无法解析内核列表”
+### Requirement: 运行状态按可解析时间单调前进
 
-### Requirement: 环境状态投影按更新时间单调前进
+renderer 收到同一环境的 `status:update` 与 IPC 返回快照时，SHALL 拒绝 `updatedAt` 早于当前状态的快照。缺少或无法解析时间戳的旧形状 SHALL 保持兼容。
 
-renderer 同时接收主进程 `status:update` 推送与生命周期 IPC 返回快照时，SHALL 按同一环境的可解析 `updatedAt` 拒绝较旧快照，避免旧的排队状态覆盖较新的运行时准备状态。缺少或无法解析时间戳的旧协议形状 SHALL 保持兼容。
+#### Scenario: 旧排队快照晚到
 
-#### Scenario: 启动 IPC 的排队快照迟于进度推送到达
+- **WHEN** 新运行时进度已上屏，随后到达时间更早的排队快照
+- **THEN** renderer 忽略旧快照，不回放较早状态或重复记录其消息
 
-- **WHEN** renderer 依次收到“排队”“正在启动浏览器”“正在启动内置运行时”，随后才收到时间更早的“排队”IPC 返回快照
-- **THEN** 最后一份旧快照被忽略，原始日志只保留第一次排队记录，当前状态仍是最新运行时准备状态
+### Requirement: Windows 开发 staging 使用当前 Node 工具链
 
-### Requirement: 内置密钥可轮换且不硬编码，失败诚实
+Windows 开发 checkout 执行 `build:ads-runtime` 时 SHALL 通过当前 build-time Node 调用 npm CLI，MUST NOT 直接 spawn `npm.cmd`。Electron 开发 SHALL 优先解析已 stage 的补丁运行时，并继续用 `process.execPath` 加 `ELECTRON_RUN_AS_NODE=1` 执行 CLI。
 
-内置的共享 AdsPower API 密钥 SHALL 存放于随包**数据文件** `ads-runtime.json`，**MUST NOT** 硬编码进任何 `.cjs` 源码、**MUST NOT** 预置进 `settings.json`。密钥解析 SHALL 走单一解析器，优先级为 表单值 > 本机设置 > 环境变量 > 内置默认，并同时喂给主进程取参、核心子进程环境、运行时启动三处。密钥全缺失时 SHALL 诚实报「缺少 api-key」并停手，**MUST NOT** 静默假成功。
+#### Scenario: Node 24 在 Windows stage 运行时
 
-#### Scenario: 轮换密钥无需改源码
-- **WHEN** 需要更换共享密钥
-- **THEN** 全局轮换＝改 `ads-runtime.json` 的密钥并升 `version`、重打安装包；单机应急＝运营在高级设置填入密钥（在第二优先级生效覆盖内置默认）——两者都不需要改动源码
-
-### Requirement: 运行时为机器级单例，退出不杀 daemon
-
-CLI 运行时 SHALL 被视为机器级共享单例：应用退出时 `gracefulStopAllAndQuit` SHALL 仅优雅停止各核心子进程（各自诚实 `browser/stop`），**MUST NOT** 额外 `ads stop` 杀掉 CLI daemon（那会连带掐掉所有指纹浏览器、abrupt 掉锁、与其它 CLI 实例相争）。运行时若在会话中途崩溃，核心 SHALL 在连续 LocalAPI `fetch failed` 后诚实非零退出，由重启路径重跑服务确保并重新取得 base。
-
-#### Scenario: 退出后下次启动秒复用
-- **WHEN** 用户退出应用后再次打开
-- **THEN** 上次留下的 daemon 仍在，`ads status` 直接复用、`reconcileRunningProfiles` 认领仍在跑的分身，不重复拉起、不重复下内核
-
-<!-- 2026-07-25 用户决定砍掉：「席位/并发上限与内核下载失败诚实分类」需求整条删除，
-     对应 tasks 7.1 / 7.2 一并作废。理由是该行为从未实装（主干搜不到席位相关实现，
-     内核下载仍盲信 is_downloaded），与其把未实装的行为写进权威 spec，不如不立此条。
-     若将来共享密钥席位成为真实痛点，另起 change 重新建模。 -->
+- **WHEN** 开发者在 Windows Node 24 下运行 `build:ads-runtime`
+- **THEN** staging 不出现 `spawnSync npm.cmd EINVAL`，并产出可由 Electron Node 执行的 CLI 入口

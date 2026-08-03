@@ -1,51 +1,41 @@
-# Self-Contained Bundled AdsPower CLI Runtime (edge desktop, macOS-first)
+# Self-Contained AdsPower Runtime
 
 ## Why
 
-The edge desktop client silently hard-depends on an **externally installed and running AdsPower desktop client** to provide the fingerprint-browser LocalAPI on `127.0.0.1:50325`. On an operator machine this surfaces as: some accounts work while AdsPower is open, then "新建环境" fails with `本地指纹浏览器服务不可达(group/create): fetch failed` the moment AdsPower is closed. Two gaps, both坐实 in code:
+The Edge desktop originally depended on a separately installed AdsPower desktop service. A cold LocalAPI call could therefore fail before the client had established its own runtime. The delivered source now ships and manages an AdsPower CLI runtime, but this change's artifacts still described deleted `group/create` behavior, speculative fallback-port and seat handling, obsolete packaging choices, and an inaccurate task ledger.
 
-- **Packaging gap** — the installer bundles **no** fingerprint-browser runtime. The embedded-runtime orchestration (`src/electron/ads-runtime.cjs`, from the deferred change `edge-bundled-adspower-cli-runtime`) exists but is **dormant**: `adspower-browser` is not a dependency, there is no `extraResources`/`asarUnpack`, and `resolveCliEntry` never finds a CLI → it falls back to "connect to whatever is on 50325." No API key is bundled either.
-- **Interaction gap** — `ads:createEnv` calls `group/create` directly with **no** runtime-ensure (only the browse/launch path ensures the runtime), so a cold LocalAPI fails with a raw, non-actionable `fetch failed`.
-
-The intended self-contained model is now **proven feasible**: AdsPower ships an official MIT-licensed CLI (`adspower-browser@2.1.0`) that runs the LocalAPI service standalone (no desktop client), downloads its own fingerprint kernel (SunBrowser), and drives real fingerprint browsers. This was verified against a **live standalone CLI running on the dev machine** (`node .../adspower-browser/cwd/lib/main.min.js` on 50325 serving profile `k1e0ero8`, kernel in `~/.adspowerCli/chrome_148`, no desktop client). Bundling this CLI makes every operator machine work out of the box.
+This reconciliation records only behavior present in the current `aidcp-edge` source. Packaging, signing, notarization, and packaged dependency closure remain authoritative in the existing `edge-desktop-packaging` baseline rather than being duplicated here.
 
 ## What Changes
 
-- **Modified** - Windows local development can stage the patched bundled runtime with the current build-time Node/npm toolchain, and `electron:dev` resolves that staged tree before any raw npm package. Windows installer packaging remains deferred.
-
-- **New** — the installer ships a **read-only template** of the AdsPower CLI runtime (`adspower-browser@2.1.0`: `cli/ + cwd/ + sqlite/ (all-arch prebuilt `node_sqlite3.node`) + nested `node_modules/` incl. `playwright-core`) at `Contents/Resources/adspower-browser` (~31 MB), plus a `Contents/Resources/ads-runtime.json` holding a **baked, rotatable shared internal API key**. Native `.node` forces `extraResources` (a `.node` cannot `dlopen` from inside `app.asar`), which lands exactly at `resolveCliEntry`'s primary candidate.
-- **New** — first-run **staging** of the template to `userData/ads-runtime/adspower-browser` (writable), because under macOS App Translocation a quarantined unsigned `.app`'s `Resources` dir is read-only and the CLI writes into its own `cwd/`.
-- **Modified** — **hard switch**: the runtime-ensure always drives **our** bundled CLI (`ads status` → reuse if already running, else `ads start -k <baked key>`), and the old `mode:'external'` HTTP-adopt and `mode:'none'` "proceed anyway" branches are **removed**. A missing bundled runtime is an honest hard-stop, not a reason to try 50325.
-- **Modified** — browser lifecycle/status calls in both the core provider and Electron inspection/reconciliation path use the bundled CLI 2.1.0 **V2 browser-profile contract** (`/api/v2/browser-profile/start|active|stop`). Legacy V1 `browser/start`, `browser/stop`, and global `browser/local-active` are no longer authoritative. If the V2 registry says `Inactive` after a daemon restart but the profile cache contains a CDP browser path that exactly matches a live loopback `/json/version`, the client adopts that orphaned browser instead of starting a duplicate.
-- **Modified** — **one base authority**: `resolveAdsOpts` prefers the actually-bound service base (`adsServiceBase`, renamed from `embeddedAdsApiBase`), closing a real split-brain where every main-process read/write ignored the resolved port and fired at 50325.
-- **Modified** — **create-env (and proxy/delete/reconcile/status read IPC) ensure the service first** (metadata-only, **never** the 735 MB kernel download), fixing the cold-start `fetch failed`. Only the **first browser launch** gates on the kernel.
-- **Modified** — a single `resolveAdsApiKey` resolver (precedence: form > settings > env > baked default) feeds `resolveAdsOpts`, `buildAdsProviderEnv` (so the core child gets the key even with zero operator input), and `ensureRuntime` → unattended cold start.
-- **Modified** — honest, actionable errors replace the raw `fetch failed`; minimal failure taxonomy for the shared-key seat/concurrency ceiling and kernel-download failures (stalled-vs-errored, disk-full, partial-file) without tripping the crash-loop give-up.
-- **Modified** — browser launch proves an already-installed pinned SunBrowser kernel from its local executable before consulting AdsPower's cloud kernel catalogue. A transient catalogue TLS/network failure therefore cannot block a locally runnable kernel; when the local kernel is absent, catalogue transport/timeout/empty/malformed failures remain distinct and actionable.
-- **Modified** — renderer status projection rejects older `updatedAt` snapshots, so an IPC response captured at queue admission cannot replay "已排队错峰启动" after newer runtime-start progress.
-- **Empirically pinned** — the LocalAPI does **not** check the key per request (`/api/v1/group/list` returns real data with no auth header); the key only authenticates `ads start` against AdsPower cloud. So injecting the baked key into the core is harmless even when adopting a daemon started under a different key.
+- Stage the build-produced AdsPower CLI template into application `userData` using content identity, an atomic replacement, and rollback on failure.
+- Manage the CLI through its own status/start/stop contract. Reset a registered daemon at most once per successful Electron session, use the CLI-reported LocalAPI base as the runtime authority, and stop the managed daemon after browser/core shutdown on application quit.
+- Resolve one API key for runtime start, main-process requests, and core children with precedence `form > settings > environment > packaged data`.
+- Ensure the CLI service before LocalAPI operations; keep metadata operations independent of the browser-kernel download. Cached status reads retry through service ensure only after a transport failure.
+- Preserve the current environment-creation contract: resolve the pre-provisioned `aidcp` group through `group/list`, then call `user/create`; never call `group/create`.
+- Use the V2 per-profile browser lifecycle and adopt a registry-lost browser only after exact loopback CDP path and port verification.
+- Prove an installed pinned kernel from its local executable before consulting the cloud catalogue, and reject older timestamped renderer status snapshots.
+- Keep the Windows development staging path that invokes npm through the current build-time Node and runs the staged CLI with Electron's Node.
 
 ## Capabilities
 
 ### New Capabilities
-- `edge-bundled-ads-runtime`: the desktop client bundles, stages, starts, and self-heals its own AdsPower fingerprint-browser runtime — no external AdsPower client required. Covers: packaging (extraResources + native-module-outside-asar), first-run userData staging (translocation seam), hard-switch service-ensure with reuse, baked rotatable key, split service-ensure vs kernel-ensure with kernel gated only at first launch, one base authority, leave-daemon-on-quit, and honest failure taxonomy.
+
+- `edge-bundled-ads-runtime`: staging, service ownership, key/base authority, service-versus-kernel gating, V2 lifecycle reconciliation, installed-kernel proof, and monotonic runtime status.
 
 ### Modified Capabilities
-- `adspower-environment-provisioning`: environment creation and other LocalAPI write/read operations SHALL ensure the bundled runtime service is ready before calling the LocalAPI (never silently hitting a cold/foreign port), and creation MUST NOT trigger the kernel download.
-- `edge-desktop-packaging`: the macOS installer SHALL bundle the AdsPower CLI runtime template via `extraResources` (native `.node` outside `app.asar`) and its baked-key config, with a build-time staging step and an asar-absence verification.
 
-## Impact
+- `adspower-environment-provisioning`: LocalAPI operations establish the managed service first and environment creation uses the already-authoritative pre-provisioned group contract.
 
-- **Windows local development**: staging uses local Node/npm only at build time; runtime execution continues to use Electron's bundled Node through `process.execPath` and `ELECTRON_RUN_AS_NODE=1`.
+## Scope Boundaries
 
-- **aidcp-edge** (all code): `package.json` (devDependency `adspower-browser@2.1.0` + top-level `extraResources` + staging build step); new `scripts/stage-ads-runtime.mjs` + `scripts/verify-ads-runtime-staged.mjs`; new `resources/ads-runtime.json`; `src/electron/ads-runtime.cjs` (resolveCliEntry +userData candidate; ensure/kernel error taxonomy; keep the sqlite native-module comment — it is correct); `src/cdp/browser-provider.ts` (V2 lifecycle plus validated orphan-CDP adoption); `src/electron/main.cjs` (split ensures; base-authority fix in `resolveAdsOpts`; `resolveAdsApiKey`; ensure-gating on create-env/proxy/delete/reconcile/status IPC; whenReady service warm-up; leave-daemon-on-quit; delete dead `openAdsClient`); `src/electron/ads-local-api.cjs` (V2 per-profile inspection/reconciliation plus validated orphan-CDP adoption); `src/electron/preload.cjs` + renderer (create-progress line + copy fixes); focused provider/Electron tests; `test/electron/lifecycle-contract.test.ts` (add a runCli-cwd / CLI-writable-dir contract test alongside the existing asar-cwd guard); `docs/release-desktop.md` (staging + translocated smoke test).
-- **Distribution**: installer grows ~+31 MB (CLI template). Each operator machine downloads the ~735 MB SunBrowser kernel **once** to `~/.adspowerCli` on first browser launch (not in the installer).
-- **Licensing**: `adspower-browser` is MIT — redistribution/bundling is permitted.
-- **Migration**: hard switch. Machines with an external desktop AdsPower or a global CLI on 50325 are handled by `ads status` reuse / CLI fallback-port, not by riding the foreign service.
-- **Platforms**: macOS this round; the staging script has a single OS-normalize line and userData target as the Windows seam (Windows deferred).
-- **Red lines**: never silently fake success (every failure returns honest `{ok,error}`); never touch同机 isales; do not regress the shipped packaged-spawn cwd/asar fix; the baked key lives in a data file, never hardcoded in a `.cjs`.
+- `edge-desktop-packaging` remains the authority for what enters the installer and for signing/notarization/package gates; this change does not create a second packaging contract.
+- No shared-key seat/concurrency taxonomy, broad disk-full/partial-download recovery model, automatic kernel-version floating, or external AdsPower desktop coexistence/fallback-port guarantee is included.
+- The managed CLI is not adopted from an arbitrary HTTP responder. A port or daemon conflict that the managed CLI cannot resolve fails visibly.
+- The four old real-machine backlog items were last active on 2026-07-30. On 2026-08-03 the user cancelled every real-machine acceptance item inactive for more than three days. Cancellation is not acceptance evidence.
 
-## Open Decisions (need the user)
+## Evidence and Delivery Boundary
 
-1. **Baked key seat/concurrency ceiling.** The chosen shared key's concurrent-open ceiling sizes the seat-handling work: if it comfortably exceeds expected concurrent operators, the seat taxonomy is low-risk; if tight, it will bite routinely. Need the actual number/plan.
-2. **Kernel-delisted policy** (only if `chrome_148` ever leaves AdsPower's list): fail-honest + require app upgrade (fingerprint-stable) vs auto-float to newest same-major (self-healing but shifts fingerprint). Recommendation: fail-honest + pinned.
+- Core source commits include `12bac1d` (service/base/key authority), `c3586e4` (bundled runtime staging), `1f36bb4` (Windows staging), `e67fac4` (V2 lifecycle), and `1e09769` (installed-kernel and status ordering).
+- Later source corrections include `c86bd94` (pre-provisioned group), `9569fec` (content-identity refresh and managed-daemon stop), `680b188`/`f4c1323` (packaged runtime gates), and `b8c9b83` (runtime kept out of development dependencies).
+- This cleanup changes control/OpenSpec artifacts only. It does not modify Edge source, build or install a desktop package, deploy anything, or claim current real-machine acceptance.
