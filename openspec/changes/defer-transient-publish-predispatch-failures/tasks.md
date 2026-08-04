@@ -28,8 +28,20 @@
 - [ ] 3.4 回归断言：`submitted_unconfirmed` / `yield_timeout` 的处置逐字未变（跨过提交点绝不重投）。
 - [ ] 3.5 `npm run test:acceptance` 全过（`AC-PUB-*` 必须全绿）→ `npm test` → `npm run typecheck`。
 
-## 4. 交付
+## 4. 登记：实装中发现、但不在本 change 范围的缺陷
 
-- [ ] 4.1 `openspec validate defer-transient-publish-predispatch-failures --strict` exit 0。
-- [ ] 4.2 提交推送 `aidcp-cloud` master + 控制仓 main，回写本文件 sha。
-- [ ] 4.3 部署 dev 并按 CLAUDE.md §5 安全序列核验（备份 → rsync → restart → healthcheck）。
+> 归档会把本目录挪进 `archive/`，之后没人会翻到这里——**所以这两条必须在归档前另有去处**。
+> 归档时须确认它们已进入各自的落点（协议那条进动协议的 change；素材那条进发布素材相关的 change 或 backlog）。
+
+- [ ] 4.1 **协议文件里有一处失效注释**：`src/comm/protocol.ts` 提到已被拆掉的 `failed_before_submit`。
+      该文件须与边缘侧逐字一致、且是并行 session 的热点文件，**不为一行注释制造漂移**——
+      留给下一次动协议时一并改。
+- [ ] 4.2 **页面状态未知档把素材归还而非隔离**（沿用旧行为，本次未改）：该档意味着提交**可能已经按下**，
+      而归还等于允许另一条草稿取用同一组图。真按下去了的话，同一组图会在平台上出现两次。
+      改它需要一并想清楚「可能已用」这个中间态怎么记，超出本 change 范围。
+
+## 5. 交付
+
+- [ ] 5.1 `openspec validate defer-transient-publish-predispatch-failures --strict` exit 0。
+- [ ] 5.2 提交推送 `aidcp-cloud` master + 控制仓 main，回写本文件 sha。
+- [ ] 5.3 部署 dev 并按 CLAUDE.md §5 安全序列核验（备份 → rsync → restart → healthcheck）。
