@@ -155,6 +155,14 @@ TRANSPORT_MEMBERS = [
     # 接口域没有任何办法推。**路由刻意不收 edgeId**——推送目标必须在属主进程就地解析，
     # 取自调用方那份会陈旧的在场镜像等于把「推给谁」建立在过期事实上。
     'src/transport/interaction-offboard-http.ts',
+    # 同族第九、第十（change deploy-derived-services-to-dev）：客户端收件箱那一整片的编排面。
+    # 生成/审批/编辑/入队/下发/同步/重开登录/浏览器控制八件事的实现全在 automation（它才持有
+    # 边缘连接注册表与推送出口），而路由由 api 服务。**缺了不是 503 是整片 404**：收件箱那个
+    # 构造式是五个依赖的全或无。failure-wire 单独成文件是因为它同时被本族与 store-reader 用：
+    # 通用传输骨架只搬 code+message，而互动失败的 httpStatus/retryable/details 三格丢掉之后，
+    # 「已发出但核不到」（409、不可重试）会被折成可重试的 500，客户端据此重投一条可能已上墙的命令。
+    'src/transport/interaction-failure-wire.ts',
+    'src/transport/interaction-automation-http.ts',
     # 批次 4b：api/automation 同步读镜像的版本化完整快照 route/client。
     # 只承载 Bearer、server-injected target、owner stream allowlist 与 envelope 校验；
     # owner snapshot 生成和 consumer 本地镜像实现仍各自留在属主仓。
