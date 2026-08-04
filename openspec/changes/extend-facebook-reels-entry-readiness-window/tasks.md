@@ -12,13 +12,13 @@
 
 - [x] 3.1 Run focused Reels/timeout tests, Native formatting and clippy gates, and Edge typecheck.
 - [x] 3.2 Run the serialized Native test gate and `openspec validate extend-facebook-reels-entry-readiness-window --strict`.
-- [ ] 3.3 Record repository, commit, validation, packaging, installation, and deployment boundaries; then integrate and push the Edge and control changes without packaging.
+- [x] 3.3 Record repository, commit, validation, packaging, installation, and deployment boundaries; then integrate and push the Edge and control changes without packaging.
 
 ## Delivery Evidence
 
 - Edge repository: `aidcp-edge`, feature commit `c9ecfe4ffe0a11aef0e5055bda6cea80d042a5a3` after rebase onto `origin/master` at `b9f9979`.
 - Control repository: this OpenSpec change on `codex/extend-facebook-reels-entry-readiness-window`; the resulting control commit is reported in the delivery closeout.
 - Focused validation: timeout-chain contract 6/6; Reels-entry Native regression 1/1; Native fmt and clippy gates; Edge typecheck.
-- Broader validation: Edge acceptance 39 passed with the real-device case gated; serialized Native gate completed with zero failures, including 199 library tests and 75 Fake CDP integration tests; strict OpenSpec validation passed.
+- Broader validation after rebase: full Edge tests 3,101 passed with one real-device case gated; Edge acceptance 39/39; Native fmt, clippy, and serialized test gates completed with zero failures, including 200 library tests and 75 Fake CDP integration tests; strict OpenSpec validation passed.
 - Timeout review: the two 30-second readiness windows plus two 15-second identity windows and a 30-second non-wait margin total 120 seconds, so the existing 180-second request/admission/engine/session limits and 240-second Cloud idle watchdog remain unchanged.
 - Runtime boundary: no Edge package was built or installed, no Cloud or Console code was changed, no deployment was performed, and no real-account acceptance was claimed.
