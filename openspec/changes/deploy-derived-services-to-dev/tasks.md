@@ -1,39 +1,93 @@
 ## 0. 起手：验事实、别信记载
 
-- [ ] 0.1 逐条复验本 change 的四条前提仍成立（本项目已因"登记比代码旧"栽过多次，本 change 立项时
+- [x] 0.1 逐条复验本 change 的四条前提仍成立（本项目已因"登记比代码旧"栽过多次，本 change 立项时
   就当场推翻了一条）：`/opt/aidcp/` 下仍无 api/automation/content 部署位；四个 `aidcp-cloud-*.service`
   仍 `disabled` 且仍指向 `/opt/aidcp/cloud`；api 与 content 仍无启动外壳；三个属主库仍各自 0 待应用。
   任一条已被别人改掉就当场改 proposal，别照着过期前提开工。
-- [ ] 0.2 **六仓对账 + 逐仓 typecheck**，确认起手状态是全绿对齐的（车队每天推进主干，
+  <!-- 2026-08-04 四条全部复验成立：/opt/aidcp/ 下只有 cloud/console/downloads（无三个部署位）；
+       四个 unit 全 disabled 且 WorkingDirectory 都是 /opt/aidcp/cloud；api 与 content 无启动外壳
+       （server.ts 靠 import.meta.url 自举）；migrate status = content 20/0、automation 57/0、api 69/0。
+       **另发现一条前提已过期（对本 change 有利）**：automation 的就绪台账已于 2026-08-03 清零
+       （AUTOMATION_ROOT_READINESS_BLOCKERS 为空数组，boundaries/…-blockers.json 0 条，门禁 4/4 绿）
+       ⇒ runAutomationEntry 不再 fail-closed，automation 的 main() 已可真跑。 -->
+- [x] 0.2 **六仓对账 + 逐仓 typecheck**，确认起手状态是全绿对齐的（车队每天推进主干，
   上一次对齐不代表现在还齐）。对账只比文件，它对"这个仓还编不编得过"一无所知，所以两件都要做。
-- [ ] 0.3 记下**单体当前的运行事实**作为并存基线：监听端口集合、周期任务清单（哪些定时器在跑）、
+  <!-- 2026-08-04 起手状态**不是**全绿，两处都修了：
+       ① automation 有 8 个属主文件与事实源（aidcp-cloud@cb12a9d）不一致 ⇒ --apply --prune 收 src、
+          --apply --tests 收测试（8 src + 8 test，另 1 个新测试文件）；aidcp-automation e508c06。
+       ② api / transport 的 node_modules 里装的 aidcp-kernel 是旧 sha（pin 与 lock 都对、装机没跟上），
+          typecheck 报一片「模块找不到」。修法：rm -rf node_modules/aidcp-{kernel,transport} && npm install。
+          ⚠️ **别用 `npm install <包名>`**：它会把 pin 规格从 git+ssh:// 重写成 github:，
+          对账脚本从此报「未 pin」，且本机实测跑了 37 分钟；rm+install 只要 17 秒。
+       两处修完：六仓 typecheck 全 0；automation 全量 2191（0 fail）、acceptance 263/263。
+       脚本报的两个「多出」测试**有意保留**：api/test/api-content-scheduling.test.ts 与
+       automation/test/acceptance/served-route-inventory.test.ts 都是派生仓私有件（cloud 里没有对应物），
+       后者正是任务 6.2 要用的那道路由清单闸，删掉等于拆掉一道闸。 -->
+- [x] 0.3 记下**单体当前的运行事实**作为并存基线：监听端口集合、周期任务清单（哪些定时器在跑）、
   飞书长连接条数。第 6 组切换周期任务时要按这份基线对着关。
+  <!-- 2026-08-04 08:30 采样，见本目录 baseline-monolith-runtime.md：
+       端口 8787/8090/8091（+ nginx 80/443/8088；同机 isales 的 4310/8990 不碰）、
+       15 项周期任务逐条列出、飞书长连接 1 条、自动化写者锁由单体持有、边缘在线 12 条。 -->
 
 ## 1. 通路验证（最可能卡住的一步，先做，只用一个仓试）
 
-- [ ] 1.1 ECS 上为**一个**仓建部署位并装依赖，验通两条通路：内网 registry 对 `@types` 域的劫持
+- [x] 1.1 ECS 上为**一个**仓建部署位并装依赖，验通两条通路：内网 registry 对 `@types` 域的劫持
   （本机绕法 `--userconfig /dev/null` 实测可用，ECS 须复验）、以及三个共享包的 git+ssh 拉取权限。
   **不通就停手上报**，MUST NOT 三个仓一起试错。
-- [ ] 1.2 确认装出来的共享包版本**恒等于**各自权威版本（顺序：kernel → transport → 业务仓；
+  <!-- 2026-08-04 先只做 api 一个仓，两条通路都验通，且**两条的结论都与预期不同**：
+       ① registry：ECS 上 `npm config get registry` = https://registry.npmjs.org/ —— @types 劫持是
+          **本机**内网 registry 的问题，ECS 上不存在，`--userconfig /dev/null` 在此不需要。
+       ② git+ssh：ECS 上**没有** GitHub 私钥（`ssh -T git@github.com` = Permission denied）。
+          解法用 **ssh agent 转发**（`ssh -A`，本机 `ssh-add ~/.ssh/id_ed25519`）——
+          服务器上**不留任何钥匙**，也不必改 package.json 的 pin。
+       api 槽：`npm ci` 74 包 / 2 分钟，退出 0。验通后才做另外两个（content 135 包 / 3 分钟、
+       automation 25 包 / 1 分钟，均退出 0）。 -->
+- [x] 1.2 确认装出来的共享包版本**恒等于**各自权威版本（顺序：kernel → transport → 业务仓；
   transport 自己也 pin kernel，只 bump 业务仓会直接失败在 transport 的构建步骤，
   报错栈全是 transport 的文件、看不出根因）。
-- [ ] 1.3 在 ECS 上跑一次该仓的 typecheck，确认装出来的东西真能编译——
+  <!-- 2026-08-04 三个槽的 node_modules/.package-lock.json 逐个读出 resolved sha：
+       kernel=8aa66f7c77937aa36f2dda8891ab91af09abd505、transport=56a1da82d4aebe2683fbda63975513f02a1d6d7e，
+       与两仓 master 头逐字相同。 -->
+- [x] 1.3 在 ECS 上跑一次该仓的 typecheck，确认装出来的东西真能编译——
   **"装上了"与"编得过"是两件事**。
+  <!-- 2026-08-04 三个槽在 ECS 上各跑一次 `npm run typecheck`，全部 0 错。 -->
 
 ## 2. 补启动外壳（api / content）
 
-- [ ] 2.1 `aidcp-api` 补可执行启动外壳，**照 `aidcp-automation/src/automation-service-entry.ts` 的形态**：
+- [x] 2.1 `aidcp-api` 补可执行启动外壳，**照 `aidcp-automation/src/automation-service-entry.ts` 的形态**：
   读配置 → 建根 → **先监听** → 就绪闸 → 放行业务 → 优雅关停 → 信号。不发明第二种。
   顺序里"先监听后就绪"不能倒：倒过来时健康检查在就绪前拿不到任何应答，
   "还在初始化"与"进程死了"从外面同形。
-- [ ] 2.2 `aidcp-content` 同上。
-- [ ] 2.3 结构断言：三个仓的公共出口（`src/index.ts`）MUST NOT 承载启动副作用——
+  <!-- aidcp-api 6218573 新增 api-service-entry.ts + api-schema-gate-startup.ts。
+       **发现 api 此前连一道 schema 契约门都没有**（只有逐存储 schemaEnsurer、且跑在建池之后），
+       且旧自举失败时只设 exitCode 不 exit ⇒ 池不关、进程可能压根不退出，
+       systemd 看到 active(running) 的僵尸。门做成不可伪造回执 + startApiService 必填持有，
+       把「门先跑、且在建池前」变成编译期约束。 -->
+- [x] 2.2 `aidcp-content` 同上。
+  <!-- aidcp-content a22a8a9 新增 content-service-entry.ts + content-schema-gate-startup.ts；
+       main() 改成导出的 startContentService()，**探活口 + listen 挪到装配之前**（原先监听是最后一句，
+       几十个角色 + 多个存储 init 期间外面完全分不出「还在初始化」与「进程死了」）；
+       信号从装配中途的 process.once（flush 完直接 exit(0)、绕过监听口与两个池）挪到入口的 close()。
+       另修：门此前没传 serviceLabel ⇒ 拒启日志打的是 [aidcp-cloud]，而那是排查时唯一的线索。 -->
+- [x] 2.3 结构断言：三个仓的公共出口（`src/index.ts`）MUST NOT 承载启动副作用——
   `import` 该包 MUST NOT 顺带建池 / 起监听 / 注册退出钩子。按"正向"写（出口列表里没有组装根），
   别按"找不到某个名字"写。
-- [ ] 2.4 启动日志 SHALL 报出**本进程实际注册了什么、实际没注册什么**，且两者由同一份数据得出。
+  <!-- api 的 index.ts 此前 `export * from './server.js'`（组装根在公共出口里）——已删。
+       两仓各加一条正向白名单用例（api test/acceptance/service-entry-shape.test.ts、content 同名文件）：
+       出口只许出现在白名单里，新增文件默认红。content 的 index.ts 本来就没出口组装根。 -->
+- [x] 2.4 启动日志 SHALL 报出**本进程实际注册了什么、实际没注册什么**，且两者由同一份数据得出。
   用例钉住：某能力因依赖缺席未注册时，日志具名说出，MUST NOT 与"已注册且空闲"同形。
+  <!-- 两仓各加能力清单（同一个数组派生两侧），缺席具名带原因；content 的探活口把清单一并答出，
+       装配未完时 registrationComplete=false。用例各 3 条。 -->
 - [ ] 2.5 三仓本地各起一次（连 dev 的属主库、周期任务全关），确认起得来、健康口答得上。
   **本地只做这一步验证，正式运行仍只在 ECS。**
+  <!-- 2026-08-04 **只做了"指向不可达库"的那一半，连 dev 属主库那一半有意没做**：
+       automation 在构造期就抢按 target 单实例的自动化写者锁，本机起一个 dev target 的进程
+       会跟 dev 单体抢锁；api / content 连 dev 库虽不抢锁，但单独验两个、留一个不验没有意义。
+       已验到的：api 与 content 两个入口在 warn 模式下如实报「未通过、enforce 下将拒绝」后继续，
+       在 enforce 模式下门当场具名拒启、退出码 1，且 **api 那次一个池都没建**（栈里无 PgAccountStore）
+       —— 即「门在建池之前」这条顺序是实测的，不是声称的。
+       真正的首次启动改在 ECS 部署位上做（第 6 组）。 -->
 
 ## 3. 排期器归属第一拍：写死"哪一条是活的"
 
