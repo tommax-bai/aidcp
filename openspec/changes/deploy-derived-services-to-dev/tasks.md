@@ -171,9 +171,52 @@
          但**业务入口未放行 ⇒ 8787 从未监听 ⇒ 窗口内边缘一台都没连上**。
        ⇒ 「三个进程起来了」成立；「三条链路通了」**不成立**，两者分开记。
        窗口 2 分 41 秒，回滚后单体全绿（写者锁 / 8787 / 8090 / 8091 / 飞书长连接都回来了）。 -->
+- [x] 6.1a **人设解析收成一份**（演练暴露的那条同游标载荷漂移，根因已在 §2.5 定位）。
+  纯解析析出到 `src/kernel/persona-soul-parse.ts`，内容段编解码器的残壳、单体组装根、
+  派生接口服务组装根**三处按引用共用同一份**；解析 + JSON 归一 + 失败回 null
+  三件事收在同一个函数里（拆开就是第二份实现长回来的缝）。
+  <!-- aidcp-cloud e6a3143（含 boundaries 登记 + §4.7 回写）/ aidcp-kernel add87e5 /
+       aidcp-transport 7b06a30（pin）/ aidcp-content a4981af / aidcp-api f3321fd。
+       **载荷逐位等于单体当初发的那一份**（收口选的就是单体那半），故游标 902 上已持久化的
+       摘要仍然成立、不会二次拒收；实测两份实现的摘要确实不同：
+       统一后 sha256:4656ea2c…（= 单体）vs 派生仓原来那份 sha256:d96c3e14…。
+       两个仓各钉一条**同值**载荷摘要用例（test/acceptance/persona-soul-parse-single-source.ts），
+       任一侧漂移一侧当场红；另加「组装根 MUST 按引用注入、MUST NOT 就地再写一份」的源级断言。
+       六仓对账 + 逐仓 typecheck 全绿；cloud 4168 / api 529 / automation 2191 / content 448 全过。 -->
 - [ ] 6.2 **逐条点名核对跨进程路由**：从调用方那一侧实际打一遍，确认对面真的注册了。
   automation 侧已有只许下降的路由清单闸，但**它只管本仓装配、管不了对面进程起没起**。
   重点是上一个 change 新加的那 12 条 `content-scheduling` + 内容侧的素材可用数那一条。
+  <!-- 2026-08-04 进行中，已坐实**两处漏注册**（都是「客户端在、registrar 在、没人调用」同一形态）：
+       ① automation 漏第七族 `facebook-group-ops`（12 个方法）。后果比前六族更隐蔽：面板侧 dep
+          是注入了的 ⇒ 不答具名 503，而是被顶层 catch 兜成 500 internal_error。修于
+          aidcp-automation 795e572，同批把该族加进路由清单闸并做了变异测试（去掉注册调用即红）。
+       ② **api 漏 7 族 api 内部 API**（content 侧六个客户端 + 配置镜像失效信号），实测已现形：
+          content 进程反复打 `[image-model-mirror] 刷新失败，沿用保守默认：no route:
+          image-model-selection/fetch`。详见 6.2a。 -->
+- [ ] 6.2a **api 内部 API 的 7 族漏注册**（本批新发现，切流前必须补）：
+  单体 `startApiInternalApi()` 注册而派生 api 的手写 main 一条都没有的族——
+  `review-card-delivery` / `publish-log` / `pipeline-log` / `publish-card-exit` /
+  `image-model-selection` / `account-platform` / `config-mirror-bump`。
+  **api 仓还缺 automation 那种路由清单闸**（漏登记比漏注册更危险），同批补上。
+  <!-- 触发点：api 的启动日志把能力清单打成「未注册=无」，而那份清单是一个固定数组、
+       与「实际注册了什么」无关 —— 于是「本进程实际注册了什么」这条自述本身是假的。 -->
+- [x] 6.1b **切流之前把面板与客户鉴权两个对外口真打一遍**（上一批只到「代码接线了」，
+  跨进程那几跳一次都没跑过）。做法：给派生 api 临时配一对**备用端口** 8190 / 8191，
+  单体的 8090 / 8091 一根手指都不碰，同一份只读脚本对两个 base 各跑一遍逐条对照。
+  <!-- 2026-08-04 11:03，脚本 /opt/aidcp/verify-panel-split.sh（只读；有副作用的路由逐条排除）。
+       **已验**：面板登录取到 JWT（207 字）、/api/me 出数；本进程属主池那批（环境列表除外）
+       与单体逐条同形出数；注定缺席的那批答**具名 503**（role_config_unavailable /
+       category_config_unavailable / model_config_unavailable / token_usage_unavailable /
+       curated_unavailable / hot_lead_config_unavailable / interaction_permissions_unavailable）
+       —— 而同样这批在单体上是 200，这正好是「我打到的是哪个进程」的干净判别式。
+       **客户鉴权口**：桌面客户端那条 name+key 登录链路**真登进去了**（248 字 token），
+       /me 与 /my-environments 出数，环境级读按归属正确答 403 environment_not_owned。
+       为此在面板上建了一个专用验证账号 cutover-verify-0804（明文 key 只写进 ECS 上
+       /root/.cutover-verify-key、未进任何文档；收口时停用并删该文件，见 8.5）。
+       **未验（不是失败，是并存期物理上验不到）**：一切要问 automation 的路由今天必然 500
+       （ECONNREFUSED 8094，automation 与单体抢按 target 单实例的写者锁、起不来），
+       含 /api/environments 与 console 首屏那条 /api/dashboard/summary。**切流后必须重跑一遍**。
+       **已验的第三条**：api → content 那一跳通（content 起来之后 /api/content/queue 200）。 -->
 - [ ] 6.3 失败原因可区分实测：故意调一条未注册的路由、故意让对面不可达，
   确认两者的原因码**不同**且都不与"版本落后"同码。有真实副作用的调用超时 ⇒ 结果记为**未知**。
 - [ ] 6.4 **按裁定把周期任务从单体原子切到派生服务**（第 3 组的结果）：
