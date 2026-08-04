@@ -45,13 +45,37 @@
 
 ## 5. aidcp-edge — 收口
 
-- [ ] 5.1 提交 + 推送 `aidcp-edge` master；本仓 tasks.md 按 `<!-- <repo> <sha> 备注 -->` 回写（sha 必须取自**已推送**提交）
-- [ ] 5.2 更新 `docs/edge-honesty-gap-inventory.md` 的 **E12**：由「已判：转出」改为本 change 承接并落地，写清承接后的实际形态
-- [ ] 5.3 更新 `docs/edge-honesty-gap-inventory.md` 里逐字输入降级记账那一条：其记账早已存在，**本 change 让它第一次可达**——如实写明「此前写了但结构上无人可见」
+- [x] 5.1 提交 + 推送 `aidcp-edge` master；本仓 tasks.md 回写
+      <!-- aidcp-edge 8381fea 经 scripts/land-change rebase 后 ff 合入 master 并推送；
+           分支上原 sha 890fec9。四道验证在 rebase 后复跑：test:acceptance 39/39；npm test 3086 pass /
+           0 fail / 1 skip（既有 GOST staging）；typecheck exit 0；gate:native fmt+clippy+test exit 0，
+           cargo 388 条全过。 -->
+- [x] 5.2 更新 `docs/edge-honesty-gap-inventory.md` 的 **E12**：由「已判：转出」改为本 change 承接并落地，写清承接后的实际形态
+- [x] 5.3 更新 `docs/edge-honesty-gap-inventory.md` 里逐字输入降级记账那一条：其记账早已存在，**本 change 让它第一次可达**——如实写明「此前写了但结构上无人可见」
 - [ ] 5.4 归档前按 handoff §12.1 逐条对读 delta 与实装（本轮实测 91 条命中 16 条），**至少读两遍、第二遍在修完之后**
 
 ## 6. 真机验收（不在本文件勾选）
 
-- [ ] 6.1 登记到 `docs/real-machine-acceptance-backlog.md`：诊断行确实出现在运营机的 `edge.log` 与 UI 活动流（共同前置＝重打一次客户端安装包，与簇 122/123/125/126 同批）
-- [ ] 6.2 登记到 backlog：指针降级在真机上的**实际发生频次**——设计里承认「可达面窄」是推断，只有真机能给出真实分布；若频次高于预期，需回头看是不是预算分配本身偏紧
-- [ ] 6.3 登记到 backlog：`class=other` 行的真实形态与量（panic / backtrace 长什么样、有多长），据此复核每行上限与每命令上限是否需要调整（design Open Questions）
+- [x] 6.1 登记到 backlog **簇 128.1**。
+      <!-- ⚠️ 本条原文的落点说法**被实装订正**：转发行到达 `edge.log`（无条件）与环境的「最后一条消息」，
+           但**到不了按句子渲染的 UI 活动流**——那条流只对带 sentence 的结构化 UI 事件触发。
+           簇 128.1 已按订正后的落点登记；本行原文保留以便追溯。 -->
+- [x] 6.2 登记到 backlog **簇 128.3**：指针降级在真机上的**实际发生频次**——设计里承认「可达面窄」是推断，只有真机能给出真实分布；若频次高于预期，需回头看是不是预算分配本身偏紧
+- [x] 6.3 登记到 backlog **簇 128.2**：`class=other` 行的真实形态与量（panic / backtrace 长什么样、有多长），据此复核每行上限与每命令上限是否需要调整（design Open Questions）
+
+## 7. 实装中发现、登记不改（归档前须确认已另有去处）
+
+- [x] 7.1 **内容安全违规一条，已在同批修掉**（发现于本 change、修在并行流的文件里）：群根决策诊断原本挟带
+      两个原始 URL 路径，`bounded_log_value` 只截长度、**截断不是脱敏**。此前无后果（那些行没有收件人），
+      **本通路一打通就会持续写进运营机日志**。
+      <!-- 修于 aidcp-edge restore-facebook-first-post-recovery 57d5a07：改为只报结论布尔量，
+           且该布尔量直接复用落地等待的同一个判据，杜绝两处对「群根」各有一份实现而漂移。 -->
+- [ ] 7.2 **其余 `eprintln!` 载荷本批未逐条审**。已抽查：小红书诊断（有限词表）与 Facebook 同意闸干净。
+      通路打开后这项从「反正没人看」变成真正承重 ⇒ 登记为 backlog **簇 128.4**。
+- [ ] 7.3 **宿主侧失败归因的误报暴露面**：有一处按关键词匹配日志行来记「最后一条失败行」，
+      转发进来的引擎诊断或 panic 若含那些词，会被当成失败原因显示给运营。今天无命中
+      （诊断信封用的字段名不撞），但**每新增一条引擎诊断这个面就大一点** ⇒ backlog **簇 128.5**。
+- [ ] 7.4 **两处刻意偏离 tasks 原文，需评审知情**：① 每命令转发上限落在转发器（由 runtime 接线）而非
+      传输层——设计明禁传输层认识「命令」，放在传输层会正好需要规格禁止的「按在飞数量推断归属」；
+      ② 降级两态与其 note 保持模块私有——`PointerPath` 本身模块私有，提成 `pub(crate)` 会触发
+      私有接口 lint（`-D warnings`）；测试同模块，可断言性不受影响。
