@@ -263,6 +263,26 @@
 
 - [ ] 7.1 派生服务保持运行，**随时可读**地记录周期任务的真实行为：醒了几次、每次判定是什么、原因是什么。
   **"一次都没醒"与"醒了但每次都判跳过"是两件事**，要分得开——两者在"进程健康"这个维度上完全同形。
+  <!-- 观察记录第 1 条（2026-08-04 15:00 实测，切流后约 2h50m）。**本条只记观察到的，不给任何验收项划勾。**
+
+       进程与端口：三个派生服务 active、`NRestarts=0`（api / automation 自 12:44:19，content 自 11:18:39），
+       单体 inactive。8787 / 8090 / 8091 / 8092 / 8093 / 8094 六个口全在监听。
+       automation 就绪度实测（带 bearer 打 `internal/automation/sync-read/readiness`）：
+       `state=ready`、`businessIngressStarted=true`、`blockers=[]`，40 秒内采样 5 次全同、零抖动。
+
+       **周期任务：一次都没醒（不是"醒了判跳过"）。** automation 自 12:45:45 起**零日志输出**，
+       2h15m 内 journal 一行没有。12:44 那批 10 条 error 全部集中在 12:44:22 一秒内，
+       是 api 与 automation 同秒重启造成的启动竞态（automation 的同步读 consumer 先于 api 监听 8093
+       ⇒ 八条流全 ECONNREFUSED），随后自行恢复、至今未再现。
+
+       **⚠ 边缘连接 0 条，切流以来一条都没连上过。** 这是本条记录里最该被下一个人看到的一行：
+       - 8787 上 established 连接数 = 0（两种 ss 口径互核）；automation 全程无任何握手日志。
+       - 但**监听层是活的**：从本机对 `http://121.89.85.150:8787/` 发裸 WS upgrade，
+         拿到 `101 Switching Protocols` ⇒ **是客户端侧没开，不是服务端拒绝**。
+       - ⇒ **"边缘能完成协议 v2 握手并建起连接运行时"这条至今零证据。**
+         §6 里"桌面客户端登录已真打过"走的是 8091 客户鉴权口，**不等于**边-云握手成功；
+         那条裸 upgrade 也只证明端口活着，没走 hello / 认证 / 建运行时。
+         这条按 7.3 记**未验**，MUST NOT 因为"进程一直活着"或"端口通"给它划勾。 -->
 - [ ] 7.2 逐条走 `docs/real-machine-acceptance-backlog.md` 簇 60 的验收项，每条记三态之一：
   **已验（附证据）/ 未验（附为什么没观察到）/ 不适用（附理由）**。
   重点是上一个 change 登记的 5 条 + 既有的 `runAutomationMain` 从未真跑、飞书 `/delegate` 从未真跑。
@@ -277,6 +297,31 @@
   `segmentsForMode` 里那几个角色分支的处置同批在代码里写清。
   **这一步不做完，本 change 不算收口**——判定写在文档里而 unit 还躺在机器上，
   下一个人看到的是"有这么四个 unit 可以用"。
+  <!-- 退役判定的事实基础（2026-08-04 15:00 实测，**判定已齐、退役动作本身尚未执行**）：
+
+       ① 四个 unit（`aidcp-cloud-{core,api,automation,content}.service`）在 dev 上全是
+          `inactive` + **`disabled`**，journal 里最后一次运行是 **7月26 10:55**（那次是三进程脚本
+          fail-closed 自动回滚单体），其中 **`core` 从未跑过**（journal 零条目）。
+       ② **生产上无人使用这四个角色模式**：OL 只有 `aidcp-cloud.service` 一个 unit，
+          `AIDCP_SERVICE` 未设 ⇒ 恒为 `monolith`。dev 的 `/opt/aidcp/cloud/.env` 同样未设。
+          ⇒ **退役不影响 OL，也不影响 §9 那条回滚路**（回滚起的是 monolith 模式）。
+       ③ 退役范围**不止 ECS 上那四个 unit**，还有：
+          - `aidcp-cloud/deploy/multi-service/`（四个 unit 文件 + README，是机器上那四个的来源）
+          - `src/gateway/service-mode.ts` 的四个角色分支，及 `src/server.ts`、
+            `src/config/api-sync-read-source.ts` 里的模式感知处
+          - **`aidcp-api` 仓里还带着一份完整的 `src/gateway/service-mode.ts`**（随同步继承来的），
+            退役时若只清单体、这份会留下来继续误导
+       ④ **`aidcp-content/.env` 设了 `AIDCP_SERVICE=content`，而 content 仓一处都没读它**（纯遗留）；
+          对照之下 **`aidcp-automation` 是硬要求**（`AIDCP_SERVICE !== 'automation'` 直接抛），
+          `aidcp-api` 也仍在读 ⇒ **这三行 .env 不可一概而论地清掉**，逐仓判。
+       ⑤ **跨 change 后果（需先裁定，不由本 change 单方面决定）**：退役这四个 unit
+          会直接作废活跃 change `fix-cloud-multi-service-deploy-script` 的未完成项 2.3
+          （"用三进程脚本把单体部署到 dev 并逐项验证"）。派生仓这条路已经跑通，
+          而单体三进程脚本 7月26 那次正是 fail-closed 回滚的 ⇒ 2.3 的正确处置是
+          **判为过时并关掉**，而不是去执行它。**MUST NOT 由本 change 静默替另一条 change 做这个决定。** -->
+  <!-- 退役动作的建议做法（尚未执行，供裁定）：单体的四个角色模式 MUST NOT 改成
+       "未识别值回落 monolith" —— 那会让一个要求按角色切段的进程**静默起成完整单体**
+       （连带抢写者锁与 8787），正是"静默假成功"。要退就退成 **fail-closed 显式拒启动 + 具名指向派生仓**。 -->
 - [x] 8.1 把 soak 里暴露但本批不修的问题**逐条**登记（backlog 或新 change），
   写清现象、复现条件、以及为什么本批不修。MUST NOT 只留在会话里。
   <!-- 2026-08-04 切流当天暴露、**本批未修**的六条，逐条如下（三条已归入 backlog 簇 60）：
