@@ -11,7 +11,16 @@
 - [x] 2.2 Commit, rebase, fast-forward integrate, and push Cloud and control changes.
 - [ ] 2.3 Deploy the integrated Cloud default branch to DEV with the three-process script and verify content, automation, API, ports, schema, PostgreSQL, Feishu, and unrelated-service isolation.
   <!-- 2026-08-02 现状订正：2.3 仍未执行、未勾选；本轮只做 DEV 只读 SSH 核验，未部署、写文件、改库或操作 systemd unit，未碰 OL。 -->
-  - **撤销旧阻塞归因**：本脚本同步并运行同一份 `aidcp-cloud`，三个 unit 都从
+  <!-- ⚠️ 2026-08-04 15:20 外部订正（由 change defer-transient-publish-predispatch-failures 的部署撞到）：
+       **下面这段「三个 unit 都从 /opt/aidcp/cloud 启动」的描述已经不成立了。** 它描述的是本脚本的形态；
+       但同日 change `deploy-derived-services-to-dev` 在 dev 上完成了切换，现网三个 unit 的
+       WorkingDirectory 实测分别是 /opt/aidcp/api、/opt/aidcp/automation、/opt/aidcp/content，
+       各自跑各自派生仓的入口（api-service-entry.ts / server.ts / content-service-entry.ts），
+       单体 `aidcp-cloud.service` 已 inactive。
+       **危害是假部署**：照下面这段操作 = rsync 到无人运行的目录 + 重启一个已停用的服务 + 以为部署成功。
+       本段保留只为追溯本脚本自身的设计意图；**MUST NOT 当作 dev 现状引用**。
+       dev 现状口径以 `docs/deployment-environments.md` 的「dev 与 ol 的运行形态已经不一样了」一节为准。 -->
+  - **撤销旧阻塞归因**（**该描述已过期，见上方订正**）：本脚本同步并运行同一份 `aidcp-cloud`，三个 unit 都从
     `/opt/aidcp/cloud/src/server.ts` 以不同 `AIDCP_SERVICE` 启动；它不会执行 sibling
     `aidcp-api/src/server.ts`。后者的存储接线欠账属于 `split-cloud-automation-production-runtime`
     task 3.1e，且已在该 change 内补齐；无论其当时状态如何，都不是本脚本的可执行入口。

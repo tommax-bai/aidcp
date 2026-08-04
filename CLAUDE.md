@@ -135,7 +135,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   `import-exemptions.json` / `table-write-exemptions.json` 是 `npm run boundaries:refresh` 的**生成物**。
   **MUST NOT 手改生成物**；认为某行判错，走控制仓 change 改 §4.x 再回写规则表。
 - **四个新仓 / 两个包的 `src/` 是派生物，MUST NOT 手工搬文件**：一律用控制仓
-  `scripts/sync-split-repos`（`--check` 对账 / `--apply` 同步 / `--prune` 才删）。
+  `scripts/sync-split-repos`（**不带参数即 dry-run 对账**——`--check` 这个参数并不存在、写了直接报错 /
+  `--apply` 同步（**只写文件、绝不代你提交**）/ `--prune` 才删 / `--repo <仓名>` 限定单仓）。
   手工切一次是搬家，手工切第二次就是猜。
 - **kernel 版本 pin 是派生事实**：三仓 `package.json` 里那条 sha MUST 恒等于 `aidcp-kernel` master 头。
   **这条漂移尤其阴——npm 装到旧 sha 不报错、编译照过，跑的却是过期契约**；已纳入 `sync-split-repos` 对账。
