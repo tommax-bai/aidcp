@@ -146,6 +146,11 @@ TRANSPORT_MEMBERS = [
     # 它此前一直缺，后果是**管理后台的环境页整页 500** —— 接口进程侧那个端口是
     # 「未注入即当场抛」的形态，而拆开之后它本来就注入不了（不该持有 automation 库连接）。
     'src/transport/client-env-automation-http.ts',
+    # 同族第七个（2026-08-04，同一天第二次报障补的）：客户端「今日进展」那块用量载荷。
+    # 与上一条同形——接口进程既没有那些表的连接、也看不见活体会话，装不出来。
+    # 粒度刻意是「装配好的整块」而不是几项原料：平台能力注册表被终局裁定留在 automation，
+    # 接口进程永远拿不到它，而硬拼时给投影传空值**不报错**、只会让 FB 账号重新看到「收藏 0/N」。
+    'src/transport/client-usage-http.ts',
     # 批次 4b：api/automation 同步读镜像的版本化完整快照 route/client。
     # 只承载 Bearer、server-injected target、owner stream allowlist 与 envelope 校验；
     # owner snapshot 生成和 consumer 本地镜像实现仍各自留在属主仓。
