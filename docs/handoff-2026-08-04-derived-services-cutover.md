@@ -277,6 +277,43 @@ cloud typecheck 干净 / acceptance 197 / 全量 4182 pass 0 fail。
 等于给刚删掉的能力立现行规格；先例见 CLAUDE.md §3 的 `facebook-scheduled-comment`）。
 它做过的事与那次失败部署的细节，已就地记进本 change 的 8.0 注释，**不随删除消失**。
 
+## 16. ⚠ 16:00 用户实测报障：桌面客户端 12 个能力在派生形态下缺依赖
+
+用户在 dev 上用客户端报了三条：`slow_start_unavailable` / `slow_start_projection_unavailable` /
+「今日进展，暂时无法获取」。**三条同一个根因**，且远不止三条。
+
+**根因**：派生 api 的**手写** `clientAuthDeps` 比单体那份**少 12 个字段**。
+这是今天第四次同类问题（前三次：自动化漏第七族路由 / 接口进程漏七族内部路由 / 面板环境页）——
+**手写组装根漏字段，typecheck 抓不到**（那些字段在类型上都是可选的）。
+
+| 用户看到的 | 缺的依赖 |
+| --- | --- |
+| `slow_start_unavailable` | `slowStart`（`GET/PUT /environments/:k/slow-start` 首行就判它） |
+| `slow_start_projection_unavailable` | 派生 api **从没调用过** `bindSlowStartResolver` |
+| 今日进展，暂时无法获取 | `environmentOverview`（客户端打 `GET /environments/:id/overview`） |
+
+**完整缺失清单（12 个）**：`slowStart` / `environmentOverview` / `environmentRisk` / `persona` /
+`publishQueue` / `publishDraftActions` / `draftRefinements` / `curatedContent` /
+`environmentSchedule` / `interactionApi` / `onOffboardCreated` / `resolveEdgeIdForAccount`。
+（另有 5 个键是配置项、由第二个参数传，**不是缺口**：`port` / `jwtSecret` / `panelJwtSecret` /
+`jwtTtlSeconds` / `forbiddenPorts`——别把它们算进来。）
+
+**其中 5 个是切流前就知道并接受的**（§3.1 第 3 点已点名：草稿精修 / 环境总览当日用量 /
+边缘 id 反查 / 互动客户 API / 离职清理回调）。**另 7 个不在任何清单里**，`slowStart` 就是其一。
+
+**修复成本分两类，别当成一件事**：
+- `slowStart` / `environmentRisk` / 绑 resolver —— 数据全来自 `riskRead`，而
+  **`RiskReadHttpClient` 本来就已经在这个进程里构造好了**（面板那份依赖 1894 行就在用）。
+  但 `slowStart` 还要两个纯函数（`omitUnsupportedUsageMetrics` / `pickDailyUsageCounts`），
+  它们在 `src/platform/surface.ts` 与 `src/comm/daily-usage.ts`、**不属 api 层、没同步进派生仓**
+  ⇒ 要走 **kernel 准入**（它俩是纯映射，正是 kernel 该收的）+ 版本抬升 + 三仓重装。
+  **MUST NOT 在 api 里照抄第二份**——那是「同一个判断两处实现」，行为测试原理上看不见。
+- `environmentOverview`（今日进展）—— 要 automation 的 `buildTodayUsageForAccount`，
+  **`aidcp-transport` 里没有现成通道**，得像今早那条环境页通道一样新开一条。
+
+**还有一条要记住的**：这 12 个缺口**在服务端一行日志都不打**（503 直接返回、不记）。
+用户是靠点客户端点出来的。**这正是 §10 第 6 条那笔根债的又一次现形**。
+
 ## 15. 下一拍（更新版）
 
 1. **§10 剩四条**：第 4 条（就绪度抖）40 秒窗口没复现，需更长窗口才能判；
