@@ -37,8 +37,8 @@ cd ../aidcp-api && grep -n "DELIBERATELY_ABSENT" -A 3 test/acceptance/client-aut
 `aidcp-cloud` = `inactive/disabled`、isales 四服务未碰。
 
 各仓 head：`aidcp-cloud@01fe8a9` / `aidcp-kernel@030d805` / `aidcp-transport@7e6cba4` /
-`aidcp-api@418213f` / `aidcp-automation@2265885` / `aidcp-content@bd56379`。
-openspec change `deploy-derived-services-to-dev` 的记录在 tasks **8.8 / 8.9**。
+`aidcp-api@8ed0aa7` / `aidcp-automation@1c770ff` / `aidcp-content@bd56379`。
+openspec change `deploy-derived-services-to-dev` 的记录在 tasks **8.8 / 8.9 / 8.10**。
 
 ---
 
@@ -75,9 +75,12 @@ ol 若将来部署，这一项必须同样补上，否则 content 直接拒绝�
 
 ---
 
-## 2. 会咬人的：同步读老雷，**重启即触发**（本拍真撞了，8787 停 10 分钟）
+## 2. 同步读老雷：撞了、恢复了、**根因也找到并修掉了**
 
-**这不是谁的改动引入的，是一颗只在重启时现形的雷。**
+> 时间线：22:33 撞上（8787 停 10 分钟）→ 22:43 推版本恢复 → 23:20 找到根因并修复部署。
+> 下面前半段是机理（仍值得读，它解释了为什么这类问题零信号），后半段是根因与现状。
+
+**它不是数据问题，是一条纯拆仓回归。**
 
 - automation 一重启就以 `same_cursor_payload_drift` **永久拒收**两条流
   （`account_persona` cursor=2345、`automation_account_projection` cursor=462240），
@@ -97,8 +100,30 @@ UPDATE config_mirror_version SET version = version + 1
  WHERE mirror_key IN ('persona_config','account_status');
 ```
 
-**真正的债不在恢复，在「谁写了那两张表却没推版本」**——没找出来之前，
-**每一次 automation 重启都可能再撞一次**。这是下一拍最该查的东西之一。
+### 根因（已修，tasks 8.10）
+
+**派生 api 自己手写的 `main()` 把七个属主存储的镜像版本推进器全丢了。**
+
+`writeWithMirrorBump(pool, bumper, key, run)` 的第一行是 `if (!bumper) return run(pool)`：
+**推进器缺席时写照常提交、版本一动不动、不报错也不告警**。
+单体给这七个**全都**传了（逐个核过），派生 main() **一个都没传**。
+这正是拆仓红线里那条「裸 `?.` 静默吞掉」——单体里那一格恒有，拆完读到 `undefined` 就没了。
+
+其中三个的原注释写着「本进程只读这三张表，缺省语义即不推版本」。
+**那句话把一条静默缺省当成了一个决定**，而那三张表的写口就在管理后台的模型配置页上、
+后端正跑在这个进程里。「今天只读」永远不是理由：读写归属会变，而变的那天没有任何东西会提醒人。
+
+**闸**：`test/acceptance/mirror-bump-wiring.test.ts`（api 与 automation **各一份**）。
+覆盖面**从事实源读出来**（扫 `src/` 找「选项里有推进器」的存储类，再回组装根逐个核），
+不手抄名单。两边都装是因为只装一边就会留下「守卫只覆盖作者在治的那条道」——
+**而它在 automation 上第一次跑就抓到一个真的**（edge-access 自建的第二个节奏配置存储没接）。
+
+**现状已验（决定性，不是「起来了」）**：经产品自己的写口做一次幂等 upsert →
+`account_status` 961→962（修复前纹丝不动）；**紧接着重启 automation**（修复前必炸的那一步）
+→ `ready`、8787 在、drift 报错 0 次。
+
+**仍未了**：automation→api 的失效信号**中继**没接线（自动化侧写的是 outbox 行，
+今天没有东西把它推给 api）。MUST NOT 读成「补完就全通了」。
 
 ---
 
@@ -125,7 +150,10 @@ UPDATE config_mirror_version SET version = version + 1
 
 ## 5. 下一拍的候选
 
-1. **查「写了表却没推镜像版本」的那个写口**（§2 的真债）。这是 dev 每次重启的定时炸弹。
+1. **接上 automation→api 的配置失效信号中继**（§2 末尾那条仍未了的）。
+   自动化侧已经在写 outbox 行了，但没有任何东西把它推给 api ⇒
+   凡是自动化属主的那几张限频配置表，改了之后 api 侧的镜像同样不会刷新。
+   形态与刚修掉的那条同源，只是方向相反。
 2. **tasks 8.2**：更新 backlog 簇 60，真验到的划掉、没验到的补「为什么没覆盖到」。
 3. **tasks 8.4**：`openspec validate deploy-derived-services-to-dev --strict` → 归档，
    归档前把仍未了的债搬进 backlog。

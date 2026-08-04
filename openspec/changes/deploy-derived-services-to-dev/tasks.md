@@ -632,6 +632,55 @@
 
        **真正的债不在这次恢复，而在「谁写了那两张表却没推版本」**：已在 8.1 的同族问题里，
        本条另行登记（见交接文档）。每一次 automation 重启都可能再撞一次。 -->
+- [x] 8.10 **8.9 那颗雷的根因找到并修掉了：派生 api 把七个存储的镜像版本推进器全丢了**。
+  <!-- aidcp-api 8ed0aa7 / aidcp-automation 1c770ff。2026-08-04 deployed dev。
+
+       **根因是一条纯拆仓回归，不是数据问题。**
+       `writeWithMirrorBump(pool, bumper, key, run)` 的第一行是 `if (!bumper) return run(pool)`：
+       **推进器缺席时写照常提交、版本一动不动、不报错也不告警**。
+       单体给这七个存储**全都**传了推进器（逐个核过 aidcp-cloud/src/server.ts）；
+       派生 api 自己手写的 main() **一个都没传**。这正是 CLAUDE §8.5 那条
+       「裸 `?.` 静默吞掉」的形态：单体里那一格恒有，拆完读到 undefined 就没了。
+
+       七个：`PgAccountStore` / `PersonaStore` / `ContentScheduleStore` /
+       `FacebookCommentConfigStore` / `FacebookGroupJoinAutomationStore` /
+       `ModelConfigStore` / `RoleConfigStore` / `CategoryConfigStore`（后三个原注释写着
+       「本进程只读这三张表，缺省语义即不推版本」——**那句话把一条静默缺省当成了一个决定**，
+       而这三张表的写口就在管理后台的模型配置页上，后端正跑在本进程）。
+
+       **后果有两层，第二层才是 8.9 那次停摆**：
+       ① 消费方镜像永远不刷新 —— 今天写进去的 12 条人设、11 个新账号，
+          对自动化进程从此不存在（**零信号**，没有任何一侧会报错）；
+       ② 同一个游标先后发出两种载荷摘要 ⇒ 消费方按设计永久拒收 ⇒ 自动化重启即
+          fail-closed、8787 消失。
+
+       **闸（`test/acceptance/mirror-bump-wiring.test.ts`，api 与 automation 各一份）**：
+       AC-MIRROR-01..03。**覆盖面从事实源读出来**——扫 `src/` 找「选项里有 mirrorVersionBumper」
+       的存储类，再回组装根逐个核；不手抄名单，于是日后新增的存储自动进闸。
+       AC-MIRROR-01 专门钉「扫不到东西时本闸会全绿」这件事本身。
+       变异测试：拿掉 `PersonaStore` 那一格 → AC-MIRROR-02 红且点名 `PersonaStore`；
+       把扫描正则改成永不命中 → AC-MIRROR-01 红（而不是安静地全绿）。
+
+       **两边都装是有意的**（automation 当时是好的）：只给 api 加闸就会留下
+       「守卫只覆盖作者在治的那条道」。**而它在 automation 上第一次跑就抓到一个真的**：
+       edge-access 模块自建了第二个节奏兜底配置存储、没接推进器，写会照常提交而
+       outbox 行根本不产生。那一格改成**必填**（不是可选）——静默跳过的那条路
+       不配有一个看起来像决定的写法；required 化当场让一条既有用例编译失败，正是要的响亮。
+
+       **dev 实测（决定性证据，非「起来了」）**：
+       - 部署前 `account_status=961`；经产品自己的写口（`ensure-account`，对一个已存在账号做
+         幂等 upsert，业务字段零变化）打一次 → **962**。修复前这一步版本纹丝不动。
+       - 紧接着**重启 automation** —— 这正是修复前必炸的那一步 —— 结果
+         `state=ready` `blockers=[]`、8787 在、`same_cursor_payload_drift` 报错 **0 次**。
+       - 三服务 active、NRestarts=0、六端口全在、isales 未碰。
+
+       **顺带修掉的两处**：automation 的派生归属账本缺了本日新同步的传输文件
+       （`boundaries:refresh` 回到 275/275、forbidden=0）；api 组装根里那句
+       「自动化四个限频配置存储也都没传推进器」是**过期说法**（实核四个全都接着），
+       就地改掉并写明理由——这类「拿不到」的句子会被一片片转抄、越写越确定。
+
+       **仍未了**：automation→api 的失效信号**中继**尚未接线（自动化侧写的是 outbox 行，
+       今天没有东西把它推给 api）。那是另一条，MUST NOT 读成「补完这里就通了」。 -->
 - [ ] 8.3a **ol 不在本 change 范围内**（用户 2026-08-03 重申）：由用户单独提出才做，
   且届时须建发布分支、按发布分支部署。**"dev 是否 ok"由用户判定**——
   实施方 MUST NOT 自行宣布 dev 已就绪并据此推进 ol。
