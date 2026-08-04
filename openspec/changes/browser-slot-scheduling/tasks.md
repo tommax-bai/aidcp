@@ -52,6 +52,7 @@
 - [x] 2.22 **修复当天环境目标统一改动触发的幽灵槽位回归**：连接回执核对本次 spawn 时冻结的认证目标，不因令牌刷新窗口重新读取易变会话状态而误杀同目标核心；OS 进程 `exit` 后立即归还执行槽位并推进 FIFO，`close` 只负责末尾日志归因且有界兜底，杜绝进程已消失但客户端永久显示 4/4。<!-- aidcp-edge d6dde80; focused 43/43; post-rebase full 3067 passed, 1 gated skip; node --check and typecheck pass; OpenSpec strict pass; no installer built or installed -->
 - [x] 2.23 **取消首次排队预启动控制核心**：自动启动和手动“打开浏览器”在槽位不足时都只登记外壳 FIFO，不 spawn 核心、不连接 Cloud；槽位放行后再完整启动核心与浏览器。启动排队已满同样不得创建控制核心。真实运行后进入冷待机的保留核心行为不变。补源码契约与 FIFO 回归测试。<!-- aidcp-edge d9821d8; focused 202/202; three JS syntax checks and typecheck pass; OpenSpec strict pass; no installer built or installed -->
 - [x] 2.24 **启动排队输入上限从 64 提升到 256**：浏览器并发上限仍保持 64；主进程分别归一两个设置，设置页与回归契约同步，避免扩大排队容量时误放宽真实浏览器并发。<!-- aidcp-edge abd1f44; focused 33/33; acceptance 39/39; full 3071 passed + 1 gated skip; three JS syntax checks and typecheck pass; no installer built or installed -->
+- [x] 2.25 **重复“打开浏览器”不得把已启用的启动队列降级为手动浏览器模式**：环境已由“开始自动化”进入启动/槽位 FIFO、核心尚未创建时，再次打开浏览器只复用原资格，不得把 `automationIntent='enabled'` 覆盖为 `stopped`；锁定“核心与引擎在线 + 浏览器冷待机 → 待机中而非离线”，并保留真正手动打开时自动化关闭的语义。<!-- aidcp-edge 0a36370; focused 208/208, acceptance 39/39, two CJS syntax checks and typecheck pass; OpenSpec strict pass; no installer built or installed -->
 - [ ] 2.8 **手动任务策略未实装**：插队首 → 起浏览器 → 执行 → 完成后关闭归还槽位。队列已支持 `kind:'manual'` 优先级，但「跑完就关」这一段还没接（现在手动任务唤醒后走的是 1.9「重判待机」的通用逻辑）。
 - [ ] 1.9-b **「任务完成后重判待机」未单独实装**：目前依赖云端下一次的待机提示来重新停泊，而不是任务一结束就立刻判。行为正确（不会漏关），但会多占一小会儿槽位。
 
