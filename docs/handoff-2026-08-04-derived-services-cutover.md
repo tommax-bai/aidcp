@@ -311,8 +311,53 @@ cloud typecheck 干净 / acceptance 197 / 全量 4182 pass 0 fail。
 - `environmentOverview`（今日进展）—— 要 automation 的 `buildTodayUsageForAccount`，
   **`aidcp-transport` 里没有现成通道**，得像今早那条环境页通道一样新开一条。
 
-**还有一条要记住的**：这 12 个缺口**在服务端一行日志都不打**（503 直接返回、不记）。
+**还有一条要记住的**：这些缺口**在服务端一行日志都不打**（503 直接返回、不记）。
 用户是靠点客户端点出来的。**这正是 §10 第 6 条那笔根债的又一次现形**。
+
+### 16.1 逐条查清了（四路并行调查，2026-08-04 16:00）
+
+**按契约类型点数是 23 个字段、本仓只装了 9 个 ⇒ 实缺 14**（比对单体手写 main 只能看见 12，
+所以参照物必须用**类型**，不能用另一个手写组装根）。逐条分类：
+
+| 字段 | 分类 | 说明 |
+| --- | --- | --- |
+| `persona` | LOCAL_WIRE | **本仓就是属主**，正把同一套能力经内部 HTTP 供别人用、自己却答 503 |
+| `environmentRisk` | LOCAL_WIRE | 四个上游全在，风控读写两个口面板那边早就 new 过了 |
+| `environmentSchedule` | LOCAL_WIRE | 三张排期表都是本仓属主 |
+| `publishQueue` | LOCAL_WIRE | 上游全在；两个内联 new 要先提成具名变量 |
+| `publishDraftActions` | LOCAL_WIRE | 实现全在；`edit` **MUST 走权威层**、不能走裸存储（否则预览不刷新） |
+| `resolveEdgeIdForAccount` | EXISTING_CHANNEL | **§3.1 把它列进「注定答不了」是错的**：在场事实一直经同步读流进到本进程镜像里 |
+| `curatedContent` | EXISTING_CHANNEL | transport 有客户端、content 进程早注册了路由、且挂在本进程已用的那个口上 |
+| `slowStart` | KERNEL | 真态可得；`dayQuotas` 差两个纯函数（其一牵着整张平台能力注册表） |
+| `environmentOverview` | NEW_CHANNEL + KERNEL | 最贵：4 条新路由（任意时间窗计数 / 活体会话用量 / 配额释放时刻）+ 7 个纯投影函数 |
+| `draftRefinements` | NEW_CHANNEL | 更贵：content 侧**连 store 与 worker 都没接**，补通道也没结果 |
+| `interactionApi` | NEW_CHANNEL | 2 个端口 8 个方法；另有一条**已写好的** reader 通道 automation 侧从未 register。**缺席时客户端是 404 整片路由消失，不是 503** |
+| `onOffboardCreated` | NEW_CHANNEL | 要往边缘推 envelope，而 transport 里根本没有「推给边缘」这类通道 |
+| `personaAutoFill` / `operatorAlias` | 未调查 | 本批未覆盖 |
+
+**顺带查出一条不在这 14 个里的**：离场指令的两个兜底定时器（60s 重投 / 1h 到期清理）
+在拆分后**没有任何进程在跑**。即使补上 `onOffboardCreated`，「边缘当时不在线就靠重试补投」
+这条兜底也已经丢了，离场指令只在边缘下次重连时才投得出去。**未修，登记在此。**
+
+### 16.2 已修并部署（`aidcp-api@961504a`，16:19 部署 dev）
+
+**接了 5 个 + 补了 1 处从未调用的绑定**，全部只用本进程已有的东西、零新通道零 kernel 抬升：
+慢启动 resolver 绑定（`slow_start_projection_unavailable` 的直接成因）、`persona`、
+`environmentRisk`、`resolveEdgeIdForAccount`、`environmentSchedule`、`curatedContent`。
+
+**更要紧的是同批加的那道闸** `aidcp-api/test/acceptance/client-auth-deps-inventory.test.ts`：
+拿**契约类型**（派生物、永远跟得上）对**装配点**，要求每个字段要么接了、要么在缺席表里
+具名写清原因；三个方向都锁（含「缺席表不许烂掉」与「不许既接了又声明缺席」）。
+三个方向各做过变异测试，各只红自己那一条。**这道闸能一次抓住全部 14 个**。
+
+**两处刻意写在原地、没有抹平的限制**：边缘反查在镜像陈旧时对所有账号回 null
+（fail-closed，但与「账号真不在线」同形，故留痕）；周活跃掩码源是三态、而存储选项只收两态，
+陈旧时会渲染成「全天活跃」——**那是一句错话、不是一个缺口**，收窄那个契约不在本批范围内。
+
+**验到哪一步（别读成更多）**：代码已落盘、api 干净重启零错、三个口都在、automation 未受影响、
+新绑定调用的那条下游路由在 dev 上实测答得上。**没有走通客户端那条真实请求**——
+切流时建的验证账号 key 文件 `/root/.cutover-verify-key` 已不在服务器上，登不进去。
+⇒ **`slow_start_unavailable` 与「今日进展」这两条用户仍会看到**（它们分别要 kernel 抬升与新通道，本批没做）。
 
 ## 15. 下一拍（更新版）
 
