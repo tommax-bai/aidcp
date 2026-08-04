@@ -68,11 +68,23 @@
 
 - [x] 6.1 `openspec validate restore-facebook-first-post-recovery --strict` exit 0。
       <!-- aidcp validate --strict exit 0 -->
-- [ ] 6.2 提交推送 `aidcp-edge` master + 控制仓 main，回写本文件 sha。
-      <!-- aidcp-edge 994ac8b + 57d5a07 已推 origin/restore-facebook-first-post-recovery（已 rebase 到 origin/master 0a36370）；
-           合回 master 属集成步，留给 land 环节 -->
-- [ ] 6.3 **不打安装包**（CLAUDE.md §6 长期授权：打包只在用户明确要求时做）。
-      真机验收项登记 `docs/real-machine-acceptance-backlog.md`，写明「须等一次桌面打包才可观测」。
+- [x] 6.2 集成到 `aidcp-edge` master + 控制仓 main，回写 sha。
+      <!-- aidcp-edge 39ccf6c（死分支修复）+ 16c8345（诊断不外泄原始页面串），经 scripts/land-change
+           rebase 后 ff 合入 master 并推送；分支上原 sha 为 994ac8b / 57d5a07。
+           四道验证在 rebase 后复跑：test:acceptance 39/39；npm test 3073 pass / 0 fail / 1 skip；
+           typecheck exit 0；gate:native fmt+clippy+test exit 0。 -->
+- [x] 6.3 **未打安装包**（CLAUDE.md §6 长期授权：打包只在用户明确要求时做）。
+      <!-- 真机验收项已登记 backlog 簇 128.6–128.10，前置写明＝下一次桌面打包（用户日常打包会自然带上，
+           本簇不产生「专门去打个包」的待办）。**与簇 128.1–128.5（引擎诊断通路）同批、须同一次 session 验，
+           顺序是先确认诊断行到得了日志再看首帖行为**——在诊断通路装机之前，本 change 的任何行为调整都无法观测。 -->
+
+## 6.4 实装中自查发现并修掉的一条（值得单独留痕）
+
+- [x] 6.4 **重构一度让阻断态闸被跳过**：落地失败通向纠正导航的那条路上，登录 / 验证码检查被绕过了。
+      后果是验证码墙会让落地判据为假 ⇒ 被判成「没落地」⇒ **去重试**，而不是按验证码自己的终局停手。
+      <!-- aidcp-edge 39ccf6c 闸改为每一轮都跑，含落地失败路径。
+           **这正是本 change 要治的毛病的镜像**：给「停得太早」补续跑时，差点把一个本该停的情形
+           也一起变成重试。实装者提交前自查发现。真机复核见 backlog 簇 128.6。 -->
 
 ## 7. 明确不在本 change 范围（各自需配对的安全补充）
 
