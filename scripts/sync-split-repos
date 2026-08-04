@@ -251,6 +251,17 @@ DERIVED_COMPOSITION = {
         # Cloud 里对应的是组装根里那一大段内联闭包（排期器与它的依赖同进程直调），
         # 跨进程之后依赖实现换了一整套，所以本文件是新写的、没有同名 cloud 对应物。
         'src/api-content-scheduling.ts',
+        # change deploy-derived-services-to-dev：本进程的可执行入口（systemd 的 ExecStart 指它）。
+        # 单体没有对应物 —— 它的入口是 server.ts 末尾那段「被直接执行才启动」的自举。
+        'src/api-service-entry.ts',
+        # 同上：启动期 schema 契约门的调用点。本仓此前**一道门都没有**（只有逐存储 schemaEnsurer、
+        # 且跑在建池之后）。形态与 automation 那份同源：只判本属主 + 不包 try/catch + 发不可伪造回执。
+        'src/api-schema-gate-startup.ts',
+    },
+    'aidcp-content': {
+        # change deploy-derived-services-to-dev：本进程的可执行入口，理由同 api 那两条。
+        'src/content-service-entry.ts',
+        'src/content-schema-gate-startup.ts',
     },
 }
 KERNEL_REPO = 'aidcp-kernel'
