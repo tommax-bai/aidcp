@@ -546,6 +546,92 @@
        - `draftRefinements` 仍缺席（23 个里剩这 1 个）：数据属 content 域，
          transport 里零通道，且 content 进程里 store 与 worker **两个文件躺在仓里无人 new**
          ⇒ 只补通道不够，属主侧也要接线。 -->
+- [x] 8.8 **客户端依赖第三批：`draftRefinements` 接通，23 个依赖全部装配（缺席表清空）**。
+  <!-- aidcp-cloud 01fe8a9 / aidcp-transport 7e6cba4 / aidcp-api 418213f / aidcp-content bd56379
+       / aidcp-automation 2265885（后者只是共享包 pin 跟进）。2026-08-04 deployed。
+
+       **它为什么是这 23 个里最贵的一个**：缺的是两个方向，不是一条通道。
+       - 方向 A（api→content）：作业队列四方法，transport 里零通道。
+       - 方向 B（content→api）：worker 的落稿写口，同样零通道；而 store 与 worker
+         两个文件此前躺在仓里**全仓零 `new`**。
+       两族写在同一个传输文件里（CLAUDE §8.4 硬要求），路由常量只有一份。
+
+       **`refreshPreview` 归属：先判断、后接线（交接文档点名要先答的那题）。**
+       结论是**绑在 api 那次属主写上**，不由 content 侧的 worker 触发 ——
+       本仓 api 组装根早有这条不变量（每次属主写成功产出一份单向预览，见
+       `createApiPublishLogAuthority` 对 editDraft 的包装，与删配图那处的 `refreshPreview: () => {}`）。
+       顺带**堵掉单体留的一个洞**：单体是在作业置完成**之后**才推预览的，
+       置完成失败时稿子已改而预览不推 —— 桌面端继续显示旧稿，用户以为没保存上。
+       绑在写上没有这个洞。content 侧那一格是**显式空实现 + 注释**，不是省略。
+
+       **`loadForDispatch` 刻意不新开路由**：复用既有的
+       `api-direct/publish-log/v1/load-for-dispatch`。端口完整性改由 content 组装根那处
+       对象字面量在编译期钉（端口加方法则当场缺属性），路由表用
+       `Exclude<…, 'loadForDispatch'>` 显式声明这个分工。两条同义路由只会各自演化。
+
+       **跨属主外键的代偿仍然成立**（交接文档要求核的那条）：创建入口
+       `client-auth-server.ts` 先经 `pendingPublishPreviewForAccountRecord` 读一次 publish_log，
+       读不到当场 404、走不到 create()。拆开后它**仍是进程内读**（publish_log 与该入口
+       同属 api），不是跨进程调用 —— 那条前置没有变成「读不到就放行」。
+
+       **三处跨进程保真，各带一条会红的闸（逐条变异测试过，共 10 次）**：
+       - `latestForAccountRecords` 回 `Map`，而 `JSON.stringify(Map)` 是 `{}`。
+         直接回 map ⇒ 待审稿列表上每条稿子永远显示「没精修过」，**没有人会为此报障**。
+         线上以 entries 传，两侧各做一次显式转换（AC-REFINE-03）。
+       - 唯一活跃作业冲突码 `23505` MUST 原样过线：客户端鉴权服务只认它来答 409
+         `refinement_already_active`，丢了就是 500「服务器错误」（AC-REFINE-04）。
+         它能活下来靠两级既有行为（`encodeHandlerError` 透传带 string code 的抛出物 +
+         `translateWriteFailure` 对不认识的 code 原样重抛），故必须有闸钉住。
+       - 落稿写口多出一种**单体没有的结局**：写已提交、应答在回程丢了。
+         worker 的兜底文案写着「原稿未变化」——那句话在这一态下是假的。
+         现按具名 `api_authority_result_unknown` 单独出一条「已提交但没能确认，
+         请刷新查看当前版本，不要重复发起」（AC-REFINE-06 + worker 两条用例）。
+         重投本身安全（写口是 expectedVersion 的 CAS，真落了会拿到 version_conflict），
+         **要治的只是回执说了假话**。
+
+       **dev 实测（附证据）**：三服务 active、NRestarts=0、六端口全在、
+       automation 就绪 `state=ready` `blockers=[]`、`aidcp-cloud` 仍 inactive/disabled、
+       isales 四服务未碰。两族路由**逐条真打过**：
+       - 无令牌 → `internal_http_unauthorized`；同前缀的假路由 → `route_not_found`
+         （**两个响应体不同**，这就是「路由在」与「路由不在」的判别式）；
+       - content 队列真读了一次自己的库：`{"ok":true,"result":null}`
+         （这个账号没精修过 —— 是答案，不是失败）；
+       - api 落稿写口真执行了一次：`{"ok":true,"result":{"ok":false,"reason":"not_found"}}`
+         （recordId 不存在，零写入）；
+       - 信封版本号写错 → `api_direct_version_unsupported`。
+       content 启动日志：`DraftRefinementStore 已就绪（target=dev, 回收中断认领=0）` +
+       能力清单 `已注册=…、draft-refinement-queue；未注册=无`。
+
+       **配置**：content 的 `.env` 新增 `AIDCP_API_INTERNAL_TOKEN`（值取自 api 侧同名项）。
+       这是**启动期必需**：回落到不带令牌只会一律 401，而 401 在 worker 眼里与
+       「api 拒绝了这次改稿」同形 —— 每条精修都失败、且失败原因指向错的地方。
+
+       **未验（MUST NOT 读成已验）**：没有从真客户端走过一次真精修。
+       503 那条分支现在是**结构上不可能**的（那一格由必需 env 无条件构造），
+       但「用户在客户端上点一次精修真能跑完」需要一条真待审稿 + 在线边缘，两者都不具备。 -->
+- [x] 8.9 **部署当天踩了同步读那颗老雷，并按既有办法恢复**（22:33–22:43，8787 未放行 10 分钟）。
+  <!-- **不是本批改动引入的，是「重启即触发」**：automation 一重启就以
+       `same_cursor_payload_drift` 永久拒收两条流（`account_persona` cursor=2345、
+       `automation_account_projection` cursor=462240），启动期 fail-closed ⇒
+       `businessIngressStarted=false` ⇒ **8787 不放行**（api / content 全程正常）。
+
+       **机理**：两条流的 cursor 就是 `config_mirror_version` 里 `persona_config` / `account_status`
+       两行的版本号（经 cantor 配对，实测 cantor(0,67)=2345 / cantor(0,960)=462240 逐位对上），
+       而载荷读的是 `persona_config` / `accounts` 两张表。**19:33 那次启动之后到 22:33 之间，
+       有人改了这两张表而没有推进对应的镜像版本** ⇒ 同一个 cursor 上载荷变了 ⇒ 消费方
+       按设计正确拒收，且 `forcedState='invalid'` 是永久的（只有 cursor 真前进才解）。
+
+       **属主自带的「镜像失效信号」路由在这里帮不上忙，而且是对的**：
+       `config-mirror/apply-bump` 对这两个键**主动拒绝**——它们与版本表同库，
+       按设计只能走属主写入同事务里的 `bumpInTx`，跨域中继信号不该碰。
+
+       **恢复（用户 2026-08-04 当场裁定）**：在 api 库把那两行版本号各 +1
+       （67→68 / 960→961）。这正是仓里 `0091_facebook_comment_config_snapshot_revision` 与
+       `0108_facebook_operation_policy_snapshot_revision` 两条迁移做的同一件事。
+       20 秒内 automation 自行回到 `state=ready` `blockers=[]`、8787 放行、六端口齐。
+
+       **真正的债不在这次恢复，而在「谁写了那两张表却没推版本」**：已在 8.1 的同族问题里，
+       本条另行登记（见交接文档）。每一次 automation 重启都可能再撞一次。 -->
 - [ ] 8.3a **ol 不在本 change 范围内**（用户 2026-08-03 重申）：由用户单独提出才做，
   且届时须建发布分支、按发布分支部署。**"dev 是否 ok"由用户判定**——
   实施方 MUST NOT 自行宣布 dev 已就绪并据此推进 ol。

@@ -163,6 +163,12 @@ TRANSPORT_MEMBERS = [
     # 「已发出但核不到」（409、不可重试）会被折成可重试的 500，客户端据此重投一条可能已上墙的命令。
     'src/transport/interaction-failure-wire.ts',
     'src/transport/interaction-automation-http.ts',
+    # 同族第十一（同 change）：客户端里的「稿件精修」。它是本批唯一**两个方向都断**的能力——
+    # 作业队列表属 content 而唯一入口在 api（方向 A），精修 worker 跑在 content 而 publish_log 属 api
+    # （方向 B）。两族同文件是因为它们是同一条链路的两半，拆成两个文件就会各自演化。
+    # 两条跨进程保真都写在文件头：`Map` 直接 JSON 化会变成 `{}`（列表页从此永远显示「没精修过」）；
+    # 唯一活跃作业的 `23505` 冲突码必须原样过线，否则「已经在调整了」会被压成 500。
+    'src/transport/draft-refinement-http.ts',
     # 批次 4b：api/automation 同步读镜像的版本化完整快照 route/client。
     # 只承载 Bearer、server-injected target、owner stream allowlist 与 envelope 校验；
     # owner snapshot 生成和 consumer 本地镜像实现仍各自留在属主仓。
