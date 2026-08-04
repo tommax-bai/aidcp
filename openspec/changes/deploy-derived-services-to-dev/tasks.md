@@ -293,7 +293,7 @@
 
 ## 8. 归属第二拍 + 收口
 
-- [ ] 8.0 **退役动作（第二拍）**：主要测试通过后，删除或改名归档单体那四个按角色切段的 unit，
+- [x] 8.0 **退役动作（第二拍）**：主要测试通过后，删除或改名归档单体那四个按角色切段的 unit，
   `segmentsForMode` 里那几个角色分支的处置同批在代码里写清。
   **这一步不做完，本 change 不算收口**——判定写在文档里而 unit 还躺在机器上，
   下一个人看到的是"有这么四个 unit 可以用"。
@@ -314,14 +314,69 @@
        ④ **`aidcp-content/.env` 设了 `AIDCP_SERVICE=content`，而 content 仓一处都没读它**（纯遗留）；
           对照之下 **`aidcp-automation` 是硬要求**（`AIDCP_SERVICE !== 'automation'` 直接抛），
           `aidcp-api` 也仍在读 ⇒ **这三行 .env 不可一概而论地清掉**，逐仓判。
-       ⑤ **跨 change 后果（需先裁定，不由本 change 单方面决定）**：退役这四个 unit
-          会直接作废活跃 change `fix-cloud-multi-service-deploy-script` 的未完成项 2.3
+       ⑤ **跨 change 后果**：退役这四个 unit 直接作废了活跃 change
+          `fix-cloud-multi-service-deploy-script` 的未完成项 2.3
           （"用三进程脚本把单体部署到 dev 并逐项验证"）。派生仓这条路已经跑通，
           而单体三进程脚本 7月26 那次正是 fail-closed 回滚的 ⇒ 2.3 的正确处置是
-          **判为过时并关掉**，而不是去执行它。**MUST NOT 由本 change 静默替另一条 change 做这个决定。** -->
-  <!-- 退役动作的建议做法（尚未执行，供裁定）：单体的四个角色模式 MUST NOT 改成
-       "未识别值回落 monolith" —— 那会让一个要求按角色切段的进程**静默起成完整单体**
-       （连带抢写者锁与 8787），正是"静默假成功"。要退就退成 **fail-closed 显式拒启动 + 具名指向派生仓**。 -->
+          **判为过时并关掉**，而不是去执行它。**用户 2026-08-04 已裁定按此处置。**
+
+          **处置结果：该 change 整条废弃删除，不归档。** 理由是归档的语义不对 ——
+          它的 spec delta（`cloud-multi-service-deployment`）全是"多服务部署脚本必须如何如何"
+          的 ADDED 要求，而归档会把 delta 并进 `openspec/specs/` 并**新建**这份主 spec
+          （核对过：主 spec 此前不存在）。那等于**给一个刚被删掉的能力建一份现行规格**。
+          先例：`facebook-scheduled-comment`（设计已被取代 ⇒ 废弃删除，见 CLAUDE.md §3）。
+
+          **它做过的事不因废弃而失效，就地记在这里**：1.1 / 1.2 修的是
+          `deploy-multi.sh` 里六处未加花括号、紧跟中文标点的变量展开（`set -u` 下会被当成
+          未定义的扩展名），落在 `aidcp-cloud@b4694df`，并配了一条词法护栏用例。
+          那是真 bug、真修了；脚本本身今天随 8.0 一并删除，护栏用例同批删（守的东西没了）。
+          2.3 唯一一次真部署是 7月26：API panel 起不来
+          （`composition_dependency_unavailable: server`），脚本 fail-closed 自动回滚单体 ——
+          **那也是那四个 unit 最后一次运行**。
+          **留给下一个想重做「单体按角色切段」的人**：这条路走到过这里，停在这里，原因在上面。 -->
+  <!-- 2026-08-04 **已执行**（用户当日裁定「全退役」）。三处一起落，缺任一处都只是换了个马甲：
+
+       ① **代码**（`aidcp-cloud@405c53c`）：`serviceModeFromEnv` 对 content / automation / api / core
+          四个名字抛具名 `RetiredServiceModeError`（带 `requestedMode` / `successor` 两个字段，
+          按 name 判而非 instanceof —— 这个错误会跨包传）。**刻意不回落 monolith**：
+          回落 = 有人要求按角色切段、进程却静默起成完整单体，连带抢走自动化写者锁与边-云 8787，
+          正是「静默假成功」。未识别的**其它**值仍回落 monolith（既有安全底线，本次不动）。
+          错误文案具名指向去处，`core` 明写「没有对应派生仓」而不是指向一个不存在的仓。
+       ② **部署工件**（同一提交）：删掉 `aidcp-cloud/deploy/multi-service/`
+          （四个 unit 文件 + 三进程脚本 `deploy-multi.sh` + README）与该脚本的词法护栏用例
+          `test/deploy-multi-script.test.ts`（删前确认：那条用例只守被删脚本里的一件事，别无其他）。
+          留 `deploy/README.md` 作墓碑，写清四个角色现在归谁、以及为什么是删不是留。
+       ③ **机器**：dev 上四个 unit 移进 `/opt/aidcp/retired-units-20260804/`（含 README 说明去向）
+          + `daemon-reload`。移前复核：四个全 inactive + disabled、无 enable 软链、
+          **无任何其它 unit 引用它们**。移后复核：三个派生服务仍 active 且 `NRestarts=0`、
+          六个端口仍在、自动化就绪度仍 `ready` + `ingress=true`、
+          **回滚路 `aidcp-cloud.service` 仍 loaded+enabled**、systemd 里 `aidcp-cloud-*` 计数归 0、
+          **isales 四个服务全程 active 未碰**。
+
+       **同步**：`service-mode.ts` 属 api 层、本就该同步进 `aidcp-api`，经 `scripts/sync-split-repos --apply`
+       落到 `aidcp-api@b79793e`；该仓 `src/` **零调用点**（它的入口在自己的 `server.ts` 里另做
+       `AIDCP_SERVICE=api` 检查），故运行中的 dev api 不受影响；`test/` 不派生，那份手抄用例一并对齐。
+       五仓全量对账：内容不同 0（只剩手写组装根的「只报不改」）。
+
+       **验证**：闸做过变异测试 —— 把 throw 摘掉换成静默回落，三条新用例全红、
+       而**原有 21 条全绿**，即旧用例原理上抓不住这个回归。cloud typecheck 干净、
+       acceptance 197/197、全量 4182 pass / 0 fail；api typecheck 干净、该用例 24/24。
+
+       ⚠ **本批刻意没有部署任何新代码到 dev**，理由逐条：
+       - 单体 `/opt/aidcp/cloud` 是**回滚路径**，今天已真走通两次。往一条验证过的回滚路上
+         推一版**没做过启动验证**的代码，是把它变得更不可靠，不是更新。
+       - 且这次改动对回滚**行为等价**：回滚起的是 monolith 模式（`AIDCP_SERVICE` 未设），
+         新旧代码在该路径上同义；退役闸只在设了那四个名字时才有动作，
+         而能设它们的那四个 unit 已经不在机器上了。
+       - api 侧同理且更明确：`src/` 零调用点 ⇒ 纯 no-op，为它重启一个现役服务是净风险
+         （上一次 api 重启就撞出了同步读的启动竞态，见 7.1 记录）。
+       ⇒ **dev 上单体与 api 跑的仍是退役前那版字节**，这是有意的、不是漏部署；
+          下次这两个服务因别的原因部署时自然带上。 -->
+  <!-- **后续清理项（已登记，本批刻意不做）**：`segmentsForMode` 等七个 `xxxForMode` 分段函数
+       的非 monolith 分支现在运行时不可达，但**保留**着。两条理由：一来那些分支里记的是
+       「哪个形态下谁有消费者」这类**判据本身**（尤其面板事件旁路与 outbox 保留期那两张表），
+       删掉等于把结论连同理由一起丢；二来连根拔起要同时改组合根十余处，而单体正是 OL 生产 +
+       dev 回滚路径 —— 那是一次独立重构，不该搭在退役这一批里。 -->
 - [x] 8.1 把 soak 里暴露但本批不修的问题**逐条**登记（backlog 或新 change），
   写清现象、复现条件、以及为什么本批不修。MUST NOT 只留在会话里。
   <!-- 2026-08-04 切流当天暴露、**本批未修**的六条，逐条如下（三条已归入 backlog 簇 60）：
