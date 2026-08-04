@@ -151,6 +151,10 @@ TRANSPORT_MEMBERS = [
     # 粒度刻意是「装配好的整块」而不是几项原料：平台能力注册表被终局裁定留在 automation，
     # 接口进程永远拿不到它，而硬拼时给投影传空值**不报错**、只会让 FB 账号重新看到「收藏 0/N」。
     'src/transport/client-usage-http.ts',
+    # 同族第八个：客户提交离场后的即时派发触发。属主域才有连接注册表与推送出口，
+    # 接口域没有任何办法推。**路由刻意不收 edgeId**——推送目标必须在属主进程就地解析，
+    # 取自调用方那份会陈旧的在场镜像等于把「推给谁」建立在过期事实上。
+    'src/transport/interaction-offboard-http.ts',
     # 批次 4b：api/automation 同步读镜像的版本化完整快照 route/client。
     # 只承载 Bearer、server-injected target、owner stream allowlist 与 envelope 校验；
     # owner snapshot 生成和 consumer 本地镜像实现仍各自留在属主仓。
