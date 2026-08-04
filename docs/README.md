@@ -15,6 +15,7 @@
 | [`deployment-environments.md`](deployment-environments.md) | dev / ol 边界、检查和部署安全流程 |
 | [`parallel-dev-worktrees.md`](parallel-dev-worktrees.md) | 多仓 worktree 与集成规范 |
 | [`risk-control.md`](risk-control.md) | 风控机制、配额与状态语义 |
+| [`stop-or-continue.md`](stop-or-continue.md) | 失败判定与加闸准入：何时停手、何时必须继续、新加一道闸的门槛 |
 | [`acceptance-tests.md`](acceptance-tests.md) | 代码验证、协议验证和真机验证分层 |
 | [`real-machine-acceptance-backlog.md`](real-machine-acceptance-backlog.md) | 尚未完成的共享机器/真实平台验证 |
 
