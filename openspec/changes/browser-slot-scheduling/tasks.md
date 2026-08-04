@@ -51,7 +51,7 @@
 - [x] 2.21 **客户端排队分组按权威位次排序**：环境栏「排队中」组按有效 `queuePosition` 升序展示；未知位次稳定置后，不再沿用与 `#1…#N` 冲突的花名册顺序。补视图模型回归测试。<!-- aidcp-edge ffc3004; focused 100/100, full suite exit 0, node --check and typecheck pass; ff-only pushed to master -->
 - [x] 2.22 **修复当天环境目标统一改动触发的幽灵槽位回归**：连接回执核对本次 spawn 时冻结的认证目标，不因令牌刷新窗口重新读取易变会话状态而误杀同目标核心；OS 进程 `exit` 后立即归还执行槽位并推进 FIFO，`close` 只负责末尾日志归因且有界兜底，杜绝进程已消失但客户端永久显示 4/4。<!-- aidcp-edge d6dde80; focused 43/43; post-rebase full 3067 passed, 1 gated skip; node --check and typecheck pass; OpenSpec strict pass; no installer built or installed -->
 - [x] 2.23 **取消首次排队预启动控制核心**：自动启动和手动“打开浏览器”在槽位不足时都只登记外壳 FIFO，不 spawn 核心、不连接 Cloud；槽位放行后再完整启动核心与浏览器。启动排队已满同样不得创建控制核心。真实运行后进入冷待机的保留核心行为不变。补源码契约与 FIFO 回归测试。<!-- aidcp-edge d9821d8; focused 202/202; three JS syntax checks and typecheck pass; OpenSpec strict pass; no installer built or installed -->
-- [x] 2.24 **启动排队输入上限从 64 提升到 256**：浏览器并发上限仍保持 64；主进程分别归一两个设置，设置页与回归契约同步，避免扩大排队容量时误放宽真实浏览器并发。<!-- aidcp-edge: focused 33/33; three JS syntax checks and typecheck pass; no installer built or installed -->
+- [x] 2.24 **启动排队输入上限从 64 提升到 256**：浏览器并发上限仍保持 64；主进程分别归一两个设置，设置页与回归契约同步，避免扩大排队容量时误放宽真实浏览器并发。<!-- aidcp-edge abd1f44; focused 33/33; acceptance 39/39; full 3071 passed + 1 gated skip; three JS syntax checks and typecheck pass; no installer built or installed -->
 - [ ] 2.8 **手动任务策略未实装**：插队首 → 起浏览器 → 执行 → 完成后关闭归还槽位。队列已支持 `kind:'manual'` 优先级，但「跑完就关」这一段还没接（现在手动任务唤醒后走的是 1.9「重判待机」的通用逻辑）。
 - [ ] 1.9-b **「任务完成后重判待机」未单独实装**：目前依赖云端下一次的待机提示来重新停泊，而不是任务一结束就立刻判。行为正确（不会漏关），但会多占一小会儿槽位。
 
