@@ -142,6 +142,10 @@ TRANSPORT_MEMBERS = [
     'src/transport/facebook-group-ops-http.ts',
     'src/transport/group-route-http.ts',
     'src/transport/alert-resolution-http.ts',
+    # 同族第六个（2026-08-04 切流当天补）：客户环境生命周期对 automation 域的只读投影。
+    # 它此前一直缺，后果是**管理后台的环境页整页 500** —— 接口进程侧那个端口是
+    # 「未注入即当场抛」的形态，而拆开之后它本来就注入不了（不该持有 automation 库连接）。
+    'src/transport/client-env-automation-http.ts',
     # 批次 4b：api/automation 同步读镜像的版本化完整快照 route/client。
     # 只承载 Bearer、server-injected target、owner stream allowlist 与 envelope 校验；
     # owner snapshot 生成和 consumer 本地镜像实现仍各自留在属主仓。

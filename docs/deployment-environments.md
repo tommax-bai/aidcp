@@ -30,10 +30,23 @@
 
 | Path | Meaning |
 | --- | --- |
-| `/opt/aidcp/cloud` | cloud runtime |
+| `/opt/aidcp/cloud` | cloud runtime（单体；**dev 上已停用，见下**） |
 | `/opt/aidcp/cloud/.env` | target-local runtime env, loaded by `aidcp-cloud.service` |
+| `/opt/aidcp/api` `/opt/aidcp/automation` `/opt/aidcp/content` | 派生三服务的部署位（**dev 现役**） |
 | `/opt/aidcp/console` | console static files served by nginx |
 | `/opt/aidcp/downloads` | optional edge installer download fallback |
+
+### dev 与 ol 的运行形态**已经不一样了**（2026-08-04 起）
+
+| | dev | ol |
+| --- | --- | --- |
+| 现役进程 | **派生三服务**：`aidcp-api` / `aidcp-automation` / `aidcp-content` | 单体 `aidcp-cloud` |
+| 单体 `aidcp-cloud.service` | **已停**（保留为回滚路，且已带最新修复） | 现役 |
+| 端口 | 8787 边-云（automation）/ 8090 面板 + 8091 客户鉴权（api）/ 8092 内容 / 8093 接口 / 8094 自动化 | 8787 / 8090 / 8091 全在单体 |
+
+**这条差异会咬人**：dev 上「重启云端」不再是 `systemctl restart aidcp-cloud`，
+而是三个 unit；「改 .env」也要分清改的是哪个服务那份。ol 不受影响、口径照旧。
+dev 的回滚路见 `docs/handoff-2026-08-04-derived-services-cutover.md` §9（今天真走过两次）。
 
 ## Invariants
 
