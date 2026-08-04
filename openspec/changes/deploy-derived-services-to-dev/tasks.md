@@ -470,6 +470,82 @@
        **留给下一个人的判据**：这类「同游标不同载荷」今天已经出现过两次
        （人设解析一次、运营策略一次），根因是同一类 —— **载荷依赖的东西没被游标覆盖**。
        新增同步读流时，先问一句「这份载荷是从哪几张表算出来的、它们变了游标会不会动」。 -->
+- [x] 8.6 **客户端依赖第二批：互动能力接通（23 个里从 21 补到 22）**，外加两处上一批遗留的账本漂移。
+  <!-- 2026-08-04 19:00–20:00。**接手第一件事是跑对账，跑出两条交接文档没记的漂移**：
+       ① 上一批修互动能力自检那两处（`aidcp-automation@28f96be`）**只落在派生仓、没回流事实源**。
+          派生仓 src/ 是 aidcp-cloud 归属清单的重放 ⇒ 下一次 `--apply` 会把它原样冲掉、
+          互动能力在 dev 上重新整体关上，而且编译过、测试过、启动不吭声。已回流（cloud a677e93）。
+       ② `aidcp-content` 的 transport pin 停在一个未提交、且已落后两个提交的 sha（content 7a3798c）。
+
+       **接通的东西**（cloud cd465a1 / af3a3d2 / becc468 → kernel 030d805 → transport f187486 →
+       automation 73ddd47 / 65c88c8 → api c16dcd1 → 控制仓 02b2f95e）：
+       - **先做前置：跨进程失败保真**。互动失败自带 httpStatus / retryable / details 三格，
+         而通用传输骨架只搬 code + message。丢掉之后「已发出但核不到」（409、不可重试）
+         会被折成可重试的 500 ⇒ 客户端重投一条可能已上墙的评论 / 私信。
+         新增 `interaction-failure-wire`（两侧编解码）+ kernel 的 `asInteractionFailure`
+         结构判别（`instanceof` 对跨进程搬来的错误恒 false，对装了两份 kernel 的同进程也恒 false）。
+         **分档判据用补集**：只有「对面答没这条路由」「对面答鉴权没过」两条能证明处理函数没跑过，
+         其余一律按「可能已发出」算。提交点名单从 kernel 常量派生、不手抄第二份。
+       - **21 条路由 + 1 条新通道**：store-reader（13，此前写好了但 automation 从没 register）、
+         workflow（3）、send（5）、runtime-controls deliver（1，新写；缺它客户改的开关要等边缘
+         下次重连才生效，而客户端只看到 delivered:0）。三族在互动能力不可用时**照样注册**、
+         由具名缺席实现带原因拒绝——不注册的现形方式是 404，而 404 只会被读成「对面漏注册」。
+       - **两个端口抬进 kernel**（`interaction-automation-ports`）：传输包只许引 kernel，
+         否则只能在传输层再声明一份结构相同的接口。同批把 `requestAuthReopen` /
+         `requestBrowserControl` 改成异步——跨网络它们不可能是同步的，而
+         `string | Promise<string>` 的端口会让调用方漏掉 await、把 Promise 当 requestId 写进台账。
+       - **恢复循环搬过来了**（`drainInteractionRecovery`，拆仓时漏搬、全仓零调用方）：
+         此前一条 queued 回复只要那次 fire-and-forget 下发失败就再没有任何东西会派发它，
+         而客户端一直显示「已批准、在发」。
+       - **三个提交点补 `!claim.fresh` 守卫**（同步 / 重开登录 / 浏览器控制）：拆进程后失窗
+         从「进程崩溃」放大成「一次网络超时」，重投重开登录会把用户正在扫的二维码顶掉。
+       - **工作流单独一条放宽超时的连接**（默认 90s）：那三个方法各跑一次模型调用，
+         对着 15s 默认必然超时，而属主侧照常把任务推进 —— 「看起来失败其实成功」。
+
+       **闸**：新增 `AC-INTXP-01..07`（失败保真 + 提交点分档，**做过两次变异测试**：
+       摘掉 details 搬运、把提交点分档改成恒 read，各自当场红且点名到具体项）；
+       automation 路由清单闸补四族（同样变异测试过）；api 依赖清单闸的缺席表从 2 条降到 1 条。
+
+       **顺带修好一条自上一批起就红着的闸**：automation 的派生归属账本比代码旧 4 条，
+       `boundaries:refresh` 因一个自 content-scheduler change 起就未裁定的文件而一直拒跑。
+       登记现状（非重新裁决）后账本回到 273/273、forbidden=0。
+
+       ⚠️ **部署时踩到一个交接文档没记的雷，务必知道**：`aidcp-cloud.service` 在切流后
+       **仍是 enabled**，且从那时起一直在崩溃重启（重启计数已到 31），就等自动化一重启
+       就把写者锁抢走。本次 `systemctl restart aidcp-automation` 正好把 dev 交回了单体
+       —— 单体拿到锁与 8787，派生自动化反而起不来（8094 消失）。已 stop + disable 单体，
+       派生三服务恢复。**退役第二拍（8.0）只处理了那四个按角色切段的 unit，主 unit 漏了。** -->
+- [x] 8.7 **dev 部署与实测**（2026-08-04 19:33–20:05）。
+  <!-- 序列：三槽各自备份（api/automation/content.bak.20260804-193341.tar.gz + .env 备份）→
+       rsync（排除 .git / node_modules / .env）→ 各槽 `rm -rf node_modules/aidcp-{kernel,transport}`
+       + npm install（ssh agent 转发）→ **ECS 上三槽各跑一次 typecheck，全 0** →
+       按「属主域先、接口域后」重启（content → automation → api）。
+
+       **已验（附证据）**：
+       - 三服务 active、NRestarts=0、六端口全在（8787 / 8090 / 8091 / 8092 / 8093 / 8094）、
+         automation 就绪度 `state=ready` `blockers=[]`；isales 四服务未碰。
+       - 四条新路由在 8094 上**逐条真打过**，且**失败保真肉眼可见**：
+         `interaction-workflow/generate` 回 `INTERACTION_NOT_FOUND` 并在 wire 上带着
+         `interactionFailure{httpStatus:404, retryable:false}`；
+         `interaction-send/request-browser-control` 回 `INTERACTION_UPSTREAM_UNAVAILABLE` 同形；
+         `interaction-runtime-controls/deliver` 回 `{delivered:0}`（**边缘不在线是事实、不是失败**）。
+       - **客户端那片路由真的在了**（交接文档 §1 点名唯一没验到的一环，这次走通了一半）：
+         临时启用 + 轮换 `cutover-verify-0804` 的 key（该账号零环境、用完立刻停回 disabled），
+         用真客户 token 打 `/environments/<未拥有>/interactions` 回的是**互动 API 自己的错误信封**
+         （`INTERACTION_NOT_FOUND` + requestId + retryable），而同一 token 打一个非收件箱路径
+         回的是客户鉴权的裸 `{"error":"not_found"}`。**两个 404 的响应体不同**，
+         这正是「整片路由消失」与「路由在、只是这个资源不属于你」的干净判别式。
+
+       **未验（如实记，MUST NOT 读成已验）**：
+       - **没有一次真的走到自动化进程的收件箱调用**：验证账号不拥有任何环境，
+         归属闸在任何一次 store 调用之前就短路了。要走通需要给它绑一个真环境，
+         那是对客户环境归属的写入，本批刻意不做。
+       - **边缘仍然一台都没连上**（8787 established 恒 0，切流至今）。
+         回复的生成 / 下发 / 同步 / 浏览器控制**全部需要在线边缘**，故这一批的
+         端到端行为一次都没被真实执行过验证。
+       - `draftRefinements` 仍缺席（23 个里剩这 1 个）：数据属 content 域，
+         transport 里零通道，且 content 进程里 store 与 worker **两个文件躺在仓里无人 new**
+         ⇒ 只补通道不够，属主侧也要接线。 -->
 - [ ] 8.3a **ol 不在本 change 范围内**（用户 2026-08-03 重申）：由用户单独提出才做，
   且届时须建发布分支、按发布分支部署。**"dev 是否 ok"由用户判定**——
   实施方 MUST NOT 自行宣布 dev 已就绪并据此推进 ol。

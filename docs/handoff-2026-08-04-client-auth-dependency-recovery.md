@@ -7,12 +7,16 @@
 
 ---
 
-## 0. 一句话现状
+## 0. 一句话现状（2026-08-04 20:05 更新）
 
-dev 上跑的是三个派生服务（单体已停）。**桌面客户端的依赖从 9 个补到 21 个（共 23）**，
-用户当天报的三条错全部已修并上线。剩 `draftRefinements` 与 `interactionApi` 两个。
+dev 上跑的是三个派生服务（单体已停 **且已 disable**，见 §1.5）。
+**桌面客户端的依赖从 9 个补到 22 个（共 23）**，剩 `draftRefinements` 一个。
+互动能力（客户端收件箱）这一批已接通并上线，含跨进程失败保真那道前置。
 
 **接手第一件事：自己跑一遍，别信下面的数字。**
+**第二件事：跑一次 `scripts/sync-split-repos`（不带参数即对账）** —— 上一批有两处修改
+只落在派生仓、没回流事实源 `aidcp-cloud`，下一次 `--apply` 会把它们静默冲掉。
+这类漂移**只有跑对账才看得见**，编译、测试、启动日志全都不会说话。
 
 ```bash
 # 三服务 + 端口 + 就绪度
@@ -27,25 +31,43 @@ ssh -i ~/codes/dev-0722.pem root@121.89.85.150 \
 cd ../aidcp-api && grep -oE "^  [a-zA-Z_]+:" test/acceptance/client-auth-deps-inventory.test.ts
 ```
 
-18:00 实测：三服务 active、`NRestarts=0`、六端口在、就绪度 `ready` / `blockers=[]`、isales 四服务未碰。
+20:05 实测：三服务 active、`NRestarts=0`、六端口在、就绪度 `ready` / `blockers=[]`、isales 四服务未碰；
+`aidcp-cloud` 已 `inactive` + `disabled`。
 
-各仓 head：`aidcp@002cb267` / `aidcp-cloud@c13dc3a` / `aidcp-api@ade7ebe` /
-`aidcp-automation@28f96be` / `aidcp-transport@39be161`。
-openspec change `deploy-derived-services-to-dev` 29/40。
+各仓 head：`aidcp-cloud@becc468` / `aidcp-kernel@030d805` / `aidcp-transport@f187486` /
+`aidcp-api@c16dcd1` / `aidcp-automation@65c88c8` / `aidcp-content@32c65f4`。
+openspec change `deploy-derived-services-to-dev` 31/42。
 
 ---
 
-## 1. ⚠ 唯一没验到的一环（**别声称它好了**）
+## 1. ⚠ 没验到的那些（**别声称它们好了**）
 
-**客户端那条真实请求，我一次都没走通。** 切流时建的验证账号 key 文件
-`/root/.cutover-verify-key` 已不在服务器上，登不进客户鉴权口。
+**「用户的客户端现在好了」这句话仍然没有证据。** 请用户在客户端上点一次那几处
+（慢启动、今日进展、发布队列、收件箱）再下结论。
 
-所以能说的只有：代码上线、服务干净重启、被调用的下游路由**实测答得上**。
-**「用户的客户端现在好了」这句话没有证据。** 请用户在客户端上点一次那三处
-（慢启动、今日进展、发布队列）再下结论。
+已经推进了一半的：**客户鉴权口那条真实请求走通过一次**（2026-08-04 20:00）。
+做法是临时启用 + 轮换 `cutover-verify-0804` 的 key（该账号零环境，用完立刻停回 disabled）。
+它证明的是**路由族真的在**：用真客户 token 打收件箱路径回的是互动 API 自己的错误信封，
+而打一个非收件箱路径回的是客户鉴权的裸 404 —— 两个 404 的**响应体不同**，
+这就是「整片路由消失」与「路由在、只是这个资源不属于你」的干净判别式。
 
-同理，**边缘从未连上过 dev**（切流至今 8787 上 established 恒为 0）。
-「边缘能完成协议握手并建运行时」这条也仍是零证据 —— 详见旧文件 §12。
+**仍然没验到的三条**：
+1. **没有一次调用真的走到自动化进程的收件箱**：验证账号不拥有任何环境，
+   归属闸在任何 store 调用之前就短路了。要走通得给它绑一个真环境（对客户环境归属的写入）。
+2. **边缘从未连上过 dev**（切流至今 8787 上 established 恒为 0）。
+   互动这一批的生成 / 下发 / 同步 / 浏览器控制**全部需要在线边缘** ⇒
+   端到端行为一次都没被真实执行过。
+3. 「边缘能完成协议握手并建运行时」仍是零证据 —— 详见旧文件 §12。
+
+## 1.5 ⚠ 一个会咬人的部署雷（本次踩到了，已拆）
+
+**`aidcp-cloud.service` 在切流后仍是 `enabled`，并从那时起一直在崩溃重启**
+（重启计数到 31）—— 它每 5 秒尝试一次抢自动化写者锁，只是一直抢不到。
+于是**任何一次 `systemctl restart aidcp-automation` 都会把 dev 交回单体**：
+重启的那几秒空窗里单体拿到锁与 8787，派生自动化反而永久起不来（8094 消失）。
+
+已 `stop` + `disable` 单体。退役第二拍（tasks 8.0）只处理了那四个按角色切段的 unit，
+**主 unit 漏了**。下次动 ECS 前先确认 `systemctl is-enabled aidcp-cloud` = `disabled`。
 
 ---
 
@@ -71,6 +93,21 @@ openspec change `deploy-derived-services-to-dev` 29/40。
 ---
 
 ## 3. 剩下两个的前置与陷阱
+
+### 3.0 ✅ `interactionApi` —— **已接通并上线**（2026-08-04 20:00）
+
+下面 3.1 的全文**作为记录保留**（它写清了为什么必须先做失败保真），但那些"待办"都已做完：
+
+- 跨进程失败保真做在 `aidcp-transport/src/transport/interaction-failure-wire.ts`；
+  结构判别 `asInteractionFailure` 在 kernel 的 `interaction-types.ts`。
+  **分档判据是补集**：只有「对面答没这条路由」「对面答鉴权没过」两条能证明处理函数没跑过，
+  其余（超时 / 连接断 / 回包坏 / 认不出的抛出物）一律按「可能已发出」算。
+- 21 条路由 + 1 条新通道已注册（store-reader 13 / workflow 3 / send 5 / runtime-controls 1）。
+- 两个端口抬进 kernel（`interaction-automation-ports.ts`），提交点名单是那里的运行时常量，
+  传输层从它派生分档、**不手抄第二份**。
+- `requestAuthReopen` / `requestBrowserControl` 已改异步；三个提交点补了 `!claim.fresh` 守卫；
+  恢复循环已搬进 automation；工作流那三个方法拿单独一条 90s 超时的连接。
+- 闸：`AC-INTXP-01..07`（做过两次变异测试）+ automation 路由清单闸四族 + api 依赖清单闸降到 1 条缺席。
 
 ### 3.1 `interactionApi` —— 前置已扫清，但**顺序不能反**
 
@@ -146,8 +183,8 @@ client 侧还原成具名错误）。判别**按 `name` + 具名字段**，MUST 
 | 3 | **精选内容跨进程失败退化成 500** | 那族是裸路由，属主侧「精选库不可用」的 `name` 过不了传输层 ⇒ 按 name 判的「诚实 503」失效。修法：给 `listForClient` 补受鉴权版本 |
 | 4 | **周活跃掩码镜像陈旧时渲染成「全天活跃」** | 镜像是三态、存储选项只收两态，表达不出「不知道」。**那是一句错话、不是一个缺口**；收窄契约不在本批范围。已留日志 |
 | 5 | **队列取数失败回 null** | 客户端渲染成「这个账号没有发布队列」，真相是「问不到」。单体本来就这样，本批只补日志、没改语义 |
-| 6 | **`aidcp-automation` 5 条既有测试失败** | 发布填充预算 / 命令序列器 / 边界记录，**在干净树上一样红**、与本轮无关。未修，如实登记 |
-| 7 | **切流验证账号收口** | `cutover-verify-0804` 账号可能仍在；key 文件已不在服务器上 |
+| 6 | **`aidcp-automation` 4 条既有测试失败** | 发布填充预算 / 命令序列器 / 抢占分档，**在干净树上一样红**、与互动那批无关。原为 5 条，其中「边界记录」那条 2026-08-04 20:00 已修（派生归属账本比代码旧 4 条 + 一个自 content-scheduler change 起就未裁定的文件让 `boundaries:refresh` 一直拒跑） |
+| 7 | **切流验证账号收口** | `cutover-verify-0804` 仍在、**已停用且零环境**。2026-08-04 20:00 临时启用+轮换 key 做过一次路由验证，用完立刻停回 disabled；key 只存在于那次会话，未落盘 |
 
 ---
 
