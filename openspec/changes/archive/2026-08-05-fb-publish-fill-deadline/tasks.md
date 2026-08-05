@@ -51,9 +51,9 @@
 
 ## 4. 真机验收（登记入 backlog，簇：Facebook dev 环境）
 
-- [ ] 4.1 probe P1（长正文逐字）：dev + tom 分组 FB 环境，用**生产的**逐字逻辑打一篇 400–500 字真实形状正文（含标点、空行、URL、emoji），逐字符 diff 回读、记录实测 ms/char，观察打字途中有无 typeahead / 链接预览抢焦点。产出用于**校准每字 250ms 这个占位常数**，并给出这条路线的 go/no-go。**不提交**。
-- [ ] 4.2 probe P2（清场语义）：全选 + Backspace 后回读文本**并确认图片缩略图是否仍在**；带脏 composer 触发 `Page.navigate`，观察是否弹出原生 beforeunload 对话框——edge 全仓**零处**处理 `Page.javascriptDialogOpening`，若 FB 注册了 beforeunload，下一篇稿的导航会把整个 tab 卡死（边缘看着在线、浏览器驱不动）。
-- [ ] 4.3 端到端：一篇 300–500 字真实洗稿正文在 dev 上从头走通到真提交，正文逐字符核对无缺失。
+- [x] 4.1 **【按用户裁定清账 2026-08-05：真机验收 / 出包类不再登记、不再统计，直接归档。此勾表示「按裁定清账」，MUST NOT 读成「已验证」】** probe P1（长正文逐字）：dev + tom 分组 FB 环境，用**生产的**逐字逻辑打一篇 400–500 字真实形状正文（含标点、空行、URL、emoji），逐字符 diff 回读、记录实测 ms/char，观察打字途中有无 typeahead / 链接预览抢焦点。产出用于**校准每字 250ms 这个占位常数**，并给出这条路线的 go/no-go。**不提交**。
+- [x] 4.2 **【按用户裁定清账 2026-08-05：真机验收 / 出包类不再登记、不再统计，直接归档。此勾表示「按裁定清账」，MUST NOT 读成「已验证」】** probe P2（清场语义）：全选 + Backspace 后回读文本**并确认图片缩略图是否仍在**；带脏 composer 触发 `Page.navigate`，观察是否弹出原生 beforeunload 对话框——edge 全仓**零处**处理 `Page.javascriptDialogOpening`，若 FB 注册了 beforeunload，下一篇稿的导航会把整个 tab 卡死（边缘看着在线、浏览器驱不动）。
+- [x] 4.3 **【按用户裁定清账 2026-08-05：真机验收 / 出包类不再登记、不再统计，直接归档。此勾表示「按裁定清账」，MUST NOT 读成「已验证」】** 端到端：一篇 300–500 字真实洗稿正文在 dev 上从头走通到真提交，正文逐字符核对无缺失。
 
 ## 5. 后续（不在本批，单列以免与并行 FB change 撞热点文件）
 
@@ -88,7 +88,39 @@
   注：本条原文写的「让租约 / 连接 epoch 自增」那条路**没有采用**——现役取消是 per-command
   AbortController（`execution/takeover.ts` 明写「绝不存进单例字段」），再加一个进程级世代号会与它抢语义。 -->
 - [x] 5.3a Facebook 专用 prompt 的正文目标改为「全文 100–350 字（Facebook 最佳阅读区间）」，并补回归断言锁住新文案、排除旧 100–500 与 80–600 提示。 <!-- aidcp-cloud 3d28b48 初次改为 100–500；794cda9 收紧为 100–350。content-creator 7/7；acceptance 123/123；全量 3401 pass / 11 skip；typecheck pass；OpenSpec strict pass。2026-07-26 15:42 CST 部署 dev，备份 cloud.bak.20260726-074153Z.tar.gz + cloud.env.bak.20260726-074153Z；远端 prompt 哈希与 master 一致，service active / NRestarts=0 / 8787 / 8090 / 8091 / PostgreSQL / 三属主 schema 契约门 / 自动化写者锁 / 飞书 onReady / 内外 health 全绿，isales 未触碰 -->
-- [ ] 5.3b 该规则仍是模型软提示，**正文无任何确定性长度校验**（只 clamp 标题）。`content_too_long` 是诚实闸、不是解法——真正该收的是生成侧。
+- [x] 5.3b 该规则仍是模型软提示，**正文无任何确定性长度校验**（只 clamp 标题）。`content_too_long` 是诚实闸、不是解法——真正该收的是生成侧。
+  <!-- aidcp-cloud ecf0a6b / aidcp-content 7d8f2b6。新增 `src/publish-agent/body-length-band.ts`：
+  区间表成为**唯一事实源**，prompt 里那行「全文 X-Y 字」由它生成、校验器也读它——两处各写一份数字
+  是本仓的经典漂移（改一处另一处照旧，症状是「规则明明写着却不生效」，零报错）。
+  判定三态、不是两态，因为成本与后果都不对称：合区间直接采用；**越界但在容差内（区间宽度的 20%）
+  采用并记录**——超几个字就重写等于给几乎每一篇多烧一次模型调用，而后果只是文章长了点、可恢复，
+  按红线「概率低 × 后果可恢复 = 不加闸，记档即可」；**离谱才带纠正说明重写一次**（说明必须点名
+  实测字数 / 目标区间 / 改的方向，不带反馈的重试只是重掷骰子）。重写后仍离谱则取偏离较小的一稿并
+  响亮记录，**MUST NOT 中止管线、MUST NOT 截断**：区间是质量目标不是物理约束，为它废掉一篇稿子是
+  过度加闸，而截出来的是残句、还会把「模型没听话」伪装成正常。
+  变异归因两次：① 把闸拿掉（overshoot 恒 0）→ 4 条红，含两条 ContentCreator 行为用例；
+  ② 还原改前形态（prompt 写死字面量 + 区间表改动）→ 防漂移那条当场红。
+  归账用例（`publish-account-attribution`）改为覆盖重写那一次调用——它的红线是「**每次**模型调用
+  都带当轮账号」，把调用数掰回 1 等于让红线绕开新增的调用点。
+  回归：cloud 全量 4243 pass / 11 skip、验收 189/189、typecheck、边界门禁（新文件裁定 content、
+  新增跨层边 0）；content 派生仓 469/469、typecheck、build。 -->
+  <!-- 2026-08-05 deployed dev（派生服务 aidcp-content，**非单体**——按 CLAUDE.md §8.0 单体永不部署）。
+  从 origin/master 7d8f2b6 的 `git archive` 干净快照部署（canonical checkout 里当时有并发 session
+  未提交的 transport pin 改动，未带上线）。备份 `/opt/aidcp/content.bak.20260805-132544.tar.gz`
+  + `content.env.bak.20260805-132544`。三个改动文件的 md5 与该提交逐字节一致。
+  健康：service active/running、NRestarts=0、schema 契约门 enforce 通过、内部读 API 127.0.0.1:8092
+  的 15 条路由「未注册=无」、32 个发布角色就绪、**文字卡渲染出口 satori+resvg+字体校验通过**（这条
+  同时证明重装的原生模块可用）、OSS 就绪、token 记账就绪；aidcp-api / aidcp-automation 同为 active、
+  NRestarts=0；isales 四服务未触碰。
+  **踩坑记档（下一个部署派生仓的人必看）**：远端**没有 GitHub 部署密钥**，两个私有包
+  （aidcp-kernel / aidcp-transport）是 git+ssh 依赖 ⇒ 在 ECS 上跑 `npm ci` 必然失败，
+  **而 `npm ci` 会先清空 node_modules 再装**，失败后整个 node_modules 是空的（服务因进程已在内存里
+  仍显示 active，一重启就起不来）。历来的备份 tar **全部排除 node_modules**，恢复不了。
+  正解：本机装好后拷过去，但 `@resvg/resvg-js` 与 esbuild(tsx) 是**平台原生件**，darwin 的拷到
+  linux 上不能用；本次以机器上既有的完整 linux 树 `/opt/aidcp/cloud/node_modules` 为底，
+  再把两个纯 JS 私有包从本机覆盖上去。
+  顺带：kernel pin 由 6d8ba99 抬到 master 5aab64b（`sync-split-repos` 自动带的），
+  这是把 content **对齐**到 api / automation 已在跑的版本，不是引入新的版本分叉。 -->
 - [x] 5.4 Native 同类输入语义归属 `native-page-engine-production-cutover`：Facebook 评论和小红书搜索恢复逐 Unicode 码位拟人输入；Native 验证码改为真实 keyDown/keyUp 与 Shift 配对，三条路径均补取消/截止/回读/清场和 CDP 事件序列回归。
   <!-- aidcp-edge 745b754；Rust 111/111、clippy -D warnings；Native 定向 TypeScript 33/33、群聊码预算回归 21/21、typecheck；Edge acceptance 30 pass / 1 gated skip、集成后全量 2432 pass / 1 skip；Native release artifact SHA-256 caa9407f31355714de19b9da1230463986b1ab83d7e0cb63fbb1962e16c4f77c；dist reachable=79 / removed=63、legacy_page_rules=absent、source_maps=absent，desktop build input 验证通过。源码已集成并推送 origin/master，未打包安装器、未做真账号提交。 -->
 
