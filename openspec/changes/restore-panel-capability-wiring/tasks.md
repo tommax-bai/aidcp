@@ -52,13 +52,23 @@
 
 ## 4. aidcp-automation — C 类：自动化域窄口
 
-- [ ] 4.1 验证码协助窄口：注册面板五个端点所需的方法面（含短命图像字节；**图像 MUST NOT 落日志**，跨进程后这条约束在两侧都要成立）。
-- [ ] 4.2 授权前置 `preflightApprovePublish` 窄口。
-- [ ] 4.3 下发在途 id `publishDispatcher.getInFlightRecordIds` 窄口；若既有同步读镜像已覆盖，改为复用镜像并在本文件记明，不新开通道。
+- [x] 4.1 验证码协助窄口：五个端点全注册；图像字节与答案明文只透传、两侧都不记。
+  <!-- 面板侧那三个**同步**方法随之改成「可能异步」：拆进程后「同步拿到答案」本身不成立，
+       留同步签名的唯一实现方式是在调用侧猜一个值。单体那份仍同步返回、原样满足。
+       协助能力未启用时不注册该族（与单体 isAvailable() 同口径）。
+       **dev 上该能力本来就没开**（.env 无 AIDCP_CAPTCHA_ASSIST_ENABLED=true），
+       所以这条端到端在 dev 上验不到，只验到「面板如实回 upstream_route_missing」
+       ——它与 unreachable / timeout / unauthorized 逐一可分。真机验收已登记 backlog。 -->
+- [x] 4.2 授权前置 `preflightApprovePublish` 窄口。
+- [x] 4.3 **不新开通道**：既有同步读镜像已覆盖在途证据（自动化侧 `recordIds` → 面板
+  `publishInFlightEvidence`，本进程早已装上）。`publishDispatcher` 保持具名缺席并写明这条理由。
 
 ## 5. aidcp-cloud — 派生源：跨进程三件套与契约
 
-- [ ] 5.1 新增 `src/transport/*-http.ts`：探活 / 用量 / 精选库 / FB 发帖图片 / 验证码协助 / 发布下发前置，各含路径常量 + 服务端注册 + 类型化客户端。路径常量**只此一份**。
+- [x] 5.1 新增三个 transport 文件：`model-probe-http.ts` / `panel-content-http.ts` /
+  `panel-automation-extra-http.ts`。路径常量只此一份。
+  <!-- 最后那个的载荷类型是**泛型参数而非 import**：具体形状在接口仓的面板契约里，
+       跨属主 import 在自动化仓解析不了，重抄一份就是第二份声明。两端各自钉真类型。 -->
 - [x] 5.2 面板契约 `src/panel/types.ts` 新增运行时能力名册 `PANEL_CAPABILITY_KEYS`，并用 `Exclude<keyof PanelDeps, 名册项> extends never` 钉死完备性。
 - [x] 5.3 新增覆盖断言工具：入参为 deps 对象 + 本进程具名缺席表，缺项即抛。
 - [x] 5.4 单体自身照旧编译通过、行为不变（新增的是 api 模式装配与新窄口，单体路径不改）。
@@ -74,7 +84,7 @@
 - [x] 6.1 装上内容侧客户端：`tokenUsage`、`billingPriceRefresh`、`curatedContent`、`facebookPublishMedia`。
   <!-- `curatedActions` 不在本批：它要发起发布管线（内容域并行洗稿准入）与定向评论调度（自动化域），
        且成功路径是 fire-and-forget + 结果卡，跨不过一次请求/应答。留批次 4，仍具名缺席。 -->
-- [ ] 6.2 装上自动化侧：`captchaAssist`、`preflightApprovePublish`、（如未复用镜像）`publishDispatcher`。
+- [x] 6.2 装上自动化侧：`captchaAssist`、`preflightApprovePublish`；`publishDispatcher` 复用镜像（见 4.3）。
 - [x] 6.3 三处写路径接真探活客户端（无占位中间态，见 1.8 注）。**三处共用同一个探活口。**
 - [x] 6.4 装上覆盖断言（5.3），填本进程具名缺席表。
   <!-- 缺席表当前 13 条，逐条写了「为什么不装 + 后台上的表现 + 归哪个批次」。
@@ -82,9 +92,18 @@
 
 ## 7. rolePromptPreview — D 类：分域拼装
 
-- [ ] 7.1 坐实三段依赖各自的属主：预览角色清单（自动化）、人设（接口）、发布 / 配图渲染闭包表（内容）。
-- [ ] 7.2 各域各出一段窄口，接口侧只做拼装。**MUST NOT 把渲染闭包表复制进接口仓**——第二份实现在行为测试上原理不可见。
-- [ ] 7.3 若拼装成本与收益不成比例（该页只是只读预览），改为记入具名缺席表 + 登记 backlog，并在本文件写清判断依据与用户可见后果。**不得静默留 503。**
+- [x] 7.1 三段属主已坐实：预览角色实例在自动化、渲染闭包表在内容、人设在接口。
+- [ ] 7.2 各域各出一段窄口、接口侧拼装：**未做**，见 7.3 的判断。
+- [x] 7.3 **改为「本进程只提供它能诚实提供的那一半」**，不是整页缺席、也不是跨三域拼装。
+  <!-- 判断依据：43 个角色里 18 个有静态预览闭包、就在本仓，本来就能渲染；其余的渲染器
+       在另外两个进程。整页 503 把能给的那 18 个也一起扣了；跨三域拼装要开两条窄口
+       且其中一条要跨进程搬「渲染时的调度器上下文」，成本与一个只读预览页不成比例。
+       落点：18 个就地渲染；其余回 available:false + **说清渲染器在哪个进程**的 note。
+       原来的回落文案是「该角色暂不支持预览」——那句话是错的（它们支持，只是渲染器不在这），
+       会让运营以为是产品限制而不是部署形态，于是这个缺口永远不会被报上来。
+       **有意不注入账号口径**：账号维度那条分支在没有真 persona 解析器时会把示例人设
+       标成「所选账号人设」——假标签比不提供该维度糟得多。
+       剩下那一半（浏览 / 发布 / 配图角色的真预览 + 账号口径）登记 backlog。 -->
 
 ## 8. 测试
 
@@ -117,6 +136,10 @@
 - [x] 9.3a 批次 3 部署 dev（content f414669 / api 763c981）。ECS 上两槽 typecheck CLEAN、
   三服务 active、NRestarts 全 0。复打：`/api/llm-usage`、`/api/curated/facets`、`/api/curated/contents`
   全部 200 并返回真数据；批次 1/2 的六条仍 200。
+- [x] 9.3b 批次 4 + 7 部署 dev（automation 1d59e26 / api 5e014ff）。三服务 active、NRestarts 全 0。
+  复打：验证码协助族改答 `upstream_route_missing`（dev 未开该能力，属实）；
+  角色提示词预览 `reply_intent_classifier` 200 可渲染，`browse:content_evaluator` 200 且
+  `available:false` + 说清渲染器在哪个进程。
 - [ ] 9.4a **OL 同样受影响，未修**（2026-08-05 12:59 OL 也切成三派生服务，钉的是切流前的发布分支）。
   实测 OL 的 `/api/config/model`、`/api/roles`、`/api/llm-usage` 同样 503。
   OL 部署须用户明确要求并走发布分支，本 change 不自行执行。

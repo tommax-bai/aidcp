@@ -189,6 +189,12 @@ TRANSPORT_MEMBERS = [
     # 里面那两个显式常量（属主侧请求体上限 / 调用侧上传超时）**必须同源**：
     # 两侧各写一份，会在「上传多大算超」这件事上悄悄分叉，且只有真传大图才现形。
     'src/transport/panel-content-http.ts',
+    # change restore-panel-capability-wiring：管理后台要用、事实源在自动化进程的两族
+    #（验证码人工协助 + 授权前置）。判据同上；零属主表 SQL。
+    # 载荷类型在本文件里是**泛型参数而非 import**：具体形状在接口仓的面板契约里，
+    # 跨属主 import 在自动化仓解析不了，而重抄一份就是第二份声明（两侧各自编译通过、
+    # 只有真跑才发现字段对不上）。两端各自钉真类型，形状漂移在调用侧那个赋值上编译红。
+    'src/transport/panel-automation-extra-http.ts',
     # 0.8 文本模型出口（裁决 A1，2026-07-29）：三家各自 `new` 一个 QwenClient，不再由谁替谁持有。
     # 准入判据逐条对上：**三家都可能调用**（automation 的角色全靠 kernel 的 TextCompletionPort 拿注入、
     # 具体客户端只能在各自 main() 里构造；content 的生成链、api 的命令式生成同理）+ **零属主表 SQL**
