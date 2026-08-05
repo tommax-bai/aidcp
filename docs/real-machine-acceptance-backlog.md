@@ -1450,6 +1450,11 @@ active（部署载体 = 整机 ECS→HEAD 升级，见控制仓 `c4ef902`）。�
 
 ## 簇 60 — 桌面客户端 mac 签名+公证包（默认 ol 环境）真机验收（GitHub CI Developer ID 签名 + Apple notarytool 公证 + staple，装完默认连 ol；edge master `f41d94c` 已 land、CI 出包 0.3.18 已上架 dev 下载页，console master `0c8db0c`，登记于 2026-07-11）
 
+> **2026-08-05 状态**：用户声明「我在持续验证」，本簇已由用户接手、验收进行中。
+> 据此结掉了 change `deploy-derived-services-to-dev` 的 task 7.2（它在等本簇走完）。
+> **条目一条都没删**：真机清单是**登记表**不是任务表——删掉就再也没人知道当初要验什么，
+> 而「谁验过了」与「当初要验什么」是两份账。逐条结论由验收方回填。
+
 **背景**：此前分发包不签名（`mac.identity=null`），用户下载安装被 macOS Gatekeeper 拦成「非法软件/无法验证开发者」。本次把签名分支（`codex/edge-macos-developer-id-signing`，基于 0.2.9、从未合回）的 Developer ID 签名 + notarytool 公证 + staple 基建移植到当前 master，并补齐**自包含运行时进 CI**（`build:ads-runtime` staging + 从 `ADS_RUNTIME_JSON_BASE64` secret 还原 gitignored 的 `resources/ads-runtime.json` baked key），出**签名+公证**包；构建期经 `-c.extraMetadata.aidcpCloudDefaultEnv=ol` 烘焙默认云端（装完无界面选择/无启动环境变量时默认连线上，界面可切；master 源码仍默认 dev、零回归）。本机已核（静态 + 干净 userData 启动）：`spctl --assess` = `accepted, source=Notarized Developer ID`、codesign 有效、dmg+app 均 staple、hardened runtime(flags=runtime) + 3 entitlements(allow-jit/allow-unsigned-executable-memory/disable-library-validation)、asar cwd 守卫、烘焙 `aidcpCloudDefaultEnv=ol` 落包、自包含运行时 42M + key 进包、干净 userData 下完整进程树启动 + 运行时工作目录 `ads-runtime/` 初始化。以下须真机核（桩验/本机静态验不了的运行时闭环 + 真实下载体验）。真机测试账号只用 tom 分组（见 memory `real-machine-test-accounts`）。
 
 - [ ] 60.1 真实下载安装不被 Gatekeeper 拦（核心诉求）— 从后台下载页（dev `:8088` `/downloads/AIDCP-0.3.18-arm64.dmg`）在一台**干净 Mac**（带 com.apple.quarantine）下载 → 双击 dmg → 拖入 Applications → 首次启动：确认全程无「非法软件/无法验证开发者/已损坏」拦截、正常打开。Apple 芯片（arm64）+ Intel（x64）各核一台。本机 `spctl` 已判 accepted，但真实下载-开封是终极证明。
@@ -3602,6 +3607,9 @@ change `stop-automation-only-on-authorization-loss`（edge master `e903cf7`）�
 ---
 
 ## 簇 132 · 第六次「分诊清账」批带出的真机面（2026-08-05）
+
+> **2026-08-05 状态**：同簇 60 —— 用户声明「我在持续验证」，本簇 78 条已由用户接手、进行中。
+> 条目原样保留，逐条结论由验收方回填。**MUST NOT 因为「用户在验」就把任何一条读成「已验证通过」**。
 
 **规模**：28 个 ✓Complete → 全部归档，零暂缓。沙箱演练 28/28 无
 `failed for header` / `Aborted`；真跑同样零失败；全库 `validate --specs --all --strict`

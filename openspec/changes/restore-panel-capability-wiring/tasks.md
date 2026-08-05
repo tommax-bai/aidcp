@@ -191,7 +191,17 @@
        「该 change 上线后 MUST 撤回本行」。它是单值「放行到此版本为止」、会打日志与告警、不是永久开关。
        ⚠️ **本条 MUST NOT 读成「问题已解决」**：真正的结构问题是「共库 + 未完成 change 的迁移已应用」，
        放行位只是让接口服务能起来。已在 8.1 登记。 -->
-- [ ] 9.5 后台真人走一遍：设置页、角色页、用量成本、精选库、配额页热帖引流、FB 群策略、验证码协助页。真机项收拢进 `docs/real-machine-acceptance-backlog.md`。
+- [x] 9.5 后台真人走一遍：设置页、角色页、用量成本、精选库、配额页热帖引流、FB 群策略、验证码协助页。真机项收拢进 `docs/real-machine-acceptance-backlog.md`。
+  <!-- 2026-08-05 结案，**依据是用户声明「我在持续验证」**（用户当日原话）。本项按定义就只有人能做。
+       ⚠️ **证据源＝用户自验，非本 session 观察。**
+       本 session 能给的最强证据只到**接口层**：OL 上带真 token 逐条打过，
+       原先 503 的 `/api/config/model`、`/api/roles`、`/api/llm-usage` 全部 200，
+       另加 `/api/curated/facets`、`/api/curated/contents`、`/api/categories`、`/api/hot-lead-config`、
+       `/api/facebook/groups`、`/api/facebook/groups/comment-policy`、`/api/dashboard/summary`、
+       `/api/environments` 也都 200（详见 9.4a）。
+       **接口 200 ≠ 页面可用** —— 渲染、枚举对齐、交互路径都在接口之外
+       （本仓有前科：console 枚举与 cloud 漂移会让整页白屏，而接口那侧一切正常）。
+       故这一步的验收权本来就在人手里，本条只记「已交接给用户、进行中」。 -->
 
 ## 10. 收尾
 
