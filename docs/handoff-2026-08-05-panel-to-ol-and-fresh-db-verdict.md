@@ -20,6 +20,8 @@
 
 1. **OL 接口服务「一重启就再也起不来」**，今天靠放行位临时救回；结构问题未解。
    共库 + 一个**未完成 change** 的迁移已应用 ⇒ 所有不含该迁移的构建当场失去启动能力，**回滚也救不了**。
+   **放行位的撤回已登记为 `unify-facebook-global-policy-across-targets` 的 7.7 / 8.8**
+   （21:10 补；在此之前它只活在一条已勾选任务的注释里，那个 change 一归档就会沉掉）。
 2. **`event_outbox` 一个主题只进不出**，约 1.6 万行/天。
    ⚠️ **已有 change 接手且挖得更深**：`bound-event-outbox-growth` ——
    根因不是我以为的「剪裁名单漏了一条」，是**「变没变」的判据里混进了时钟**
@@ -46,7 +48,8 @@ scripts/sync-split-repos     # 六仓对账
 scripts/boundary-census      # 跨仓边界普查
 ```
 
-**各仓 head**（fleet 高度活跃，**必然**已经变了——以 `git log` 为准）：
+**各仓 head**（fleet 高度活跃，**必然**已经变了——以 `git log` 为准。
+21:10 复核：除 `aidcp-cloud` 已被并发 session 推进到 `8dff95e` 外，其余 7 个当时仍精确）：
 `aidcp@64cb3565` / `aidcp-edge@cc6001c` / `aidcp-cloud@11bacad` / `aidcp-kernel@5aab64b` /
 `aidcp-transport@7d10d2f` / `aidcp-api@5b11654` / `aidcp-automation@60f9022` / `aidcp-content@0cbb648`。
 
@@ -77,6 +80,8 @@ scripts/boundary-census      # 跨仓边界普查
 
 ⚠️ **行为验证仍未拿到**：复查那 5 分钟账号都在配额睡眠、评估器一次没跑，
 「零告警」**分母是 0、不算证据**。等有账号带配额跑到 Reel 上才算真验过。
+**承接人已建**（21:10 补）：`deploy-derived-services-to-dev` 7.5 + backlog 簇 60 的 2026-08-05 增补。
+此前它只写在 6.2b 这条**已勾选**任务的注释里，没有任何未勾项承接它。
 
 ### 2.2 面板能力修复上 OL（三仓 22 个提交里只挑本 change 的）
 

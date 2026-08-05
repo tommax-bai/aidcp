@@ -4,8 +4,7 @@
 > `docs/handoff-2026-08-05-panel-to-ol-and-fresh-db-verdict.md`（15:10–21:00）。**
 > 本文其余内容仍然有效、可作背景；**但下面 §0 那条最高优先级已被实测推翻**（原文折叠保留）。
 
-> **新 session 从这份看起。**
-> 上一份 `handoff-2026-08-04-draft-refinement-wired-all-deps-done.md` 写的事都已完成，
+> 更早的 `handoff-2026-08-04-draft-refinement-wired-all-deps-done.md` 写的事都已完成，
 > 它现在只作背景（那些坑仍然有效）。再往前的只用于追溯。
 
 ---
