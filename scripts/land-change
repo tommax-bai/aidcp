@@ -44,6 +44,17 @@ info "跑安全红线 + 全量 + typecheck + Native 门禁（在 worktree 内；
   && if has_script gate:native; then npm run gate:native; fi ) \
   || die "测试/typecheck/Native 门禁未过——不合并。修好再来。"
 
+# 协议逐字对账（跨仓，只有控制仓做得到）。
+# 为什么不能指望子仓自查：两份 protocol.ts 的现役闸门是各自按自己的消息名穷举，
+# 它**不读对端文件**，所以注释文字、联合成员次序、注释里的原因码拼写全部在它的盲区里。
+# 2026-08-05 实测过一次 10 行漂移、全部闸门绿，其中一处两侧注释描述的是互相矛盾的契约。
+# 注意作用域：这条查的是**当前工作区里各仓的文件**，不限于本次要合的那个仓——
+# 本仓的漂移可能是别人上一次只改一侧留下的，而受害者是下一个碰协议的人。
+if [ -x "$(dirname "$0")/protocol-parity" ]; then
+  info "协议逐字对账（跨仓）..."
+  "$(dirname "$0")/protocol-parity" || die "两份 protocol.ts 已漂移——不合并。按上面的第一处差异对齐后再来。"
+fi
+
 ahead="$(git -C "$wt" rev-list --count "origin/$def..$name")"
 info "$name 领先 origin/$def $ahead 个提交。"
 [ "$ahead" = "0" ] && info "空 diff = 已在远端，直接清理即可。"

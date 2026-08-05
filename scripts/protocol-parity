@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""协议文件逐字对账 —— 补上「每仓自查」结构上抓不到的那一类漂移。
+
+## 为什么必须在控制仓，而不是在任何一个子仓
+
+根 `CLAUDE.md` §2 要求边缘与云端两份 `src/comm/protocol.ts` **逐字一致**，
+并说「漂移由 `npm run typecheck` 暴露」。**那句话只对一部分漂移成立。**
+
+现役那道闸的形态是：两份文件各自用 `Record<MessageType, true>` 把消息名穷举一遍，
+不一致就编译失败。它抓的是**消息类型集合**。它**不读对端文件、不做字节比对**，所以下面这些
+它结构上看不见：
+
+  - 注释文字不同（哪怕两段注释描述的是**互相矛盾的契约**）
+  - 联合类型里成员次序不同（TypeScript 语义等价，但「逐字一致」已经不成立）
+  - 注释里原因码的拼写笔误（下游按注释写代码就会用错名字）
+
+**这不是理论风险。** 2026-08-05 实测：两份文件有 10 行不一致，其中一处是
+`ui.snapshot` 的注释——边缘那份写「账号资料快照 + 发布审批状态回填」，云端那份写
+「新客户端仅接收自动化控制投影，客户数据经 HTTP 拉取」。**两段注释描述的是两套不同的契约**，
+而所有既有闸门全绿。另一处是把 `submitted_unconfirmed` 写成了 `submitted-unconfirmed`
+（全仓真实拼法 58 : 1）。
+
+任何单仓视角都做不到这件事——它需要同时打开两个仓的文件。所以做成一处、跨仓看，
+形态与 `boundary-census` 相同。
+
+## 它检查什么
+
+`aidcp-edge` / `aidcp-cloud` / 派生仓（若该仓有自己的副本）三方的 `src/comm/protocol.ts`
+必须**逐字节相同**。不同即非零退出，并打印第一处差异的行号与两侧原文。
+
+**判据是字节，不是语义。** 这是有意的：语义比对需要一个解析器，而解析器自己会漂；
+字节比对不会。「两处注释意思一样只是措辞不同」在这里同样算漂——因为下一个读它的人
+没有办法知道哪份是对的。
+
+## 用法
+
+    scripts/protocol-parity            # 对账，不一致即 exit 1
+    scripts/protocol-parity --list     # 只列出参与对账的文件
+
+仓缺失时**跳过该仓并说明**（本机可能没 clone 全），但**至少要有两份**才算对账成立；
+只找到一份或零份时 exit 1 —— 「没得比」MUST NOT 被读成「比过了，一致」。
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+# 控制仓在 aidcp/，四仓与派生仓是同级目录（根 CLAUDE.md §0）
+ROOT = Path(__file__).resolve().parent.parent.parent
+
+CANDIDATES = [
+    ("aidcp-edge", "src/comm/protocol.ts"),
+    ("aidcp-cloud", "src/comm/protocol.ts"),
+    ("aidcp-api", "src/comm/protocol.ts"),
+    ("aidcp-automation", "src/comm/protocol.ts"),
+    ("aidcp-content", "src/comm/protocol.ts"),
+]
+
+
+def collect() -> tuple[list[tuple[str, Path, bytes]], list[str]]:
+    found: list[tuple[str, Path, bytes]] = []
+    skipped: list[str] = []
+    for repo, rel in CANDIDATES:
+        path = ROOT / repo / rel
+        if not (ROOT / repo).is_dir():
+            skipped.append(f"{repo}（仓未 clone 到本机）")
+            continue
+        if not path.is_file():
+            skipped.append(f"{repo}（该仓没有自己的副本，非漂移）")
+            continue
+        found.append((repo, path, path.read_bytes()))
+    return found, skipped
+
+
+def first_difference(a: bytes, b: bytes) -> tuple[int, str, str]:
+    """返回第一处不同的行号（1 起）与两侧该行原文。"""
+    la = a.decode("utf-8", "replace").split("\n")
+    lb = b.decode("utf-8", "replace").split("\n")
+    for i in range(max(len(la), len(lb))):
+        x = la[i] if i < len(la) else "<文件到此结束>"
+        y = lb[i] if i < len(lb) else "<文件到此结束>"
+        if x != y:
+            return i + 1, x, y
+    return 0, "", ""
+
+
+def main(argv: list[str]) -> int:
+    found, skipped = collect()
+
+    for note in skipped:
+        print(f"SKIP: {note}")
+
+    if len(found) < 2:
+        print(
+            "FAIL: 参与对账的副本少于两份，对账不成立。\n"
+            "      「没得比」MUST NOT 被读成「比过了，一致」——"
+            "请确认子仓已 clone 到与控制仓同级的目录。",
+            file=sys.stderr,
+        )
+        return 1
+
+    if "--list" in argv:
+        for repo, path, blob in found:
+            print(f"{repo:20s} {path}  ({len(blob)} 字节)")
+        return 0
+
+    base_repo, base_path, base_blob = found[0]
+    drifted = []
+    for repo, path, blob in found[1:]:
+        if blob == base_blob:
+            continue
+        line, left, right = first_difference(base_blob, blob)
+        drifted.append((repo, path, line, left, right))
+
+    if not drifted:
+        names = " / ".join(repo for repo, _, _ in found)
+        print(f"OK: {len(found)} 份 protocol.ts 逐字一致（{names}）")
+        return 0
+
+    print(f"FAIL: protocol.ts 出现逐字漂移，基准 = {base_repo}", file=sys.stderr)
+    for repo, path, line, left, right in drifted:
+        print(f"\n  {repo}  ({path})", file=sys.stderr)
+        print(f"    第一处差异在第 {line} 行：", file=sys.stderr)
+        print(f"      {base_repo:16s}: {left}", file=sys.stderr)
+        print(f"      {repo:16s}: {right}", file=sys.stderr)
+    print(
+        "\n  修法：两份 MUST 逐字一致（根 CLAUDE.md §2）。\n"
+        "  先判哪一份是当下的事实（注释描述的契约谁更新？原因码的真实拼法是哪个？），\n"
+        "  再把另一份对齐——MUST NOT 只改一侧就以为完事，派生仓那份要跑 scripts/sync-split-repos。",
+        file=sys.stderr,
+    )
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
