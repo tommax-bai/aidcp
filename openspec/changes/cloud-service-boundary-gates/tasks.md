@@ -113,16 +113,34 @@ src/ 与 migrations/ 零改动（`git status --porcelain src/ migrations/` 为�
 <!-- aidcp-cloud 071252c 花名册 = §4.7 的 4 文件，protocol.ts 已删除并进 boundaries/kernel-non-members.json 拒入清单（AC-BOUND-03 断言拒入清单内文件不得标 kernel）。两处待裁决项一次判定：event-bus/types.ts 与 platform/registry.ts **均不析出、整体维持 automation**，理由三条写在 kernel-non-members.json。§4.7 回写属控制仓文档改动，已写成 docpatch P1 交主控套用。2026-07-23 主控套用 docpatch P1/P2/P3 + R1/R4：§4.7 kernel 段「两处待裁决项」bullet 改为「均不析出」裁决结论；目录级聚合行点名 src/agents/ 两文件（persona-auto-fill.ts 136 + persona-format.ts 16 = 152）；合计表下新增「基线 sha 之后的增量」note（350 文件 / api 101 content 80 automation 163；新目录 src/schema 12、src/db 1 及四个两可文件标「待定稿裁决」）。 -->
 - [x] 2.2 明确记录**不进 kernel**的三边共导文件及其原因（有 SQL / 有业务判定 / 有进程内活状态）：`src/cache/curated-content-store.ts`、`src/client-auth/client-user-store.ts`、`src/config/content-schedule-store.ts`、`src/risk/session-limits.ts`、`src/risk/resume-limits.ts`、`src/soul/writing-language.ts`、`src/event-bus/index.ts`。它们的三边共导进豁免清单等待削减，不得靠改归属绕过。
 <!-- aidcp-cloud 071252c 七个文件逐条写进 boundaries/kernel-non-members.json 的 rejected 段（另加 protocol.ts / event-bus/types.ts / platform/registry.ts / platform/index.ts / agents/base-role.ts）；AC-BOUND-03 断言这些路径仍存在且归属层不是 kernel -->
-- [ ] 2.3 把 `DEFAULT_PG_CONFIG`（现在 `src/cache/pg-anchor-cache.ts:33`）移到 `src/cache/pg-config.ts`，反转现有依赖方向（该文件 `:2` 今天反向 import 回 `pg-anchor-cache.js`），并把 32 个引用方改为从 `pg-config.js` 取。行为不得改变：环境变量优先级与默认值逐字保持。**不得**在本次改动里把源码兜底口令写进新文件——它应在后续独立 change 改为纯配置读取。
+- [x] 2.3 把 `DEFAULT_PG_CONFIG`（现在 `src/cache/pg-anchor-cache.ts:33`）移到 `src/cache/pg-config.ts`，反转现有依赖方向（该文件 `:2` 今天反向 import 回 `pg-anchor-cache.js`），并把 32 个引用方改为从 `pg-config.js` 取。行为不得改变：环境变量优先级与默认值逐字保持。**不得**在本次改动里把源码兜底口令写进新文件——它应在后续独立 change 改为纯配置读取。
 <!-- PARTIAL(aidcp-cloud 071252c)：已完成「搬迁 + 反转依赖方向」这一半——DEFAULT_PG_CONFIG 整体移入 pg-config.ts，pg-anchor-cache.ts 改为再导出，31 个引用方零改动、取值逐字不变、typecheck 与全量测试全绿。这一半是 kernel 准入的硬前置（搬迁前 pg-config.ts 反向 import 业务层，AC-BOUND-03 当天即红）。 -->
 <!-- BLOCKED（未完成的两半）：① 「把 32 个引用方改为从 pg-config.js 取」未做——那是削减动作而非门禁前置，且引用方含 src/risk/pg-risk-store.ts，属本轮明令不得触碰的范围；这些边已按「先冻结后削减」进 import 豁免清单。② 「不得把源码兜底口令写进新文件」这条与「移到 pg-config.ts」+「默认值逐字保持」三者互斥：口令是 DEFAULT_PG_CONFIG 的一个字段，移过去必然带上，不带就改变行为。取舍是**整体搬迁、不复制**（全仓出现点仍恰好 1 处，只是换了文件），并按定稿 §6.5.6 把「删除明文兜底、改为纯配置读取」留给它已登记的拆分前置 change——搬到 kernel 之后它反而收敛到唯一一处，那个 change 更好做。该偏离已在最终报告与 docpatch 里登记。 -->
+<!-- 2026-08-05 复核后勾选：当时挂 BLOCKED 的那一半**已由后续 change 完成**（登记比代码旧的又一例）。
+     实读现状：`DEFAULT_PG_CONFIG` 定义在 `src/kernel/pg-config.ts`、无任何反向 import；
+     **48 个文件直接从 `kernel/pg-config.js` 取**；`src/cache/pg-anchor-cache.ts` 已**不再再导出**它
+     （grep `export.*DEFAULT_PG_CONFIG` 在该文件里零命中，只剩三处说明归属的注释）。
+     第二半「不得把源码兜底口令写进新文件」维持原偏离结论（整体搬迁、全仓仍恰好 1 处），
+     已按定稿 §6.5.6 留给那个独立 change，不因本次勾选而消失。 -->
 - [ ] 2.4 收窄 `src/agents/base-role.ts` 的两处具体实现导入（`:8` 的 `../event-bus/index.js`、`:11` 的 `../llm/qwen.js`），改为 kernel 内的接口声明；照仓内既有弱接口范式（`src/agents/base-role.ts:14` 的 `RoleLlm`）。改完 `base-role.ts` 方可标为 `kernel`。
 <!-- BLOCKED：与定稿冲突，按「定稿优先」不做。§4.7 kernel 段写死「本基线 sha 上恰好 4 文件 251 行，这是 kernel 的全量名单」，base-role.ts 不在其中；且 §4.7 规定新增 kernel 成员 MUST 先走「准入 + 析出为独立新文件 + 同批回写 §4.7 目录行与计数」三条通道。本 change 无权单方面把第 5 个文件塞进花名册。base-role.ts 已登记在 boundaries/kernel-non-members.json，注明「是否进 kernel 由后续控制仓 change 改 §4.7 后再定」。 -->
+<!-- 2026-08-05 复核：**两处只收窄了一处，本项维持不勾**（同批的 2.3 / 2.6 已因现实推进而勾上，
+     本项没有，别顺手一起划）。实读 `src/agents/base-role.ts` 现在的全部 import：
+     · `../llm/qwen.js` 那处**已收窄**——改成 kernel 的 `TextCompletionPort`（`kernel/llm-contract.js`）✓
+     · `../event-bus/index.js` 那处**仍在**（`import type { EventBus }`），kernel 里也没有对应接口
+       （只有 `event-fanout-port.ts` / `panel-event-delivery-port.ts`，都不是 EventBus 本身）✗
+     `base-role.ts` 至今仍具名留在 kernel 拒入名册里，与「改完方可标为 kernel」的验收口径一致。
+     ⚠️ 只按「import 行数变少了」判这项已做，会得出相反结论——本次差点就那么判了。 -->
 - [x] 2.5 在门禁里实现 kernel 准入断言：kernel 成员 MUST NOT 含 `INSERT`/`UPDATE`/`DELETE`/`CREATE TABLE`/`SELECT` 字面量、MUST NOT 注册 HTTP 路由、MUST NOT 调用 LLM 或供应商 HTTP、MUST NOT 含模块级可变单例或定时器或连接池、MUST NOT 导入 `api`/`content`/`automation`/`composition` 任一层。任一条不满足即失败并指名文件。
 <!-- aidcp-cloud 071252c AC-BOUND-03：四类正则逐条断言 + 花名册比对 + 拒入清单比对；反向依赖由 classifyEdge 判 forbidden（无豁免通道），实测搬迁前 kernel->automation 1 条、搬迁后 0 条 -->
 <!-- 缺陷修复 aidcp-cloud 31dfab2（2026-07-23 审计坐实）：「模块级可变单例」那一条原只锚行首裸 let/var，`export let …` 以 export 开头故整类漏过（已注入 `export let` 到 kernel 成员验证过：当时 AC-BOUND-03 仍绿）——而导出型可变单例正是最容易被其它层写坏的一种。现改为 `^(?:export\s+)?(?:let|var)\s`，并补一条模块级 `const x = new Map()/new Set()` 的可变容器检查；「SQL 字面量」一条改为复用扫描器的 UPDATE 语法源串（原来同样对带别名的 UPDATE 失明）。三条机械回归写在 module-boundary.test.ts 的「kernel 准入判据保真自检（非 AC 编号）」里（export/裸形态必命中、不可变导出与函数内局部量必不误判、带别名 UPDATE 必命中） -->
-- [ ] 2.6 建 `src/kernel/` 目录并把已裁定成员物理搬迁过去（分批，每批同批削减豁免清单）。本步在 1、3 两节门禁生效之后做。**搬迁范围 MUST 排除 `src/comm/protocol.ts`**（§10.9 终局裁决）；只删任务 5.1 的该项而不改本步与 2.1，`protocol.ts` 仍会经这两步进 kernel，§10.9 点名要消除的 6 处 type-only 依赖会就地合法化。
+- [x] 2.6 建 `src/kernel/` 目录并把已裁定成员物理搬迁过去（分批，每批同批削减豁免清单）。本步在 1、3 两节门禁生效之后做。**搬迁范围 MUST 排除 `src/comm/protocol.ts`**（§10.9 终局裁决）；只删任务 5.1 的该项而不改本步与 2.1，`protocol.ts` 仍会经这两步进 kernel，§10.9 点名要消除的 6 处 type-only 依赖会就地合法化。
 <!-- BLOCKED：与定稿冲突，按「定稿优先」不做。§4.7 的 kernel 花名册用的就是四个文件的**现有路径**（src/time/shanghai-day.ts、src/time/source-published-time.ts、src/deployment-target.ts、src/cache/pg-config.ts），物理搬到 src/kernel/ 会让 §4.7 那四行路径逐条失效，属「两处各判一次」。另两条理由：搬迁不改变任何门禁判定（归属层已是 kernel，方向规则按层不按路径），且本 change 是 5 条并行流里最后集成的一条，动路径会与另 4 条的 rebase 全面冲突。搬迁范围已排除 protocol.ts 的要求由 boundaries/kernel-non-members.json + AC-BOUND-03 机械保证。 -->
+<!-- 2026-08-05 复核后勾选：当时挡住本步的前提（§4.7 花名册只有 4 个文件、搬路径会让那四行失效）
+     **已被后续 change 整体取代**——现在 `src/kernel/` 里有 **109 个文件**、名册 `kernelRoster.members` **112 条**，
+     物理搬迁事实上早已完成，只是没人回来勾。
+     本步那条硬约束逐条复验仍成立：`src/kernel/protocol.ts` **不存在**，且 `comm/protocol.ts`
+     仍具名留在 `boundaries/kernel-non-members.json` 的拒入段里（AC-BOUND-03 会查）。 -->
 
 ## 3. aidcp-cloud — 导入方向门禁（AC-BOUND-*）
 
@@ -179,8 +197,28 @@ src/ 与 migrations/ 零改动（`git status --porcelain src/ migrations/` 为�
 <!-- aidcp-cloud 071252c 三项处置已定：protocol.ts 取消（§10.9）；event-bus/types.ts 与 platform/index.ts 按 2.1 判为不析出。**重算结果 = 削减 0 条**，故本步不产生 import 路径改动、不产生豁免条目删除。实测方向分解也已把原稿的「79 条」纠正为 content→automation **27 条**（其中 event-bus/types.ts 6 条、platform/index.ts 2 条、platform/registry.ts 1 条、protocol.ts 0 条——protocol.ts 的 6 条来自 api 侧）。「不作为既定收益写进准入条件」已落实：6.3 的阈值用的是实测 involvingContent=112，不含任何假定收益 -->
 - [ ] 5.2 `src/platform/registry.ts` 的纯数据声明段随 `platform/index.ts` 进 kernel，再削 4 条；剩余 6 条（`comm/edge-task-lease-client.ts` 2、`event-bus/index.ts` 1、`risk/session-limits.ts` 1、`risk/resume-limits.ts` 1、`comm/preemption.ts` 1）保留豁免并在条目 `reason` 里写明属真实跨边界依赖。
 <!-- BLOCKED：前半段已被 2.1 的裁决作废（registry.ts 纯数据段判为不析出），「再削 4 条」不成立。后半段的六个具名目标按 §4.7 归属实测也已失真：edge-task-lease-client.ts 与 comm/preemption.ts 的被导入条数为 0（没有 content 层文件导入它们），event-bus/index.ts 2 条、session-limits.ts 4 条、resume-limits.ts 1 条。这些边已全部在豁免清单里、reason 写明是实测既存跨边界依赖，但没有按原稿那份（已失真的）名单逐条加特写理由。正确的后续动作是：按实测的 content→automation 27 条重新分组、逐条挂消除 change，属独立削减 change 的范围。 -->
-- [ ] 5.3 【正方向，单点最纠缠】起一个**专门的独立 change** 处理 `src/orchestrator/role-dispatcher.ts`（3088 行）文件头对 40 个角色类的 import（`automation→content` 53 条里的 43 条）：引入 `RoleName → 角色工厂` 注册表，dispatcher 只依赖 kernel 里的角色基类接口，具体角色类由组合根 `src/server.ts` 注入。按 CLAUDE.md §7 标记为热点文件、需串行独占，不与其它 change 并行。
+- [x] 5.3 【正方向，单点最纠缠】起一个**专门的独立 change** 处理 `src/orchestrator/role-dispatcher.ts`（3088 行）文件头对 40 个角色类的 import（`automation→content` 53 条里的 43 条）：引入 `RoleName → 角色工厂` 注册表，dispatcher 只依赖 kernel 里的角色基类接口，具体角色类由组合根 `src/server.ts` 注入。按 CLAUDE.md §7 标记为热点文件、需串行独占，不与其它 change 并行。
 <!-- BLOCKED：本条要求「起一个专门的独立 change」，属控制仓建 change 的动作，本 session 只有本 change 目录的写权限，无权新建。**收益量级 MUST 重算**：按 §4.7 归属实测，role-dispatcher.ts 的 40 条 ../agents/ import 里只有 **4 条**跨边界（其余 36 条被导入的角色同属 automation），不是 43 条；automation→content 总数也是 28 条而非 53 条。该独立 change 本身仍成立（拆仓时 automation MUST 能在不 import content 角色的前提下启动），但排期依据要按 4 条写。重算请求已写进 docpatch P7。这 4 条已在豁免清单里逐条挂了说明性 note。2026-07-23 主控套用 docpatch P7：§12 两族门禁第 1 条已回写（role-dispatcher 跨边界 4 条、panel 8、customer→risk 1、首批 seed 295+12），评审报告 P12 的 43→4 同步。本任务「起一个专门的独立 change」的部分仍 BLOCKED（本 session 无权建控制仓 change）。 -->
+<!-- 2026-08-05 结案，**改判为「不再需要那个独立 change」**，与 5.1「重算结果 = 削减 0 条」同形。
+     用户本轮本来是要我把它摘出去单独立项的；先去代码里核，核出来的结论是立项等于造无用功。
+
+     **判据一：那 36 条一条都不跨边界。** 逐个文件核过——`aidcp-automation/src/orchestrator/role-dispatcher.ts`
+     文件头 36 条 `../agents/*` import，**对应的 36 个文件全部存在于 `aidcp-automation` 仓自己里**
+     （逐条 `test -f src/agents/<name>.ts`，不在本仓的 = **0** 条）。同属主 import 不是边界问题。
+     台账正文写的「53 条里的 43 条」是立项当日的估计，本条自己的上一段批注早在 2026-07-23 就把它
+     **改判成 4 条**并同步进了 §12 门禁与评审报告 P12——正文没跟着改，于是这个已作废的数字又骗了一轮。
+
+     **判据二：真正跨边界的那 4 条已经解决，且解法正是本条要的那个。**
+     automation 侧现有 `ContentRoleFactoryOptionMap` / `ContentRoleName` / `makeContentRole<K>()`
+     （`src/orchestrator/role-dispatcher.ts:237/244/2716`）——**就是本条要求的「RoleName → 角色工厂注册表 +
+     具体角色类由组装根注入」**，content 域的四个角色已按此走，dispatcher 不再直接 import 它们。
+
+     **判据三：豁免棘轮已归零。** `boundaries/import-exemptions.json` 现在 `frozenTotal=0`、条目 0 条
+     ⇒ 门禁口径下**一条跨属主 import 违规都不剩**，包括本条原本要消除的那些。
+
+     ⇒ 本条的立项理由（「拆仓时 automation MUST 能在不 import content 角色的前提下启动」）**已达成**。
+     剩下的「3000 行文件头有 36 个同属主 import」属代码整洁度，不是拆仓阻塞，按 YAGNI 不为它立 change。
+     若日后确要做，判据要重写成「文件体量 / 可测性」，MUST NOT 再引用已作废的「43 条跨边界」。 -->
 - [x] 5.4 每次削减 MUST 在同一提交里同步下调 `frozenTotal` 并删除失效条目（否则门禁的失效条目断言会直接失败）。**子仓 MUST NOT 在没有控制仓 change 批准的情况下上调 `frozenTotal`**：上调只走 3.4 定义的 `raises[]` 例外通道，且每个元素必须齐备 `amount` / `approvedByChange` / `eliminateBy` 三字段。
 <!-- aidcp-cloud 071252c 纪律已机械化而非只写在文档里：AC-BOUND-05 / AC-OWN-04 判失效条目，AC-BOUND-06 / AC-OWN-05 判 frozenTotal 上界（基准是不可变的 seedTotal）与 raises[] 三字段齐备。已人工验证：只加条目不加 raises 时两条同时红（见 7.3 记录）。操作说明写在 boundaries/README.md -->
 <!-- 缺陷修复 aidcp-cloud 620c0db（2026-07-23 第二轮审计坐实）：`--reseed`（拆掉整个棘轮的开关）此前**零机械守卫**——同一个 npm 入口、无必填参数、不校验 seed 窗口是否还开着，且会连带清空 raises[]（已批准上调及其消除时限的唯一记录）。实测：注入一条 content→automation import 后，默认 refresh 正确拒绝，但紧接着 `refresh --reseed`（连 README 写的 --seed-note 都不给）退出 0、seedTotal / frozenTotal 一起从 274 抬到 275、raises[] 被重置为 []，随后 AC-BOUND-06 全绿。现补四道机械门，任一不满足即 exit 1：① `boundaries/ownership-rules.json` 新增 `seedWindow.open` 必须为 true（缺省按已关闭处理，fail-safe）；② 必须给 `--seed-note=`；③ 清单已 seed 过时必须再加 `--i-am-reseeding-the-ratchet`；④ raises[] 非空时直接拒绝、要求先人工处置。四种拒绝形态逐条实测通过，「全标志齐备 + 窗口开着」时仍能正常 reseed。**归档本 change 时的强制动作：把 seedWindow.open 改成 false** —— 那一刻起 --reseed 一律拒绝，与 §12「棘轮自本 change 归档起开始计数」逐字对齐 -->
