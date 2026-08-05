@@ -67,11 +67,17 @@
   - 本轮未做（2026-07-29）：落点 `src/native-page-engine/browse-session.ts` 归并行流（该文件本轮被 b57d619 大改）。实读 HEAD 仍是 `await active;` 之后紧跟 `if (env.type === 'session.end') this.stop('cloud_session_end');`（:245-246），`finally` 块只复位 `active` / `activeAbort`——**命令失败时收尾仍不执行，缺口原样保留**。需在 browse-session.ts 的单写者手里落。
 - [x] 5.2 给 `src/native-page-engine/runtime.ts:128-131` 的会话缓存加存活判据（现为命中即返回、零判据）：返回缓存句柄前必须**取到存活的肯定证据**（如子进程未退出且通道可写），取不到即按已死处理、丢弃并重开——「没记到死讯」不算存活证据 <!-- aidcp-edge 74eaf41 client.ts 新增 NativeProcessTransport.isLive()（握手完成 + 未退出 + 未被 kill + exitCode/signalCode 均为 null + stdin.writable）与会话级 isLive()；runtime.ts 的 sessionFor 取不到证据即丢弃重开，新增 discardSession() 让收尾失败不堵住重建入口 -->
   - 非空转验证：把 `cached.session.isLive()` 临时短路成 `true` 后，会话自愈 3 条里有 2 条失败（随即还原并以 `git diff` 确认）。
-- [ ] 5.3 加回归：引擎进程已退出时下发结束会话 → 该命令失败，但 owner 被释放；随后一条命令能重建引擎并正常执行
-  - **未做（2026-08-01，如实登记）**：5.1 的行为改动已落地，**但这条护栏没写**。当前状态是「改对了但没有断言钉着」——
-    后人把收尾挪回成功路径不会有任何东西变红。**MUST NOT 因 5.1 已勾就顺手勾掉本条。**
-    真机侧的对照项在 `docs/real-machine-acceptance-backlog.md` 簇 124.2（杀一次引擎子进程验恢复），
-    但那是真机项、替代不了这条脱机回归。
+- [x] 5.3 加回归：引擎进程已退出时下发结束会话 → 该命令失败，但 owner 被释放；随后一条命令能重建引擎并正常执行 <!-- aidcp-edge ef1258f 新增用例「引擎已死时下发结束会话：命令诚实报失败，且收尾照做（owner 释放 + 周期观测停）」，落在 test/native-page-engine/runtime-contracts-session-recovery.test.ts。**做了变异归因、不是只看全绿**：把收尾从 finally 挪回成功路径后，恰好只有这条新用例变红、同文件另三条仍绿。前置里先 start() 一次让周期观测真的武装，否则「观测停了」这条断言在一个从未起拍的观测上恒真（memory gate-always-true-equals-gate-gone） -->
+  - **【已完成 2026-08-05】** 上一轮登记的「改对了但没有断言钉着」已消除。真机侧对照项
+    （`docs/real-machine-acceptance-backlog.md` 簇 124.2，杀一次引擎子进程验恢复）**仍然保留**——
+    它验的是真进程行为，与这条脱机回归互不替代。
+  - **⚠ 本条原文的前半句今天已不成立，是实测发现，不是措辞问题。** 原文写「引擎进程已退出 → 该命令失败」，
+    而它写于 5.2 / 5.4 之前。用真引擎实跑：结束命令**不会失败**——运行时的存活判据先一步认出缓存句柄是僵尸、
+    丢弃重开，于是这条命令落在**新**引擎上正常成功。**「引擎已退出」单独不再构成结束命令的失败原因。**
+    5.1 真正护住的是更一般的一类：**结束命令因任何原因失败**（重建也起不来 / 页面规则报错 / 中途被接管）时收尾照做，
+    新用例喂的正是这一类。原文后半句「随后一条命令能重建引擎」**未另写用例**：
+    它已由同文件既有那条真引擎用例（断言前后 pid 不同）钉住，再写一条只会重复，
+    且会把一条必然自愈的路径伪装成失败路径。判断已写进测试文件的注释块里。
   - 偏离说明（2026-07-29）：**只落了 runtime 层那一半**。已有用例「引擎已退出时释放 owner：收尾失败不堵住重建入口」（校验新旧引擎 pid 不同），`closeOwner` 打在已死句柄上不再把异常抛给调用方（调用点是 `void closeOwner(...)`，抛出去即未处理拒绝）。缺的是「**下发结束会话命令**」这条入口——它依赖 5.1，同属 browse-session.ts 单写区。
 - [x] 5.4 加回归：缓存会话的传输已死时，下一条命令走重建而不是立刻抛「引擎已退出」 <!-- aidcp-edge 74eaf41 runtime-contracts-session-recovery.test.ts 3 tests / 3 pass：传输已死走重建 + 外部 SIGKILL（宿主完全没机会记到死讯）后仍能重建 + 健康会话必须被复用（判据不许严到每条命令重开引擎） -->
 
@@ -128,11 +134,11 @@
 
 ## 9. 验证 / 验收
 
-- [ ] 9.1 `cd ../aidcp-edge && npm run test:acceptance`（安全红线 `AC-PROTO-*` / `AC-PUB-*` / `AC-RISK-*` 必须全过）
+- [x] 9.1 `cd ../aidcp-edge && npm run test:acceptance`（安全红线 `AC-PROTO-*` / `AC-PUB-*` / `AC-RISK-*` 必须全过） <!-- aidcp-edge ef1258f 实测 39/39 全过（AC-PROTO / AC-PUB / AC-RISK 安全红线在内）；rebase 到 origin/master bdc652f 之后复跑一次仍 39/39 -->
   - 阶段性记录（2026-07-29，`aidcp-edge` worktree `native-migration-repair` @ `74eaf41`）：**30/30 全过**（1 条 gated 跳过 = 需真机的 E2E）。change 未收口，本条不勾。
-- [ ] 9.2 `cd ../aidcp-edge && npm test` 与 `npm run typecheck`
+- [x] 9.2 `cd ../aidcp-edge && npm test` 与 `npm run typecheck` <!-- aidcp-edge ef1258f 实测 npm test 3153 例 / 3152 绿 / 0 红 / 1 跳过（跳过的是 gated 的 AC-E2E 真机层）；typecheck 通过，rebase 后复跑仍通过。§12 登记的那条既有 flake 本轮两次全量均未触发 -->
   - 阶段性记录（2026-07-29）：`npm test` **2676 例 / 2675 绿 / 0 红 / 1 跳过**；`npm run typecheck` **通过**。另实测 `npm run build:dist` **通过**（`reachable=77 removed=68 legacy_page_rules=absent page_rule_fragments_guarded=11 source_maps=absent`）。change 未收口，本条不勾。
-- [ ] 9.3 `cd ../aidcp-edge/native/page-engine && cargo fmt --check && cargo clippy -- -D warnings && cargo test --locked`
+- [x] 9.3 `cd ../aidcp-edge/native/page-engine && cargo fmt --check && cargo clippy -- -D warnings && cargo test --locked` <!-- aidcp-edge ef1258f 经 npm run gate:native 跑（它按 rust-toolchain.toml 解析钉死工具链，比直接 cargo 更能保证跑的是同一个编译器）：OK toolchain=1.97.1-aarch64-apple-darwin steps=fmt,clippy,test，clippy 带 -D warnings。注：cargo 不在默认 PATH，须先 export PATH="$HOME/.rustup/toolchains/1.97.1-aarch64-apple-darwin/bin:$PATH" -->
   - 阶段性记录（2026-07-29）：`npm run gate:native` **通过**（fmt + clippy `-D warnings` + test），toolchain `1.97.1-aarch64-apple-darwin`。change 未收口，本条不勾。
 - [x] 9.4 `cd ../aidcp-cloud && npm run test:acceptance && npm test && npm run typecheck` <!-- 2026-07-31 **不适用**：本条存在的唯一理由是 §8 的云端改动，而 §8 已随本次裁定摘出（见该节抬头）。**本 change 至此零云端改动**，跑云端测试没有对象。若将来重新纳入云端工作，本条须跟着回来。 -->
   - 本轮不适用（2026-07-29）：第 8 节整节未做、`aidcp-cloud` 零改动，故未跑云端闸。第 8 节落地时补跑。
@@ -181,7 +187,7 @@
   - 对账检查自身的已知盲区（2026-07-29 登记）：「每条命令的成功输出 kind」那一侧（`BROWSE_SUCCESS_OUTPUTS`，26 条，每条注明来自哪个 Rust 分支或页面规则分支）是**带出处引用的人工登记表**，键集被强制等于命令映射表；`report()` 那一侧与随行载荷分支是从源码机械导出的。后果：新增命令必须登记（漏登即失败），但**既有条目若被实现悄悄改掉输出 kind，检查抓不到**。要机械化这一侧需从两份页面规则与 Rust 分支导出「命令→输出 kind」表，属独立工作量，建议随后续 change 评估。
   - **既有 flaky 登记（非本 change 引入、非本 change 职责，2026-07-29）**：`facebook::publish::tests` 的三条截止线用例（`select_mode_reports_ambiguous_after_one_unconfirmed_click` / `select_mode_is_ambiguous_when_post_click_confirmation_crosses_the_deadline` / `submit_does_not_confirm_when_the_submitted_probe_crosses_the_deadline`）给的是 `unix_time_ms()+150` 这类**绝对墙钟预算**，机器高负载时会退化成 `NotStarted`；同一二进制连跑三次实测为 失败 / 通过 / 失败，机器空闲时全绿。后果是 CI 或多 agent 并行跑测试时会随机变红、**掩盖真实回归**。另有 `test/native-page-engine/client.test.ts` 的「rejects a ready engine whose capability manifest differs from the packaged contract」（`processTimeoutMs=500`）同属负载敏感 flaky。`publish.rs` / `publish_tests.rs` 本轮不在改动面，此处仅登记。
 
-- [ ] 9.6 运行 `openspec validate harden-native-engine-runtime-contracts --strict`
+- [x] 9.6 运行 `openspec validate harden-native-engine-runtime-contracts --strict` <!-- aidcp 本次 实测输出：Change 'harden-native-engine-runtime-contracts' is valid -->
   - 阶段性记录（2026-07-29）：已运行，输出 `Change 'harden-native-engine-runtime-contracts' is valid`。change 未收口（第 3.2、5.1、5.3、6.x、7.4、8.x 未完成），本条留到收口时勾。
 
 ### 9.7 真机验收项 —— **已移出本清单（2026-07-31 用户裁定）**
@@ -297,6 +303,18 @@
    本轮不修（超出范围），**登记备查**。
 
 ## 12. 待处理：会话恢复的存活性判断竞态（2026-08-01 登记，**非本轮引入**）
+
+> **【已转登记 2026-08-05，归档前的必要动作】本节分析已原样搬到
+> `docs/deferred-defect-proposals-2026-08-05.md` §8，处置为「记档、遇到 case 再处理」。**
+>
+> **为什么必须搬**：本节没有勾选框，因此**任何「任务是否全勾」的检查都拦不住它随归档消失**。
+> 一条**尚未修复的生产缺陷**跟着 change 进 `archive/` 目录，等于此后无人再看得见。
+>
+> **判据（照根 `CLAUDE.md` §2 的加闸准入）**：竞态吃掉的是**一条**命令，
+> 下一条命令时进程已被完全回收、存活判断会正常判死并重建 ⇒ 后果可恢复、不对外可见、非不可逆写入。
+> **概率低 × 后果可恢复 = 记档即可。** 三条触发条件（含「有人想给这条用例加重试」）写在该文件 §8。
+>
+> 下方原文保留，仅作追溯。
 
 **症状**：`test/native-page-engine/runtime-contracts-session-recovery.test.ts` 的
 「缓存会话的传输已死时，下一条命令走重建而不是立刻抛引擎已退出」在**满负载并行跑全量**时

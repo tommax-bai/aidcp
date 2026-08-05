@@ -48,8 +48,46 @@
 - [x] 5.1 在 `scripts/build-native-page-engine.mjs` 的 `build()` 里计算「引擎源码输入摘要」（Rust 源码树 + `src/facebook-router/` 全部分片与清单 + `build.rs` + `command-manifest.json`），写入 staged `manifest.json` 的新字段 <!-- aidcp-edge be0a8be 新字段 sourceDigest；输入集排除测试专用文件；只加字段、不抬清单版本号（理由见 5.5） -->
 - [x] 5.2 在同文件 `verify()`（72-113 行）里重算该摘要并比对，不一致即抛「产物相对源码已过期」；保留既有的哈希/清单/协议版本/能力摘要检查 <!-- aidcp-edge be0a8be 既有检查全部保留，摘要比对为新增的第五道 -->
 - [x] 5.3 确认 `scripts/ensure-native-page-engine-dev.mjs:19-28` 的「verify 成功即 return verified、不重建」在 5.2 之后自动变成「源码变了就重建」，不再需要额外分支；如需改动则一并落地 <!-- aidcp-edge be0a8be 开发态「已校验」分支改由源码摘要决定；校验失败理由原样带进重建日志、不吞 -->
-- [ ] 5.4 复现并消灭已知实证：`touch native/page-engine/src/facebook-router/00-shared.js` 后跑 `node scripts/ensure-native-page-engine-dev.mjs`，改造前输出 `OK: unsigned target artifact verified ...` 且不重建；改造后必须触发重建。把改造前后的实测输出记进本清单
-  - 【部分完成】判定逻辑已由用例证明（摘要随分片内容变化、同输入稳定），但**改造前后的实测对照未取到**：本工作区产物目录为空，需先做一次完整 release 构建才能跑这条对照。按「不当既成事实」口径保持未勾。解锁条件：在有已构建产物的工作区跑一次 touch 分片 → `ensure-native-page-engine-dev.mjs` 的前后对照并把输出记进本条
+- [x] 5.4 **【已完成 2026-08-05，实测对照见下；⚠ 任务原文的复现步骤本身是错的，已就地订正】** 复现并消灭已知实证：~~`touch native/page-engine/src/facebook-router/00-shared.js`~~ **改分片内容**后跑 `node scripts/ensure-native-page-engine-dev.mjs`，改造前输出 `OK: unsigned target artifact verified ...` 且不重建；改造后必须触发重建。把改造前后的实测输出记进本清单
+  - **【实测对照 2026-08-05】** 解锁方式与原设想不同：**没有做完整 release 构建**，而是用 `git archive HEAD` 把 edge 主干头快照到临时树、
+    再把本机 `build/native-page-engine/darwin-arm64` 那份**已构建产物**（8-5 15:21 构建，与主干头对得上）拷进去。
+    同一棵树、同一份产物，只换脚本版本，两边逐字对照如下。
+
+    **⚠ 先说订正：任务原文写的 `touch` 复现步骤不成立，照它跑会得出「修了也没用」的错误结论。**
+    源码摘要 `computeEngineSourceDigest` 是**按文件内容**算的（`scripts/build-native-page-engine.mjs:173-182`，
+    `hash.update(digest(file.contents))`），`touch` 只动 mtime、不动内容 ⇒ **新旧代码都判 verified**。实测：
+
+    ```
+    A. 只 touch 00-shared.js → 现行代码
+       OK: unsigned target artifact verified with encoded page rules darwin-arm64 9a32bea3…   EXIT=0
+    ```
+
+    真正的复现是**改内容**（这里追加一行注释）：
+
+    ```
+    B. 改内容 → 现行代码（改造后）
+       Native Page Engine darwin-arm64 artifact is missing or stale; rebuilding.
+       Reason: Native Page Engine staged artifact is stale relative to engine sources
+               (manifest d0923a7ac09d89bfb6c75616247cfdde02bdcccfb88b8ac7db8664a570eac4a5
+                vs sources 0441d9cd081e01f6a97046f665e596094d9448ddcd293d0c255765bcb46ea1d2)
+       => { status: 'rebuilt' }
+
+    C. 同一棵树、同一份产物、同一处内容改动 → 改造前代码（be0a8be~1 的两个脚本同时在位）
+       OK: unsigned target artifact verified with encoded page rules darwin-arm64 9a32bea3…
+       => { status: 'verified' }        ← 不重建
+    ```
+
+    **改造前为什么必然看不见**：`be0a8be~1` 的 `verify()` 读的只有「产物二进制 + 校验和 + 清单 + `Cargo.toml` + `command-manifest.json`」，
+    **一个字节的页面规则源码都不读**。所以它不是「判错了」，是**结构上不可能判对**——
+    改完分片直接发版，运营机上跑的仍是不含该改动的引擎，且全程零告警。
+
+    **两处实验纪律**（避免本次结论本身不可信）：
+    ① `build` 那一跳**打了桩**（只取「决定 + 理由」，不付一次 cargo 构建），
+       桩只拦 `--verify` 之外的调用，verify 是真跑的；桩的存在已在输出里显式标出。
+    ② 第一次跑老侧时结论是假的——老 `ensure` 按路径调 `scripts/build-native-page-engine.mjs`，
+       而临时树上那个位置放的是**新**脚本，于是「老代码」跑出了新行为。
+       已把老 build 脚本真正换到该路径后重跑，上表 C 是重跑结果。
+       **教训与本仓「变异还原 mtime 陷阱」同族：换代码做对照时，必须确认被执行的真是那一份。**
 - [x] 5.5 在 `src/electron/native-page-engine-artifact.cjs` 的打包态校验里同步接受并校验新字段（缺字段视为不兼容清单） <!-- aidcp-edge 30f4d9a 打包态无法重算该摘要（安装包里没有源码树），故只判「在不在、像不像」——但这已是它要挡的那件事：清单里没有这个字段，说明该产物出自**还没把产物与源码绑定**的构建器，它的自洽（二进制哈希 / 能力摘要 / crate 版本）对源码漂移完全无感。**缺字段一律判不兼容，MUST NOT 当「旧版兼容」放行。** 落地顺序红线已写进代码注释：本文件硬校验清单版本号等于 1，所以写入侧只加字段没抬版本；现在读取侧接受了才谈得上抬，且两侧必须同一个提交里一起动 --> <!-- 2026-07-31 **一度误判为弃守，同日订正回待办**。误判的前提是「不打客户端安装包 ⇒ 打包态不可达」，而该前提是错的——用户一直在手动打包测试别的功能、**包在持续更新**。本条不是「打个包验一下」的验收活，是**打包态的代码路径**，每次出包都会跑到；且它挂着就是一颗雷，见本节抬头的事实订正与下方实装注记的落地顺序红线。 -->
   - 【阻塞】需改 `src/electron/native-page-engine-artifact.cjs`，该文件在本轨可改文件白名单外。解锁条件：由白名单属主放行或该文件属主接手
   - 【实装实测注记 · 落地时必看】该打包态校验**硬校验清单版本号恒等于 1**。因此 5.1 只新增了 `sourceDigest` 字段、**没有抬版本号**——先抬版本会让打包在 5.5 落地之前就炸。落地 5.5 时必须「先接受新字段、再考虑是否抬版本」，两步不可颠倒
@@ -155,10 +193,25 @@
 
 - [x] 11.1 在 aidcp-edge worktree 内跑 `npm run test:acceptance`、`npm test`、`npm run typecheck`，记录通过数与本次新增用例的定位 <!-- aidcp-edge be0a8be 分支 native-migration-repair 实测：验收 30/30 全过；全量 2621 例 / 2594 绿 / 26 红 / 1 跳过；typecheck 通过。26 红全部是同分支他轨的失败优先用例（动作侧 15 条等 slice 2.3–2.7、通知侧 11 条等 2.9–2.15），本 change 零新增失败。本 change 新增用例定位：test/native-page-engine/artifact-gates.test.ts（各闸门的植入 / 对照自测 + 闸门次序回归）、build-contract.test.ts（存在性断言标注 + 判定型断言） -->
 - [x] 11.2 跑新增的 `npm run gate:native`（fmt / clippy / test），记录解析到的工具链版本与实际执行的组件 <!-- aidcp-edge be0a8be 从仓根调用即解析到钉死工具链 1.97.1；实际执行 fmt --check、clippy -D warnings、test 三项全过 -->
-- [ ] 11.3 记录 5.4 的改造前后实测对照（touch 分片后 verify 的输出）
-  - 【阻塞于 5.4】本工作区产物目录为空，取不到改造前后的对照输出。解锁条件同 5.4：先做一次完整 release 构建
-- [ ] 11.4 记录 1.4 对账断言在接入 `08-reaction-semantics.js` 前后的实际报错文本
-  - 【无法取样】派生化与对账断言在同一次改造里落地，没有「清单已含该分片、闸门尚未派生」的中间态可复现；当前树上对账断言直接通过。若要留证据，只能人为回退派生再跑一次，本轮未做
+- [x] 11.3 **【已完成 2026-08-05】** 记录 5.4 的改造前后实测对照（~~touch 分片~~ **改分片内容**后 verify 的输出）<!-- aidcp 本次 三档实测（touch 无效 / 改内容后新代码判 stale 并带出理由 / 同树同产物下老代码判 verified 不重建）与两处实验纪律，全部逐字记在 5.4 条下，不在此重复 -->
+- [x] 11.4 **【已完成 2026-08-05；原记的「无法取样」是判错了，取样成本其实是两分钟】** 记录 1.4 对账断言在接入 `08-reaction-semantics.js` 前后的实际报错文本
+  - **原判错在哪**：原文说「派生化与对账断言在同一次改造里落地，没有中间态可复现」。
+    但 1.4 那条对账断言比的是「有序清单 ↔ 分片目录实际文件」，
+    **「该分片未登记」这个状态可以直接构造**——把它从 `manifest.txt` 里摘掉即可，不需要回退任何代码。
+    **这是一次「把可复现的状态误判成不可复现」**，登记下来防止同类判断再发生。
+  - **实测（临时树，与 5.4 同一棵 `git archive` 快照）**：
+
+    ```
+    接入后（现状）        → 对账通过
+
+    接入前（把 08-reaction-semantics.js 从有序清单摘掉）→
+      Error: page-rule fragment is not registered in
+             native/page-engine/src/facebook-router/manifest.txt: 08-reaction-semantics.js
+    ```
+
+  - **顺带取到 12.1 问题①的直证**：在「该分片未登记」的同一状态下跑泄漏闸，
+    覆盖数仍是 **18 且仍包含 `08-reaction-semantics.js`** ——
+    **泄漏闸不依赖登记，1.4 的登记要求也没被泄漏闸绕过**，两道闸确实各守各的。
 - [ ] 11.5 在本清单按 `<!-- <repo> <commit-sha> 备注 -->` 格式回写 aidcp-edge 与控制仓的提交 sha（sha 必须取自已推送的提交）
   - 【部分完成】aidcp-edge 侧本轨 sha `be0a8be`（已推 origin/native-migration-repair）已回写。差控制仓侧 sha——本轮按分工不提交控制仓，提交由主 session 统一做，届时补写
 > **11.6–11.9 已移出本清单（2026-07-31 用户裁定）** —— 已收拢到
@@ -170,7 +223,7 @@
 > 若真机发现它不是响亮失败，弃守结论须推翻。
 >
 > **口径不变**：登记 ≠ 已验证。
-- [ ] 11.10 运行 `openspec validate enforce-native-engine-artifact-gates --strict`
+- [x] 11.10 运行 `openspec validate enforce-native-engine-artifact-gates --strict` <!-- aidcp 本次 实测输出：Change 'enforce-native-engine-artifact-gates' is valid -->
 
 ## 12. 跨属主改动待追认（他人 change 已改本 change 的属主文件）
 
