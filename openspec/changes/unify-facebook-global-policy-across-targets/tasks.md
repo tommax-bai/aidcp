@@ -50,11 +50,22 @@
 
 ## 3. aidcp-cloud — 存储与路由
 
-- [ ] 3.1 `FacebookOperationPolicyStore`：全局策略读写去掉目标过滤与 `executionTarget` 依赖；审计写入把目标降级为追溯字段
-- [ ] 3.2 `FacebookGroupCommentPolicyStore`：同上；保留既有 legacy env 回落语义不变
-- [ ] 3.3 冷启动完成事实的读写（含 `refreshEnvironmentSlowStartMirror` 的子查询）去掉目标条件
-- [ ] 3.4 客户鉴权侧冷启动进度写：新增 / 删除完成事实不再按目标
-- [ ] 3.5 面板全局策略读写路由不再接受也不再推导目标选择器
+- [x] 3.1 `FacebookOperationPolicyStore`：全局策略读写改按作用域键选行；审计写入把目标降级为追溯字段
+  <!-- aidcp-cloud 7fd4137（分支 unify-facebook-global-policy-across-targets）。
+       新增 src/config/facebook-global-policy-scope.ts 作唯一定义；7 处行选择器切读。
+       视图上的 executionTarget 改为「你正在通过哪个目标的接口读」——MUST NOT 回传作用域键，
+       管理后台对该字段有 ['dev','ol'] 硬闸，回它不认识的值不是报错、是整页打不开。 -->
+- [x] 3.2 `FacebookGroupCommentPolicyStore`：同上；legacy env 回落语义不变
+  <!-- aidcp-cloud 7fd4137。**入参 executionTarget 直接删掉**而不是留着不用：留着会让下一个人
+       以为还能按目标分，唯一拦着他的只是约定；删掉则仍在传它的组装根当场编译失败——本次
+       正是靠它把 3 个构造点全点出来的。派生 api 仓的手写组装根同样要改，见 5.2。 -->
+- [x] 3.3 冷启动完成事实的读写（含镜像重建子查询）切读作用域键
+  <!-- aidcp-cloud 7fd4137。client-user-store 6 处 + policy-store 6 处 + api-sync-read-source 1 处。
+       **client_env_revocation_holds 那 3 处保持按目标隔离**——它是运行态，不在本次合并清单里。 -->
+- [x] 3.4 客户鉴权侧冷启动进度写：新增 / 删除完成事实不再按目标
+  <!-- aidcp-cloud 7fd4137 -->
+- [x] 3.5 面板全局策略读写路由不再接受也不再推导目标选择器
+  <!-- aidcp-cloud 7fd4137：路由本就没有目标入参，目标推导全在存储层，已随 3.1 收掉。 -->
 - [ ] 3.6 依 1.2 的结论落跨目标可见性通道（补消费者名册 或 明确沿用并记录时限）
 
 ## 4. aidcp-cloud — 测试
@@ -65,7 +76,10 @@
 - [ ] 4.4 单测：基于过期 revision 的并发写被具名拒绝并返回最新投影，MUST NOT 覆盖
 - [ ] 4.5 单测：冷启动完成写入后，另一目标视角读到同样为已完成
 - [ ] 4.6 迁移用例：喂"dev 有行 / ol 无行""两侧都有且时刻不同""两侧 revision 不同"三种输入，断言合并结果
-- [ ] 4.7 跑 `npm run test:acceptance` → `npm test` → `npm run typecheck`
+- [x] 4.7 跑 `npm run test:acceptance` → `npm test` → `npm run typecheck`
+  <!-- 2026-08-05 acceptance 189/0、全量 4204 中 4193 通过 0 失败、typecheck 0。
+       期间修掉两处机械闸：KNOWN_MAX_SCHEMA_VERSION 抬到 0110；迁移头补表声明
+       （约束名反推不出表 → 归属推断落「残留」→ 该迁移被计入全部属主库，拆库后会被派去自动化库跑）。 -->
 
 ## 5. aidcp-api — 派生仓同步与组装根
 
