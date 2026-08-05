@@ -95,6 +95,36 @@
 <!-- aidcp-cloud 9c9e72b 已交付该验证的**静态前提**：test/schema/ddl-parity.test.ts 逐条比对 src 会建出的对象与迁移目录建出的对象，并因此发现并补上了 0070 的 16 列 3 索引。这只证明「静态上不缺对象」，不能替代真库拉起 -->
 <!-- aidcp-cloud a6c00c1 静态前提补齐第二半：ddl-parity 只管「对象集合不缺」，migration-order 管「按复合序跑得完」。两条都绿仍不等于真库跑过一遍。本 session 另做过一次一次性证据（PGlite 0.5.4 真空库、复刻 commandUp 的「任一条失败即停整批」语义）：返工前停在第 5 条 0005，返工后 69/69 全部应用、建出 89 张表；再把全部 src DDL 常量解析成要求集合与该库比对，缺口 0。PGlite 不是 PG，且未起 cloud 进程，故 110.6 仍必须做 -->
 <!-- BLOCKED: 需要一次性临时库 + 真跑 migrate up + 真启动 cloud，本 session 无 ECS / 真库权限。已登记 docs/real-machine-acceptance-backlog.md 簇 110.6 -->
+<!-- 2026-08-05 **真跑了，没通过 —— 这条验证当场证明了自己不是仪式。**
+     用户先问「迁移不是早完成了吗，为什么还要验」，跑完的答案是：**「迁移已应用」只对现存的库成立，
+     这套迁移在一个全新环境上根本跑不完，第 30 条就断。**
+
+     **环境**：本机 Homebrew PostgreSQL **16.14** 真集群（临时 datadir `/tmp/aidcp-freshverify`，
+     端口 55432，用完已 stop + 整目录删除）。**一根手指没碰 dev / OL** —— 那台机器的 pg_hba 是
+     **按库名逐条列**的（拆库当天的坑），加临时库就得改共享认证配置，而 isales 同机共用，
+     不值得为一次性验证冒这个险。库按属主建三个空库，属主为**非超级用户**角色 `aidcp`
+     （用超级用户会把授权类问题一起掩盖掉）。三库起手实测 0 张表。
+
+     **发现一（先撞上的，独立缺陷）：三个派生仓的迁移 CLI 一条都跑不起来。**
+     `scripts/migrate.ts` 仍 `import ... from '../src/kernel/pg-owner-connection-resolver.js'`，
+     而该文件在派生仓里**不存在**（已搬进 `aidcp-kernel` 包）——本机与 ECS 上都不存在，三仓各 2 处引用。
+     ⇒ **今天唯一能跑迁移的仍是 `aidcp-cloud`**，也就是刚被定为「永不部署」的那个仓（§8.0）。
+     本 change 的 5.10「每批部署 dev 前先跑 migrate status/up」在派生形态下**物理上做不到**。
+
+     **发现二（本条要找的那个）：13 条迁移没有属主头声明，被计入全部三个属主，而它们操作的表分属不同库。**
+     `migrate status` 自报「残留迁移（头声明为空、计入全部属主）13 条」。实跑到
+     **`0030_panel_hardening_indexes` 整批停止**：`relation "risk_counters" does not exist`。
+     该迁移一条就横跨两个属主库——`risk_counters` / `interaction_feed` 归 **automation**，
+     `llm_token_usage` 归 **content** ⇒ **物理上不可能在任何单一属主库里跑通**。
+     停止行为本身是对的（整批停、已成功的留在账本、提示从失败处继续），只是**跑不完**。
+     进度：content 1/20、automation 13/57、api 20/70 之后全线卡住。
+     其余 12 条已按正文引用的表做了粗归位（api 9 / automation 3 / 1 条待读正文），
+     **该清单只作起点、MUST 逐条实读**——`0030` 正是粗归位会看漏的那种（去重后只报了一个属主）。
+
+     ⇒ **本条不勾**。它已经交付了自己的价值（找出两条真缺陷），但「空库 → migrate up → 启动服务」
+     这条链**没有走通**，MUST NOT 记成已验。修复属独立 change：给 13 条补属主头，
+     跨属主的那些 MUST 拆成按属主分文件（`0030` 至少要拆成 automation / content 两条）。
+     已在 8.1 与 backlog 簇 110.6 登记。 -->
 - [ ] 5.10 每批部署 dev 并观察后再进下一批；每批在 tasks 里记录 commit sha 与观察结论。
 <!-- BLOCKED: 部署由主控串行做，本 session 明确禁止 push / 部署 / 碰 ECS。六批的代码改动在同一个提交 9c9e72b 里交付（无法逐批部署观察），**部署前必须先按 10.3 的新步骤在 dev 上跑 migrate status/up**——存储不再自建表，带着未应用的迁移重启会让对应能力 fail-closed。已登记 backlog 簇 110.3 / 110.5 -->
 <!-- 批 5 / risk dev observation 2026-07-25：aidcp-cloud f3f6ed9 已从 clean master 推送并部署；备份 /opt/aidcp/cloud.bak.20260725-190910.tar.gz + .env.bak.20260725-190910。部署前后 migrate status：content 20/20、automation 42/42、api 53/53，待应用均 0；enforce 三属主启动门全部通过。现役拓扑仍为 AIDCP_SERVICE 未设的 monolith（多服务源码已具备、unit 未启用），本修复归 segC automation，未来切独立 automation 进程时同样生效。服务 active、NRestarts=0，8787/8090/8091、panel/public health、三库 SELECT 1、Feishu onReady、writer lock、risk outbox/reconciler 均通过；部署文件 hash 与本地一致；automation 累计 deadlocks 保持修复前 3，重启后 deadlock/risk schema error 日志 0。isales-api/isales-scheduler 保持 active。 -->
