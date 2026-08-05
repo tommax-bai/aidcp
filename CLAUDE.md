@@ -128,6 +128,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 > 执行清单见 `docs/cloud-cross-service-coupling-resolution.md`，上位方案见
 > `docs/cloud-composition-root-trisection.md` 与 `docs/cloud-service-decomposition-proposal.md`。
 
+### 8.0 `aidcp-cloud` 永不部署（2026-08-05 定，OVERRIDE 级）
+
+- **dev 与 OL 都已切到 api / automation / content 三个派生服务，单体 `aidcp-cloud.service` 停并 disable。
+  从此 `aidcp-cloud` MUST NOT 被部署到任何环境**——不 rsync 到 `/opt/aidcp/cloud`、不 `systemctl enable`、
+  不 `start`。它保留的唯一身份是**事实源 + 整图验证仓**（见下条），不是一个可运行的服务。
+  例外只有一个：**回滚**。回滚是用户显式决定的动作，MUST NOT 由任何任务顺手触发。
+- **它不退役、只降级**：134 个只活在 cloud 的用例里真正搬得动的只有 7 个，其余 90% 的本质就是**跨属主**
+  （97 个跨 2+ 业务属主、24 个要整张图或全部 108 条迁移在一处）。论证见
+  `docs/cloud-retirement-blockers-2026-08-05.md`。**MUST NOT 再按「把测试分家就能退役」立项。**
+- **为什么要写成规则**：在此之前这只是「两个环境都 disabled」这个**事实状态**。
+  事实状态挡不住任何人——重新 enable 一次不会撞到任何东西，而单体一起来就会去抢
+  按 target 单实例的自动化写者锁与 8787，把在跑的派生服务顶掉（前科见
+  `[[monolith-unit-still-enabled-steals-lock]]`）。
+
 ### 8.1 事实源与派生物（弄反了就会静默漂）
 
 - **归属的唯一事实源＝控制仓 `docs/cloud-service-decomposition-proposal.md` §4.7 / §4.6.x**；
