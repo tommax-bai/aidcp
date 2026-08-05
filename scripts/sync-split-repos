@@ -176,6 +176,13 @@ TRANSPORT_MEMBERS = [
     # A3-A6 runtime changed 仅作轮询加速：automation outbox relay 与 API ingress
     # 共用闭合 signal/ACK 传输；outbox SQL/consumer 仍只留 automation 属主仓。
     'src/transport/sync-read-changed-http.ts',
+    # change restore-panel-capability-wiring：保存前模型探活。管理后台三处模型写入
+    # （平台配置 / 角色 / 分类）都以「先探活再落库」为既有保证，而探活真发一次模型调用、
+    # 客户端归内容进程。**三家都可能是调用方**：接口进程今天就是（面板在那儿），
+    # automation 侧未来若要在写前自证同理；零属主表 SQL。
+    # 线上传的是判别式结果而非错误类 —— 跨进程后 `instanceof` 恒 false，密钥缺失的识别
+    # 必须留在属主侧完成，否则会静默降级成泛化的「模型不可用」。
+    'src/transport/model-probe-http.ts',
     # 0.8 文本模型出口（裁决 A1，2026-07-29）：三家各自 `new` 一个 QwenClient，不再由谁替谁持有。
     # 准入判据逐条对上：**三家都可能调用**（automation 的角色全靠 kernel 的 TextCompletionPort 拿注入、
     # 具体客户端只能在各自 main() 里构造；content 的生成链、api 的命令式生成同理）+ **零属主表 SQL**
@@ -221,6 +228,11 @@ DERIVED_COMPOSITION = {
         'src/automation-model-exit.ts',
         # 风控单写者与告警底座的装配（批 B）。同样是 Cloud 组装根内联段的落点。
         'src/automation-risk-foundation.ts',
+        # 养号事实在本进程的唯一取用口（change restore-automation-risk-quota-inputs，
+        # automation@40b66d2）。**补登记，不是新增**：文件 2026-08-04 就落了，但两处名单都没写它
+        # —— 于是 `--prune` 会把它当「多出的」删掉，而删掉的现形方式是慢启动 clamp 静默失效
+        # （那个参数可选、缺省语义是「不叠 clamp」）。由 `scripts/boundary-census` 独立报出。
+        'src/automation-nurture-provider.ts',
         # 本进程的配置副本停手闸（批 C）：判定在 kernel 工厂，这里只定「哪些键算闸门档」
         # 与「拒绝记账落哪」。Cloud 里对应的是组装根内联的那个适配器，无同名文件。
         'src/automation-config-mirror-gate.ts',

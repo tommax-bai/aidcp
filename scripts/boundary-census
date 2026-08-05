@@ -1,0 +1,300 @@
+#!/usr/bin/env python3
+"""跨仓边界普查 —— 补上「每仓自查」结构上看不见的那一片。
+
+## 它为什么在控制仓，而不是每个仓各一份
+
+拆仓之后有两处盲区，方向相反：
+
+  ① **aidcp-cloud 的整图门禁看不见派生仓的私有件。**
+     组装根（`src/server.ts` / `src/index.ts`）与仓私有件（`api-*.ts` / `content-*.ts` /
+     `automation-*.ts`）**从不回流事实源**（`sync-split-repos` 对它们只报不改），
+     所以 cloud 那张 556 文件的图里，它们要么不存在、要么是另一份内容。
+     实测盲区：api 5 个、content 4 个、automation 26 个。
+
+  ② **每仓自查看不见跨仓的边。**
+     单仓只能看自己那张图。而本仓最贵的两次线上事故正是**跨属主读** ——
+     它需要同时看见「谁在读」和「那张表归谁」，任何单仓视角都做不到。
+
+再往每个仓复制一份 1000 行扫描器不是解法：cloud 与 automation 那两份**已经漂开了**
+（2026-08-05 实测 `diff` 不同），复制到四份只会让漂移更快。所以做成一处、跨仓看。
+
+## 判据从事实源读，不手抄
+
+- 每个文件的归属层：读该仓自己的 `boundaries/ownership-rules.json`
+  （`fileOverrides` > `compositionWhitelist` > `directoryRules`，与生成器同序）。
+- 「谁能引谁」：`EDGE_RULES` 逐字复刻 `boundary-scan.ts` 的 `classifyEdge`，
+  并由 `--self-check` 与那份 TypeScript 源文本比对，防两份实现漂开。
+
+## 退出码
+0 = 没有禁止边、没有未裁定文件、没有悬空引用；1 = 有，逐条列出。
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SIBLINGS = os.path.dirname(ROOT)
+
+# 参与普查的仓。kernel / transport 是共享包，没有 ownership-rules，按整仓单层处理。
+CODE_REPOS = ['aidcp-api', 'aidcp-automation', 'aidcp-content']
+PACKAGE_LAYER = {'aidcp-kernel': 'kernel', 'aidcp-transport': 'automation'}
+
+LAYERS = ('kernel', 'api', 'content', 'automation', 'composition')
+
+
+def classify_edge(src: str, dst: str) -> str:
+    """逐字复刻 boundary-scan.ts 的 classifyEdge。改这里必须同时改那边（--self-check 会拦）。"""
+    if src == 'composition':
+        return 'allowed'
+    if dst == 'composition':
+        return 'forbidden'
+    if src == 'kernel':
+        return 'allowed' if dst == 'kernel' else 'forbidden'
+    if dst == 'kernel':
+        return 'allowed'
+    if src == dst:
+        return 'allowed'
+    return 'exemptable'
+
+
+# 5×5 全表判定。**两侧漂移都要能抓到，所以自检必须双向**：
+#   - 只比 TypeScript 文本 ⇒ Python 侧改坏了照样全绿（2026-08-05 变异测试实测漏抓，已修）；
+#   - 只比 Python 真值表 ⇒ TypeScript 侧改了没人知道。
+# 故 self_check 同时做两件事：跑一遍本表核 Python 行为 + 核 TS 源里那几条判据还在。
+EXPECTED_TABLE = {
+    ('composition', 'composition'): 'allowed',
+    ('composition', 'kernel'): 'allowed',
+    ('composition', 'api'): 'allowed',
+    ('composition', 'content'): 'allowed',
+    ('composition', 'automation'): 'allowed',
+    ('kernel', 'composition'): 'forbidden',
+    ('kernel', 'kernel'): 'allowed',
+    ('kernel', 'api'): 'forbidden',
+    ('kernel', 'content'): 'forbidden',
+    ('kernel', 'automation'): 'forbidden',
+    ('api', 'composition'): 'forbidden',
+    ('api', 'kernel'): 'allowed',
+    ('api', 'api'): 'allowed',
+    ('api', 'content'): 'exemptable',
+    ('api', 'automation'): 'exemptable',
+    ('content', 'composition'): 'forbidden',
+    ('content', 'kernel'): 'allowed',
+    ('content', 'api'): 'exemptable',
+    ('content', 'content'): 'allowed',
+    ('content', 'automation'): 'exemptable',
+    ('automation', 'composition'): 'forbidden',
+    ('automation', 'kernel'): 'allowed',
+    ('automation', 'api'): 'exemptable',
+    ('automation', 'content'): 'exemptable',
+    ('automation', 'automation'): 'allowed',
+}
+
+
+def self_check() -> int:
+    """双向自检：① 本文件的规则行为对不对；② TypeScript 那份还是不是同一套。"""
+    drift = [f'{a}->{b}: 期望 {v}，实得 {classify_edge(a, b)}'
+             for (a, b), v in sorted(EXPECTED_TABLE.items())
+             if classify_edge(a, b) != v]
+    if drift:
+        print('self-check: **本文件的 classify_edge 已偏离真值表**：')
+        for x in drift:
+            print(f'   {x}')
+        return 1
+    ts = None
+    for repo in ('aidcp-automation', 'aidcp-cloud'):
+        p = os.path.join(SIBLINGS, repo, 'test/acceptance/helpers/boundary-scan.ts')
+        if os.path.isfile(p):
+            ts = open(p, encoding='utf-8').read()
+            break
+    if ts is None:
+        print('self-check: 找不到 boundary-scan.ts —— 无法对齐，视为失败')
+        return 1
+    m = re.search(r'export function classifyEdge[\s\S]*?\n\}', ts)
+    if not m:
+        print('self-check: boundary-scan.ts 里找不到 classifyEdge（改名了？）')
+        return 1
+    body = m.group(0)
+    # **判据必须把条件与结论绑在同一条语句上。** 第一版写成「这两个串在函数体里各自出现过」，
+    # 2026-08-05 变异测试当场证伪：把 `to === 'composition'` 的结论从 forbidden 改成 exemptable，
+    # 检查照样全绿 —— 因为 `'forbidden'` 在 kernel 那行里也出现。**恒真的闸比没有闸更糟**，
+    # 它让人以为两份规则被钉住了。
+    expect = [
+        r"if \(from === 'composition'\) return 'allowed';",
+        r"if \(to === 'composition'\) return 'forbidden';",
+        r"if \(from === 'kernel'\) return to === 'kernel' \? 'allowed' : 'forbidden';",
+        r"if \(to === 'kernel'\) return 'allowed';",
+        r"if \(from === to\) return 'allowed';",
+        r"return 'exemptable';",
+    ]
+    missing = [p for p in expect if not re.search(p, body)]
+    if missing:
+        print('self-check: boundary-scan.ts 的 classifyEdge 已与本文件的真值表不一致：')
+        for x in missing:
+            print(f'   对不上：{x}')
+        return 1
+    print('self-check: Python 规则与 boundary-scan.ts 的 classifyEdge 一致')
+    return 0
+
+
+def load_rules(repo: str) -> dict | None:
+    p = os.path.join(SIBLINGS, repo, 'boundaries/ownership-rules.json')
+    if not os.path.isfile(p):
+        return None
+    return json.load(open(p, encoding='utf-8'))
+
+
+def derived_composition() -> dict[str, set[str]]:
+    """派生仓私有组装根名单 —— **从 `sync-split-repos` 里读，不另立一份**。
+
+    那份名单是同步器判断「哪些文件没有 Cloud 对应物、只登记不覆盖」的依据，
+    与本脚本要判的「哪些文件 cloud 的归属规则天生覆盖不到」是同一件事。
+    抄成第二份的后果很具体：加一个私有组装根时只改了一处，另一处要么漏判、要么误报未裁定。
+    用 `ast` 静态取值，不执行那个脚本。
+    """
+    import ast
+    src = open(os.path.join(ROOT, 'scripts/sync-split-repos'), encoding='utf-8').read()
+    for node in ast.parse(src).body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == 'DERIVED_COMPOSITION' for t in node.targets
+        ):
+            return {k: set(v) for k, v in ast.literal_eval(node.value).items()}
+    raise SystemExit('boundary-census: sync-split-repos 里找不到 DERIVED_COMPOSITION（改名了？先修本脚本）')
+
+
+def layer_of(rel: str, rules: dict) -> str | None:
+    """归属解析顺序与生成器一致：fileOverrides > compositionWhitelist > directoryRules。"""
+    for ov in rules.get('fileOverrides', []):
+        if ov.get('path') == rel:
+            return ov.get('layer')
+    if rel in rules.get('compositionWhitelist', []):
+        return 'composition'
+    best = None
+    for dr in rules.get('directoryRules', []):
+        d = dr.get('dir', '')
+        if rel.startswith(d) and (best is None or len(d) > len(best[0])):
+            best = (d, dr.get('layer'))
+    return best[1] if best else None
+
+
+def list_ts(root: str) -> list[str]:
+    out = []
+    for d, _, fs in os.walk(root):
+        for f in fs:
+            if f.endswith('.ts') and not f.endswith('.d.ts'):
+                out.append(os.path.relpath(os.path.join(d, f), os.path.dirname(root)))
+    return sorted(out)
+
+
+IMPORT_RE = re.compile(r"""(?:from|import)\s*\(?\s*['"]([^'"]+)['"]""")
+
+# 注释里写 `from './x'` 是本仓的常见笔法（「保既有 from './x' 的导入面逐字不变」这类）。
+# 不剥注释就扫，2026-08-05 首跑实测 11 条「悬空引用」**全是假阳性**、无一为真。
+_BLOCK = re.compile(r'/\*[\s\S]*?\*/')
+_LINE = re.compile(r'(^|[^:"\'])//[^\n]*')
+
+
+def strip_comments(src: str) -> str:
+    """剥块注释与行注释。行注释前置排除 `://`，免得把 URL 里的双斜杠当注释起点。"""
+    src = _BLOCK.sub('', src)
+    return _LINE.sub(lambda m: m.group(1), src)
+
+
+def scan(repo: str, private: set[str]) -> tuple[list[str], list[str], list[str], int]:
+    """返回 (禁止边, 未裁定文件, 悬空引用, 扫描文件数)。"""
+    base = os.path.join(SIBLINGS, repo)
+    rules = load_rules(repo)
+    if rules is None:
+        return ([f'{repo}: 没有 boundaries/ownership-rules.json'], [], [], 0)
+    files = list_ts(os.path.join(base, 'src'))
+    own_roots = derived_composition().get(repo, set())
+    layers: dict[str, str] = {}
+    unowned: list[str] = []
+    for rel in files:
+        # 仓私有组装根：cloud 里没有对应物，故 cloud 的归属规则天生覆盖不到它们。
+        # 它们**就是**组装根，按 composition 判——于是「业务层反向 import 组装根」照样会被拦。
+        lay = 'composition' if rel in own_roots else layer_of(rel, rules)
+        if lay is None:
+            unowned.append(f'{repo}: {rel} 未裁定归属（目录规则与 fileOverrides 都没接住）')
+        else:
+            layers[rel] = lay
+    forbidden: list[str] = []
+    dangling: list[str] = []
+    for rel in files:
+        src_layer = layers.get(rel)
+        if src_layer is None:
+            continue
+        text = strip_comments(open(os.path.join(base, rel), encoding='utf-8', errors='ignore').read())
+        for spec in IMPORT_RE.findall(text):
+            if not spec.startswith('.'):
+                continue
+            tgt = os.path.normpath(os.path.join(os.path.dirname(rel), spec))
+            tgt = re.sub(r'\.js$', '.ts', tgt)
+            if not tgt.startswith('src/'):
+                continue
+            if tgt not in layers:
+                if not os.path.isfile(os.path.join(base, tgt)):
+                    mark = ' ← 仓私有件' if rel in private else ''
+                    dangling.append(f'{repo}: {rel} -> {spec}（目标不存在）{mark}')
+                continue
+            verdict = classify_edge(src_layer, layers[tgt])
+            if verdict == 'forbidden':
+                mark = ' ← 仓私有件（cloud 的整图门禁看不见它）' if rel in private else ''
+                forbidden.append(f'{repo}: {rel}[{src_layer}] -> {tgt}[{layers[tgt]}]{mark}')
+    return (forbidden, unowned, dangling, len(files))
+
+
+def private_files(repo: str) -> set[str]:
+    """cloud 事实源看不见的那一片：账本里没有的，加上两个组装根（内容不同步）。"""
+    p = os.path.join(SIBLINGS, 'aidcp-cloud/boundaries/module-ownership.json')
+    known = set()
+    if os.path.isfile(p):
+        known = {e['path'] for e in json.load(open(p, encoding='utf-8'))}
+    base = os.path.join(SIBLINGS, repo)
+    mine = set(list_ts(os.path.join(base, 'src')))
+    return (mine - known) | ({'src/server.ts', 'src/index.ts'} & mine)
+
+
+def main() -> int:
+    if '--self-check' in sys.argv:
+        return self_check()
+    rc = self_check()
+    print()
+    all_forbidden: list[str] = []
+    all_unowned: list[str] = []
+    all_dangling: list[str] = []
+    for repo in CODE_REPOS:
+        if not os.path.isdir(os.path.join(SIBLINGS, repo)):
+            print(f'{repo:<20} 本机没有 clone —— 跳过（**不是通过**）')
+            continue
+        priv = private_files(repo)
+        f, u, d, n = scan(repo, priv)
+        print(f'{repo:<20} 源文件 {n:<4} 仓私有 {len(priv):<3} '
+              f'禁止边 {len(f)} · 未裁定 {len(u)} · 悬空 {len(d)}')
+        all_forbidden += f
+        all_unowned += u
+        all_dangling += d
+    for repo, lay in PACKAGE_LAYER.items():
+        d = os.path.join(SIBLINGS, repo, 'src')
+        if os.path.isdir(d):
+            print(f'{repo:<20} 源文件 {len(list_ts(d)):<4} 整仓单层={lay}（无 ownership-rules，不逐文件判）')
+
+    print()
+    bad = False
+    for title, items in (('禁止的跨层边', all_forbidden),
+                         ('未裁定归属的文件', all_unowned),
+                         ('悬空的相对引用', all_dangling)):
+        if items:
+            bad = True
+            print(f'✗ {title}（{len(items)}）：')
+            for x in items:
+                print(f'   {x}')
+    if not bad:
+        print('✓ 跨仓普查：禁止边 0 · 未裁定 0 · 悬空 0')
+    return 1 if (bad or rc) else 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
