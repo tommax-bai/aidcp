@@ -1,7 +1,7 @@
 ## 1. aidcp-edge — 泄漏闸门从事实源派生
 
-- [x] 1.1 在 `scripts/` 下新增一个共享模块，运行时读取 `native/page-engine/src/facebook-router/manifest.txt`，导出「已登记分片名列表」，供剪枝脚本、打包后置扫描与测试共用 <!-- aidcp-edge be0a8be 新增 scripts/native-engine-inventory.cjs 为唯一派生点；写成 CommonJS 以同时供 ESM 脚本与 electron-builder 的 after-pack 钩子同步调用 -->
-- [x] 1.2 把 `scripts/prune-production-dist.mjs:47-57` 的 10 条 `facebook-router/*.js` 字面量删掉，改为按 1.1 的列表生成禁止路径，并把检查根重新锚定到该脚本实际能产出的语料（当前 `dist/facebook-router` 与 `src/facebook-router` 均不存在，须先确认剪枝脚本应该守的是哪个目录，若确认无对应产物则改为「守 dist 全树的分片文件名」并记录判断依据）<!-- aidcp-edge be0a8be 判断依据：任何分支下都不产出 dist/facebook-router，原 10 条恒不触发；改为按清单派生分片文件名、检查根重锚到整棵 dist 树按文件名判 -->
+- [x] 1.1 在 `scripts/` 下新增一个共享模块，运行时读取 `native/page-engine/src/facebook-router/manifest.txt`，导出「已登记分片名列表」，供剪枝脚本、打包后置扫描与测试共用 <!-- aidcp-edge be0a8be 新增 scripts/native-engine-inventory.cjs 为唯一派生点；写成 CommonJS 以同时供 ESM 脚本与 electron-builder 的 after-pack 钩子同步调用 --> <!-- aidcp-edge f652786 追认（2026-08-05）：派生点保留，但泄漏闸的枚举源由「FB 有序清单」改为「明文语料目录树」——清单结构上覆盖不到平铺的小红书分片与明文选择器。1.4 的清单对账未受影响，见 12.1 -->
+- [x] 1.2 把 `scripts/prune-production-dist.mjs:47-57` 的 10 条 `facebook-router/*.js` 字面量删掉，改为按 1.1 的列表生成禁止路径，并把检查根重新锚定到该脚本实际能产出的语料（当前 `dist/facebook-router` 与 `src/facebook-router` 均不存在，须先确认剪枝脚本应该守的是哪个目录，若确认无对应产物则改为「守 dist 全树的分片文件名」并记录判断依据）<!-- aidcp-edge be0a8be 判断依据：任何分支下都不产出 dist/facebook-router，原 10 条恒不触发；改为按清单派生分片文件名、检查根重锚到整棵 dist 树按文件名判 --> <!-- aidcp-edge f652786 追认（2026-08-05）：「按清单派生」已改为「按目录树派生」，检查根与按 basename 判的口径不变，覆盖面扩大且新分片自动进闸，见 12.1 -->
   - 【实装实测订正 · 次序必须写死】原任务只规定了闸门的锚定位置、没规定它与剪枝步骤的**先后**。实测把分片闸放在剪枝之后：植入的分片会先被剪枝当孤儿删掉，闸门随后报通过——泄漏路径原样留着、痕迹被同一次构建擦掉，正是「静默假成功」在构建闸上的形态。已改为**剪枝之前**判并补回归用例。次序要求同步写进 `specs/native-engine-artifact-gates/spec.md`（新增「闸门 MUST 在任何会改写被检语料的步骤之前执行」一句与对应 Scenario）
 - [x] 1.3 把 `scripts/after-pack.cjs:177-187` 的 10 条 `/native/page-engine/src/facebook-router/*.js` 字面量删掉，改为按 1.1 的列表生成条目；同时对 electron-builder 的 `files` 允许清单加一条断言：允许清单一旦被放宽到覆盖 `native/page-engine/src/**`，打包失败 <!-- aidcp-edge be0a8be 原先漏掉的 08-reaction-semantics.js 随派生自动进闸 -->
   - 【范围说明】允许清单断言当前只覆盖 `build.files`，未纳入 `build.extraResources`。判断依据：`extraResources` 是归档外资源，不构成「明文分片进 asar 归档」的路径；如后续要把 `extraResources` 也纳入，须另立判据
@@ -10,7 +10,7 @@
 
 ## 2. aidcp-edge — 否定式闸门的可证伪自测
 
-- [x] 2.1 为剪枝脚本的禁止路径闸加一条自测：在临时目录里造出一个被禁文件、跑闸门、断言抛错 <!-- aidcp-edge be0a8be test/native-page-engine/artifact-gates.test.ts，植入违规→断言拒绝，另配无植入的对照断言放行 -->
+- [x] 2.1 为剪枝脚本的禁止路径闸加一条自测：在临时目录里造出一个被禁文件、跑闸门、断言抛错 <!-- aidcp-edge be0a8be test/native-page-engine/artifact-gates.test.ts，植入违规→断言拒绝，另配无植入的对照断言放行 --> <!-- aidcp-edge f652786 追认（2026-08-05）：同批新增目录派生的植入/对照自测，形态与本条一致（可证伪、有对照），见 12.1 -->
 - [x] 2.2 为剪枝脚本与打包扫描的明文标记闸各加一条自测：在临时语料里植入一条标记、断言闸门拒绝 <!-- aidcp-edge be0a8be 同上文件，两道标记闸各一对（植入 / 对照） -->
 - [x] 2.3 为打包后置扫描的禁止条目闸加一条自测：用一个植入了被禁条目的临时 asar（或等价条目清单桩）断言拒绝 <!-- aidcp-edge be0a8be 用等价条目清单桩，避免自测依赖真出包 -->
 - [x] 2.4 把 `test/native-page-engine/build-contract.test.ts:38,43` 那类「断言脚本文本里出现某标识符」的用例标注为「存在性断言、不构成判定证据」，并在同文件补上指向 2.1–2.3 的判定型断言 <!-- aidcp-edge be0a8be -->
@@ -145,10 +145,10 @@
 ## 10. aidcp（控制仓）— 护栏与在途工作收口
 
   - ⏸ **【降级为「按 case 处理」，2026-07-30，用户裁定】不做，后面看 case。****已确认这样做是安全的**：即便在 macOS 上打 Windows 包踩中这条，也是**响亮失败、不会静默出错包** —— `scripts/after-pack.cjs` 的打包后置校验按**目标平台**（`context.electronPlatformName`）取值，`src/electron/native-page-engine-artifact.cjs` 直接比对产物清单里的 `platform` / `arch` / 可执行文件名，对不上即抛错（清单实测带 `"platform":"darwin"`、`"arch":"arm64"`）。**触发条件**：第一次真的要在 macOS 上出 Windows 包时回到本条；在那之前它零影响、不可能悄悄发货。
-- [ ] 10.1 更新 `docs/architecture.md`：组件图（72-85 行）、边缘模块表（125-138 行）、`DomProvider` / `ActionExecutor` 接口说明（141-144 行）与单步定位 / 锚点晋升两节（172-201 行）当前仍把已从生产剪除的 JS 页面智能当现役；改为如实描述 Native 引擎为现役、并标注这些 TypeScript 模块为退役保留
-- [ ] 10.2 复核根 `CLAUDE.md` §2 的「DOM-first 定位三道闸」铁律表述：三道闸的语义仍然有效，但其权威落点已不是 `aidcp-edge/src/locating/engine.ts`；据实修订指针，不改变红线本身
-- [ ] 10.3 在活跃 change `facebook-consent-structural-detect` 的 `tasks.md` 顶部登记「实装落点 `src/facebook/consent.ts` 已从生产构建剪除，按现落点实装不会改变生产行为」，并交由其属主决定改写落点或废弃；MUST NOT 代其改写立论 <!-- 2026-07-30 本条原同时指向 facebook-join-actuation-decouple，该 change 已由用户裁定按「立论过期」删除（其落点 TypeScript 加群执行器 src/facebook/join-executor.ts 全仓仅剩 import type 引用、运行时不可达，编译后从 dist 剪除），故本条收窄为单条。判据不变：代码是否还算数，看核心入口到不到得了，不看有没有人引用 -->
-- [ ] 10.4 在 `native-page-engine-production-cutover/tasks.md` 里标注：其未勾的 4.6 / 6.5 / 9.1 / 9.3 所需的机械位置由本 change 提供，本 change 不代替其覆盖率承诺；并明确该 change 归档前必须先收口 **7 条**未勾任务（3.2 / 3.3 / 4.6 / 6.5 / 8.5 / 9.1 / 9.3），否则归档会把缺口随 delta 并进主规格变成已上线保证 <!-- 2026-07-31 由 9 条改为 7 条：原列的 9.4 / 9.5 是真机验收，已按用户裁定移出 tasks.md、收拢进 backlog 簇 125.1 / 125.2。**收口门槛只对代码级任务生效，真机项不再 gate 归档**（与 backlog 顶部「归档不 gate 在真机验收上」的既有解耦约定一致） -->
+- [x] 10.1 更新 `docs/architecture.md`：组件图（72-85 行）、边缘模块表（125-138 行）、`DomProvider` / `ActionExecutor` 接口说明（141-144 行）与单步定位 / 锚点晋升两节（172-201 行）当前仍把已从生产剪除的 JS 页面智能当现役；改为如实描述 Native 引擎为现役、并标注这些 TypeScript 模块为退役保留 <!-- aidcp 本次 组件图边缘框重画为「EdgeClient → Native 引擎 → CDP 接入层」并列出退役清单；§2.2 拆成「现役 / 已从生产剪除」两张表；§3.2 §3.3 加退役横幅。**判据不是文档记载而是实读生产 dist**：本机已构建的 dist 里 `locating/` `publish/` 全空、`browse/` 只剩 cdp-util、`flows/` 只剩三个非业务件，`cdp/` `humanize/` `client/` `execution/` `native-page-engine/` `wechat-channels/` 现役。另订正三处原文错误：① `CdpDomProvider` / `CdpActionExecutor` **仍在生产**（原以为随定位引擎一起退役），只是不再服务定位引擎；② `src/locating/` 里 extractor/matcher/selector/guard **不在显式退役名单上**，是被可达性剪枝删掉的——所以「名单 35 条」不等于「退役 35 个模块」；③ 退役名单事实源写明是 `native-engine-inventory.cjs` 的 `RETIRED_DIST_MODULES`，不再在文档里复制易漂移的清单 -->
+- [x] 10.2 复核根 `CLAUDE.md` §2 的「DOM-first 定位三道闸」铁律表述：三道闸的语义仍然有效，但其权威落点已不是 `aidcp-edge/src/locating/engine.ts`；据实修订指针，不改变红线本身 <!-- aidcp 本次 三闸语义逐字保留并按引擎侧实现补全（闸②补「一次都没写下去 vs 写下去了但结果没发生」两种终局 + 不可重放的写绝不重放）。**指针改写时发现一件不能只挪落点的事**：引擎侧 `native/page-engine/src/locating.rs` 虽是三闸新落点，但其模块注释自陈「只造原语、尚未接进任何平台命令」，且闸③在固定选择器下**必然空转**（无非确定性锚点来源、暂存区恒为空）。若只把指针指过去，会制造「三闸已在 Rust 侧就位」的错觉——故改为分层表述：闸①②的实际行为在各平台分片自己的实现里，统一落点待接线，并明写 MUST NOT 据此认为「定位自愈已恢复」。**顺带修了 §4 一处同类滞后**（不在本条范围内，属主已有裁定故直接改）：发布审批信号文件被写成「两端契约路径必须一致」，而 change `publish-approval-signal-to-database` 的 6.1 / 6.2 已把它降为本机开发夹具、生产人审改走云端持久记录，且该文件已从生产 dist 剪除 -->
+- [x] 10.3 **【按新事实结案 2026-08-05：登记目标已不存在，事实改存到别处】** 原文要求在活跃 change `facebook-consent-structural-detect` 的 `tasks.md` 顶部登记「实装落点 `src/facebook/consent.ts` 已从生产构建剪除，按现落点实装不会改变生产行为」，并交由其属主决定改写落点或废弃；MUST NOT 代其改写立论 <!-- 2026-07-30 本条原同时指向 facebook-join-actuation-decouple，该 change 已由用户裁定按「立论过期」删除（其落点 TypeScript 加群执行器 src/facebook/join-executor.ts 全仓仅剩 import type 引用、运行时不可达，编译后从 dist 剪除），故本条收窄为单条。判据不变：代码是否还算数，看核心入口到不到得了，不看有没有人引用 --> <!-- 2026-08-05 结案：`facebook-consent-structural-detect` 已于同日随另外 6 份零进度提案被用户裁定撤回，**活跃 change 已不存在**，本条的登记目标随之消失。但它要传递的事实不能跟着消失——已就地写进该提案的存档件 `docs/deferred-defect-proposals-2026-08-05.md` §5（新增「重新拾起前必看」块）：点名落点 `src/facebook/consent.ts` 已从生产构建剪除、照原落点实装零生产效果、重新拾起的第一步是把落点改到 Native 引擎的同意闸分片。**落点已实读核对**：TypeScript 侧文件仍在（未删，只是被剪出产物），Native 侧同意逻辑落在 `native/page-engine/src/facebook-router/05-session.js` 与 `native/page-engine/src/facebook/shared.rs`。判据不变、未代其改写立论 -->
+- [x] 10.4 **【按新事实结案 2026-08-05：门槛已满足，标注对象已归档】** 在 `native-page-engine-production-cutover/tasks.md` 里标注：其未勾的 4.6 / 6.5 / 9.1 / 9.3 所需的机械位置由本 change 提供，本 change 不代替其覆盖率承诺；并明确该 change 归档前必须先收口 **7 条**未勾任务（3.2 / 3.3 / 4.6 / 6.5 / 8.5 / 9.1 / 9.3），否则归档会把缺口随 delta 并进主规格变成已上线保证 <!-- 2026-07-31 由 9 条改为 7 条：原列的 9.4 / 9.5 是真机验收，已按用户裁定移出 tasks.md、收拢进 backlog 簇 125.1 / 125.2。**收口门槛只对代码级任务生效，真机项不再 gate 归档**（与 backlog 顶部「归档不 gate 在真机验收上」的既有解耦约定一致） --> <!-- 2026-08-05 结案：迁移主线 `native-page-engine-production-cutover` 已于 **2026-08-01 归档**（`openspec/changes/archive/2026-08-01-native-page-engine-production-cutover/`），**其 tasks.md 零条未勾，本条点名的 7 条（3.2 / 3.3 / 4.6 / 6.5 / 8.5 / 9.1 / 9.3）实读全部为 `[x]`** —— 这道收口门槛在归档时被遵守了，缺口没有随 delta 并进主规格。因此：① 本条要防的坏结果没有发生；② 标注对象已进 archive，再往里写标注既无读者也无意义（archive 目录是历史件，MUST NOT 事后改写）。**本条的实质诉求已由事实满足，就地结案，不留待办。**另注：本 change 自身的归档因此**不再被迁移主线阻塞** —— 07-31 交接文档里「产物门禁不能先归档」那条前提已失效 -->
 - [x] 10.5 在 `docs/real-machine-acceptance-backlog.md` 新增或并入「小红书 Native 切换真机验收」簇，承接 9.4 / 9.5 两项（当前全文无 XHS native 簇） <!-- aidcp 本次 已建**簇 125**「小红书 Native 切换：只读矩阵与写动作验收」，承接 cutover 9.4 / 9.5 + 小红书动作诚实化 5.1–5.10 + 运行时契约 4 条，共 12 条；并注明与簇 122 / 123 共用同一台机器与分身 -->
 
 ## 11. 验证与验收
@@ -178,7 +178,7 @@
 > 该 change 的 9.2 表里已自认越界，但**只登记在越界方自己的台账里，属主这边看不到** —— 本节补上。
 > **MUST NOT 当成默认通过**：方向是收紧不等于属主已同意。
 
-- [ ] 12.1 追认或否决 `aidcp-edge f652786` 对本 change 三个属主文件的改动：
+- [x] 12.1 **【追认 2026-08-05】** 追认或否决 `aidcp-edge f652786` 对本 change 三个属主文件的改动：
   `scripts/native-engine-inventory.cjs`、`scripts/prune-production-dist.mjs`、
   `test/native-page-engine/artifact-gates.test.ts`。
   **改了什么**：分片泄漏守卫的覆盖面从「只数 Facebook 有序清单」改成**按目录派生**，计数 11 → 17；
@@ -186,6 +186,24 @@
   **为什么是越界**：与越界方自身 5.7「不改该文件一行」的纪律直接冲突，且这三个文件是本 change 1.1 / 1.2 / 2.1 的产物。
   **属主要判的**：① 目录派生是否与 1.4「清单每条都必须被两处闸门覆盖」的对账语义相容（会不会出现「目录里有、清单里无」被派生自动放行、反而绕过 1.4）；
   ② 11 → 17 是**覆盖面变了**、不是新增 6 个分片，本 change 台账里若已记过 11 这个数，须一并订正为「计数不是覆盖的证据」。
+  - **【追认 2026-08-05】结论：追认，无否决项。逐条回答本条点名的两问：**
+    - **① 不绕过 1.4，两道闸守的是不同问题，且现在互相钉住。** `assertFragmentInventoryReconciled`（1.4 那条）
+      **一行未动**，仍在比对「Facebook 有序清单 ↔ facebook-router 目录实际文件」，
+      目录里多一个没登记的分片照样响亮抛 `page-rule fragment is not registered`。
+      目录派生只喂**泄漏闸**（「明文规则有没有漏进产物」），而对这个问题，按目录派生是**只会更宽不会更窄**的方向。
+      越界方还补了一条**反向交叉校验**：有序清单点名的每一片都必须被目录扫描看见，看不见即抛
+      `ordered source manifest names a file the cleartext scan cannot see` —— 两套派生因此互为对方的守卫。
+    - **② 确认「11 → 17 是覆盖面变了、不是新增 6 个分片」，并订正一个更要紧的事实：今天实测是 18，不是 17。**
+      那 6 个（小红书 4 份分片 + 2 份明文选择器）一直都在，只是 Facebook 有序清单**结构上不可能覆盖到它们**
+      （清单只管「哪些片按什么顺序拼进 FB 路由」）。
+      **17 → 18 的那一个是自己进来的**：`f652786` 之后另一条 change 新增了 `06-auth.js`（`a393004`），
+      有序清单从 11 行变 12 行，目录派生**无需任何人登记就自动把它纳入泄漏闸**。
+      这既是该改法有效的实证，**也正是「计数不是覆盖的证据」这句话的意思**——
+      所以本台账**不再登记任何守护计数**，要看当场跑 `forbiddenFragmentBasenames()`。
+    - **顺带澄清一处会被误读的数字**：本清单 4.2 记的「实测当前 **11** 片末字节均为 `0a`」
+      说的是**拼接不变量覆盖的 FB 有序分片数**（今天是 12），与泄漏闸的守护面（今天 18）是两个量，
+      **不是同一个 11**，无需订正、但别把两者对读。
 
-- [ ] 12.2 若追认，把 12.1 的结论回写进 1.1 / 1.2 / 2.1 的任务行备注（带 `f652786`）；
+
+- [x] 12.2 **【已完成 2026-08-05：已追认，结论写在 12.1 条下并按下述三条回写 1.1 / 1.2 / 2.1；无否决项，无需通知越界方】** 若追认，把 12.1 的结论回写进 1.1 / 1.2 / 2.1 的任务行备注（带 `f652786`）；
   若否决，由属主给出替代形态并通知越界方，**MUST NOT 静默保留**。

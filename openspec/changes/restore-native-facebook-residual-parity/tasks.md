@@ -2,11 +2,38 @@
 
 ## 1. aidcp-edge — Facebook 互动热度取数
 
+> **1.3 / 1.4 显式弃守（2026-08-05，用户裁定；不是待办，也不是遗漏）。** §7 整节随之弃守。
+> 判据是「危害已经消除，剩下的是可区分性」：**主症状（Facebook 热度恒 0 ⇒ 整平台被判不值得评）
+> 已由 1.1 / 1.2 在边缘侧修掉并上线**；见证解析在无匹配时已经返回空串、不进 `count()`，机械前提是满足的。
+> 这两条差的只是把「未观测」落成载荷上的一个标记，让云端能把它与「测量到 0」分开。
+>
+> **为什么可以弃**：
+> - **失败方向是诚实的。** 读不出反应数 ⇒ 当 0 ⇒ 评论门槛判「低于阈值」⇒ **跳过评论**。
+>   少做事、不多做事，**不产生任何对外写入**，不触及提交点。
+> - **成本明显高于收益**：要动协议热点单写者的**三个**文件同批改（两份 `protocol.ts` + `model.rs`，
+>   后者对未知字段严格拒绝，漏改一个直接反序列化失败），并抢 fleet 串行窗口。
+>
+> **弃的到底是什么（MUST NOT 读宽）**：弃的是**可区分性**，不是诚实性。
+> 今天的回执并没有声称「我读到了 0」——`likeCount` 在协议里就是必填 `number`，它没有能力表达「没读到」。
+> **代价是云端的跳过原因码说了假话**：报「热度不够」，实际是「没读到热度」。
+> 这条代价**只落在日志与统计上，不落在动作上**。
+>
+> **触发条件（出现任一条即重新拾起）**：
+> ① Facebook 评论量出现无法解释的下滑，且抽样发现跳过原因集中在「低于阈值」；
+> ② 有人要拿反应数做**放行**决策——今天它只用于**拦截**，方向一反过来，「未观测当 0」就从少做事变成多做事；
+> ③ 因别的 change 已经拿到协议三文件的单写窗口——那时这两条的成本降到接近零。
+>
+> **⚠️ 归档前 MUST 先处置 spec delta，否则会把没实装的东西写成已上线保证。**
+> 本 change 的 `specs/native-facebook-behavior-parity/spec.md`（「未观测被标记」）与
+> `specs/comment-interaction/spec.md`（「未观测不等于低于阈值」整条 Requirement）
+> **已经声明了这套能力**。弃守之后这两份 delta 与实装不符：
+> 归档前 MUST 把依赖该标记的场景删除或收窄到已实装范围，**MUST NOT 原样并进主规格**。
+
 - [x] 1.1 在 `native/page-engine/src/facebook-router/08-reaction-semantics.js` 新增一个**只用于读数**的反应计数见证解析：在给定根内选出「accessible label 或渲染文本含数字」**且**属反应汇总语义的可见控件，返回其文本；判据是两条**合取**（只判含数字会把带数字的中性控件误采），不确定一律回空 = 未观测。验收：`reactionButton()`（当前 `:28-31`）的正则与返回值逐字不变（用 `git diff` 断言该函数零改动），且 1.5 的语料上其选中结果不变（参照 src/facebook/feed-reader.ts:203-206；旧判据是「前缀 AND 含数字」且没数字就跳过继续找，取值文案优先、空退标签 — 见 oracle.md ①；新写的标签匹配须去变音符归一，见 oracle.md 覆盖漏洞 C） <!-- aidcp-edge 9176dcb 新增只读见证，判据是「含数字 AND 反应汇总语义」两条合取、不确定回空；reactionButton() 的正则与返回值逐字未动 -->
 - [x] 1.2 把**三处**计数取数点改用 1.1 的见证（已逐行核对，覆盖四类上报载荷）：`20-feed.js` 的 `cardOf`（控件 `:7`、取数 `:12`；feed 卡与 Reels 卡**同走这一处**，因 `feedCards()` 在 Reels 面把 `activeReel()` 的根喂给 `cardOf`）、首帖卡（`:117`）、详情（控件 `:228`、取数 `:243`）。**`30-reels.js` 无 `likeCount`**——它的 `:22` / `:94` 是动作见证包里的 `reactionText` 字符串（`grep -rn reactionText aidcp-cloud/src` 只命中协议注释、**零云端消费者**）；本 change **不改**这两处取值，只在台账/注释里注明它是观测串、MUST NOT 被当计数消费。验收：改后 `grep -n likeCount native/page-engine/src/facebook-router/*.js` 三处全部指向 1.1 的见证，`reactionButton` 在读数路径零命中（仅剩 `90-dispatch.js:110` / `30-reels.js:116` 两个点赞执行点与 `30-reels.js:22`/`:94` 的观测串）（参照 src/facebook/feed-reader.ts:519；另注数字所在的汇总控件常在 `[role=toolbar]` 内、被 10-feed-like.js:3-6 排除，扫卡侧从不查 toolbar — 见 oracle.md ①） <!-- aidcp-edge 9176dcb feed/Reels 卡、首帖卡、详情三处取数点全改走 1.1 的见证；30-reels.js 的两处观测串按台账口径未动 -->
-- [ ] 1.3 在两份 `protocol.ts`（`aidcp-edge/src/comm/protocol.ts` 卡片 `:1618-1626` / 详情 `:828-836`，与 `aidcp-cloud/src/comm/protocol.ts`，两份逐字一致）为卡片载荷与详情载荷各新增一个**可选**「反应计数未观测」标记，并写明「省略 = 已观测 = 老边端零回归」；MUST NOT 改 `likeCount` 的必填性，MUST NOT 新增或删除任何消息类型。**热点单写者文件（CLAUDE §2 / §7），集成期必须与 fleet 串行。** 验收：`AC-PROTO-*` 全过（两份不漂移）+ 断言 `likeCount` 仍是必填 `number`。**（实装实测订正）第三个文件必须同批改**：`native/page-engine/src/model.rs` 的卡片载荷与详情载荷两个结构体**对未知字段严格拒绝**，只加两份 `protocol.ts` 而不加它，标记一进载荷就会直接反序列化失败——所以本条的改动文件是**三个**，不是两个
+- [x] 1.3 **【显式弃守 2026-08-05，见本节抬头】** 在两份 `protocol.ts`（`aidcp-edge/src/comm/protocol.ts` 卡片 `:1618-1626` / 详情 `:828-836`，与 `aidcp-cloud/src/comm/protocol.ts`，两份逐字一致）为卡片载荷与详情载荷各新增一个**可选**「反应计数未观测」标记，并写明「省略 = 已观测 = 老边端零回归」；MUST NOT 改 `likeCount` 的必填性，MUST NOT 新增或删除任何消息类型。**热点单写者文件（CLAUDE §2 / §7），集成期必须与 fleet 串行。** 验收：`AC-PROTO-*` 全过（两份不漂移）+ 断言 `likeCount` 仍是必填 `number`。**（实装实测订正）第三个文件必须同批改**：`native/page-engine/src/model.rs` 的卡片载荷与详情载荷两个结构体**对未知字段严格拒绝**，只加两份 `protocol.ts` 而不加它，标记一进载荷就会直接反序列化失败——所以本条的改动文件是**三个**，不是两个
     - **阻塞**：三个文件（两份 `protocol.ts` + `model.rs`）都在本轮 edge 白名单外，且协议是热点单写者（CLAUDE §2 / §7），必须与 fleet 串行；解锁条件＝拿到协议文件的单写窗口后与 1.4 同批落地。主症状（热度恒 0）已由 1.1 / 1.2 修掉，本条只影响「未观测 vs 真零」的可区分性
-- [ ] 1.4 让 Native 引擎在无法解析计数见证时置该标记；已观测为 0 时不置标记。**机械要点**：共享的 `count()`（`00-shared.js:23-29`）在无匹配时 `return 0`，把「没数字」直接塌成 0——所以「未观测」判定 MUST 在**进 `count()` 之前**由见证解析返回空来表达，MUST NOT 依赖 `count()` 的返回值区分。另注：`count()` 只认 `k|m|万|萬|w`，无越南语等其他量级词；采样若发现其他单位，按 9.4 结论补进单位表（补不了的一律回未观测，绝不回 0）。验收：见 1.5 的三档语料断言（未观测置标记 / 真零不置标记 / 有数字不置标记）（参照 src/facebook/feed-reader.ts:148 的 parseFacebookCount，与 00-shared.js:23-29 覆盖已对齐、非缺口 — 见 oracle.md ①）。**（实装实测订正）落点同 1.3**：标记要落进载荷，`model.rs` 的两个结构体必须与两份 `protocol.ts` 同批改
+- [x] 1.4 **【显式弃守 2026-08-05，见本节抬头】** 让 Native 引擎在无法解析计数见证时置该标记；已观测为 0 时不置标记。**机械要点**：共享的 `count()`（`00-shared.js:23-29`）在无匹配时 `return 0`，把「没数字」直接塌成 0——所以「未观测」判定 MUST 在**进 `count()` 之前**由见证解析返回空来表达，MUST NOT 依赖 `count()` 的返回值区分。另注：`count()` 只认 `k|m|万|萬|w`，无越南语等其他量级词；采样若发现其他单位，按 9.4 结论补进单位表（补不了的一律回未观测，绝不回 0）。验收：见 1.5 的三档语料断言（未观测置标记 / 真零不置标记 / 有数字不置标记）（参照 src/facebook/feed-reader.ts:148 的 parseFacebookCount，与 00-shared.js:23-29 覆盖已对齐、非缺口 — 见 oracle.md ①）。**（实装实测订正）落点同 1.3**：标记要落进载荷，`model.rs` 的两个结构体必须与两份 `protocol.ts` 同批改
     - **部分完成** <!-- aidcp-edge 9176dcb 见证侧已可表达未观测 -->：见证解析已经能表达「未观测」——无匹配时返回**空串**而不是进 `count()`，符合本条「MUST 在进 `count()` 之前表达」的机械要求；**差的是把它落成载荷上的标记**，那要改 1.3 点名的三个白名单外文件（两份 `protocol.ts` + `model.rs`），随 1.3 一并解锁
 - [x] 1.5 加路由特征测试：中性控件无数字 → 未观测；汇总控件带 `1.2万` / `1.2K` → 解析为 12000 / 1200；真零 → 已观测 0 且无标记；断言点赞控件定位器的选中结果在同一语料上不变（可 port 旧用例：feed-reader.test.ts『轻量视频动作按钮内含数字 866 + 越南语汇总 toolbar 825』与 cta-labels.test.ts 数字守卫反向用例 — 见 oracle.md ①） <!-- aidcp-edge 9176dcb 新增 facebook-reaction-count.test.ts：中性控件不再盖住汇总计数、单位折算、真零、含数字的非反应控件不采信 -->
 - [x] 1.6 运行 `cd ../aidcp-edge && npm run typecheck`，并跑 1.5 的聚焦用例与 Native Rust 用例 <!-- aidcp-edge 9176dcb typecheck 通过；gate:native（fmt + clippy -D warnings + test，工具链 1.97.1）通过 -->
@@ -96,13 +123,22 @@
 
 ## 7. aidcp-cloud — 缺失指标的门槛结论
 
+> **7.1–7.4 显式弃守（2026-08-05，用户裁定；不是待办）。** 本节消费的是 1.3 / 1.4 的载荷标记，
+> 该标记已随 1.3 / 1.4 一并弃守——**理由、触发条件与归档前必须做的 spec delta 处置，全部见 §1 抬头**。
+> 一句话复述：热度恒 0 这个主症状已在边缘侧修掉，剩下的只是「未观测 vs 真零」在云端的可区分性，
+> 而它的失败方向是诚实的（跳过评论，不是发出评论）。
+>
+> **7.5 不随本节弃守**：§6 仍有云端改动（6.1 / 6.5），那套件仍要跑，已就地改写为服务 §6。
+>
+> ---
+>
 > **本轮状态（轨 B 实装，2026-07-28）**：本节五条**全部未做**，且 7.1 / 7.2 **另有硬前置**——它们消费的「反应计数未观测」标记要靠 1.3 / 1.4 落进载荷，而 1.3 / 1.4 本轮被协议热点单写者阻塞（见 §1）。所以解锁顺序是：先解 1.3 / 1.4 的协议窗口，再做 7.1 / 7.2。**主症状（Facebook 热度恒 0 → 整平台被判不值得评）已由 1.1 / 1.2 在边缘侧修掉**，本节修的是残下的「未观测 vs 真零」不可区分。
 
-- [ ] 7.1 让 `src/comm/handler.ts:496-505` 的字段映射（今天是 `likeCount: (p.likes as number) ?? (p.likeCount as number) ?? 0`，`:502`）在把边缘卡片 / 详情映射进内部笔记结构时保留「反应计数未观测」标记，MUST NOT 用 `?? 0` 把它塌成 0。验收：用例断言带标记的载荷进来后，内部笔记结构上标记仍在、下游能区分「未观测」与「测量到 0」（旧口径：解析不出即 0 且明文「绝不臆造」，缺失从不冒充 — 见 oracle.md ①）
-- [ ] 7.2 在 `src/agents/comment-appraiser.ts:167-168` 的硬门槛处区分「已测量」与「未观测」：未观测时 emit 一条点名缺失指标的独立 `comment.skipped` 原因，MUST NOT 用 `below_comment_threshold`，MUST NOT 调 LLM，MUST NOT 放行
-- [ ] 7.3 保持门槛数值与「无收藏概念平台放宽收藏合取项」的既有规则逐字不变；真零仍走既有 `below_comment_threshold`（旧实现明文：Facebook 无收藏概念、collect 一律诚实 0，绝不用反应数冒充；collectCount:0 两代一致、非缺口 — 见 oracle.md ①）
-- [ ] 7.4 加 Cloud 用例：未观测 → 独立原因、零 LLM 调用、不放行；测量 0 → 既有 below_comment_threshold；测量 500 → 照常进 LLM 判定
-- [ ] 7.5 运行 `cd ../aidcp-cloud && npm run test:acceptance`（须含 `AC-PROTO-*` 全过，证明两份 protocol.ts 未漂移）→ `npm test` → `npm run typecheck`
+- [x] 7.1 **【显式弃守 2026-08-05，见本节抬头】** 让 `src/comm/handler.ts:496-505` 的字段映射（今天是 `likeCount: (p.likes as number) ?? (p.likeCount as number) ?? 0`，`:502`）在把边缘卡片 / 详情映射进内部笔记结构时保留「反应计数未观测」标记，MUST NOT 用 `?? 0` 把它塌成 0。验收：用例断言带标记的载荷进来后，内部笔记结构上标记仍在、下游能区分「未观测」与「测量到 0」（旧口径：解析不出即 0 且明文「绝不臆造」，缺失从不冒充 — 见 oracle.md ①）
+- [x] 7.2 **【显式弃守 2026-08-05，见本节抬头】** 在 `src/agents/comment-appraiser.ts:167-168` 的硬门槛处区分「已测量」与「未观测」：未观测时 emit 一条点名缺失指标的独立 `comment.skipped` 原因，MUST NOT 用 `below_comment_threshold`，MUST NOT 调 LLM，MUST NOT 放行
+- [x] 7.3 **【显式弃守 2026-08-05，见本节抬头】** 保持门槛数值与「无收藏概念平台放宽收藏合取项」的既有规则逐字不变；真零仍走既有 `below_comment_threshold`（旧实现明文：Facebook 无收藏概念、collect 一律诚实 0，绝不用反应数冒充；collectCount:0 两代一致、非缺口 — 见 oracle.md ①）
+- [x] 7.4 **【显式弃守 2026-08-05，见本节抬头】** 加 Cloud 用例：未观测 → 独立原因、零 LLM 调用、不放行；测量 0 → 既有 below_comment_threshold；测量 500 → 照常进 LLM 判定
+- [ ] 7.5 **【2026-08-05 改写范围：本条现服务 §6（6.1 / 6.5）的云端验证，不再服务已弃守的 7.1–7.4】** 运行 `cd ../aidcp-cloud && npm run test:acceptance`（须含 `AC-PROTO-*` 全过，证明两份 protocol.ts 未漂移）→ `npm test` → `npm run typecheck`
 
 ## 8. 控制仓 — 规格与台账
 

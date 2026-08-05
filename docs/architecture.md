@@ -68,24 +68,25 @@ Electron 应用就是客户端；普通 Edge 子进程是按需自动化引擎�
                                  │  page.cards/note.detail · session.budget/risk.canDo · publish.*
 ┌────────────────────────────────┼────────────────────────────────────────────────┐
 │                                ▼            aidcp-edge (边缘端 · 轻)              │
-│   ┌──────────────┐  ┌────────────────────────┐  ┌───────────────────────────┐   │
-│   │ EdgeClient   │  │  BrowseSession          │  │  LocatingEngine            │   │
-│   │ 握手/路由/上报 │──│  云端命令分发 + 拟人化   │──│  五层编排 + 三道闸          │   │
-│   │ cloud-selector│  │  feed/modal/note/search │  │  guard→cache/match→select  │   │
-│   └──────┬───────┘  └───────────┬────────────┘  │  →execute→post-validate    │   │
-│          │                      │               └──────┬───────────┬─────────┘   │
-│   ┌──────▼──────┐  ┌────────────▼──────┐  ┌────────────▼──┐  ┌─────▼─────────┐   │
-│   │ publish/    │  │ humanize/          │  │ flows/        │  │ extractor /   │   │
-│   │ approval-gate│ │ 停顿/鼠标/键盘/     │  │ anchors/      │  │ matcher /     │   │
-│   │ 审批信号等待  │  │ 滚动/疲劳曲线       │  │ like/publish  │  │ cache/guard   │   │
-│   └─────────────┘  └────────────────────┘  └───────────────┘  └───────────────┘   │
-│   ┌──────────────────────────────────────────────────────────────────────────┐  │
-│   │  CDP 接入层（原生 WebSocket，非 Playwright）                               │  │
-│   │  CdpDomProvider ── Runtime.evaluate(outerHTML) → jsdom Document            │  │
-│   │  CdpActionExecutor ── 结构路径→XPath，浏览器侧 click/input/scroll          │  │
-│   │  CdpClient / targets / session / chrome-launcher / stealth-injector       │  │
-│   └─────────────────────────────────┬────────────────────────────────────────┘  │
-│   （Electron 客户端：客户会话 + HTTP 数据面 + 按需引擎监督 + 控制面板 UI）          │
+│     EdgeClient ── 握手 / 命令路由 / 上报 / 客户端鉴权                           │
+│          │                                                                      │
+│          ▼                                                                      │
+│     ★ Native 页面引擎（Rust 子进程）── 现役，且是唯一的页面智能                 │
+│       命令 → 定位 → 拟人化动作 → 后置校验 → 结构化诚实回执                      │
+│       页面规则分片编进二进制（facebook-router / xhs-command-router）            │
+│          │                                                                      │
+│          ▼                                                                      │
+│     CDP 接入层（原生 WebSocket，非 Playwright）                                 │
+│       CdpClient / targets / session / chrome-launcher / stealth-injector        │
+│       cdp/browser-provider ── 指纹浏览器生命周期；execution ── 页面单写         │
+│       humanize ── 节奏参数；wechat-channels ── API-only 旁路（不占浏览器）      │
+│                                                                                 │
+│     ⚠ 退役并已从生产 dist 剪除：locating/ · browse/ · publish/ ·                │
+│       facebook/ 的 reader | executor | consent | identity 等，共 35 个模块。    │
+│       名单事实源 = aidcp-edge/scripts/native-engine-inventory.cjs 的            │
+│       RETIRED_DIST_MODULES；本文 §2.2 / §3.2 / §3.3 已按此标注。                │
+│                                                                                 │
+│     （Electron 客户端：客户会话 + HTTP 数据面 + 按需引擎监督 + 控制面板 UI）    │
 └─────────────────────────────────────┼────────────────────────────────────────────┘
                                       │ CDP over WebSocket (:9222)
                                       ▼
@@ -120,28 +121,54 @@ Electron 应用就是客户端；普通 Edge 子进程是按需自动化引擎�
 
 ### 2.2 边缘端 aidcp-edge
 
+> **⚠ 读这一节前必须知道的一件事（2026-08-05 据实修订）：页面智能已整体迁进 Native 引擎，
+> 原来的那套 TypeScript 页面实现虽然还在仓里，但已被生产构建剪除。**
+>
+> **判据是「核心入口到不到得了」，不是「有没有人 import 它」。** 生产 `dist` 由两道机制共同裁剪：
+> ① 一张显式退役名单（`aidcp-edge/scripts/native-engine-inventory.cjs` 的
+> `RETIRED_DIST_MODULES`，35 条，**这是事实源**）；② 从核心入口出发的可达性剪枝——
+> 名单外但已无人可达的模块同样被删掉（`src/locating/` 除 `engine.ts` / `cache.ts` 之外的几个模块正是这样消失的）。
+>
+> **后果对写代码的人最要紧**：在退役模块上实装，**代码会写完、测试会全绿、发版会成功，
+> 而运营机上跑的仍是 Native 引擎那一套**——改动零生产效果，且没有任何东西会警告你。
+> 这已经让至少两份提案的立论整个落空（一份被裁定删除，一份的落点须重写，见
+> `docs/deferred-defect-proposals-2026-08-05.md` §5）。
+>
+> 下表按此拆成两半。**「已从生产剪除」那半仍可作实现参照**（很多正确写法与真机经验只留在那边，
+> 各 change 的 `oracle.md` 就是干这个的），**但 MUST NOT 当作现役落点**。
+
+**现役（在生产 `dist` 里）**
+
 | 组件 | 文件 | 职责 |
 | --- | --- | --- |
-| LocatingEngine | `src/locating/engine.ts` | 五层编排（守卫→定位→执行→校验）+ 三道闸 |
-| extractor | `src/locating/extractor.ts` | 把 DOM（或作用域）内可交互元素抽成结构化清单 |
-| matcher | `src/locating/matcher.ts` | 多信号一致性打分，唯一且分差达标才判 hit |
-| AnchorCache | `src/locating/cache.ts` | 内存锚点缓存（read-write/read-only/write-only）+ 暂存晋升 |
-| selector | `src/locating/selector.ts` | 缓存缺口时让文本 LLM"做选择题"，校验编号防幻觉 |
-| guard | `src/locating/guard.ts` | 操作前扫描并清除偶现干扰（弹窗/遮罩/登录过期…） |
-| **EdgeClient** | `src/client/edge-client.ts` | 边-云 WS 客户端：握手、命令路由、结果回传；`cloud-selector` 委托选元素、`like-runner` 点赞执行 |
-| **BrowseSession** | `src/browse/browse-session.ts` | 浏览会话编排：分发云端命令、结构化上报、拟人化；`feed-scroller`/`modal-controller`/`note-extractor`/`search-handler`（`card-filter` 已 `@deprecated`，开/跳决策上移至云端 `ContentEvaluator`） |
-| **EdgeTaskCoordinator** | `src/execution/edge-task-coordinator.ts` | 同一 edge/CDP 页面写任务单写：浏览命令边界 quiesce、陈旧队列取消、任务优先级/FIFO、taskId owner 校验、租约到期与队列清空后单次恢复 |
-| **humanize** | `src/humanize/*.ts` | 拟人化：`timing` 对数正态停顿、`mouse-path` 贝塞尔、`keyboard-rhythm`、`scroll-physics`、`reading-time`、`session-rhythm` 疲劳曲线 |
-| **flows** | `src/flows/{anchors,like-post,publish-post,publish-command-handlers}.ts` | 垂直业务流程：业务锚点常量、点赞流程、发布原子指令；小红书定时链路在内容/话题/其它选项之后设置并正证据校验定时时间，再精确点击“定时发布” |
-| **publish/approval-gate** | `src/publish/approval-gate.ts` | 发布审批：生成 requestId、构造/校验/轮询信号文件、等待授权 |
-| CdpDomProvider | `src/cdp/dom-provider.ts` | 实现 `DomProvider`：从真实页面取 DOM 快照 |
-| CdpActionExecutor | `src/cdp/action-executor.ts` | 实现 `ActionExecutor`：原子操作落到真实页面 |
-| CdpClient / chrome-launcher / stealth-injector | `src/cdp/*.ts` | 原生 WebSocket CDP RPC、Chrome 启动/登录检测、反检测脚本注入 |
-| **electron** | `src/electron/{main,preload,chrome-launcher}.cjs` + `renderer/` | 桌面打包：系统托盘、Chrome 启动网关、控制面板 UI（状态/暂停恢复/重登） |
+| **Native 页面引擎** | `native/page-engine/`（Rust，编成子进程二进制） | **现役唯一的页面智能**：定位、拟人化动作、后置校验、诚实回执全在引擎内；平台页面规则以分片形式编进二进制，明文不落盘 |
+| **native-page-engine 宿主** | `src/native-page-engine/{client,runtime,browse-session,command-mapper,publish,identity,facebook-auth,identity-guard,diagnostic-forwarder}.ts` | 引擎子进程的监督与通道：开会话 / 下发命令 / 收回执 / 诊断转发；命令映射与发布、身份等编排落在这一层 |
+| **EdgeClient** | `src/client/edge-client.ts` | 边-云 WS 客户端：握手、命令路由、结果回传、客户端鉴权与生命周期 |
+| **EdgeTaskCoordinator** | `src/execution/{edge-task-coordinator,commit-window,takeover}.ts` | 同一 edge/CDP 页面写任务单写：浏览命令边界 quiesce、陈旧队列取消、任务优先级/FIFO、taskId owner 校验、租约到期与队列清空后单次恢复；提交窗口预算与接管 |
+| **humanize** | `src/humanize/*.ts` | 拟人化节奏参数：`timing` 对数正态停顿、`mouse-path` 贝塞尔、`keyboard-rhythm`、`scroll-physics`、`reading-time`、`session-rhythm` 疲劳曲线 |
+| CdpClient / targets / session | `src/cdp/{client,targets,session}.ts` | 原生 WebSocket CDP RPC、目标枚举与会话 |
+| browser-provider / chrome-launcher / stealth-injector | `src/cdp/*.ts` | 指纹浏览器与 Chrome 生命周期、登录检测、反检测脚本注入、代理运行时观测 |
+| CdpDomProvider / CdpActionExecutor | `src/cdp/{dom-provider,action-executor}.ts` | 仍在生产，但**已不再服务已退役的定位引擎**；现由 `cdp/` 内部与少量工具路径使用 |
+| **wechat-channels** | `src/wechat-channels/*.ts` | 视频号 API-only 运行时（浏览器只作一次性登录旁车，不占浏览器槽位） |
+| **electron** | `src/electron/*` + `renderer/` | 桌面客户端：系统托盘、浏览器启动网关、控制面板 UI、按需引擎监督 |
 
-> 关键接口 `DomProvider` / `ActionExecutor` 定义在 `engine.ts`，单测下由 jsdom
-> 充当 DOM 源、由内存桩充当执行层；真实环境由 CDP 层实现同一接口——**接口不变，
-> 实现可换**，这正是定位层能脱离浏览器完整单测的原因。
+**已从生产剪除（退役，仅留仓中作实现参照）**
+
+| 组件 | 文件 | 原职责 | 现由谁承担 |
+| --- | --- | --- | --- |
+| LocatingEngine / AnchorCache | `src/locating/engine.ts`、`cache.ts` | 五层编排 + 三道闸、内存锚点缓存与暂存晋升 | Native 引擎内的定位与校验 |
+| extractor / matcher / selector / guard | `src/locating/*.ts` | 元素抽取、多信号打分、LLM 选择题、干扰清除 | 同上（这几个是**可达性剪枝**掉的，不在显式名单里） |
+| BrowseSession 及其执行件 | `src/browse/{browse-session,feed-scroller,modal-controller,note-extractor,search-handler,notification-monitor}.ts` | 浏览会话编排与结构化上报 | `src/native-page-engine/browse-session.ts` + 引擎分片 |
+| cloud-selector / like-runner | `src/client/*.ts` | 委托云端选元素、点赞执行 | 引擎内定位与动作 |
+| Facebook 读写件 | `src/facebook/` 的 `*-reader` / `*-executor` / `consent` / `identity` / `cta-labels` / `post-identity` / `facebook-session` 等 | Facebook 页面读取与写动作 | `native/page-engine/src/facebook-router/` 分片 + `facebook/*.rs` |
+| flows | `src/flows/{anchors,like-post,publish-post,publish-command-handlers}.ts` | 业务锚点、点赞、发布原子指令 | 引擎内平台分片（`src/flows/` 只剩 `bounded-poll` / `image-uploader` / `ui-event-lines` 现役） |
+| publish/approval-gate | `src/publish/approval-gate.ts` | 发布审批信号文件的构造 / 校验 / 轮询 | **注意：审批链正在迁移**（活跃 change `publish-approval-signal-to-database` + 客户端内审批）。根 `CLAUDE.md` §4 仍把该文件写成边侧契约端点，**该指针已滞后**，随那条 change 收口时一并订正 |
+
+> **关键接口 `DomProvider` / `ActionExecutor` 的现状**：它们定义在已退役的 `src/locating/engine.ts` 里，
+> 且是 TypeScript 接口——**编译后不留任何运行时痕迹**。所以「接口不变、实现可换」这套
+> jsdom ↔ CDP 可替换的单测结构，**描述的是退役那一代**。
+> Native 引擎自己的等价能力靠 Rust 侧的 trait 与假 CDP 服务端实现（见
+> `native/page-engine/tests/fake_cdp.rs`），脱离浏览器单测的性质没变，但换了落点。
 
 页面内 JavaScript 只负责只读定位、提取和返回唯一目标坐标。对于会推进工作流、展开后续输入面或触发平台写入的控件，
 `HTMLElement.click()` 返回不构成已点击证据；Native 必须在动作前重取唯一坐标，通过 CDP
@@ -174,7 +201,26 @@ Electron 应用就是客户端；普通 Edge 子进程是按需自动化引擎�
 会话由 `feed.entered` 事件启动、并在"互动/返回"后再次 `feed.entered` 形成**闭环往复**，
 直到 `SessionMonitorRole` 判定结束——而非一次性 `plan.response` 跑完即止。
 
-### 3.2 单步定位（规划 / 锚点 / 选择，每步循环）
+### 3.2 单步定位（规划 / 锚点 / 选择，每步循环）—— ⚠ **退役路径，已不在生产**
+
+> **2026-08-05 据实修订。** 本节描述的是 TypeScript 那一代的定位循环。它依赖的
+> `src/locating/engine.ts`、`cache.ts` 与 `client/cloud-selector.ts` **都已从生产构建剪除**，
+> 「每步把元素清单发云端、让文本模型做选择题」这条路径**在迁移中整条消失**。
+> 保留本节是因为它仍是那套机制的完整记述（各 change 的 `oracle.md` 会引用它），
+> **MUST NOT 当作现役行为读**。
+>
+> **现役是什么**：Native 引擎用**编译进二进制的固定选择器**定位（`native/page-engine/src/` 的
+> 平台分片），没有每步的模型选择，也没有非确定性锚点来源。
+>
+> **⚠ 三道闸的现役状态必须分开说，别把「落点搬了」读成「能力还在」**：
+> 引擎侧 `native/page-engine/src/locating.rs` 是三道闸的**新落点**，但该模块自己的文档注释写明
+> ——**本轮只造原语、尚未接进任何平台命令**；且**第三道闸（反污染晋升）在当前引擎里必然空转**，
+> 因为固定选择器不产生任何需要暂存确认的新锚点。
+> 也就是说：**后置校验与有界重试的语义活在各平台分片自己的实现里，
+> 而「统一的三道闸落点」目前是待接线状态**。红线本身不变（见根 `CLAUDE.md` §2），
+> 但**不得据此把「定位自愈已恢复」当成事实**。
+
+**以下为退役路径原文：**
 
 1. **守卫层**：扫描 DOM 干扰，能清则清，不能清→升级 `guard_blocked`。
 2. **定位（缓存优先）**：
@@ -192,7 +238,15 @@ Electron 应用就是客户端；普通 Edge 子进程是按需自动化引擎�
    **绝不静默成功**。**该升级描述的是「本步」已耗尽重试**，**MUST NOT** 被上层翻译成
    「该任务结构上做不到」而落持久终态——跨层义务见 [`stop-or-continue.md`](stop-or-continue.md) §4。
 
-### 3.3 锚点生命周期（反污染晋升）
+### 3.3 锚点生命周期（反污染晋升）—— ⚠ **边缘侧已随 §3.2 退役**
+
+> **2026-08-05 据实修订。** 下图与末段描述的边缘侧机制（`AnchorCache` 的暂存→确认→晋升）
+> 随 `src/locating/cache.ts` 一并从生产剪除。**云端 `PgAnchorCache` 仍在**，但它服务的是
+> 已退役的每步定位循环，边缘不再向它回写（协议里的 `anchor.get` / `anchor.report`
+> 本就是保留通道、从未接线，见 [`protocol.md`](protocol.md)；边缘客户端里那个
+> `anchor.get` 请求辅助方法虽仍在编译产物中，但它的调用方——定位引擎——已经不在了）。
+>
+> **引擎侧的对应物是空转的**：固定选择器不产生非确定性锚点，暂存区恒为空（依据同 §3.2）。
 
 ```
 LLM 新解析锚点 ──stage──► 暂存区(staging)
