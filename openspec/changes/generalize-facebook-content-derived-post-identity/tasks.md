@@ -163,11 +163,23 @@
 
 ## 13. 实装期发现（不属于本 change，但别忘了）
 
-- [ ] 13.1 **两份 `protocol.ts` 已有既存漂移（非本 change 造成）**：`origin/master` 上 18 行不一致
-  （`ui.snapshot` 注释、`INTERACTION_BROWSER_PROFILE_IN_USE` 在三处联合里的位置、一处 `submitted_unconfirmed`
-  拼写）。本 change 新增的字段与 `AC-PROTO-20c` 用例两侧逐字一致（已 diff 校验）。
-  **`AC-PROTO` 抓不到这类漂移**——它不读对端文件、不做字节比对，只靠手工维护的消息名穷举 + 计数 + 逐字段往返。
-  值得单起一条 change 收口（要么真做字节比对，要么把注释类差异显式豁免）。
+- [x] 13.1 **【已收口 2026-08-05】两份 `protocol.ts` 的既存漂移（非本 change 造成）已消除，且补了一道真能抓住它的闸。**
+  - **实测是 10 行不是 18 行**（此前的计数已随其它改动部分收敛）。三类，逐条判过：
+    ① **`ui.snapshot` 注释——不是措辞差异，是两段互相矛盾的契约**。边缘那份写「账号资料快照 + 发布审批状态回填」，
+    云端那份写「新客户端仅接收自动化控制投影，客户数据经 customer-auth HTTP 拉取」。云端那份是当下事实
+    （与 `docs/architecture.md` 的客户端交互边界一致），边缘已原样采用云端措辞。
+    ② **联合成员次序**（`INTERACTION_BROWSER_PROFILE_IN_USE` 在两处联合里位置不同）。TypeScript 语义等价，
+    但「逐字一致」不成立；已统一到边缘的排法（`INTERACTION_*` 与 `WECHAT_*` 各自连续）。
+    ③ **注释里的原因码拼写**：云端写成 `submitted-unconfirmed`，全仓真实拼法 `submitted_unconfirmed` 58 : 1。
+    注释点名一个不存在的原因码，下一个照它写代码的人就会用错串。已改。
+  - **落地**：`aidcp-edge a5a65ef` / `aidcp-cloud 72d7e53` / `aidcp-automation`（经 `scripts/sync-split-repos --apply` 同步，
+    **今天才发现派生仓也有第三份副本**）。三份现已逐字一致。
+  - **新闸**：控制仓 `scripts/protocol-parity`（跨仓逐字节比对），已接进 `scripts/land-change`（`aidcp 0a76d6fa`）。
+    **选控制仓而不是子仓，理由与 `boundary-census` 相同**：它要同时打开两个仓的文件，任何单仓视角都做不到。
+    **判据是字节不是语义**——语义比对要一个解析器，而解析器自己会漂。
+    副本少于两份时**失败而非通过**：「没得比」MUST NOT 被读成「比过了，一致」。
+  - **变异归因（不是只看绿）**：同一处变异——把注释里一个下划线改成连字符——`typecheck` 退出 0（抓不住），
+    新闸退出 1（抓住）；联合成员换位置同样如此。**这正是原条目说的那个盲区，现在有东西钉着了。**
 - [ ] 13.2 **`contentRefNoteIds`（云端调度器侧，前一批 `3e4203b` 引入）没有清理点**：
   `clearFacebookNaturalInteractionEvidence()` 清了另外五个 FB 集合、没清它。方向是 fail-closed
   （一个引用 id 永远被挡住），不是正确性洞，但长会话会缓慢增长。本批新加的 handler 侧同名登记表已有界（FIFO 4096）。

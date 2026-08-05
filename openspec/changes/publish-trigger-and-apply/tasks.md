@@ -39,8 +39,34 @@
 
 ## 4. aidcp-cloud — CommandSequencer 元数据/配图 emit（缺口②）
 
+> **【2026-08-05 事实订正 · 动这四条之前必看】4.2 / 7.2 / 7.3 / 8.2 点名的落点已从生产剪除，
+> 而它们要的能力**在现役路径上已经实装了**。照原文实装 = 零生产效果。**
+>
+> **① 落点是退役模块。** 这四条都指向 `aidcp-edge/src/flows/publish-command-handlers.ts`
+> 与 `src/flows/publish-post.ts`。`flows/publish-command-handlers.js` **在退役名单上**
+> （事实源 `aidcp-edge/scripts/native-engine-inventory.cjs` 的 `RETIRED_DIST_MODULES`），
+> 本机实测生产 `dist/flows/` 只剩三个非业务件。**在那儿写代码，测试会绿、发版会成功，
+> 运营机上跑的仍是 Native 引擎那一套。**（同一个陷阱今天已经咬过另一份提案，见
+> `docs/deferred-defect-proposals-2026-08-05.md` §5。）
+>
+> **② 小红书配图上传已在现役路径实装，且做得比本条原文要求的更严。**
+> 落点 `aidcp-edge/native/page-engine/src/engine.rs` 的 `execute_xhs_publish_upload_image`：
+> 写之前先取**预览位身份基线**，写之后有界轮询等那一位出现「基线里没有的」身份——
+> 因为旧判据「那个序号位上存在预览图」**会被上一次的残留预览满足**，一次根本没生效的上传照样回确认，
+> 上游据此走到提交，最后发出去的稿子少一张图或配错图。四种终局各有独立原因码，
+> 附件写下去之后的任何失败一律「不确定」、绝不回「未开始」。
+>
+> **③ 真正还缺的是 Facebook 那半，而且它是诚实缺席、不是静默假成功。**
+> `native/page-engine/src/facebook-router/90-dispatch.js` 对 `publish_set_cover` /
+> `publish_add_with_candidate` / `publish_set_option` / `publish_set_schedule` 一律回
+> `kind_not_implemented`。要补就在**那里**补，不在退役模块里。
+>
+> **④ 原文写的 deferral 目标 `publish-media-upload` 已于 2026-07-03 归档。**
+> 所以「deferred 到另一条 change」这个状态今天已经不成立——它要么已经交付（小红书那半，见②），
+> 要么就是没人接（Facebook 那半，见③）。这四条**按此结案，不再挂 deferred**。
+
 - [x] 4.1 `src/publish-agent/command-sequencer.ts` `buildCommandSequence` 扩展：从 `publishMetadata` emit `add_with_candidate`（`mention` / `location` / `collection`）/ `set_option`（`visibility` / `permissions` / 各合规声明）/ `set_schedule`（`mode==='scheduled'` 时按 `publishTime`）；按配图 emit `upload_image`×N / `set_cover`。序列序：`navigate_entry → select_mode → upload_image×N → set_cover → fill_field(title/content) → add_with_candidate(topic)×N → add_with_candidate(mention|location|collection)×N → set_option×N → set_schedule → [授权]submit_publish → capture_postId`。验证：`test/publish-agent/command-sequencer.test.ts` 断言序列含元数据/配图指令、顺序正确 <!-- aidcp-cloud 89cf903 元数据 emit 全做：SEQ-08/09 断言 mention/location/collection 经 candidateKind、visibility/declaration_ai 经 set_option、scheduled→set_schedule，全在 submit 前。配图 emit（upload_image/set_cover）DEFERRED→publish-media-upload -->
-- [ ] 4.2 配图上传失败降级纯文字：`upload_image` 回 `ok:false` → 标 `imagesOk=false`、跳过依赖图的 `set_cover`、继续余下文字/元数据指令；`imagesOk` 如实（**MUST NOT 伪造有图**）。验证：单测桩 `upload_image ok:false` → 序列降级、`imagesOk=false`、不报带图成功 <!-- DEFERRED → publish-media-upload（配图 CDP 桥下沉，本 change 不发图指令故无降级面） -->
+- [x] 4.2 **【按 2026-08-05 事实订正结案，见本节抬头：落点已退役，能力在现役路径已实装（小红书）/ 诚实缺席（Facebook）】** 配图上传失败降级纯文字：`upload_image` 回 `ok:false` → 标 `imagesOk=false`、跳过依赖图的 `set_cover`、继续余下文字/元数据指令；`imagesOk` 如实（**MUST NOT 伪造有图**）。验证：单测桩 `upload_image ok:false` → 序列降级、`imagesOk=false`、不报带图成功 <!-- DEFERRED → publish-media-upload（配图 CDP 桥下沉，本 change 不发图指令故无降级面） -->
 - [x] 4.3 AC-PUB 第二闸不变：未授权时元数据/配图指令仍下发（提交前），`submit_publish` / `capture_postId` 截止不入序列（保持 `if (!input.approvedByUser) return cmds;`）。验证：单测断言未授权序列含元数据指令但截止在提交前 <!-- aidcp-cloud 89cf903 SEQ-09 断言未授权含 set_option 但无 submit_publish；AC-PUB 第二闸完整 -->
 
 ## 5. aidcp-cloud — PublishExecutor metadata + 落库（缺口②⑤⑥）
@@ -59,15 +85,15 @@
 ## 7. aidcp-edge — 配图与元数据 kind 处理器（缺口②）
 
 - [x] 7.1 扩 `src/flows/anchors.ts`（**注意：锚点声明在 `flows/anchors.ts`，不是 `locating/anchors.ts`**；`publish-command-handlers.ts` 由此 import）补配图 / 封面 / 可见范围 / 权限 / 定时 / 提及 / 合集等新锚点（仿既有 `XHS_PUBLISH_*` 三件套 `ACTION_ID` + `GOAL` + `ANCHOR_HINT`）；复用 `LocatingEngine` 三道闸反污染回写（stage→confirm），**engine 不改**。验证：`npm run typecheck` 过、新锚点经 stage→confirm 单测 <!-- aidcp-edge 45922a7 偏离：元数据锚点（mention/location/collection/visibility/各声明/schedule）以 best-effort 内联在 publish-command-handlers.ts 的清晰注释段（CANDIDATE_ANCHOR/OPTION_KEYWORD + builders），未拆到 anchors.ts —— 因这些是占位级、待实机 CDP 校准，集中一处比散落 10+ 占位常量更可维护；engine 不改、复用三道闸。配图/封面锚点 DEFERRED→publish-media-upload -->
-- [ ] 7.2 `src/flows/publish-command-handlers.ts` 实装 `upload_image`：URL → 下载到 `/tmp` → CDP 文件输入桥（`DOM.setFileInputFiles` 类机制）→ 后置校验图进入编辑区 → 清理临时文件；失败回真实 `error`（`upload_failed` / `no_target` / `post_validation_failed`），替换 `kind_not_implemented`。验证：jsdom/CDP 桩单测成功 + 失败两路、失败不翻 `ok:true` <!-- DEFERRED → publish-media-upload（CDP 文件输入桥依赖真实浏览器、CI 不可测）；当前 upload_image 诚实回 kind_not_implemented -->
-- [ ] 7.3 实装 `set_cover`（复用 `LocatingEngine`，定位封面入口选定、后置校验封面已设）。验证：单测定位失败回 `ok:false` + 真实 error <!-- DEFERRED → publish-media-upload（依赖配图先就位）；当前 set_cover 诚实回 kind_not_implemented -->
+- [x] 7.2 **【按 2026-08-05 事实订正结案，见本节抬头：落点已退役，能力在现役路径已实装（小红书）/ 诚实缺席（Facebook）】** `src/flows/publish-command-handlers.ts` 实装 `upload_image`：URL → 下载到 `/tmp` → CDP 文件输入桥（`DOM.setFileInputFiles` 类机制）→ 后置校验图进入编辑区 → 清理临时文件；失败回真实 `error`（`upload_failed` / `no_target` / `post_validation_failed`），替换 `kind_not_implemented`。验证：jsdom/CDP 桩单测成功 + 失败两路、失败不翻 `ok:true` <!-- DEFERRED → publish-media-upload（CDP 文件输入桥依赖真实浏览器、CI 不可测）；当前 upload_image 诚实回 kind_not_implemented -->
+- [x] 7.3 **【按 2026-08-05 事实订正结案，见本节抬头：落点已退役，能力在现役路径已实装（小红书）/ 诚实缺席（Facebook）】** 实装 `set_cover`（复用 `LocatingEngine`，定位封面入口选定、后置校验封面已设）。验证：单测定位失败回 `ok:false` + 真实 error <!-- DEFERRED → publish-media-upload（依赖配图先就位）；当前 set_cover 诚实回 kind_not_implemented -->
 - [x] 7.4 实装 `set_option`（按 `optionKind` 路由 `visibility` / `permissions` / 各声明开关/单选，engine 定位、后置校验选中态==期望）。验证：单测校验不符回 `post_validation_failed` <!-- aidcp-edge 45922a7 buildSetOptionRequest 按 optionKind 路由 + valueValidator best-effort 后置校验；AC-CMD-S4 set_option 测过；缺控件→no_target 不假成功 -->
 - [x] 7.5 实装 `set_schedule`（定位时间选择器填 `publishTime`、后置校验已设定）。验证：单测覆盖成功 / 失败两路 <!-- aidcp-edge 45922a7 buildSetScheduleRequest + valueValidator('定时')；AC-CMD-S4 set_schedule 测过 -->
 
 ## 8. aidcp-edge — 人审默认 + 放开硬拒（缺口④ + 配图前置）
 
 - [x] 8.1 `src/main.ts:130` 审批闸条件 `process.env.AIDCP_REAL_PUBLISH === 'true'` → `!== 'false'`（缺省即挂闸，仅显式 `AIDCP_REAL_PUBLISH=false` 才跳过）；审批信号路径契约 `/tmp/aidcp-publish-approve-<requestId>.json` 两端不漂移。验证：单测/手测缺省即挂闸、显式 `false` 才跳过、其余取值一律挂闸 <!-- aidcp-edge 45922a7 main.ts 闸条件改 !== 'false'（默认必过人审，AC-PUB）；AC-PUB-* 6 测全过、信号路径契约不漂移 -->
-- [ ] 8.2 放开 `src/flows/publish-post.ts:294-295` v1 整页带图硬拒（`images are not supported in phase one`），带图走配图流程 / 指令驱动路径。验证：带图 payload 不再返回硬拒 error <!-- DEFERRED → publish-media-upload（与配图应用同批放开，避免放开后无桥导致带图必败）-->
+- [x] 8.2 **【按 2026-08-05 事实订正结案，见本节抬头：落点已退役，能力在现役路径已实装（小红书）/ 诚实缺席（Facebook）】** 放开 `src/flows/publish-post.ts:294-295` v1 整页带图硬拒（`images are not supported in phase one`），带图走配图流程 / 指令驱动路径。验证：带图 payload 不再返回硬拒 error <!-- DEFERRED → publish-media-upload（与配图应用同批放开，避免放开后无桥导致带图必败）-->
 
 ## 9. 验收（中控触发，落 sub-repo 执行）
 
@@ -84,10 +110,20 @@
 
 ## 11. 部署（ECS 安全序列 + edge 本地；执行前先做 §0 前置检查）
 
-- [ ] 11.1 §0 前置检查：`ls -d ../aidcp-edge ../aidcp-cloud` 确认 sub-repo 存在 + 私钥 `~/codes/dev-0722.pem` 存在且 `chmod 600`；缺失即停手告知用户 <!-- 部署按用户指示延后（A 全阶段统一部署） -->
-- [ ] 11.2 ECS 先备份（`/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`）→ `rsync`（`--exclude .env --exclude node_modules --exclude .git`）→ DB 迁移（`publish_log` 加 `publish_metadata` / `ai_enforced` 列 + `liked_notes` 建表，DDL `IF NOT EXISTS` 幂等）→ `systemctl restart aidcp-cloud.service`
-- [ ] 11.3 healthcheck：`active (running)` + 8787 监听 + 飞书长连接已建立 + PG `select 1`；失败即回滚。**任何 ECS 操作绝不碰同机 `isales`**
-- [ ] 11.4 edge 本地跑、连 `ws://121.89.85.150:8787`，验证飞书 `/publish` → 指令驱动 → 人审 → 配图/元数据应用 → 真实落库 + 血缘端到端（`AIDCP_REAL_PUBLISH` 缺省即挂人审；受控放行用 `AIDCP_REAL_PUBLISH=false`）
+> **【2026-08-05 立论过期结案】11.1–11.3 描述的是「把单体 `aidcp-cloud` rsync 到 `/opt/aidcp/cloud` 再重启」这套部署动作，
+> 而根 `CLAUDE.md` §8.0（2026-08-05 立、OVERRIDE 级）已定：**`aidcp-cloud` 永不部署到任何环境**——
+> dev 与 OL 都已切到 api / automation / content 三个派生服务，单体已停并 disable。
+> 照这三条执行会把一个已停用的单体重新拉起来，而它一起来就会去抢按 target 单实例的自动化写者锁与 8787，
+> **把正在跑的派生服务顶掉**（前科见记忆 `monolith-unit-still-enabled-steals-lock`）。
+> 所以这不是「还没做」，是**做了就出事**。
+>
+> 本 change 的云端改动实际已随派生服务的常规部署上线；要复核就核派生服务，不核单体。
+> 11.4 是真机端到端，按 2026-08-05 用户裁定不再登记、不再统计。
+
+- [x] 11.1 **【按 §8.0 立论过期：单体永不部署，见本节抬头】** §0 前置检查：`ls -d ../aidcp-edge ../aidcp-cloud` 确认 sub-repo 存在 + 私钥 `~/codes/dev-0722.pem` 存在且 `chmod 600`；缺失即停手告知用户 <!-- 部署按用户指示延后（A 全阶段统一部署） -->
+- [x] 11.2 **【按 §8.0 立论过期：单体永不部署，见本节抬头】** ECS 先备份（`/opt/aidcp/cloud.bak.<ts>.tar.gz` + `.env.bak.<date>`）→ `rsync`（`--exclude .env --exclude node_modules --exclude .git`）→ DB 迁移（`publish_log` 加 `publish_metadata` / `ai_enforced` 列 + `liked_notes` 建表，DDL `IF NOT EXISTS` 幂等）→ `systemctl restart aidcp-cloud.service`
+- [x] 11.3 **【按 §8.0 立论过期：单体永不部署，见本节抬头】** healthcheck：`active (running)` + 8787 监听 + 飞书长连接已建立 + PG `select 1`；失败即回滚。**任何 ECS 操作绝不碰同机 `isales`**
+- [x] 11.4 **【按用户裁定清账：真机端到端不再登记，见本节抬头】** edge 本地跑、连 `ws://121.89.85.150:8787`，验证飞书 `/publish` → 指令驱动 → 人审 → 配图/元数据应用 → 真实落库 + 血缘端到端（`AIDCP_REAL_PUBLISH` 缺省即挂人审；受控放行用 `AIDCP_REAL_PUBLISH=false`）
 
 ## Migration（仅当实施中实测配图桥风险超预期才触发）
 
