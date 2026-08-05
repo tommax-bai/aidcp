@@ -143,9 +143,54 @@
   复打：验证码协助族改答 `upstream_route_missing`（dev 未开该能力，属实）；
   角色提示词预览 `reply_intent_classifier` 200 可渲染，`browse:content_evaluator` 200 且
   `available:false` + 说清渲染器在哪个进程。
-- [ ] 9.4a **OL 同样受影响，未修**（2026-08-05 12:59 OL 也切成三派生服务，钉的是切流前的发布分支）。
+- [x] 9.4a **OL 同样受影响，未修**（2026-08-05 12:59 OL 也切成三派生服务，钉的是切流前的发布分支）。
   实测 OL 的 `/api/config/model`、`/api/roles`、`/api/llm-usage` 同样 503。
   OL 部署须用户明确要求并走发布分支，本 change 不自行执行。
+  <!-- 2026-08-05 16:30–17:00 用户明确要求后已部署 OL 并复打验证。
+       **上线前先坐实缺陷仍在**（登记比代码旧）：把 OL 实跑的两个关键文件取回本机算 git blob 哈希，
+       与 `02e2237^`（本 change 第一个提交之前）**逐位相同** ⇒ 那批修复确实一条都没上过 OL。
+
+       **做法（三仓各一条发布分支，只挑本 change 的提交，主干头一概不发）**：
+       主干在切流后已被并发 session 推进——api 超前 13 / content 6 / automation 17 个提交，
+       其中**非本 change 的那些属于 4 个尚未完成的 change**（FB 全局策略统一、通知分类路由、
+       会话启动闸复判、返回后重扫），发主干头等于把它们一起推上生产。故：
+       · `aidcp-api release/20260805-ol-panel`（← OL 基线）cherry-pick 7 个提交
+       · `aidcp-content release/20260805-ol-panel`（← OL 基线）5 个
+       · `aidcp-automation release/20260805-ol-panel`（← 今早那条 `ol-capability-names`，
+          即 OL 基线 + 能力名修复）6 个
+       三仓**零冲突**；三仓 pin 的共享包一致（transport ffc6d2b / kernel 030d805，均为各自 master 头）。
+       三仓 typecheck 0 错，acceptance api 19/19、content 27/27、automation 277/277。
+       序列：三服务各备份（`*.bak.20260805-163822.pre-panel.tar.gz` + `.env.bak`）→ git archive 快照 rsync
+       → **ECS 上重装两个共享包**（pin 变了，漏这步会跑着旧契约且不报错）→ 三槽 typecheck 全 CLEAN
+       → 按属主域先起、接口域后起（content → automation → api）。
+
+       **复打结果（8090 带真 token；登录口是 `/api/auth/login`）**：
+       原先 503 的三条 `/api/config/model`、`/api/roles`、`/api/llm-usage` **全部 200**；
+       另打 `/api/curated/facets`、`/api/curated/contents`、`/api/categories`、`/api/hot-lead-config`、
+       `/api/facebook/groups`、`/api/facebook/groups/comment-policy`、`/api/dashboard/summary`、
+       `/api/environments` **也都 200**。
+       `/api/captcha-assist/sessions` 仍 503，但回包是**具名**的 `upstream_route_missing`
+       ——该能力在 OL 未开，与 dev 同形，属设计内的诚实回答，不是本次遗留。
+       三服务 active / NRestarts=0、六端口全在、自动化就绪 `ready` `blockers=[]`、
+       单体仍 inactive/disabled、边缘 17 条在线、重启成功后报错 0。 -->
+- [x] 9.4b **上线过程中撞出一条此前无人知道的生产陷阱：OL 的接口服务其实早已「重启即死」。**
+  <!-- 2026-08-05 现象：新构建起不来，schema 契约门 enforce 判 `schema_ahead_of_code` ——
+       **库内账本最高版本 `0110_facebook_global_policy_single_scope`，比本构建认识的 `0109` 还新**。
+       0110 由 change `unify-facebook-global-policy-across-targets`（当时 20/46、**尚未完成**）
+       带入，而 DEV/OL **共库** ⇒ 一条未完成 change 的迁移一旦应用，
+       **所有不含该迁移的构建当场失去启动能力**。
+
+       **最要紧的一点：回滚救不了。** 备份里的旧构建同样不认识 0110，同样起不来；
+       它之所以一直在跑，只是因为它在 0110 应用**之前**就启动了、此后没被重启过。
+       也就是说这台机器的接口服务**从 0110 应用那一刻起就处于「一重启就再也起不来」的状态，
+       而没有任何告警**——因为契约门只在启动时跑。要不是本次部署，下一次撞见它的会是一次故障重启。
+
+       **处置**：用系统自带的放行通道恢复——OL 的 automation 早就有 `AIDCP_ALLOW_SCHEMA_AHEAD=0105_…`
+       （说明这情况以前发生过、就是这么处理的），但 **api 的 .env 里根本没有这个键**。
+       已追加 `AIDCP_ALLOW_SCHEMA_AHEAD=0110_facebook_global_policy_single_scope` 并注明
+       「该 change 上线后 MUST 撤回本行」。它是单值「放行到此版本为止」、会打日志与告警、不是永久开关。
+       ⚠️ **本条 MUST NOT 读成「问题已解决」**：真正的结构问题是「共库 + 未完成 change 的迁移已应用」，
+       放行位只是让接口服务能起来。已在 8.1 登记。 -->
 - [ ] 9.5 后台真人走一遍：设置页、角色页、用量成本、精选库、配额页热帖引流、FB 群策略、验证码协助页。真机项收拢进 `docs/real-machine-acceptance-backlog.md`。
 
 ## 10. 收尾
