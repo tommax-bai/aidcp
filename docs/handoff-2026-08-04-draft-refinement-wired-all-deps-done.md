@@ -1,5 +1,9 @@
 # 交接：客户端 23 个依赖全部接通 + 同步读老雷根因已修（2026-08-04 21:00–23:30）
 
+> ## 📌 这份已被接续：**新 session 请看 `docs/handoff-2026-08-05-ol-cutover-and-cloud-demotion.md`**
+> 那之后发生了：OL 切成三服务、清账归档 28 个、跨仓边界普查落地、cloud 定为「降级不退役」，
+> 以及一条**至今没人报障的生产故障**（OL 上 scroll 两天零成功）。本文件只作背景。
+
 > **新 session 从这份看起。**
 > 上一份 `handoff-2026-08-04-interaction-wired-draft-refinements-next.md` 交代的那件事
 > （`draftRefinements`）**已经做完**，它剩下的价值只是背景——那些坑仍然有效。
