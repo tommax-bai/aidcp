@@ -2815,3 +2815,37 @@ Exclusive recall and shown-target restore SHALL use stable environment routing, 
 - **THEN** the companion MAY leave that driven browser in the foreground
 - **AND** the avatar-specific exclusive recall policy does not change that action
 
+### Requirement: 慢启动曲线表 SHALL 只呈现云端下发的当前生效曲线
+
+客户端展示的慢启动曲线表 SHALL 全部来自云端该环境慢启动读的曲线字段：行数取回包曲线的行数，每格数字取回包对应值。客户端 MUST NOT 内置任何曲线数字，MUST NOT 假定总天数为 7，也 MUST NOT 按天数、账号或平台在本地推算任何一格。
+
+曲线表 SHALL 只呈现回包曲线里出现的动作项。客户端 MUST NOT 为回包中不存在的动作自造列或补零——该平台结构上做不了的动作，云端本就不会下发，客户端补出来的是一份系统永远不会执行的计划。
+
+云端未下发曲线时，客户端 SHALL 就地如实说明当前读不到曲线，并 MUST NOT 渲染任何曲线数字。**MUST NOT 回落到上一次读到的曲线、内置默认曲线或另一环境的曲线**：运营正是照这张表判断新号当天还能做多少，把「读不到」渲染成一张看起来确定的表，比不显示更危险。
+
+曲线表随附的说明文案 SHALL 按回包的权威总天数表述，MUST NOT 写死天数。
+
+#### Scenario: 后台改过曲线后客户端跟随
+
+- **WHEN** 运营在管理后台把总天数改为 10 天并调整了若干天的上限，客户端随后读取该 Facebook 环境的慢启动状态
+- **THEN** 曲线表显示 10 行，且每格数字等于云端回包的值
+- **AND** 说明文案按 10 天表述
+
+#### Scenario: 云端未下发曲线时不显示旧数字
+
+- **WHEN** 云端回包不含曲线字段
+- **THEN** 客户端就地说明当前读不到曲线
+- **AND** MUST NOT 显示任何曲线数字，包括上一次读到的与内置默认的
+
+#### Scenario: 切换环境不得沿用上一环境的曲线
+
+- **WHEN** 用户从一个已读到曲线的环境切到另一个尚未读到曲线的环境
+- **THEN** 客户端不显示任何曲线数字，直到当前环境自己的回包到达
+- **AND** MUST NOT 沿用上一环境的行数、数字或天数表述
+
+#### Scenario: 只呈现回包里的动作项
+
+- **WHEN** 云端下发的曲线每行只含浏览、点赞、评论、关注、发布、搜索、加组
+- **THEN** 曲线表恰好呈现这些项
+- **AND** MUST NOT 出现收藏、评论点赞、私信回复等回包中不存在的项，也 MUST NOT 以 0 补齐
+
