@@ -6,9 +6,41 @@
 
 ---
 
-## ⚠️ 0. 接手第一件事：OL 上 `scroll` 长期 100% 失败
+## ~~⚠️ 0. 接手第一件事：OL 上 `scroll` 长期 100% 失败~~ → **已查清，是误报。不要按这条开工。**
 
-**这是当前唯一一条正在持续损失价值的事，比本文其余全部都要紧。**
+> **2026-08-05 16:20 更正（下一段 session 实测）。** 原文这一节的判断
+>「浏览是整条自动化的地基，它不动等于账号在空转」**是错的**。浏览一直在满负荷跑。
+> 原节全文保留在下面「原文」里，只为追溯，**MUST NOT 再当作待办**。
+
+**实测事实（OL，同一 6 小时窗口）**：
+
+| 量 | 值 | 取自 |
+| --- | --- | --- |
+| `scroll` 回执 `ok=false` | 658 | journal |
+| **真实浏览记账** | **1703 次** | `risk_counters` 表 `action='view'` |
+| 点赞 / 关注 / 加群记账 | 193 / 14 / 15 | 同上 |
+| 真实换页节拍 | **p50 26.5s、p90 36.4s** | `risk_counters` 相邻 view 间隔 |
+
+**每一次 `view` 记账都要求「一条新的活动 Reel 真的呈现并被读到」**（`comm/handler.ts` 里
+按规范 Reel 身份逐条记，畸形/空卡 fail-closed 不记）。1703 次 ⇒ **换页在工作**，
+而且比 scroll 指令本身还多 2.6 倍。当时 17 个账号在睡，原因是
+`view 配额暂不可用 reason=quota:day` —— **今日浏览额度用满了**，不是滚不动。
+
+**那 658 个 `ok=false` 是什么**：边缘回的原因是 `reels_navigation_unconfirmed`，
+即本仓三态里的「**没能确认**」，不是「确认到没有」。边缘这一侧是按红线诚实回报的。
+**误报出在统计口径**：`action.completed` 的 `ok` 是个布尔，原因在另一个字段里，
+于是任何按 `ok` 做的汇总都把「没能确认」压成了「失败」——
+**正是本仓红线写的「三态不得压成一态」，只不过这次压在了度量上，不是控制流上。**
+
+**还没查清的一条**（真正剩下的问题，优先级远低于原文所定）：确认窗口是 15s
+（`aidcp-edge/native/page-engine/src/facebook/reels.rs` 的
+`FACEBOOK_REEL_IDENTITY_HYDRATION_TIMEOUT`，08-02 那条 change 刚从更短抬到 15s），
+按键之后它在这 15s 里始终看不到换页，可换页确实发生了。
+**别急着再抬窗口**——1703 view / 658 scroll = 2.6 意味着换页多半不是那次按键驱动的，
+先弄清是谁在推进，再谈窗口。相关记忆 [[primary-surface-pinned-once-at-session-start]]。
+
+<details>
+<summary>原文（已被上面推翻，仅供追溯）</summary>
 
 | 时段 | scroll 回执 |
 | --- | --- |
@@ -16,23 +48,24 @@
 | 08-05 切流前（单体） | 1092 次，**成功 0** |
 | 08-05 切流后（派生自动化） | 同样全 false |
 
-同期 `like` 64 次成功、`follow` 13 次成功 —— **只有滚动这一条，两天零成功**。
-
-**切流前后比例完全一致 ⇒ 不是切流引入的**，是一条至少存在两天、无人报障的既有故障。
+同期 `like` 64 次成功、`follow` 13 次成功 —— 只有滚动这一条，两天零成功。
+切流前后比例完全一致 ⇒ 不是切流引入的，是一条至少存在两天、无人报障的既有故障。
 浏览是整条自动化的地基，它不动等于账号在空转。
 
 ```bash
-# 复现（OL；把 key/host 换成 dev 的可对照）
 ssh -i ~/codes/ol-0722.pem root@123.56.253.183 \
   'journalctl -u aidcp-automation --since "-3 hours" --no-pager \
    | grep -oE "action.completed: [a-z_]+ ok=(true|false)" | sort | uniq -c | sort -rn'
 ```
 
-**我没有诊断它，只摆了事实。** 相关线索：日志里出现过
-`Facebook Reels fallback 收到终止失败 native_effect_ambiguous → 释放`；
-仓里有三条在做的相关 change（`restore-native-facebook-residual-parity` /
-`harden-native-engine-runtime-contracts` / `enforce-native-engine-artifact-gates`）；
-记忆里有 [[fb-feed-never-scrolls-down]]。**动手前先读代码确认缺陷还在**，登记比代码旧。
+我没有诊断它，只摆了事实。相关线索：`Facebook Reels fallback 收到终止失败 native_effect_ambiguous → 释放`；
+仓里有三条在做的相关 change；记忆里有 [[fb-feed-never-scrolls-down]]。
+
+</details>
+
+**教训**（值得带走的那条）：**只按布尔成功率做的汇总会凭空造出故障**。
+这次的代价是一份交接文档把最高优先级给了一件没在发生的事。
+下次判「某个动作是不是坏了」，先去问**记账表**（那里记的是既成事实），别只看回执布尔。
 
 ---
 

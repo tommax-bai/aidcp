@@ -248,8 +248,37 @@
        （`boundary census executable exits zero…`）**改前改后同一条**，与本项无关。
        2026-08-05 15:30 已部署 dev（git archive 快照 rsync、不从工作区推；ECS 上 typecheck CLEAN、
        重启后 active/NRestarts=0、8787 与 8094 在、就绪 `ready` `blockers=[]`、近 3 分钟零报错）。
-       ⚠️ **OL 未部署**：同一份缺陷在 OL 上同样恒关（那 6 个在跑的账号一直没有自动 Reel 关注、
-       没有免导航身份读），但 OL 部署须用户明确要求 + 走发布分支，已在收尾里向用户点名。 -->
+       2026-08-05 16:05 **OL 也已部署**（用户当场明确要求）。按 §5/§6 走发布分支：
+       从 `origin/release/20260805-ol-cutover`（= OL 实跑基线）新建
+       `release/20260805-ol-capability-names`，**只 cherry-pick 这一个提交**（274de19），
+       **刻意不发主干头**——主干在切流后已被并发 session 推进到 02c644d，那些提交没在 OL 验过。
+       **影响面实测**：发布分支快照与 OL 实跑树逐文件 sha256 对照，574 个文件里**只有我改的那 2 个不同**。
+       发布分支自跑 typecheck 0 错、acceptance 277/277。
+       序列：备份（`automation.bak.20260805-160106.pre-capfix.tar.gz` + `.env.bak`）→ git archive 快照
+       rsync → ECS 上 typecheck CLEAN → 重启 → 三服务 active/NRestarts=0、六端口在、就绪
+       `ready` `blockers=[]` `executionTarget=ol`、单体仍 inactive/disabled、边缘 23 条自行重连、零报错。
+       ⚠️ **行为验证未拿到，MUST NOT 记成「已验」**：复查那 5 分钟里
+       `interaction_appraiser` **一次都没跑**（17 个账号今日 view 配额已用满、在睡），
+       所以「0 条 `facebook_reel_follow_edge_capability_missing`」**分母是 0、不构成证据**。
+       真正的验收是「有账号带配额跑到 Reel 上、且不再报能力缺失 / 真下发了 Reel 关注」，
+       留给下一段（同时也是 dev 侧那条验收）。 -->
+- [x] 6.2c **顺带查清了交接文档 §0 那条「OL scroll 两天 100% 失败」——是误报，浏览一直满负荷在跑。**
+  <!-- 2026-08-05 实测（同一 6 小时窗口）：journal 里 658 条 `scroll ok=false`，
+       但 `risk_counters` 表里 `action='view'` **记了 1703 次**、like 193 / follow 14 / join_group 15。
+       每一次 view 记账都要求「一条新的活动 Reel 真的呈现并读到」（`comm/handler.ts` 按规范
+       Reel 身份逐条记、畸形空卡 fail-closed 不记）⇒ **换页在工作**，且比 scroll 指令本身还多 2.6 倍。
+       当时 17 个账号在睡的原因是 `view 配额暂不可用 reason=quota:day`——**今日额度用满**，不是滚不动。
+       真实换页节拍 p50 26.5s / p90 36.4s（相邻 view 间隔）。
+       **误报的根因值得记**：边缘回的是 `reels_navigation_unconfirmed` = 三态里的「没能确认」，
+       边缘这侧是诚实的；`action.completed` 的 `ok` 是布尔、原因在另一字段，
+       于是任何按 `ok` 做的汇总都把「没能确认」压成「失败」——
+       **本仓红线「三态不得压成一态」这次压在了度量上，不是控制流上**。
+       已就地更正 `docs/handoff-2026-08-05-ol-cutover-and-cloud-demotion.md` §0（原文折叠保留供追溯）。
+       **剩下的真问题**（优先级远低于原文所定，本 change 不做）：15s 确认窗口
+       （edge `native/page-engine/src/facebook/reels.rs` 的 `FACEBOOK_REEL_IDENTITY_HYDRATION_TIMEOUT`）
+       内始终看不到换页，而换页确实发生。**别急着再抬窗口**——2.6 这个比值说明换页多半不是那次按键
+       驱动的，先弄清是谁在推进。用户确认 OL 运营机跑的是 0.3.26（08-04 最新），
+       08-02~08-04 那 6 个 Reels 修复都在机器上，所以这是真剩余缺陷、不是旧包。 -->
 - [x] 6.1b **切流之前把面板与客户鉴权两个对外口真打一遍**（上一批只到「代码接线了」，
   跨进程那几跳一次都没跑过）。做法：给派生 api 临时配一对**备用端口** 8190 / 8191，
   单体的 8090 / 8091 一根手指都不碰，同一份只读脚本对两个 base 各跑一遍逐条对照。
