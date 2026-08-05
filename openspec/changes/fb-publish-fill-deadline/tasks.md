@@ -57,8 +57,36 @@
 
 ## 5. 后续（不在本批，单列以免与并行 FB change 撞热点文件）
 
-- [ ] 5.1 FB 评论路径用的是同一条无界逐字循环（`comment-executor.ts`）：云端虽已按长度算等待窗口（18s + 220ms/字，上限 90s），但**边缘侧仍无截止时刻**——长评论同样会留下孤儿打字循环。把 deadline 一并传下去。
-- [ ] 5.2 **edge 生命周期层：给逐字输入接「取消令牌」**（复审存活项 3b.7）。今天的预算是自我计时——云端 WS 断连时边缘 reset 租约、恢复浏览循环，而打字循环仍在有界地跑，两个写者短暂共用同一个 CDP 页面。彻底消灭要让租约 / 连接 epoch 在 `reset()` / `finishActive()` 时自增，逐字循环在每个字符间与 `deadlineAt` 一并检查。属 `edge-task-coordinator` / `main.ts` 热点，单列串行做。
+- [x] 5.1 ~~FB 评论路径用的是同一条无界逐字循环（`comment-executor.ts`）：云端虽已按长度算等待窗口（18s + 220ms/字，上限 90s），但**边缘侧仍无截止时刻**——长评论同样会留下孤儿打字循环。把 deadline 一并传下去。~~
+  <!-- 2026-08-05 复核：**本条登记与代码不符，已实装，无需改动。**三处坐实：
+  ① 落点错了——`src/facebook/comment-executor.ts` 与 `src/facebook/facebook-session.ts` **都在退役名单**
+     （`scripts/native-engine-inventory.cjs` 的 `RETIRED_DIST_MODULES` 第 64/65 行），现役 FB 评论走
+     `NativeBrowseSession` + Native 引擎。在那两个文件上实装＝零生产效果（同一陷阱本轮第三次）。
+  ② 边缘侧**有**截止时刻：`native-page-engine/browse-session.ts:968` 的 `facebookCommandTimeoutMs()`
+     对 `interaction_comment` 按 `Array.from(text).length` 算预算，减去 2s 让边缘必定先答，
+     经 `deadlineUnixMs` 传进引擎；`native/page-engine/src/facebook/comment.rs:216` 再扣一段提交预留，
+     逐字循环每个字符都对它复检（`ensure_text_input_active`），超时回 `comment_deadline_exceeded`。
+  ③ 数字也旧了：两侧现在都是 27s + 330ms/字、上限 180s（edge `browse-session.ts:222-228`
+     与 cloud `src/comment-agent/facebook-edge-steps.ts:70-72` 逐值一致），不是登记里的 18s + 220ms / 90s。 -->
+- [x] 5.2 **edge 生命周期层：给逐字输入接「取消令牌」**（复审存活项 3b.7）。今天的预算是自我计时——云端 WS 断连时边缘 reset 租约、恢复浏览循环，而打字循环仍在有界地跑，两个写者短暂共用同一个 CDP 页面。彻底消灭要让租约 / 连接 epoch 在 `reset()` / `finishActive()` 时自增，逐字循环在每个字符间与 `deadlineAt` 一并检查。属 `edge-task-coordinator` / `main.ts` 热点，单列串行做。
+  <!-- aidcp-edge cc6001c。**实测后根因与登记不同，故修法也不同——取消令牌早已存在，坏的是那道闸的探针。**
+  取消链路是齐的：`native-page-engine/client.ts:1109` 把 AbortSignal 接到 `cancel(commandId)`，
+  引擎侧落到 `main.rs:225` 的 AtomicBool，逐字循环每字符复检；断连（`main.ts` cloud.disconnected）、
+  暂停（`stopAndWait`）、执行器故障（`isolateExecutorFailure`）三条路径都会触发它。
+  真正的洞在**发布**这一侧：`publishInFlight()` 读的是**回执登记表** `inFlightPublishes`，
+  而回收路径 `failInFlightPublishesHonestly` 发完诚实失败回执就把该表 `clear()`——
+  探针当场变假，`resumeBrowseIfIdle()` 的 `if (publishInFlight()) return` 失效，
+  租约又刚被 `reset()`，于是浏览恢复，而发布 dispatch 还在页面上按自己的预算逐字打（FB 正文上限 400s）。
+  提交那步另有租约闸（`task_lease_mismatch`），所以后果不是重复发帖，是**页面互踩**：
+  恢复导航把发布页导走，发布侧看到「打的字不见了」。
+  修法：抽出 `src/execution/in-flight-publishes.ts`，把「回执登记」与「写者在场」分成两件事，
+  `recycle()` MUST NOT 动后者；写者计数只由 dispatch 自己的 begin/finally-settle 加减，
+  且 begin 与 finally 之间不留任何可抛语句（未配对的自增＝浏览永久冻结的砖）。
+  变异归因：把 `recycle()` 改回「顺手清零写者计数」（＝旧的合并语义），5 条新用例红 3 条，
+  含那条驱动真实 `EdgeTaskCoordinator` 的端到端用例；不变异则 5/5 绿。
+  回归：acceptance 39/39、全量 3163 pass / 1 gated skip、typecheck 干净。
+  注：本条原文写的「让租约 / 连接 epoch 自增」那条路**没有采用**——现役取消是 per-command
+  AbortController（`execution/takeover.ts` 明写「绝不存进单例字段」），再加一个进程级世代号会与它抢语义。 -->
 - [x] 5.3a Facebook 专用 prompt 的正文目标改为「全文 100–350 字（Facebook 最佳阅读区间）」，并补回归断言锁住新文案、排除旧 100–500 与 80–600 提示。 <!-- aidcp-cloud 3d28b48 初次改为 100–500；794cda9 收紧为 100–350。content-creator 7/7；acceptance 123/123；全量 3401 pass / 11 skip；typecheck pass；OpenSpec strict pass。2026-07-26 15:42 CST 部署 dev，备份 cloud.bak.20260726-074153Z.tar.gz + cloud.env.bak.20260726-074153Z；远端 prompt 哈希与 master 一致，service active / NRestarts=0 / 8787 / 8090 / 8091 / PostgreSQL / 三属主 schema 契约门 / 自动化写者锁 / 飞书 onReady / 内外 health 全绿，isales 未触碰 -->
 - [ ] 5.3b 该规则仍是模型软提示，**正文无任何确定性长度校验**（只 clamp 标题）。`content_too_long` 是诚实闸、不是解法——真正该收的是生成侧。
 - [x] 5.4 Native 同类输入语义归属 `native-page-engine-production-cutover`：Facebook 评论和小红书搜索恢复逐 Unicode 码位拟人输入；Native 验证码改为真实 keyDown/keyUp 与 Shift 配对，三条路径均补取消/截止/回读/清场和 CDP 事件序列回归。
