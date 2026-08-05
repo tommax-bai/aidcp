@@ -306,7 +306,47 @@
 
        **另记一条小口子（本批不修）**：具体原因 `missing_account_id` 只留在服务端日志里，
        客户端收到的 close reason 是笼统的 `handshake rejected`。对一个**配错了就能改好**的原因来说，
-       跨层时把可执行的那半丢了；运营侧看到的是"被拒"，而不是"你少配了 AIDCP_ACCOUNT_ID"。 -->
+       跨层时把可执行的那半丢了；运营侧看到的是"被拒"，而不是"你少配了 AIDCP_ACCOUNT_ID"。
+
+       ── 观察记录第 2 条（2026-08-05 10:30–11:20，切流后约 22h）──
+
+       **用户实测 `/comment` 与 `/publish` 两条命令都不触发。查下来是两处独立断链叠在一起，
+       且两处都"看起来一切正常"** —— 命令有受理回执、进程 active、端口全在、日志无 error。
+
+       **断链一：4.4 那条"周期任务一律关"里的委托泵，切流后没人摘。**
+       `/opt/aidcp/automation/.env` 的 `AIDCP_DELEGATED_TASK_WORKER=false` 自 8-04 11:41
+       automation 首次启动起一直在，**22h 内所有委托命令只入队、零执行**。
+       - 现象为什么难发现：飞书那侧回的是 `ok:委托任务已直接排队`（受理成功，如实），
+         库里 `delegated_tasks` 干净地停在 `queued`，automation 每次启动**明说**
+         "DelegatedTaskWorker 已按配置禁用" —— 一句诚实的日志，只是没人在看。
+       - 6.4 把周期任务原子切给派生服务时，切的是排期心跳 / 恢复扫描那几样；
+         **委托泵是"另有 env 显式关闭"的那一条，不在 6.4 的动作清单里，于是漏在原地。**
+       - 已摘（.env 改 true + 重启），两条积压任务当场被认领。
+         ⚠️ **口径**：OL 单体的 .env **根本没有这个键**（默认即开），所以它是切流期额外加的临时闸，
+         不是需要长期携带的配置。以后再加这类临时闸，MUST 在 4.4 同一处登记摘除条件。
+
+       **断链二：下发段存储在装配处把属主客户端的方法全丢了（本批引入的真回归）。**
+       `automation-publish-dispatch.ts` 把 store 写成 `{ ...options.publishLog, … }`。
+       拆仓后 `publishLog` 是 `AutomationPublishLogHttpClient` 这个 **class 实例**，
+       方法在 prototype 上，而对象展开只拷自有可枚举属性 ⇒ **五个方法一个都没过去**。
+       - **单体里没有这个错**（那边传的是普通对象 `dispatchPublishStore`）⇒ 派生仓引入。
+       - **编译期抓不到**：TS 对展开 class 实例的类型推导仍保留全部方法签名，
+         `tsc --noEmit` 全绿。**单测也抓不到**：下发链路上每处都拿字面量桩当 store，
+         桩复现不了 prototype 那一层。已实测确认——把修复改回展开后 typecheck 依然 0 错。
+       - **后果是静默的**：兜底扫描那条路径只 `warn` 后 `跳过`，于是人审通过的稿
+         **永远发不出去**，日志里只有每 30s 一条 `loadForDispatch is not a function`。
+         实测 recordId=216/220 卡在「已批准·待下发」一天多无人发现。
+       - 已修（automation `5795b1e`，逐方法显式委托 + 具名导出可测函数），
+         配套加 `test/acceptance/publish-dispatch-store-wiring.test.ts`：用**真 class 实例**
+         喂装配函数，并**自证前提**（断言展开确实会丢方法，前提变了就当场红，不留恒真闸）。
+         变异验证过：改回展开 ⇒ typecheck 仍绿、这条闸红。
+       - ⚠️ **同类风险已全仓扫过**：automation / api / content 三仓其余的对象展开都是纯数据对象，
+         展开 class 实例的**只此一处**。
+
+       **剩下的不是缺陷**：两条任务现在都在正常等目标账号 61591753702668 的边缘上线
+       （评论 `deferred`+`edge_offline`、发布「控制核心暂离线，保留授权等待恢复」），
+       **且都没消耗重试次数**（`attempt_discarded_before_start`）——
+       这正是"等资源 ≠ 失败"那条红线该有的样子。 -->
 - [ ] 7.2 逐条走 `docs/real-machine-acceptance-backlog.md` 簇 60 的验收项，每条记三态之一：
   **已验（附证据）/ 未验（附为什么没观察到）/ 不适用（附理由）**。
   重点是上一个 change 登记的 5 条 + 既有的 `runAutomationMain` 从未真跑、飞书 `/delegate` 从未真跑。
