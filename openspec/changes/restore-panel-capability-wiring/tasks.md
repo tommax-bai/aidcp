@@ -41,9 +41,14 @@
        不是自拟的 REST 路径。**注册点特意放在 publish-generation 之后**：验收 `curated content absence
        cannot disable persona or publish` 用「精选库守卫到 publish-status 之间不许出现 return」当代理，
        本回调体内的 return 是内层函数的、与那条不变量无关，但会把代理打成误报。挪出该区间比放宽守卫便宜。 -->
-- [ ] 3.2 用量成本窄口：注册用量查询 + 账单价刷新两条，形状取自面板既有两个方法。
-- [ ] 3.3 精选库窄口：注册列表 / 筛选面 / 删单条 / 清空壳行 / 读单行五条（`account_id` 一律进 WHERE 防越权，跨进程后这条 MUST 由属主侧保证，MUST NOT 交给调用方自觉）。
-- [ ] 3.4 FB 发帖图片窄口：注册列表 / 上传 / 重排 / 改组 / 删组五条；**上传是大载荷**（单张原图上限 10 MiB、Base64 后约 14 MiB），跨进程连接的体积上限与超时须显式设置，MUST NOT 用默认值撞上限后回一个看不出原因的失败。
+- [x] 3.2 用量成本窄口：注册用量查询 + 账单价刷新两条，形状取自面板既有两个方法。
+  <!-- 账单价刷新的凭据读复用本进程既有的厂商密钥客户端（事实源在接口域），未新开通道。 -->
+- [x] 3.3 精选库窄口：五条全注册，`account_id` 仍由属主侧那段 SQL 进 WHERE。
+  <!-- 缺实例时**不注册**对应路由：空路由会把「精选库暂时不可用」画成「一条都没有」。 -->
+- [x] 3.4 FB 发帖图片窄口：五条全注册。
+  <!-- 属主侧内部 HTTP 请求体上限抬到 24 MiB（默认 8 MiB 会在传输层砍掉 14 MiB 的 Base64 载荷）；
+       调用侧上传单独一条 120s 超时连接——超时后属主侧很可能已经写完，那是「看起来失败其实成功」。
+       删组是软删（status:'deleted'），与单体逐字同源。 -->
 
 ## 4. aidcp-automation — C 类：自动化域窄口
 
@@ -66,7 +71,9 @@
 
 ## 6. aidcp-api — 接线跨进程客户端 + 打开写路径
 
-- [ ] 6.1 装上内容侧四族客户端：`tokenUsage`、`billingPriceRefresh`、`curatedContent`、`curatedActions`、`facebookPublishMedia`。
+- [x] 6.1 装上内容侧客户端：`tokenUsage`、`billingPriceRefresh`、`curatedContent`、`facebookPublishMedia`。
+  <!-- `curatedActions` 不在本批：它要发起发布管线（内容域并行洗稿准入）与定向评论调度（自动化域），
+       且成功路径是 fire-and-forget + 结果卡，跨不过一次请求/应答。留批次 4，仍具名缺席。 -->
 - [ ] 6.2 装上自动化侧：`captchaAssist`、`preflightApprovePublish`、（如未复用镜像）`publishDispatcher`。
 - [x] 6.3 三处写路径接真探活客户端（无占位中间态，见 1.8 注）。**三处共用同一个探活口。**
 - [x] 6.4 装上覆盖断言（5.3），填本进程具名缺席表。
@@ -107,6 +114,9 @@
             /api/roles/:id/prompt —— 分别待批次 3 / 3 / 4 / 7。
        **写路径端到端实打**：同值回写 200（跨进程真探活跑通）；喂一个不存在的模型名回 400 model_invalid
        且配置未被写坏（复读仍是原值）。这两条一起才证明探活既没被绕过、也没把好值改坏。 -->
+- [x] 9.3a 批次 3 部署 dev（content f414669 / api 763c981）。ECS 上两槽 typecheck CLEAN、
+  三服务 active、NRestarts 全 0。复打：`/api/llm-usage`、`/api/curated/facets`、`/api/curated/contents`
+  全部 200 并返回真数据；批次 1/2 的六条仍 200。
 - [ ] 9.4a **OL 同样受影响，未修**（2026-08-05 12:59 OL 也切成三派生服务，钉的是切流前的发布分支）。
   实测 OL 的 `/api/config/model`、`/api/roles`、`/api/llm-usage` 同样 503。
   OL 部署须用户明确要求并走发布分支，本 change 不自行执行。

@@ -183,6 +183,12 @@ TRANSPORT_MEMBERS = [
     # 线上传的是判别式结果而非错误类 —— 跨进程后 `instanceof` 恒 false，密钥缺失的识别
     # 必须留在属主侧完成，否则会静默降级成泛化的「模型不可用」。
     'src/transport/model-probe-http.ts',
+    # change restore-panel-capability-wiring：管理后台读写内容域三张属主表的窄口
+    #（用量成本 / 精选库 / FB 发帖素材）。判据同上：接口进程是今天的调用方、内容进程是属主，
+    # 文件本身零属主表 SQL（只有路由名 + 端口形状 + 类型化客户端）。
+    # 里面那两个显式常量（属主侧请求体上限 / 调用侧上传超时）**必须同源**：
+    # 两侧各写一份，会在「上传多大算超」这件事上悄悄分叉，且只有真传大图才现形。
+    'src/transport/panel-content-http.ts',
     # 0.8 文本模型出口（裁决 A1，2026-07-29）：三家各自 `new` 一个 QwenClient，不再由谁替谁持有。
     # 准入判据逐条对上：**三家都可能调用**（automation 的角色全靠 kernel 的 TextCompletionPort 拿注入、
     # 具体客户端只能在各自 main() 里构造；content 的生成链、api 的命令式生成同理）+ **零属主表 SQL**
