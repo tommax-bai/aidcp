@@ -157,8 +157,12 @@
        ③ 单体 aidcp-cloud 的剪裁名单仍只有两条主题。它按 §8.0 永不部署、只作回滚路径，
           本次刻意未动（monolith 形态下这两条主题的消费者是否存在需另行判定，
           `consumers: []` 与 `consumers: [不存在的名字]` 后果相反）。 -->
-- [ ] 8.2 回写 `deploy-derived-services-to-dev` 的 tasks.md：8.1 第 ④ 条已由本 change 收掉
-- [ ] 8.3 观察项登记进 `docs/real-machine-acceptance-backlog.md`
+- [x] 8.2 回写 `deploy-derived-services-to-dev` 的 tasks.md：8.1 第 ④ 条已由本 change 收掉
+  <!-- 已就地标注为「2026-08-05 由 bound-event-outbox-growth 收掉（aidcp-api beeeb84）」，
+       并写清真因是**消费侧**那一半没跟着改，原文保留。 -->
+- [x] 8.3 观察项登记进 `docs/real-machine-acceptance-backlog.md`
+  <!-- 新簇 143（143.1 存量排空 / 143.2 告警消失且不是判据改松 / 143.3 漂移守卫不误报
+       / 143.4 三个 unit 都 disabled / 143.5 OL 仍跑旧构建、该表仍在长）。 -->
   <!-- ① 7.5 的告警消失需一段够长的观察窗（原频率约每分钟一条）；
        ② dev 存量排空需约 6.7 小时，届时确认行数确实降到保留期以内；
        ③ **非本 change 造成**：dev 上 api/automation/content 三个 unit 都是 disabled，
