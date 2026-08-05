@@ -21,4 +21,4 @@
 
 ## 4. 运维观察（非本 change 范围，登记）
 
-- [ ] 4.1 `aidcp-automation.service` 每次 restart 都会卡在优雅关停、约 90 秒后被 systemd `stop-sigterm` 超时 SIGKILL（2026-08-05 一小时内四次，次次如此）。后果：每次部署给连着 dev 的真机客户端造成约 1.5 分钟中断，且强杀意味着在途状态没有走完关停路径。值得单独查是谁没关（WS server / PG 池 / 定时器）。
+- [x] 4.1 `aidcp-automation.service` 每次 restart 都会卡在优雅关停、约 90 秒后被 systemd `stop-sigterm` 超时 SIGKILL（2026-08-05 一小时内四次，次次如此）。后果：每次部署给连着 dev 的真机客户端造成约 1.5 分钟中断，且强杀意味着在途状态没有走完关停路径。值得单独查是谁没关（WS server / PG 池 / 定时器）。 <!-- 2026-08-05 **已修复，实测复核过，不是听说**。dev 时间线：15:35 / 15:42 / 16:00 三次停机各卡满 90 秒 → `State 'stop-sigterm' timed out. Killing.` → 三个进程 SIGKILL → `Failed with result 'timeout'`；16:15 起转为 5 秒内收尾；**16:53:18 与 16:54:04 两次重启均为同一秒内 `Succeeded`**。ol 侧 16:02 那次仍是 90 秒强杀，**16:46:00 那次已是 Stopping 与 Started 同秒完成**。两边都不再卡在优雅关停。**顺带记一条不同源的现象、不属本条**：ol 16:32:35 有一次 `Failed with result 'exit-code'`（崩溃后 5 秒自动拉起），那是异常退出不是关停挂死，另行观察 -->
