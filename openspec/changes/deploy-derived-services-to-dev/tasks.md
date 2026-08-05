@@ -727,9 +727,35 @@
        它被原样转抄进了本条与交接文档。**已在三处就地改掉，并把那段注释留作反例。**
        这正是 [[stale-cant-reach-claims-compound]] 那条：**转述的「对面拿不到」不能当结论用，
        动手前先去 grep 事实源在谁那儿。** -->
-- [ ] 8.3a **ol 不在本 change 范围内**（用户 2026-08-03 重申）：由用户单独提出才做，
-  且届时须建发布分支、按发布分支部署。**"dev 是否 ok"由用户判定**——
-  实施方 MUST NOT 自行宣布 dev 已就绪并据此推进 ol。
+- [x] 8.3a **ol 已切流**（2026-08-05 12:47–12:59，用户当场裁定「dev 已经可以了，拉上线分支部署 OL」）。
+  <!-- 发布分支 `release/20260805-ol-cutover`：api `6a7ba81` / automation `1c770ff` / content `bd56379`。
+       **刻意不发主干头**：建分支时发现主干已被并发 session 推进 3 个提交（改的是调度器与下发存储），
+       我一条没验过 ⇒ 钉回 dev 上正在跑的基线。生产要发的是**验过的东西**，不是最新的东西。
+
+       **切前勘察推翻了两条我以为的前提**：
+       ① OL 的单体 env 与 dev **不是同一套键**（36 vs 53）。照抄 dev 的划分会**静默丢掉 4 个键**：
+          `AIDCP_ALLOW_SCHEMA_AHEAD`（schema 门放行位）/ `AIDCP_COLDSTART_RAMP`（养号爬坡回滚拉杆）/
+          `AIDCP_FEISHU_WS_ENABLED` / `OSS_INTERNAL`。改为**按代码实读**逐键定归属。
+          `AIDCP_MOCK_PUBLISH` 单独查过——它只是诊断触发器，不是「不真发」，派生仓不读它是安全的。
+       ② **OL 上没装 git**，而两个共享包是 git 依赖 ⇒ `npm install` 直接 ENOENT。
+          dev 上有 git 2.43，也就是说这套部署形态本来就要求它；OL 缺的是环境 parity，已装（additive）。
+
+       **库这一关是过的**：OL 三个属主库的迁移数 69 / 57 / 20，与三仓的迁移文件数逐个吻合。
+
+       序列：三槽 .env（值只在服务器上流转、4 个内部令牌就地 openssl 生成）→ systemd unit 照搬 dev →
+       git archive 快照 rsync（不从工作区推）→ npm install → **ECS 上三槽各跑一次 typecheck，全 CLEAN** →
+       备份单体 → **停 + disable 单体** → content → automation → api。
+
+       **已验**：三服务 active、NRestarts=0、六端口全在、自动化就绪 `state=ready` `blockers=[]`
+       `executionTarget=ol`、console 8088 与 /api 反代均 200、客户端鉴权口 401（在且要鉴权）、
+       飞书长连接已建立、近 3 分钟三服务零报错。单体保留在 `inactive/disabled`，回滚是一条命令。
+
+       **边缘没被我切断**（这条特意查了）：最后一条边缘指令在 12:03，紧接着 5 条 `会话结束: disconnect`；
+       12:03→12:47 单体侧零边缘活动。切换窗口内**没有任何边缘会话被打断**。
+
+       **未验（MUST NOT 读成已验）**：**没有任何边缘连上过新的自动化进程**——切换前后都是 0，
+       所以「边缘 ↔ 派生自动化」在 OL 上一次都没真跑过。同步读中继在切换后要追约 3.7 万条积压
+       （12:59 实测 118812/136237，约 6500 条/分钟，自愈中）。 -->
 - [ ] 8.4 `openspec validate deploy-derived-services-to-dev --strict` 通过后归档；
   **归档前把仍未了的债搬进 backlog**——归档会把本文件埋进 archive 目录，
   只活在任务注释里的东西从此没有任何机制会提醒人。
