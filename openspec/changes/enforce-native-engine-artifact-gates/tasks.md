@@ -212,8 +212,13 @@
   - **顺带取到 12.1 问题①的直证**：在「该分片未登记」的同一状态下跑泄漏闸，
     覆盖数仍是 **18 且仍包含 `08-reaction-semantics.js`** ——
     **泄漏闸不依赖登记，1.4 的登记要求也没被泄漏闸绕过**，两道闸确实各守各的。
-- [ ] 11.5 在本清单按 `<!-- <repo> <commit-sha> 备注 -->` 格式回写 aidcp-edge 与控制仓的提交 sha（sha 必须取自已推送的提交）
-  - 【部分完成】aidcp-edge 侧本轨 sha `be0a8be`（已推 origin/native-migration-repair）已回写。差控制仓侧 sha——本轮按分工不提交控制仓，提交由主 session 统一做，届时补写
+- [x] 11.5 在本清单按 `<!-- <repo> <commit-sha> 备注 -->` 格式回写 aidcp-edge 与控制仓的提交 sha（sha 必须取自已推送的提交）
+  - **【已完成 2026-08-05】** 缺的那一半（控制仓 sha）已补：
+    - **aidcp-edge**：本轨实装 `be0a8be`、`30f4d9a`（均已在 `origin/master`；原记的 `origin/native-migration-repair` 是当时的临时分支，后已合回主干）。
+      越界方对本 change 属主文件的改动为 `f652786`，已在 12.1 追认。
+    - **aidcp（控制仓）**：`a4e5a3fc`（10.1 / 10.2 / 10.3 / 10.4 的结案与文档订正）、
+      `b167cd88`（5.4 / 11.3 / 11.4 实测对照，12.1 / 12.2 追认结论，11.5 本条）。
+      两条均已 `git push` 到 `origin/main`，`git branch -r --contains` 实核命中。
 > **11.6–11.9 已移出本清单（2026-07-31 用户裁定）** —— 已收拢到
 > `docs/real-machine-acceptance-backlog.md`：**簇 127**（产物门禁打包与 CI）承接 11.6 / 11.7 / 11.8，
 > **簇 125**（小红书 Native 切换）承接 11.9。不再计入本 change 的任务数、不再阻塞归档。
