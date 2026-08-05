@@ -24,10 +24,37 @@
 - [x] 4.2 派生仓落地：`scripts/sync-split-repos --apply --repo aidcp-automation` 同步对账器（dry-run 显示仅此 1 个文件有差异），并手写本仓自己的组装（组装根不派生）。 <!-- aidcp-automation master 5795b1e..60b4845 -->
 - [x] 4.3 部署 dev（安全序列：target 检查 → 备份 `automation.bak.20260805-124012.tar.gz` → rsync → restart → healthcheck）。 <!-- 2026-08-05 deployed；healthcheck：service active、8787 监听、写者锁 target=dev 已持有、记账 outbox 就绪；启动日志确认「风控计数对账已启动……范围=归属为 dev 的账号」 -->
 - [x] 4.4 部署后确认 dev 不再对 ol 归属账号报 `risk_counter_drift`。 <!-- 2026-08-05 13:01:57 dev 对账回执：`已物化=29 实际对账=23 他target跳过=6 归属未知跳过=0 偏差=0`。那 6 个正是此前每 5 分钟刷 P1 的 ol 归属账号；归属未知=0 说明归属读口在生产上真答得出来（不是被整体降级成跳过）。自 12:56 重启起 `计数偏差` 0 条 -->
-- [ ] 4.5 **ol 侧仍未修**。口径 2026-08-05 13:00 更新：ol 已由并行 session 于 12:47–12:59 切到三派生服务（控制仓 `d512e8ce`），但发布分支 `release/20260805-ol-cutover` 钉的是**本 change 之前**的快照——ol 上 `risk-counter-reconciler.ts` 无 `ownerTargetFor`、启动日志无「范围=…」后缀。故 ol 对 dev 归属账号的误报会原样持续。上 ol 需用户明确要求，并把本 change 的两个提交（automation `60b4845` + `9b102b3`）带进该发布分支（CLAUDE.md §5/§6）。
+- [x] 4.5 **ol 侧落地（2026-08-05 用户明确授权后执行）。** 发布分支 `release/20260805-ol-risk-scope`
+  （aidcp-automation `bce58dc`），由 `release/20260805-ol-panel` 切出 + cherry-pick `60b4845` / `9b102b3`，无冲突。
+  <!-- **先纠正一条台账事实**：本条原写「ol 跑的是 release/20260805-ol-cutover」，实测**不是**。
+  三个 ol 发布分支的 risk-counter-reconciler.ts 同 md5，无法区分，改用它们之间**真有差异**的三个文件
+  （automation-connection-dispatcher / automation-main / transport/model-probe-http）比对，
+  ol 三处全部命中 `release/20260805-ol-panel`（d8c3747）。发布分支是按小时新建的，台账里的名字必然滞后
+  —— 部署前 MUST 用「分支间有差异的文件」实测认定，MUST NOT 照抄台账。
+  部署前另做一次全量对账：ol 的 `src/` 逐文件 md5 汇总与该分支**逐字节相同**（无本地漂移，`--delete` 安全）。
+  本地校验用的是**从 ol 上拉下来的** aidcp-kernel / aidcp-transport（该发布分支钉的 pin 与 master 不同，
+  用 master 的包校验结论不作数）：typecheck 干净、定向 15/15、acceptance 277/277。
+  安全序列：target 检查 → 备份 `/opt/aidcp/automation.bak.20260805-ol-riskscope.tar.gz`
+  + `automation.env.bak.20260805-ol-riskscope` → git archive 干净快照 rsync → restart → healthcheck。
+  package.json 未变（cherry-pick 只碰 src/ 与 test/），故未动 node_modules。
+  验收按本 change 自己的两条判据：ol 上 `ownerTargetFor` 由 **0 处变 7 处**；
+  启动日志出现此前 ol 完全没有的 `风控计数对账已启动……范围=归属为 ol 的账号`；
+  22:00:34 首轮对账回执 `已物化=10 实际对账=8 他target跳过=2 归属未知跳过=0 偏差=0`
+  —— 那 2 个正是 dev 归属账号，误报源已切断。
+  三服务 active / NRestarts=0，8787 监听，写者锁 target=ol。 -->
+  <!-- **部署中暴露的既有故障（与本 change 无关，但必须记）**：首次 restart 后 automation
+  **起不来**——schema 契约门报「账本最高版本 0111_facebook_consumption_obligation_per_type 高于本构建
+  认识的 0106（超前 1 条）」。dev/OL 共用 PostgreSQL，别的 session 在 dev 上加了 0111，把共享账本推高了；
+  **ol 上那份旧构建同样起不来**，只是没人重启过所以没暴露。⇒ 在此之前 OL 一直处于「离一次重启就停机」
+  的状态，与部署谁无关。
+  处置：按既有精确（非通配）豁免口径把 `.env` 的 `AIDCP_ALLOW_SCHEMA_AHEAD` 从 `0105_...`
+  改为 `0111_facebook_consumption_obligation_per_type`（ol 上 api/content 本就是这个做法，各自钉 0110）。
+  安全性不是拍脑袋：0111 的文件头自带回滚安全论证——**索引名刻意不变**（门禁按名字查索引，改名会让回滚
+  到旧码的进程直接起不来），且旧码在插入前先查「本账号有没有未终结动作」、命中即返回，
+  **根本走不到被放宽的那一格**。启动日志确认放行区间为 `(0106, 0111]`、逐次放行、`applied_by=root`。 -->
 
 ## 5. 收口
 
 - [x] 5.1 `openspec validate scope-risk-reconcile-to-owned-accounts --strict` 通过。
 - [x] 5.2 观测对账周期，确认 dev 侧 `risk_counter_drift` 归零。 <!-- 证据见 4.4 -->
-- [ ] 5.3 归档前置：ol 侧落地（4.5）未完成前不归档——只在 dev 生效的修复会让告警列表继续被 ol 的同一批误报占满，而归档会把这条未了债埋进 archive 目录。
+- [x] 5.3 归档前置：ol 侧落地（4.5）未完成前不归档——只在 dev 生效的修复会让告警列表继续被 ol 的同一批误报占满，而归档会把这条未了债埋进 archive 目录。
