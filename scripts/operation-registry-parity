@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+"""Cloud→Edge 操作登记表跨仓对账 —— 补上「每仓自查」结构上抓不到的那一类漂移。
+
+## 为什么必须在控制仓，而不是在任何一个子仓
+
+Cloud→Edge 的「可下发命令登记表」是**两份手工维护的副本**：
+
+  - `aidcp-edge/src/client/operation-registry.ts`   的 `CLOUD_OPERATION_REGISTRY`
+  - `aidcp-cloud/src/comm/operation-registry.ts`    的 `AUTOMATION_OPERATION_REGISTRY`
+  - （派生仓 `aidcp-automation` 各自持有云端那份的同步副本）
+
+漏登记一条命令的后果**不是报错，是静默拒发**：云端出口闸（`ws-server.ts` 的 `pushToEdges`）
+判 `operation_unclassified`、投递数返回 0，发送方拿到一次「已处理」的返回，接收方什么都没收到。
+
+**现役三道闸对这类漏登记全部无感：**
+
+  - 编译期看不见——两份表都写成 `satisfies Partial<Record<MessageType, …>>`，
+    `Partial` 意味着**缺 key 不是类型错误**；
+  - 两仓各自的验收用例看不见——一仓只读得到自己那份，缺条目在本仓视角下与
+    「本仓不需要这条」**完全同形**；
+  - `scripts/protocol-parity` 看不见——它只对 `protocol.ts` 做逐字对账，不看这张表。
+
+**这不是理论风险。** 2026-08-05 实测：云端那份缺 `identity.read_current` /
+`identity.read_self_profile` 两条，而边缘那份有。后果是 OL 上近三天 37 次身份读取全部
+`sent=0`，且边缘身份救援放行清单里**唯一**能解开「不知道浏览器里登着谁」终局的那条命令，
+在云端侧结构上发不出去。全部既有闸门当时全绿。
+
+任何单仓视角都做不到这件事——它需要同时打开两个仓的文件。所以做成一处、跨仓看，
+形态与 `protocol-parity` / `boundary-census` 相同。
+
+## 它检查什么
+
+三方（存在几份查几份）的 Cloud→Edge 登记表：
+
+  1. **键集合 MUST 相同** —— 谁多、谁少，逐条打印；
+  2. **同名键的描述符四字段（category / transport / identity / browser）MUST 逐字相同**
+     —— 只比键集合会漏掉「两边都登记了，但一边把 browser 从 required 改成了 forbidden」。
+
+判据是**解析出来的语义值**，不是字节：三份文件类型名与辅助函数名本就不同（边缘叫
+`OperationDescriptor`、云端叫 `AutomationOperationDescriptor`），逐字比对必然全红、
+等于没有闸。
+
+**解析不了的行一律判失败，MUST NOT 跳过。** 一条被静默跳过的登记，就是这道闸上的一个洞，
+而洞和「一致」在输出上长得一模一样——那正是本脚本要终结的那种同形。
+
+## 用法
+
+    scripts/operation-registry-parity          # 对账，不一致即 exit 1
+    scripts/operation-registry-parity --list   # 只列出参与对账的文件与条目数
+
+仓缺失时**跳过该仓并说明**（本机可能没 clone 全），但**至少要有两份**才算对账成立；
+只找到一份或零份时 exit 1 —— 「没得比」MUST NOT 被读成「比过了，一致」。
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+# 控制仓在 aidcp/，四仓与派生仓是同级目录（根 CLAUDE.md §0）
+ROOT = Path(__file__).resolve().parent.parent.parent
+
+# (仓名, 相对路径, 登记表变量名)
+CANDIDATES = [
+    ("aidcp-edge", "src/client/operation-registry.ts", "CLOUD_OPERATION_REGISTRY"),
+    ("aidcp-cloud", "src/comm/operation-registry.ts", "AUTOMATION_OPERATION_REGISTRY"),
+    ("aidcp-automation", "src/comm/operation-registry.ts", "AUTOMATION_OPERATION_REGISTRY"),
+    ("aidcp-api", "src/comm/operation-registry.ts", "AUTOMATION_OPERATION_REGISTRY"),
+    ("aidcp-content", "src/comm/operation-registry.ts", "AUTOMATION_OPERATION_REGISTRY"),
+]
+
+DESCRIPTOR_FIELDS = ("category", "transport", "identity", "browser")
+
+
+class ParseError(Exception):
+    """解析不了 —— 判失败，绝不静默跳过。"""
+
+
+def strip_comments(text: str) -> str:
+    """去掉 // 行注释与 /* */ 块注释。字符串字面量里没有 // 的用法，本表内成立。"""
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"//[^\n]*", "", text)
+
+
+def extract_block(source: str, var_name: str, path: Path) -> str:
+    """取 `export const <var_name> = {` 到配平右括号之间的内容。"""
+    m = re.search(rf"export\s+const\s+{re.escape(var_name)}\s*(?::[^=]*)?=\s*\{{", source)
+    if not m:
+        raise ParseError(f"{path}: 找不到 `export const {var_name} = {{`")
+    i = m.end() - 1  # 指向那个 '{'
+    depth = 0
+    for j in range(i, len(source)):
+        if source[j] == "{":
+            depth += 1
+        elif source[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[i + 1 : j]
+    raise ParseError(f"{path}: `{var_name}` 的对象字面量括号不配平")
+
+
+def parse_factories(source: str, path: Path) -> dict[str, tuple[str | None, str | None, dict[str, str]]]:
+    """解析 `const name = (params) => ({ fields });`。
+
+    返回 {工厂名: (参数名, 参数默认值, {字段名: 值或 '@param'})}
+    """
+    factories: dict[str, tuple[str | None, str | None, dict[str, str]]] = {}
+    pattern = re.compile(r"const\s+(\w+)\s*=\s*\(([^)]*)\)\s*(?::[^=]*?)?=>\s*\(\{(.*?)\}\)", re.S)
+    for m in pattern.finditer(source):
+        name, params, body = m.group(1), m.group(2).strip(), m.group(3)
+
+        param_name: str | None = None
+        param_default: str | None = None
+        if params:
+            # 形如：identity: AutomationOperationDescriptor['identity'] = 'bound_account'
+            pm = re.match(r"(\w+)\s*(?::.*?)?(?:=\s*'([^']*)')?\s*$", params, re.S)
+            if not pm:
+                raise ParseError(f"{path}: 工厂 `{name}` 的参数解析不了：{params!r}")
+            param_name = pm.group(1)
+            param_default = pm.group(2)
+
+        fields: dict[str, str] = {}
+        for raw in body.split(","):
+            raw = raw.strip()
+            if not raw:
+                continue
+            fm = re.match(r"^(\w+)\s*:\s*'([^']*)'$", raw)
+            if fm:
+                fields[fm.group(1)] = fm.group(2)
+                continue
+            sm = re.match(r"^(\w+)$", raw)  # 简写属性，取自同名参数
+            if sm:
+                fields[sm.group(1)] = "@param"
+                continue
+            raise ParseError(f"{path}: 工厂 `{name}` 的字段解析不了：{raw!r}")
+        factories[name] = (param_name, param_default, fields)
+    return factories
+
+
+def resolve_call(
+    factory: str,
+    arg: str | None,
+    factories: dict[str, tuple[str | None, str | None, dict[str, str]]],
+    key: str,
+    path: Path,
+) -> dict[str, str]:
+    if factory not in factories:
+        raise ParseError(f"{path}: 键 `{key}` 用了未知工厂 `{factory}`")
+    param_name, param_default, fields = factories[factory]
+    bound = arg if arg is not None else param_default
+    out: dict[str, str] = {}
+    for field, value in fields.items():
+        if value == "@param":
+            if field != param_name or bound is None:
+                raise ParseError(f"{path}: 键 `{key}` 的字段 `{field}` 绑不到参数值")
+            out[field] = bound
+        else:
+            out[field] = value
+    missing = [f for f in DESCRIPTOR_FIELDS if f not in out]
+    if missing:
+        raise ParseError(f"{path}: 键 `{key}` 缺字段 {missing}")
+    return out
+
+
+def parse_registry(path: Path, var_name: str) -> dict[str, dict[str, str]]:
+    source = strip_comments(path.read_text(encoding="utf-8"))
+    factories = parse_factories(source, path)
+    block = extract_block(source, var_name, path)
+
+    entries: dict[str, dict[str, str]] = {}
+    for raw in re.split(r",\s*(?=\n)|,\s*$", block):
+        item = raw.strip().rstrip(",").strip()
+        if not item:
+            continue
+        m = re.match(r"^(?:'([^']+)'|(\w+))\s*:\s*(.*)$", item, re.S)
+        if not m:
+            raise ParseError(f"{path}: 登记表里这一项解析不了（绝不跳过）：{item!r}")
+        key = m.group(1) or m.group(2)
+        value = m.group(3).strip()
+
+        call = re.match(r"^(\w+)\s*\(\s*(?:'([^']*)')?\s*\)$", value)
+        if call:
+            entries[key] = resolve_call(call.group(1), call.group(2), factories, key, path)
+            continue
+        if value.startswith("{"):  # 内联对象字面量
+            fields: dict[str, str] = {}
+            for part in value.strip("{} ").split(","):
+                part = part.strip()
+                if not part:
+                    continue
+                fm = re.match(r"^(\w+)\s*:\s*'([^']*)'$", part)
+                if not fm:
+                    raise ParseError(f"{path}: 键 `{key}` 的内联字段解析不了：{part!r}")
+                fields[fm.group(1)] = fm.group(2)
+            missing = [f for f in DESCRIPTOR_FIELDS if f not in fields]
+            if missing:
+                raise ParseError(f"{path}: 键 `{key}` 缺字段 {missing}")
+            entries[key] = fields
+            continue
+        raise ParseError(f"{path}: 键 `{key}` 的值形态不认识（绝不跳过）：{value!r}")
+    return entries
+
+
+def collect() -> tuple[list[tuple[str, Path, dict[str, dict[str, str]]]], list[str]]:
+    found: list[tuple[str, Path, dict[str, dict[str, str]]]] = []
+    skipped: list[str] = []
+    for repo, rel, var_name in CANDIDATES:
+        path = ROOT / repo / rel
+        if not (ROOT / repo).is_dir():
+            skipped.append(f"{repo}（仓未 clone 到本机）")
+            continue
+        if not path.is_file():
+            skipped.append(f"{repo}（该仓没有自己的副本，非漂移）")
+            continue
+        found.append((repo, path, parse_registry(path, var_name)))
+    return found, skipped
+
+
+def main(argv: list[str]) -> int:
+    try:
+        found, skipped = collect()
+    except ParseError as err:
+        print(f"FAIL: 登记表解析失败 —— {err}", file=sys.stderr)
+        print(
+            "      解析不了的条目 MUST NOT 被跳过：跳过一条就是这道闸上的一个洞，\n"
+            "      而洞与「一致」在输出上同形。请先让本脚本认识这种写法，再谈对账结果。",
+            file=sys.stderr,
+        )
+        return 1
+
+    for note in skipped:
+        print(f"SKIP: {note}")
+
+    if len(found) < 2:
+        print(
+            "FAIL: 参与对账的副本少于两份，对账不成立。\n"
+            "      「没得比」MUST NOT 被读成「比过了，一致」——"
+            "请确认子仓已 clone 到与控制仓同级的目录。",
+            file=sys.stderr,
+        )
+        return 1
+
+    if "--list" in argv:
+        for repo, path, entries in found:
+            print(f"{repo:20s} {path}  ({len(entries)} 条登记)")
+        return 0
+
+    base_repo, _, base_entries = found[0]
+    failures: list[str] = []
+
+    for repo, path, entries in found[1:]:
+        only_base = sorted(set(base_entries) - set(entries))
+        only_other = sorted(set(entries) - set(base_entries))
+        if only_base:
+            failures.append(f"  {repo} 缺少（{base_repo} 有）：{', '.join(only_base)}")
+        if only_other:
+            failures.append(f"  {repo} 多出（{base_repo} 没有）：{', '.join(only_other)}")
+        for key in sorted(set(base_entries) & set(entries)):
+            diffs = [
+                f"{f}: {base_repo}={base_entries[key][f]!r} vs {repo}={entries[key][f]!r}"
+                for f in DESCRIPTOR_FIELDS
+                if base_entries[key][f] != entries[key][f]
+            ]
+            if diffs:
+                failures.append(f"  {repo} 的 `{key}` 分类不一致：" + "；".join(diffs))
+
+    if not failures:
+        names = " / ".join(repo for repo, _, _ in found)
+        print(f"OK: {len(found)} 份 Cloud→Edge 登记表一致，各 {len(base_entries)} 条（{names}）")
+        return 0
+
+    print(f"FAIL: Cloud→Edge 登记表出现漂移，基准 = {base_repo}", file=sys.stderr)
+    for line in failures:
+        print(line, file=sys.stderr)
+    print(
+        "\n  修法：先判哪一份是当下的事实（这条命令到底该不该能下发？该按哪一类下发？），\n"
+        "  再把另一份对齐。MUST NOT 只改一侧就以为完事——派生仓那份要跑 scripts/sync-split-repos。\n"
+        "  提醒：漏登记的后果是**静默拒发**（出口闸判 operation_unclassified、投递数返回 0），\n"
+        "  发送方看到的是一次正常返回，不会有任何报错。",
+        file=sys.stderr,
+    )
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

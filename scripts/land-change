@@ -55,6 +55,18 @@ if [ -x "$(dirname "$0")/protocol-parity" ]; then
   "$(dirname "$0")/protocol-parity" || die "两份 protocol.ts 已漂移——不合并。按上面的第一处差异对齐后再来。"
 fi
 
+# Cloud→Edge 操作登记表跨仓对账。与上面同族、同理由，但盲区更深一层：
+# 那张表两侧都声明成 `satisfies Partial<Record<MessageType, …>>`，**缺 key 连类型错误都不是**，
+# 所以编译期、两仓各自的用例、protocol.ts 逐字对账三道现役闸门对漏登记全部无感。
+# 漏登记的后果不是报错而是**静默拒发**：出口闸判 operation_unclassified、投递数返回 0，
+# 发送方拿到一次正常返回，接收方什么都没收到。
+# 2026-08-05 实测：云端缺 identity.read_current / identity.read_self_profile 两条，
+# OL 上近三天 37 次身份读取全部 sent=0，而当时全部闸门绿。
+if [ -x "$(dirname "$0")/operation-registry-parity" ]; then
+  info "Cloud→Edge 操作登记表对账（跨仓）..."
+  "$(dirname "$0")/operation-registry-parity" || die "Cloud→Edge 操作登记表已漂移——不合并。按上面的差集/差异字段对齐后再来（派生仓那份走 scripts/sync-split-repos）。"
+fi
+
 ahead="$(git -C "$wt" rev-list --count "origin/$def..$name")"
 info "$name 领先 origin/$def $ahead 个提交。"
 [ "$ahead" = "0" ] && info "空 diff = 已在远端，直接清理即可。"
