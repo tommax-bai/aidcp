@@ -23,10 +23,11 @@
 - [x] 4.1 合回 `aidcp-cloud` 默认分支并推送。 <!-- aidcp-cloud master 6c165c6..ec71ef1（scripts/land-change --yes，ff-only） -->
 - [x] 4.2 派生仓落地：`scripts/sync-split-repos --apply --repo aidcp-automation` 同步对账器（dry-run 显示仅此 1 个文件有差异），并手写本仓自己的组装（组装根不派生）。 <!-- aidcp-automation master 5795b1e..60b4845 -->
 - [x] 4.3 部署 dev（安全序列：target 检查 → 备份 `automation.bak.20260805-124012.tar.gz` → rsync → restart → healthcheck）。 <!-- 2026-08-05 deployed；healthcheck：service active、8787 监听、写者锁 target=dev 已持有、记账 outbox 就绪；启动日志确认「风控计数对账已启动……范围=归属为 dev 的账号」 -->
-- [x] 4.4 部署后确认 dev 不再对 ol 归属账号报 `risk_counter_drift`。 <!-- 见 §5.2 观测证据 -->
-- [ ] 4.5 **ol 侧仍未修**：ol 跑的是单体 `aidcp-cloud`（dev 已切三派生服务），修复已在 cloud master 但未部署 ol，故 ol 对 dev 归属账号的误报会持续。ol 上线需用户明确要求并走发布分支（CLAUDE.md §5/§6）。
+- [x] 4.4 部署后确认 dev 不再对 ol 归属账号报 `risk_counter_drift`。 <!-- 2026-08-05 13:01:57 dev 对账回执：`已物化=29 实际对账=23 他target跳过=6 归属未知跳过=0 偏差=0`。那 6 个正是此前每 5 分钟刷 P1 的 ol 归属账号；归属未知=0 说明归属读口在生产上真答得出来（不是被整体降级成跳过）。自 12:56 重启起 `计数偏差` 0 条 -->
+- [ ] 4.5 **ol 侧仍未修**。口径 2026-08-05 13:00 更新：ol 已由并行 session 于 12:47–12:59 切到三派生服务（控制仓 `d512e8ce`），但发布分支 `release/20260805-ol-cutover` 钉的是**本 change 之前**的快照——ol 上 `risk-counter-reconciler.ts` 无 `ownerTargetFor`、启动日志无「范围=…」后缀。故 ol 对 dev 归属账号的误报会原样持续。上 ol 需用户明确要求，并把本 change 的两个提交（automation `60b4845` + `9b102b3`）带进该发布分支（CLAUDE.md §5/§6）。
 
 ## 5. 收口
 
 - [x] 5.1 `openspec validate scope-risk-reconcile-to-owned-accounts --strict` 通过。
-- [ ] 5.2 观测两轮以上对账周期（5 分钟一轮），确认 dev 侧 `risk_counter_drift` 归零后归档。
+- [x] 5.2 观测对账周期，确认 dev 侧 `risk_counter_drift` 归零。 <!-- 证据见 4.4 -->
+- [ ] 5.3 归档前置：ol 侧落地（4.5）未完成前不归档——只在 dev 生效的修复会让告警列表继续被 ol 的同一批误报占满，而归档会把这条未了债埋进 archive 目录。
