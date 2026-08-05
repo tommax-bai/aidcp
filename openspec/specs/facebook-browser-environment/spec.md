@@ -321,3 +321,183 @@ When Native confirms one visible Facebook login form but AdsPower has not filled
 - **THEN** edge closes and confirms the owned AdsPower browser through the existing lifecycle close path before releasing the browser slot
 - **AND** the supervisor MUST NOT automatically restart that intentional stop
 
+### Requirement: Facebook authentication checkpoints SHALL receive bounded structural hydration
+
+When Facebook navigates to a checkpoint document during authentication, Edge SHALL allow that exact document up to 15 seconds to hydrate into a supported authentication signal before classifying an otherwise unknown checkpoint as terminal. This classification SHALL NOT depend on whether the preceding step was login submission, TOTP, or another supported transition. During this window Native SHALL only re-probe structure and MUST NOT replay any preceding action. Explicit credential/code rejection, human verification, restriction or account-lock evidence, ambiguous supported-warning structure, and unsafe action targets SHALL retain their existing fail-closed behavior without gaining action authority from elapsed time.
+
+#### Scenario: TOTP Continue reaches an incomplete checkpoint
+- **WHEN** Native has confirmed the TOTP submit action and the newly navigated checkpoint is less than 15 seconds old but has not hydrated a supported structure
+- **THEN** Edge SHALL keep the authentication transition pending and re-probe without replaying TOTP entry or submit
+- **AND** it MUST NOT report `unsupported_facebook_checkpoint` solely from the checkpoint path during that window
+
+#### Scenario: Automation warning independently hydrates within the window
+- **WHEN** any authentication checkpoint stabilizes within 15 seconds as “We suspect automated behavior on your account” with one unique visible topmost `Dismiss` control in the supported scope
+- **THEN** Native SHALL emit `automation_warning_dismiss` with a fresh signal id and exact bound target
+- **AND** the coordinator SHALL dispatch the existing `facebook_auth_dismiss_warning` action at most once and verify disappearance or document change before continuing
+- **AND** this action SHALL NOT require evidence that TOTP or any other particular step preceded the warning page
+
+#### Scenario: Unknown checkpoint remains after the window
+- **WHEN** the exact checkpoint document reaches 15 seconds without a supported signal or stable authenticated identity
+- **THEN** Edge SHALL fail closed with the safe unsupported-checkpoint reason and SHALL NOT start account-scoped work
+
+#### Scenario: Explicit blocker appears during hydration
+- **WHEN** the checkpoint exposes human verification, rejected authentication, restriction/account-lock evidence, ambiguous warning structure, or an unsafe Dismiss target before 15 seconds elapse
+- **THEN** Native SHALL preserve the corresponding terminal or blocked result and MUST NOT click or extend action authority because the hydration budget remains
+
+### Requirement: Facebook startup SHALL reconcile supported post-login blockers before account-scoped work
+
+After Native first confirms stable Facebook authentication, Edge SHALL keep the single startup authentication coordinator active for a 15-second quiet window before reading final identity and connecting to Cloud. During this window it SHALL re-probe the current Facebook document serially, MAY execute only explicitly supported fresh Native prompt actions, and MUST NOT start browsing, commenting, Cloud connection, or other account-scoped work while a supported blocker or manual choice remains unresolved.
+
+#### Scenario: Late prompt appears after authentication cookies
+- **WHEN** Native first reports `authenticated` and a supported post-login prompt appears during the next 15 seconds
+- **THEN** Edge SHALL keep startup in the automatic-login phase and reconcile that prompt through the same Native auth owner
+- **AND** it MUST NOT connect to Cloud from the earlier cookie observation
+
+#### Scenario: Authenticated page remains quiet
+- **WHEN** Native reports authenticated page state without a supported blocker for 15 continuous seconds
+- **THEN** Edge SHALL continue to the existing stable-identity gate and MAY connect to Cloud only after that gate succeeds
+
+#### Scenario: Remember Password appears after authentication
+- **WHEN** the exact Facebook Remember Password modal and its unique visible enabled topmost `OK` control appear during the authenticated quiet window
+- **THEN** Native SHALL move the CDP pointer to the fresh target, press and release once, and require the existing prompt-disappearance postcondition before startup continues
+- **AND** a loading or disabled-button observation alone MUST NOT be reported as confirmed success
+
+### Requirement: Facebook ad-data review introduction SHALL be independently recognized
+
+Native SHALL recognize the first-time Facebook ad-data review introduction only from the conjunction of Facebook origin, `/privacy/consent/`, `flow=ad_free_subscription`, `afs_variant=first_time`, the supported introduction content, and exactly one visible enabled topmost `Get started` control. It MUST NOT reuse the cookie-consent overlay classifier or match a same-label Feed card.
+
+#### Scenario: Exact first-time introduction is actionable
+- **WHEN** the supported first-time ad-data review introduction contains one fresh visible enabled topmost `Get started` control
+- **THEN** Native SHALL emit `ad_data_review_get_started` with a document-bound signal id and exact pointer target
+
+#### Scenario: Same-label Feed card is not the introduction
+- **WHEN** Facebook Feed contains a “manage your ad experience” card with a `Get started` link but the page is not the exact review introduction route and structure
+- **THEN** Native MUST NOT emit `ad_data_review_get_started` and MUST NOT click that link under this capability
+
+#### Scenario: Introduction target is ambiguous or unsafe
+- **WHEN** the exact introduction has zero or multiple matching controls, or its candidate is hidden, disabled, covered, out of viewport, or not topmost
+- **THEN** Native SHALL fail closed before input with a bounded safe reason
+
+### Requirement: Ad-data review start SHALL use Native pointer input and verify the exact successor
+
+For a fresh `ad_data_review_get_started` signal, Native SHALL move the CDP pointer to the target before one atomic left-button press/release. It SHALL observe the original button state and page loading state for up to 30 seconds, but SHALL confirm the action only when the exact successor subscription-versus-free-with-ads choice structure appears. The action MUST NOT use DOM `click()` and MUST NOT replay after any possible dispatch.
+
+#### Scenario: Successor choice hydrates after loading
+- **WHEN** Native dispatches the authorized `Get started` pointer action, the original control disappears or becomes disabled during loading, and the exact successor choice structure hydrates within 30 seconds
+- **THEN** Native SHALL report the action confirmed once and expose the successor as a manual-choice state
+
+#### Scenario: Loading state does not become a supported successor
+- **WHEN** the original control changes or disappears but no supported successor is confirmed within 30 seconds
+- **THEN** Native SHALL report an ambiguous post-input outcome and MUST NOT click `Get started` again
+
+#### Scenario: Fresh action probe no longer matches
+- **WHEN** action-time revalidation does not reproduce the same document-bound signal id and target
+- **THEN** Native SHALL report not-started `stale_auth_signal` and dispatch no pointer input
+
+### Requirement: Facebook ad-data choice SHALL remain manual and retain the current session
+
+When the exact subscription-versus-free-with-ads successor appears, Edge SHALL emit enumerated reason `facebook_ad_data_choice_required`, project the environment as needing attention, and retain the same core/browser/CDP generation without connecting to Cloud. Edge MUST NOT select a subscription, free-with-ads, personalized, less-personalized, Continue, Agree, or OK action on the operator's behalf.
+
+#### Scenario: Manual data choice blocks identity completion
+- **WHEN** the exact ad-data choice page is present while Facebook authentication cookies are valid
+- **THEN** the retained startup preflight SHALL defer the next identity read and keep the environment in “需要处理”
+- **AND** valid cookies alone MUST NOT bypass the unresolved choice
+
+#### Scenario: Operator completes the choice in place
+- **WHEN** the operator completes the Facebook choice flow and the same retained browser reaches an authenticated page with no supported blocker for a new 15-second quiet window
+- **THEN** Edge SHALL perform the existing stable-identity read and continue startup in the same process/browser/CDP generation
+
+#### Scenario: Operator pauses or closes during the choice
+- **WHEN** pause or close is requested while the ad-data choice remains unresolved
+- **THEN** Edge SHALL use the existing confirmed AdsPower browser-close path before exiting and releasing the browser slot
+
+### Requirement: Facebook startup lifecycle interruption SHALL confirm owned browser teardown
+
+Before the normal runtime lifecycle controller is available, Edge SHALL treat an operator pause or close during Facebook startup authentication as a request to stop and confirm the currently owned AdsPower browser. Edge MUST NOT advance to identity, Cloud connection, or account-scoped work after that interruption unless the operator explicitly resumes.
+
+#### Scenario: Close during authenticated quiet-window confirmation
+
+- **WHEN** a Facebook startup authentication coordinator is observing an authenticated quiet window and the operator closes the environment
+- **THEN** Edge calls the existing confirmed close operation for that owned AdsPower browser and emits browser-close evidence before exiting the core
+- **AND** Electron displays closed only after receiving evidence scoped to the same lifecycle generation
+
+#### Scenario: Startup browser close cannot be confirmed
+
+- **WHEN** the owned browser close operation cannot confirm that the profile CDP endpoint is dark
+- **THEN** Edge emits the existing close-failed result, keeps the core at the blocked startup boundary, and releases no browser slot as confirmed closed
+- **AND** Electron MUST NOT display the browser as closed or advance the environment to account-scoped work
+
+#### Scenario: Operator retries close after an unconfirmed startup close
+
+- **WHEN** startup is blocked after an unconfirmed close and the operator requests pause or close again
+- **THEN** Edge retries the same existing confirmed close operation for the same owned browser generation
+- **AND** it exits only after confirmed browser-close evidence is delivered
+
+#### Scenario: Operator resumes after an unconfirmed startup close
+
+- **WHEN** startup is blocked after an unconfirmed close and the operator explicitly resumes
+- **THEN** Edge resumes Facebook authentication reconciliation in the same retained browser generation
+- **AND** it MUST NOT open a second profile browser or bypass the stable-identity gate
+
+#### Scenario: Intentional core exit lacks browser-close evidence
+
+- **WHEN** an Edge core exits under a local pause or close intent without generation-matched browser-close evidence
+- **THEN** Electron reports that browser closure is unconfirmed instead of displaying the browser as closed
+
+### Requirement: Facebook suspension appeal entry is one bounded operator handoff
+
+For a proven fresh managed Facebook start, the reconciler SHALL treat the observed account-suspension appeal entry as one independent `suspension_appeal_start` signal and `facebook_auth_start_suspension_appeal` action. The signal MUST require Facebook origin, a numeric checkpoint route with the canonical Facebook next destination, the observed suspension and appeal instruction structure, and exactly one visible enabled topmost control whose accessible label is `Appeal`. The action SHALL fresh-revalidate the target-bound signal id, use Native CDP pointer movement and press/release, and MUST NOT be replayed after any committed or ambiguous receipt.
+
+The action is confirmed only after bounded polling proves that the original suspension entry is gone and a distinct, complete, non-loading Facebook checkpoint step is present. Confirmation means only that the appeal entry advanced. Edge SHALL then retain the owned browser as `facebook_suspension_appeal_step_required`, block runnable account identity/Cloud startup, and perform no later appeal input or submission.
+
+#### Scenario: Loaded suspension entry has one actionable Appeal clone
+- **WHEN** the exact observed suspension checkpoint is complete and its DOM contains a hidden disabled `Appeal` clone plus one visible enabled topmost `Appeal` control
+- **THEN** Native binds only the visible enabled topmost control and emits one suspension-appeal signal
+- **AND** the hidden clone does not make the actionable target ambiguous
+
+#### Scenario: Appeal entry advances after trusted input
+- **WHEN** action-time revalidation returns the same target-bound signal and Native CDP pointer input activates it
+- **THEN** Edge polls through bounded loading and confirms only after the original suspension entry is gone and a distinct complete non-loading Facebook checkpoint step is present
+- **AND** it reports `facebook_suspension_appeal_step_required`, retains the browser/CDP, and does not establish a runnable account
+
+#### Scenario: Loading or button mutation is not success
+- **WHEN** the `Appeal` control disappears, becomes disabled, is covered, or the page shows only loading after the pointer press
+- **THEN** Native continues bounded postcondition polling without treating those intermediate changes as success
+- **AND** timeout or unreadable/unsupported destination returns an honest ambiguous result with no click replay
+
+#### Scenario: Exact page or target contract is absent
+- **WHEN** the origin, numeric checkpoint route, canonical next destination, suspension content, accessible label, visibility, enabled state, uniqueness, or top-hit check does not match
+- **THEN** Edge dispatches no pointer input and reports the checkpoint as unsupported or blocked
+
+#### Scenario: Later appeal steps remain operator owned
+- **WHEN** a confirmed entry action reaches a later checkpoint step
+- **THEN** Edge performs no option selection, text entry, confirmation, verification, or appeal submission
+- **AND** a later unsupported checkpoint remains a deferred manual state only in the context of the confirmed appeal-entry handoff, while CAPTCHA and other failures still fail closed
+
+#### Scenario: Operator clears the checkpoint
+- **WHEN** the retained browser later reaches a supported authenticated non-checkpoint page after operator handling
+- **THEN** the normal fresh auth probe and stable identity gate may resume
+- **AND** account/Cloud startup still requires canonical identity readback rather than the earlier Appeal action receipt
+
+### Requirement: Terminal Facebook startup authentication failure SHALL close the owned browser
+
+When the Facebook startup authentication coordinator reaches a terminal failure, Edge SHALL report the existing authentication failure, call the existing confirmed close operation for the AdsPower browser owned by that startup, and then exit the core. It MUST NOT retain that browser merely because normal runtime lifecycle assembly was not reached.
+
+#### Scenario: Unsupported checkpoint stops startup
+
+- **WHEN** startup authentication terminates with `unsupported_facebook_checkpoint`
+- **THEN** Edge reports the existing structured authentication failure and invokes the existing owned-browser confirmed close operation before process exit
+- **AND** confirmed closure is reported through the existing generation-scoped browser-close evidence
+
+#### Scenario: Browser closure cannot be confirmed
+
+- **WHEN** the existing owned-browser close operation cannot confirm that the startup browser is dead
+- **THEN** Edge exits with the original authentication failure and supplies no false browser-close evidence
+- **AND** the existing supervisor projection keeps browser closure unconfirmed
+
+#### Scenario: Manual login is still required
+
+- **WHEN** startup authentication returns the existing controlled `manual_required` result
+- **THEN** Edge retains the current browser and CDP session under the existing manual-login contract
+- **AND** MUST NOT treat that non-terminal state as a terminal authentication failure
+

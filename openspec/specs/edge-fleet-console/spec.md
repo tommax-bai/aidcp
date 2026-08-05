@@ -86,21 +86,54 @@ TBD - created by archiving change edge-multi-environment-fleet. Update Purpose a
 
 ### Requirement: 打开真实浏览器窗口为尽力抬前、抬不动 MUST 诚实告知
 
-主界面与引导流中明确要求人工操作的「打开窗口」SHALL 尽力把目标环境的浏览器窗口抬到前台；环境头像的显示手势 SHALL 读取 AIDCP 客户端实时窗口矩形，把保持固定桌面尺寸的浏览器中心对齐到该矩形，再把客户端恢复到前台，使浏览器处于客户端正后方而不落在无关的主屏居中位或环境级联位。两类入口 SHALL 以窗口错位摆放 + 行↔窗口同名 / 同色让窗口与环境行可对应。请求无法送达、执行失败或有界完成回执超时时 SHALL 诚实告知，MUST NOT 假装窗口已按目标层级放置。
+主界面与引导流中明确要求人工操作的「打开窗口」SHALL 尽力把目标环境的浏览器窗口抬到前台。尚未显示环境的头像双击召回手势 SHALL 由主进程作为一次互斥窗口操作处理：主进程 SHALL 先向除目标外所有当前可控环境发送带完成回执的归位请求，由各环境应用自身已经解析的窗口停放参数；随后 SHALL 读取 AIDCP 客户端实时窗口矩形，把保持固定桌面尺寸的目标浏览器中心对齐到该矩形，再把客户端恢复到前台，使目标浏览器处于客户端正后方。已经显示在 AIDCP 后方的同一环境再次双击时，主进程 SHALL 以带完成回执的精确目标归位操作恢复该环境自己的停放参数。单击环境行 SHALL 只选择环境，MUST NOT 触发浏览器显示或归位。
 
-#### Scenario: 环境头像显示时客户端保持在上方
-- **WHEN** 运维在已选中环境上触发头像显示手势
-- **THEN** 浏览器按 AIDCP 当前窗口中心对齐后，客户端恢复到前台并位于浏览器上方
-- **AND** 浏览器保持平台所需的固定桌面尺寸，不为贴合客户端而改变响应式布局
-- **AND** 完成回执未到达时界面 MUST NOT 进入已显示相位
+互斥召回与当前显示目标复原 MUST 按稳定 `envId` 寻址并在同一个 latest-request-wins 队列中串行收敛，快速连续操作时最后一次用户意图 SHALL 决定最终目标，较早请求的迟到完成 MUST NOT 覆盖它。目标显示、目标复原、其他窗口归位与请求被更新操作取代 SHALL 使用可区分的回执：目标显示失败或超时时 MUST NOT 进入已显示相位；当前显示目标复原失败或超时时 MUST NOT 清除已显示相位；目标显示成功但其他窗口存在归位失败时 SHALL 保留目标显示并明确报告未完整归位的环境，MUST NOT 假装互斥布局已完全建立。未运行或浏览器尚未就绪的非目标环境 SHALL 被跳过，MUST NOT 为归位而启动。引导登录和显式恢复仍 MAY 保持浏览器本身在前台。
+
+#### Scenario: 双击头像召回目标并按配置归位其他窗口
+
+- **WHEN** 运维双击环境 B 的头像，且环境 A、B 与 C 的浏览器当前可控
+- **THEN** 主进程要求 A 与 C 分别应用各自的窗口停放参数，并在归位尝试完成后把 B 放到 AIDCP 当前窗口正后方
+- **AND** AIDCP 最终恢复到 B 上方，B 成为唯一的界面已显示目标
+
+#### Scenario: 未选中环境的双击无需额外点击
+
+- **WHEN** 环境 A 当前选中而运维直接双击环境 B 的头像
+- **THEN** B 在同一手势中完成选中与召回，MUST NOT 因第二击被丢弃而只停在选中态
+
+#### Scenario: 再次双击已显示环境按配置复原
+
+- **WHEN** 环境 B 已显示在 AIDCP 正后方，运维再次双击 B 的头像
+- **THEN** 主进程向 B 发送带完成回执的归位请求，由 B 应用自己的窗口停放参数
+- **AND** 只有归位成功后界面才清除 B 的已显示相位，B 仍保持选中
+
+#### Scenario: 已显示环境复原失败
+
+- **WHEN** 环境 B 的归位请求执行失败或在有界时间内未返回完成回执
+- **THEN** 界面保留 B 的已显示相位并提示归位失败
+- **AND** MUST NOT 把命令写入成功冒充为窗口已经复原
+
+#### Scenario: 快速切换以最后一次召回为准
+
+- **WHEN** 环境 A 的互斥召回尚未完成，运维又双击环境 B
+- **THEN** 主进程串行收敛窗口操作，最终把 B 放在 AIDCP 正后方并归位其他当前可控窗口
+- **AND** A 的迟到回执 MUST NOT 把界面或最终窗口目标改回 A
+
+#### Scenario: 其他窗口部分归位失败
+
+- **WHEN** 目标浏览器成功放到 AIDCP 正后方，但某个非目标环境的归位失败或超时
+- **THEN** 界面保留目标的已显示相位并提示哪些环境未完整归位
+- **AND** MUST NOT 展示或暗示“其他窗口均已停放成功”
+
+#### Scenario: 目标抬不动或未完成时诚实告知
+
+- **WHEN** 目标窗口控制请求无法送达、执行失败或在有界时间内未返回完成回执
+- **THEN** 界面诚实提示目标环境的失败原因，MUST NOT 进入已显示相位
 
 #### Scenario: 引导处理仍把浏览器抬前
+
 - **WHEN** 运维在登录或验证码引导流中点击「打开窗口」
 - **THEN** 界面尽力把目标浏览器抬到前台，允许运维直接完成页面操作
-
-#### Scenario: 抬不动或未完成时诚实告知
-- **WHEN** 窗口控制请求无法送达、执行失败或在有界时间内未返回完成回执
-- **THEN** 界面诚实提示目标环境的失败原因，MUST NOT 无声假装已完成窗口层级调整
 
 ### Requirement: 每环境的失败 MUST 在其行诚实呈现、绝不聚合掩盖
 
@@ -355,9 +388,19 @@ Edge 客户端 SHALL 在当前选中环境的主区域提供 Phase 1 快捷委�
 
 ### Requirement: 左栏环境昵称支持双击人工修改并可辨来源
 
-展开的环境栏 SHALL 允许运营双击环境昵称进入就地编辑。编辑器 SHALL 以当前显示名预填，支持 Enter 与失焦提交、Escape 取消；纯空白昵称 MUST NOT 保存。提交后 SHALL 在第一次等待持久化前即时更新当前页面的环境身份锚点，并以 pending 提示明确其仍在保存；成功后持久化为人工来源，后续系统更新不得覆盖。人工昵称 SHALL 使用轻微不同的文字颜色或同等低干扰标识，并提供“人工昵称”提示，MUST NOT 冒充运行状态、平台或告警。保存失败 SHALL 恢复原昵称与原来源，并展示真实失败原因，MUST NOT 留下只在内存生效的人工昵称或假报成功。
+展开的环境栏 SHALL 允许运营双击环境昵称进入就地编辑。编辑器 SHALL 以当前显示名预填，支持 Enter 与失焦提交、Escape 取消；纯空白昵称 MUST NOT 保存。提交后 SHALL 在第一次等待持久化前即时更新当前页面的环境身份锚点，并以 pending 提示明确其仍在保存；成功后持久化为人工来源，后续系统更新不得覆盖。人工昵称 SHALL 使用轻微不同的文字颜色或同等低干扰标识，并提供“人工昵称”提示，MUST NOT 冒充运行状态、平台或告警。
 
-人工昵称属于 Edge 本地环境花名册，不依赖 Cloud 更新。这里的即时更新是昵称数据热更新，不代表运行中的 Electron 会热加载新源码。
+一次改名提交 SHALL 分别写入**本地环境名**（本机花名册，以及该环境在指纹浏览器中的分身名）与**云端账号别名**两处。两处的成败 SHALL 相互独立：云端账号别名写入失败 MUST NOT 回滚已经写好的本地名字，也 MUST NOT 阻止本地名字继续按人工来源生效。云端别名挂在账号上，环境尚未绑定账号时该路必然失败；此失败 SHALL 只影响它自己那一路。
+
+本地花名册写盘失败 SHALL 恢复原昵称与原来源并展示真实失败原因，MUST NOT 留下只在内存生效的人工昵称或假报成功——本地花名册是显示名的唯一来源，它没写成就等于什么都没发生。
+
+指纹浏览器分身改名 SHALL 沿用既有写客户端的诚实降级语义：失败保持原分身名并如实报告，MUST NOT 重试风暴或阻塞其余路径；没有分身的环境 SHALL 跳过该步且不计为失败。
+
+改名回执 SHALL 分别点名本地与云端两路的结果，MUST NOT 在任一路失败时只报一句已保存。左栏显示名在没有云端别名时会回落到环境名，本地改名成功即可让新名字显示出来；因此回执 MUST NOT 依赖左栏显示是否变化来表达成败。云端拒收原因 SHALL 译为运营可读文案（如环境尚未完成首次登录），MUST NOT 直接呈现内部原因串。
+
+本变更 MUST NOT 为云端别名失败新增任何排队、重试或补偿路径。云端失败的名字按既有语义保留为未同步来源，因而落入既有的「客户端登录后有界补同步」范围；该机制 SHALL 保持原有边界（单轮条数与单请求超时均有界），MUST NOT 为本变更扩容或加频。运营也 SHALL 可以在该环境登录成功后再改一次名字直接同步过去。
+
+人工昵称属于 Edge 本地环境花名册，其本地生效不依赖 Cloud 更新。这里的即时更新是昵称数据热更新，不代表运行中的 Electron 会热加载新源码。
 
 #### Scenario: 双击昵称并保存
 - **WHEN** 运营双击某环境昵称、输入非空新昵称并按 Enter
@@ -378,6 +421,20 @@ Edge 客户端 SHALL 在当前选中环境的主区域提供 Phase 1 快捷委�
 #### Scenario: 保存等待期间明确区分 pending 与成功
 - **WHEN** 运营提交新昵称而本地持久化回执尚未返回
 - **THEN** 当前页面立即显示新昵称，同时明确标记“正在保存”，MUST NOT 提前显示“已保存”
+
+#### Scenario: 未绑定账号的环境仍可改本地名字
+- **WHEN** 某环境尚未完成首次登录、云端因该环境未绑定账号拒收别名写入，而本地花名册写盘成功
+- **THEN** 本地名字与人工来源保留生效，MUST NOT 回滚，MUST NOT 因云端失败而恢复原名
+- **AND** 回执分别说明本地已改与云端未改，并以运营可读文案给出云端未改的原因
+
+#### Scenario: 分身改名失败不牵连其余路径
+- **WHEN** 指纹浏览器分身改名失败而本地花名册与云端别名均写入成功
+- **THEN** 本地名字与云端别名保持生效，回执如实点出分身名未改，MUST NOT 回滚任何一路
+
+#### Scenario: 云端失败不引入新的补偿路径
+- **WHEN** 云端账号别名写入失败
+- **THEN** 客户端 MUST NOT 为此新增排队、重试或补偿路径，该名字按既有语义保留为未同步来源
+- **AND** 既有的登录后有界补同步 SHALL 维持原有边界，MUST NOT 因此扩容或加频
 
 ### Requirement: 客户端环境身份锚点统一解析显示名与来源
 
@@ -750,34 +807,13 @@ Edge 客户端 SHALL 在当前选中环境的主区域提供 Phase 1 快捷委�
 
 客户端 SHALL 以当前登录协调器能否在无需用户输入的情况下继续推进作为环境登录分类依据，MUST NOT 仅因账号身份尚未最终确立而显示 `需要处理`。当协调器已结构化确认可自动提交现成账号密码、自动获取并输入 TOTP、提交验证，或正在其既有有界预算内等待这些已确认动作的页面过渡时，环境 SHALL 显示 `登录中` 并归入现有 `启动中` 分组；该状态 MUST NOT 冒充已有可执行任务证据的 `运行中`。
 
-只有当平台或协调器明确要求用户输入账号密码、扫码、处理验证码/安全检查，或自动登录已经终止且必须人工恢复时，环境 SHALL 进入 `需要处理`。同一保留会话从人工等待重新观察到可自动执行的登录信号时，Edge SHALL 以结构化生命周期事件立即撤销旧人工状态，MUST NOT 等到最终身份确立才清除，也 MUST NOT 依赖自然语言日志推断。终止的认证失败 SHALL 在核心退出后继续显示为需处理项，短状态显示 `异常` 并保留完整认证异常原因，MUST NOT 回落为普通 `离线`。
+只有当平台或协调器明确要求用户输入账号密码、扫码、处理验证码/安全检查，或自动登录已经终止且必须人工恢复时，环境 SHALL 进入 `需要处理`。同一保留会话从人工等待重新观察到可自动执行的登录信号时，Edge SHALL 以结构化生命周期事件立即撤销旧人工状态，MUST NOT 等到最终身份确立才清除，也 MUST NOT 依赖自然语言日志推断。终止的认证失败 SHALL 在核心退出后继续显示为需处理项，短状态显示 `异常` 并保留完整认证异常原因，主区域在场文案 SHALL 显示登录认证异常而非 `待命中`，MUST NOT 回落为普通 `离线`。
 
-#### Scenario: 现成账号密码由系统自动提交
-- **WHEN** 登录协调器结构化确认登录表单已有可用账号密码并开始自动提交
-- **THEN** 环境 SHALL 显示 `登录中` 并归入 `启动中`
-- **AND** MUST NOT 显示 `需要处理` 或 `运行中`
+#### Scenario: 自动认证终止不得显示待命
 
-#### Scenario: 自动 TOTP 与页面过渡仍属于启动
-- **WHEN** 登录协调器自动获取、输入或提交 TOTP，或在有界预算内等待已确认登录动作后的页面过渡
-- **THEN** 环境 SHALL 保持 `登录中` 的启动状态且不要求用户介入
-
-#### Scenario: 人工等待恢复为自动登录
-- **WHEN** 环境先因账号密码未填入而进入人工等待，随后同一保留会话结构化观察到可自动执行的登录信号
-- **THEN** Electron SHALL 立即撤销旧人工提示并改为 `启动中 · 登录中`
-- **AND** MUST NOT 等待最终账号身份读取成功才离开 `需要处理`
-
-#### Scenario: 扫码或人工输入才需要处理
-- **WHEN** 平台明确要求用户输入账号密码、扫码、处理验证码或完成安全检查，且协调器无法自行继续
-- **THEN** 环境 SHALL 进入 `需要处理` 并保留具体人工动作原因
-
-#### Scenario: 自动认证终止不得显示离线
 - **WHEN** 自动登录协调器以当前操作代的结构化失败原因安全停手并导致核心退出
-- **THEN** 环境 SHALL 进入 `需要处理`，短状态显示 `异常` 并保留完整认证异常安全原因
-- **AND** MUST NOT 因自动化进程已停止或存在更早的绑定未确认状态而回落为普通 `离线`
-
-#### Scenario: 正常任务运行证据仍独立
-- **WHEN** 环境仅处于自动登录过程且尚未确立稳定账号身份或获得当前可执行任务证据
-- **THEN** 环境 MUST NOT 显示 `运行中` 或 `待任务`
+- **THEN** 环境 SHALL 进入 `需要处理`，短状态显示 `异常`，主区域在场文案显示登录认证异常并保留完整认证异常安全原因
+- **AND** MUST NOT 因自动化进程已停止而显示 `待命中` 或回落为普通 `离线`
 
 ### Requirement: Fleet UI SHALL expose the exact controlled Facebook manual-login state
 
@@ -796,4 +832,21 @@ The Electron supervisor SHALL accept a generation-scoped local auth-required not
 #### Scenario: Stable identity clears manual attention
 - **WHEN** the same core reports the existing stable account identity event
 - **THEN** Electron clears the manual-login reason and projects the normal authenticated startup state
+
+### Requirement: Fleet login state SHALL not demand attention during bounded authentication hydration
+
+The client SHALL keep a managed Facebook environment in the existing starting/login projection while saved-credential filling remains inside its 25-second window or an authentication checkpoint remains inside its 15-second structural hydration window. It MUST NOT emit or project `credential_fill_unavailable`, `unsupported_facebook_checkpoint`, `需要登录`, or terminal `异常` solely because the in-window document is incomplete. This state MUST NOT be promoted to `运行中` before stable identity and ordinary execution evidence exist.
+
+#### Scenario: Credential fill is still pending
+- **WHEN** the freshly started Facebook login document has empty fields but remains inside the 25-second managed credential-fill window
+- **THEN** the environment SHALL remain in `启动中` and MUST NOT appear under `需要处理`
+
+#### Scenario: Post-TOTP checkpoint is still hydrating
+- **WHEN** a confirmed automatic TOTP submission is followed by an incomplete checkpoint inside the 15-second hydration window
+- **THEN** the environment SHALL remain `启动中 · 登录中` without showing `异常` or requiring user intervention
+
+#### Scenario: Bounded wait ends without recovery
+- **WHEN** the relevant 25-second credential or 15-second checkpoint window expires and the coordinator reports the existing structured manual or terminal reason
+- **THEN** the client SHALL project the existing `需要处理` state with that safe reason
+- **AND** it MUST NOT report successful login, running work, or stable identity
 

@@ -1,3 +1,23 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: Cloud environment is selectable in client settings`
+- TO: `### Requirement: Cloud environment is selectable in the client login gate`
+
+- FROM: `### Requirement: Selection resolves cloud endpoint with UI-first precedence`
+- TO: `### Requirement: Deployment target resolves every official Cloud endpoint`
+
+- FROM: `### Requirement: Switching cloud takes effect only on explicit restart`
+- TO: `### Requirement: Switching deployment target requires a new authenticated session`
+
+- FROM: `### Requirement: Current cloud is always visible and matches actual connection`
+- TO: `### Requirement: Current deployment target and automation receipt are visible and honest`
+
+- FROM: `### Requirement: Switching to ol requires confirmation`
+- TO: `### Requirement: Switching to OL requires confirmation`
+
+- FROM: `### Requirement: Resolved cloud environment controls Facebook automatic browse mode`
+- TO: `### Requirement: Authenticated deployment target controls Facebook automatic browse mode`
+
 ## MODIFIED Requirements
 
 ### Requirement: Cloud environment is selectable in the client login gate

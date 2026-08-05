@@ -3,83 +3,6 @@
 ## Purpose
 TBD - created by archiving change edge-client-customer-auth. Update Purpose after archive.
 ## Requirements
-### Requirement: Startup login gate blocks cloud connect until authenticated
-
-edge 客户端启动时 MUST 先恢复并校验客户会话。仍有效的客户令牌 SHALL 按既有续签与客户范围校验继续启动；令牌本地过期或被服务端明确拒绝时，客户端 MUST 读取当前 `userData` 下由 `safeStorage` 加密保存的最近成功 `name + key`，并在主进程内自动登录至多一次。只有现有令牌或该次自动登录建立有效会话后，客户端才 SHALL 继续正常启动。无可用加密凭据或自动登录失败时，客户端 MUST 显示登录门，且 MUST NOT 建立已认证主界面、MUST NOT 启动任何环境子进程、MUST NOT 循环自动重试。
-
-#### Scenario: 有效令牌正常恢复
-
-- **WHEN** 客户端启动且持有仍有效、通过既有续签与范围校验的客户令牌
-- **THEN** 客户端继续正常启动，不额外提交保存的 `name + key`
-
-#### Scenario: 无效令牌以保存凭据自动恢复
-
-- **WHEN** 客户端启动时客户令牌已本地过期或被服务端明确拒绝，且当前实例存在可解密的最近成功 `name + key`
-- **THEN** 客户端在主进程内自动调用 `/login` 至多一次
-- **AND** 登录成功后保存新令牌、刷新该客户权威环境范围并进入主界面
-
-#### Scenario: 无凭据时登录门保持 fail-closed
-
-- **WHEN** 客户端启动时无有效客户令牌，且没有可用的加密登录凭据
-- **THEN** 显示登录门，且不建立已认证主界面、不启动任何环境
-
-#### Scenario: 自动登录失败不循环
-
-- **WHEN** 启动自动登录因凭据拒绝、限流或网络错误失败
-- **THEN** 客户端停止本次自动恢复并显示登录门
-- **AND** 本次应用启动不得再次自动提交保存凭据
-
-#### Scenario: 登录成功后正常启动
-
-- **WHEN** 客户在登录门以正确 name+key 手动登录成功
-- **THEN** 客户端保存令牌并进入主界面，按可见环境清单启动环境
-
-### Requirement: Login view is the only new/redesigned surface
-
-登录门 SHALL 是本次唯一新增/重做的界面,视觉为蓝灰简约风、与客户端现有浅色界面连续。其余现有界面(环境栏、主界面各功能区)MUST NOT 被重绘或改变结构。登录门 MUST 提供 name 与 key 两个输入(key 支持显隐切换)、明确的错误态文案(凭据错误 / 账户停用 / 网络错误)、以及无障碍与 `prefers-reduced-motion` 降级。
-
-#### Scenario: 只改登录页
-
-- **WHEN** 本变更落地后打开客户端各现有界面
-- **THEN** 除新增的登录门外,其余界面的样式与结构保持与变更前一致
-
-#### Scenario: 错误态给出可辨文案
-
-- **WHEN** 登录因凭据错误 / 账户停用 / 网络故障而失败
-- **THEN** 登录门显示对应的、面向客户的中文错误提示,而非静默或含糊报错
-
-### Requirement: Token persistence and session lifecycle
-
-登录成功的客户令牌 MUST 持久化于客户端 userData 目录(随 `AIDCP_USER_DATA_DIR` 多实例隔离)。客户端 SHALL 在令牌临近过期时静默续签；恢复已有会话启动时，若令牌将在首次定时维护前进入续签窗口，客户端 MUST 在主界面和环境启动流程继续前先尝试续签。登出或令牌失效时，客户端 MUST 停止所有环境并回到登录门，MUST NOT 因本地过期而静默跳过失效处理并保留已认证主界面。
-
-#### Scenario: 恢复的会话临近过期
-
-- **WHEN** 客户端启动时恢复到仍有效、但已进入续签窗口的客户令牌
-- **THEN** 客户端在主界面和环境启动流程继续前请求静默续签
-- **AND** 续签成功后持久化新令牌并继续正常启动
-
-#### Scenario: 定时维护发现本地令牌已过期
-
-- **WHEN** 客户鉴权已启用且定时维护发现本地客户令牌已经过期
-- **THEN** 客户端执行既有会话失效流程、停止所有环境并回到登录门
-- **AND** 客户端不得静默返回并保留已认证主界面
-
-#### Scenario: 受保护请求发现本地令牌已过期
-
-- **WHEN** 客户在两次定时维护之间发起受保护的客户内容请求且本地令牌已经过期
-- **THEN** 客户端立即执行既有会话失效流程并回到登录门
-- **AND** 请求如实返回会话已过期，不得只显示可重试的数据读取失败并保留陈旧主界面
-
-#### Scenario: 登出回到登录门
-
-- **WHEN** 客户在主界面点击登出
-- **THEN** 客户端清除本地令牌、停止所有环境、回到登录门
-
-#### Scenario: 令牌失效回到登录门
-
-- **WHEN** 客户端携带的令牌被服务端判为失效(过期/撤销/客户被停用)
-- **THEN** 客户端停止环境并回到登录门,提示需重新登录
-
 ### Requirement: Environment rail renders only the customer's environments
 
 登录后,客户端 MUST 用客户令牌向云端取该客户的可见环境清单,并以"云端清单 ∩ 本地花名册"为准渲染环境栏与启动环境。不属于当前客户的环境 MUST NOT 显示、MUST NOT 启动。环境栏 MUST 保持既有视觉与结构,仅其数据范围按登录客户收窄。
@@ -103,74 +26,104 @@ edge 客户端启动时 MUST 先恢复并校验客户会话。仍有效的客户
 - **WHEN** 客户 A 在登录态下新建一个环境
 - **THEN** 客户端向云端登记归属 A,该环境随即出现在 A 的环境栏
 
-### Requirement: Login credential prefill is local and clearable
+### Requirement: Startup login gate blocks Cloud connect until target-scoped authentication
 
-登录成功后，客户端 SHALL 在当前实例的 `userData` 范围内保存账户名与访问密钥的加密副本，并在后续登录门打开时回填两个输入框或按启动恢复契约自动登录一次。访问密钥 MUST NOT 以明文写入本地存储、session 文件、日志、renderer、协议或云端；加密能力不可用时 MUST 不写明文回退且不阻断正常登录。客户令牌失效 SHALL 只清除 session 并保留加密凭据；客户显式退出或启动自动登录收到明确凭据拒绝时 MUST 清除 session 与加密凭据。
+Edge 客户端启动时 MUST 先恢复部署目标并校验同目标客户会话。仍有效且 `deploymentTarget` 匹配的客户令牌 SHALL 按既有续签与客户范围校验继续启动；令牌缺少目标、本地过期、目标不匹配或被服务端明确拒绝时，客户端 MUST 保持所有环境停止。只有目标匹配的现有令牌或一次同目标自动登录建立有效会话后，客户端才 SHALL 建立主界面和自动化连接。无可用同目标加密凭据或自动登录失败时，客户端 MUST 显示登录门且不得循环自动重试。
 
-#### Scenario: 成功登录后下次自动恢复
+#### Scenario: Matching target session restores
 
-- **WHEN** 客户使用有效账户名和访问密钥登录成功，随后在客户令牌无效时重新启动客户端
-- **THEN** 主进程从当前实例的加密记忆读取凭据并按启动恢复契约自动登录一次
-- **AND** 凭据明文不发送给 renderer、不写入日志
+- **WHEN** 客户端选择 DEV 且持有通过 DEV 续签与范围校验的 DEV 令牌
+- **THEN** 客户端继续正常启动，不额外提交保存的凭据
 
-#### Scenario: 网络或限流失败保留回填
+#### Scenario: Legacy or mismatched session fails closed
 
-- **WHEN** 启动自动登录因网络错误或 429 限流失败
-- **THEN** 客户端保留加密凭据并在登录门回填，供客户稍后手动重试
+- **WHEN** 保存令牌缺少部署目标或其目标与当前选择不一致
+- **THEN** 客户端清除该短期会话并显示登录门，不建立主界面或启动环境
 
-#### Scenario: 明确凭据拒绝清除记忆
+#### Scenario: Matching saved credentials restore once
 
-- **WHEN** 启动自动登录收到 `/login` 的统一凭据拒绝
-- **THEN** 客户端清除旧 session 与本地加密凭据，后续启动不得继续自动提交该旧 key
+- **WHEN** 当前目标没有有效令牌但存在同目标可解密的最近成功凭据
+- **THEN** 客户端在主进程内向该目标 `/login` 自动提交至多一次
+- **AND** 成功后保存带目标的新令牌并刷新该目标环境范围
 
-#### Scenario: 用户手动清空后不再回填
+#### Scenario: Automatic login failure does not loop
 
-- **WHEN** 客户在登录页把账户名或访问密钥输入框清空
-- **THEN** 客户端立即删除本地记忆，后续打开登录门不得回填旧凭据
+- **WHEN** 同目标自动登录因凭据拒绝、限流或网络错误失败
+- **THEN** 客户端显示带当前目标的登录门，且本次启动不得再次自动提交
 
-#### Scenario: 退出登录清除凭据记忆
+### Requirement: Login view selects target and credentials without exposing URLs
 
-- **WHEN** 客户显式退出登录
-- **THEN** 客户端清除本地令牌与凭据记忆，重新打开或再次启动时保持未登录
+登录门 SHALL 延续现有蓝灰简约视觉，提供 DEV/OL 目标选择、name、key、目标化登录按钮、明确错误态与无障碍降级。DEV SHALL 明示测试环境，OL SHALL 明示正式环境。登录 renderer 只能提交目标枚举与凭据，MUST NOT 接收或提交 Cloud URL、token、环境归属或任意请求配置。除主界面的目标状态/切换入口外，其余现有功能区 MUST NOT 被重绘。
 
-#### Scenario: 令牌失效保留加密凭据
+#### Scenario: Login clearly names the target
 
-- **WHEN** 短期客户令牌在运行期本地过期、续签被拒或受保护请求返回 401
-- **THEN** 客户端停止环境并回到登录门，同时保留 `safeStorage` 加密凭据供手动登录或下次启动的一次自动恢复
+- **WHEN** 客户在登录门选择 DEV 或 OL
+- **THEN** 选择器与提交按钮清楚显示“测试环境 DEV”或“正式环境 OL”
 
-### Requirement: Edge client login gate activation
+#### Scenario: Login renderer cannot provide endpoints
 
-The edge desktop client SHALL enable the customer login gate whenever it can
-resolve a customer-auth base URL. Explicit full URLs from
-`AIDCP_CLIENT_AUTH_URL` or persisted `clientAuthUrl` SHALL take precedence over
-baked package metadata. Baked package metadata SHALL take precedence over
-environment defaults.
+- **WHEN** 登录 renderer 发起登录
+- **THEN** IPC 仅接受 `deploymentTarget`, `name`, `key` 的冻结形状，主进程自行解析端点
 
-When no explicit or baked customer-auth URL is present, the client SHALL resolve
-the default customer-auth URL from the resolved cloud environment key. The
-official `dev` and `ol` cloud environments SHALL both have default customer-auth
-URLs and therefore SHALL require customer login by default.
+#### Scenario: Target persistence failure is visible
 
-#### Scenario: dev starts with customer login by default
+- **WHEN** 客户选择的目标无法写入当前 `userData`
+- **THEN** 登录门显示环境设置未保存且不提交凭据
 
-- **WHEN** the desktop client starts with the resolved cloud environment `dev`
-  and no explicit customer-auth URL override
-- **THEN** the client resolves `http://121.89.85.150:8088/capi` as the
-  customer-auth base URL
-- **AND** the login gate is enabled before the main window can proceed
+### Requirement: Token persistence and session lifecycle are target-scoped
 
-#### Scenario: ol starts with customer login by default
+客户令牌 MUST 在当前 `userData` 内与 `deploymentTarget` 一起持久化。客户端 SHALL 仅向令牌所属目标续签和发送受保护请求。显式退出、目标切换、目标不匹配或令牌失效时，客户端 MUST 停止所有环境、清除该会话与目标权威投影并回到登录门；目标切换 MUST NOT 保留旧目标令牌供新目标尝试。
 
-- **WHEN** the desktop client starts with the resolved cloud environment `ol`
-  and no explicit customer-auth URL override
-- **THEN** the client resolves `https://aidcp.tommax.cc/capi` as the
-  customer-auth base URL
-- **AND** the login gate is enabled before the main window can proceed
+#### Scenario: Refresh uses token target
 
-#### Scenario: explicit customer-auth URL still wins
+- **WHEN** OL 令牌进入续签窗口
+- **THEN** 客户端只向 OL customer-auth 请求续签，且当前目标不是 OL 时不发送该令牌
 
-- **WHEN** the desktop client is started with `AIDCP_CLIENT_AUTH_URL` or a
-  persisted full `clientAuthUrl`
-- **THEN** that full URL is used as the customer-auth base URL
-- **AND** the dev/ol default URL mapping does not override it
+#### Scenario: Target switch clears authority
+
+- **WHEN** 已登录客户请求切换部署目标
+- **THEN** 客户端停止环境并清除 token、可见环境、平台/绑定投影和客户范围排除状态后返回登录门
+
+#### Scenario: Token rejection retains only same-target credential memory
+
+- **WHEN** 受保护请求明确拒绝当前目标令牌
+- **THEN** 客户端清除 session、停止环境并返回同目标登录门，且只可回填同目标加密凭据
+
+### Requirement: Login credential prefill is encrypted and target-scoped
+
+登录成功后，客户端 SHALL 在当前实例保存包含 `deploymentTarget`, name 与 key 的加密凭据记录。只可在记录目标等于登录门当前目标时回填或自动登录；目标切换 SHALL 清除旧目标回填，MUST NOT 将凭据静默复制到新目标。访问密钥 MUST NOT 明文落盘、日志、renderer、协议或 Cloud。
+
+#### Scenario: Same-target prefill
+
+- **WHEN** 客户在 DEV 成功登录后回到仍选择 DEV 的登录门
+- **THEN** 客户端可回填 DEV 加密凭据或按启动契约自动登录一次
+
+#### Scenario: Cross-target prefill is forbidden
+
+- **WHEN** 保存凭据属于 OL 而登录门当前选择 DEV
+- **THEN** 客户端不回填、不自动提交并清除旧目标凭据记忆
+
+#### Scenario: Legacy prefill has no target
+
+- **WHEN** 升级后读取到不含目标的旧加密凭据
+- **THEN** 客户端不提交该凭据并要求客户重新登录一次
+
+### Requirement: Edge client login gate activation follows the official target catalog
+
+桌面客户端 SHALL 始终为官方 DEV/OL 目标启用客户登录门，并仅从主进程目标目录解析 customer-auth base URL。旧 `AIDCP_CLIENT_AUTH_URL`、持久化 `clientAuthUrl` 或 `aidcpClientAuthUrl` 构建元数据 MUST NOT 成为官方会话的活动路由。目标目录缺失任一端点时启动 MUST fail closed，不得关闭登录门或从另一个目标借用地址。
+
+#### Scenario: DEV login gate uses DEV catalog
+
+- **WHEN** 当前目标为 DEV
+- **THEN** 登录门启用且登录、续签和客户数据请求使用 DEV customer-auth base
+
+#### Scenario: OL login gate uses OL catalog
+
+- **WHEN** 当前目标为 OL
+- **THEN** 登录门启用且登录、续签和客户数据请求使用 OL customer-auth base
+
+#### Scenario: Catalog entry is incomplete
+
+- **WHEN** 当前官方目标无法同时解析 customer-auth 与 automation 端点
+- **THEN** 客户端显示配置错误并保持所有环境停止，MUST NOT 回退到旧绝对 URL
 

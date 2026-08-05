@@ -3595,3 +3595,82 @@ change `stop-automation-only-on-authorization-loss`（edge master `e903cf7`）�
       （既有不变量：登录与 roster 刷新不得自动启动引擎），仍由用户显式点启动。
 - [ ] 131.7 导入号本身卡 Facebook 验证 / 需改密（环境名被改成 `checkpoint` / `password` 那批）
       仍然只能人工过 FB 那一关——它与本 change 无关，别把它读成同一个故障。
+
+---
+
+## 簇 132 · 第六次「分诊清账」批带出的真机面（2026-08-05）
+
+**规模**：28 个 ✓Complete → 全部归档，零暂缓。沙箱演练 28/28 无
+`failed for header` / `Aborted`；真跑同样零失败；全库 `validate --specs --all --strict`
+**214 项 0 失败**。活跃 change 49 → 21，已合并 spec 191 → 193（新建两份：
+`client-facebook-slow-start-progress` / `edge-bundled-ads-runtime`）。
+
+**本簇的性质与前几批不同，读之前先看清楚：**
+
+这 28 个 change 的 tasks **一条未勾项都没有** —— 也就是说，实装方认为自己做完了。
+但**没有一条把真机项登记到本文件**（28 个里只有 1 个曾被点名）。
+而它们改的东西**几乎全是只有真机才看得见的**：Reels 浏览与导航、桌面客户端的登录门 /
+认证态迁移 / 浏览器生命周期、慢启动进度展示、法语等语种的控件识别。
+
+**所以本簇的正确读法是**：
+> **「任务勾完」= 代码落地 + 已部署；它不等于「在真机上验过」。**
+> 本簇条目至今**无人系统验证**，除非用户的日常测试恰好覆盖到了
+> （按 2026-07-30 裁定，真机验收已改为由日常测试逐步覆盖，而日常覆盖是**不均匀**的）。
+
+**按前置聚成四组**，解掉前置就能一次覆盖一组：
+
+### 132-A · Facebook Reels 浏览与导航（前置：一台在线边缘 + 一个能进 Reels 的 FB 账号）
+
+- [ ] 132.1 Reels 入口就绪窗口 / 身份注水窗口延长后，冷启动进 Reels **不再**因等待不足而空跑
+      （`extend-facebook-reels-entry-readiness-window` / `extend-facebook-reels-identity-hydration-window`）
+- [ ] 132.2 主浏览面配置为 Reels 时，走的是**已验证的那条入口路径**，不是另起一条
+      （`fix-native-facebook-primary-reels-routing`）
+- [ ] 132.3 Reels 滚动只认「规范 noteId 变了」作为前进证据；媒体 URL / DOM 元素 / 控件结构变化
+      **不得**被当成成功（`remove-facebook-reels-video-key` / `restore-facebook-reels-probe-first-continuity`）
+- [ ] 132.4 匿名态进 Reels（未登录 / 身份未注水）能拿到规范身份后再上报，且只上报一次
+      （`support-facebook-reels-anonymous-entry`）
+- [ ] 132.5 Reels 与 feed 的节奏放慢后，观感与配额都对得上（`slow-facebook-feed-reels-pacing`）
+- [ ] 132.6 法语界面下 Reels 控件能被认出（`recognize-facebook-french-reel-controls`）
+- [ ] 132.7 Reels 点赞的慢启动节奏（`add-facebook-slow-start-reel-like-cadence`）
+- [ ] 132.8 帖子任务与浏览的续跑衔接（`unify-facebook-post-task-browse-resume`）
+- [ ] 132.9 Reels 动作校验与浏览解耦后，校验失败不再连带打断浏览
+      （`decouple-facebook-reel-action-verification`）
+
+### 132-B · 桌面客户端登录门与部署目标（前置：**Edge 安装包**，这是本组的硬门槛）
+
+- [ ] 132.10 登录门里选 DEV/OL，登录后**数据口与自动化口都跟着走**，不再混连
+      （`unify-edge-login-and-runtime-deployment-target`，BREAKING）
+- [ ] 132.11 旧的无目标会话**失败关闭**、要求重新登录一次；旧的绝对 URL 覆盖不再生效
+- [ ] 132.12 已认证目标与自动化实连目标**分开显示**，engine 确认前不混为一谈
+- [ ] 132.13 客户端子进程生命周期修复后，反复启停不留僵尸（`repair-edge-child-spawn-lifecycle`）
+- [ ] 132.14 自包含指纹浏览器运行时随包分发，免装桌面客户端也能起
+      （`self-contained-ads-runtime`，新 spec `edge-bundled-ads-runtime`）
+
+### 132-C · Facebook 认证态与浏览器生命周期（前置：一个真会卡验证 / 会被封的 FB 账号）
+
+- [ ] 132.15 启动期认证时关掉浏览器，不留占用（`close-facebook-browser-during-startup-auth`）
+- [ ] 132.16 认证态迁移期间的注水稳定（`stabilize-facebook-auth-transition-hydration`）
+- [ ] 132.17 登录后各种提示弹窗被正确处理（`handle-facebook-post-login-prompts`）
+- [ ] 132.18 认证**终态**被尊重：判死就不再重试（`honor-facebook-auth-terminal-state`）
+- [ ] 132.19 封号申诉能真的发起（`start-facebook-suspension-appeal`）
+- [ ] 132.20 页面就绪探测统一后，各处等待口径一致（`unify-facebook-page-readiness-probe`）
+
+### 132-D · 后台 / 客户端展示与归属（前置：管理后台 + 一台装了客户端的机器）
+
+- [ ] 132.21 独占浏览器窗口切换：选中与「把浏览器调到前台」是**两个动作**
+      （`exclusive-browser-window-switching`）
+- [ ] 132.22 环境改名与账号改名各自成败、互不牵连（`decouple-environment-and-account-rename`）
+- [ ] 132.23 已删除的客户环境不再出现在归属里（`hide-deleted-client-environments-from-ownership`）
+- [ ] 132.24 慢启动进度的展示：活跃 / 非活跃两种态各自该显示什么
+      （`configure-facebook-slow-start-progress` / `hide-facebook-active-runtime-guidance` /
+      `hide-inactive-facebook-slow-start-guidance`，新 spec `client-facebook-slow-start-progress`）
+- [ ] 132.25 配额与养号输入接进风控判定后，判定结果与后台展示一致
+      （`restore-automation-risk-quota-inputs`）
+
+### 归档时做过的一处 spec 修正（记录备查）
+
+`unify-edge-login-and-runtime-deployment-target` 的两份 delta 少写了 `## RENAMED Requirements` 段：
+它把 `edge-client-login-gate` 5 条、`edge-cloud-env-selection` 6 条需求**有意改了名**
+（cloud-env → deployment-target），而 `MODIFIED` 按 header 逐字匹配、跟不上。
+归档前逐条比对确认是**改名 + 重写正文**（不是建模错位）后前置了 RENAMED 段，随后干净合入。
+`validate --strict` 对这类**一条都查不出**——它只校验 delta 内部结构。

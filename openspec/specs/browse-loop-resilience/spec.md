@@ -409,3 +409,37 @@ Native MUST NOT merely because this recovery control exists activate the browser
 - **THEN** Edge 不重复点击、不改点其他控件
 - **AND** 按是否已经发出 CDP 点击分别报告未开始或结果不明
 
+### Requirement: Terminal Reels scroll outcomes continue through normal admission
+When a confirmed Facebook Reels session receives a terminal failed scroll receipt whose reason is Reels-specific, Cloud SHALL request one next scroll without waiting for the generic idle watchdog. The continuation MUST pass the existing view-quota, session, soft-pause, interaction-hold, command-dedupe, and dwell gates. It MUST NOT count a view, create interaction cadence, create retry debt, or bypass normal pacing solely because the prior scroll failed.
+
+#### Scenario: Reels navigation is unconfirmed
+- **WHEN** Edge reports `action.completed{action:'scroll', ok:false, reason:'reels_navigation_unconfirmed'}` in a confirmed Reels session
+- **THEN** Cloud SHALL issue one normally admitted continuation scroll and SHALL NOT wait for the idle watchdog
+
+#### Scenario: Reels identity remains unresolved
+- **WHEN** Edge reports `reels_identity_unresolved` or `reels_target_unavailable` in a confirmed Reels session
+- **THEN** Cloud SHALL issue one normally admitted continuation scroll without creating a view or interaction opportunity
+
+#### Scenario: Existing admission gate suppresses continuation
+- **WHEN** the continuation is rejected by view quota, soft pause, interaction hold, session end, or command dedupe
+- **THEN** Cloud SHALL preserve that gate's existing recovery or terminal behavior and SHALL NOT create a bypass timer or debt
+
+### Requirement: Reels keyboard-probe learning advances only through normal continuation
+The Edge Reels key preference SHALL affect only which single key a normally admitted `page.scroll` dispatches. An unconfirmed or identity-unresolved key delivery MAY select the alternate key for the next command, and canonical progress MAY retain the successful key, but neither result SHALL create an immediate retry, bypass dwell or risk admission, consume a view, or disable later commands. Cloud SHALL continue to own whether and when another command is admitted.
+
+#### Scenario: Unconfirmed probe waits for normal admission
+- **WHEN** Edge emits `reels_navigation_unconfirmed` after delivering one preferred key
+- **THEN** no second key SHALL run in that command and the alternate key SHALL run only if Cloud later admits another scroll normally
+
+#### Scenario: Identity-unresolved probe waits for normal admission
+- **WHEN** Edge emits `reels_identity_unresolved` after delivering one preferred key
+- **THEN** Edge SHALL emit no card or view and SHALL wait for Cloud's ordinary continuation path before trying the alternate key
+
+#### Scenario: Confirmed key remains a soft preference
+- **WHEN** one probe produces a canonical Reel and its key is retained
+- **THEN** the retained key SHALL still run only after the next command passes existing session, quota, soft-pause, interaction-hold, dedupe, dwell, cancellation, and deadline gates
+
+#### Scenario: Admission suppression performs no new input
+- **WHEN** quota, pause, hold, session end, command dedupe, cancellation, or deadline suppresses the next command
+- **THEN** the key preference SHALL create no timer, retry debt, bypass command, or trusted input
+

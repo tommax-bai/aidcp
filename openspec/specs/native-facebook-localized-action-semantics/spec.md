@@ -19,7 +19,7 @@ The Edge repository SHALL maintain focused executable evidence comparing each Na
 
 ### Requirement: Native Facebook reaction vocabulary has one shared owner
 
-The Native Facebook router SHALL maintain the observed zh-CN, zh-TW, English, Spanish, and Vietnamese Like/reaction label families in one capability-neutral internal semantics module assembled before Feed Like and Reels. Feed Like and Reels MUST consume that shared vocabulary and positive-state classifier, while the shared module MUST NOT own card identity, active-video association, action-rail geometry, target uniqueness, actuation, or verification choreography. Production TypeScript, caller input, and package resources MUST NOT supply or override the vocabulary.
+The Native Facebook router SHALL maintain the observed zh-CN, zh-TW, English, Spanish, Vietnamese, and French Like/reaction label families in one capability-neutral internal semantics module assembled before Feed Like and Reels. Feed Like and Reels MUST consume that shared vocabulary and positive-state classifier, while the shared module MUST NOT own card identity, active-video association, action-rail geometry, target uniqueness, actuation, or verification choreography. Production TypeScript, caller input, and package resources MUST NOT supply or override the vocabulary.
 
 #### Scenario: Bare simplified-Chinese Reel Like with count is accepted
 
@@ -28,8 +28,13 @@ The Native Facebook router SHALL maintain the observed zh-CN, zh-TW, English, Sp
 
 #### Scenario: Retained Like locales use the same Reel evidence
 
-- **WHEN** an otherwise identical primary control uses a retained zh-TW, English, Spanish, or Vietnamese Like label
+- **WHEN** an otherwise identical primary control uses a retained zh-TW, English, Spanish, Vietnamese, or French Like label
 - **THEN** Reels applies the same geometry, uniqueness, commit-count, and same-target verification requirements
+
+#### Scenario: French Reel Like is recognized exactly
+
+- **WHEN** the canonical active Reel has exactly one geometrically associated right-rail control labeled `J’aime` or `J'aime`
+- **THEN** Reels classifies it as the neutral Like target without matching unrelated French free text
 
 #### Scenario: Numeric Feed summary remains a decoy
 
@@ -40,6 +45,11 @@ The Native Facebook router SHALL maintain the observed zh-CN, zh-TW, English, Sp
 
 - **WHEN** the resolved Reel control still exposes only its neutral label and numeric count after activation
 - **THEN** verification remains unconfirmed until the same marked control exposes an established selected attribute or remove/unlike witness
+
+#### Scenario: French reaction picker preserves positive verification
+
+- **WHEN** a neutral French Reel Like activation opens a unique associated reaction picker
+- **THEN** only the exact `J’aime` picker item is eligible for the bounded fallback commit and success still requires a fresh positive selected-state witness on the marked Reel control
 
 ### Requirement: Native Facebook Publish preserves navigation and composer selection stages
 
@@ -126,3 +136,4 @@ An action label outside the evidence-backed Native vocabulary MUST remain a trut
 
 - **WHEN** Native cannot establish an exact capability-owned target from the supported vocabulary and structural evidence
 - **THEN** no generic selector or LLM authorizes a replacement click and the command remains non-success
+

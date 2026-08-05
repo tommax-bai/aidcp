@@ -4,98 +4,66 @@
 TBD - created by archiving change repair-native-facebook-reels-scroll. Update Purpose after archive.
 ## Requirements
 ### Requirement: Native Facebook Reels scrolling uses a surface-specific trusted actuator
+When the Native-only Facebook runtime receives `page.scroll` on an exact Reels surface, Edge SHALL freshly verify explicit keyboard safety plus cancellation and deadline gates, then dispatch exactly one trusted CDP key selected by a non-blocking session preference. A new session SHALL prefer ArrowRight. After a delivered key lacks canonical progress, the next normally admitted command SHALL prefer the other key; after canonical progress, the successful key SHALL remain preferred. Active-video uniqueness, canonical pre-identity, next-control structure, disabled or occluded controls, and a resolved navigation axis MUST NOT be prerequisites for this reversible probe. Edge MUST NOT dispatch wheel input, click a navigation control, try both keys, or perform a second write within the command.
 
-When the Native-only Facebook runtime receives `page.scroll` while the observed list surface is Reels, the Edge SHALL resolve exactly one active video independently from canonical Reel identity and SHALL resolve exactly one structural navigation axis before dispatch. A vertical layout SHALL use bounded trusted CDP input in this order: ArrowDown, one small wheel over the freshly active video, then one geometrically constrained vertical next-button click. A horizontal layout SHALL use ArrowRight and then one geometrically constrained horizontal next-button click. The axis-specific keyboard input SHALL remain the first write when fresh structure proves one axis and the router explicitly reports the forward control as geometry-only pointer-unsafe. A missing, ambiguous, disabled, or occluded forward control MUST remain pre-dispatch. It MUST NOT use document `window.scrollBy`, a horizontal wheel guess, or both keyboard axes in one command. Before each fallback write, the Edge MUST freshly re-probe the active video and axis so late movement suppresses the next input.
+#### Scenario: Axisless live shape receives the first probe
+- **WHEN** an exact `/reel/` page is explicitly keyboard-safe but a disabled `Next items` control and an active `Next Card` overlay do not yield one structural axis
+- **THEN** a new session SHALL dispatch exactly one ArrowRight gesture and no wheel or pointer input
 
-#### Scenario: Anonymous landing Reel advances vertically
+#### Scenario: Unconfirmed first probe selects the other key later
+- **WHEN** the first delivered ArrowRight does not produce canonical progress and Cloud later admits another scroll command normally
+- **THEN** Edge SHALL dispatch exactly one ArrowDown gesture for the later command
 
-- **WHEN** `/reel/` has one active video without `noteId`, a vertical rail is uniquely resolved, and trusted ArrowDown changes to a different active video with canonical identity
-- **THEN** the Edge reports the newly active Reel and does not dispatch wheel or button input
+#### Scenario: Confirmed direction remains preferred
+- **WHEN** a delivered probe produces a canonically confirmed next Reel
+- **THEN** Edge SHALL retain that probe key as the preference for a later normally admitted scroll
 
-#### Scenario: Identified Reel advances horizontally
+#### Scenario: Missing active-video structure does not veto a probe
+- **WHEN** the exact Reels surface is keyboard-safe but zero or multiple videos satisfy the active-card heuristic
+- **THEN** Edge SHALL still dispatch the one preferred key and SHALL report no card unless bounded post-observation resolves one canonical active Reel
 
-- **WHEN** one identified active Reel and a horizontal rail are uniquely resolved and trusted ArrowRight changes its stable identity
-- **THEN** the Edge reports the newly active Reel and does not dispatch wheel or button input
-
-#### Scenario: Axis-only horizontal evidence advances by keyboard
-
-- **WHEN** viewport-normalized structure uniquely proves a horizontal rail but its forward overlay is not eligible for a pointer fallback
-- **THEN** the Edge dispatches trusted ArrowRight as the first and only initial write
-- **AND** it reports success only if the active-video transition and canonical next identity are proven
-
-#### Scenario: Disabled forward control dispatches nothing
-
-- **WHEN** the router reports a structurally related but disabled forward control
-- **THEN** the Edge returns a pre-dispatch failure and emits no keyboard, wheel, or pointer input
-
-#### Scenario: Occluded forward control dispatches nothing
-
-- **WHEN** the router cannot prove that the forward control is topmost at its center point
-- **THEN** the Edge returns a pre-dispatch failure and emits no keyboard, wheel, or pointer input
-
-#### Scenario: Vertical keyboard is unchanged and wheel advances
-
-- **WHEN** ArrowDown leaves the vertical Reel unchanged but one wheel over the freshly resolved active video changes its stable identity
-- **THEN** the Edge reports the newly active Reel and does not click the next button
-
-#### Scenario: Late movement suppresses a fallback write
-
-- **WHEN** the active video changes after a prior attempt but before the next fallback input is committed
-- **THEN** the fresh pre-commit probe accepts that transition, verifies canonical identity, and does not dispatch the fallback input
+#### Scenario: Stable safety gate blocks all input
+- **WHEN** focus is editable, login/captcha/consent evidence is present, the route is not Reels, the command is cancelled, or its deadline cannot contain the trusted input
+- **THEN** Edge SHALL dispatch no keyboard, wheel, or pointer input
 
 ### Requirement: Reels progress requires stable identity change
+Edge SHALL use canonical `noteId` as the only reportable Reel identity. A Reel card or interaction target requires an exact canonical Facebook Reel URL freshly associated with one active video, but that association SHALL be a reporting or irreversible-target postcondition rather than a reversible keyboard precondition. For an anonymous pre-state, navigation success requires a canonical post-state `noteId`; for an identified pre-state, success requires a different canonical post-state `noteId`. Document scroll, input delivery, coordinates, control state, media URLs or segments, DOM replacement, and keyboard preference MUST NOT independently prove progress.
 
-The Edge SHALL structurally identify the active Reels target by a unique visible `videoKey`; a canonical `noteId + videoKey` pair is required before that target may be reported as a Reel card or used for any interaction. For an anonymous pre-state, navigation success requires both a different active `videoKey` and a canonical post-state `noteId`. For an identified pre-state, success requires a canonical post-state whose `noteId` or `videoKey` differs. Document `scrollY`, command receipt, input dispatch, route hydration onto an unchanged anonymous video, and unchanged cards MUST NOT independently prove progress.
+#### Scenario: Anonymous surface is probeable but not reportable
+- **WHEN** `/reel/` is keyboard-safe but no unique canonical active Reel can be resolved before input
+- **THEN** Edge MAY dispatch the one trusted probe but MUST NOT emit a pre-state card, count a view, or authorize an interaction
 
-#### Scenario: Anonymous active video is targetable but not reportable
+#### Scenario: Canonical active identity appears after input
+- **WHEN** bounded post-observation resolves one canonical active Reel satisfying the anonymous or identified transition rule
+- **THEN** Edge SHALL report one fresh Reels card batch for that canonical post-state
 
-- **WHEN** `/reel/` has exactly one visible active video and no canonical Reel permalink or route id
-- **THEN** Edge may bind navigation to its session-local `videoKey` and rectangle
-- **AND** Edge MUST NOT emit a card, count a view, or authorize an interaction for it
-
-#### Scenario: Anonymous route gains id without changing video
-
-- **WHEN** an anonymous pre-state gains a canonical route id but retains the same active `videoKey`
-- **THEN** Edge MUST NOT claim that the requested forward navigation succeeded
-
-#### Scenario: Document scroll position changes without Reel identity movement
-
-- **WHEN** a Reels input changes document scroll position but the active video identity remains unchanged
-- **THEN** the Edge does not report new `page.cards`
-
-#### Scenario: Active video and canonical identity change
-
-- **WHEN** the freshly probed active Reel satisfies the applicable anonymous or identified transition rule
-- **THEN** the Edge reports one fresh Reels card batch derived from the moved-to active Reel
+#### Scenario: Implementation structure changes without canonical progress
+- **WHEN** video selection, controls, coordinates, media segments, or DOM elements change while canonical `noteId` is absent or unchanged
+- **THEN** Edge SHALL NOT report a new Reel or count a view
 
 #### Scenario: Route identity has no matching permalink-bearing article
-
-- **WHEN** a `/reel/<id>` page has one active video whose bounded container contains only repeated `/reel/hashtag/` navigation links and no `article` or current-Reel permalink
-- **THEN** the Edge binds the canonical route `noteId` to that active-video container, excludes the hashtag routes as post identities, and reports exactly one current Reels card
+- **WHEN** a `/reel/<id>` page has one active video whose bounded container contains only repeated `/reel/hashtag/` navigation links and no current-Reel permalink
+- **THEN** Edge SHALL bind the exact canonical route `noteId` to that active video, exclude discovery routes, and report exactly one current Reels card
 
 ### Requirement: Reels no-change terminates honestly
+If stable surface, keyboard-safety, cancellation, or deadline admission fails, Edge SHALL terminate before keyboard input and emit no cards. An ordinary scroll with no earlier write SHALL report `effectPhase:not_started`; a Reels-entry command that already dispatched route navigation SHALL retain an honest ambiguous phase. If its one trusted key was delivered but no eligible canonical post-state appears within bounded observation, Edge SHALL emit one failed scroll receipt with an ambiguous effect phase and no cards. The result SHALL update only the non-blocking key preference after actual keyboard input and MUST NOT create a pending latch, disable a later command, or trigger another write in the same command.
 
-If the Reels surface has no unique active video or no unambiguous navigation axis, the Edge SHALL fail before input with `effectPhase:not_started` and SHALL NOT emit a normal `page.cards` result. If any trusted input was dispatched but all permitted methods complete without a canonical post-transition Reel, the Edge SHALL emit one failed scroll receipt with an ambiguous effect phase and SHALL NOT emit normal cards. Either terminal MUST stop the current decision cycle instead of triggering an unbounded high-rate scroll loop.
+#### Scenario: Canonical identity remains unchanged
+- **WHEN** the one trusted key is delivered and the canonical active `noteId` remains unchanged through bounded observation
+- **THEN** Edge SHALL emit `reels_navigation_unconfirmed` with ambiguous effect, emit no card, and prefer the other key for the next admitted command
 
-#### Scenario: Active Reel is missing or ambiguous
+#### Scenario: Canonical identity remains absent
+- **WHEN** the one trusted key is delivered and no canonical active `noteId` appears through bounded observation
+- **THEN** Edge SHALL emit `reels_identity_unresolved` with ambiguous effect, emit no card, and dispatch no further input in that command
 
-- **WHEN** zero or multiple videos are equally eligible as the active Reel
-- **THEN** the Edge fails closed before input with `not_started/no_target` and emits no fabricated progress
+#### Scenario: Unsafe context fails before input
+- **WHEN** a fresh explicit keyboard-safety or lifecycle gate fails
+- **THEN** Edge SHALL perform zero keyboard input and leave the key preference unchanged
+- **AND** its effect phase SHALL remain not-started unless Reels entry already dispatched route navigation
 
-#### Scenario: Navigation axis is ambiguous
-
-- **WHEN** one active video exists but vertical and horizontal control evidence is absent or ambiguous
-- **THEN** the Edge dispatches no input and returns one pre-dispatch failure
-
-#### Scenario: All axis-specific methods leave the Reel unchanged
-
-- **WHEN** the driver dispatches all permitted methods for the resolved axis and no canonical post-transition Reel is proven
-- **THEN** the Edge emits one failed `action.completed{action:'scroll'}` with an ambiguous effect phase and emits no `page.cards`
-
-#### Scenario: Video changes but canonical identity remains absent
-
-- **WHEN** a trusted input changes the active `videoKey` but no canonical `noteId` appears within the bounded verification window
-- **THEN** the Edge emits one ambiguous `reels_identity_unresolved` scroll receipt and dispatches no further input
+#### Scenario: Later command is never latched off
+- **WHEN** Cloud sends another scroll after any terminal Reels outcome
+- **THEN** Edge SHALL evaluate it from fresh stable safety facts and SHALL NOT consult active-video, axis, or pending-transition state as an eligibility gate
 
 ### Requirement: Ordinary Facebook Feed scrolling remains separate
 

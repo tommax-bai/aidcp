@@ -4,21 +4,20 @@
 TBD - created by archiving change facebook-empty-feed-reels-fallback. Update Purpose after archive.
 ## Requirements
 ### Requirement: Facebook Reels identifies exactly one active video card
+Edge SHALL distinguish a keyboard-probeable Reels surface from a reportable or interactable Reel card. An exact `/reel/` or `/reels/` surface with explicit keyboard safety MAY receive one trusted navigation probe without a unique active video or canonical identity. Edge SHALL emit a Reel card or authorize an irreversible interaction only when it freshly resolves exactly one active video and binds that video to a canonical Facebook `/reel/<id>` identity. Missing or ambiguous active video, off-route observations, and identity-changing reads MUST fail closed for reporting and irreversible actions, but active-video structure MUST NOT veto reversible keyboard probing.
 
-Edge SHALL distinguish a structurally targetable active video from a reportable Reel card. On `/reel/` or `/reels/`, Edge MAY resolve one unique visible video by greatest viewport intersection, using viewport-center distance only as a tie-breaker, and bind it to a session-local `videoKey` for navigation even when canonical identity is absent. Edge SHALL emit a Reel card only when that same active video is bound to a canonical Facebook `/reel/<id>` identity; the canonical Reel URL SHALL be the card and note identity. Missing or ambiguous active video, off-route observations, and identity-changing reads MUST fail closed and MUST NOT fabricate a card.
-
-#### Scenario: Current Reel wins over preloaded neighbours
+#### Scenario: Current Reel wins over preloaded neighbours for reporting
 - **WHEN** previous, current, and next videos coexist in the DOM
-- **THEN** Edge resolves only the video with the greatest current viewport intersection
-- **AND** it reports that video only if a canonical current Reel identity is available
+- **THEN** Edge SHALL report only a uniquely resolved current video with canonical identity
+- **AND** failure to make that selection SHALL emit no card without disabling an otherwise safe keyboard probe
 
-#### Scenario: Anonymous Reel landing is navigation-only
-- **WHEN** `/reel/` exposes one unique active video but no canonical Reel id
-- **THEN** Edge exposes its stable video observation only to the Native navigation actuator and emits no Reel card
+#### Scenario: Anonymous or ambiguous landing remains probeable
+- **WHEN** an exact `/reel/` surface is explicitly keyboard-safe but canonical identity or unique active-video structure is unavailable
+- **THEN** Edge MAY dispatch its one trusted navigation key and SHALL emit no Reel card for the unresolved pre-state
 
 #### Scenario: Route is not a Reel
 - **WHEN** the current top-level route is home, login, checkpoint, another Facebook surface, or a non-Facebook URL
-- **THEN** Edge reports no Reel target and performs no Reels action
+- **THEN** Edge SHALL report no Reel target and perform no Reels action
 
 ### Requirement: Facebook Reels reads the active video's visible text honestly
 
@@ -52,67 +51,173 @@ When Cloud authorizes `interaction.like`, Edge SHALL require the command noteId 
 
 An account whose ordinary home feed produces nothing SHALL still be able to be re-authorized onto the Reels surface. Re-authorization MUST NOT depend solely on a non-empty ordinary feed returning, because an account is on Reels precisely when its ordinary feed produced nothing — that unlock can never fire for the accounts that need it.
 
-The re-entry evidence SHALL be a scroll receipt reporting no available target on the ordinary feed. A stale ordinary-feed empty/exhaustion report arriving while the account is already confirmed on Reels MUST NOT unlock re-entry: such a report is most likely a late signal from before the surface switch, and treating it as current would mistake stale emptiness for a genuine return to an empty home feed.
+Cloud MUST NOT use a long-lived `confirmed` flag as evidence of the current page. It SHALL retain only a bounded in-flight Reels redrive attempt and per-session recovery count. Edge SHALL probe the live page for every `page.scroll{reason:'resume_redrive',targetSurface:'reels'}` and either report the canonical Reel already active or enter Reels through the verified entry path.
 
 Re-entry SHALL be bounded per session. Once the bound is spent, the browse loop MUST reach a terminal state rather than alternating between two surfaces that both yield nothing.
 
-#### Scenario: Confirmed on Reels, returned to an empty ordinary feed
-- **WHEN** an account confirmed on Reels is returned to its ordinary home feed and a scroll there reports no available target
-- **THEN** the fallback state returns to its authorizable state and Reels is authorized again
-- **AND** the account is not left on a surface that yields no work
+#### Scenario: Reels session returns to an ordinary feed or task page
+- **WHEN** a Reels-targeted session is currently on an ordinary feed, group, detail, or other non-Reels page and receives a unified Reels redrive
+- **THEN** Edge reconciles the live page to Reels without requiring a non-empty Feed report first
+- **AND** Cloud does not consult a past `confirmed` state
 
-#### Scenario: Stale ordinary-feed empty report does not unlock
-- **WHEN** an ordinary-feed empty or exhaustion confirmation arrives while the account is already confirmed on Reels
-- **THEN** it does not reopen the fallback epoch
-- **AND** the existing epoch idempotency is unchanged
+#### Scenario: Already on Reels
+- **WHEN** Edge receives a unified Reels redrive while a canonical active Reel is already present
+- **THEN** Edge reports the current canonical Reel without redundant navigation or input
+- **AND** the normal evidence-driven browse loop continues from that fresh card report
 
-#### Scenario: Non-empty ordinary feed keeps its existing behaviour
-- **WHEN** a non-empty ordinary feed arrives for an account confirmed on Reels
-- **THEN** the fallback state becomes authorizable as it already did
-- **AND** ordinary browsing continues on that feed
+#### Scenario: Duplicate evidence during an in-flight entry
+- **WHEN** repeated Feed-empty or no-target evidence arrives while one Reels redrive attempt is in flight
+- **THEN** Cloud does not issue a parallel entry command
+- **AND** a canonical Reel card clears only the transient attempt
 
 #### Scenario: Re-entry is bounded
-- **WHEN** re-entry has already been used its allowed number of times in one session
-- **THEN** further no-target scroll receipts do not reopen the epoch
+- **WHEN** Reels redrive recovery has already been used its allowed number of times in one session
+- **THEN** further no-target receipts do not create unbounded retries
 - **AND** the session reaches a terminal state instead of alternating indefinitely
 
-### Requirement: Facebook Reels advances through an axis-specific global next-card control
-
-For `page.scroll` while in the authorized Reels list mode, Edge SHALL classify the current global navigation controls as one unambiguous vertical or horizontal rail relative to the active video. Vertical navigation MAY use its lower global next control after the vertical key and wheel fallbacks; horizontal navigation MAY use its right global next control after the horizontal key fallback. Edge MUST NOT use an in-video media control or a control from another axis. Success SHALL require the applicable canonical Reel URL plus active-video transition rule and the new active card to pass the same identity and summary probe before reporting. Disabled, missing, ambiguous, stale, or axis-drifting controls and unchanged identity MUST fail honestly.
-
-#### Scenario: Vertical next control changes active Reel
-- **WHEN** the unique enabled lower control in a proven vertical rail is clicked and a new canonical active Reel is proven
-- **THEN** Edge reports exactly the new Reel card and marks it seen through the existing canonical deduplication path
-
-#### Scenario: Horizontal next control changes active Reel
-- **WHEN** the unique enabled right control in a proven horizontal rail is clicked and a new canonical active Reel is proven
-- **THEN** Edge reports exactly the new Reel card and marks it seen through the existing canonical deduplication path
-
-#### Scenario: Wheel does not count as navigation
-- **WHEN** vertical wheel input leaves route and active-video identity unchanged
-- **THEN** Edge MUST NOT claim a new card or a successful scroll
-
-#### Scenario: In-video control is not used as next Reel
-- **WHEN** a bottom media or attachment control exists inside the active video
-- **THEN** Edge ignores it and considers only the unique global control belonging to the proven navigation rail
-
-#### Scenario: Generic single next control has no axis proof
-- **WHEN** only one generic next-labelled control is visible and neither a structural pair nor directional semantics proves its axis
-- **THEN** Edge clicks nothing and emits no fabricated progress
-
 ### Requirement: Configured Reels primary reuses the verified Reels entry path
+When a Facebook session pins Reels as its primary surface, Cloud SHALL authorize entry with `page.scroll{reason:'facebook_reels_primary'}` and Edge SHALL route that command to the existing Reels entry executor. Edge SHALL first use bounded observation to report a canonical active Reel without input when available. If the observation ends on an exact keyboard-safe Reels surface without a reportable card, Edge SHALL continue the same command through the one-key probe boundary; active-video or axis recognition MUST NOT terminate entry before that probe. Route navigation or input delivery alone MUST NOT count as entry success.
 
-When a Facebook session pins Reels as its primary surface, Cloud SHALL authorize entry with `page.scroll{reason:'facebook_reels_primary'}` and Edge SHALL route that command to the existing Reels entry executor. Route navigation alone MUST NOT count as entry success; browsing SHALL begin only after Edge reports a canonical active Reel through `page.cards{listKind:'reels'}`.
+#### Scenario: Configured primary reaches a reportable Reel without input
+- **WHEN** Cloud authorizes `facebook_reels_primary` and bounded entry observation verifies one canonical active Reel
+- **THEN** Edge SHALL report that Reel through the existing Reels card contract and perform no navigation input
 
-#### Scenario: Configured primary reaches a reportable Reel
+#### Scenario: Reels route is safe but has no reportable card
+- **WHEN** bounded entry observation reaches an exact keyboard-safe Reels route but cannot resolve one canonical active Reel
+- **THEN** Edge SHALL dispatch exactly one preferred key through the shared navigation actuator
+- **AND** it SHALL report a card only if bounded post-observation then verifies canonical progress
 
-- **WHEN** Cloud authorizes `facebook_reels_primary` and Edge verifies one canonical active Reel
-- **THEN** Edge reports that Reel through the existing Reels card contract
-- **AND** the current persona, slow-start, rule, or consumption path continues without a parallel executor
+#### Scenario: Reels entry remains unresolved after the probe
+- **WHEN** the one entry probe is delivered but no canonical active Reel appears within the bounded post-observation window
+- **THEN** Edge SHALL return the existing honest ambiguous result and neither Edge nor Cloud SHALL fabricate a view or start content evaluation
 
-#### Scenario: Reels route has no reportable card
+### Requirement: Ineffective Reels entry receives one exact-target foreground recovery
 
-- **WHEN** navigation reaches a Reels route but no canonical active Reel can yet be reported
-- **THEN** Edge returns the existing honest pending or no-target result
-- **AND** neither Edge nor Cloud fabricates a Reel view or starts content evaluation
+For `page.scroll{reason:'facebook_reels_primary'}` and `page.scroll{reason:'empty_feed_reels_fallback'}`, Edge SHALL keep the first navigation to the Reels route background-first and SHALL prove that the exact bound page reached a ready Reels route/surface before deciding whether entry took effect. If bounded readback proves that the exact bound target remained outside a ready Reels surface, Edge MAY call `Page.bringToFront` on that same target at most once for the command, SHALL re-probe before another write, and MAY issue at most one fresh Reels navigation retry. Reaching the Reels surface MUST suppress foreground activation even when canonical video cards are still hydrating or unavailable; that later card condition SHALL terminate honestly without reclassifying the navigation as ineffective. A late successful entry observed after activation MUST suppress the retry. Target drift, blocker state, or `Page.bringToFront` acknowledgement alone MUST NOT count as entry success.
+
+#### Scenario: First background entry succeeds
+
+- **WHEN** the initial Reels navigation reaches a ready Reels surface
+- **THEN** Edge never calls `Page.bringToFront` for that command and separately reports the canonical Reel or an honest hydration/no-target outcome
+
+#### Scenario: Ineffective entry foregrounds and retries once
+
+- **WHEN** the initial navigation completes but bounded same-target readback proves that the eligible Facebook page did not enter a ready Reels surface
+- **THEN** Edge calls `Page.bringToFront` once, re-probes the exact target, and issues at most one fresh Reels navigation retry
+
+#### Scenario: Entry completes after activation but before retry
+
+- **WHEN** the post-activation re-probe observes a ready Reels surface
+- **THEN** Edge accepts that entry and does not send another `Page.navigate`
+
+#### Scenario: Foreground recovery still cannot confirm entry
+
+- **WHEN** the one foreground recovery and optional fresh navigation retry do not produce a canonical active Reel
+- **THEN** Edge returns the existing honest pending, no-target, or ambiguous result and does not fabricate a Reel view
+
+#### Scenario: Blocker or target drift suppresses recovery
+
+- **WHEN** the initial entry readback observes login, challenge, consent, another blocker, or a different target/document context
+- **THEN** Edge does not foreground or retry navigation through this recovery path and returns the applicable honest outcome
+
+### Requirement: Anonymous Reels entry receives one bounded local advance
+
+For `facebook_reels_primary` and `empty_feed_reels_fallback`, Edge SHALL preserve one initial 15-second canonical-card hydration window after reaching a ready Reels surface. If that window expires, Edge SHALL invoke the existing bounded Native forward-navigation contract at most once only when fresh active and navigation readbacks bind one unique anonymous `videoKey` and both explicitly prove `inputSafe=true`. The invocation MAY use the existing bounded actuator-discovery order, but it MUST produce at most one active-video transition and MUST stop every later write as soon as any transition is observed. Pre-input same-video hydration MAY complete entry; completion after a transition SHALL require the bound moved-to `videoKey` and exactly one matching canonical-permalink Reel card. The anonymous landing, a content-derived card, input dispatch, or route arrival MUST NOT count as success or a view.
+
+#### Scenario: First Reel hydrates before input commit
+
+- **WHEN** the initially anonymous active video gains a matching canonical Reel card during the hydration window or fresh pre-commit readback
+- **THEN** Edge reports that current canonical card and dispatches no keyboard, wheel, pointer, or second route navigation input
+
+#### Scenario: Identity appears at the initial hydration boundary
+
+- **WHEN** the same active video gains canonical identity as the initial 15-second window closes but its card is not yet reportable
+- **THEN** Edge performs one immediate card read, dispatches no input, and does not open a second initial hydration window
+
+#### Scenario: Anonymous horizontal landing advances
+
+- **WHEN** the hydration window expires with one safe anonymous active video, fresh structure proves a horizontal layout, and the bounded invocation changes to a different canonically identified Reel
+- **THEN** Edge reports exactly the moved-to canonical card, starts with the existing `ArrowRight` actuator, and dispatches no input after the transition
+
+#### Scenario: Anonymous vertical landing advances
+
+- **WHEN** the hydration window expires with one safe anonymous active video, fresh structure proves a vertical layout, and the bounded invocation changes to a different canonically identified Reel
+- **THEN** Edge reports exactly the moved-to canonical card, starts with the existing `ArrowDown` actuator, and dispatches no input after the transition
+
+#### Scenario: Original Reel hydrates after an ineffective actuator
+
+- **WHEN** one entry actuator was dispatched, the active `videoKey` did not change, and that same video's exact canonical Reel card then becomes available
+- **THEN** Edge reports the now-canonical current Reel and dispatches no second key, wheel, pointer, or route navigation input
+
+#### Scenario: Anonymous entry target is unavailable
+
+- **WHEN** fresh readback finds no active video, equally eligible videos, `inputSafe=false`, a missing input-safety signal, a blocker, target drift, or no remaining post-input verification budget
+- **THEN** Edge dispatches no Reels navigation input and emits no fabricated card or view
+
+#### Scenario: Entry is cancelled around the route boundary
+
+- **WHEN** cancellation is observed immediately before the first `/reels/` route dispatch
+- **THEN** Edge dispatches no route and reports `not_started`
+- **AND WHEN** cancellation is observed after that route or before a retry route
+- **THEN** Edge dispatches no later route or actuator and reports `ambiguous`
+
+#### Scenario: Input leaves the anonymous Reel unchanged
+
+- **WHEN** the one bounded navigation invocation exhausts its permitted methods without changing the active `videoKey`
+- **THEN** Edge returns an ambiguous navigation-unconfirmed receipt and does not start a second entry invocation
+
+#### Scenario: Video changes but canonical identity remains pending
+
+- **WHEN** entry input changes the active `videoKey` but no matching canonical Reel card appears within the post-transition hydration window
+- **THEN** Edge returns `ambiguous/reels_post_transition_identity_pending`, dispatches no later input, and retains a session-local read-only pending observation
+
+#### Scenario: Later scroll encounters a pending entry transition
+
+- **WHEN** another scroll command arrives while the prior entry transition still awaits canonical identity
+- **THEN** Edge performs read-only active-card recovery and dispatches no keyboard, wheel, pointer, or route navigation input
+- **AND** it clears the pending observation only after reporting one matching canonical Reel card or leaving the Reels surface
+
+#### Scenario: Pending target drifts a second time
+
+- **WHEN** a pending observation is already bound to one moved-to `videoKey` and either the same hydration window or a later command sees a different active video
+- **THEN** Edge reports an ambiguous target-changed receipt, emits no card, and dispatches no input
+- **AND** returning to the previously bound `videoKey` later cannot make that drifted observation confirm
+
+#### Scenario: Ordinary Reels transition still awaits identity
+
+- **WHEN** a normal Reels scroll proves one active-video transition but the moved-to video has no matching canonical card within its hydration window
+- **THEN** Edge retains the exact moved-to video as a read-only pending observation and a later scroll MUST recover it before attempting another navigation
+- **AND** if that video temporarily exposes the previous Reel's canonical ID, Edge MUST NOT report or count it until a distinct canonical Reel ID appears
+
+#### Scenario: Noncanonical Reel card cannot complete entry
+
+- **WHEN** Reels card extraction yields an invalid host or non-Reel URL, anonymous identity, `content_ref`, non-video card, non-ready batch, multiple cards, the previous Reel's stale canonical ID, or a card that does not match the freshly active canonical Reel
+- **THEN** Edge does not confirm entry and Cloud receives no Reel view from that batch
+
+### Requirement: Facebook Reels entry allows thirty seconds of document readiness per navigation attempt
+
+For every authorized Facebook Reels entry path, Edge SHALL allow each initial and existing optional retry `Page.navigate` attempt up to 30 seconds to observe an `interactive` or `complete` document on the exact bound page. The 30-second timer SHALL apply separately to each navigation attempt and SHALL remain separate from canonical Reel identity/card hydration. A ready document or route acknowledgement alone MUST NOT count as entry success; success SHALL still require the existing canonical `page.cards{listKind:'reels'}` postcondition. Cancellation, command deadline exhaustion, blocker state, or target/document drift MAY terminate the path earlier and MUST retain their existing fail-closed outcomes.
+
+#### Scenario: Slow Reels landing becomes ready inside thirty seconds
+
+- **WHEN** an authorized Reels entry navigation reaches an `interactive` or `complete` document after the former eight-second boundary but no later than 30 seconds
+- **THEN** Edge continues with the existing Reels-surface and canonical-card verification instead of terminating the command at the former readiness boundary
+- **AND** it does not count a Reel until canonical card evidence is available
+
+#### Scenario: Optional retry uses the same readiness window
+
+- **WHEN** the existing exact-target foreground recovery authorizes its one optional fresh Reels navigation retry
+- **THEN** Edge gives that retry its own bounded 30-second document-readiness window
+- **AND** it adds no further navigation retry
+
+#### Scenario: Document remains unready after thirty seconds
+
+- **WHEN** a Reels entry navigation still has no `interactive` or `complete` document at the end of its 30-second window
+- **THEN** Edge returns the existing honest failure and does not fabricate route arrival, a Reel card, or a view
+
+#### Scenario: Outer timeout chain remains larger than the entry path
+
+- **WHEN** the two readiness windows and two possible canonical-card hydration windows are combined with explicit probe and receipt margin
+- **THEN** the sum remains below the existing 180-second Facebook scroll request, admission, engine, and session ceilings
+- **AND** Cloud retains its existing 240-second idle watchdog
 

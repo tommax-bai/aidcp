@@ -16,7 +16,7 @@ The Native Facebook runtime SHALL map every supported Facebook page command to e
 - **THEN** the runtime returns `capability_unsupported` before router evaluation, navigation, scrolling, clicking, typing, or file input
 
 ### Requirement: Facebook capability owners preserve the complete platform transaction
-Each state-changing Facebook capability SHALL own its complete `admit → locate → fresh revalidate → commit → same-target verify → classify` transaction. The target witness carried across that transaction MUST retain the identity and association evidence required by the capability and MUST NOT be reduced to a stale coordinate when the established behavior requires a live React element, operation marker, active-video/author association, current-group scope, or composer generation.
+Each state-changing Facebook capability SHALL own its complete `admit → locate → fresh revalidate → commit → same-target verify → classify` transaction. The target witness carried across that transaction MUST retain the canonical identity and association evidence required by the capability and MUST NOT be reduced to a stale coordinate. A live React element or operation marker used to establish the one-time commit or reaction-picker association MUST NOT become terminal verification authority when the same canonical target and current state can be freshly re-resolved. Established behavior that requires active-Reel/author association, current-group scope, or composer generation MUST remain proven through verification.
 
 #### Scenario: React-owned control requires in-page activation
 - **WHEN** recorded Facebook behavior requires fresh in-page activation of the current React-owned Feed Like, Reel primary Like, or Group Join element
@@ -28,8 +28,13 @@ Each state-changing Facebook capability SHALL own its complete `admit → locate
 - **THEN** the owning capability validates the current target and returns one bounded pointer target for at most one dispatch
 - **AND** verification remains bound to the same canonical post or Reel witness
 
+#### Scenario: Same canonical Reel replaces an action control after dispatch
+- **WHEN** a Reel write was dispatched once and Facebook replaces the clicked Like or Follow DOM node while the same canonical Reel and required author association remain freshly provable
+- **THEN** the capability verifies the current action state from the freshly resolved replacement control within the existing bounded window
+- **AND** it does not replay the commit or require the original DOM node to survive
+
 #### Scenario: Target witness is lost after dispatch
-- **WHEN** a write was dispatched but its tagged card, active Reel/video, author binding, current-group scope, or composer witness can no longer be proven
+- **WHEN** a write was dispatched but its canonical card or Reel identity, required author binding, current-group scope, or composer witness can no longer be proven
 - **THEN** the capability returns an ambiguous non-success terminal result without replaying the commit
 
 ### Requirement: Facebook command deadlines are coherent end to end
@@ -98,3 +103,4 @@ Source, fixture, fake-CDP, build, and package validation SHALL be reported separ
 #### Scenario: Source and artifact validation pass without a real write
 - **WHEN** all automated and artifact checks pass but no explicitly authorized real Facebook action is observed
 - **THEN** the change is reported as source/artifact validated with real-account acceptance still pending
+

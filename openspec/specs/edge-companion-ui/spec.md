@@ -495,36 +495,6 @@ The Electron companion SHALL offer a `primary-screen` parking mode and SHALL mak
 - **THEN** the environment still installs its stdin control listener
 - **AND** the show / re-park commands remain available for that environment
 
-### Requirement: Environment rail avatar cycles select, show-on-primary, and re-park
-Clicking an environment's rail entry SHALL act as a three-state control for that environment. The first click (on a not-yet-selected environment) selects it and highlights it with a distinct color. On the already-selected environment, the next click centers that environment's fixed-size driven browser on the AIDCP companion's current outer window bounds and then restores the companion as the foreground window, leaving the driven browser immediately and geometrically behind the client rather than covering it or using an unrelated primary-screen/cascade position; the following click sends the browser back to its parked slot; further clicks continue to toggle between shown-below-client and parked. The selected-environment highlight MUST be visually distinct, and the shown state MUST be visually distinguishable from the merely-selected state. The show and re-park actions MUST reuse the existing per-environment control channel and MUST honestly surface failure; a failed or timed-out action (for example, the browser is not yet ready) MUST NOT advance the toggle phase. Switching to a different environment MUST reset the toggle phase. The persona icon on a rail entry MUST NOT trigger this toggle. Guided login and explicit browser recovery MAY continue to focus the driven browser because they express a different operator intent.
-
-#### Scenario: First click selects with a distinct highlight
-- **WHEN** the operator clicks a rail entry that is not currently selected
-- **THEN** that environment becomes selected and is highlighted with the distinct selected color
-- **AND** no browser show / re-park command is sent
-
-#### Scenario: Second click shows the browser below AIDCP
-- **WHEN** the operator clicks the already-selected environment's rail entry and its browser is parked
-- **THEN** the companion reads its current window bounds and moves that environment's fixed-size browser to a center-aligned rectangle behind them
-- **AND** an AIDCP window on a secondary display uses that display's coordinate space rather than the primary-screen inspection position
-- **AND** after the browser move completes, the AIDCP companion is restored to the foreground above it
-- **AND** the rail entry reflects the shown state
-
-#### Scenario: Third click re-parks the browser
-- **WHEN** the operator clicks the already-selected environment's rail entry while its browser is shown below AIDCP
-- **THEN** the companion requests that environment's browser return to its parked slot
-- **AND** the shown state is cleared
-
-#### Scenario: Honest failure does not advance the toggle
-- **WHEN** a show or re-park request fails or times out because the environment's browser is not running/ready
-- **THEN** the companion surfaces the failure
-- **AND** the toggle phase does not advance
-
-#### Scenario: Guided login still focuses the browser
-- **WHEN** the operator uses the guided login or explicit recovery action because direct browser interaction is required
-- **THEN** the companion MAY leave that driven browser in the foreground
-- **AND** the avatar-specific below-client policy does not change that action
-
 ### Requirement: Companion window permits its own notifications while denying device access
 The Electron companion window permission policy SHALL allow the client's own notifications so operator-facing status can be surfaced, while continuing to deny device-access permissions (geolocation, camera, microphone, and similar) that the local companion UI does not need. This policy governs only the companion window and is independent of the driven fingerprint browser's permission handling.
 
@@ -1157,11 +1127,28 @@ renderer SHALL 将通用可写门禁与 channel send capability 分离。保存�
 - **WHEN** 用户点击该脚注行内的开关或文字标签
 - **THEN** 今日进展展开/收起状态保持不变，开关恰好切换一次
 
-#### Scenario: 规则说明常驻可读且说清优先关系
+#### Scenario: 仅已确认冷启动时显示曲线说明
 
-- **WHEN** 该脚注行可见
-- **THEN** 常驻说明明确该设置属于当前环境、每日额度按曲线逐日放开、第 7 天自动恢复，且实际额度取曲线与当前账号档位中更严的一个
-- **AND** MUST NOT 依赖悬浮或额外交互才能看到
+- **WHEN** 当前环境最后确认的慢启动状态为 `active` 或 `graduated`
+- **THEN** 客户端显示 `?` 曲线帮助入口和常驻说明，明确设置属于当前环境、每日额度按曲线逐日放开、完成后按当前账号档位运行，且实际额度取曲线与当前账号档位中更严的一个
+- **AND** MUST NOT 依赖悬浮或额外交互才能看到常驻说明
+
+#### Scenario: 已确认非冷启动时隐藏曲线说明
+
+- **WHEN** 当前环境最后确认的慢启动状态为 `off` 或其它运行方式已被 Cloud 确认
+- **THEN** 客户端继续显示可用的慢启动选择控件，但隐藏 `?` 曲线帮助入口和曲线说明
+
+#### Scenario: 提交期间沿用最后确认的说明可见性
+
+- **WHEN** 开启或关闭慢启动的写入尚未取得 Cloud 写后回读
+- **THEN** 曲线帮助和说明的可见性继续取最后确认状态
+- **AND** MUST NOT 根据本地目标勾选值提前显示或隐藏
+
+#### Scenario: 未知与跨环境状态不得泄漏说明
+
+- **WHEN** 当前环境的慢启动读取中、读取失败或完整权威状态未知，或上一环境的响应晚到
+- **THEN** 客户端隐藏当前环境的曲线帮助和说明
+- **AND** MUST NOT 沿用另一环境的说明可见性
 
 ### Requirement: Cloud MUST NOT supply usage metrics for actions the platform cannot perform
 
@@ -1958,7 +1945,7 @@ The client MUST deduplicate the activity by canonical post identity for the acti
 
 客户端 SHALL 在“开发者详情”中为当前环境展示 Cloud 主动下发到 Edge 的命令诊断。每条诊断 SHALL 包含接收时间、命令类型、当前可证明阶段、安全摘要和短关联标识，并 MUST 明确区分已收到、已拒绝、已交给执行器及 Edge 接收层能够直接观测的步骤结果。`received` 或 `dispatched` MUST NOT 被表述为命令已经执行成功、业务已经完成或平台已经确认。
 
-命令摘要 MUST 由逐命令字段白名单生成。正文、标题、评论、私信、搜索词、群聊码、Cookie、Token、二维码、截图内容、完整 URL、浏览器调试地址、账号身份字段、任务永久键和原始 payload MUST NOT 进入命令诊断事件、renderer 状态或可见诊断行。文本字段只可展示有界字符数，URL 只可展示是否存在，安全枚举和有界计数可按需展示。未知命令或新增 payload 字段 MUST 默认不展示内容。
+命令摘要 MUST 由逐命令字段白名单生成。`page.scroll{reason:'facebook_reels_primary'}` 与 `page.scroll{reason:'empty_feed_reels_fallback'}` SHALL 使用“进入 Reels”命令名称，并分别使用固定的主入口或 Feed 结束回退摘要；其它 `page.scroll` SHALL 保留“页面滚动 / 滚动当前页面”。正文、标题、评论、私信、搜索词、群聊码、Cookie、Token、二维码、截图内容、完整 URL、浏览器调试地址、账号身份字段、任务永久键和原始 payload MUST NOT 进入命令诊断事件、renderer 状态或可见诊断行。文本字段只可展示有界字符数，URL 只可展示是否存在，安全枚举和有界计数可按需展示。未知命令或新增 payload 字段 MUST 默认不展示内容。
 
 诊断 SHALL 仅保存在 Edge 本机内存中，按环境隔离并具有数量与时间双重上限；它 MUST NOT 进入普通活动流、Cloud 数据库或自动化回执。旧客户端状态缺少诊断字段时界面 MUST null-safe 降级。
 
@@ -1967,6 +1954,23 @@ The client MUST deduplicate the activity by canonical post identity for the acti
 - **WHEN** 当前环境收到一条已登记、通过校验且存在本地处理器的主动命令
 - **THEN** 开发者详情出现该命令，并将阶段更新为“已交给执行器”
 - **AND** 界面明确该阶段不表示执行成功或平台确认
+
+#### Scenario: Reels 主入口显示导航意图
+
+- **WHEN** Edge 收到 `page.scroll{reason:'facebook_reels_primary'}`
+- **THEN** 开发者详情显示“进入 Reels”及固定的主浏览入口摘要
+- **AND** 阶段仍只显示 Edge 已收到或已交付的事实，不宣称已经进入 Reels
+
+#### Scenario: Feed 结束回退显示导航意图
+
+- **WHEN** Edge 收到 `page.scroll{reason:'empty_feed_reels_fallback'}`
+- **THEN** 开发者详情显示“进入 Reels”及固定的 Feed 结束回退摘要
+- **AND** 不把该命令显示为普通页面滚动
+
+#### Scenario: 普通页面滚动保留原文案
+
+- **WHEN** `page.scroll` 不携带任一 Reels 入口 reason
+- **THEN** 开发者详情继续显示“页面滚动 / 滚动当前页面”
 
 #### Scenario: 非法或未协商命令诚实显示拒绝
 
@@ -2003,11 +2007,6 @@ The client MUST deduplicate the activity by canonical post identity for the acti
 - **WHEN** Edge 收到、拒绝或交付一条引擎命令
 - **THEN** 该接收诊断只出现在开发者详情
 - **AND** “今天做了这些”不得因此新增一条动作成功、失败或处理中记录
-
-#### Scenario: 旧状态安全降级为空态
-
-- **WHEN** renderer 收到不含 `commandDiagnostics` 的旧形状环境状态
-- **THEN** 开发者详情的引擎命令区域显示无记录空态且不抛错、不白屏
 
 ### Requirement: 首页状态卡统一层级并保持平台能力真实
 
@@ -2767,4 +2766,52 @@ Edge SHALL 在选中小红书环境的 `legacy-workspace` 中、实时工作说�
 #### Scenario: 减少动态效果
 - **WHEN** 系统启用 reduced-motion
 - **THEN** 当前时段的呼吸或流光动画停止，但文字状态和边框标识仍完整可辨
+
+### Requirement: Environment rail separates selection from exclusive browser recall
+
+Clicking an environment's rail entry SHALL select that environment and highlight it with a distinct selected color; a single click MUST NOT show or re-park any browser. Double-clicking an environment avatar that is not the shown target SHALL select that environment if necessary and request an exclusive browser recall: every other currently controllable environment browser SHALL be sent to its own configured parking position, then the target environment's fixed-size driven browser SHALL be centered on the AIDCP companion's current outer window bounds and the companion SHALL be restored above it. Double-clicking the avatar of the environment already shown behind AIDCP SHALL restore that exact browser to its configured parking position. The shown target MUST be visually distinguishable from a merely selected environment. Nickname editing, persona controls, guided login, and explicit browser recovery MUST NOT be reinterpreted as this avatar gesture.
+
+Exclusive recall and shown-target restore SHALL use stable environment routing, one latest-request-wins operation queue, and bounded completion receipts. A failed target show MUST NOT advance the shown target. A failed or timed-out restore MUST NOT clear the shown target. A superseded request MUST NOT overwrite a later request or display a stale failure. If the target is shown but one or more other controllable browsers fail to park, the client SHALL expose that incomplete parking result and MUST NOT claim that exclusivity was fully established.
+
+#### Scenario: Single click only selects
+
+- **WHEN** the operator single-clicks an environment rail entry
+- **THEN** that environment becomes selected and highlighted
+- **AND** no browser show or park command is sent, whether or not the environment was already selected
+
+#### Scenario: Double-clicking another avatar performs one complete switch
+
+- **WHEN** environment A is shown behind AIDCP and the operator double-clicks environment B's avatar
+- **THEN** environment B becomes selected, environment A and every other controllable non-target browser are sent to their configured parking positions, and B is placed behind AIDCP
+- **AND** B becomes the only shown target in renderer state
+
+#### Scenario: Repeated target double-click restores the shown browser
+
+- **WHEN** the operator double-clicks the avatar of the environment already shown behind AIDCP
+- **THEN** the companion sends that exact environment to its configured parking position with a bounded completion receipt
+- **AND** it clears the shown target only after parking succeeds while leaving the environment selected
+
+#### Scenario: Shown-target restore failure remains visible
+
+- **WHEN** the operator double-clicks the shown environment but its configured parking action fails or times out
+- **THEN** the client keeps that environment represented as shown and exposes the restore failure
+- **AND** it MUST NOT claim that the browser was restored from command acceptance alone
+
+#### Scenario: Latest rapid double-click determines the final target
+
+- **WHEN** the operator double-clicks environment A and then environment B before A's placement completes
+- **THEN** the operations cannot complete out of order with A as the final shown target
+- **AND** B is the final browser placed behind AIDCP while the superseded result remains silent
+
+#### Scenario: Partial non-target parking failure is honest
+
+- **WHEN** the target browser is shown successfully but one or more other controllable browsers fail or time out while parking
+- **THEN** the client identifies the incomplete parking result without claiming full exclusivity
+- **AND** the target remains represented as shown
+
+#### Scenario: Guided login still focuses the browser
+
+- **WHEN** the operator uses guided login or explicit recovery because direct browser interaction is required
+- **THEN** the companion MAY leave that driven browser in the foreground
+- **AND** the avatar-specific exclusive recall policy does not change that action
 

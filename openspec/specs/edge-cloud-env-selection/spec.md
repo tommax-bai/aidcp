@@ -3,85 +3,108 @@
 ## Purpose
 TBD - created by archiving change edge-cloud-env-selector. Update Purpose after archive.
 ## Requirements
-### Requirement: Cloud environment is selectable in client settings
+### Requirement: Cloud environment is selectable in the client login gate
 
-边缘客户端 SHALL 在设置界面提供 dev、ol、自定义三种 Cloud 目标并持久化。每个目标 SHALL 结构化解析 customer-auth `http(s)` API base 与 automation `ws(s)` URL；dev/ol 使用 edge 内单点映射，自定义目标必须分别校验两个地址，MUST NOT 从一个协议地址静默猜测另一个。旧单一 WS 设置 MAY 兼容读取为 automation URL，但缺失 HTTP base 时 SHALL 明确要求补充或使用可验证的内置映射。
+边缘客户端 SHALL 在登录门提供 DEV 与 OL 两个部署目标并持久化唯一的 `deploymentTarget`。DEV/OL SHALL 由 Edge 主进程内同一目标目录同时解析 customer-auth `http(s)` API base 与 automation `ws(s)` URL；普通客户界面 MUST NOT 接受、保存或分别覆盖两个地址。自定义目标 MAY 仅在显式开发者门下以成对地址启用，并 MUST NOT 出现在客户登录选择器中。
 
-#### Scenario: Operator selects a built-in cloud environment
+#### Scenario: Customer selects an official deployment target
 
-- **WHEN** 运营选择 dev 或 ol 并保存
-- **THEN** 客户端持久化该目标及映射出的 HTTP/WS 地址；写盘失败如实回报未持久化
+- **WHEN** 客户在登录门选择 DEV 或 OL 并提交登录
+- **THEN** 客户端先持久化该目标，再使用同一目标目录中的数据 API 与 automation 地址
+- **AND** 写盘失败时拒绝登录并如实提示目标未保存
 
-#### Scenario: Custom endpoint validation
+#### Scenario: Ordinary login cannot split endpoints
 
-- **WHEN** 运营选择自定义并提交 API base 或 automation URL
-- **THEN** 客户端分别要求合法 `http(s)` 与 `ws(s)` 地址，任一非法都拒绝保存且不静默补猜
+- **WHEN** 普通客户打开登录门或主界面设置
+- **THEN** 界面只提交 `dev | ol` 枚举，MUST NOT 提供独立 HTTP/WS URL 输入
 
-### Requirement: Selection resolves cloud endpoint with UI-first precedence
+### Requirement: Deployment target resolves every official Cloud endpoint
 
-客户端 SHALL 按“界面结构化选择 > 对应启动环境变量 > 缺省 dev”分别解析 customer-auth HTTP 与 automation WebSocket 目标。Electron HTTP 适配器使用解析后的 API base；派生自动化引擎时显式注入解析后的 `AIDCP_CLOUD_URL`。两者 SHALL 来自同一个目标环境配置但具有独立实际状态，MUST NOT 因引擎未启动而使 HTTP 无法使用。
+Electron 客户端 SHALL 以已持久化并通过登录验证的 `deploymentTarget` 解析 customer-auth 登录、续签、客户数据、环境归属以及 automation WebSocket。派生或重连自动化引擎时 SHALL 显式注入该目标目录中的 `AIDCP_CLOUD_URL`。构建元数据、持久化设置或启动环境中的独立绝对 URL MUST NOT 覆盖官方目标中的单个传输并制造混连。
 
-#### Scenario: UI selection resolves both transports
+#### Scenario: DEV login resolves both transports
 
-- **WHEN** 外壳继承 dev 环境变量但界面已选择 ol
-- **THEN** 后续客户 HTTP 请求使用 ol API，后续启动/重连的引擎使用 ol automation URL
+- **WHEN** 登录门选择 DEV 且 DEV 登录与环境范围验证成功
+- **THEN** 后续 customer-auth/data 请求与自动化引擎均使用 DEV 目标目录
 
-#### Scenario: No selection falls back to configured defaults
+#### Scenario: OL login resolves both transports
 
-- **WHEN** 界面没有显式选择
-- **THEN** 客户端分别使用已配置的 HTTP/WS 环境变量或缺省 dev 映射，不得把 WS URL直接当 HTTP URL
+- **WHEN** 登录门选择 OL 且 OL 登录与环境范围验证成功
+- **THEN** 后续 customer-auth/data 请求与自动化引擎均使用 OL 目标目录
 
-### Requirement: Switching cloud takes effect only on explicit restart
+#### Scenario: Legacy independent URL cannot override one transport
 
-保存新 Cloud 目标后，后续 customer-auth HTTP 请求 SHALL 使用新 API base；保存 MUST NOT 自动打断在途页面任务或静默重连引擎。automation WS 目标只在显式恢复、重连或下次启动引擎时生效。在途自动化需切换时 SHALL 先到安全边界再断开旧通道，MUST NOT 通过浏览器启动队列实现 Cloud 切换。
+- **WHEN** 安装包仍含旧 `aidcpClientAuthUrl` 或外壳继承旧 `AIDCP_CLIENT_AUTH_URL`/`AIDCP_CLOUD_URL`
+- **THEN** 官方 DEV/OL 会话忽略这些单传输覆盖并使用所选目标的成对目录
 
-#### Scenario: 保存目标不打断当前自动化
+### Requirement: Switching deployment target requires a new authenticated session
 
-- **WHEN** 运营保存新目标且某环境仍连接旧 automation Cloud
-- **THEN** 新 HTTP 请求使用新 API，当前自动化连接保持旧目标直至显式重连，UI 分别显示两者
+已认证客户端 MUST NOT 通过保存设置或只重绑 automation WebSocket 来切换部署目标。切换 SHALL 停止旧目标自动化、清除旧目标客户会话与权威投影、返回登录门，并仅在新目标登录与环境范围刷新成功后建立新目标主界面。物理浏览器配置 MAY 保留，但 MUST NOT 在新目标授权前启动。
 
-#### Scenario: 自动化停止时无需批量核心重绑
+#### Scenario: Authenticated user requests a target switch
 
-- **WHEN** 所有环境自动化均为 stopped/paused，运营保存新目标
-- **THEN** 客户端不启动任何引擎或浏览器；各环境下次启动/恢复自动化时连接新目标
+- **WHEN** 已登录客户选择切换部署环境
+- **THEN** 客户端停止自动化并退出旧目标会话，返回登录门供客户选择新目标
+- **AND** 不执行仅 WebSocket 重绑
 
-### Requirement: Current cloud is always visible and matches actual connection
+#### Scenario: New-target login fails
 
-客户端设置 SHALL 显示当前数据 API 目标；运行中的自动化 MAY 额外显示引擎实际 automation Cloud 与已保存目标。目标与实际不一致时 SHALL 明确为“数据 API X / 自动化实际 Y / 自动化目标 X”，MUST NOT 把 HTTP 保存或请求成功等同于引擎已连接，也不得在自动化停止时显示 Cloud 离线故障。
+- **WHEN** 客户选择新目标但登录、续签或环境范围刷新失败
+- **THEN** 客户端停留在登录门且所有环境保持停止，MUST NOT 回用旧目标令牌或花名册授权
 
-#### Scenario: 自动化未启动时只显示数据目标
+### Requirement: Current deployment target and automation receipt are visible and honest
 
-- **WHEN** 客户端使用 dev HTTP API 且环境自动化未启动
-- **THEN** 设置显示数据目标 dev，环境状态短标签显示“已就绪”、自动化明细显示“未启动”，MUST NOT 显示“Cloud 离线”
+登录门与已认证主界面 SHALL 显示当前选择/认证的部署目标。运行中的自动化 SHALL 独立显示核心已确认连接的目标；只有连接回执成功后才能标记实际 DEV/OL。等待浏览器槽位的活动文案 SHALL 命名已确认的 automation 目标，MUST NOT 把所选目标、数据请求成功或包默认值冒充自动化已连接。
 
-#### Scenario: 数据与自动化目标暂时不同
+#### Scenario: Authenticated target with stopped automation
 
-- **WHEN** HTTP 已切到 ol 而运行中引擎仍连接 dev
-- **THEN** UI 如实显示数据 API ol、自动化实际 dev、目标 ol，MUST NOT 宣称自动化已切换
+- **WHEN** 客户已登录 OL 但自动化引擎未启动
+- **THEN** 主界面显示认证目标 OL，并显示自动化未启动而不是已连接 OL
 
-#### Scenario: ol marked as production
+#### Scenario: Waiting slot after confirmed automation connection
 
-- **WHEN** 数据 API 或自动化实际/目标为 ol
-- **THEN** 对应标签以醒目方式标注线上生产含义
+- **WHEN** automation 核心已确认连接 DEV 且浏览器仍在等待槽位
+- **THEN** 活动流显示“自动化通道已连接 DEV，等待浏览器槽位”
 
-### Requirement: Switching to ol requires confirmation
-在界面将云端选择切换到 ol 时，客户端 SHALL 弹出二次确认（提示将连接线上生产云端）；未确认则不改变已保存选择。
+#### Scenario: OL is marked as production
 
-#### Scenario: ol switch confirmation
-- **WHEN** 运营人员在界面把云端选择改为 ol
-- **THEN** 弹出确认提示；确认后方保存为 ol，取消则保持原选择不变
+- **WHEN** 登录选择、认证目标或 automation 实际目标为 OL
+- **THEN** 对应标签醒目标注为正式/线上环境
 
-### Requirement: Resolved cloud environment controls Facebook automatic browse mode
+### Requirement: Switching to OL requires confirmation
 
-Facebook 自动浏览模式 SHALL 以自动化引擎实际连接的 Cloud 解析结果为准，不以当前 HTTP API 请求目标推断。新目标只在引擎成功启动或重连后成为实际模式；保存数据目标 MUST NOT 静默改变在途自动化。浏览器是否打开与 Cloud 目标状态正交。
+在登录门把持久化目标从 DEV 改为 OL 时，客户端 SHALL 明确提示将连接线上生产环境；未确认则保持原目标。首次安装默认预选 OL 时 SHALL 直接把“正式环境”含义显示在选择器与登录按钮上，不以隐藏默认代替告知。
 
-#### Scenario: 下次启动连接 dev 后使用 dev 模式
+#### Scenario: Existing DEV selection changes to OL
 
-- **WHEN** 自动化停止期间把目标设为 dev，随后启动引擎并成功握手
-- **THEN** 引擎实际模式成为 dev，浏览器准备完成后的会话使用 dev 模式
+- **WHEN** 客户在登录门把已保存 DEV 目标切换为 OL
+- **THEN** 客户端要求确认；确认后方可随登录提交保存，取消则保持 DEV
 
-#### Scenario: 保存未重连不改变在跑模式
+### Requirement: Authenticated deployment target controls Facebook automatic browse mode
 
-- **WHEN** 引擎实际仍连接 dev、只把目标保存为 ol
-- **THEN** 在途自动化继续使用 dev 模式直到显式重连成功，UI MUST NOT 显示模式已切换
+Facebook 自动浏览模式 SHALL 以自动化引擎实际连接的官方目标为准，且该目标必须等于当前已认证 `deploymentTarget`。目标不一致、未知或连接未确认时 MUST NOT 启动 Facebook 自动浏览。浏览器是否打开与目标确认状态正交。
+
+#### Scenario: Confirmed DEV engine uses DEV mode
+
+- **WHEN** 客户已认证 DEV 且自动化引擎确认连接 DEV
+- **THEN** 浏览器准备完成后的 Facebook 会话使用 DEV 模式
+
+#### Scenario: Mismatch fails closed
+
+- **WHEN** 已认证目标与自动化连接回执目标不一致或任一目标未知
+- **THEN** 客户端停止自动浏览并显示目标不一致，MUST NOT 选择任一目标继续
+
+### Requirement: Spawn startup projections SHALL use the lifecycle-frozen deployment target
+
+Before spawning an automation core, the desktop supervisor SHALL freeze the authenticated deployment target and automation target on that lifecycle generation. The child environment, pending `targetCloudKey` status projection, and later connection-receipt validation MUST use those frozen values; post-spawn setup MUST NOT read a removed alias or re-resolve mutable session state.
+
+#### Scenario: Pending target matches the spawned core
+
+- **WHEN** the supervisor freezes target OL and spawns an environment core
+- **THEN** the child's automation URL and the pending `targetCloudKey` projection both identify OL from the same lifecycle-frozen value
+
+#### Scenario: Mutable session state changes after spawn
+
+- **WHEN** token refresh or another session transition occurs after the child is spawned but before its connection receipt
+- **THEN** startup projection and receipt validation remain scoped to the target frozen for that child and MUST NOT reinterpret it from transient session validity
 

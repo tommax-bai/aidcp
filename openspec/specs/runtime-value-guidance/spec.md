@@ -5,12 +5,22 @@ TBD - created by archiving change client-runtime-value-guidance. Update Purpose 
 ## Requirements
 ### Requirement: 主运行区以阶段价值说明真实运行节奏
 
-Edge 客户端 SHALL 在既有在场感下方保留一个紧凑的运行价值说明区。该区域 MUST 只在真实的新鲜运行事件、本轮浏览完成、小时级浏览完成或今日完整计划完成时出现；其余状态 MUST 回退为既有在场感，不得制造等待或完成状态。当选中环境明确为 Facebook 且自动化生命周期为 `stopped` 时，该区域 MUST 隐藏并优先于缓存的首帖引导、浏览窗口或今日完成数据；未知平台或其他生命周期状态 MUST NOT 被解释为 Facebook 未启动。新鲜运行态 SHALL 使用紧凑的本地图形标记，MUST NOT 用大吉祥物占据主运行说明首列；本轮/小时间隔与今日完成 MAY 继续使用静态观察或庆祝吉祥物。
+Edge 客户端 SHALL 在既有在场感下方保留一个紧凑的运行价值说明区。该区域 MUST 只在真实的新鲜运行事件、本轮浏览完成、小时级浏览完成或今日完整计划完成时出现；其余状态 MUST 回退为既有在场感，不得制造等待或完成状态。当选中环境明确为 Facebook 时，该区域 MUST 在自动化生命周期为 `stopped`、首作状态为 `searching` 或 `generating`、以及普通运行态存在新鲜 `presence` 事件时隐藏整张卡片；Facebook 本轮浏览完成、小时级浏览完成和今日完整计划完成仍 MUST 按真实证据展示。该平台闸门 MUST NOT 影响人设完成弹窗、顶部在场感、今日进展或发布卡。未知平台与非 Facebook 平台 MUST 保持既有视图判定。非 Facebook 的新鲜运行态 SHALL 使用紧凑的本地图形标记，MUST NOT 用大吉祥物占据主运行说明首列；本轮/小时间隔与今日完成 MAY 继续使用静态观察或庆祝吉祥物。
 
-#### Scenario: 新鲜运行时说明内容灵感目标
-- **WHEN** 引擎与会话均在运行，且最近 `presence` 事件仍在新鲜阈值内
+#### Scenario: 非 Facebook 新鲜运行时说明内容灵感目标
+- **WHEN** 当前平台不是 Facebook，引擎与会话均在运行，且最近 `presence` 事件仍在新鲜阈值内
 - **THEN** 主运行区展示“正在首页为你寻找更容易被看见的内容灵感”及紧凑的本地图形标记
 - **AND** 仅在该条件下运行细微动效，并尊重系统减少动态偏好
+
+#### Scenario: Facebook 普通运行中不展示获得感卡
+- **WHEN** 当前选中环境为 Facebook，引擎与会话均在运行，且最近 `presence` 事件仍在新鲜阈值内
+- **THEN** 主运行区不展示普通 `running` 运行价值/获得感卡片
+- **AND** 顶部真实动作、更新时间与今日进展继续按既有真源展示
+
+#### Scenario: Facebook 首作寻找和生成中不展示获得感卡
+- **WHEN** 当前选中环境为 Facebook，且显式首作状态为 `searching` 或 `generating`
+- **THEN** 主运行区不展示 `first-post` 运行价值/获得感卡片
+- **AND** Cloud 首作状态、自动生成、待审与发布确认链路保持不变
 
 #### Scenario: 本轮浏览完成时说明自然间隔的价值
 - **WHEN** 活跃的本轮窗口中 `view` 已达到真实计划且存在未来的继续时间
@@ -38,10 +48,21 @@ Edge 客户端 SHALL 在既有在场感下方保留一个紧凑的运行价值�
 - **THEN** 主运行区不展示运行价值/获得感卡片
 - **AND** 今日进展、内容发布及其他环境级数据卡继续按各自真源与既有规则展示
 
-#### Scenario: 非未启动状态不被平台闸门吞掉
-- **WHEN** 当前选中环境为 Facebook，但自动化处于启动、排队、待任务、待机、运行、暂停或异常状态
-- **THEN** 系统继续按既有运行证据决定是否展示运行价值说明
-- **AND** 不得仅因平台为 Facebook 而隐藏真实的进行中或已完成阶段说明
+#### Scenario: Facebook 间隔与完成状态不被主动运行闸门吞掉
+- **WHEN** 当前选中环境为 Facebook，且真实证据表明本轮浏览完成、小时级浏览完成或今日完整计划完成
+- **AND** 自动化生命周期不是 `stopped`
+- **THEN** 系统继续按既有规则展示 `session`、`hour` 或 `day` 运行价值说明
+- **AND** 不得因隐藏首作与普通运行卡而扩大隐藏间隔或完成卡
+
+#### Scenario: Facebook 人设完成弹窗保持原样
+- **WHEN** Facebook 账号首次成功建立人设并收到 `firstPostOnboarding:true`
+- **THEN** 人设完成弹窗继续展示全部既有首作说明、“开始找灵感”按钮、吉祥物、撒花和流光
+- **AND** 主运行区的 Facebook 卡片隐藏规则不得修改或简化该弹窗
+
+#### Scenario: 小红书首作与普通运行卡保持原样
+- **WHEN** 当前选中环境为小红书，且显式首作状态为 `searching` 或 `generating`，或普通运行态存在新鲜 `presence` 事件
+- **THEN** 系统继续按既有证据展示对应 `first-post` 或 `running` 运行价值说明
+- **AND** Facebook 平台闸门不得改变小红书的内容、进度、流程或视觉状态
 
 ### Requirement: 运行价值说明的视觉语义保持克制且可访问
 运行价值说明 SHALL 使用透明背景流程图标：已完成步骤为绿色、当前自然间隔为蓝色、下一步为中性灰；星标价值句使用蓝色强调。等待和完成的吉祥物 MUST 静态呈现，运行吉祥物的动效 MUST 在 `prefers-reduced-motion` 下关闭。

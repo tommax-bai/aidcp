@@ -1,3 +1,20 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: Startup login gate blocks cloud connect until authenticated`
+- TO: `### Requirement: Startup login gate blocks Cloud connect until target-scoped authentication`
+
+- FROM: `### Requirement: Login view is the only new/redesigned surface`
+- TO: `### Requirement: Login view selects target and credentials without exposing URLs`
+
+- FROM: `### Requirement: Token persistence and session lifecycle`
+- TO: `### Requirement: Token persistence and session lifecycle are target-scoped`
+
+- FROM: `### Requirement: Login credential prefill is local and clearable`
+- TO: `### Requirement: Login credential prefill is encrypted and target-scoped`
+
+- FROM: `### Requirement: Edge client login gate activation`
+- TO: `### Requirement: Edge client login gate activation follows the official target catalog`
+
 ## MODIFIED Requirements
 
 ### Requirement: Startup login gate blocks Cloud connect until target-scoped authentication
