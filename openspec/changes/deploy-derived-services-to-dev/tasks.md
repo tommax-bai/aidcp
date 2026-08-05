@@ -219,6 +219,33 @@
        （internal_http_unauthorized，证明 bearer 真生效）。
        ⚠️ `config-mirror-bump` 只补了**落地端**：生产方（automation 的中继 + 四个限频配置存储的
        版本推进器）今天仍未接线，已在 8.1 登记，MUST NOT 读成「这条通道通了」。 -->
+- [x] 6.2b **派生 automation 的四道版本偏斜闸恒关**（2026-08-05 查 §0 那条 scroll 时顺带坐实的
+  另一条切流回归）。形态与 6.2 / 6.2a 是**第三种**：不是漏注册、也不是漏传参，是**参数值抄错**——
+  派生组装根把能力名手抄成不带 `_v1` 的短名，两侧都是裸 `string`，typecheck 一个字都不说。
+  后果不是报错，是**新边端被静默当成老边端**：该能力对所有连接恒判「没有」。
+  <!-- 判据链（每一步都实读、没有一步是转述）：
+       ① OL 日志每条 Reel 都打 `[interaction_appraiser] skip reason=facebook_reel_follow_edge_capability_missing`
+          ⇒ 云端认为边缘没有 `facebook_reel_follow_v1`（edge 侧 07-22 ca6df3b 就加了）。
+       ② 同一批日志里边缘回的失败原因是 `reels_navigation_unconfirmed` —— 该串 07-28 845ef0d 才引入
+          ⇒ **这些边缘必然 ≥07-28 的构建**，不可能没有 07-22 的能力位。两条互相矛盾 ⇒ 是云端读错名。
+          （用户当场确认：OL 运营机跑的确是新包，只是 /opt/aidcp/downloads 的下载链接停在 0.3.23。）
+       ③ 逐字对照事实源：cloud `src/server.ts:7293-7297` 用常量，派生
+          `aidcp-automation/src/automation-connection-dispatcher.ts:417-422` 手抄短名。
+          四道全中：`facebook_reel_follow_v1` / `search_activity_receipt_v1` /
+          `identity_read_current_v1` / `identity_read_self_profile_v1`；只有 `inline_targeting`
+          （本来就没后缀）是对的 —— 唯一对的那个正是 buildCtx 默认 fixture 里的那个，所以既有用例全绿。
+       **顺带排掉了更贵的那种**：把两侧 RoleDispatcher 选项键全量取出对差集，
+       **单体有而派生没有的 = 0**（`blocker` 是嵌套类型字段的假阳性）。即这次只是值错、不是漏接，
+       与 [[split-process-drops-optional-providers]] 那次的形态不同。
+       修于 aidcp-automation dd1afa8：改按协议常量比对 + 三条 guard 用例。
+       **变异测试做了两轮、并记了是哪条抓住的**：抄回短名 ⇒ 「按常量识别」与「截短名不认」两条同时红；
+       改成「两种写法都认」⇒ 只有「截短名不认」那条红 ⇒ 第三条用例是独立承重的，不是前一条的重复。
+       automation typecheck 0 错、acceptance 289/290、全量 2253/2257；那 1 红
+       （`boundary census executable exits zero…`）**改前改后同一条**，与本项无关。
+       2026-08-05 15:30 已部署 dev（git archive 快照 rsync、不从工作区推；ECS 上 typecheck CLEAN、
+       重启后 active/NRestarts=0、8787 与 8094 在、就绪 `ready` `blockers=[]`、近 3 分钟零报错）。
+       ⚠️ **OL 未部署**：同一份缺陷在 OL 上同样恒关（那 6 个在跑的账号一直没有自动 Reel 关注、
+       没有免导航身份读），但 OL 部署须用户明确要求 + 走发布分支，已在收尾里向用户点名。 -->
 - [x] 6.1b **切流之前把面板与客户鉴权两个对外口真打一遍**（上一批只到「代码接线了」，
   跨进程那几跳一次都没跑过）。做法：给派生 api 临时配一对**备用端口** 8190 / 8191，
   单体的 8090 / 8091 一根手指都不碰，同一份只读脚本对两个 base 各跑一遍逐条对照。
