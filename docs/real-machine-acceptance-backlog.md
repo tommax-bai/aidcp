@@ -3593,8 +3593,11 @@ change `stop-automation-only-on-authorization-loss`（edge master `e903cf7`）�
 
 - [ ] 131.6 **不做自动恢复**：撤权被恢复、冲突被消解后，客户端 MUST NOT 自动把引擎拉起来
       （既有不变量：登录与 roster 刷新不得自动启动引擎），仍由用户显式点启动。
-- [ ] 131.7 导入号本身卡 Facebook 验证 / 需改密（环境名被改成 `checkpoint` / `password` 那批）
-      仍然只能人工过 FB 那一关——它与本 change 无关，别把它读成同一个故障。
+- [ ] 131.7 导入号本身卡 Facebook 验证（环境名被改成 `checkpoint` 那批）仍然只能人工过 FB 那一关——
+      它与本 change 无关，别把它读成同一个故障。
+      <!-- 2026-08-05 更正：原文把 `password` 那批也算进「只能人工」，**这一半是错的**。当天实测证明
+           被改名成 `password` 的 9 个环境不是账号问题，是我们自己在密码只敲进 1–2 个字符时就点了提交
+           （见下方簇 133 / change settle-facebook-credential-fill）。`checkpoint` 那批仍按本条处理 -->
 
 ---
 
@@ -3674,3 +3677,29 @@ change `stop-automation-only-on-authorization-loss`（edge master `e903cf7`）�
 （cloud-env → deployment-target），而 `MODIFIED` 按 header 逐字匹配、跟不上。
 归档前逐条比对确认是**改名 + 重写正文**（不是建模错位）后前置了 RENAMED 段，随后干净合入。
 `validate --strict` 对这类**一条都查不出**——它只校验 delta 内部结构。
+
+---
+
+## 簇 133 — 首登不再提交半截密码（登记于 2026-08-05）
+
+change `settle-facebook-credential-fill`（edge master `313b2e1`）。**与簇 129 / 130 / 131 共享同一个前提：
+必须重新打包桌面客户端才能验证**——修复在 Native 引擎的页面规则与核心进程里，运营机上跑的安装包不换，
+行为一个字都不会变。
+
+现场事实（2026-08-05 实测，三个环境，真引擎 + 真协调器 + 真预算）：指纹浏览器的凭据是**逐字符敲**进去的
+（表单第 ~10.7s 出现 → 邮箱 26–27 字符敲约 4s → 密码第 ~15.2s 才开始、约 5 字符/秒）。旧判据只看「两个框
+非空」，500ms 一拍，于是密码敲到第 1–2 个字符就被判成「填好了」并点提交；Facebook 回
+「The password you entered is incorrect」，而点击又抢走焦点，填充永远停在半截。运营侧据此把 9 个环境
+改名成 `password`。**每启动一次就向 Facebook 递一次错密码**——`checkpoint` / `locked` 那几个很可能是同一条链
+的下一站。
+
+- [ ] 133.1 在一个原 `password` 命名的环境上重跑首登：判定就绪时密码字符数等于存储值长度，**提交一次即通过**，
+      页面不再出现「The password you entered is incorrect」。
+- [ ] 133.2 在「填充中途被页面重绘清空」的环境上（实测 k1fd395p 是这一形态）：45s 宽限期到点后进入人工登录
+      等待，浏览器与 CDP **保活未被杀**，客户端显示的原因仍是既有的 `credential_fill_unavailable` 文案。
+- [ ] 133.3 代理慢的环境（越南住宅代理，表单出现晚）不再被误判成「凭据不可用」——宽限期锚点已改成
+      「两个凭据框首次同时出现」，不再从文档加载起算。
+- [ ] 133.4 运营回填：验收通过后把被本缺陷改名的 9 个 `password` 环境名按实际登录态还原。
+      `checkpoint` ×2 / `locked` ×1 的解除**不在本 change 范围**，仍按簇 131.7 走人工。
+- [ ] 133.5 **反向确认**：首登过程中不得因为「凭据在下发瞬间又变了」而出现终局失败 + 杀浏览器
+      （新的有界恢复路径最多重来 5 次；超出才如实报 `credential_fill_unsettled`）。
