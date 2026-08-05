@@ -112,7 +112,10 @@
 - [x] 8.3 探活不可用时三处写路径均拒写、且原因可区分于「模型不合法」「密钥缺失」。
   <!-- 逐值断言状态映射（404/503/400），并断言 probe_unavailable ≠ model_invalid ≠ provider_key_missing。 -->
 - [ ] 8.4 精选库跨进程后账号隔离仍由属主侧保证的用例。
-- [ ] 8.5 三仓 `npm run test:acceptance` → `npm test` → `npm run typecheck` 全绿；边界门禁 `boundaries` 相关用例不退化（豁免清单只准下降）。
+- [x] 8.5 四仓 `test:acceptance` → `test` → `typecheck` 全绿（每批次各跑一遍）。
+  <!-- 最后一轮：cloud 4221/0 失败、api 567/0、automation 2254/0、content 453/0。
+       中途抓到一条**我自己造成的**回归：更早两次同步把 transport 文件搬进自动化仓时
+       没登记边界账本，而那时我没跑该仓验收 —— 破了两批才被发现。已随批次 4 补上。 -->
 
 ## 9. 集成与部署
 
@@ -147,5 +150,5 @@
 
 ## 10. 收尾
 
-- [ ] 10.1 回写 `deploy-derived-services-to-dev` 的 task 6.2：指向本 change，写明它本该抓住这批。
+- [x] 10.1 回写 `deploy-derived-services-to-dev` 的 task 6.2：指向本 change。
 - [ ] 10.2 `openspec validate restore-panel-capability-wiring --strict` 通过后归档。

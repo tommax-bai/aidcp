@@ -35,14 +35,18 @@
        `AutomationSyncReadMirrors.facebookSlowStartPolicy()` 同样不带目标。预期零改动，
        但 4.x 要有一条断言钉住"属主去掉过滤后载荷逐字不变"。 -->
 
-## 2. aidcp-cloud — 数据模型与迁移
+## 2. aidcp-cloud — 数据模型与迁移（**只做 expand 段**，删列见第 9 组）
 
-- [ ] 2.1 写迁移：`facebook_operation_global_policy` 删 `execution_target`，改单行约束（固定主键 + CHECK），数据按逐项基准落一行
-- [ ] 2.2 写迁移：`facebook_operation_global_policy_audit` 保留 `execution_target` 作历史追溯，放宽 CHECK 允许"全目标"取值，唯一约束 `(execution_target, new_revision)` 保持不变；历史行一行不改
-- [ ] 2.3 写迁移：`facebook_group_comment_policy` 删 `execution_target`，收成单行；取值按"缺席不参与"规则落 ol 现值（72 小时）
-- [ ] 2.4 写迁移：`facebook_environment_slow_start_completion` 删 `execution_target`，主键改为 `env_key`，同环境多行按 `min(completed_at)` 合并
-- [ ] 2.5 新 revision 序列起点取两侧历史最大值 +1，写进迁移
-- [ ] 2.6 迁移脚本自带前置备份步骤（三张表全量导出、含时刻），并在缺备份时拒绝执行
+- [x] 2.1 写 expand 迁移 `0110_facebook_global_policy_single_scope.sql`：五处 `CHECK` 放宽到接受哨兵值 `'all'`（三张主表 + 两张审计表）
+  <!-- 原计划是「删 execution_target 改单行约束」，与 migrations/README.md「收缩 MUST 独立 change、
+       独立部署、MUST NOT 与 expand 同批交付」冲突。改为两段：本段 expand 切读，删列另立 change。
+       见 design D1 修订。 -->
+- [x] 2.2 审计表放宽后新行写 `'all'`，唯一约束 `(execution_target, new_revision)` 原样保留；历史行一行不改
+- [x] 2.3 主策略与群评论策略按"两行都在取 dev、只有一行取那一行"写入合并行；**只从存在的行里挑**，故 dev 侧的缺席不会把 72 小时改回默认 24
+- [x] 2.4 完成事实按 `env_key` 分组取 `min(completed_at)` 写入合并行
+- [x] 2.5 新 revision 起点取全表最大值 +1，写进迁移
+- [ ] 2.6 迁移前备份的操作步骤写进部署任务（第 7 组），并在迁移记录里留导出时刻与文件位置
+- [ ] 2.7 `npm run migrate status` / `verify` 在 dev 上确认本迁移声明的对象与实际一致
 
 ## 3. aidcp-cloud — 存储与路由
 
@@ -94,3 +98,8 @@
 - [ ] 8.5 入群后首次评论等待仍为 72 小时（未被 dev 的缺席回落成 24）
 - [ ] 8.6 迁移当天分开观察并各自记录结论：毕业那批看当日各动作总量是否顶到安全限额；消费模式那批只看加群次数是否随阈值 5→2 成比例上升
 - [ ] 8.7 真机 / 长周期观察项登记进 `docs/real-machine-acceptance-backlog.md`
+
+## 9. 收尾：把中间态收掉（**独立 change，本 change 不做，但必须立项**）
+
+- [ ] 9.1 切读稳定后立一个独立的 contract change：删掉 `dev` / `ol` 两行与三张主表的 `execution_target` 列，策略表改单行约束、完成表主键改 `env_key`
+- [ ] 9.2 该 change 落地前，`'all'` 哨兵值是**中间态不是终点** —— 一个还留着的分行维度迟早会被重新用起来。本条 MUST NOT 因为"现在能跑"而无限期挂起；本 change archive 时若 9.1 尚未立项，MUST 在 backlog 里留具名条目
