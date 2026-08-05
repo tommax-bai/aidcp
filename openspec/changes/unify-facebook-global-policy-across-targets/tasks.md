@@ -1,9 +1,39 @@
 ## 1. 前置坐实（动手改代码之前必须先有结论）
 
-- [ ] 1.1 坐实"另一目标多久能看到对方的写"：读接口进程的同步读快照发布周期与 `refreshFromAuthority()` 的实际触发点，给出一个可写进规格的时限上限（带 `文件:行`）
-- [ ] 1.2 依 1.1 结论二选一并记录理由：沿用现有周期性重读（则把时限写进规格并补验收），或把接口进程补进 `facebook_operation_policy` 镜像键的消费者名册走既有失效通道
-- [ ] 1.3 清点全部按 `execution_target` 过滤这三张表的读写点（含派生 `aidcp-api` 仓自己的组装根），列成清单；**MUST 把动态引用与 SQL 字符串一起 grep**，只匹配符号名会漏
-- [ ] 1.4 确认自动化侧经同步读镜像消费的载荷形状不含目标维度（预期零改动，但要验证不因属主侧去掉过滤而漂移）
+- [x] 1.1 坐实"另一目标多久能看到对方的写"
+  <!-- 结论比设计里的假设更差：**接口进程根本没有周期性重读这张表**。
+       `facebookOperationPolicy.refreshFromAuthority()` 在派生 api 仓只有一个调用点
+       （aidcp-api `src/server.ts:1944`），它在**属主快照闭包**里——只有当自动化进程
+       过来拉 `facebook_operation_policy` 这条流时才跑。节奏由**对方**决定，不是本进程的定时器。
+       单体侧的 `scheduleSyncReadRefresh('api-owner', 30_000, …)`（aidcp-cloud `src/server.ts:1527`）
+       是单体自己的推送循环，派生 api 走的是 `snapshotFor` 拉取式（aidcp-api `src/server.ts:3054`），
+       两者不是同一条路，30s 这个数**不能**当作派生部署下的时限来引用。 -->
+- [x] 1.2 依 1.1 结论二选一并记录理由 → **选"补消费者名册"，不沿用副作用**
+  <!-- 接口进程今天持有 MirrorVersionStore 但只用来**写** bump（aidcp-api `src/server.ts:1241`），
+       全进程没有任何"按镜像版本重读自己配置"的消费侧通道（grep `refreshFromAuthority` 的调用点可证）。
+       今天不需要是因为每张表只有一个进程在写、它自己的缓存永远是对的；合并后有两个 api 进程，
+       这条通道从"不需要"变成"必须有"。
+       沿用副作用的失效方式：自动化改拉取节奏、或那条流改成"变更才拉"，另一目标就**永远**读旧值且不报错。
+       任务落到 3.6。 -->
+- [x] 1.3 清点全部按 `execution_target` 过滤这三张表的读写点
+  <!-- aidcp-cloud 侧：
+       - `src/config/facebook-operation-policy-store.ts`：979/988（全局行读）、1243/1252/1295/1296（写+RETURNING）、
+         1327（审计插入）、1789/1791/1798（完成事实写删）、2501 与 2688（完成事实子查询）、
+         2670/2676（完成事实插入）、2599（行→视图）、332/413/433/446（行类型与 schema 要求集）
+       - `src/config/facebook-group-comment-policy-store.ts`：174、255、274、289、302（读/写/审计）、
+         46/53/69-70（schema 要求集与索引名）
+       - `src/client-auth/client-user-store.ts`：1260（镜像重建子查询）、1502/1517/1520/1558/1575/1578
+         （进度写的完成事实增删）、2129（全局策略读）
+       - `src/config/api-sync-read-source.ts`：206（完成事实子查询）
+       - `src/panel/panel-server.ts`：1144/1152/1435/1441（只是错误串，无目标过滤，不改）
+       - `src/orchestrator/facebook-consumption-mode-coordinator.ts`：231（错误串，不改）
+       - migrations：0100 / 0103 / 0104 / 0107
+       派生 `aidcp-api` 仓的手写组装根另计（构造这两个存储时传 `executionTarget`）。 -->
+- [x] 1.4 确认自动化侧经同步读镜像消费的载荷形状不含目标维度
+  <!-- 载荷是 `slowStart: store.slowStartRuntimePolicy()`（`src/config/api-sync-read-source.ts:103`），
+       只有 totalDays + dailyCaps，无目标维度；自动化侧取用口
+       `AutomationSyncReadMirrors.facebookSlowStartPolicy()` 同样不带目标。预期零改动，
+       但 4.x 要有一条断言钉住"属主去掉过滤后载荷逐字不变"。 -->
 
 ## 2. aidcp-cloud — 数据模型与迁移
 
