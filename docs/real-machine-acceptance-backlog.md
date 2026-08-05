@@ -3971,3 +3971,34 @@ change `route-notification-items-by-category`（cloud master `9e5b000` / 派生 
       新号昵称是否开始由平台真实昵称回填（此前一直靠建号时已知的注册名，所以通道全废也看不出来）。
 - [ ] 141.5 **构建到达确认**：验之前先确认运营机上跑的客户端版本**包含** edge `c4ec8bc`。
       不确认就验，验的是旧构建，结论无效。
+
+## 簇 142 — 消费模式那条链：卡住的一格不再冻住整条（登记于 2026-08-05）
+
+**前置环境**：一台 dev 上的 Facebook 消费模式环境（`base_mode=consumption`），边缘客户端在线、
+能跑起一场浏览。**必须是部署后的 dev**（automation 已含 `60f9022`、库已应用迁移 `0111`）。
+
+背景：change `unblock-facebook-consumption-comment-segment`。2026-08-05 生产实测：12 个账号
+（dev 2 / OL 10）的消费链全部冻死在评论那一格——评论义务停在 `waiting_gate`，而链条是单槽的，
+于是同账号的**点赞与加群一并永久停摆**、跨重启不恢复、日志零报错。最早一个卡了一天多、
+期间 3325 次浏览零点赞。修复两件：把群评论时序策略接进自动化进程；把「等待中的义务」与
+「推进槽位」解耦（义务不作废、只是不再挡路）。
+
+**部署时已核到的部分**（不必重验）：dev 上该 blocker 已从 `facebook_group_comment_policy_unavailable`
+变成 `comment_edge_offline` / `no_strict_eligible_historical_group` ⇒ 策略确实读到了；
+库内唯一索引已换代为 `(account_id, execution_target, action_type)`。
+
+**没核到的部分**（本簇要验的）——部署时边缘全部离线，解耦的运行期证据一条都没观测到：
+
+- [ ] 142.1 **承重项**：让一个带「等待中评论义务」的账号跑一场浏览，确认
+      `facebook_consumption_progress.active_action_id` **归零**、且该账号重新出现
+      `action=like sent=1`。这是解耦的端到端证明；此前它恒为「有事在办」。
+- [ ] 142.2 **义务没被丢掉**：同一时刻那条评论义务 MUST 仍在（`state<>'terminal'`）、原因值不变。
+      让位 ≠ 作废——作废等于悄悄少做一次运营动作，是本次刻意没选的那条路。
+- [ ] 142.3 **在途的写仍然独占**：点赞已派发、回执未回时，新的浏览 MUST 仍判「有事在办」，
+      MUST NOT 再造第二次点赞。这是让位判据第三个条件（`dispatch_phase='not_started'`）的落点。
+- [ ] 142.4 **积压上限**：连着跑到第二次「到点造同类义务」，确认没造出第二份，
+      且日志有一行 `[facebook-consumption] obligation merged`。静默跳过与合并必须可分辨。
+- [ ] 142.5 **评论真的能发了**：等某个群过了 72 小时预热窗口，确认覆盖评论选群不再返回
+      「本轮无可评群」、评论真的发出去。这一条要等时间，急不得。
+- [ ] 142.6 **OL 尚未部署**：OL 上 10 个账号的 blocker 仍是 `facebook_group_comment_policy_unavailable`，
+      在 OL 更新之前不会自愈。若先要救急，唯一手段是改一次该环境的运营策略（换策略号）。
