@@ -6,6 +6,8 @@
 - [x] 1.2 `runOnce` 返回值携带四个计数（已物化 / 实际对账 / 他 target 跳过 / 未知跳过）；`已物化>0 且 实际对账=0` 时 warn 级响亮记录。 <!-- aidcp-cloud ec71ef1 返回类型由 ReconcileDrift[] 改为 ReconcileRound，调用点与用例同批更新 -->
 - [x] 1.3 装配处注入归属读口（复用风控条件写在用的那一个，MUST NOT 另起读法）；归属口缺席时保持全量对账并在启动日志写明当前是哪一种形态。 <!-- aidcp-cloud ec71ef1 偏离（收紧）：判据由「读口在不在」改为与握手侧占位归属**逐字相同**的 `ownershipMode !== 'off'`——enforce 被回滚成 off 时握手不再改写归属，按陈旧归属过滤会把本进程真正驱动的账号判成别人的、静默丢掉这道保护 -->
 
+- [x] 1.4 每轮补一行常态回执（四个计数 + 偏差数）。加上过滤之后，「一切正常」「过滤器把范围收成空」「定时器根本没跑」在运维视角下同形，而后两件是故障；这行也是这道过滤在生产上唯一的正向证据。 <!-- aidcp-cloud 3665590 / aidcp-automation 9b102b3；部署时才发现的缺口：只留「异常才说话」的那条 warn，验收就只能靠「没日志」推断 -->
+
 ## 2. aidcp-cloud — 告警来源可分辨
 
 - [x] 2.1 在风控告警唯一收口处把本进程 `execution_target` 拼进 detail，使 dev / ol 共用告警列表可分辨来源；不动 `alerts` 表 schema。 <!-- aidcp-cloud ec71ef1（`raiseRiskAlert`）/ aidcp-automation 60b4845（`createAutomationRiskFoundation` 的 `raiseAlert`） -->
