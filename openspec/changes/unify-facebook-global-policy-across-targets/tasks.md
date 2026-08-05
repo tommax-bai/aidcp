@@ -91,15 +91,20 @@
 
 ## 5. aidcp-api — 派生仓同步与组装根
 
-- [ ] 5.1 从控制仓跑 `scripts/sync-split-repos --repo aidcp-api`（先 dry-run 对账再 `--apply`）
+- [x] 5.1 从控制仓跑 `scripts/sync-split-repos --repo aidcp-api`（先 dry-run 对账再 `--apply`）
+  <!-- 源 aidcp-cloud@e2d0e6d，写入 5 文件。六仓全量对账：api/automation/content 三仓 0 差异，
+       故本 change 只需部署 api。**迁移文件不派生**，须手工 cp 进该仓 migrations/。 -->
   <!-- **必须等 cloud 分支合回 master 之后再做**：同步脚本从 canonical aidcp-cloud 的 master 取源、
        写 canonical aidcp-api，现在跑只会把不含本 change 的旧源同步过去。 -->
-- [ ] 5.2 派生仓手写组装根按需调整（该文件不参与自动同步，必须手改）
+- [x] 5.2 派生仓手写组装根按需调整
+  <!-- aidcp-api 6f3e02a。删掉群评论策略存储的 executionTarget 实参；
+       该仓 test/ 不派生，属主那边改过的两个测试文件在这里是独立副本，同样三处照搬。 -->
   <!-- 已知必改一处、且**顺序不能反**：cloud 侧删掉了群评论策略存储的 executionTarget 入参，
        该仓组装根现在仍在传它。同步（5.1）之前删会因为入参仍必填而编译失败，
        同步之后不删会因为多余属性编译失败——只有「先同步、后删参」这一个顺序是通的。
        3.6 的刷新器接线已先行落在 2219134，与本条无依赖。 -->
-- [ ] 5.3 派生仓 `npm run typecheck` 通过
+- [x] 5.3 派生仓 `npm run typecheck` 通过
+  <!-- aidcp-api 6f3e02a：typecheck 0、567 通过 0 失败。 -->
 
 ## 6. aidcp-console — 明示"对全部运行目标同时生效"
 
@@ -120,10 +125,24 @@
 
 ## 7. 部署与迁移执行
 
-- [ ] 7.1 dev 部署代码，跑迁移前先在 dev 上做一次演练（备份 → 迁移 → 验收 → 回滚 → 再迁移）
-- [ ] 7.2 迁移窗口选低峰；执行前导出三张表全量备份并记录时刻与文件位置
-- [ ] 7.3 在一个事务里执行 DDL + 数据合并
-- [ ] 7.4 两个接口进程重启，确保缓存重新装载
+- [x] 7.1 dev 部署 + 迁移
+  <!-- 2026-08-05 dev：api rsync + migrate up + 重启，healthcheck 通过；console 也已部署。
+       **迁移第一次失败并整体回滚**：完成事实表的约束自动名 65 字节、超过 PG 63 字节标识符上限，
+       实际落库的是被截断的名字；按拼写全名 DROP IF EXISTS 不命中、**且不报错**，老约束原样留着，
+       写哨兵值时被它拒绝。修法：两个名字都 drop + 新约束用短名（aidcp-cloud 7246bcf / aidcp-api 749dbfe）。 -->
+- [x] 7.2 迁移前备份
+  <!-- dev 上 /opt/aidcp/backup-0110-{global-policy,group-comment,completion}.csv（2026-08-05 16:23，
+       2 / 1 / 73 行）；api 目录 tar 备份 dev 16:23、ol 16:31；两侧 .env 各备份一份。
+       dev 与 ol 共用同一个 api 库（已实测：从 ol 连过去看到同一批行），故迁移只需跑一次。 -->
+- [x] 7.3 在一个事务里执行 DDL + 数据合并
+  <!-- 执行器逐条单事务；第一次失败时整条回滚、账本未动，这一点被实测确认。 -->
+- [x] 7.4 两个接口进程重启
+  <!-- dev 16:29 起来干净。**ol 起了一次事故**：OL 上 npm install 拉不到 git 依赖（无 GitHub 访问），
+       其 node_modules 的 aidcp-transport 仍是旧 pin，缺 model-probe-http，新代码启动即崩；
+       回滚到备份又被 schema 闸拦住（账本已 0110、旧构建只认 0109）——**回滚路径被自己堵死**，
+       OL 接口面短时中断。向前修：把 dev 上已装好的 aidcp-transport / aidcp-kernel 打包搬到 OL，
+       再上新代码，16:35 恢复。**教训见 backlog：OL 无法装 git 依赖，任何抬 pin 的部署都必须
+       先解决包分发，否则 OL 的回滚窗口会在迁移应用后立即消失。** -->
 - [ ] 7.5 迁移记录里逐个列出：受影响的"立即毕业"环境键、消费模式加群阈值那一格的前后值、回滚窗口截止时刻
 - [ ] 7.6 一次迁移全量切换（不分阶段）；迁移记录 MUST 把"立即毕业"与"处于消费模式"两批对象分开成两份清单，交集单独标出——它们是当天唯一无法靠观察面归因的样本
 
