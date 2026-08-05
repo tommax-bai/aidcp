@@ -168,6 +168,38 @@
        api 与 content 都当场具名拒绝、退出码 1、且 api 那次一个池都没建）。
        **"从进程管理器状态直接看出"这一半没验**——unit 已配 StartLimitBurst=3 让它进 failed，
        但没有真造一个落后的库去跑一遍。留着。 -->
+  <!-- 2026-08-05 **反例这次真跑了，第二半不成立 —— 是缺陷，不是没验。本条继续不勾。**
+
+       **前一半再次坐实（这回是生产上的真事）**：OL 接口进程今天因账本 0110 超前于构建 0109
+       被契约门拒启，journal 逐次 `Main process exited, code=exited, status=1/FAILURE`。
+       退出码这一半没问题。
+
+       **后一半实测为假**：同一段 journal 里 `restart counter is at 1..9` 一路涨、**从没停手**，
+       服务状态一直停在 activating，`systemctl status` 上看不出"它其实起不来"。
+       也就是说今天那句"从 0110 应用那一刻起就一重启即死，而全程零告警"里的**零告警**，
+       有一半正是这条造成的：进程管理器根本没把它记成失败。
+
+       **根因（systemd 自己说的，不是推断）**：`systemd-analyze verify` 对三个 unit 各报一句
+       `Unknown key name 'StartLimitIntervalSec' in section 'Service', ignoring`。
+       这两条指令属于 `[Unit]` 段，写在 `[Service]` 里 **`StartLimitBurst` 因兼容仍生效、
+       `StartLimitIntervalSec` 被直接丢弃** ⇒ 间隔回落到默认 **10s**。
+       而每个崩溃周期 ≈ RestartSec 5s + 起崩 3s ≈ 8s ⇒ 任何 10s 窗口里最多 1~2 次启动，
+       **"3 次即停手"这条限速永远触发不了**。unit 文件第 10-11 行的注释写着它要防的正是这个。
+       **两台环境的三个 unit 全中**（dev / OL 各 3 个，实测生效值都是 `StartLimitIntervalUSec=10s`）。
+
+       **修法已在 dev 上用一次性探针实测通过**（`aidcp-startlimit-probe.service`，跑 `/bin/false`，
+       验完即删，全程没碰任何真服务，也没碰 isales）：
+       · 摆在 `[Service]`（＝现状）：生效 10s，45 秒内重启计数到 8 仍在涨，状态 activating；
+       · 挪进 `[Unit]`：生效 2min，计数**停在 3**，状态 **failed**。
+       ⇒ 判据形态是对的，只是位置写错了一段。
+
+       **尚未落地**：真 unit 的修改需要人批准（本 session 的权限闸拦下了对 ECS unit 文件的写）。
+       接续任务见 5.3a。 -->
+- [ ] 5.3a **把 `StartLimitIntervalSec` / `StartLimitBurst` 从 `[Service]` 挪进 `[Unit]`**
+  （dev 与 OL 各三个 unit），`daemon-reload` 后确认生效值为 `StartLimitIntervalUSec=2min`、
+  `systemd-analyze verify` 不再报那句 `Unknown key name`，且三服务保持 active / NRestarts 不变
+  （`daemon-reload` 不重启服务，本操作对在跑的业务无影响）。**改前逐个备份 unit 文件。**
+  完成后回到 5.3 复跑一次反例再勾。**MUST NOT 顺手碰 isales 的任何 unit。**
 
 ## 6. 起三个服务，逐条核对跨进程
 
@@ -202,7 +234,36 @@
        两个仓各钉一条**同值**载荷摘要用例（test/acceptance/persona-soul-parse-single-source.ts），
        任一侧漂移一侧当场红；另加「组装根 MUST 按引用注入、MUST NOT 就地再写一份」的源级断言。
        六仓对账 + 逐仓 typecheck 全绿；cloud 4168 / api 529 / automation 2191 / content 448 全过。 -->
-- [ ] 6.2 **逐条点名核对跨进程路由**：从调用方那一侧实际打一遍，确认对面真的注册了。
+- [x] 6.2 **逐条点名核对跨进程路由**：从调用方那一侧实际打一遍，确认对面真的注册了。
+  <!-- 2026-08-05 21:5x 收口。**两层各做一遍，并写清各自证明了什么、没证明什么。**
+
+       ① **真打（dev，13 条点名的那批）**——接口进程→自动化的 12 条 content-scheduling
+          全部 200 并回真结论（在线账号空表 / 风控 normal / 三个 busy 均 false /
+          今日评论 0 / 今日加群 0 / 加群日上限 20）；内容侧素材可用数那条打到属主，
+          答**具名领域错误** `facebook_publish_media_account_not_found`（我用的是不存在的账号，
+          这正是它该说的话——回 0 才是危险答案）。
+          **三条写口是故意送不合法 input 打的**：信封解析在转调之外、先跑，
+          于是收到 `api_direct_invalid_request` 就已经证明路由注册了，**一个真动作都没触发**。
+          **负对照必须有**：另打一条编造的路由，答 404 `route_not_found` ——
+          没有这一条，前面那些 200 证明不了任何事。
+
+       ② **静态普查（全部 71 个 registrar）**——共享包里每一个 `register*Routes`
+          都在某个派生仓的 src 里有**真调用**，缺口 0。这正是前面两次真事故的形态
+          （`客户端在 + registrar 在 + 没人调用`：automation 漏第七族、api 漏七族）。
+          **判据剥了注释再算**：接口进程组装根里就有一句注释原样写着
+          `registerContentSchedulingRoutes(...)`，不剥注释这条闸会被它骗过——
+          与跨仓普查那次「11 条悬空引用全是没剥注释的假阳性」同一个坑。
+
+       **两层各自的边界，MUST NOT 混着读**：
+       · 静态那层证明「源码里有人调它」，**不证明「这台机器上它真跑了」**——
+         不少注册挂在 `if (存储起来了)` 下面，属主起不来就具名 skip。
+       · 真打那层只覆盖点名的 13 条。**故意没做全量盲扫**，原因在设计探针时撞到了：
+         有的路由**不吃参数、直接转调一个会产生副作用的属主方法**
+         （面板那条计费价格刷新就是），「随便 POST 一下看它 404 不 404」的盲扫会把它们真触发。
+         下一个人别再发明这个扫法。
+       · 面板那一族的运行时完备性由另一条闸管：启动期装配对账（少装一项且未具名即进程起不来），
+         见 change `restore-panel-capability-wiring`。 -->
+
   <!-- 2026-08-05：这条**没做**，而它本该抓住的东西真的发生了 —— 接口进程的手写组装根
        装配面板能力清单时漏了 21 项（单体 49 / 手写 29），运营打开设置页才发现，
        七处后台功能整页失败。补救与防复发见 change `restore-panel-capability-wiring`
