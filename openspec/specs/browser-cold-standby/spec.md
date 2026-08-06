@@ -41,6 +41,16 @@ In particular, the browse-session lifecycle label — whose only writers are
 log-phrase matches emitted by the retired page-automation path — MUST NOT be an
 admission condition.
 
+Having a live writer is a **necessary but not sufficient** condition for
+admission input. The browse-session lifecycle label SHALL remain excluded from
+the admission decision **even after it is rewired to a live structured source**,
+and re-adding it SHALL require amending this requirement rather than citing the
+restored writer. The governing reason is not whose writer is alive: that label
+describes the target's **posture** (whether a browse round happens to be running
+right now), not the target's **identity** (which environment and account would
+be acted upon). Per the stop-or-continue criterion, a posture condition MUST NOT
+by itself be grounds for refusing to act; only an identity condition may be.
+
 #### Scenario: 安全长等待关闭浏览器并提前唤醒
 - **WHEN** edge receives an eligible long-wait hint while the environment is
   safely idle or resting
@@ -54,6 +64,16 @@ admission condition.
   such as `idle`
 - **THEN** edge closes the browser for cold standby anyway, because that label
   is not an admission condition
+
+#### Scenario: 会话轴接上活写入方之后仍不得进入准入闸
+- **WHEN** the browse-session lifecycle label is rewired to a live structured
+  session source that is written on every supported platform, and that label
+  reports no browse round in progress while an eligible long-wait hint arrives
+- **THEN** admission SHALL be decided without consulting that label, and edge
+  SHALL close the browser for cold standby exactly as it would have before the
+  rewiring
+- **AND** a structural assertion SHALL fail if that label reappears among the
+  admission inputs
 
 #### Scenario: 手工操作取消自动恢复
 - **WHEN** an operator manually pauses, closes, removes, or restarts an
