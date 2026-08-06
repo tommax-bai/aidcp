@@ -4130,9 +4130,16 @@ change `route-notification-items-by-category`（cloud master `9e5b000` / 派生 
 - [ ] 144.5 **派生 api 仓在 dev 上跑不了迁移命令**：`npm run migrate status` 报
   `Cannot find module '/opt/aidcp/api/src/kernel/pg-owner-connection-resolver.js'`
   —— 派生仓没有 `src/kernel/`，kernel 走包路径。修复已落在
-  change `restore-derived-migration-executability`（1.1–1.4 已完成）**但尚未部署到 dev**。
-  这直接卡住 `unify-facebook-global-policy-across-targets` 的 2.7
-  （在 dev 上核对迁移声明对象与实际是否一致）。**部署那条 change 后 2.7 才有执行条件。**
+  change `restore-derived-migration-executability`（1.1–1.4 已完成）**但尚未部署到 dev**，
+  由那条 change 自己的 §7 收口，本条只登记「dev 上那份副本现在是坏的」这个事实。
+  **更正（2026-08-06 当天）**：此前写「这直接卡住 `unify-facebook-global-policy-across-targets`
+  的 2.7」——**判断错了，2.7 已完成**。那条任务要的是「迁移声明的对象 vs 库里实际对象」，
+  只需要校验器**连得上那个库**，不需要它**跑在那台机上**：从 canonical `aidcp-api` 本机 checkout
+  经 SSH 隧道连 dev 的属主库跑 `verify --owner=api` 即可，全程只读、零部署。
+  **这个跑法不比在机器上跑弱** —— 账本报「已应用且校验和一致」，即本机那份迁移文件的字节
+  与 dev 上当初应用的逐字相同。
+  **留作判据**：下次再遇到「某台机器上的工具坏了」，先问一句**这个工具到底需要跑在哪**，
+  再决定要不要为它安排一次部署。
 
 ---
 

@@ -51,8 +51,29 @@
        **第 3 步是这次补出来的**：记行数不是走形式——本次 46 + 27 − 24 重叠 = 49，
        与合并后 `all` 行数一致，这一步当场就能发现取值方向错了。
        原任务只写「备份」，没写备份什么、备份完拿它干什么，等于把核对基准留给了记忆。 -->
-- [ ] 2.7 `npm run migrate status` / `verify` 在 dev 上确认本迁移声明的对象与实际一致
-  <!-- 2026-08-06 **被另一条 change 的缺陷卡住，不是本 change 的问题**。
+- [x] 2.7 `npm run migrate status` / `verify` 在 dev 上确认本迁移声明的对象与实际一致
+  <!-- 2026-08-06 完成，**未部署任何东西**：从 canonical `aidcp-api` 本机 checkout 经 SSH 隧道
+       连 dev 的接口属主库跑 `status --owner=api` 与 `verify --owner=api`（两条都只读）。
+       结果：**声明 554 个对象、覆盖 63 张表，缺失对象 0，退出码 0**；
+       账本最高版本 = `0110_facebook_global_policy_single_scope`，已应用且校验和一致 70 条，
+       待应用 2 条（0112 / 0113，均为「记账不执行」）。
+       0110 声明的 10 个对象（5 表 + 5 约束）全部存在，**含那条为绕开 PG 63 字节标识符上限
+       而改用短名的 `facebook_env_slow_start_completion_scope_check`** —— 7.1 那次修复确实落到了库里。
+       **三条判据必须一起看，少一条这个勾就不成立**：
+       ① **本机跑不比在 dev 上跑弱**：账本报「已应用且校验和一致 70」，即本机这份 0110 的字节
+          与 dev 上当初应用的那份逐字相同（校验和不一致会整批拒绝）；校验对象是同一个库。
+       ② **校验器不是空转**：`objectPresent` 的 `constraint` 分支按 `pg_constraint` 实读，
+          约束类声明真的会被查。这一条 MUST 自己验——若声明解析悄悄丢掉 constraint 类型，
+          「缺失 0」对 0110 的 5 条约束就毫无意义（闸恒真 = 闸不在）。
+       ③ **118 条「多余对象」不是漂移信号**：声明粒度是表与约束，列 / 索引本就不逐个声明；
+          `diffSchema` 只对**已声明的表**报其列 / 索引，且跳过约束背书的索引。
+       **为什么没有按原计划先部署 `restore-derived-migration-executability`**：
+       实测它当时 29/36，**§7 整合与部署整节一项没做**（sync-split-repos 分发、三仓 typecheck/test、
+       boundaries refresh 全未跑），且**它自己的 7.6 写着「部署 dev 前 MUST 先跑一次迁移状态查询
+       自证零异常」**。此时部署 = 把半整合状态推上 dev，并踩正在做它的并发 session。
+       而本条要的东西——「声明对象 vs 库里实际对象」——只需要校验器能连上那个库，不需要它跑在那台机上。
+       dev 上那份部署副本的 CLI 仍然是坏的（backlog 144.5 保留，由那条 change 自己收口）。 -->
+  <!-- 上一轮记录（保留，说明当初为何判为受阻）：
        dev 上 `cd /opt/aidcp/api && npm run migrate status` 直接崩：
        `ERR_MODULE_NOT_FOUND: /opt/aidcp/api/src/kernel/pg-owner-connection-resolver.js`
        —— 派生仓没有 `src/kernel/`，kernel 走包路径，而迁移 CLI 仍是单体形态的相对引用。
