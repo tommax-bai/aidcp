@@ -4282,3 +4282,13 @@ change `route-notification-items-by-category`（cloud master `9e5b000` / 派生 
   自此「代码回滚、旧行仍在」这条退路**不再存在**，唯一退路是迁移前备份
   （`/opt/aidcp/backup/facebook-global-policy-precollapse*.20260806-163151.sql`，见 migration-record §4–5）。
   执行前当次实测已确认合并行覆盖了全部 `env_key`、无重复、且完成时刻无一晚于旧行。
+
+## 簇 148 · 身份闸机制换血后的真机观察（recategorize-nonpage-commands，2026-08-06）
+
+共享前置：dev 车队有账号进入「身份未落定」终局（可遇不可造——人设弹窗、账号翻转、登录失效均可触发）。
+
+- [ ] 身份终局期间：读身份 / 验证码协助命令照常放行执行（日志无 identity_unresolved 拒绝）
+- [ ] 身份终局期间：`edge.task.acquire` 照常被拒且回执 reason=identity_unresolved（不是静默）
+- [ ] 副本 unknown 瞬时态（配置轮询中断）期间 `session.end` 可送达（本批唯一有意行为变化——旧行为是被扣住）
+
+> 机制换血、结果应与旧救援清单逐条一致（对照表见该 change design 决策一）；观察到任何偏差按缺陷处理。
