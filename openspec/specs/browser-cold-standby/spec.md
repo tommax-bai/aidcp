@@ -352,3 +352,27 @@ MUST NOT 静默丢弃。该拒绝 SHALL 与「已执行」在本地呈现上可�
 - **THEN** edge refuses it with a named reason and records that refusal, rather
   than dropping it without a trace
 
+### Requirement: 让位判决 SHALL 向云端回执，且该回执 MUST NOT 进入准入
+
+宿主层每一次冷待机准入判决 SHALL 向云端上报一条只读回执（内容与节流规则见能力
+`host-standby-decision-telemetry`）。这是宿主层持有槽位决策权的**对价**：一个没人能质询的
+本地决定，正是 2026-08-05 那次「连续 32 分钟拒绝让位、锁死一个浏览器槽位、界面与日志零痕迹」
+故障的形状；补上的本地留痕只在有人坐在那台机器前时有用，而车队是跨机器的。
+
+该回执 MUST NOT 反向影响准入：它 MUST NOT 成为准入判据的输入，云端 MUST NOT 因其内容
+下发任何强制让位或禁止让位的指令。准入的输入集合 SHALL 不因本要求而增加任何一项。
+
+上报失败、云端不可达或对端不支持该能力时，**准入 SHALL 完全不受影响**——
+回执是观测，MUST NOT 成为让位的前置条件。否则一次云端抖动就会让整批环境停止让出槽位，
+把一条观测通道变成新的可用性依赖。
+
+#### Scenario: 上报不可达时让位照常发生
+- **WHEN** 宿主层判定应当让位，但回执因云端不可达或对端不支持该能力而未能送出
+- **THEN** 边缘 SHALL 照常关闭浏览器进入冷待机
+- **AND** 准入结果 SHALL 与回执是否送达无关
+
+#### Scenario: 准入输入集合不因回执而增加
+- **WHEN** 回执能力启用后重新评估准入
+- **THEN** 准入判据 SHALL 与启用前逐项相同
+- **AND** 结构断言 SHALL 在回执相关状态出现于准入输入中时失败
+
