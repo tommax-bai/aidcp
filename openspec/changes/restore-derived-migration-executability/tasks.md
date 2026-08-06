@@ -6,16 +6,67 @@
 
 ## 1. aidcp-cloud — 派生仓迁移命令修复（独立、先做、可单独验证）
 
-- [ ] 1.1 把三个派生仓 `scripts/migrate.ts` 里指向共享内核的两处相对引用改为包引用：`../src/kernel/pg-owner-connection-resolver.js` → `aidcp-kernel/kernel/pg-owner-connection-resolver.js`，`../src/kernel/schema-name.js` → `aidcp-kernel/kernel/schema-name.js`。**MUST NOT 在 `aidcp-cloud` 里改**——事实源仓有 `src/kernel/`，相对引用在那里是对的；改法差异由第 4 节的同步改写器承担。
-- [ ] 1.2 全仓扫一遍**同类漏网**：三个派生仓的 `scripts/**` 里所有指向 `../src/kernel/` 的相对引用逐条列出并修掉。只修 1.1 点名的两处等于假设「就这两处」，而这个文件从没被任何工具看过。
-- [ ] 1.3 逐仓自证 CLI 能起：在三个派生仓各跑一次迁移状态查询，确认**不是**因模块解析失败而退出。此步 MUST NOT 连 dev / ol 的库（无库连接时的预期失败形态是「连不上库」，不是「找不到模块」——两者 MUST 在输出里可区分）。
+> **⚠️ 本节立项时的范围判断是错的，实施当天被全量扫描推翻。原文保留在下面不删——它记录了「只看点名的那两处」会漏掉什么。**
+>
+> **真实故障面（2026-08-06 实测）**：不是「两处过期的 kernel 引用」，而是**整套迁移机器 api / content 根本够不着**。`src/schema/` 判归 automation 独占，只有 automation 有本地副本；api / content 靠共享包取用，而那个包只搬了 12 个文件里的 10 个——`migrate verify` 要用的对象探测器不在其中。**三仓 10 个脚本里 9 个的相对 import 指向本仓不存在的路径**（api / content 各 7 个文件断、automation 4 个）。
+>
+> **还有第二层，import 修完才露出来**：`migrationsDir()` / `tableOwnershipPath()` 的默认值是「模块文件往上两级」，装进共享包后指向包自己的目录。实测报错 `migrations_dir_unreadable dir=.../node_modules/aidcp-transport/migrations`。**这一层比 import 那层更该记**——漏传的后果不是报错而是**读到零条迁移**，契约门会据此说「通过」。
+
+- [x] 1.1 把三个派生仓 `scripts/migrate.ts` 里指向共享内核的两处相对引用改为包引用：`../src/kernel/pg-owner-connection-resolver.js` → `aidcp-kernel/kernel/pg-owner-connection-resolver.js`，`../src/kernel/schema-name.js` → `aidcp-kernel/kernel/schema-name.js`。**MUST NOT 在 `aidcp-cloud` 里改**——事实源仓有 `src/kernel/`，相对引用在那里是对的；改法差异由第 4 节的同步改写器承担。
+<!-- aidcp 4e64e1b + aidcp-transport 2c635e8 + aidcp-cloud 343c464 + api e91880d / automation 2bcca28 / content cc8a0ab。
+     实际落地范围大于本条：除 kernel 两处外，另有 4 处 `../src/schema/**` 也要改（migration-files /
+     migration-owners / migration-plan / schema-inspect），且 schema-inspect **原本不在共享包里**，
+     须先把它纳入点名清单（准入逐条复核过：零属主表 SQL，只查 pg_indexes / pg_constraint；
+     两个依赖 migration-plan / pg-catalog 本就在清单内）。
+     「MUST NOT 在 aidcp-cloud 里改」这条守住了：事实源仓的相对引用一字未动，
+     包说明符由控制仓同步脚本的 rewrite_shared_imports 产出。 -->
+- [x] 1.2 全仓扫一遍**同类漏网**：三个派生仓的 `scripts/**` 里所有指向 `../src/kernel/` 的相对引用逐条列出并修掉。只修 1.1 点名的两处等于假设「就这两处」，而这个文件从没被任何工具看过。
+<!-- 本条是本节唯一写对了的一项，而且它捞出的东西直接改写了 1.1 的范围。实测（逐文件解析相对说明符、
+     检查目标是否真实存在）：**api 7 文件断 / content 7 文件断 / automation 4 文件断，cloud 全部可解析**。
+     断的目标分两族：`../src/kernel/**`（已搬进包）与 `../src/schema/**`（判归 automation 独占）。
+     处置分两类：`migrate.ts`（唯一被 package.json 引用的）纳入同步点名清单并改写；
+     其余 7 个 .ts **删除**——它们零 package.json 引用、当前全断，且留着有害：
+     `generate-migration-headers.ts` 会 `writeFile(migrationsDir()/…)` **写回迁移文件**，
+     而派生仓 migrations/ 只有本属主子集（实测 api 70 / automation 58 / content 20，事实源 110），
+     在那儿跑一次就会按不完整集合重算并改写已应用的迁移 → 校验和不符 → 该库迁移命令全停。
+     `db-split/**` 与字体子集脚本判为「有意不纳管」，进 SCRIPT_UNMANAGED，与「多出」分开报、永不 prune。 -->
+- [x] 1.3 逐仓自证 CLI 能起：在三个派生仓各跑一次迁移状态查询，确认**不是**因模块解析失败而退出。此步 MUST NOT 连 dev / ol 的库（无库连接时的预期失败形态是「连不上库」，不是「找不到模块」——两者 MUST 在输出里可区分）。
+<!-- 三仓逐个实测 `npx tsx scripts/migrate.ts status`：均正常启动，读到**本仓属主范围**的迁移
+     （api 70 / automation 58 / content 20，三个数各不相同即证明各读各的目录），
+     如实打出「残留迁移 13 条」清单，最后停在 `connect ECONNREFUSED 127.0.0.1:5432`。
+     可区分性达标：失败原因是连不上库，与修复前的 `ERR_MODULE_NOT_FOUND` /
+     `migrations_dir_unreadable` 三者输出各不相同。未连 dev / ol。三仓 typecheck 均通过。 -->
+- [x] 1.4 **（实施中新增）** 迁移目录与属主清单改取自**脚本自己的仓根**，不再吃 `migrationsDir()` / `tableOwnershipPath()` 的默认值。
+<!-- aidcp-cloud 343c464。改在事实源仓一处，四仓逐字同解：`scripts/` 往上一级恒为本仓仓根。
+     形态与 `src/*-schema-gate-startup.ts` 那道启动期契约门一致——**那边先撞过同一个坑**，
+     `migration-files.ts` 的文件头注释也早写着「消费方 MUST 显式传入自己的 migrations 目录」，
+     只是没人把这句话应用到 scripts/ 上。
+     注意这一层与 import 那层的危险度不同：import 断了是响亮失败，路径默认值错了是**读到零条迁移**，
+     而契约门会把「零条」判成通过。仓内那道空目录守卫正是为此而设，本次实测被它拦住（报
+     migrations_dir_unreadable），是它第一次真正生效。 -->
 
 ## 2. aidcp — 控制仓：把 `scripts/` 纳入拆仓同步覆盖（根因，不做等于下次照漂）
 
-- [ ] 2.1 在 `scripts/sync-split-repos` 里新增 `scripts/` 的同步段，按**逐文件点名**（范式抄 `aidcp-transport` 那份点名清单），起手只点 `scripts/migrate.ts`。MUST NOT 整目录同步——`scripts/` 下多数脚本是控制仓 / 事实源仓自用的。
-- [ ] 2.2 该段 MUST 复用既有的 `rewrite_kernel_imports`（已验证它对 `scripts/migrate.ts` + `../src/kernel/x.js` 解析正确，产出 `aidcp-kernel/kernel/x.js`），MUST NOT 另写一份改写逻辑。
-- [ ] 2.3 自证覆盖生效：改一行事实源仓的 `scripts/migrate.ts`（可用无意义空白改动，验完还原），跑一次不带参数的对账，确认它**报出该文件有差异**；还原后再跑一次，确认报「无差异」。
-- [ ] 2.4 自证幂等：`--apply` 后立刻再跑一次对账，MUST 报零差异；三个派生仓 `git status --porcelain` 在第二次 apply 后 MUST 为空。
+- [x] 2.1 在 `scripts/sync-split-repos` 里新增 `scripts/` 的同步段，按**逐文件点名**（范式抄 `aidcp-transport` 那份点名清单），起手只点 `scripts/migrate.ts`。MUST NOT 整目录同步——`scripts/` 下多数脚本是控制仓 / 事实源仓自用的。
+<!-- aidcp 4e64e1b `SCRIPT_MEMBERS` + `sync_scripts()`。另加 `SCRIPT_UNMANAGED`（前缀匹配，
+     db-split/ 与字体子集脚本）——**这一条是实施中补的，不加就每次刷一屏「多出」把真该删的淹掉**：
+     光 db-split/ 一族每仓就 8 条。三类分开报（点名 / 多出 / 有意不纳管），只有第二类会被 --prune 删。 -->
+- [x] 2.2 该段 MUST 复用既有的 `rewrite_kernel_imports`（已验证它对 `scripts/migrate.ts` + `../src/kernel/x.js` 解析正确，产出 `aidcp-kernel/kernel/x.js`），MUST NOT 另写一份改写逻辑。
+<!-- 偏离并说明理由：**不能直接复用，因为它只认 kernel**，而 `migrate.ts` 有 4 处要指向 transport 包。
+     写成 `rewrite_shared_imports`（kernel + transport 一起判），与原函数同一套解析逻辑、同一条正则，
+     只是包名按目标落在哪份清单里选——不是「另写一份改写逻辑」。
+     `src/` 那边**保持只改 kernel 不变**：跨属主的相对 import 正是要留着让编译器报出来的断裂，
+     而 `scripts/migrate.ts` 三仓同源、要用的东西全在两个共享包里，没有「留着报错」的余地。
+     另一处判断：**automation 也走包说明符**，尽管它本地有 src/schema/。差异化改写等于给同一个脚本
+     留两种形态，而两种形态的漂移没有任何工具会报。 -->
+- [x] 2.3 自证覆盖生效：改一行事实源仓的 `scripts/migrate.ts`（可用无意义空白改动，验完还原），跑一次不带参数的对账，确认它**报出该文件有差异**；还原后再跑一次，确认报「无差异」。
+<!-- 改从派生侧做（对账读的是事实源的 `git show <ref>:<path>`，事实源的**未提交**改动它看不见，
+     从那侧注入只会得到假阴性）：往 `aidcp-api/scripts/migrate.ts` 追加一行 → 对账当场报
+     「内容不同 1 · ~ scripts/migrate.ts」；`git checkout` 还原后复跑报「内容不同 0」。
+     **这条差异在本 change 之前是完全不可见的**——scripts/ 根本不在对账范围里。 -->
+- [x] 2.4 自证幂等：`--apply` 后立刻再跑一次对账，MUST 报零差异；三个派生仓 `git status --porcelain` 在第二次 apply 后 MUST 为空。
+<!-- 实测：`--apply` 后复跑对账，三仓均报「新增 0 · 内容不同 0 · 多出 0 · 有意不纳管 9」；
+     三仓 `git status --porcelain` 均为空。 -->
 - [ ] 2.5 在 `docs/cloud-cross-service-coupling-resolution.md`（或同批执行清单）里记一句：`scripts/` 自本 change 起是派生物，MUST NOT 手工改派生仓里的它。
 
 ## 3. aidcp-cloud — 执行范围与账本范围拆开
