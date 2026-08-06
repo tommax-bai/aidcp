@@ -70,10 +70,18 @@ OL `/opt/aidcp/*.bak.20260806-165729.tar.gz`（`api` / `automation` / `content` 
 OL 的 `AIDCP_PG_API_URL` 指向 `121.89.85.150:5432/aidcp_api`，即 dev 本机那个库。因此：
 
 - 这条 contract 迁移对**两个环境是同一个动作**，MUST NOT 按「先 dev 观察几天再 OL」排期。
-- 实测代价：16:40 迁移落地后，OL 上仍跑旧构建的 `aidcp-api` 立刻开始报
+- 实测代价（**下面这段在本记录初稿里被低估过，据实修订**）：
+  16:38–16:40 迁移落地后，OL 上仍跑旧构建的 `aidcp-api` 立刻开始报
   `column c.execution_target does not exist`（16:41–16:52 共 124 条），
   `client_environment_slow_start` 镜像停在 `version=1768` 不再前进。
-  这是**响亮失败**（日志逐条说明缺哪一列、副本落后多少秒），不是静默错值。
+  **但事情没有停在「镜像变陈旧」这一层**：陈旧的副本被下游当成 fail-closed 依据，
+  OL 自动化侧 16:41 起逐个拒绝启动浏览会话（`config_mirror_stale`，实测 16 次），
+  **且对外那句理由被压成了「未绑人设」**——
+  日志原文：`账号 6159… config_mirror_stale：未绑人设，拒绝启动浏览会话`。
+  即：客户端全在线、浏览器全开、后台一片绿，动作却全停，而运营看到的原因是错的。
+  **所以「响亮失败」只对 api 那条日志成立，对整条链不成立**：它在跨层翻译时掉进了一个不相干的原因名。
+  这正是本仓红线里「跨层翻译 MUST 保住可恢复性、MUST NOT 有兜底桶」那一条的现场样本，
+  由本次迁移触发、但缺陷本身在那条翻译上，不在迁移里。
 - 16:59 OL 部署完成后当场恢复：`execution_target` 报错归零，镜像重载到 `version=1789` 并继续推进。
 - 新旧代码**没有共存窗口**：迁移前跑新代码那条不带过滤的子查询会直接报
   `more than one row returned by a subquery`（同一 `env_key` 在 `all` 与 `dev`/`ol` 上各有一行）；
