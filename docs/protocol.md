@@ -75,8 +75,6 @@
 | --- | --- | --- |
 | `note.content` | edge → cloud | 上报一条笔记的标题/摘要/指标，供评估与概念抽取 |
 | `note.ack` | cloud → edge | 确认收到笔记，异步处理中 |
-| `browse.next` | cloud → edge | 滚动/滑到下一条笔记 |
-| `browse.scroll` | cloud → edge | 在当前页面滚动 |
 | `note.open` | cloud → edge | 打开一条笔记（可选 `surface`:'feed'\|'detail'、`purpose`:'read'\|'navigate'；Facebook 还可用 `url` 直达，或用 `selection:'first_commentable_group_post'` + `container` 选择群讨论流首条可评论帖；无 permalink 时可保持同页容器绑定） |
 | `note.close` | cloud → edge | 关闭当前笔记 |
 | `search.execute` | cloud → edge | 执行一次关键词搜索；协商 `search_activity_receipt_v1` 时携稳定 `activityId` 与 purpose/scope，Edge 回诚实提交边界和结果终态 |
@@ -150,7 +148,6 @@
 
 | type | 方向 | 用途 |
 | --- | --- | --- |
-| `publish.request` | cloud → edge | 请求在浏览器中发布一篇帖子 |
 | `publish.approval_request` | edge → cloud | 请求云端发送发布审批卡片（飞书） |
 | `publish.approval_action` | edge → cloud | 客户端稿件审批页提交批准/取消，批准可携立即/定时发布计划与稿件版本 |
 | `publish.approval_action.result` | cloud → edge | 返回审批动作受理结果；不代表已完成发帖 |
@@ -566,7 +563,6 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 
 **`note.ack`**（cloud → edge）：`{ "received": true }`
 
-**`browse.next` / `browse.scroll`**（cloud → edge）：`{ "reason": "继续刷的原因" }`（均可选）
 
 **`note.open`**（cloud → edge）
 ```jsonc
@@ -1048,15 +1044,8 @@ edge 按 `system_recovery > human > automatic` 授予；同级 FIFO。发布从 
 
 ### 3.11 发布编排
 
-**`publish.request`**（cloud → edge）——请求在浏览器中发布
-```jsonc
-{
-  "title": "测评｜入门露营装备清单",   // string
-  "content": "正文 200–500 字…",      // string
-  "tags": ["露营", "装备", "新手"],    // string[]  3–5 个
-  "images": ["https://..."]           // string[]? 可选配图
-}
-```
+> 旧整页发布消息 `publish.request` 已随 change `drop-dead-cloud-edge-commands` 从协议删除
+> （云端零发送点、边缘生产无处理器）；发布一律走 `publish.command` 原子指令。
 
 **`publish.approval_request`**（edge → cloud）——请求云端发飞书审批卡片
 ```jsonc
@@ -1408,7 +1397,7 @@ edge                                cloud
 
 ```
 cloud（Publish Agent）          edge                         飞书（云端 Bot）
- │ publish.request {title,...}   │                            │
+ │ publish.command {kind,...}    │                            │
  │ ─────────────────────────────►│ 生成 requestId             │
  │                               │ publish.approval_request   │
  │                               │ ──────────────────────────►│ buildPublishApprovalCard()

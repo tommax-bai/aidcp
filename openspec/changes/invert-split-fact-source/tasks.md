@@ -98,7 +98,7 @@
 ## 6. 文档与脚本改指（cutover 后）
 
 - [ ] 6.1 CLAUDE.md §8 整节重写为翻转后的模式（派生仓各自为政、cloud=集成测试仓、共享包版本化、新服务接入路径）。
-- [ ] 6.2 控制仓引用 aidcp-cloud 的脚本逐一核对改指（08-05 盘点为 9 个，执行时重扫）：`protocol-parity` / `boundary-census` / `land-change` / `operation-registry-parity` 等。
+- [ ] 6.2 控制仓引用 aidcp-cloud 的脚本逐一核对改指（08-05 盘点为 9 个，执行时重扫）：`protocol-parity` / `boundary-census` / `land-change` / `operation-registry-parity` 等。**其中 parity 两个已由并行 change `drop-dead-cloud-edge-commands` 先行处理**（着陆被挡，按 1.2 的标记感知模式落地：读 `scripts/fact-source.json`，flipped=true ⇒ cloud 冻结副本退出比对、flipped=false 行为逐字不变；两脚本实测 OK）。本条剩余 7 个脚本仍归本 change。
 - [ ] 6.3 memory 条目更新：`cloud-demoted-not-retired` 等涉及事实源方向的条目改写；本 change 结论入档。
 
 ## 7. 回滚路解绑（可与 5 并行准备，OL 演练等用户窗口）

@@ -57,6 +57,7 @@ Cloud→Edge 的「可下发命令登记表」是**两份手工维护的副本**
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -72,6 +73,21 @@ CANDIDATES = [
     ("aidcp-api", "src/comm/operation-registry.ts", "AUTOMATION_OPERATION_REGISTRY"),
     ("aidcp-content", "src/comm/operation-registry.ts", "AUTOMATION_OPERATION_REGISTRY"),
 ]
+
+# --- Split fact-source flip awareness (invert-split-fact-source 6.2 的 parity 切片,由 drop-dead-cloud-edge-commands 顺手落地) ---
+# flipped=true 时 aidcp-cloud 的副本被冻结在 frozenCloudRef,不再是协议/登记表的现行参与方;
+# 把它留在比对里会让每一次真实的词汇演进都撞上一份按定义不再更新的快照。
+
+def _fact_source_flipped() -> bool:
+    """scripts/fact-source.json flipped=true ⇒ aidcp-cloud src 冻结,其副本退出比对(invert-split-fact-source)。"""
+    try:
+        marker = json.loads((Path(__file__).resolve().parent / "fact-source.json").read_text())
+        return bool(marker.get("flipped"))
+    except (OSError, ValueError):
+        return False
+
+if _fact_source_flipped():
+    CANDIDATES = [c for c in CANDIDATES if c[0] != "aidcp-cloud"]
 
 class ParseError(Exception):
     """解析不了 —— 判失败，绝不静默跳过。"""
