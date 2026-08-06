@@ -69,6 +69,37 @@ for repo in aidcp aidcp-edge aidcp-cloud aidcp-console; do
   fi
 done
 
+# Fact-source flip guard (openspec change invert-split-fact-source): once the split
+# fact source is flipped, aidcp-cloud src/ + migrations/ are frozen at frozenCloudRef.
+# Any drift there (committed, uncommitted, or untracked) means someone is still
+# working in the retired replay model — block new tasks until it is moved or reverted.
+fact_source_marker="$(dirname "${BASH_SOURCE[0]}")/fact-source.json"
+if [ -f "$fact_source_marker" ]; then
+  flipped="$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print("1" if d.get("flipped") else "0")' "$fact_source_marker" 2>/dev/null || echo 0)"
+  if [ "$flipped" = "1" ]; then
+    frozen_ref="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("frozenCloudRef") or "")' "$fact_source_marker")"
+    cloud_root="$(repo_path aidcp-cloud)"
+    if [ -z "$frozen_ref" ]; then
+      echo "FAIL: fact-source.json is flipped but frozenCloudRef is empty" >&2
+      failures=$((failures + 1))
+    elif [ ! -e "$cloud_root/.git" ]; then
+      echo "SKIP: fact-source flip guard — aidcp-cloud is not cloned at ${cloud_root}" >&2
+    elif ! git -C "$cloud_root" rev-parse --verify --quiet "${frozen_ref}^{commit}" >/dev/null; then
+      echo "FAIL: frozenCloudRef ${frozen_ref} is not present in aidcp-cloud (git fetch?)" >&2
+      failures=$((failures + 1))
+    else
+      frozen_drift="$({ git -C "$cloud_root" diff --name-only "$frozen_ref" -- src/ migrations/; \
+                        git -C "$cloud_root" ls-files --others --exclude-standard -- src/ migrations/; } | sort -u)"
+      if [ -n "$frozen_drift" ]; then
+        echo "FAIL: fact source is flipped — aidcp-cloud src/+migrations/ are frozen at ${frozen_ref}, but drift exists:" >&2
+        echo "$frozen_drift" | head -20 | sed 's/^/  /' >&2
+        echo "  (edit the owning derived repo instead: aidcp-api / aidcp-automation / aidcp-content)" >&2
+        failures=$((failures + 1))
+      fi
+    fi
+  fi
+fi
+
 if [ "$checked" -eq 0 ]; then
   echo "ERROR: no canonical repositories are available for task admission" >&2
   exit 1

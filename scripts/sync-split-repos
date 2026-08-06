@@ -52,6 +52,19 @@ else:
 CLOUD = os.path.join(CODES, 'aidcp-cloud')
 MANIFEST = 'boundaries/module-ownership.json'
 
+# 事实源翻转标记（openspec change invert-split-fact-source）。翻转后派生仓是各自代码的
+# 唯一事实源：重放写入退役，cloud 的 src/ + migrations/ 冻结在 frozenCloudRef。
+# 标记从脚本自己的仓目录读（不受 AIDCP_CODES_ROOT 影响）——标记与读它的代码必须同版本。
+FACT_SOURCE_MARKER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fact-source.json')
+
+
+def load_fact_source() -> dict:
+    try:
+        with open(FACT_SOURCE_MARKER, encoding='utf-8') as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        return {'flipped': False, 'frozenCloudRef': None}
+
 # 仓 → 它承载的属主层。三个业务仓**不内嵌 kernel 副本**，靠 npm 依赖 aidcp-kernel 取用。
 REPOS = {
     'aidcp-api': 'api',
@@ -907,6 +920,39 @@ def main() -> int:
     except subprocess.CalledProcessError:
         print(f'ERROR: aidcp-cloud 里没有 ref {args.ref}（先 git fetch？）', file=sys.stderr)
         return 2
+
+    fact = load_fact_source()
+    if fact.get('flipped'):
+        if args.apply or args.prune:
+            print(
+                'ERROR: 事实源已翻转（scripts/fact-source.json）：派生仓已是各自代码的唯一事实源，\n'
+                '重放写入（--apply / --prune）已退役。改动请直接落对应派生仓；\n'
+                '详见 openspec change invert-split-fact-source。',
+                file=sys.stderr,
+            )
+            return 2
+        frozen = fact.get('frozenCloudRef')
+        if not frozen:
+            print('ERROR: fact-source.json 已置 flipped=true 但缺 frozenCloudRef', file=sys.stderr)
+            return 2
+        try:
+            subprocess.run(['git', '-C', CLOUD, 'rev-parse', '--verify', '--quiet', f'{frozen}^{{commit}}'],
+                           capture_output=True, check=True)
+        except subprocess.CalledProcessError:
+            print(f'ERROR: frozenCloudRef {frozen} 在 aidcp-cloud 里不存在（先 git fetch？）', file=sys.stderr)
+            return 2
+        # 冻结校验：受冻结目录相对冻结 ref 不得有任何差异。差异只可能来自「有人还按旧模式改 cloud」。
+        changed = [f for f in git(CLOUD, 'diff', '--name-only', frozen, args.ref,
+                                  '--', 'src/', MIGRATIONS_DIR + '/').split('\n') if f]
+        if changed:
+            print(f'ERROR: aidcp-cloud 已冻结于 {frozen[:12]}，但 {args.ref} 上有 {len(changed)} 个受冻结文件的改动：',
+                  file=sys.stderr)
+            for f in changed[:50]:
+                print(f'  {f}', file=sys.stderr)
+            print('  事实源已翻转：这些改动必须落到对应派生仓，cloud 侧须回退。', file=sys.stderr)
+            return 1
+        print(f'事实源已翻转：aidcp-cloud 冻结于 {frozen[:12]}，{args.ref} 无受冻结改动。冻结校验通过。')
+        return 0
 
     sha = git(CLOUD, 'rev-parse', '--short', args.ref).strip()
     own = load_manifest(args.ref)
