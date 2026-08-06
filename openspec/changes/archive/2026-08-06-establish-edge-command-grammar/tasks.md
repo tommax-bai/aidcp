@@ -30,4 +30,4 @@
 - [x] 3.1 `openspec validate establish-edge-command-grammar --strict` 通过。 <!-- 2026-08-06 -->
 - [x] 3.2 验收：未改任何存量命令名 / 类别 / 载荷；未产生新的命令清单或归属表；无 sub-repo 改动（edge/cloud 工作区实查，仅有旧备份目录与本次无关）。 <!-- 2026-08-06 -->
 - [x] 3.3 控制仓 commit + push（本 change 全部产物在控制仓，无部署）。 <!-- aidcp 8195ec3f 已推送 -->
-- [ ] 3.4 归档（archive 时 spec delta 并入 `openspec/specs/edge-command-grammar/`）。**待用户过目蓝图后执行**——蓝图里有逐条处置（如 `user.follow` / `comment.like` 新名、批次划分），归档前留一次改动窗口。
+- [x] 3.4 归档。用户过目蓝图与全部裁定（平台段编法 A、直接切换、确认不了当发了）后明确指示归档。 <!-- 2026-08-06 -->
