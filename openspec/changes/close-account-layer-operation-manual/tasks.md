@@ -52,23 +52,39 @@
 
 ## 4. aidcp-cloud — 同维度、逐字一致
 
-- [x] 4.1 `src/comm/operation-registry.ts` 的 `AutomationOperationDescriptor` 加同名同取值的维度，46 条取值与边缘**逐字相同**。构造器默认值同样落在 `account_visible` 一侧。<!-- aidcp-cloud aeeb98c（分支 close-account-layer-operation-manual，待集成后由主 session 更新为 master sha）46 条取值逐字同边缘（对表闸 fixture 实跑对账 OK，见 5.2） -->
-- [x] 4.2 补验收用例：期望值**按引用**取自同类命令的描述符，不另抄字面量（沿用 `align-cloud-edge-operation-registries` 1.2 的做法）。<!-- aidcp-cloud aeeb98c 新用例以 interaction.comment / note.close 两条为参照锚点、其余各族按引用比对同侧；用例注释写明绝对取值由边缘字面量用例+跨仓对表闸钉死、本用例守「分侧不塌」 -->
-- [x] 4.3 云端侧写清这一维**将来**的消费方是重放决策（重试上限 / 升级 / 绝不重放都在云端），本 change 不接线。注释 MUST 写明「尚未接线」，避免被后来人当成已生效的闸。<!-- aidcp-cloud aeeb98c PlatformFootprint 类型注释明写「当前尚未接线…MUST NOT 被当成已生效的闸」 -->
-- [x] 4.4 `npm run test:acceptance` → `npm test` → `npm run typecheck` 全过。<!-- aidcp-cloud aeeb98c acceptance 198/198；全量 4318 用例 4307 过 0 红 11 跳过（全部为 AIDCP_E2E / 真库 PG gated 常规跳过）；typecheck 0 错误 -->
+> **落点已按事实源翻转改道（fleet 2026-08-06 航向修正）**：本节原写 aidcp-cloud，实装期间 cutover
+> 冻结了 cloud `src/`。改动已**重落到属主仓 `aidcp-automation`**（同路径 `src/comm/operation-registry.ts`
+> + `test/comm/operation-registry.test.ts`，内容逐字同曾写好的 cloud 版）；cloud 侧曾推的分支
+> aeeb98c 已按指令**整体丢弃**（远端分支已删、worktree 已清，canonical cloud 未被触碰）。
+
+- [x] 4.1 `src/comm/operation-registry.ts` 的 `AutomationOperationDescriptor` 加同名同取值的维度，46 条取值与边缘**逐字相同**。构造器默认值同样落在 `account_visible` 一侧。<!-- aidcp-automation 4342db1（分支 close-account-layer-operation-manual，待集成后由主 session 更新为 master sha）46 条取值逐字同边缘（对表闸 fixture 以 edge+automation 两份实跑对账 OK，见 5.2） -->
+- [x] 4.2 补验收用例：期望值**按引用**取自同类命令的描述符，不另抄字面量（沿用 `align-cloud-edge-operation-registries` 1.2 的做法）。<!-- aidcp-automation 4342db1 新用例以 interaction.comment / note.close 两条为参照锚点、其余各族按引用比对同侧；用例注释写明绝对取值由边缘字面量用例+跨仓对表闸钉死、本用例守「分侧不塌」 -->
+- [x] 4.3 云端侧写清这一维**将来**的消费方是重放决策（重试上限 / 升级 / 绝不重放都在云端），本 change 不接线。注释 MUST 写明「尚未接线」，避免被后来人当成已生效的闸。<!-- aidcp-automation 4342db1 PlatformFootprint 类型注释明写「当前尚未接线…MUST NOT 被当成已生效的闸」 -->
+- [x] 4.4 `npm run test:acceptance` → `npm test` → `npm run typecheck` 全过。<!-- aidcp-automation 4342db1 acceptance 298/298；全量 2303 用例 2300 过 0 红 3 跳过（AIDCP_E2E / 真库 PG gated 常规跳过）；typecheck 0 错误。（此前同内容曾在 cloud 分支跑过 cloud 全量：acceptance 198/198、全量 4307/4318 过 0 红 11 gated 跳过——该分支已弃，仅留此作实测记录） -->
 
 ## 5. aidcp（控制仓）— 对表闸扩到全部字段
 
 - [x] 5.1 `scripts/operation-registry-parity` 的比对从写死四字段改为**遍历描述符全部字段**；实现与输出措辞 MUST NOT 出现字段数量。<!-- 控制仓（由主 session 提交）：删 DESCRIPTOR_FIELDS 常量；跨仓按两侧实际声明字段的**并集**遍历（一侧独有字段报 <缺字段>）；同表内条目字段集不一致按解析失败拦（一条漏声明新维绝不静默）；解析器升级支持多参工厂/多实参调用（新维带来的 automationControl('bound_account','none') 形态），对 canonical master 的旧四字段格式仍向后兼容（实跑 OK 3 份各 46 条） -->
-- [x] 5.2 **变异验证**：只在一份副本里改某条命令的留痕维 → 闸 MUST 报出该键在该维上的差异。这一条是本任务的要害——扩维时最容易的失败正是「新维不参与比对，闸照报一致」。<!-- 已验但须说明验法：脚本硬编码只读 canonical checkout，而 canonical master 还没有新维——为不假装验过，把脚本拷到 scratchpad 仅改 ROOT 指向 fixture（内容＝两个 worktree 的真实新维文件），比对逻辑一行未动。结果：①基线两份新维文件对账 OK；②仅在 cloud 侧把 session.end 的留痕维改成 account_visible → FAIL 点名「session.end 描述符不一致：platformFootprint: aidcp-edge='none' vs aidcp-cloud='account_visible'」exit 1（同时坐实工厂默认值解析）；③一侧整仓缺新维（canonical 旧格式 vs 新维）→ 逐键报 platformFootprint <缺字段>；④旧字段（identity）变异仍被抓。**canonical 路径的实跑留待集成后**：6.3 三方一致那步天然就是它 -->
+- [x] 5.2 **变异验证**：只在一份副本里改某条命令的留痕维 → 闸 MUST 报出该键在该维上的差异。这一条是本任务的要害——扩维时最容易的失败正是「新维不参与比对，闸照报一致」。<!-- 已验但须说明验法：脚本硬编码只读 canonical checkout，而 canonical master 还没有新维——为不假装验过，把脚本拷到 scratchpad 仅改 ROOT 指向 fixture（内容＝edge 与 automation 两个 worktree 的真实新维文件），比对逻辑一行未动。结果：①基线两份新维文件对账 OK（aidcp-edge / aidcp-automation 各 46 条）；②仅在 automation 侧把 session.end 的留痕维改成 account_visible → FAIL 点名「session.end 描述符不一致：platformFootprint: aidcp-edge='none' vs aidcp-automation='account_visible'」exit 1（同时坐实工厂默认值解析）；③一侧整仓缺新维（cloud 冻结旧格式 vs 新维）→ 46 键逐键报 platformFootprint <缺字段>（这同时就是第 6 节注记的集成过渡态）；④旧字段（identity）变异仍被抓。**canonical 路径的实跑留待集成后**：6.3 那步天然就是它 -->
 - [x] 5.3 确认闸仍保留既有的两条硬性行为：解析不了的条目判失败（绝不跳过）、参与方 < 2 判失败（绝不把「没得比」报成「比过了」）。<!-- 已验（同 5.2 的 fixture 验法）：伪造 mysteryFactory(someVar) 条目 → FAIL「工厂实参解析不了（绝不跳过）」；只留一份副本 → FAIL「参与方少于两份，对账不成立」 -->
 - [x] 5.4 `scripts/README.md` 相应更新（那里若写了字段数量，一并去掉）。<!-- 控制仓（由主 session 提交）：「描述符四字段」→「描述符全部字段（按实际声明的并集遍历；任一份漏字段即失败）」 -->
 
-## 6. 派生仓同步
+## 6. 派生仓同步（**已因事实源翻转作废**，2026-08-06 fleet 航向修正）
 
-- [ ] 6.1 `scripts/sync-split-repos --repo aidcp-automation` 先不带参数 dry-run 对账，确认唯一内容差异是登记表文件、零删除、kernel pin 已对齐 → 再 `--apply`。**MUST NOT 手工搬文件**（CLAUDE.md §8.1）。
-- [ ] 6.2 `aidcp-automation` 侧 `npm run typecheck` 通过。
-- [ ] 6.3 `scripts/operation-registry-parity` 三方一致。
+> 事实源翻转（`invert-split-fact-source` cutover：cloud `src/` 冻结、`sync-split-repos --apply` 退役）后
+> **没有「派生仓同步」这回事了**——`aidcp-automation` 就是登记表的直接写入仓。第 4 节改动已直接
+> 重落 automation（分支 4342db1，含验收用例；cloud 侧曾推的 aeeb98c 已整体丢弃）。
+> 原 6.1/6.2 的实质（automation 侧落 + typecheck + 全量测试）已在第 4 节完成。
+>
+> **⚠️ 遗留给集成的过渡态（实测坐实，勿在本 change 里硬修）**：对表闸参与方现为
+> edge / cloud（冻结副本）/ automation 三份。集成后 edge 与 automation 有新维、cloud 冻结副本没有——
+> **canonical 实跑 parity 必将 FAIL**（已用 fixture 模拟三方坐实：cloud 副本 46 键逐键报
+> `platformFootprint: <缺字段>`，exit 1）。这属 `invert-split-fact-source` 应处理的过渡态
+> （冻结副本要么退出 CANDIDATES、要么一次性对齐后再冻结），MUST NOT 为迁就它改 parity 脚本的判据。
+
+- [x] 6.1 ~~`scripts/sync-split-repos --repo aidcp-automation` dry-run 对账 → `--apply`~~<!-- 作废：--apply 已退役；改道后的实质动作（直接落 automation）已在 4.1–4.2 完成（4342db1） -->
+- [x] 6.2 `aidcp-automation` 侧 `npm run typecheck` 通过。<!-- aidcp-automation 4342db1 typecheck 0 错误（另 acceptance 298/298、全量 2300/2303 过 0 红 3 gated 跳过，见 4.4） -->
+- [ ] 6.3 `scripts/operation-registry-parity` 各方一致（edge + automation 集成后跑；这一步同时是 5.2 的 canonical 路径实跑）。**注意上方过渡态：cloud 冻结副本会让它红**，须先按 `invert-split-fact-source` 的口径处置冻结副本，主 session 执行。
 
 ## 7. 集成与部署
 

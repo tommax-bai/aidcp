@@ -13,7 +13,7 @@
 | `spawn-change <repo> <name> [--launch]` | 多终端模式：确保 worktree（幂等）+ 生成任务简报；`--launch` 直接在中控仓启动 claude | 同 new-change；`--launch` 只是启动 CLI |
 | `land-change <repo> <name> [--yes]` | 集成：fetch+rebase+测试；`--yes` 才 ff 推送+同步主 checkout+清理 | 默认只 prep 不推；push 撞 non-ff 即中止，**绝不 force** |
 | `protocol-parity [--list]` | 跨仓对账两份（含派生仓）`src/comm/protocol.ts` **逐字一致**；不一致打印第一处差异行 | 只读；副本 < 2 份即失败（「没得比」不等于「一致」） |
-| `operation-registry-parity [--list]` | 跨仓对账各仓 Cloud→Edge 操作登记表：**键集合 + 描述符四字段**须一致。漏登记的后果是静默拒发（出口闸判 `operation_unclassified`、投递数返回 0），编译期与两仓各自的用例都抓不到 | 只读；解析不了的条目即失败、绝不跳过；副本 < 2 份即失败 |
+| `operation-registry-parity [--list]` | 跨仓对账各仓 Cloud→Edge 操作登记表：**键集合 + 描述符全部字段**须一致（字段清单不写死，按各份表实际声明的并集遍历；任一份漏字段即失败）。漏登记的后果是静默拒发（出口闸判 `operation_unclassified`、投递数返回 0），编译期与两仓各自的用例都抓不到 | 只读；解析不了的条目即失败、绝不跳过；副本 < 2 份即失败 |
 | `deploy-target <dev\|ol> [--check\|--shell]` | 打印/校验 ECS 目标元数据：host、key、runtime 目录、cloud URL | 只读；`--check` 查 key 存在且可读，dev/ol 都不要求 Git Bash 的 POSIX 600 |
 | `release-desktop-macos <version> [--target dev\|ol] [--expect-env ol] [--yes]` | 桌面签名包**出包后交付**编排：下载 CI prerelease 的 dmg → 静态校验（spctl/codesign/stapler/asar/烘焙环境/运行时）→ 改 console `downloads.ts` → 构建 console；`--yes` 才传包+部署 console+验活+提交 | 默认只做本地只读段（下载+校验+改配置+构建）并打印剩余命令；`--yes` 才做 3 个对外动作。构建/签名/公证仍是 CI 专属、脚本不碰。push 撞 non-ff 软失败不 force |
 

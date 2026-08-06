@@ -33,8 +33,11 @@ Cloud→Edge 的「可下发命令登记表」是**两份手工维护的副本**
 三方（存在几份查几份）的 Cloud→Edge 登记表：
 
   1. **键集合 MUST 相同** —— 谁多、谁少，逐条打印；
-  2. **同名键的描述符四字段（category / transport / identity / browser）MUST 逐字相同**
-     —— 只比键集合会漏掉「两边都登记了，但一边把 browser 从 required 改成了 forbidden」。
+  2. **同名键的描述符全部字段 MUST 逐字相同** —— 字段清单不写死在这里，按各份表实际声明的
+     字段**并集**遍历：任一份对某键漏了一个字段，或同键同字段取值不同，都判失败。
+     写死字段名单的版本吃过的亏正是「新加的维不参与比对，闸照报一致」——扩维时最容易的
+     失败形态，本脚本据此改为全字段遍历（change close-account-layer-operation-manual）。
+     同一份表内条目之间字段集也 MUST 一致（一条漏声明新维=解析失败，绝不静默）。
 
 判据是**解析出来的语义值**，不是字节：三份文件类型名与辅助函数名本就不同（边缘叫
 `OperationDescriptor`、云端叫 `AutomationOperationDescriptor`），逐字比对必然全红、
@@ -70,9 +73,6 @@ CANDIDATES = [
     ("aidcp-content", "src/comm/operation-registry.ts", "AUTOMATION_OPERATION_REGISTRY"),
 ]
 
-DESCRIPTOR_FIELDS = ("category", "transport", "identity", "browser")
-
-
 class ParseError(Exception):
     """解析不了 —— 判失败，绝不静默跳过。"""
 
@@ -100,25 +100,58 @@ def extract_block(source: str, var_name: str, path: Path) -> str:
     raise ParseError(f"{path}: `{var_name}` 的对象字面量括号不配平")
 
 
-def parse_factories(source: str, path: Path) -> dict[str, tuple[str | None, str | None, dict[str, str]]]:
-    """解析 `const name = (params) => ({ fields });`。
+def split_top_level(text: str, sep: str = ",") -> list[str]:
+    """按不在 () / [] / {} / 引号内的分隔符切分。工厂参数的类型标注可能带方括号索引类型。"""
+    parts: list[str] = []
+    depth = 0
+    quote: str | None = None
+    current: list[str] = []
+    for ch in text:
+        if quote is not None:
+            current.append(ch)
+            if ch == quote:
+                quote = None
+            continue
+        if ch in "'\"":
+            quote = ch
+            current.append(ch)
+            continue
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        if ch == sep and depth == 0:
+            parts.append("".join(current))
+            current = []
+            continue
+        current.append(ch)
+    if current:
+        parts.append("".join(current))
+    return parts
 
-    返回 {工厂名: (参数名, 参数默认值, {字段名: 值或 '@param'})}
-    """
-    factories: dict[str, tuple[str | None, str | None, dict[str, str]]] = {}
+
+# {工厂名: (有序参数表 [(参数名, 默认值或 None)], {字段名: 值或 '@param'})}
+Factory = tuple[list[tuple[str, str | None]], dict[str, str]]
+
+
+def parse_factories(source: str, path: Path) -> dict[str, Factory]:
+    """解析 `const name = (params) => ({ fields });`。参数个数不限，逐位绑定。"""
+    factories: dict[str, Factory] = {}
     pattern = re.compile(r"const\s+(\w+)\s*=\s*\(([^)]*)\)\s*(?::[^=]*?)?=>\s*\(\{(.*?)\}\)", re.S)
     for m in pattern.finditer(source):
-        name, params, body = m.group(1), m.group(2).strip(), m.group(3)
+        name, params_text, body = m.group(1), m.group(2).strip(), m.group(3)
 
-        param_name: str | None = None
-        param_default: str | None = None
-        if params:
-            # 形如：identity: AutomationOperationDescriptor['identity'] = 'bound_account'
-            pm = re.match(r"(\w+)\s*(?::.*?)?(?:=\s*'([^']*)')?\s*$", params, re.S)
-            if not pm:
-                raise ParseError(f"{path}: 工厂 `{name}` 的参数解析不了：{params!r}")
-            param_name = pm.group(1)
-            param_default = pm.group(2)
+        params: list[tuple[str, str | None]] = []
+        if params_text:
+            for raw_param in split_top_level(params_text):
+                raw_param = raw_param.strip()
+                if not raw_param:
+                    continue
+                # 形如：identity: AutomationOperationDescriptor['identity'] = 'bound_account'
+                pm = re.match(r"^(\w+)\s*(?::.*?)?(?:=\s*'([^']*)')?\s*$", raw_param, re.S)
+                if not pm:
+                    raise ParseError(f"{path}: 工厂 `{name}` 的参数解析不了：{raw_param!r}")
+                params.append((pm.group(1), pm.group(2)))
 
         fields: dict[str, str] = {}
         for raw in body.split(","):
@@ -134,32 +167,33 @@ def parse_factories(source: str, path: Path) -> dict[str, tuple[str | None, str 
                 fields[sm.group(1)] = "@param"
                 continue
             raise ParseError(f"{path}: 工厂 `{name}` 的字段解析不了：{raw!r}")
-        factories[name] = (param_name, param_default, fields)
+        factories[name] = (params, fields)
     return factories
 
 
 def resolve_call(
     factory: str,
-    arg: str | None,
-    factories: dict[str, tuple[str | None, str | None, dict[str, str]]],
+    args: list[str],
+    factories: dict[str, Factory],
     key: str,
     path: Path,
 ) -> dict[str, str]:
     if factory not in factories:
         raise ParseError(f"{path}: 键 `{key}` 用了未知工厂 `{factory}`")
-    param_name, param_default, fields = factories[factory]
-    bound = arg if arg is not None else param_default
+    params, fields = factories[factory]
+    if len(args) > len(params):
+        raise ParseError(f"{path}: 键 `{key}` 传给工厂 `{factory}` 的实参多于形参")
+    bound: dict[str, str | None] = {}
+    for index, (param_name, param_default) in enumerate(params):
+        bound[param_name] = args[index] if index < len(args) else param_default
     out: dict[str, str] = {}
     for field, value in fields.items():
         if value == "@param":
-            if field != param_name or bound is None:
+            if field not in bound or bound[field] is None:
                 raise ParseError(f"{path}: 键 `{key}` 的字段 `{field}` 绑不到参数值")
-            out[field] = bound
+            out[field] = bound[field]  # type: ignore[assignment]
         else:
             out[field] = value
-    missing = [f for f in DESCRIPTOR_FIELDS if f not in out]
-    if missing:
-        raise ParseError(f"{path}: 键 `{key}` 缺字段 {missing}")
     return out
 
 
@@ -179,9 +213,18 @@ def parse_registry(path: Path, var_name: str) -> dict[str, dict[str, str]]:
         key = m.group(1) or m.group(2)
         value = m.group(3).strip()
 
-        call = re.match(r"^(\w+)\s*\(\s*(?:'([^']*)')?\s*\)$", value)
+        call = re.match(r"^(\w+)\s*\(([^)]*)\)$", value)
         if call:
-            entries[key] = resolve_call(call.group(1), call.group(2), factories, key, path)
+            args: list[str] = []
+            args_text = call.group(2).strip()
+            if args_text:
+                for raw_arg in split_top_level(args_text):
+                    raw_arg = raw_arg.strip()
+                    am = re.match(r"^'([^']*)'$", raw_arg)
+                    if not am:
+                        raise ParseError(f"{path}: 键 `{key}` 的工厂实参解析不了（绝不跳过）：{raw_arg!r}")
+                    args.append(am.group(1))
+            entries[key] = resolve_call(call.group(1), args, factories, key, path)
             continue
         if value.startswith("{"):  # 内联对象字面量
             fields: dict[str, str] = {}
@@ -193,12 +236,21 @@ def parse_registry(path: Path, var_name: str) -> dict[str, dict[str, str]]:
                 if not fm:
                     raise ParseError(f"{path}: 键 `{key}` 的内联字段解析不了：{part!r}")
                 fields[fm.group(1)] = fm.group(2)
-            missing = [f for f in DESCRIPTOR_FIELDS if f not in fields]
-            if missing:
-                raise ParseError(f"{path}: 键 `{key}` 缺字段 {missing}")
             entries[key] = fields
             continue
         raise ParseError(f"{path}: 键 `{key}` 的值形态不认识（绝不跳过）：{value!r}")
+
+    # 同一份表内条目之间字段集 MUST 一致：一条漏声明某维，与「一致」在旧版输出上同形——
+    # 这正是「写死字段名单」吃过的亏的表内形态。字段清单不写死，按本表实际声明的并集判。
+    all_fields: set[str] = set()
+    for descriptor in entries.values():
+        all_fields |= set(descriptor)
+    for key, descriptor in sorted(entries.items()):
+        missing = sorted(all_fields - set(descriptor))
+        if missing:
+            raise ParseError(
+                f"{path}: 键 `{key}` 缺字段 {missing}（同表其他条目声明了这些字段，绝不静默跳过）"
+            )
     return entries
 
 
@@ -257,13 +309,19 @@ def main(argv: list[str]) -> int:
         if only_other:
             failures.append(f"  {repo} 多出（{base_repo} 没有）：{', '.join(only_other)}")
         for key in sorted(set(base_entries) & set(entries)):
-            diffs = [
-                f"{f}: {base_repo}={base_entries[key][f]!r} vs {repo}={entries[key][f]!r}"
-                for f in DESCRIPTOR_FIELDS
-                if base_entries[key][f] != entries[key][f]
-            ]
+            # 遍历两侧实际声明字段的并集——字段清单绝不写死：一侧独有的字段是「漏维」，
+            # 与取值不同同样是漂移（任一份漏字段即失败，BREAKING 同批更新的机械保证）。
+            diffs = []
+            for f in sorted(set(base_entries[key]) | set(entries[key])):
+                base_value = base_entries[key].get(f)
+                other_value = entries[key].get(f)
+                if base_value == other_value:
+                    continue
+                base_text = repr(base_value) if base_value is not None else "<缺字段>"
+                other_text = repr(other_value) if other_value is not None else "<缺字段>"
+                diffs.append(f"{f}: {base_repo}={base_text} vs {repo}={other_text}")
             if diffs:
-                failures.append(f"  {repo} 的 `{key}` 分类不一致：" + "；".join(diffs))
+                failures.append(f"  {repo} 的 `{key}` 描述符不一致：" + "；".join(diffs))
 
     if not failures:
         names = " / ".join(repo for repo, _, _ in found)
