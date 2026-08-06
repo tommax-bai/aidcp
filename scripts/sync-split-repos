@@ -392,11 +392,53 @@ DERIVED_COMPOSITION = {
 KERNEL_REPO = 'aidcp-kernel'
 
 
-def pin_pattern(pkg_name: str) -> 're.Pattern[str]':
-    """匹配 package.json 里对某个 git 依赖的 sha pin。"""
-    return re.compile(
-        rf'("{re.escape(pkg_name)}"\s*:\s*"git\+ssh://git@github\.com/[^"#]+#)(?P<sha>[0-9a-f]{{7,40}})(")'
+def parse_shared_pin(text: str, pkg_name: str) -> tuple[str, str | None, object]:
+    """package.json 里对某个共享包的依赖行。
+
+    返回三元组，第一项是状态：
+    - ('absent', None, None)          —— 依赖表里根本没有这一条（不依赖它的仓，合法）；
+    - ('ok', spec, ref)               —— 认识的两种历史写法之一：
+                                          `git+ssh://git@github.com/…#<ref>` 或 `github:owner/repo#<ref>`，
+                                          <ref> 可以是 sha 也可以是 tag；
+    - ('bad', spec, line_no)          —— 有这一条但写法不认识。**这必须响亮报错**：
+                                          写法认不出时若归入「未 pin」，钉子漂到哪儿都没人知道
+                                          （automation 的 github: 简写钉子就这样静默漏检过一回）。
+    """
+    dep_re = re.compile(rf'"{re.escape(pkg_name)}"\s*:\s*"(?P<spec>[^"]*)"')
+    m = dep_re.search(text)
+    if not m:
+        return 'absent', None, None
+    spec = m.group('spec')
+    form = re.fullmatch(
+        r'(?:git\+ssh://git@github\.com/[^#\s]+|github:[^#\s]+)#(?P<ref>[A-Za-z0-9._/-]+)',
+        spec,
     )
+    if not form:
+        return 'bad', spec, text[:m.start()].count('\n') + 1
+    return 'ok', spec, form.group('ref')
+
+
+def resolve_shared_ref(pkg_repo: str, ref: str) -> str | None:
+    """把钉子引用（sha 或 tag）经**本机兄弟 checkout** 解析成 commit sha；解析不了返回 None。
+
+    不走网络：tag → sha 的映射以 `<codes>/<pkg_repo>` 里的对象为准，annotated tag 经 ^{commit}
+    剥到 commit。解析不了（tag 没 fetch / sha 不存在）由调用方判错，不在这里吞掉。
+    """
+    repo_dir = os.path.join(CODES, pkg_repo)
+    proc = subprocess.run(
+        ['git', '-C', repo_dir, 'rev-parse', '--verify', '--quiet', f'{ref}^{{commit}}'],
+        capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip()
+
+
+def latest_tag(pkg_repo: str) -> str | None:
+    """共享包仓最近创建的 tag（翻转后的落后报告用）；无 tag 返回 None。"""
+    out = git(os.path.join(CODES, pkg_repo), 'for-each-ref', 'refs/tags',
+              '--sort=-creatordate', '--format=%(refname:short)').strip()
+    return out.split('\n')[0] if out else None
 
 
 # 共享包 → 它的仓名。消费仓的 pin MUST 恒等于对应仓 master 的头（见 check_package_pin）。
@@ -686,24 +728,105 @@ def check_package_pin(repo_path: str, pkg_name: str, head: str, apply: bool) -> 
 
     两个包都要查：kernel 是零副作用契约，transport 里还有跨进程路由名 —— 后者过期的后果更直接，
     两端路径对不上时**两边各自编译通过、各自测试通过，只有真跑起来才 404**。
+
+    钉子写法（invert-split-fact-source §2 起）：规范形是 `git+ssh://…#v<semver>`（tag），
+    历史裸 sha 与 `github:` 简写仍认识；tag 经本机兄弟 checkout 解析成 sha 后再与 head 比对。
+    翻转前强度不变：解析出的 sha 必须等于共享包 master 头。翻转后的放宽口径见 report_flipped_pins。
     """
     pkg = os.path.join(repo_path, 'package.json')
     if not os.path.isfile(pkg):
         return False, 'package.json 不存在'
     with open(pkg, encoding='utf8') as fh:
         text = fh.read()
-    pin_re = pin_pattern(pkg_name)
-    m = pin_re.search(text)
-    if not m:
+    repo = os.path.basename(repo_path.rstrip('/'))
+    state, spec, extra = parse_shared_pin(text, pkg_name)
+    if state == 'bad':
+        return True, (
+            f' ERROR: {repo}/package.json:{extra} 对 {pkg_name} 的写法不认识：{spec!r}'
+            f'（只认 git+ssh://git@github.com/…#<ref> 与 github:owner/repo#<ref>；'
+            f'真不依赖它的仓是**不写这一行**，不是换个写法）'
+        )
+    if state == 'absent':
         return False, f' 未 pin {pkg_name}（用得上它的仓才需要）'
-    cur = m.group('sha')
-    if head.startswith(cur) or cur.startswith(head[:len(cur)]):
-        return False, f' {pkg_name} pin 对齐（{cur[:7]}）'
-    if apply:
-        with open(pkg, 'w', encoding='utf8') as fh:
-            fh.write(pin_re.sub(lambda mm: mm.group(1) + head + mm.group(3), text))
-        return True, f' {pkg_name} pin {cur[:7]} → {head[:7]}（已更新，记得 npm install 刷 lock）'
-    return True, f' {pkg_name} pin 过期：{cur[:7]} ≠ {pkg_name} master {head[:7]}'
+    ref = extra
+    pkg_repo = SHARED_PACKAGES[pkg_name]
+    resolved = resolve_shared_ref(pkg_repo, ref)
+    if resolved is None:
+        return True, (
+            f' ERROR: {repo} 的 {pkg_name} pin 引用 {ref} 在本机 {pkg_repo} checkout 里解析不了'
+            f'（先 git -C {os.path.join(CODES, pkg_repo)} fetch --tags？）'
+        )
+    is_sha_ref = bool(re.fullmatch(r'[0-9a-f]{7,40}', ref))
+    shown = ref if not is_sha_ref else ref[:7]
+    if resolved == head:
+        return False, f' {pkg_name} pin 对齐（{shown} → {resolved[:7]}）'
+    if is_sha_ref:
+        # 裸 sha 钉子仍保留 --apply 自动追头（只换 # 后的 ref，不动写法）。
+        if apply:
+            new_spec = spec[: spec.rfind('#') + 1] + head
+            with open(pkg, 'w', encoding='utf8') as fh:
+                fh.write(text.replace(f'"{spec}"', f'"{new_spec}"', 1))
+            return True, f' {pkg_name} pin {shown} → {head[:7]}（已更新，记得 npm install 刷 lock）'
+        return True, f' {pkg_name} pin 过期：{shown} ≠ {pkg_name} master {head[:7]}'
+    # tag 钉子过期＝head 已越过这个 tag。正确动作是在共享包仓打新 tag 再 bump 钉子；
+    # **绝不自动把 tag 改写回裸 sha**（那会悄悄退掉版本化写法），--apply 对它也只报不改。
+    return True, (
+        f' {pkg_name} pin {shown}（→ {resolved[:7]}）落后 master {head[:7]}：'
+        f'head 已越过该 tag，需在 {pkg_repo} 打新 tag 并 bump 钉子（tag 钉子不自动改写）'
+    )
+
+
+def report_flipped_pins() -> int:
+    """翻转后的 pin 报告（invert-split-fact-source §2.3③）。返回退出码。
+
+    翻转后共享包按 tag 发版，消费仓不再被要求追 master 头：
+    - 钉子必须**落在某个已存在的 tag 上**（tag 引用，或恰好指向某 tag 目标 commit 的 sha）——
+      不落在任何 tag 上的钉子指向「未发版」的中间提交，仍是错误；
+    - 落后最新 tag **只报告不判错**（仓名、所钉 tag、最新 tag），升级节奏归各仓自己。
+    写法不认识 / 引用解析不了，与翻转前同样响亮报错。
+    """
+    code = 0
+    consumers = [r for r in REPOS if r != KERNEL_REPO] + [TRANSPORT_REPO]
+    print('共享包 pin（翻转后口径：必须钉在 tag 上；落后最新 tag 只报告）：')
+    for repo in consumers:
+        path = os.path.join(CODES, repo)
+        pkg_json = os.path.join(path, 'package.json')
+        if not os.path.isfile(pkg_json):
+            continue
+        with open(pkg_json, encoding='utf8') as fh:
+            text = fh.read()
+        for pkg_name, pkg_repo in SHARED_PACKAGES.items():
+            if repo == pkg_repo:
+                continue  # transport 不 pin 自己
+            state, spec, extra = parse_shared_pin(text, pkg_name)
+            if state == 'absent':
+                continue
+            if state == 'bad':
+                print(f'  ERROR: {repo}/package.json:{extra} 对 {pkg_name} 的写法不认识：{spec!r}'
+                      f'（只认 git+ssh://…#<ref> 与 github:owner/repo#<ref>）')
+                code = 1
+                continue
+            ref = extra
+            resolved = resolve_shared_ref(pkg_repo, ref)
+            if resolved is None:
+                print(f'  ERROR: {repo} 的 {pkg_name} pin 引用 {ref} 在本机 {pkg_repo} checkout 里解析不了'
+                      f'（先 git -C {os.path.join(CODES, pkg_repo)} fetch --tags？）')
+                code = 1
+                continue
+            tags_at = [t for t in git(os.path.join(CODES, pkg_repo), 'tag', '--points-at', resolved)
+                       .split('\n') if t]
+            if not tags_at:
+                print(f'  ERROR: {repo} 的 {pkg_name} pin {ref}（→ {resolved[:7]}）不落在任何 tag 上：'
+                      f'翻转后共享包按 tag 发版，先在 {pkg_repo} 打 tag 再钉')
+                code = 1
+                continue
+            pinned = ref if ref in tags_at else tags_at[0]
+            newest = latest_tag(pkg_repo)
+            if newest and newest not in tags_at:
+                print(f'  {repo}: {pkg_name} pin {pinned} 落后最新 tag {newest}（只报告，不判错）')
+            else:
+                print(f'  {repo}: {pkg_name} pin {pinned} = 最新 tag')
+    return code
 
 
 # ── 测试的归属：**派生的，不是人分配的** ────────────────────────────────────────────────
@@ -952,7 +1075,7 @@ def main() -> int:
             print('  事实源已翻转：这些改动必须落到对应派生仓，cloud 侧须回退。', file=sys.stderr)
             return 1
         print(f'事实源已翻转：aidcp-cloud 冻结于 {frozen[:12]}，{args.ref} 无受冻结改动。冻结校验通过。')
-        return 0
+        return report_flipped_pins()
 
     sha = git(CLOUD, 'rev-parse', '--short', args.ref).strip()
     own = load_manifest(args.ref)
