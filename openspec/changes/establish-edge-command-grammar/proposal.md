@@ -6,10 +6,11 @@
 
 ## What Changes
 
-- 新增判据文档 `docs/edge-command-grammar.md`：六条规则 + 四个判例 + 三条讨论中撤回的结论（防重走弯路）。
-- 新增规格 `edge-command-grammar`：约束**新增** Cloud→Edge 命令的设计过程。
+- 新增判据文档 `docs/edge-command-grammar.md`：六条规则 + 四个判例 + 撤回结论清单（防重走弯路）。
+- 新增**目标词汇蓝图**（判据文档附录）：46 条存量 + 观察命令逐条映射到目标形态（保留 / 改名 / 拆分 / 墓碑），充分借鉴 OpenCLI 的两层分离与命名空间化（用户 2026-08-06 定调：核心目标是 CLI 层功能清晰，OpenCLI 非常值得借鉴、要充分参考）。蓝图是迁移设计产物，MUST NOT 成为第二张运行时表。
+- 新增规格 `edge-command-grammar`：约束**整个** Cloud→Edge 命令词汇——新增即时生效，存量按蓝图分批迁移收敛（出包与非原子升级两项迁移成本，用户均裁定可接受；核心目标是功能清晰）。
 - `docs/architecture.md` 加指针（与 addressing-layers 指针并列）。
-- **零源码改动**。不重命名任何存量命令、不实装观察命令、不动那七条的归类——那些是本判据立起来之后的后续 change。
+- **本 change 仍零源码改动**：蓝图落纸；分批迁移由后续 change 按命名空间成批执行（协议热点单写区，批次串行）。观察命令与七条归类根治并入蓝图后的迁移序列。
 
 六条规则（全文见 design）：
 
@@ -32,5 +33,5 @@
 
 - `docs/edge-command-grammar.md`（新增）、`docs/architecture.md`（一行指针）
 - 无 sub-repo 改动、无协议改动、无部署、无出包
-- **后续被本判据解锁的活（本 change 不做，只登记）**：观察命令（问「现在在哪个面」，46 条里没有）；七条归错类的根治（`close-account-layer-operation-manual` tasks 9.0 已登记「等本规则立起来再做」）；`page.scroll` 裸字符串面区分的收敛
+- **后续被本判据解锁的活（本 change 不做，蓝图排序）**：按命名空间分批的词汇迁移（含 `page.scroll` 拆分收敛）；观察命令（问「现在在哪个面」，46 条里没有）；七条归错类的根治（`close-account-layer-operation-manual` tasks 9.0 已登记「等本规则立起来再做」）
 - 与在途 change `generalize-facebook-content-derived-post-identity` 的协议改动不冲突：本语法只约束新增，不追溯已定案的
