@@ -1,0 +1,39 @@
+## MODIFIED Requirements
+
+### Requirement: 页面命令具有跨平台固定副作用
+
+每个 Cloud-to-Edge 页面命令 SHALL 具有不随平台变化的页面副作用合同。`identity.read_current` MUST 仅从当前页面读取会话绑定账号身份，禁止导航、重载、历史跳转或打开任何主页；`identity.read_self_profile` MAY 仅进入该会话绑定账号的规范本人主页并读取身份，MUST NOT 接受调用方提供的任意账号或作者 id；作者主页访问命令（`xiaohongshu.profile.open`，仅存在于 xiaohongshu 平台段下）SHALL 仅用于普通作者主页访问，MUST NOT 承担本人身份采集，也 MUST NOT 再接受改变其语义的 `direct` 字段。
+
+#### Scenario: Facebook 当前页身份读取没有导航
+- **WHEN** Cloud 对已协商 `identity.read_current` 的 Facebook 会话下发运行期本人身份采集
+- **THEN** Edge/Native 从当前 Facebook 页面读取身份并返回结果
+- **AND** MUST NOT 执行 `Page.navigate`、reload、history back/forward 或作者主页打开
+
+#### Scenario: 本人主页读取只使用绑定账号
+- **WHEN** Cloud 对支持 `identity.read_self_profile` 的会话下发本人身份采集
+- **THEN** Edge/Native 只可从会话绑定身份推导规范本人主页并读取
+- **AND** 命令 payload MUST NOT 接受可改写目标的账号 id、作者 id 或 URL
+
+#### Scenario: profile open 不再兼任本人采集
+- **WHEN** Edge 收到携带遗留 `direct` 字段的 `xiaohongshu.profile.open`
+- **THEN** Edge 在浏览器/CDP 派发前返回显式不支持或协议错误
+- **AND** MUST NOT 丢弃该字段后把命令当普通作者主页访问
+
+### Requirement: 页面命令支持经协商并在 Native 再校验
+
+Edge 平台驱动与 Native adapter SHALL 声明准确、版本化的页面命令支持集。Edge 仅可向 Cloud 宣告驱动声明与 Native manifest 共同支持的命令；Cloud 仅可发送平台策略选择且连接已协商的命令；平台专属命令的存在性 SHALL 由命令名的平台段声明，出入两道平台段闸按「平台段 = 会话平台」校验、不符以 `platform_mismatch` 显式拒绝；Native MUST 在 CDP 派发前再次按会话平台拒绝未支持命令（纵深防线，不因平台段闸存在而移除）。
+
+#### Scenario: 新 Cloud 连接旧 Edge
+- **WHEN** 平台策略需要的新身份命令未被该 Edge 连接声明
+- **THEN** Cloud 以可观测的 command-unavailable 结果跳过可选二次采集
+- **AND** MUST NOT 回落到近似命令
+
+#### Scenario: Facebook 会话收到 xiaohongshu 平台段命令
+- **WHEN** `identity.read_self_profile` 之外的 xiaohongshu 专属页面命令（如 `xiaohongshu.profile.open`）被提交给 Facebook 会话
+- **THEN** 出口闸按「平台段 ≠ 目标平台」拒发；若仍到达边缘，入口闸以 `platform_mismatch` 拒收
+- **AND** 任何 CDP 页面操作 MUST NOT 发生
+
+#### Scenario: manifest 与驱动声明漂移
+- **WHEN** Edge driver 声明某命令但选中的 Native adapter manifest 未声明同一版本命令
+- **THEN** Edge MUST NOT 向 Cloud 广告该命令能力
+- **AND** 对该功能诚实报告不可用
