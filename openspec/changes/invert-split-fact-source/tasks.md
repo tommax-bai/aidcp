@@ -31,9 +31,20 @@
 
 ## 3. 边界扫描器合并（并行流 B，本批落）
 
-- [ ] 3.1 盘点：cloud 与 automation 两份扫描器逐行 diff，列出漂移点及各自语义；同时查 api / content 有无第三、四份副本。
-- [ ] 3.2 合并为单一实现，落点默认 `aidcp-transport`（三家都要调、零属主 SQL，符合准入），cloud 与 automation 改薄壳引用；若盘点后发现更优落点，写明理由再改。
-- [ ] 3.3 合并后两仓边界门禁全绿，且做一轮变异验证：故意违反一条边界规则，两边的门禁都要红（防「合并成谁都不跑的死代码」）。
+- [x] 3.1 盘点：cloud 与 automation 两份扫描器逐行 diff，列出漂移点及各自语义；同时查 api / content 有无第三、四份副本。
+<!-- 全量盘点见 scanner-merge-report.md（aidcp 8f7ae77a）。api / content 零副本。真漂移只有一处语义：
+     classifyEdge 对「组装根→组装根」内部边的判序两边相反（automation 允许＝正确且有测试，cloud 判禁
+     ＝与自己文档矛盾）。两份 boundary-record.ts 是设计上不同的程序（refresh 生成器 vs 派生 census），
+     不是副本对、不合并。 -->
+- [x] 3.2 合并为单一实现，落点默认 `aidcp-transport`（三家都要调、零属主 SQL，符合准入），cloud 与 automation 改薄壳引用；若盘点后发现更优落点，写明理由再改。
+<!-- 偏离（有理由，见报告）：transport 落点在翻转前结构性走不通——扫描器活在 test/（transport 点名只
+     重放 cloud src/）、REPO_ROOT 按模块自身位置解析。改为：语义对齐到 byte-identity（以派生侧裁定为准，
+     保护性规则零放松；cloud e5db151 / automation bf015f7）+ 两仓各装防再漂移 parity 闸（只改一边立刻红，
+     兄弟 checkout 缺失时如实报「没能确认」不报「一致」）。结构性单一落点合并推迟到 cutover（见 5.7）。 -->
+- [x] 3.3 合并后两仓边界门禁全绿，且做一轮变异验证：故意违反一条边界规则，两边的门禁都要红（防「合并成谁都不跑的死代码」）。
+<!-- cloud test:acceptance 198/198、automation 298/298、双侧 typecheck 与 census 全绿。三个变异全响：
+     M1 cloud 越界边→AC-BOUND-04 红并点名；M2 automation 同形→census 非零退出；M3 单侧改扫描器
+     →两仓 parity 闸同时红。各自 revert 后复绿。 -->
 
 ## 4. 整图测试搬家 pilot（并行流 C，本批只产报告，cloud 零提交）
 
@@ -48,6 +59,7 @@
 - [ ] 5.4 删除 cloud `src/` 与 `migrations/`；`boundaries/` 归属清单转冻结历史记录（README 注明）；仓 README 自述改「集成测试仓」；整图套件在删除后的状态下再跑一遍全绿。
 - [ ] 5.5 `sync-split-repos` 退役收尾：census 模式只剩冻结校验与 pin 报告；`--apply` 路径删除或永久封死。
 - [ ] 5.6 「只测单体组装」的 5 个用例随单体死掉：删除并在本条注释记档。
+- [ ] 5.7 边界扫描器结构性收口（3.2 递延项，细节见 scanner-merge-report.md）：cloud src 删除后 automation 侧副本成为唯一实现，撤下两仓 parity 闸；若 api / content 届时需要该闸，先把 REPO_ROOT 改成可注入再进 transport。同时裁决报告记录的 record 层不对称（派生侧 census 只拦 forbidden、不带棘轮）与三条既存 `--tests` 多出条目。
 
 ## 6. 文档与脚本改指（cutover 后）
 
