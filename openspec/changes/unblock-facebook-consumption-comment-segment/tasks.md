@@ -41,7 +41,21 @@
 - [x] 6.3 部署 dev（安全序列：target 检查 → 备份 → rsync → restart → healthcheck）。 <!-- 2026-08-05 deployed；备份 {api,automation,content}.bak.20260805-204610.tar.gz + .env.bak；git archive 快照 rsync（不从工作区推）；ECS 上三槽 typecheck 全 CLEAN；迁移 0111 经 /opt/aidcp/cloud 的执行器 `migrate up --allow-contract` 应用（只进 automation 库）；重启序 content → automation → api -->
 - [x] 6.4 部署验收（可当场核的部分）。 <!-- 三服务 active、NRestarts=0、六端口全在（8787/8090/8091/8092/8093/8094）、单体仍 inactive+disabled、isales 未碰；库内索引定义已换代为 (account_id, execution_target, action_type) WHERE state<>'terminal'；**dev 上 blocker 已从 facebook_group_comment_policy_unavailable 变为 comment_edge_offline / no_strict_eligible_historical_group ⇒ 策略确实读到了** -->
 - [ ] 6.5 **真机验收（未完成，已登记 backlog）**：需边缘客户端接入并跑一场消费模式浏览，核 ① 槽位指针归零 ② 该账号重新出现 `action=like sent=1` ③ 评论义务仍在、不再挡路。部署时边缘全部离线，无法当场观测。
-- [ ] 6.6 OL 处置：OL 上 10 个冻结账号在 OL 部署前不会自动恢复（其 blocker 仍是 `facebook_group_comment_policy_unavailable`）。需用户明确要求才走发布分支上 OL。
+- [x] 6.6 OL 处置：OL 上 10 个冻结账号在 OL 部署前不会自动恢复（其 blocker 仍是 `facebook_group_comment_policy_unavailable`）。需用户明确要求才走发布分支上 OL。
+  <!-- 2026-08-06 用户明确要求后部署。三仓同名发布分支
+       release/20260806-ol-derived-services：api beeeb84 / automation 0ccdef2 / content 61bd075。
+       发布前 acceptance 26/296/30、全量 570/2286(+3 skipped)/472、typecheck 全 CLEAN，
+       OpenSpec strict 212/212；三属主迁移 20/58/70、pending=0。
+
+       第一次启动被三个同步读流按设计 fail-closed：同 cursor 载荷摘要已变化；业务入口保持
+       not_ready。立即从 /opt/aidcp/backups/20260806-020807Z-pre-release 完整回滚，旧构建首轮
+       恢复 ready。随后按本文件 7.1 的发布契约，在停住旧生产者/消费者后只把
+       client_environment_slow_start / content_schedule / facebook_operation_policy 三个具名镜像键
+       各单调 +1（1712→1713 / 196→197 / 65→66），再部署同一 release 快照。
+
+       最终三条 checkpoint cursor=1469754/19700/2277、state=ready、last_error=null；三服务
+       active、NRestarts=0、六端口齐、写者锁 target=ol、飞书 Red.A onReady、内外 health 通过，
+       release 树内容漂移 0。验收时 Edge 连接数为 0，故 6.5 的真实账号行为仍保持未完成。 -->
 
 ## 7. 部署期踩到的两个坑（下次照做）
 

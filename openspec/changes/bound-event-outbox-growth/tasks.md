@@ -125,6 +125,9 @@
   <!-- dev 代数停在 81,735、updated_at=21:36:04（重启那一刻）之后不再前进。
        对照组 ol 仍在涨（59,644 → 21:37:06 仍在动）——**OL 还跑着旧构建**，
        这同时证明这项测量是灵敏的，不是「查不出来」。 -->
+  <!-- 2026-08-06 后续：OL 已从 release/20260806-ol-derived-services 部署本 change 对应构建
+       （automation 0ccdef2 / api beeeb84 / content 61bd075）；“OL 仍跑旧构建”只描述 8 月 5 日
+       当时的对照窗口，不再是当前事实。长窗增长/剪裁结论仍由 backlog 143 承接。 -->
 - [x] 7.2 `sync_read.changed` 新增速率掉到接近 0
   <!-- dev 侧 max(created_at) 停在 21:36:04（部署时刻）。ol 侧继续按每 10 秒一条产出。 -->
 - [x] 7.3 剪裁生效
@@ -157,6 +160,8 @@
        ③ 单体 aidcp-cloud 的剪裁名单仍只有两条主题。它按 §8.0 永不部署、只作回滚路径，
           本次刻意未动（monolith 形态下这两条主题的消费者是否存在需另行判定，
           `consumers: []` 与 `consumers: [不存在的名字]` 后果相反）。 -->
+  <!-- 2026-08-06：上面第 ② 条的部署前提已兑现，OL 已切到同名三仓 release 分支；
+       它保留为历史残留记录，不再表示当前运行版本。 -->
 - [x] 8.2 回写 `deploy-derived-services-to-dev` 的 tasks.md：8.1 第 ④ 条已由本 change 收掉
   <!-- 已就地标注为「2026-08-05 由 bound-event-outbox-growth 收掉（aidcp-api beeeb84）」，
        并写清真因是**消费侧**那一半没跟着改，原文保留。 -->
