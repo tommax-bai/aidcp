@@ -122,7 +122,7 @@ src/ 与 migrations/ 零改动（`git status --porcelain src/ migrations/` 为�
      （grep `export.*DEFAULT_PG_CONFIG` 在该文件里零命中，只剩三处说明归属的注释）。
      第二半「不得把源码兜底口令写进新文件」维持原偏离结论（整体搬迁、全仓仍恰好 1 处），
      已按定稿 §6.5.6 留给那个独立 change，不因本次勾选而消失。 -->
-- [ ] 2.4 收窄 `src/agents/base-role.ts` 的两处具体实现导入（`:8` 的 `../event-bus/index.js`、`:11` 的 `../llm/qwen.js`），改为 kernel 内的接口声明；照仓内既有弱接口范式（`src/agents/base-role.ts:14` 的 `RoleLlm`）。改完 `base-role.ts` 方可标为 `kernel`。
+- [x] 2.4 收窄 `src/agents/base-role.ts` 的两处具体实现导入（`:8` 的 `../event-bus/index.js`、`:11` 的 `../llm/qwen.js`），改为 kernel 内的接口声明；照仓内既有弱接口范式（`src/agents/base-role.ts:14` 的 `RoleLlm`）。改完 `base-role.ts` 方可标为 `kernel`。
 <!-- BLOCKED：与定稿冲突，按「定稿优先」不做。§4.7 kernel 段写死「本基线 sha 上恰好 4 文件 251 行，这是 kernel 的全量名单」，base-role.ts 不在其中；且 §4.7 规定新增 kernel 成员 MUST 先走「准入 + 析出为独立新文件 + 同批回写 §4.7 目录行与计数」三条通道。本 change 无权单方面把第 5 个文件塞进花名册。base-role.ts 已登记在 boundaries/kernel-non-members.json，注明「是否进 kernel 由后续控制仓 change 改 §4.7 后再定」。 -->
 <!-- 2026-08-05 复核：**两处只收窄了一处，本项维持不勾**（同批的 2.3 / 2.6 已因现实推进而勾上，
      本项没有，别顺手一起划）。实读 `src/agents/base-role.ts` 现在的全部 import：
@@ -131,6 +131,25 @@ src/ 与 migrations/ 零改动（`git status --porcelain src/ migrations/` 为�
        （只有 `event-fanout-port.ts` / `panel-event-delivery-port.ts`，都不是 EventBus 本身）✗
      `base-role.ts` 至今仍具名留在 kernel 拒入名册里，与「改完方可标为 kernel」的验收口径一致。
      ⚠️ 只按「import 行数变少了」判这项已做，会得出相反结论——本次差点就那么判了。 -->
+<!-- 2026-08-06 用户裁定：**改判为「不再需要」，与 5.1 / 5.3 同款处置。本条 MUST NOT 被读成「已做」——
+     那处事件总线依赖至今仍在，改判的是这件事该不该做，不是它做没做。**
+
+     **判据一：要共用的第二家不存在。** 拆仓后逐仓实测——角色基类 `src/agents/base-role.ts`
+     **只存在于 `aidcp-automation`**（`aidcp-api` / `aidcp-content` 下无此文件）；事件总线目录
+     `src/event-bus/` 同样**只在 `aidcp-automation`**（api / content / kernel / transport 四处皆无）。
+     content 侧有自己另一套发布角色基类（`src/publish-agent/roles/base-role.ts` 的 `BasePublishRole`），
+     api 侧 `src/agents/` 只有一个人设自动补全文件。⇒ 它是单属主文件，进不进 kernel 对任何一家都零影响。
+
+     **判据二：门禁口径下它不产生任何违规。** `boundaries/import-exemptions.json` 现为
+     `frozenTotal=0 / 条目 0`（seedTotal 173），表写入侧同为 0 ⇒ 本条要收窄的那条依赖既不在豁免清单里、
+     也不构成跨属主边。剩下那处是**同属主的 type-only import**，本 change 的门禁本来就不管。
+
+     **判据三：反向做法是纯做功。** 为满足字面要求而在 kernel 里造一个事件总线接口，等于为唯一一个
+     消费者造抽象（YAGNI），且会把一个单属主概念抬进三仓共享层、与 §6.4「不共享含业务逻辑的公共包」相悖。
+
+     ⇒ 验收口径维持不变：`base-role.ts` **仍具名留在 `boundaries/kernel-non-members.json` 拒入段**
+     （AC-BOUND-03 会查），与「改完方可标为 kernel」逐字一致——没改完，所以不标，闸仍然生效。
+     日后若真有第二家要共用角色基类，MUST 重新立项并重写判据，**MUST NOT 援引本条当既有授权**。 -->
 - [x] 2.5 在门禁里实现 kernel 准入断言：kernel 成员 MUST NOT 含 `INSERT`/`UPDATE`/`DELETE`/`CREATE TABLE`/`SELECT` 字面量、MUST NOT 注册 HTTP 路由、MUST NOT 调用 LLM 或供应商 HTTP、MUST NOT 含模块级可变单例或定时器或连接池、MUST NOT 导入 `api`/`content`/`automation`/`composition` 任一层。任一条不满足即失败并指名文件。
 <!-- aidcp-cloud 071252c AC-BOUND-03：四类正则逐条断言 + 花名册比对 + 拒入清单比对；反向依赖由 classifyEdge 判 forbidden（无豁免通道），实测搬迁前 kernel->automation 1 条、搬迁后 0 条 -->
 <!-- 缺陷修复 aidcp-cloud 31dfab2（2026-07-23 审计坐实）：「模块级可变单例」那一条原只锚行首裸 let/var，`export let …` 以 export 开头故整类漏过（已注入 `export let` 到 kernel 成员验证过：当时 AC-BOUND-03 仍绿）——而导出型可变单例正是最容易被其它层写坏的一种。现改为 `^(?:export\s+)?(?:let|var)\s`，并补一条模块级 `const x = new Map()/new Set()` 的可变容器检查；「SQL 字面量」一条改为复用扫描器的 UPDATE 语法源串（原来同样对带别名的 UPDATE 失明）。三条机械回归写在 module-boundary.test.ts 的「kernel 准入判据保真自检（非 AC 编号）」里（export/裸形态必命中、不可变导出与函数内局部量必不误判、带别名 UPDATE 必命中） -->
@@ -195,8 +214,14 @@ src/ 与 migrations/ 零改动（`git status --porcelain src/ migrations/` 为�
 
 - [x] 5.1 【反方向，收益最集中】原稿三个搬迁目标 MUST 按定稿裁决重排：**`src/comm/protocol.ts`（10 条）一项取消**——§10.9 终局裁决它归 `aidcp-automation` 独占、MUST NOT 进 kernel；`src/event-bus/types.ts`（46 条）与 `src/platform/index.ts`（13 条）两项的处置**随任务 2.1 对 §4.7「两处待裁决项」的定案而定**，定案前 MUST 视为未定。因此「一次性削掉 79 条里的 69 条」这个数字 MUST 按定案结果重算，MUST NOT 作为既定收益写进准入条件（连带影响见 6.3）。这一步不写业务代码，只改 import 路径与归属表，同批删除对应豁免条目。
 <!-- aidcp-cloud 071252c 三项处置已定：protocol.ts 取消（§10.9）；event-bus/types.ts 与 platform/index.ts 按 2.1 判为不析出。**重算结果 = 削减 0 条**，故本步不产生 import 路径改动、不产生豁免条目删除。实测方向分解也已把原稿的「79 条」纠正为 content→automation **27 条**（其中 event-bus/types.ts 6 条、platform/index.ts 2 条、platform/registry.ts 1 条、protocol.ts 0 条——protocol.ts 的 6 条来自 api 侧）。「不作为既定收益写进准入条件」已落实：6.3 的阈值用的是实测 involvingContent=112，不含任何假定收益 -->
-- [ ] 5.2 `src/platform/registry.ts` 的纯数据声明段随 `platform/index.ts` 进 kernel，再削 4 条；剩余 6 条（`comm/edge-task-lease-client.ts` 2、`event-bus/index.ts` 1、`risk/session-limits.ts` 1、`risk/resume-limits.ts` 1、`comm/preemption.ts` 1）保留豁免并在条目 `reason` 里写明属真实跨边界依赖。
+- [x] 5.2 `src/platform/registry.ts` 的纯数据声明段随 `platform/index.ts` 进 kernel，再削 4 条；剩余 6 条（`comm/edge-task-lease-client.ts` 2、`event-bus/index.ts` 1、`risk/session-limits.ts` 1、`risk/resume-limits.ts` 1、`comm/preemption.ts` 1）保留豁免并在条目 `reason` 里写明属真实跨边界依赖。
 <!-- BLOCKED：前半段已被 2.1 的裁决作废（registry.ts 纯数据段判为不析出），「再削 4 条」不成立。后半段的六个具名目标按 §4.7 归属实测也已失真：edge-task-lease-client.ts 与 comm/preemption.ts 的被导入条数为 0（没有 content 层文件导入它们），event-bus/index.ts 2 条、session-limits.ts 4 条、resume-limits.ts 1 条。这些边已全部在豁免清单里、reason 写明是实测既存跨边界依赖，但没有按原稿那份（已失真的）名单逐条加特写理由。正确的后续动作是：按实测的 content→automation 27 条重新分组、逐条挂消除 change，属独立削减 change 的范围。 -->
+<!-- 2026-08-06 用户裁定：**结案（不再做）。** 上一条批注已把本条两半都判废——前半段被 2.1 的
+     「registry.ts 纯数据段不析出」裁决作废，后半段那份具名清单当日实测即失真（六个目标里两个的
+     被导入条数为 0）。今天再复验一次，连「重新分组挂消除 change」这个善后动作也没有对象了：
+     `boundaries/import-exemptions.json` 现为 `frozenTotal=0 / 条目 0` ⇒ **content→automation 那 27 条
+     已在拆仓过程中全部消化，一条豁免都不剩**，没有条目可写 reason、也没有边可削。
+     棘轮本身仍然生效（此后新增违规照样被 AC-BOUND-04/06 拦），本条关的只是这一轮的削减动作。 -->
 - [x] 5.3 【正方向，单点最纠缠】起一个**专门的独立 change** 处理 `src/orchestrator/role-dispatcher.ts`（3088 行）文件头对 40 个角色类的 import（`automation→content` 53 条里的 43 条）：引入 `RoleName → 角色工厂` 注册表，dispatcher 只依赖 kernel 里的角色基类接口，具体角色类由组合根 `src/server.ts` 注入。按 CLAUDE.md §7 标记为热点文件、需串行独占，不与其它 change 并行。
 <!-- BLOCKED：本条要求「起一个专门的独立 change」，属控制仓建 change 的动作，本 session 只有本 change 目录的写权限，无权新建。**收益量级 MUST 重算**：按 §4.7 归属实测，role-dispatcher.ts 的 40 条 ../agents/ import 里只有 **4 条**跨边界（其余 36 条被导入的角色同属 automation），不是 43 条；automation→content 总数也是 28 条而非 53 条。该独立 change 本身仍成立（拆仓时 automation MUST 能在不 import content 角色的前提下启动），但排期依据要按 4 条写。重算请求已写进 docpatch P7。这 4 条已在豁免清单里逐条挂了说明性 note。2026-07-23 主控套用 docpatch P7：§12 两族门禁第 1 条已回写（role-dispatcher 跨边界 4 条、panel 8、customer→risk 1、首批 seed 295+12），评审报告 P12 的 43→4 同步。本任务「起一个专门的独立 change」的部分仍 BLOCKED（本 session 无权建控制仓 change）。 -->
 <!-- 2026-08-05 结案，**改判为「不再需要那个独立 change」**，与 5.1「重算结果 = 削减 0 条」同形。
@@ -222,8 +247,14 @@ src/ 与 migrations/ 零改动（`git status --porcelain src/ migrations/` 为�
 - [x] 5.4 每次削减 MUST 在同一提交里同步下调 `frozenTotal` 并删除失效条目（否则门禁的失效条目断言会直接失败）。**子仓 MUST NOT 在没有控制仓 change 批准的情况下上调 `frozenTotal`**：上调只走 3.4 定义的 `raises[]` 例外通道，且每个元素必须齐备 `amount` / `approvedByChange` / `eliminateBy` 三字段。
 <!-- aidcp-cloud 071252c 纪律已机械化而非只写在文档里：AC-BOUND-05 / AC-OWN-04 判失效条目，AC-BOUND-06 / AC-OWN-05 判 frozenTotal 上界（基准是不可变的 seedTotal）与 raises[] 三字段齐备。已人工验证：只加条目不加 raises 时两条同时红（见 7.3 记录）。操作说明写在 boundaries/README.md -->
 <!-- 缺陷修复 aidcp-cloud 620c0db（2026-07-23 第二轮审计坐实）：`--reseed`（拆掉整个棘轮的开关）此前**零机械守卫**——同一个 npm 入口、无必填参数、不校验 seed 窗口是否还开着，且会连带清空 raises[]（已批准上调及其消除时限的唯一记录）。实测：注入一条 content→automation import 后，默认 refresh 正确拒绝，但紧接着 `refresh --reseed`（连 README 写的 --seed-note 都不给）退出 0、seedTotal / frozenTotal 一起从 274 抬到 275、raises[] 被重置为 []，随后 AC-BOUND-06 全绿。现补四道机械门，任一不满足即 exit 1：① `boundaries/ownership-rules.json` 新增 `seedWindow.open` 必须为 true（缺省按已关闭处理，fail-safe）；② 必须给 `--seed-note=`；③ 清单已 seed 过时必须再加 `--i-am-reseeding-the-ratchet`；④ raises[] 非空时直接拒绝、要求先人工处置。四种拒绝形态逐条实测通过，「全标志齐备 + 窗口开着」时仍能正常 reseed。**归档本 change 时的强制动作：把 seedWindow.open 改成 false** —— 那一刻起 --reseed 一律拒绝，与 §12「棘轮自本 change 归档起开始计数」逐字对齐 -->
-- [ ] 5.5 建立削减节奏约定并写进控制仓：每归档一批 change 至少削减 N 条豁免（N 由首批实测后确定），`role-dispatcher.ts` 那 43 条单列不计入常规配额。
+- [x] 5.5 建立削减节奏约定并写进控制仓：每归档一批 change 至少削减 N 条豁免（N 由首批实测后确定），`role-dispatcher.ts` 那 43 条单列不计入常规配额。
 <!-- BLOCKED：本条要求「写进控制仓」，属控制仓法条改动，本 session 不直接改控制仓 docs。已按首批实测（257 条 import + 10 条表写入）拟出具体节奏并写成 docpatch P15 交主控套用：每批清账 frozenTotal 至少降 12 条（≈seed 的 5%），role-dispatcher 那一簇（重算后 4 条）与表写入侧 10 条各自单列不计入常规配额。2026-07-23 主控套用 docpatch P15 + S1：§12 棘轮规则已加削减节奏（每批降 ≥12 条、seed 实测终值 295 import + 12 表写入）与「条目粒度 = 违规粒度」通则；表写入侧按 S1 记 12 条（三元组口径，非松动）。本任务「写进控制仓法条」的部分即由此落地。 -->
+<!-- 2026-08-06 用户裁定：**关闭。本条的义务（把节奏约定写进控制仓）事实上已经履行，只是没人回来勾。**
+     复验落点：`docs/cloud-service-decomposition-proposal.md` §12 棘轮规则段已写死「每归档一批 change，
+     `import-exemptions.frozenTotal` MUST 至少下降 12 条」，并把 role-dispatcher 那一簇（实测 4 条）
+     与表写入侧 12 条各自单列、不计入常规配额——与本条要求逐项对应，N 已由首批实测确定。
+     **今天这条配额已无对象**：两份清单均为 `frozenTotal=0 / 条目 0`，没有可削的豁免。
+     配额条文保留在 §12 不删——它约束的是「今后若再产生豁免」，删掉等于把未来的棘轮节奏一起删了。 -->
 
 ## 6. aidcp — 控制仓文档与阶段准入
 
