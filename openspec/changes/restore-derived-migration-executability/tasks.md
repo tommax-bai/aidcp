@@ -13,7 +13,7 @@
 > **还有第二层，import 修完才露出来**：`migrationsDir()` / `tableOwnershipPath()` 的默认值是「模块文件往上两级」，装进共享包后指向包自己的目录。实测报错 `migrations_dir_unreadable dir=.../node_modules/aidcp-transport/migrations`。**这一层比 import 那层更该记**——漏传的后果不是报错而是**读到零条迁移**，契约门会据此说「通过」。
 
 - [x] 1.1 把三个派生仓 `scripts/migrate.ts` 里指向共享内核的两处相对引用改为包引用：`../src/kernel/pg-owner-connection-resolver.js` → `aidcp-kernel/kernel/pg-owner-connection-resolver.js`，`../src/kernel/schema-name.js` → `aidcp-kernel/kernel/schema-name.js`。**MUST NOT 在 `aidcp-cloud` 里改**——事实源仓有 `src/kernel/`，相对引用在那里是对的；改法差异由第 4 节的同步改写器承担。
-<!-- aidcp 4e64e1b + aidcp-transport 2c635e8 + aidcp-cloud 343c464 + api e91880d / automation 2bcca28 / content cc8a0ab。
+<!-- aidcp f79e58e3 + aidcp-transport 2c635e8 + aidcp-cloud 343c464 + api e91880d / automation 2bcca28 / content cc8a0ab。
      实际落地范围大于本条：除 kernel 两处外，另有 4 处 `../src/schema/**` 也要改（migration-files /
      migration-owners / migration-plan / schema-inspect），且 schema-inspect **原本不在共享包里**，
      须先把它纳入点名清单（准入逐条复核过：零属主表 SQL，只查 pg_indexes / pg_constraint；
@@ -48,7 +48,7 @@
 ## 2. aidcp — 控制仓：把 `scripts/` 纳入拆仓同步覆盖（根因，不做等于下次照漂）
 
 - [x] 2.1 在 `scripts/sync-split-repos` 里新增 `scripts/` 的同步段，按**逐文件点名**（范式抄 `aidcp-transport` 那份点名清单），起手只点 `scripts/migrate.ts`。MUST NOT 整目录同步——`scripts/` 下多数脚本是控制仓 / 事实源仓自用的。
-<!-- aidcp 4e64e1b `SCRIPT_MEMBERS` + `sync_scripts()`。另加 `SCRIPT_UNMANAGED`（前缀匹配，
+<!-- aidcp f79e58e3 `SCRIPT_MEMBERS` + `sync_scripts()`。另加 `SCRIPT_UNMANAGED`（前缀匹配，
      db-split/ 与字体子集脚本）——**这一条是实施中补的，不加就每次刷一屏「多出」把真该删的淹掉**：
      光 db-split/ 一族每仓就 8 条。三类分开报（点名 / 多出 / 有意不纳管），只有第二类会被 --prune 删。 -->
 - [x] 2.2 该段 MUST 复用既有的 `rewrite_kernel_imports`（已验证它对 `scripts/migrate.ts` + `../src/kernel/x.js` 解析正确，产出 `aidcp-kernel/kernel/x.js`），MUST NOT 另写一份改写逻辑。
