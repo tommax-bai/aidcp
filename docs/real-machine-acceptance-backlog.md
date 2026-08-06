@@ -4292,3 +4292,17 @@ change `route-notification-items-by-category`（cloud master `9e5b000` / 派生 
 - [ ] 副本 unknown 瞬时态（配置轮询中断）期间 `session.end` 可送达（本批唯一有意行为变化——旧行为是被扣住）
 
 > 机制换血、结果应与旧救援清单逐条一致（对照表见该 change design 决策一）；观察到任何偏差按缺陷处理。
+
+## 簇 149 · 观察命令「问现状」真机验收（add-state-observation-command，2026-08-06）
+
+共享前置：dev 车队真机（引擎侧零 Rust 改动，但边缘 TS 改动需出包才到运营机——与既有出包等待项同簇）。
+验收工具：云端侧通道已落（`RoleDispatcher.askEdgeState()`），无自动触发方——真机验收需临时脚本或
+面板入口手动触发一次 `state.read`。
+
+- [ ] 「问现状」对五种面各答对一次（feed/explore、搜索、详情、通知、发布任一子集凑五）：
+      `state.report.surface = {outcome:'confirmed', kind:<对应面>}`，身份维 confirmed 且 accountId 与绑定一致
+- [ ] 验证码 / 登录墙常驻时问一次：面如实报 `captcha` / `login`（不被停手闸扣住、不超时）
+- [ ] Facebook Reels / 群组页问一次：如实 `unconfirmed page_unrecognized`（已知词表缺口，MUST NOT 伪装具体面）
+- [ ] 冷待机（浏览器收起）问一次：两维 `browser_unavailable`，且**没有**触发浏览器唤醒（外壳无 wake 日志）
+- [ ] 独占任务（发布中）问一次：两维 `executor_busy`，发布不受扰动
+- [ ] 纯读复核：问询前后页面 URL / 滚动位置零变化

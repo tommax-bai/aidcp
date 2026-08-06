@@ -212,6 +212,20 @@
 | `interaction.offboard.result` | edge → cloud | `interaction.offboard.ack` | durable cleared/already_cleared/failed 结果，可重连补发 |
 | `interaction.offboard.ack` | cloud → edge | — | exact accepted/duplicate 后 Edge 才清 offboard outbox |
 
+### 2.9 观察命令「问现状」（v2 新增，change add-state-observation-command，蓝图批 3）
+
+> 三段对账的第③段（`docs/edge-command-grammar.md` §3）：云端凭已发命令对当前页的推定是开环的，
+> 报错之后需要一条能主动问真相的观察命令。观察族、**无平台段**（`域.动作`）：询问的是
+> 「环境→账号」翻译层的现场事实，不以页面账号名义动作；登记类别 `page_observation`
+> （identity 维非 `page_account`——身份未落定时本命令 MUST 可用，它正是解开该终局的探针之一）。
+> 云端当前只落**通道**（`StateObservationChannel`：captureId pending 表 + 有界超时）；
+> 何时问、问完怎么改航向＝阶段四（观测决策上移）。
+
+| type | 方向 | 关联响应 | 用途 |
+| --- | --- | --- | --- |
+| `state.read` | cloud → edge | `state.report` | 主动询问浏览器现场（当前面 + 登录身份 + 采集时刻）。**纯读**：MUST NOT 触发导航/点击/滚动，MUST NOT 为观察唤醒浏览器或抢占任务的引擎会话 |
+| `state.report` | edge → cloud | — | 按请求信封 id 关联的应答；面与身份**各自两态**（confirmed + 穷举取值 / unconfirmed + 具名原因），MUST NOT 把读不出来伪装成任何具体面或身份，也 MUST NOT 静默不答 |
+
 ## 3. 各消息 payload 定义
 
 ### 3.1 握手
@@ -1336,6 +1350,47 @@ Edge 必须只打开该 env/account 所属 sidecar，并用后续 `interaction.a
 ```
 
 该控制只服务于已经 `active` 的视频号环境：`open` 启动或保留所属 AdsPower sidecar，并尽力把页面带到前台；`close` 只关闭 sidecar、回到加密会话驱动的 API-only 后台，不删除会话，也不触发客户登出/offboard。Edge 必须校验 env/account/platform 精确匹配，并串行执行重复请求。HTTP/WS 投递成功只表示 accepted；客户端只有读回 `interaction.auth.status.browserState=open|closed` 后才能显示“已打开/已转入后台”。旧 Edge 或未协商 `interaction_browser_control_v1` 时 Cloud 必须 fail closed，不得假装已执行。
+
+### 3.14 观察命令「问现状」（change add-state-observation-command）
+
+`state.read`（cloud → edge）：
+
+```jsonc
+{
+  "captureId": "cap-7f3a"   // Cloud 生成、Edge 原样回传（照 identity.read_current 的关联模式）
+}
+```
+
+`state.report`（edge → cloud，envelope.id = 请求 envelope.id）：
+
+```jsonc
+{
+  "captureId": "cap-7f3a",
+  // 面观察两态（结构化穷举，MUST NOT 裸字符串）：
+  //   confirmed 的 kind 取值 = STATE_SURFACE_KINDS（与 Native 引擎现役页面分类词表同源）：
+  //   home | explore | search | note_detail | profile | notification | publish | login | captcha | error
+  "surface": { "outcome": "confirmed", "kind": "note_detail" },
+  // 或 { "outcome": "unconfirmed", "reason": "browser_unavailable" | "executor_busy" | "probe_failed" | "page_unrecognized" }
+  // 身份观察两态（confirmed 复用既有身份载荷口径 accountId/nickname）：
+  "identity": { "outcome": "confirmed", "accountId": "5f8...", "nickname": "小晴" },
+  // 或 { "outcome": "unconfirmed", "reason": "browser_unavailable" | "executor_busy" | "read_failed" }
+  "observedAt": 1784044845000  // 采集时刻（epoch ms，边缘时钟）
+}
+```
+
+语义要点：
+
+- **纯读**：边缘实现只走引擎 `page_probe`（两平台都登记为阻断豁免的纯读探针）与装配层的就地
+  身份读取（`allowNavigate:false` 强制；Facebook 走 Native cookie 派生、其余走 TS CDP 就地扫描）。
+  零导航、零输入、零滚动；MUST NOT 为观察唤醒冷待机浏览器、MUST NOT 抢占独占任务的引擎会话
+  （两种形态各自折成 `browser_unavailable` / `executor_busy` 的诚实 unconfirmed）。
+- **两态分开、端到端保留**：`unconfirmed` 的原因值与「确认到在某面」是不同结构化取值；
+  引擎归不进已知面的页面（含 FB 分类器未覆盖的 Reels / 群组页）如实报 `page_unrecognized`，
+  MUST NOT 回落任何默认面。
+- **三态不得压成一态（云端侧）**：通道对「拿到应答」（reported，内容自表两态）、「边缘静默」
+  （timeout）、「出口未投递」（not_sent）给出三个不同结局；timeout MUST NOT 被伪造成一份
+  unconfirmed 观察。
+- 验证码 / 登录墙常驻时本命令仍可达（不进停手闸）：「在 captcha 面」正是它要带回的真相。
 
 ## 4. 典型时序
 
