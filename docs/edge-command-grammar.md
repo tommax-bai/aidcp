@@ -146,7 +146,7 @@
 | 借什么 | 它的形态 | 落到我们 |
 | --- | --- | --- |
 | **两层分离** | 语义命令与浏览器原语两个命名空间，不平级混放 | 协议层全语义；坐标级原语只活在引擎内部——比它更严：它的原语暴露给现场 agent，我们的决策者远程，原语不出引擎 |
-| **命名空间化** | `<站点>.<命令>`，站点即目录 | `<面/对象>.<能力>`；平台不进名字（账号已隐含平台），平台差异留引擎适配器——它的 site adapter 正对应 Native 引擎的平台分片，规则三就是「什么进适配器、什么进协议」的分界 |
+| **命名空间化** | `<站点>.<命令>`，站点即目录 | `平台.面/对象.能力`——**站点＝顶层命名空间，与它同构**（用户裁定编法 A，见 §6.1）。页面长相差异仍留引擎适配器——它的 site adapter 正对应 Native 引擎的平台分片，规则三仍是「什么进适配器、什么进协议」的分界 |
 | **只读 / 交互分组** | Get（read-only）与 Interact 两组动词 | 即「平台留痕」维（change `close-account-layer-operation-manual` 实装）——它画在文档分组里，我们画进机读描述符 |
 | **观察命令** | `state`（带元素引用的页面快照） | 蓝图批 3 新增「问现状」（面 + 身份一次回），三段对账第③段 |
 | **不借** | 每步快照循环（snapshot-and-act） | 它的决策者在现场、看是免费的，即便如此快照到动作之间页面照样会变；远程决策者照抄＝每个动作多一次往返。「前提随命令走 + 执行点核验」更新鲜（动手前最后一刻）且零往返 |
@@ -157,15 +157,39 @@
 
 ## 6. 目标词汇蓝图（46 条逐条 + 新增 1 条）
 
-### 6.1 族约定
+### 6.1 命名空间：平台段（编法 A，用户 2026-08-06 裁定）
 
-| 族 | 命名形态 | 编址什么 |
+**凡以页面账号名义在平台上执行的能力，命令名顶层段＝平台**：`平台.面/对象.能力`。
+
+裁定理由：平台间差异预期会持续扩大（小红书没有 group / reels，FB 没有收藏，视频号纯 API），
+显式优于隐式，日志与沟通直观。**裁定时已摆明并接受的代价**：跨平台同语义的能力按平台各留一条
+同构名（`xhs.note.like` / `facebook.note.like`），此刻语义逐字相同也不合并。
+
+换回的收益：
+
+1. **「哪条命令在哪个平台存在」由名字直接声明**。出入闸只需校验「平台段 = 账号所属平台」，
+   不符拒发 / 拒收。引擎测试里那张手抄的「FB 独有命令排除清单」改由前缀推导——又消一份手抄。
+2. **说明书可按平台声明差异化描述符**——失败原因集合、留痕细节本就可能按平台不同，
+   同构名各自登记后有了落点。
+3. **横向扩充天然显式**：新平台＝新前缀下的一组命令声明，缺什么、独有什么，一眼可见。
+
+**适用边界（防笛卡尔积的新形态）**：
+
+- 平台段声明的是**存在性与差异化声明位**；同一平台内，面×原语无语义差异仍不许建（规则三不变）。
+- **宿主 / 环境 / 翻译 / 编排 / 传输域不带平台段**——任务租约、验证码协助、读身份、会话收尾、
+  心跳、节奏、界面快照不编址任何平台。**§6.2 那七条改类命令恰好全在此列**：
+  它们不带平台段，与判例四「它们不是页面动作」互为印证。
+- 平台段取值 MUST 与代码平台枚举一致（本文以 `xhs` / `facebook` / `wechat` 行文，实装批以代码为准）。
+
+### 族约定
+
+| 族 | 命名形态 | 例 |
 | --- | --- | --- |
-| 手势 | `面.动作` | 执行面 |
-| 互动 | `对象.动作` | 被作用的对象 |
-| 导航 | `目标.动作` | 去往的目标 |
-| 观察 | `域.动作` | 现状（面 + 身份） |
-| 非页面 | `域.动作` | 各自域（任务 / 验证码 / 会话 / 节奏…） |
+| 手势 | `平台.面.动作` | `xhs.feed.scroll` · `facebook.reels.scroll` |
+| 互动 | `平台.对象.动作` | `xhs.note.like` · `facebook.comment.like` |
+| 导航 | `平台.目标.动作` | `xhs.note.open` · `facebook.profile.open` |
+| 观察 | `域.动作`（无平台段） | 「问现状」（翻译层） |
+| 非平台域 | `域.动作`（无平台段） | `edge.task.acquire` · `captcha.assist.capture` · `session.end` |
 
 「note」一词全程恒指**内容单元**（打开它、作用于它、在它里面的手势都编址同一单元），一词一义成立。
 
@@ -197,56 +221,60 @@
 说明书的类别词汇大概率要扩（如「页面观察」「环境处置」），身份闸随之不再需要救援清单打洞——
 这正是根治的定义。**改类改变身份闸实际拦截范围，属行为变更，独立 change。**
 
-#### 拆分（2 条 → 批 4 / 批 5）
+#### 浏览词汇平台化 + 拆分（14 条 → 批 4）
 
-| 命令 | 拆成 | 判据 |
+页面手势 / 导航 / 面命令全部加平台段；`page.scroll` 同批按面拆分。`{p}` ＝ 该命令实际支持的平台各展开一条：
+
+| 现名 | 目标名 | 支持平台 |
 | --- | --- | --- |
-| `page.scroll` | `feed.scroll` / `search.scroll` / …（批 4 从调用点与 `reason` 取值枚举实际在用的面；已坐实 feed / search，群组与 Reels 待核） | 规则三①②（回执语义、失败原因按面不同） |
-| `interaction.like` | `note.like` + `video.like` | 规则三判据 + 决策六：按对象类型拆（视频已有独立概率策略），不按位置拆 |
+| `page.scroll` | `{p}.feed.scroll` / `{p}.search.scroll` / …（从调用点与 `reason` 取值枚举实际在用的面；已坐实 feed / search，群组与 Reels 待核） | xhs · facebook |
+| `note.open` `note.close` `note.browse_images` `note.scroll_comments` | `{p}.note.*` 原样加前缀 | xhs · facebook |
+| `feed.refresh` `search.execute` `profile.open` | `{p}.` 原样加前缀 | xhs · facebook |
+| `group.join` | `facebook.group.join` | 仅 facebook（今天引擎手抄排除清单说的就是它） |
+| `notification.open` `notification.browse_comments` `notification.browse_likes` `notification.browse_follows` `notification.back_home` | `{p}.notification.*` | 待核（通知巡视今天只在小红书跑） |
 
-#### 改名（4 条 → 批 5，互动族按对象编址）
+#### 互动平台化 + 按对象改名（5 条 → 批 5）
 
-| 现名 | 新名 | 说明 |
+| 现名 | 目标名 | 说明 |
 | --- | --- | --- |
-| `interaction.collect` | `note.collect` | 对象＝内容单元 |
-| `interaction.follow` | `user.follow` | 对象＝用户，不是笔记 |
-| `interaction.comment` | `note.comment` | 对象＝内容单元 |
-| `interaction.like_comment` | `comment.like` | 对象＝评论——对象编址的收益最直观的一条 |
+| `interaction.like` | `{p}.note.like` + `facebook.video.like` | 按对象类型拆（视频已有独立概率策略），不按位置拆 |
+| `interaction.collect` | `xhs.note.collect` | 仅小红书（FB 无收藏） |
+| `interaction.follow` | `{p}.user.follow` | 对象＝用户，不是笔记 |
+| `interaction.comment` | `{p}.note.comment` | 对象＝内容单元 |
+| `interaction.like_comment` | `{p}.comment.like` | 对象＝评论——对象编址收益最直观的一条 |
 
-改名后「interaction」一词只剩视频号互动收件箱一族（IM 语义），一词一义随之恢复。
+动作关联键口径随动（协议第 5 处同步点：两侧 21 条动作名映射表）。各条的实际支持平台以实装批核对为准。
 
-#### 新增（1 条 → 批 3）
+#### 新增（1 条 → 批 3，无平台段）
 
 | 命令 | 说明 |
 | --- | --- |
-| 「问现状」（名称候选 `state.read`，实装批定） | 面 + 身份一次回，三段对账第③段。今天 46 条里最近的是读登录身份——问的是登着谁，不是在哪页 |
+| 「问现状」（名称候选 `state.read`，实装批定） | 面 + 身份一次回，三段对账第③段；属翻译层观察，不编址平台 |
 
-#### 保留（29 条）
+#### IM 族、发布与收尾（批 6）
 
-| 族 | 命令 | 备注 |
+| 现名 | 目标 | 说明 |
 | --- | --- | --- |
-| 控制 | `ui.snapshot` `pacing.update` `interaction.runtime.controls` `ping` `pong` | 域.动作已符 |
-| IM 确认 | `interaction.sync.ack` `interaction.reply.result.ack` `interaction.offboard.ack` | 三条 ack 是信封应答形态 |
-| IM 执行 | `interaction.sync.request` `interaction.reply.send` `interaction.reply.reconcile` `interaction.offboard.command` | `reply.send` 是 46 条里唯一不经页面身份闸的留痕写（已在说明书 change 登记待议） |
-| IM 浏览器 | `interaction.auth.reopen` `interaction.browser.control` | |
-| 内容单元 | `note.open` `note.close` `note.browse_images` `note.scroll_comments` | 编址同一单元，一词一义 ✓ |
-| 面 | `search.execute` `feed.refresh` | 面.动作已符 |
-| 对象 | `group.join` `profile.open` | 对象.动作已符 |
-| 通知面 | `notification.open` `notification.browse_comments` `notification.browse_likes` `notification.browse_follows` `notification.back_home` | 面.动作已符 |
-| 导航 | `navigation.back` | **待核（批 6）**：与 `note.close` 的分工要坐实——语义重叠则合并，不同则 back 改带目标面 |
-| 发布 | `publish.command` | 原子信封，改名收益近零 |
-| 任务 | `edge.task.acquire` `edge.task.release` | 名可留；`edge.` 前缀冗余，批 2 顺带议 `task.*` |
+| `interaction.sync.*` `interaction.reply.*` `interaction.offboard.*` `interaction.auth.reopen` `interaction.browser.control` `interaction.runtime.controls`（10 条） | `wechat.inbox.*`（定名批 6） | 视频号专属一族加平台段；「interaction」一词随之整体退役，一词一义恢复。`reply.send` 是唯一不经页面身份闸的留痕写（已登记待议） |
+| `publish.command` | 平台段化（`{p}.publish.command`，原子 kind 表分平台） | 发布是平台间差异最大的流程 |
+| `navigation.back` | 与 `note.close` 定分工后平台段化 | 语义重叠则合并，不同则 back 带目标面 |
+| `edge.task.acquire` / `edge.task.release` | 可选顺带改 `task.*` | 非平台域，无平台段；`edge.` 前缀冗余 |
+
+#### 保留不动（4 条，非平台域控制 / 传输）
+
+`ui.snapshot` · `pacing.update` · `ping` · `pong` ——域.动作已符、不编址平台。
+（`interaction.runtime.controls` 归入上面 IM 族批 6。）
 
 ### 6.3 迁移批次（一批一个 change，批次串行走协议热点）
 
 | 批 | 内容 | 性质 |
 | --- | --- | --- |
 | **1** | 删 4 条死角（`plan.response` 带核实前置） | 纯减法，风险最低，顺手验证迁移流程本身 |
-| **2** | 7 条改类 + 说明书类别词汇扩容 + 身份闸摘救援补丁 | 行为变更（闸的拦截范围），不动协议名 |
+| **2** | 7 条改类 + 说明书类别词汇扩容 + 身份闸摘救援补丁 + **出入闸的平台段校验落地** | 行为变更（闸的拦截范围），不动协议名 |
 | **3** | 新增「问现状」观察命令 | 协议新增，三段对账闭环 |
-| **4** | `page.scroll` 按面拆分 | 协议改名 + 云端下发点改造 |
-| **5** | 互动族按对象改名（4 改名 + `video.like` 拆分） | 协议改名，动作关联键口径随动（§2 第 5 处同步点） |
-| **6** | 收尾：`navigation.back` vs `note.close` 定分工；可选 `task.*` 前缀、IM 族是否更名 | 杂项清账 |
+| **4** | 浏览词汇平台化 + `page.scroll` 按面拆分（14 条） | 协议改名最大的一批；引擎手抄排除清单改由前缀推导 |
+| **5** | 互动平台化 + 按对象改名（5 条） | 协议改名，动作关联键口径随动（第 5 处同步点） |
+| **6** | IM 族 `wechat.inbox.*`、发布平台段、`navigation.back` 分工、可选 `task.*` | 收尾清账 |
 
 ---
 
