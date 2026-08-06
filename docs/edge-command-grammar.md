@@ -221,17 +221,21 @@
 说明书的类别词汇大概率要扩（如「页面观察」「环境处置」），身份闸随之不再需要救援清单打洞——
 这正是根治的定义。**改类改变身份闸实际拦截范围，属行为变更，独立 change。**
 
-#### 浏览词汇平台化 + 拆分（14 条 → 批 4）
+#### 浏览词汇平台化 + 拆分（14 条 → 批 4）✅ 已实装（2026-08-06，change `platformize-browse-vocabulary`）
 
-页面手势 / 导航 / 面命令全部加平台段；`page.scroll` 同批按面拆分。`{p}` ＝ 该命令实际支持的平台各展开一条：
+页面手势 / 导航 / 面命令全部加平台段；`page.scroll` 同批按面拆分。平台段取值＝代码枚举
+（`xiaohongshu` / `facebook`，非本文行文的 `xhs`）。**14 旧名 → 22 新名**，前置核实结论：
 
-| 现名 | 目标名 | 支持平台 |
+| 现名 | 落地名 | 核实结论 |
 | --- | --- | --- |
-| `page.scroll` | `{p}.feed.scroll` / `{p}.search.scroll` / …（从调用点与 `reason` 取值枚举实际在用的面；已坐实 feed / search，群组与 Reels 待核） | xhs · facebook |
-| `note.open` `note.close` `note.browse_images` `note.scroll_comments` | `{p}.note.*` 原样加前缀 | xhs · facebook |
-| `feed.refresh` `search.execute` `profile.open` | `{p}.` 原样加前缀 | xhs · facebook |
-| `group.join` | `facebook.group.join` | 仅 facebook（今天引擎手抄排除清单说的就是它） |
-| `notification.open` `notification.browse_comments` `notification.browse_likes` `notification.browse_follows` `notification.back_home` | `{p}.notification.*` | 待核（通知巡视今天只在小红书跑） |
+| `page.scroll` | `xiaohongshu.{feed,search}.scroll` + `facebook.{feed,search,reels}.scroll` | 面=feed/search/reels 三个：Reels 是真面（原靠 `targetSurface`+reason 族区分，字段已删）；**群不是面**（群内找首帖的滚动是引擎对 `note.open{selection}` 的内部分解，协议层从不单独指挥）；FB search 成立（三搜索角色恒注册 + 真实执行器） |
+| `note.open` `note.close` `note.browse_images` `note.scroll_comments` | open/close 双平台、browse_images/scroll_comments 仅 xhs | `note.close` 云端零发送点（回列表走 `navigation.back`），仍改名保留、分工批 6 裁 |
+| `feed.refresh` `search.execute` `profile.open` | refresh/search 双平台、profile 仅 xhs | FB 结构性不访作者主页（C4） |
+| `group.join` | `facebook.group.join` | 引擎测试的手抄「FB 独有排除清单」已由 manifest `edgeTypes[]` 前缀推导取代 |
+| `notification.*` 五条 | `xiaohongshu.notification.*` | 结构性 xhs-only：12 巡视角色注册被平台能力表拦、FB 引擎无臂 |
+
+**顺手清账（据实修正批 1 遗留）**：`browse_next` 全链删除（真死）；`browse_scroll` **保留**——
+它是首帖探测的引擎内部载体（`facebook/runtime.rs` 构造），排除表理由与 postconditions 证据已改写。
 
 #### 互动平台化 + 按对象改名（5 条 → 批 5）
 
@@ -272,7 +276,7 @@
 | **1** | ✅ **已完成（2026-08-06）**：删 3 条（`plan.response` 核出活发送点、留待 v1 退役）；迁移流程首跑坐实——类型穷举逐个点名残留直到全绿，Rust 侧留排除表过渡 | 纯减法（change `drop-dead-cloud-edge-commands`） |
 | **2** | 7 条改类 + 说明书类别词汇扩容 + 身份闸摘救援补丁 + **出入闸的平台段校验落地** | 行为变更（闸的拦截范围），不动协议名 |
 | **3** | 新增「问现状」观察命令 | 协议新增，三段对账闭环 |
-| **4** | 浏览词汇平台化 + `page.scroll` 按面拆分（14 条） | 协议改名最大的一批；引擎手抄排除清单改由前缀推导 |
+| **4** | ✅ **已实装（2026-08-06）**：14 → 22 平台段名（协议 95→103、登记表 44→52）；`page.scroll` 拆三面、`targetSurface` 字段删；两道休眠平台段闸转正；`FACEBOOK_UNSUPPORTED_COMMANDS` 收缩到两条共享名互动命令（批 5 归零）；manifest `edgeTypes[]` 取代手抄排除清单；跨面到达诚实失败 `surface_mismatch_*` | 协议改名最大的一批（change `platformize-browse-vocabulary`） |
 | **5** | 互动平台化 + 按对象改名（5 条） | 协议改名，动作关联键口径随动（第 5 处同步点） |
 | **6** | IM 族 `wechat.inbox.*`、发布平台段、`navigation.back` 分工、可选 `task.*` | 收尾清账 |
 

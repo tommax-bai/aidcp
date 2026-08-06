@@ -11,8 +11,8 @@
 
 > **v1 → v2 演进**：v1 只覆盖"单线规划"链路（`hello/plan/select/anchor/action/ping`）。
 > v2 在保持这条链路向后兼容的同时，新增了三大块：
-> 1. **浏览会话编排**（`note.content`/`browse.*`/`note.open` 等）——云端逐条驱动边缘刷信息流；
-> 2. **角色驱动指令 + 结构化上报**（`page.cards`/`note.detail` 上报，`interaction.like`/`page.scroll` 等下发）——
+> 1. **浏览会话编排**（`note.content`/`{platform}.note.open` 等）——云端逐条驱动边缘刷信息流；
+> 2. **角色驱动指令 + 结构化上报**（`page.cards`/`note.detail` 上报，`interaction.like`/`{platform}.feed.scroll` 等下发）——
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 多角色，覆盖浏览闭环、会话守护、评论、通知、概念和平台专题等职责；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
@@ -75,35 +75,35 @@
 | --- | --- | --- |
 | `note.content` | edge → cloud | 上报一条笔记的标题/摘要/指标，供评估与概念抽取 |
 | `note.ack` | cloud → edge | 确认收到笔记，异步处理中 |
-| `note.open` | cloud → edge | 打开一条笔记（可选 `surface`:'feed'\|'detail'、`purpose`:'read'\|'navigate'；Facebook 还可用 `url` 直达，或用 `selection:'first_commentable_group_post'` + `container` 选择群讨论流首条可评论帖；无 permalink 时可保持同页容器绑定） |
-| `note.close` | cloud → edge | 关闭当前笔记 |
-| `search.execute` | cloud → edge | 执行一次关键词搜索；协商 `search_activity_receipt_v1` 时携稳定 `activityId` 与 purpose/scope，Edge 回诚实提交边界和结果终态 |
+| `xiaohongshu.note.open` / `facebook.note.open` | cloud → edge | 打开一条笔记/帖子（可选 `surface`:'feed'\|'detail'、`purpose`:'read'\|'navigate'；Facebook 变体还可用 `url` 直达，或用 `selection:'first_commentable_group_post'` + `container` 选择群讨论流首条可评论帖；无 permalink 时可保持同页容器绑定） |
+| `xiaohongshu.note.close` / `facebook.note.close` | cloud → edge | 关闭当前笔记/帖子（云端现役零发送点，与 `navigation.back` 的分工批 6 裁） |
+| `xiaohongshu.search.execute` / `facebook.search.execute` | cloud → edge | 执行一次关键词搜索（FB 变体支持全站/容器 `scope`）；协商 `search_activity_receipt_v1` 时携稳定 `activityId` 与 purpose/scope，Edge 回诚实提交边界和结果终态 |
 | `session.end` | cloud → edge | 结束本次浏览会话 |
 
 ### 2.3 角色/命令式驱动指令（v2 新增，cloud → edge）
 
 | type | 方向 | 用途 |
 | --- | --- | --- |
-| `page.scroll` | cloud → edge | 页面滚动（`reason`: feed_scroll / search_scroll / idle_recover_nudge 等；Facebook Native 仅 `idle_recover_nudge` 可将精确 target 置前，其它自动滚动保持后台；主动续场、主入口恢复与 Feed→Reels 降级统一使用 `resume_redrive`，并携带 Cloud 当次选择的 `targetSurface: feed\|reels`；可选 `dwellMs`） |
-| `feed.refresh` | cloud → edge | 主 feed 浏览深度到阈值后，点右下「刷新」按钮回到顶部换出全新一批（`reason`: feed_refresh；可选 `thinkMs`；边缘诚实回执 `action.completed{action:'refresh'}`，非 feed 页 / 无按钮 / 点后未换新批均如实失败，绝不假成功） |
+| `xiaohongshu.feed.scroll` / `xiaohongshu.search.scroll` / `facebook.feed.scroll` / `facebook.search.scroll` / `facebook.reels.scroll` | cloud → edge | 页面滚动，**面进命令名**（词汇批 4）：`reason` 只承载意图/因由（idle_recover_nudge / resume_redrive / continue_after_* 等），不再兼职面；`targetSurface` 载荷字段已删。Facebook Native 仅 `idle_recover_nudge` 可将精确 target 置前；主动续场、主入口恢复与 Feed→Reels 降级统一使用 `resume_redrive`（面段=目标面）；`facebook.reels.scroll` 的进入型 reason（resume_redrive / facebook_reels_primary / empty_feed_reels_fallback）先导航进 Reels，推进型到达时观测不在 Reels 则诚实失败 `surface_mismatch_observed_list`（对称：feed/search 声明到达 Reels 现场失败 `surface_mismatch_observed_reels`，绝不静默改跑另一面执行器）；可选 `dwellMs` |
+| `xiaohongshu.feed.refresh` / `facebook.feed.refresh` | cloud → edge | 主 feed 浏览深度到阈值后换出全新一批（xhs=右下「刷新」按钮；FB=顶栏首页图标页内点击 + 显式回顶。`reason`: feed_refresh；可选 `thinkMs`；边缘诚实回执 `action.completed{action:'refresh'}`，非 feed 页 / 无按钮 / 点后未换新批均如实失败，绝不假成功） |
 | `pacing.update` | cloud → edge | 会话中途风控档位变化推送新 `tempo`（payload `{tempo}`）；边缘刷新兜底节奏（最小间隔 + 停留兜底）、**不重置**操作间隔锚点、不入队/不唤醒会话（change pacing-fallback-hardening） |
 | `interaction.like` | cloud → edge | 点赞指定笔记 |
 | `interaction.collect` | cloud → edge | 收藏指定笔记 |
 | `interaction.follow` | cloud → edge | 关注作者 |
 | `interaction.comment` | cloud → edge | 在当前笔记发评论（`text` 正文；云端已撰写/去AI味/人审通过）。可选 `groupChatCode`=账号「联系方式」，非空则 verbatim 追加到评论末尾（wire 名历史保留，概念=contact info，change generalize-contact-info）；可选 `fastReturnToFeed=true` 仅承载手工 `/comment --feed`：提交派发后不等平台确认，500ms 后直回平台首页，并诚实回 submitted-unconfirmed / verification_ambiguous（绝不冒充平台确认成功） |
 | `interaction.like_comment` | cloud → edge | 给详情页内某条评论点赞（`commentAnchorId` 稳定锚点定位，绝不按序号） |
-| `group.join` | cloud → edge | Facebook 加群原子指令：导航到群、回传结构化 observation；仅 `click:true` 时点击 Join 一次，必须走 Facebook `join` 能力，绝不复用 `browse` |
-| `navigation.back` | cloud → edge | 返回上一页（feed / search） |
-| `note.browse_images` | cloud → edge | 浏览笔记图片（`count` 张；DeepReader 决策下发） |
-| `note.scroll_comments` | cloud → edge | 滚动评论区（CommentReviewer 决策下发） |
-| `profile.open` | cloud → edge | 进入普通作者主页；不得承载本人身份采集或 `direct` |
+| `facebook.group.join` | cloud → edge | Facebook 加群原子指令：导航到群、回传结构化 observation；仅 `click:true` 时点击 Join 一次，必须走 Facebook `join` 能力，绝不复用 `browse`。（群内找首帖的滚动是引擎对 `facebook.note.open{selection}` 的内部分解，协议层无群滚动面） |
+| `navigation.back` | cloud → edge | 返回上一页（feed / search；无平台段，批 6 与 note.close 裁分工） |
+| `xiaohongshu.note.browse_images` | cloud → edge | 浏览笔记图片（`count` 张；DeepReader 决策下发；仅小红书） |
+| `xiaohongshu.note.scroll_comments` | cloud → edge | 滚动评论区（CommentReviewer 决策下发；仅小红书） |
+| `xiaohongshu.profile.open` | cloud → edge | 进入普通作者主页（仅小红书；FB 结构性不访作者主页）；不得承载本人身份采集或 `direct` |
 | `identity.read_current` | cloud → edge | 就地读取会话绑定账号身份；禁止导航，payload 仅含 Cloud 生成的 `captureId` |
 | `identity.read_self_profile` | cloud → edge | 导航到 Edge 会话绑定账号本人主页读取身份；Cloud 不得提供目标账号 ID |
-| `notification.open` | cloud → edge | 导航到通知首页（仅导航；落地后边缘上报 `notification.home`） |
-| `notification.browse_comments` | cloud → edge | 进「评论和@」+ 滚动加载 + 抽取（→ `notification.items`） |
-| `notification.browse_likes` | cloud → edge | 进「赞和收藏」（清未读 + 抽取点赞/收藏发送者 → `notification.items`） |
-| `notification.browse_follows` | cloud → edge | 进「新增关注」（清未读 + 抽取关注者 → `notification.items`） |
-| `notification.back_home` | cloud → edge | 返回通知首页（重报各类未读） |
+| `xiaohongshu.notification.open` | cloud → edge | 导航到通知首页（仅小红书；仅导航，落地后边缘上报 `notification.home`） |
+| `xiaohongshu.notification.browse_comments` | cloud → edge | 进「评论和@」+ 滚动加载 + 抽取（→ `notification.items`） |
+| `xiaohongshu.notification.browse_likes` | cloud → edge | 进「赞和收藏」（清未读 + 抽取点赞/收藏发送者 → `notification.items`） |
+| `xiaohongshu.notification.browse_follows` | cloud → edge | 进「新增关注」（清未读 + 抽取关注者 → `notification.items`） |
+| `xiaohongshu.notification.back_home` | cloud → edge | 返回通知首页（重报各类未读；巡视五条结构性仅小红书——12 巡视角色注册被平台能力表拦） |
 
 ### 2.4 结构化上报（v2 新增，edge → cloud，`RoleDispatcher` 消费）
 
@@ -273,7 +273,7 @@
 
 它 MUST NOT 复用 `browser.status`：那条只接受 `absent | ready`，且 Cloud 在状态未变化时直接返回——让位被拒时浏览器始终 `ready`，整条消息连同诊断字段会被静默丢弃。
 
-`browser.status` 只承载同一 WebSocket 内浏览器执行层的真态变化，不是“唤醒意图”。首次启动尚在 Electron 本地 FIFO 时没有核心和 WebSocket，因此不会上报 `browser.status`；槽位放行、浏览器启动且登录态/账号身份复核通过后上报 `ready`；已有核心进入冷待机并释放浏览器层后上报 `absent`。Cloud 在 `absent` 时拆除或不启动浏览会话及 `SessionMonitorRole`，因此不得生成 `session.idle_nudge/page.scroll`；任务/发布租约仍可按在线 Edge 路由并由 Edge 统一浏览器闸执行按需唤醒。重复状态幂等。
+`browser.status` 只承载同一 WebSocket 内浏览器执行层的真态变化，不是“唤醒意图”。首次启动尚在 Electron 本地 FIFO 时没有核心和 WebSocket，因此不会上报 `browser.status`；槽位放行、浏览器启动且登录态/账号身份复核通过后上报 `ready`；已有核心进入冷待机并释放浏览器层后上报 `absent`。Cloud 在 `absent` 时拆除或不启动浏览会话及 `SessionMonitorRole`，因此不得生成 `session.idle_nudge` 触发的滚动命令；任务/发布租约仍可按在线 Edge 路由并由 Edge 统一浏览器闸执行按需唤醒。重复状态幂等。
 
 **`welcome`**（cloud → edge）
 ```jsonc
@@ -290,9 +290,9 @@
   "pacing": {                 // object?  可选节奏快照（change pacing-floor-config-min-interval）；旧端忽略
     "tempo": 1.0,             //   number  风控档全局节奏乘子（normal=1.0/warned=1.3/restricted=1.6），边缘乘算
     "opFloorsMs": {           //   object  每类操作兜底 floor 默认区间（已含云端读出口 clamp 护栏、非零）；逐字段可缺、边缘逐项回落内置默认
-      "action":       { "minMs": 1500, "maxMs": 4000 }, // note.open/profile.open/interaction.*
-      "scroll":       { "minMs": 500,  "maxMs": 1500 }, // note.scroll_comments
-      "card_gap":     { "minMs": 3000, "maxMs": 7000 }, // note.browse_images
+      "action":       { "minMs": 1500, "maxMs": 4000 }, // {p}.note.open/xiaohongshu.profile.open/interaction.*
+      "scroll":       { "minMs": 500,  "maxMs": 1500 }, // xiaohongshu.note.scroll_comments
+      "card_gap":     { "minMs": 3000, "maxMs": 7000 }, // xiaohongshu.note.browse_images
       "detail_dwell": { "minMs": 2500, "maxMs": 5000 }  // ensureDetailDwell 兜底 floor
     }
   }
@@ -578,14 +578,14 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 **`note.ack`**（cloud → edge）：`{ "received": true }`
 
 
-**`note.open`**（cloud → edge）
+**`xiaohongshu.note.open` / `facebook.note.open`**（cloud → edge）
 ```jsonc
 { "noteId": "n123", "index": 0, "reason": "值得打开" } // 字段均可选
 // url?（change facebook-scheduled-comment，可选）：完整 permalink 直驱打开（Facebook 定向评论候选帖直达详情页），
 //   非空时边缘按此链接直接导航、不依赖 feed 卡片索引/noteId；缺省=走原有 index/noteId 卡片定位（小红书旧行为）。
 { "url": "https://www.facebook.com/groups/123/posts/456" }
 // selection/container?（changes facebook-join-contact-first-post,
-//   facebook-first-post-container-fallback，可选）：不配置搜索关键词时，Cloud 不发 search.execute，
+//   facebook-first-post-container-fallback，可选）：不配置搜索关键词时，Cloud 不发 facebook.search.execute，
 //   而发下面的选择请求。Edge 打开群讨论流，选择第一条可唯一绑定的可评论帖子：
 //   有稳定群帖 permalink 时进入详情并以 permalink 回 note.detail.noteId；没有 permalink 时留在群讨论流，
 //   以严格的 aidcp:facebook-group-feed-post:v1:<sha256> targetRef 回 note.detail.noteId，并把后续
@@ -597,9 +597,9 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 }
 ```
 
-**`note.close`**（cloud → edge）：`{ "reason": "..." }`（可选）
+**`{platform}.note.close`**（cloud → edge）：`{ "reason": "..." }`（可选；云端现役零发送点）
 
-**`search.execute`**（cloud → edge）
+**`xiaohongshu.search.execute` / `facebook.search.execute`**（cloud → edge）
 ```jsonc
 {
   "activityId": "search-7f3d", // string? 协商 search_activity_receipt_v1 时必填；同一条逻辑命令重试保持稳定
@@ -632,15 +632,15 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 ### 3.7 角色驱动指令（cloud → edge）
 
 大部分浏览闭环动作由云端 `RoleDispatcher` 产出语义动作 `EdgeCommand`，经 `command-bridge`
-（`edgeCommandToEnvelope`）翻译为以下协议消息下发；`group.join` 由 Facebook 加群调度器按同一信封格式直发到目标 edge。
+（`edgeCommandToEnvelope(command, platform)`，词汇批 4 起按目标账号平台 + 面选名）翻译为以下协议消息下发；`facebook.group.join` 由 Facebook 加群调度器按同一信封格式直发到目标 edge。
 
 ```jsonc
-// page.scroll
+// {platform}.{feed|search}.scroll / facebook.reels.scroll（面进命令名）
 { "reason": "feed_scroll" }                  // feed_scroll | search_scroll
 { "reason": "feed_scroll", "dwellMs": 1350 } // feed 出新卡：翻页前按新卡数看一会（feed-scroll-card-floor）；返回未刷新则省略 dwellMs
 { "reason": "resume_redrive", "targetSurface": "reels" } // 统一主动重驱；Edge 现探页面，在 Reels 上继续，否则复用已验证进入路径
 { "reason": "resume_redrive", "targetSurface": "feed" }  // 统一主动重驱；Edge 把临时 group/search active-list 纠正回 Facebook 首页后继续 Feed
-// feed.refresh（feed 浏览深度到阈值改点右下「刷新」回顶换新批，change feed-refresh-on-depth）
+// {platform}.feed.refresh（feed 浏览深度到阈值换新批：xhs=右下「刷新」，FB=顶栏首页图标；change feed-refresh-on-depth）
 { "reason": "feed_refresh", "thinkMs": 700 } // 边缘点后校验「回顶 + 首卡换新」才回 ok:true 并上报新一批 page.cards
 // interaction.like
 { "noteId": "n123", "reason": "高质量内容", "thinkMs": 900 }
@@ -652,19 +652,19 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 // interaction.comment（noteId 通常为 canonical id；Facebook 无 permalink 首帖可原样回传 Edge 签发的严格 targetRef）
 { "noteId": "n123", "text": "今天的分享很有启发", "thinkMs": 900, "groupChatCode": "...", "fastReturnToFeed": true } // text 必填；groupChatCode 可选=账号「联系方式」；fastReturnToFeed 仅手工 --feed 置 true：提交后 500ms 直回首页、结果保持未确认
 // 注（change generalize-contact-info）：本字段承载的概念已正名为「联系方式」，内部变量为 contactInfo；wire 字段名保留 groupChatCode 作历史兼容（Method A），物理改名属后续协调步骤。
-// group.join（Facebook 加群；click 缺省/false=只观察不点击，true=cloud 已判定可点后才点击一次）
+// facebook.group.join（Facebook 加群；click 缺省/false=只观察不点击，true=cloud 已判定可点后才点击一次）
 { "groupUrl": "https://www.facebook.com/groups/123", "click": false, "thinkMs": 900 }
 // navigation.back
 { "reason": "quality_rejected", "targetPage": "feed", "dwellMs": 2200 } // targetPage: feed | search
-// note.open
+// {platform}.note.open
 { "index": 0, "noteId": "n123", "reason": "值得打开", "thinkMs": 800 }
-// note.close
+// {platform}.note.close
 { "reason": "...", "dwellMs": 2200 }
-// note.browse_images（DeepReader 决策；count 为目标张数，边缘按实际可见数截断）
+// xiaohongshu.note.browse_images（DeepReader 决策；count 为目标张数，边缘按实际可见数截断）
 { "noteId": "n123", "count": 3, "thinkMs": 700, "dwellMs": 2000 }
-// note.scroll_comments（CommentReviewer 决策）
+// xiaohongshu.note.scroll_comments（CommentReviewer 决策）
 { "noteId": "n123", "thinkMs": 700, "dwellMs": 2000 }
-// profile.open（普通作者主页；不得用于本人身份采集）
+// xiaohongshu.profile.open（普通作者主页；不得用于本人身份采集）
 { "authorId": "u456", "reason": "作者值得关注评估", "thinkMs": 800 }
 // identity.read_current（Facebook；只允许当前页读取，禁止导航）
 { "captureId": "capture-018f..." }
@@ -672,7 +672,7 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 { "captureId": "capture-0190..." }
 ```
 
-本人身份采集分三层，禁止再把平台差异塞进通用 `profile.open`：
+本人身份采集分三层，禁止再把平台差异塞进作者主页命令：
 
 | 平台 | Cloud 选择 | Edge 握手能力 | 页面副作用 | 完成后恢复 |
 | --- | --- | --- | --- | --- |
@@ -694,8 +694,8 @@ Edge 启动握手所需的身份读取是本地 `identity_bootstrap`，不属于
 ```
 
 Cloud 只接受同时匹配当前连接 `accountId` 与在途 `captureId` 的结果。新 Cloud 连接旧 Edge 时，缺少对应握手能力
-即跳过这次可选二次采集并留可观测日志，绝不回落 `profile.open`；新 Edge 收到遗留
-`profile.open{direct:...}` 必须在 CDP 前以 `legacy_profile_direct_unsupported` 拒绝。平台不支持的身份命令同样
+即跳过这次可选二次采集并留可观测日志，绝不回落作者主页命令；新 Edge 收到遗留
+`xiaohongshu.profile.open{direct:...}` 必须在 CDP 前以 `legacy_profile_direct_unsupported` 拒绝。平台不支持的身份命令同样
 在 Native adapter 支持矩阵/CDP 前拒绝，不做跨平台 fallback。
 
 `interaction.follow.noteId` 是向后兼容的可选扩展：非 Reels 调用方仍可只携 `authorId`。Facebook
@@ -703,29 +703,29 @@ Reels 执行器仅在会话确处于 Reels 模式、且 `noteId` 与立即重探
 关注按钮；命令延迟后若已滑到下一条则回 `no_target`、零点击。该字段只接通执行能力，不等于云端已经选择了
 自动关注策略；普通 Facebook Feed / 作者主页关注在本 change 中仍为 `capability_unsupported`。
 
-> **深读动作的回报**：`note.browse_images` / `note.scroll_comments` 经 `action.completed` 如实回报——
+> **深读动作的回报**：`xiaohongshu.note.browse_images` / `xiaohongshu.note.scroll_comments` 经 `action.completed` 如实回报——
 > 命中则 `ok:true` 且 `reason` 记实际量（`browsed=N` / `scrolled=N`），未命中目标则 `ok:false, reason:'no_target'`
-> （不再 `count||1` 假报成功）。`profile.open` 进主页后由边缘抽取作者资料并经 `profile.detail` 上报
+> （不再 `count||1` 假报成功）。`xiaohongshu.profile.open` 进主页后由边缘抽取作者资料并经 `profile.detail` 上报
 > （含 `extracted` 标记，抽取失败也上报以便云端区分"数据缺失"与"真 0 粉丝"）。
 
 > **时间指令（timing directive，指令级节奏 Command Pacing）**：上列决策指令携带**可选**时间字段，
 > 由云端基于**已上报内容**（`note.detail.content` 长度）+ 风控状态（`tempo`：normal=1.0 /
 > warned=1.3 / restricted=1.6）+ 会话进度（疲劳曲线）算出的**中心值**：
-> - `thinkMs`：执行该动作**前**的犹豫 / 感知时间（`interaction.*` / `note.open`）；
-> - `dwellMs`：离开当前页前应达到的**总停留时间**（`navigation.back` / `note.close`），治详情页"秒退"。
+> - `thinkMs`：执行该动作**前**的犹豫 / 感知时间（`interaction.*` / `{platform}.note.open`）；
+> - `dwellMs`：离开当前页前应达到的**总停留时间**（`navigation.back` / `{platform}.note.close`），治详情页"秒退"。
 >
 > §3 时间系数收口在云端一处，**不下发系数**。边缘收到中心值后叠一层 lognormal 抖动（防确定性指纹）
 > 再执行：`thinkMs` → 动作前等待；`dwellMs` → 保证当前页实际停留达标（真实阅读已超过则不叠加）。
 > 字段缺失（旧云端 / 自主动作）→ 边缘走内置默认下限兜底，**绝不零延迟**。向后兼容（旧端忽略）。
 
 `EdgeCommand.action` → 协议 `type` 映射（`command-bridge.ts`）：
-`scroll→page.scroll`、`open_note→note.open`、`close_note→note.close`、
+`scroll→{platform}.{surface}.scroll`（面由 `EdgeCommand.surface` 声明：sendScrollCommand 经单点解析器落面）、`open_note→{platform}.note.open`、`close_note→{platform}.note.close`、
 `like→interaction.like`、`collect→interaction.collect`、`follow→interaction.follow`、`comment→interaction.comment`、`comment_like→interaction.like_comment`、
-`search→search.execute`、`back→navigation.back`、`browse_images→note.browse_images`、
-`scroll_comments→note.scroll_comments`、`profile_open→profile.open`、
+`search→{platform}.search.execute`、`back→navigation.back`、`browse_images→xiaohongshu.note.browse_images`、
+`scroll_comments→xiaohongshu.note.scroll_comments`、`profile_open→xiaohongshu.profile.open`、
 `identity_read_current→identity.read_current`、`identity_read_self_profile→identity.read_self_profile`、
 `session.end→session.end`。
-Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.join`，edge active-command 白名单必须放行。
+Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `facebook.group.join`，edge active-command 白名单必须放行。
 
 ### 3.8 结构化上报（edge → cloud）
 
@@ -754,19 +754,19 @@ Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `group.
 
 Cloud 在 Facebook 会话开始时锁定环境主浏览入口。若为 Reels，首批 `listKind:'feed'` 观察无论含卡、
 `empty` 或 `present_unreportable`，Cloud 均在卡片身份收集、内容评估和浏览计数之前改发
-`page.scroll{reason:'resume_redrive',targetSurface:'reels'}`。配置在本会话中不热切换，下一会话重新读取。任务临时导航到群组或详情页也不改变本场钉住的目标；最终任务租约 release 回执确认后，Cloud 复用同一命令立即恢复。Feed 为主入口时保持既有证据型降级逻辑。
+`facebook.reels.scroll{reason:'resume_redrive'}`（面段即目标面，词汇批 4）。配置在本会话中不热切换，下一会话重新读取。任务临时导航到群组或详情页也不改变本场钉住的目标；最终任务租约 release 回执确认后，Cloud 复用同一命令立即恢复。Feed 为主入口时保持既有证据型降级逻辑。
 
 Facebook 首页空态的兼容握手：Edge 必须先确认顶层 Facebook 首页、认证/主区域就绪、无登录/checkpoint/consent/captcha，
 且在同一 URL + `performance.timeOrigin` generation、document age ≥8s、无真卡/loading 时，同一紧凑容器的显式空态
 语义连续命中 3 次并通过最终复检，才可上报 `cards:[], listKind:'feed', listState:'empty'`。仅 Cloud 将该观察翻译为
-`page.scroll{reason:'resume_redrive',targetSurface:'reels'}`；普通 0 卡、加载中、未知布局及其它平台不得触发。Reels 卡仍以现有
-`page.cards → note.open{surface:'feed'} → note.detail → interaction.like/page.scroll` 链运行，`feed/detail` Surface union 不新增 `reels`。
+`facebook.reels.scroll{reason:'resume_redrive'}`；普通 0 卡、加载中、未知布局及其它平台不得触发。Reels 卡仍以现有
+`page.cards → facebook.note.open{surface:'feed'} → note.detail → interaction.like/facebook.reels.scroll` 链运行，`feed/detail` Surface union 不新增 `reels`。
 
 Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有规则连续滚动最多 8 轮；仍无可信卡片身份时，必须重新
 读取同一完整页面样本。仅在 canonical 首页、主壳就绪、无登录/checkpoint/consent/captcha/loading，且可见物理 Feed
 卡仍在场时，才可上报 `cards:[], listKind:'feed', listState:'present_unreportable'`（可携带 `startupId` 与
 `documentGeneration`）。Cloud 不把它送入内容评估，也不把它冒充空 Feed；仅复用同一
-`page.scroll{reason:'resume_redrive',targetSurface:'reels'}` 做本场有界 Reels 授权。Cloud 只维护在途尝试和恢复次数，不把过去一次可读 Reel 记成当前页面；页面仍在加载、未知或受阻时失败关闭。
+`facebook.reels.scroll{reason:'resume_redrive'}` 做本场有界 Reels 授权。Cloud 只维护在途尝试和恢复次数，不把过去一次可读 Reel 记成当前页面；页面仍在加载、未知或受阻时失败关闭。
 
 **`note.detail`**——上报笔记详情
 ```jsonc
@@ -782,7 +782,7 @@ Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有
                                                // 云端以 note.detail.arrived 事件时刻为锚做统一标准化，再派生帖龄/热度并供精选池复用。
                                                // 缺失或不可解析时保留诚实未知语义，绝不以首次发现/记录更新时间代替。
   "authorFollowed": true,                      // 可选：作者区关注按钮当下真实态（已关注/互关→true）。
-                                               // 边缘在 note.open 探测、只读取上报；云端据此在评估进主页前短路已关注作者。缺省→回退原流程。
+                                               // 边缘在 note.open（平台段变体）探测、只读取上报；云端据此在评估进主页前短路已关注作者。缺省→回退原流程。
   "url": "https://www.xiaohongshu.com/explore/n123?xsec_token=…",
                                                // 可选（change interaction-feed-enrichment）：带 xsec_token 的详情页链接，供面板「按笔记互动」可点跳转。
                                                // 诚实置空：地址栏无 token 时不带、绝不用裸 id 拼假链。
@@ -822,7 +822,7 @@ Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有
   "searchOutcome": "results_ready", // results_ready | no_results | failed_after_submit | not_submitted
   "resultCount": 8                    // 非负整数? 当前已验证可见结果数；no_results 时为 0
 }
-// group.join 回执：ok=true 只表示点击后观测到 member-now；observe-only / already_member / pending / questionnaire_required 均不计成功加群
+// facebook.group.join 回执：ok=true 只表示点击后观测到 member-now；observe-only / already_member / pending / questionnaire_required 均不计成功加群
 {
   "action": "join_group",
   "ok": false,
@@ -833,7 +833,7 @@ Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有
 }
 ```
 
-Facebook Native 仅在 `page.scroll.reason` 精确等于 `idle_recover_nudge` 时，才在输入前将已绑定的
+Facebook Native 仅在滚动命令 `reason` 精确等于 `idle_recover_nudge` 时，才在输入前将已绑定的
 精确 Facebook target 置前，并且每条该命令恰好置前一次。缺失 reason 或 `feed_scroll`、`search_scroll`、
 `resume_redrive`、`feed_continuation_unconfirmed` 等其它自动滚动不得调用 `Page.bringToFront`；Feed
 恢复控件也不得独立触发前台化。该 watchdog reason 表达 Cloud 的长时间无活动恢复意图，不构成滚动成功
@@ -1042,7 +1042,7 @@ search 回执的计数边界是 `actuated=true`，而不是 `ok=true`：`results
 }
 ```
 
-`acquired` 是唯一的 quiesced 事实：它表示当前浏览原子动作已到命令边界，尚未开始的普通浏览命令已取消，且该 `taskId` 已成为唯一页面写 owner。cloud 在此前不得发送该任务第一条业务命令。普通浏览不带 `taskId`；独占任务的 `publish.command`、评论 `search.execute/note.open/note.scroll_comments/interaction.comment`、`notification.*`、`group.join` 与验证码点击必须携当前 `taskId`。
+`acquired` 是唯一的 quiesced 事实：它表示当前浏览原子动作已到命令边界，尚未开始的普通浏览命令已取消，且该 `taskId` 已成为唯一页面写 owner。cloud 在此前不得发送该任务第一条业务命令。普通浏览不带 `taskId`；独占任务的 `publish.command`、评论 `{platform}.search.execute/{platform}.note.open/xiaohongshu.note.scroll_comments/interaction.comment`、`xiaohongshu.notification.*`、`facebook.group.join` 与验证码点击必须携当前 `taskId`。
 
 释放与确认：
 
@@ -1408,8 +1408,8 @@ edge                                          cloud（RoleDispatcher + 多角色
  │ ◄───────────────────────────────────────────│
  │                                              │
  │  page.cards {cards[]}                         │  ContentEvaluator 评估卡片价值
- │ ───────────────────────────────────────────►│   → 有价值: 发 note.open；无价值: 发 page.scroll
- │  note.open {index} | page.scroll             │
+ │ ───────────────────────────────────────────►│   → 有价值: 发 {platform}.note.open；无价值: 发 {platform}.feed.scroll
+ │  {p}.note.open {index} | {p}.feed.scroll     │
  │ ◄───────────────────────────────────────────│
  │  note.detail {noteId,content,...}            │  ContentCurator 质量关卡 → InteractionAppraiser 决策
  │ ───────────────────────────────────────────►│
