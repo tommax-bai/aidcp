@@ -55,6 +55,7 @@
 | `hello` | edge → cloud | `welcome` | 边缘上线握手，声明平台、账号、能力与可选浏览器初始真态 |
 | `welcome` | cloud → edge | — | 握手确认，下发 sessionId |
 | `browser.status` | edge → cloud | — | 同一连接内上报浏览器执行层 `absent | ready` 变化；只陈述事实，不请求页面动作 |
+| `standby.decision` | edge → cloud | — | 宿主层（桌面外壳）一次让位判决的只读回执；能力位 `host_standby_decision_telemetry_v1` 协商后启用。Cloud 只留存 / 呈现，**MUST NOT 据此否决宿主层** |
 | `ui.snapshot` | cloud → edge | — | 自动化控制投影；新能力客户端仅接收 `browserStandby` 等控制提示，旧客户端兼容接收昵称/发布/今日用量等历史字段 |
 | `plan.request` | edge → cloud | `plan.response` | 高层目标拆解为步骤 |
 | `plan.response` | cloud → edge | — | 返回有序步骤清单 |
@@ -242,7 +243,26 @@
 }
 ```
 
-该消息只承载同一 WebSocket 内浏览器执行层的真态变化，不是“唤醒意图”。首次启动尚在 Electron 本地 FIFO 时没有核心和 WebSocket，因此不会上报 `browser.status`；槽位放行、浏览器启动且登录态/账号身份复核通过后上报 `ready`；已有核心进入冷待机并释放浏览器层后上报 `absent`。Cloud 在 `absent` 时拆除或不启动浏览会话及 `SessionMonitorRole`，因此不得生成 `session.idle_nudge/page.scroll`；任务/发布租约仍可按在线 Edge 路由并由 Edge 统一浏览器闸执行按需唤醒。重复状态幂等。
+**`standby.decision`**（edge → cloud，fire-and-forget，change report-host-standby-decisions）
+```jsonc
+{
+  "verdict": "refused",        // "yielded" | "refused"
+  "reason": "task_lease_active", // string  具名原因；让位时恒 "ok"
+  "refusedCount": 32,          // number  连续拒绝次数（同因累加、换因复位）；让位时 0
+  "refusedSince": 1729958400000, // number? 本段连续拒绝的首次时刻
+  "hintGeneratedAt": 1729960200000, // number  该判决所针对提示的 generatedAt
+  "decidedAt": 1729960260000,  // number  判决作出时刻（边缘时钟）
+  "envId": "env-7"             // string? 宿主层对该环境的本地标识
+}
+```
+
+浏览器槽位调度权在宿主层（槽位不跨机器、环境绑死本机分身）。**向上可见是宿主层持有这份决策权的对价**：一个没人能质询的本地决定，正是 2026-08-05「某环境连续 32 分钟拒绝让位、锁死一个浏览器槽位、运营侧零证据」那次故障的形状。
+
+三条边界：① Cloud **只读、只呈现、只留存**，MUST NOT 据此参与槽位裁决、MUST NOT 新增强制让位 / 禁止让位的指令；② 上报按**判决变化**发（首次 / 换原因 / 此后每 N 次），与边缘本地日志留痕共用同一套节流规则，**判决迁移不受节流约束**；③ 上报失败、Cloud 不可达或未协商该能力位时，**让位判决与执行逐字不变**——回执是观测，MUST NOT 成为让位的前置条件。
+
+它 MUST NOT 复用 `browser.status`：那条只接受 `absent | ready`，且 Cloud 在状态未变化时直接返回——让位被拒时浏览器始终 `ready`，整条消息连同诊断字段会被静默丢弃。
+
+`browser.status` 只承载同一 WebSocket 内浏览器执行层的真态变化，不是“唤醒意图”。首次启动尚在 Electron 本地 FIFO 时没有核心和 WebSocket，因此不会上报 `browser.status`；槽位放行、浏览器启动且登录态/账号身份复核通过后上报 `ready`；已有核心进入冷待机并释放浏览器层后上报 `absent`。Cloud 在 `absent` 时拆除或不启动浏览会话及 `SessionMonitorRole`，因此不得生成 `session.idle_nudge/page.scroll`；任务/发布租约仍可按在线 Edge 路由并由 Edge 统一浏览器闸执行按需唤醒。重复状态幂等。
 
 **`welcome`**（cloud → edge）
 ```jsonc
