@@ -84,6 +84,11 @@ TRANSPORT_MEMBERS = [
     # 漏掉它的后果不是编译错，而是 **api 与 content 的迁移 CLI 整个起不来**——它俩没有本地
     # src/schema/（该目录判归 automation 独占），migrate.ts 却要 import 它。
     'src/schema/schema-inspect.ts',
+    # 2026-08-06 追加（同一 change）：单条迁移的施加动作（执行范围内发 SQL、范围外只写账本行）。
+    # 准入同族：唯一写的表是每个库都有的账本表 schema_migrations，不 import pg（客户端按最小接口注入）。
+    # 它被 scripts/migrate.ts import，而 api / content 没有本地 src/schema/ —— 漏掉它，
+    # 那两个仓的迁移 CLI 又会退回「找不到模块」。
+    'src/schema/migration-apply.ts',
     'src/transport/internal-http.ts',
     'src/transport/image-model-selection-http.ts',
     'src/transport/account-platform-http.ts',
@@ -201,6 +206,13 @@ TRANSPORT_MEMBERS = [
     # 跨属主 import 在自动化仓解析不了，而重抄一份就是第二份声明（两侧各自编译通过、
     # 只有真跑才发现字段对不上）。两端各自钉真类型，形状漂移在调用侧那个赋值上编译红。
     'src/transport/panel-automation-extra-http.ts',
+    # change report-host-standby-decisions：宿主层让位判决遥测的只读跨进程通道。
+    # 判据逐条对上：**事实在自动化进程**（边-云网关收下边缘回执并持在进程内），
+    # **读者在接口进程**（面板要让运营在另一处看出「哪台机器上的哪个环境卡住了」），
+    # 文件本身零属主表 SQL（只有一条路由名 + 服务端注册 + 类型化客户端）。
+    # 复制两份的现形方式不是编译报错，是两端路径悄悄对不上、只有真跑起来才 404 ——
+    # 而这条通道一旦 404，面板看到的是「读不到」，绝不能被读成「没有环境卡住」。
+    'src/transport/host-standby-decision-http.ts',
     # 0.8 文本模型出口（裁决 A1，2026-07-29）：三家各自 `new` 一个 QwenClient，不再由谁替谁持有。
     # 准入判据逐条对上：**三家都可能调用**（automation 的角色全靠 kernel 的 TextCompletionPort 拿注入、
     # 具体客户端只能在各自 main() 里构造；content 的生成链、api 的命令式生成同理）+ **零属主表 SQL**
@@ -241,6 +253,10 @@ TRANSPORT_REPO = 'aidcp-transport'
 # build-font-subset）零 package.json 引用、且当前全部处于断裂状态——它们不是「派生仓要用的工具」，
 # 是搬家时顺手拷过去的残留。清单外的文件由 --prune 删除；日后确需某个，往本清单加一行即可。
 SCRIPT_MEMBERS = ['scripts/migrate.ts']
+
+# `migrations/` 里非 .sql 的判据文件（逐字节镜像三仓一份，见 sync_migration_aux 的 docstring）。
+# `.sql` 仍是「只报不改」：搬迁移是有后果的操作。这一份不是迁移，是判据。
+MIGRATION_AUX_MEMBERS = ['migrations/legacy-owner-overrides.json']
 
 # 清单外但**有意留着、永不 --prune**的（前缀匹配）。与「多出」分开报，否则每次运行都刷一屏
 # 噪声，真正该删的那几条会被淹掉。
@@ -1018,6 +1034,7 @@ def main() -> int:
     )
     if selected_script_repos:
         exit_code = sync_scripts(args, kernel_paths, selected_script_repos) or exit_code
+        exit_code = sync_migration_aux(args, selected_script_repos) or exit_code
 
     if args.tests:
         selected_test_repos = set(REPOS) if not args.repo else set(args.repo) & set(REPOS)
@@ -1027,6 +1044,48 @@ def main() -> int:
 
     if exit_code and not args.apply:
         print('存在差异。--apply 可同步（组装根除外）；组装根的差异须人工判断。')
+    return 0 if args.apply else exit_code
+
+
+def sync_migration_aux(args, selected_repos: set[str]) -> int:
+    """`migrations/` 里**非 .sql 的判据文件**：逐文件点名、逐字节镜像，三仓一份。
+
+    为什么不能靠 `check_migrations`：那道对账只比 `.sql` 文件集合，对目录里的 JSON 判据**完全无感**
+    —— 缺了既不会被报「缺」、也不会被报「多」。而这份判据是三个派生仓迁移 CLI 与**启动契约门**
+    的必读输入（执行范围解析顺序的第 ② 步），缺了它三个服务的契约门会判「判据不可用」而拒绝启动。
+    「谁都不管、缺了也没人报」正是 scripts/ 那次的同一个根因，不能在隔壁目录再来一遍。
+
+    与 `.sql` 的处置有意不同：迁移文件按属主分发（各仓只持自己那批），而这份名册是**全量判据**
+    ——它要回答的是「任意一条迁移的执行范围是什么」，按属主裁剪等于让派生仓看不见另一家的条目，
+    条目数一变，`sealedEntryCount` 的只减不增断言当场对不上。
+    """
+    exit_code = 0
+    print(f'=== migrations/ 判据文件（逐文件点名 {len(MIGRATION_AUX_MEMBERS)} 个）===')
+    for repo in sorted(selected_repos):
+        path = os.path.join(CODES, repo)
+        if not os.path.isdir(path):
+            print(f'  {repo}: SKIP（本机未 clone）')
+            continue
+        add, changed = [], []
+        for rel in MIGRATION_AUX_MEMBERS:
+            want = git(CLOUD, 'show', f'{args.ref}:{rel}')
+            dst = os.path.join(path, rel)
+            if not os.path.exists(dst):
+                add.append(rel)
+            else:
+                with open(dst, encoding='utf8') as fh:
+                    if fh.read() != want:
+                        changed.append(rel)
+            if args.apply and (rel in add or rel in changed):
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                with open(dst, 'w', encoding='utf8') as fh:
+                    fh.write(want)
+        print(f'  {repo}: 新增 {len(add)} · 内容不同 {len(changed)}')
+        for rel in add + changed:
+            print(f'   {"+" if rel in add else "~"} {rel}')
+        if add or changed:
+            exit_code = 1
+    print()
     return 0 if args.apply else exit_code
 
 
@@ -1093,7 +1152,16 @@ def sync_transport(args, own, kernel_paths, shared_heads) -> int:
         print(f'=== {TRANSPORT_REPO} ===\n  SKIP: 本机未 clone（{path}）\n')
         return 0
     actual = {f for f in git(path, 'ls-files').split() if f.startswith('src/')}
-    expected = set(TRANSPORT_MEMBERS)
+    # 点名了、但源 ref 上还没有那个文件的成员：并行开发下这是常态——把成员名加进本清单的提交
+    # （控制仓）先于对应文件落到 aidcp-cloud master。此前这里会让整条同步**当场崩掉**，
+    # 连带别人那批已经就绪的文件一起同步不了。改成响亮跳过 + 退出码非 0：
+    # 报出来是必须的（清单与事实源不一致本身就是要人处理的事），但 MUST NOT 因此株连整批。
+    missing_at_ref = sorted(
+        rel for rel in TRANSPORT_MEMBERS
+        if subprocess.run(['git', '-C', CLOUD, 'cat-file', '-e', f'{args.ref}:{rel}'],
+                          capture_output=True).returncode != 0
+    )
+    expected = set(TRANSPORT_MEMBERS) - set(missing_at_ref)
     add, remove, changed = sorted(expected - actual), sorted(actual - expected), []
     for rel in sorted(expected & actual):
         want = rewrite_kernel_imports(git(CLOUD, 'show', f'{args.ref}:{rel}'), kernel_paths, rel)
@@ -1112,7 +1180,9 @@ def sync_transport(args, own, kernel_paths, shared_heads) -> int:
         print(f'   {"+" if rel in add else "~"} {rel}')
     for rel in remove:
         print(f'   ! {rel}（不在点名清单；--prune 才会删）')
-    drift = bool(add or changed or remove)
+    for rel in missing_at_ref:
+        print(f'   ⚠ {rel}（已点名但 {args.ref} 上还没有这个文件：本轮跳过，等它落到 cloud 再同步）')
+    drift = bool(add or changed or remove or missing_at_ref)
     if args.apply:
         for rel in add + changed:
             want = rewrite_kernel_imports(git(CLOUD, 'show', f'{args.ref}:{rel}'), kernel_paths, rel)
