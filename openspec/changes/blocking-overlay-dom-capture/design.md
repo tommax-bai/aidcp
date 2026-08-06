@@ -25,7 +25,8 @@
 ### 约束
 
 - Native 引擎的页面规则是**防反编译**资产：新增的 Facebook 页面逻辑必须落在 `facebook-router/` 内嵌片段，不得进明文 dist。
-- `probe.rs` 的 `RawPageSignals` 带 `#[serde(deny_unknown_fields)]`：JS 侧多产出一个字段而 Rust 侧不同步声明，**整条探针解码失败**（不是忽略字段，是命令报错）。
+- **`deny_unknown_fields` 在 `ProbeResult`（不在 `RawPageSignals`——后者明确不拒未知字段）**：Facebook 的 `page_probe` 输出经 `facebook.rs:921` 直接反序列化成 `ProbeResult`。JS 侧多产出一个字段而 Rust 侧不同步声明，**整条探针解码失败**（不是忽略字段，是命令报错）。<!-- 2026-08-06 实装时据实修订：原文写的是 RawPageSignals，那是 XHS 的解码入口且不带该属性 -->
+- **XHS 与 FB 两条解码路径不同**：XHS 走 `result_from_cdp` → `RawPageSignals` → `build_result`；FB 直接解成 `ProbeResult`。故 `build_result` 需显式补 `overlay_capture: None`。
 - 阻断探针每拍都跑（默认约 1s），命令超时预算 5s。采集必须有界，不能把探针拖爆。
 - 红线：MUST NOT 静默假成功 / 假失败。「没采到」与「页面上确实没有可见容器」是两态，不得压成一态。
 
@@ -87,7 +88,13 @@
 
 ### 决策 5：Rust 侧同步扩结构体（非可选）
 
-`RawPageSignals` 带 `deny_unknown_fields`。JS 侧新增字段**必须**在 `probe.rs` 同步声明为 `#[serde(default)]` 的可选字段，否则整条 `page_probe` 解码失败 → 探针失败 → sticky 保持 → 阻断监测失明。
+`ProbeResult` 带 `deny_unknown_fields`。JS 侧新增字段**必须**在 `probe.rs` 同步声明为 `#[serde(default)]` 的可选字段，否则整条 `page_probe` 解码失败 → 探针失败 → sticky 保持 → 阻断监测失明。
+
+**但嵌套的采集结构体刻意相反：不带 `deny_unknown_fields`**。留证数据不是控制信号——页面规则先行新增一个字段时，正确的降级是「那一格丢了、样本仍到手」，而不是把阻断监测打瞎。漂移由测试拦（见决策 5b），使其停在「测试失败」而非「真机失明」。
+
+### 决策 5b：字段漂移闸两侧名单都必须是**读出来的**
+
+实装落点是 edge TS 测试（jsdom 真跑一次 `page_probe`）：递归收集实际产出的键 → 与从 `probe.rs` 正则读出的 struct 字段（snake→camel）比对。**两侧都不手抄**——手抄名单正是本仓反复付过代价的形态。该闸已做变异验证：往 JS 加一个未声明字段，恰好这一条变红。
 
 新增字段挂在 `ProbeResult` 顶层（与 `blocking_text` 同级），**不并进 `signals`**——`signals` 全是页型分类用的 u32 计数，塞进去要么污染分类输入、要么把结构压扁（`probe.rs` 对 `notification_unread` 已有同款先例与注释）。
 

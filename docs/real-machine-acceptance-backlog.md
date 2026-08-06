@@ -4306,3 +4306,23 @@ change `route-notification-items-by-category`（cloud master `9e5b000` / 派生 
 - [ ] 冷待机（浏览器收起）问一次：两维 `browser_unavailable`，且**没有**触发浏览器唤醒（外壳无 wake 日志）
 - [ ] 独占任务（发布中）问一次：两维 `executor_busy`，发布不受扰动
 - [ ] 纯读复核：问询前后页面 URL / 滚动位置零变化
+
+## 簇 150 · 阻断弹窗现场采集（blocking-overlay-dom-capture，2026-08-06）
+
+共享前置**两条，缺一验不了**：
+① **迁移 0115 尚未执行**——执行它会武装一次 OL 停机（dev/ol 共库共账本、双方 `AIDCP_SCHEMA_GATE=enforce`、
+   OL 在跑的构建 `KNOWN_MAX=0113`，账本一旦出现 0115，OL 下次重启即拒启且重启前零症状）。
+   出路见该 change tasks.md §9.1：要么先把同一 automation 构建部署到 OL 再执行迁移，要么维持惰性态。
+   **在此之前样本表不存在，下列任何一条都验不了**（当前 dev 行为：store 按名退化、风控与告警零影响）。
+② 边缘 TS + 页面规则改动需**出安装包并装机**才到运营机（与既有出包等待项同簇）。
+
+- [ ] 真机复现一次 FB 阻断弹窗，`blocking_overlay_samples` 落到一条：三层信息齐全
+      （容器结构 / 可点击子元素带 rect / HTML 原文）
+- [ ] **从飞书告警卡上的 `captureId` 直接查到唯一一条样本行**（回溯链路；不通等于成果拿不到手上）
+- [ ] **可用性验收（本 change 的实质验收）**：拿真实样本人工确认「照着它能写出认出该弹窗的锚点
+      ＋ 点中确认按钮的动作参数」。**字段够但写不出＝采集规格有缺口，须回填，MUST NOT 记成已验证**
+- [ ] 告警冷却窗内被抑制的那几次上报，样本同样在表里（这是本 change 与既有 alerts 的关键差别）
+- [ ] 采集接入后阻断探针耗时无可观测退化：无命令超时、无 `observation_probe_failed` 增量
+      （无上限的 outerHTML 会把探针拖成超时，而超时按 sticky 保持上一状态＝阻断监测失明）
+- [ ] 三态在真机上分得开：确实没有可见容器 → `none_visible`；采集抛错 → `failed` 带原因；
+      两者 MUST NOT 都呈现为「空样本」
