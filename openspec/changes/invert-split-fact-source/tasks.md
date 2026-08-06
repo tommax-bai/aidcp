@@ -120,7 +120,20 @@
      boundary-record 生成器——被测对象（单体并集 import/SQL 图）随源码消失；归宿=各仓自己的扫描器与
      census + 控制仓 boundary-census（删除后实跑全绿：五仓 禁止边 0/未裁定 0/悬空 0）+ 运行时属主池断言。
      ⚠ 随之无家可归的一件记入 5.7：KERNEL_ADMISSION_CHECKS（kernel 准入机器闸）。 -->
-- [ ] 5.7 边界扫描器结构性收口（3.2 递延项，细节见 scanner-merge-report.md）：cloud src 删除后 automation 侧副本成为唯一实现，撤下两仓 parity 闸；若 api / content 届时需要该闸，先把 REPO_ROOT 改成可注入再进 transport。同时裁决报告记录的 record 层不对称（派生侧 census 只拦 forbidden、不带棘轮）与三条既存 `--tests` 多出条目。**新增递延项（5.6 产生）**：给 kernel 准入机器闸找新家——原 `KERNEL_ADMISSION_CHECKS` 活在已退役的 cloud 整图边界测试里，现无 live 执行点；再收 kernel 成员前先在 aidcp-kernel 仓补准入测试。**注**：cloud 侧 boundary-scan.ts 本体暂保留（migration-executability 的 scanSqlSource 与 sync-read-inventory 的 readJson 仍引用它），parity 闸两侧继续护漂移，结构收口时一并处置。
+- [x] 5.7 边界扫描器结构性收口（3.2 递延项，细节见 scanner-merge-report.md）：cloud src 删除后 automation 侧副本成为唯一实现，撤下两仓 parity 闸；若 api / content 届时需要该闸，先把 REPO_ROOT 改成可注入再进 transport。同时裁决报告记录的 record 层不对称（派生侧 census 只拦 forbidden、不带棘轮）与三条既存 `--tests` 多出条目。**新增递延项（5.6 产生）**：给 kernel 准入机器闸找新家——原 `KERNEL_ADMISSION_CHECKS` 活在已退役的 cloud 整图边界测试里，现无 live 执行点；再收 kernel 成员前先在 aidcp-kernel 仓补准入测试。**注**：cloud 侧 boundary-scan.ts 本体暂保留（migration-executability 的 scanSqlSource 与 sync-read-inventory 的 readJson 仍引用它），parity 闸两侧继续护漂移，结构收口时一并处置。
+<!-- ① kernel 准入闸移居 aidcp-kernel 7e175a6：test/admission.test.ts 从冻结 ref 逐字节移植五族判据
+     （SQL 字面量 / HTTP 路由 / LLM 与外呼 / 进程内活状态 / 第五条=import 只许 node: 内建或仓内相对路径
+     + 零 runtime dependencies，type-only peerDep 豁免有档），含判据保真自检夹具；78 用例全绿，
+     变异（埋 setTimeout）实测报警。行为类禁令原本就无机器检查、按令未新造。
+     ② 扫描器归一：cloud 998845a 抽出 sql-scan.ts（scanSqlSource+readJson 逐字节副本）供两个活消费者，
+     删 boundary-scan.ts 与两侧 parity 闸（automation 056b051），automation 副本成唯一实现；
+     REPO_ROOT 可注入 / 进 transport 继续递延（api/content 采用时再做，已记提交信息）。
+     ③ 裁决 (a) record 不对称=睁眼接受：硬禁方向仍 fail-closed、exemptable 每次 census 打印，
+     补棘轮违反加闸准入（可恢复+可见⇒记档不加闸）；(b) 三条 --tests 多出=范畴随重放消亡而作废，
+     三个文件全是活测试无一陈旧。验证：cloud npm test 2451/0 败（=基线减 parity 两用例，精确），
+     automation 验收 297/0 败 + typecheck 清。cloud typecheck 现存 2 个**先证与本 change 无关**的
+     跨仓类型漂移错误（automation 的 page_observation ↔ transport 枚举未跟上，pristine-HEAD 同报）——
+     属它的在飞 owner，集成仓抓跨仓漂移的新职能首次实战命中。 -->
 
 ## 6. 文档与脚本改指（cutover 后）
 
