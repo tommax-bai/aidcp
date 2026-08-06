@@ -30,7 +30,7 @@ TBD - created by archiving change configure-facebook-slow-start-progress. Update
 
 Cloud SHALL 提供当前客户环境作用域的独立冷启动进度读取与写入，且 MUST 保持既有 operation-policy 客户响应形状不变。写入只接受 `envKey` 路径参数与严格请求 `{ expectedRevision, day, completed }`。Cloud MUST 复核环境 ownership、Facebook 平台、唯一环境绑定事实与当前冷启动生命周期；客户端 MUST NOT 提交 `accountId`、日期锚点、总天数、配额、HTTP 目标或运行授权。
 
-`day` MUST 是当前全局 `slowStart.totalDays` 范围内的整数。Cloud SHALL 以中国标准时当前自然日为第 `day` 天重写既有环境锚点，并按 `completed` 原子新增或删除当前 execution target 的完成事实；同一事务 MUST 创建新 operation-policy revision、写入可区分的前后进度审计并推进相关同步读镜像。写成功 SHALL 返回同一环境的完整写后投影。
+`day` MUST 是当前全局 `slowStart.totalDays` 范围内的整数，该总天数取**跨全部运行目标唯一一份**的全局策略。Cloud SHALL 以中国标准时当前自然日为第 `day` 天重写既有环境锚点，并按 `completed` 原子新增或删除该环境的完成事实；完成事实 MUST 按环境唯一标识存放，MUST NOT 按 execution target 各记一套。同一事务 MUST 创建新 operation-policy revision、写入可区分的前后进度审计并推进相关同步读镜像。写成功 SHALL 返回同一环境的完整写后投影。
 
 #### Scenario: 修改当前天数
 
@@ -41,14 +41,16 @@ Cloud SHALL 提供当前客户环境作用域的独立冷启动进度读取与�
 #### Scenario: 显式标记完成
 
 - **WHEN** 当前环境冷启动 active，运营提交合法 day 与 `completed=true`
-- **THEN** Cloud 在当前 execution target 写入完成事实并返回 `state=graduated, completed=true`
+- **THEN** Cloud 写入该环境的完成事实并返回 `state=graduated, completed=true`
 - **AND** 后续运行时不再以 active 冷启动接管
+- **AND** 其它运行目标读到该环境同样为已完成
 
 #### Scenario: 取消完成恢复所选天数
 
 - **WHEN** 当前环境已 graduated，运营提交合法 day 与 `completed=false`
-- **THEN** Cloud 删除当前 target 的完成事实并同时刷新锚点，使写后状态为该 day 的 active 冷启动
+- **THEN** Cloud 删除该环境的完成事实并同时刷新锚点，使写后状态为该 day 的 active 冷启动
 - **AND** 不因旧锚点已经过期而立即再次毕业
+- **AND** 其它运行目标读到该环境同样恢复为 active
 
 #### Scenario: 非冷启动状态拒绝进度写
 
