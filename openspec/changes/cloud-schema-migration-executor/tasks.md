@@ -125,6 +125,23 @@
      这条链**没有走通**，MUST NOT 记成已验。修复属独立 change：给 13 条补属主头，
      跨属主的那些 MUST 拆成按属主分文件（`0030` 至少要拆成 automation / content 两条）。
      已在 8.1 与 backlog 簇 110.6 登记。 -->
+<!-- 2026-08-06 **前置已解除，但本条仍不勾。** change `restore-derived-migration-executability` 已落地
+     （aidcp-cloud e186154 / transport 505e804 / api 943882c / automation 39502c8 / content 643e488）：
+     · 发现一（三仓迁移 CLI 一条都跑不起来）**已修**，三仓 `migrate status` 均实测起得来；
+     · 发现二（13 条被计入全部属主而它们操作的表分属不同库）**已修**，且修法与当时写的那句预判**不同**——
+       **MUST NOT 给那 13 条补属主头**：它们全部 ≤ 0069、在 dev / ol 的账本里都已入账，而校验和是整文件
+       sha256，改一个字节就是 `migration_checksum_mismatch` **整批拒绝**、两个环境的迁移命令当场全停。
+       改法是把「执行范围」与「账本范围」拆成两件事：账本范围口径不变（分发仍按它、文件一条都不删），
+       执行范围由**独立的封闭名册**（历史）与**文件内 `-- aidcp:owner=` 头**（新迁移）显式给出。
+       `0030` 判「记账不执行」+ 两条接替迁移 `0112`/`0113` 各在正确的库里建回自己那一半索引。
+
+     **本条为什么仍不勾**：新加的可执行性静态闸照出 **0030 之外另有 8 条同类存量违规**
+     （`aidcp-cloud/boundaries/migration-executability-debt.json`，只减不增、逐条写清语句与后果）。
+     ⇒ 空库拉起**现在第一次具备执行条件**，但**第一次跑必然停在这 8 条上**。
+     它们与 0030 不同形态、不能照搬那套处置（各自都在为自己的属主建真实对象），
+     其中 `0057` 是一条**跨属主外键**，物理拆库后无论怎么排都建不出来，要先裁定两张表的属主划分。
+     另：本条正文的「启动 cloud」口径也已过期——`aidcp-cloud` 永不部署（§8.0），
+     要验的是三个派生服务各自对自己的属主库跑 `migrate up` 再起进程。均记于 backlog 簇 111.6。 -->
 - [ ] 5.10 每批部署 dev 并观察后再进下一批；每批在 tasks 里记录 commit sha 与观察结论。
 <!-- BLOCKED: 部署由主控串行做，本 session 明确禁止 push / 部署 / 碰 ECS。六批的代码改动在同一个提交 9c9e72b 里交付（无法逐批部署观察），**部署前必须先按 10.3 的新步骤在 dev 上跑 migrate status/up**——存储不再自建表，带着未应用的迁移重启会让对应能力 fail-closed。已登记 backlog 簇 110.3 / 110.5 -->
 <!-- 批 5 / risk dev observation 2026-07-25：aidcp-cloud f3f6ed9 已从 clean master 推送并部署；备份 /opt/aidcp/cloud.bak.20260725-190910.tar.gz + .env.bak.20260725-190910。部署前后 migrate status：content 20/20、automation 42/42、api 53/53，待应用均 0；enforce 三属主启动门全部通过。现役拓扑仍为 AIDCP_SERVICE 未设的 monolith（多服务源码已具备、unit 未启用），本修复归 segC automation，未来切独立 automation 进程时同样生效。服务 active、NRestarts=0，8787/8090/8091、panel/public health、三库 SELECT 1、Feishu onReady、writer lock、risk outbox/reconciler 均通过；部署文件 hash 与本地一致；automation 累计 deadlocks 保持修复前 3，重启后 deadlock/risk schema error 日志 0。isales-api/isales-scheduler 保持 active。 -->

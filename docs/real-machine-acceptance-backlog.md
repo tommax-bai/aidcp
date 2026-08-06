@@ -2690,6 +2690,26 @@ Phase 0（云端）不依赖 UI，可先用 SQL 造态 + 后台仪表盘验（�
 - [ ] 111.4 **（契约门通过行）** restart 之后在启动日志里确认 schema 契约门的通过行，含账本最高版本 id；确认它出现在**任何存储 `init()` 之前**。
 - [ ] 111.5 **（存储不再自建表）** 在 dev 上确认 33 个存储启动时**没有**发出任何建表语句（日志无 `schema_missing_*` / `schema_incomplete_*` 即为 ready；出现任一条即说明该库缺对象，按 111.1 的清单补跑迁移，MUST NOT 打开 `AIDCP_SCHEMA_SELF_CREATE` 绕过）。
 - [ ] 111.6 **（全新空库拉起 · 必须在一次性临时库上做）** 空库 → `npm run migrate up --allow-contract`（历史迁移里有 6 条 contract：`0036`/`0041`/`0045`/`0046`/`0052`/`0069`）→ 启动 cloud → 断言全部存储无需自建即 ready。**MUST NOT 对 dev/ol 共库执行本项。** 口径提醒：`a6c00c1` 之后仓内有两条**静态**闸守着这件事——`test/schema/ddl-parity.test.ts` 守「对象没抄漏」、`test/schema/migration-order.test.ts` 守「按复合序跑得完」。两条都绿仍不等于本项已做：静态模拟不会执行 SQL，也没起过 cloud 进程。
+  > **2026-08-06 更新（change `restore-derived-migration-executability` 落地后）。三件事一起说清楚：**
+  >
+  > 1. **本项此前根本不具备执行条件，现在才第一次具备。** 拆仓后三个派生仓的迁移 CLI 全断（相对引用指向本仓不存在的路径），
+  >    唯一能跑迁移的是按 §8.0 永不部署的 `aidcp-cloud`。该 change 修好了 CLI，并把「执行范围」与「账本范围」拆开——
+  >    在此之前，12 条只碰单一属主表的历史迁移会在另外两个库里对**不存在的表**执行 DDL/DML。
+  > 2. **口径改了：本项的落点不再是「启动 cloud」。** `aidcp-cloud` 永不部署（§8.0），空库拉起要验的是
+  >    **api / automation / content 三个派生服务各自对自己的属主库跑 `migrate up` 再起进程**。
+  >    每个库的执行范围各不相同（实测账本范围 api 72 / automation 60 / content 22，
+  >    执行范围分别少 1 / 11 / 14 条——那些是「只记账不发 SQL」的）。
+  > 3. **第一次跑必然停在 8 条已登记的存量违规上，这是预期结果、不是本项失败。**
+  >    清单见 `aidcp-cloud/boundaries/migration-executability-debt.json`（只减不增，每条写清语句与后果）：
+  >    `0039`/`0061`/`0070` 在 api 库里碰 automation 的表、`0067`/`0070` 在 automation 库里碰 api 的表、
+  >    `0005`/`0057`/`0067` 在 content 库里碰 api 的 `publish_log`。全部是「一个文件里装了两家的 DDL」，
+  >    其中 **`0057` 更深一层：它是一条跨属主外键**（content 的表指向 api 的 `publish_log`），
+  >    物理拆库后无论迁移怎么排都建不出来，消除它要先裁定两张表的属主划分，属独立立项。
+  >    它们**不能**照 `0030` 那样处置（0030 只建索引不建表，整条判「记账不执行」+ 两条接替迁移即可；
+  >    这 8 条各自都在为自己的属主建真实对象，判成记账不执行等于让它们那批表/列也一起消失）。
+  >
+  > ⇒ 跑本项时的正确记法：把停在第几条、报的是哪张表**原文贴回**，与欠账清单逐条对上即为「符合预期」；
+  > 只有出现清单之外的停顿才是新发现。
 - [ ] 111.7 **（回滚场景 · 契约门真的拦得住）** 在临时库上把账本推到一个比构建更高的版本，用当前构建启动：MUST 报 `schema_ahead_of_code` 并列出超前版本；确认**没有任何表被重建**。再用 `AIDCP_ALLOW_SCHEMA_AHEAD=<具体版本 id>` 放行一次，确认启动日志与告警通道**各**记一条。
 - [ ] 111.8 **（warn → enforce 切换）** 契约门以 `warn` 跑满一个发布周期且覆盖一次 ol 部署后，切 `AIDCP_SCHEMA_GATE=enforce` 并把默认值改为 `enforce`；把实际跑满的**日历天数**记进 tasks.md（design.md「Open Questions」要求这个数字落在 tasks 而不是代码注释里）。
 - [ ] 111.9 **（收尾清账）** 上述各项稳定后，执行 tasks 5.11：删除 `AIDCP_SCHEMA_SELF_CREATE` 旋钮与 33 个存储里的 DDL 常量、删除 `test/schema/ddl-parity.test.ts`、删除 `scripts/run-migration.ts`（保留它等于保留一条无账本旁路）；届时 `test/schema/runtime-ddl-allowlist.json` 的条目才真正变少。

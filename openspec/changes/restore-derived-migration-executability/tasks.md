@@ -254,8 +254,15 @@
      但**账本上必须补两行**，否则那两个环境的账本最高版本停在 0111，而代码的 KNOWN_MAX 已是 0113。
      故部署 dev 的正确序列是：先 `migrate status` 自证只有这两条 pending、无其它异常 →
      `migrate up` → 复核 → 再 restart。REQUIRED 未抬，所以在跑 up 之前契约门也不会判 behind。 -->
-- [ ] 7.7 把「空库 → migrate up → 启动服务」这条真验收挂回 change `cloud-schema-migration-executor` 的 5.9 与 backlog 簇 111.6，并注明本 change 是它的前置。**本 change MUST NOT 自称已验证空库拉起**——它只负责让那件事第一次可执行。
-<!-- 待办。挂回时 MUST 一并写上第 6 节实测出来的那 8 条存量违规
+- [x] 7.7 把「空库 → migrate up → 启动服务」这条真验收挂回 change `cloud-schema-migration-executor` 的 5.9 与 backlog 簇 111.6，并注明本 change 是它的前置。**本 change MUST NOT 自称已验证空库拉起**——它只负责让那件事第一次可执行。
+<!-- aidcp ca7413d2 之后一批。两处都写了，且都**没有勾选对方的项**（本 change 只解除前置，不代验）：
+     · `cloud-schema-migration-executor` 5.9：记录前置已解除 + 为什么仍不勾 + 一条重要更正——
+       该条 2026-08-05 的结论里写的修法「给 13 条补属主头」**是错的**，那会改字节 ⇒ 校验和不符 ⇒
+       dev / ol 迁移命令当场全停。留着不改，下一个人会照着它去撞。
+     · backlog 簇 111.6：补了三件事——本项此前根本不具备执行条件、口径从「启动 cloud」改成
+       「三个派生服务各自对自己的属主库跑」、以及第一次跑必然停在 8 条已登记的存量违规上（预期结果，
+       不是本项失败；只有清单之外的停顿才是新发现）。 -->
+<!-- 挂回时一并写上了第 6 节实测出来的那 8 条存量违规
      （`aidcp-cloud/boundaries/migration-executability-debt.json`）：**空库拉起会停在它们上面**，
      所以 5.9 现在的形态是「机制已就位、可以开始跑，但第一次跑必然停在已登记的 8 条上」，
      而不是「跑通了」。这 8 条的消除需要先裁定「一个文件装了两家 DDL」怎么拆（其中 0057 更深一层：
