@@ -76,8 +76,19 @@
 
 ## 5. CUTOVER（串行；前置＝触碰 cloud src 的在飞 change 全部 land ＋ 用户点火）
 
-- [ ] 5.1 前置确认：`openspec list` 里无触碰 cloud `src/` 的在飞 change；`sync-split-repos` census 零漂移；重测头部基线数字。
-- [ ] 5.2 置位 `fact-source.json`（frozenCloudRef=当时 cloud master sha）+ CLAUDE.md §8 头部加翻转声明（整节重写在 6.1）。此提交即点火。
+- [x] 5.1 前置确认：`openspec list` 里无触碰 cloud `src/` 的在飞 change；`sync-split-repos` census 零漂移；重测头部基线数字。
+<!-- 偏离（用户裁定 2026-08-06）：「在飞 change 清场」这条前置被用户显式豁免——「我们直接改，不等他们了」。
+     替代处置＝给 6 个仍有 cloud 侧任务的在飞 change（drop-dead-cloud-edge-commands /
+     cloud-schema-migration-executor / browser-slot-scheduling / restore-native-facebook-residual-parity /
+     close-account-layer-operation-manual / publish-approval-signal-to-database）逐个在 tasks.md 顶部
+     写入改道说明（cloud 侧任务改落属主派生仓）。census 零漂移已核（cloud@2d34e06，受管 src 566）；
+     基线重测：test 508 文件 / 引用 src 478 / 单属主可裁剪 233 / 待改写 245（内含数据读 38）。 -->
+- [x] 5.2 置位 `fact-source.json`（frozenCloudRef=当时 cloud master sha）+ CLAUDE.md §8 头部加翻转声明（整节重写在 6.1）。此提交即点火。
+<!-- aidcp fe4914f1，frozenCloudRef=2d34e06、flippedAt=2026-08-06。点火后三道闸实弹核验：census=
+     「冻结校验通过」+ 翻转态 pin 报告正常（transport 已被车队按新规矩发到 v0.1.1 并被正确识别）、
+     --apply 拒绝 exit 2、task-preflight exit 0。cloud 侧基建随后落地（cloud 412b1d6：tsconfig 属主别名
+     双布局回退 + 撤 rootDir/outDir/declaration + 退役 build script + test/helpers/sibling-repos.ts +
+     scripts/codemod-repoint.mjs），未触碰冻结目录。 -->
 - [ ] 5.3 按 pilot codemod 分桶并行改写 cloud test 全量引用，整图套件全绿。（pilot 定稿的执行序：**先删后搬**——先删 ~239 个派生仓已复制的单属主用例并对账，再 codemod 改写 232 文件 / 1021 说明符；23 个动态数据读取文件人工处理、13 个组装根数据读取用例逐条裁决；tsconfig paths + 撤 rootDir 同一提交；数字以当天重测为准。）
 - [ ] 5.4 删除 cloud `src/` 与 `migrations/`；`boundaries/` 归属清单转冻结历史记录（README 注明）；仓 README 自述改「集成测试仓」；整图套件在删除后的状态下再跑一遍全绿。
 - [ ] 5.5 `sync-split-repos` 退役收尾：census 模式只剩冻结校验与 pin 报告；`--apply` 路径删除或永久封死。（pin 报告那半已随 2.3 预做——翻转早退路径里已有宽松版 pin 报告；本条剩「删/封 --apply 代码路径」与收掉重放专用逻辑。）
