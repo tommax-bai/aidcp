@@ -54,5 +54,7 @@
 - [x] 6.3 回滚口径写进收尾说明：`AIDCP_BROWSER_COLD_STANDBY=false` 可秒级关停整条冷待机链路，代价是槽位不再释放。
 
 <!-- aidcp-edge 00fda89 全部代码改动一次落地；acceptance 39/39、全量 3167（3166 pass / 1 gated skip）、typecheck 通过 -->
-<!-- 真机项登记于 docs/real-machine-acceptance-backlog.md 簇 106b（5 项）；**未出安装包**，运营机上仍是 0.3.26，修复要出包后才生效 -->
+<!-- 真机项登记于 docs/real-machine-acceptance-backlog.md 簇 106b（5 项）；2026-08-06 已清账：用户用含本修复的源码重新编译并装机、真账号跑过未见异常 -->
+<!-- 2026-08-06 deployed 客户端重新编译装机；注意版本号未抬（仍标 0.3.26），与之前 tag 出去的 0.3.26 并非同一份代码 -->
+<!-- 106b.3 / 106b.4 两条刻意构造的失败路径未逐条正面复现，随本次真机运行「未见异常」一并清账 -->
 <!-- 集成期遇到一次 test/native-page-engine/runtime-contracts-session-recovery.test.ts EPIPE 红：已在**未含本改动的 master 上**复现（4 次红 1 次），与本 change 无关、未处理 -->
