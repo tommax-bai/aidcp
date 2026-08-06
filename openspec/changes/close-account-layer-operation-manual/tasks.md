@@ -88,10 +88,10 @@
 
 ## 7. 集成与部署
 
-- [ ] 7.1 起手自检：控制仓在 `main`、四个 canonical checkout 都停在各自默认分支；edge / cloud 改动在各自 worktree 里做（本 change 的控制仓部分是 additive 目录，可在主 checkout 直接写）。
-- [ ] 7.2 `scripts/land-change` 分别集成 edge / cloud（rebase → 全量测试 → 两道跨仓对表闸 → ff 推 master）。
-- [ ] 7.3 部署 `dev`（走 CLAUDE.md §5 安全序列）。部署的是 `aidcp-automation` 派生服务；**MUST NOT 部署 `aidcp-cloud`**（§8.0）。
-- [ ] 7.4 dev healthcheck：服务 active、8787 监听、写者锁 target=dev、`NRestarts=0`。
+- [x] 7.1 起手自检：控制仓在 `main`、四个 canonical checkout 都停在各自默认分支；edge / cloud 改动在各自 worktree 里做（本 change 的控制仓部分是 additive 目录，可在主 checkout 直接写）。
+- [x] 7.2 集成（锁步成对落地，方式同批 1 偏离三） edge / cloud（rebase → 全量测试 → 两道跨仓对表闸 → ff 推 master）。
+- [x] 7.3 部署 `dev`（走 CLAUDE.md §5 安全序列）。部署的是 `aidcp-automation` 派生服务；**MUST NOT 部署 `aidcp-cloud`**（§8.0）。
+- [x] 7.4 dev healthcheck：服务 active、8787 监听、写者锁 target=dev、`NRestarts=0`。
 - [ ] 7.5 **不出安装包**（§6 长期授权：出包属用户显式触发）。**边缘侧改动不出包也不影响本 change 的价值**——新维零运行时消费，它守的是代码里的漂移，不是运营机上的行为。这一条 MUST 写清楚，避免被后来人当成"和另外两条 change 一样卡在出包上"。
 
 ## 8. 归档前置
@@ -105,3 +105,10 @@
 
 - [ ] 9.0 **七条命令的类别是错的，救援清单是这个错误的补丁**（2026-08-06 用户指出后重查坐实，详见 design 决策一的「修正」节）：`identity.read_*`（翻译层）/ `captcha.assist.*`（环境层）/ `edge.task.acquire` `edge.task.release` `session.end`（执行权与编排）今天全登记为 `page_automation` / `page_account`，唯一共同点是**都需要浏览器**——分类被「怎么执行」污染了。**本 change 只止血不根治**（重新归类会改变身份闸实际拦什么，属行为变更）。根治 MUST 等「新增页面命令按什么维度编址」的规则立起来之后再做，否则改完仍无判据挡住下一次归错。**该规则已立**：change `establish-edge-command-grammar`（判据 `docs/edge-command-grammar.md`），根治即其蓝图批 2（7 条改类 + 类别词汇扩容 + 身份闸摘救援补丁）。本任务只负责**登记**，MUST NOT 在本 change 内动类别。
 - [ ] 9.1 **视频号 API 写入路径不经过页面身份闸**：`interaction.reply.send`（真发私信）是 `platform_api_automation` / `bound_account`，而身份闸只拦 `page_account`。即身份未落定时页面动作被拦、API 私信照发。本 change 只登记不修（修它属行为变更，与「零运行时变更」的边界冲突）。**实装 1.4 时若确认该条判为 `account_visible`，这个缺口的严重度就被本 change 的数据坐实了**——届时 MUST 单独提 change 或登记 backlog，不得只留在本文件里。<!-- 1.4 已确认：interaction.reply.send 判为 account_visible（46 条里 API 族唯一直写），且是全表唯一「留痕 + 不经页面身份闸」的组合——缺口严重度已被数据坐实。**登记动作（单独提 change 或落 backlog）留给主 session**，本条在此之前不得勾选 -->
+
+## 10. 集成实录（主 session，2026-08-06）
+
+- master 落点：edge `9bc5d62`、automation `8691874`（分支 sha 7f55bd1/4342db1 经 rebase 批 1 后重写；冲突解法＝已删 3 条不复活、其判定随删、手抄清单保持删除）。
+- automation 侧留痕分侧断言里 3 条已删命令名随 rebase 摘除。
+- 部署 dev 与批 1 同一次（automation 服务重启一次covering两 change），healthcheck 全过。
+- 8.1/8.2 归档前置未动：`align-cloud-edge-operation-registries` 未归档，措辞对账待归档时执行。**当前 MUST NOT 归档本 change**。
