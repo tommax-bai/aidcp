@@ -21,6 +21,7 @@
 - **边缘：填上一直为空的快照字段**。上报时把采集结果放进现有 `overlay.dom` / `overlay.candidates`，并新增承载可点击子元素与 HTML 原文的字段。
 - **协议：扩展既有载荷，不新增消息类型**。`risk.captcha_detected` 的 overlay 快照字段扩容；消息类型数不变，无新增 cloud→edge 主动命令，不触碰主动命令路由白名单。
 - **云端：新增独立样本表**。每次收到带现场的上报都原样存一条结构化 JSON，**不受告警冷却影响**，可按平台 / URL / 文案指纹查询。
+- **告警可回溯到样本**。采集时由边缘生成采集标识，随上报送出、作为样本表唯一键、并展示在告警正文里——运营收到告警后可据此直接查到该次现场。样本写失败时告警仍展示该标识并注明未存住（否则既查不到、也不知道曾采到过）。
 - **明确不做（Non-Goals）**：不改任何阻断判定逻辑；不改风控状态迁移；不改告警卡片文案与冷却行为；不做自动关闭 / 自动点击；不做形态→动作规则表；不新增任何 Cloud→Edge 浏览器操作命令（故不触发命令语法判据流程）。
 
 ## Capabilities
@@ -38,7 +39,7 @@
   - `native/page-engine/src/probe.rs`（`RawPageSignals` 带 `deny_unknown_fields`，新增字段必须同步 Rust 侧结构体，否则整条探针解码失败）；
   - `src/native-page-engine/browse-session.ts`（`observeProbe` 承接、`reportBlocking` 停止硬编码空快照）；
   - `src/comm/protocol.ts`（载荷扩容，与 automation 逐字一致）。
-- **aidcp-automation**：`src/comm/protocol.ts`（同上）、`src/comm/captcha-coordinator.ts`（落样本，与告警冷却解耦）、新增样本表迁移（三仓并集下一号 = `0115`）、样本写入端口。
+- **aidcp-automation**：`src/comm/protocol.ts`（同上）、`src/comm/captcha-coordinator.ts`（落样本，与告警冷却解耦；告警正文加采集标识行）、新增样本表迁移（三仓并集下一号 = `0115`）、样本写入端口。
 - **不涉及**：aidcp-console（本期不做展示面）、aidcp-content、风控状态机、发布链路。
 - **平台范围**：Facebook 优先（其阻断探针已产出 `unknown` 桶）。小红书当前**不认未知阻断桶**（`XIAOHONGSHU_BLOCKING_POLICY.reportsUnknownBucket: false`，属已声明的缺席），故 XHS 侧只在验证码 / 登录墙两桶上顺带采集，不为本 change 新增 XHS 阻断分类。
 - **风险面**：采集是只读求值，不点击、不改页面；采集失败必须诚实降级为「没采到」，MUST NOT 阻断既有上报或改变判定结果。

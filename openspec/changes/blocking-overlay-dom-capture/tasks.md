@@ -14,10 +14,11 @@
 - [ ] 1.4 每个入选容器采「HTML 原文」层：`outerHTML`，按字节上限截断
 - [ ] 1.5 落硬上限并显式标记截断：容器数上限（建议 5，按面积降序）、每容器子元素上限（建议 30）、每容器原文字节上限（建议 20 KB）、单次总字节上限（建议 64 KB）；任一触及即在结果内置显式截断标记，MUST NOT 静默截断
 - [ ] 1.6 采集结果携带三态：`captured` / `none_visible` / `failed`（后者带原因）；MUST NOT 用空数组同时表示后两态
-- [ ] 1.7 片段内自带独立超时与容错：抛错 / 超时一律降级为 `failed` 并返回，MUST NOT 让异常逸出到阻断探针
-- [ ] 1.8 在 `05-session.js` 的 `blockingProbe()` 中接线：**判出 `kind !== 'none'` 之后**才调用采集；采集结果 MUST NOT 回喂判定输入（判定仍只读既有整页文本 + iframe src）
-- [ ] 1.9 在 `90-dispatch.js` 的 `page_probe` 分支输出采集结果（与既有 `blockingKind` / `blockingText` 同级）
-- [ ] 1.10 按既有片段纪律登记新片段（`scripts/native-engine-inventory.cjs` 的片段清单 / manifest 对账），确认不进明文 dist、打包后置扫描通过
+- [ ] 1.7 生成本次采集标识 `captureId`（edge 标识 + 单调时间 + 短随机段）随结果返回。MUST NOT 由页面内容派生（文案哈希会把同形态弹窗的多次独立采集折叠成一条）
+- [ ] 1.8 片段内自带独立超时与容错：抛错 / 超时一律降级为 `failed` 并返回，MUST NOT 让异常逸出到阻断探针。**注意 `captureId` 在采集入口即生成**，使 `failed` 态也带得出标识
+- [ ] 1.9 在 `05-session.js` 的 `blockingProbe()` 中接线：**判出 `kind !== 'none'` 之后**才调用采集；采集结果 MUST NOT 回喂判定输入（判定仍只读既有整页文本 + iframe src）
+- [ ] 1.10 在 `90-dispatch.js` 的 `page_probe` 分支输出采集结果（与既有 `blockingKind` / `blockingText` 同级）
+- [ ] 1.11 按既有片段纪律登记新片段（`scripts/native-engine-inventory.cjs` 的片段清单 / manifest 对账），确认不进明文 dist、打包后置扫描通过
 
 ## 2. aidcp-edge — Rust 引擎结构体同步
 
@@ -31,7 +32,7 @@
 - [ ] 3.1 `src/native-page-engine/browse-session.ts` 的 `observeProbe()`：从探针输出承接采集结果，与既有 `lastBlockingEvidence` 一并暂存
 - [ ] 3.2 `reportBlocking()`：**停止硬编码 `candidates: []`**，把采集结果填进 `overlay.dom` / `overlay.candidates` 与新增字段
 - [ ] 3.3 采集为 `failed` / `none_visible` 时，仍 MUST 照常发出既有 `risk.captcha_detected`（kind + 既有证据文案），行为与本 change 引入前逐字一致
-- [ ] 3.4 诊断行只记「采到几个 / 三态是哪一态 / 是否截断」，MUST NOT 把 HTML 原文或子元素文字写进日志
+- [ ] 3.4 诊断行只记「`captureId` / 采到几个 / 三态是哪一态 / 是否截断」，MUST NOT 把 HTML 原文或子元素文字写进日志。**`captureId` 必须进诊断行**——它是边缘侧与云端样本对上号的唯一凭据
 - [ ] 3.5 补边缘单测：标准 FB 限流弹窗形态（无 iframe、约 35% 视口、带确认按钮）MUST 被采到——这是今天采不到的那一类，是本 change 的核心回归
 - [ ] 3.6 补边缘单测：采集抛错时既有上报的 kind 与证据文案不变（采集失败不影响既有上报）
 - [ ] 3.7 补边缘单测：良性浮层（符合较宽采集口径但不命中任何阻断判据）MUST NOT 产生任何上报（采集口径不改变判定）
@@ -39,7 +40,7 @@
 
 ## 4. 协议同步（edge ↔ automation 两份逐字一致）
 
-- [ ] 4.1 `aidcp-edge/src/comm/protocol.ts`：扩展 `BlockingOverlayDomFeaturePayload`（可点击子元素清单、HTML 原文、截断标记）与 `BlockingOverlaySnapshotPayload`（采集三态、总截断标记）
+- [ ] 4.1 `aidcp-edge/src/comm/protocol.ts`：扩展 `BlockingOverlayDomFeaturePayload`（可点击子元素清单、HTML 原文、截断标记）与 `BlockingOverlaySnapshotPayload`（`captureId`、采集三态、总截断标记）
 - [ ] 4.2 `aidcp-automation/src/comm/protocol.ts`：同上，**逐字一致**
 - [ ] 4.3 确认消息类型数不变、无新增 cloud→edge 主动命令（故不触碰 `edge-client.ts` 主动命令路由白名单，也不触发命令语法判据流程）
 - [ ] 4.4 `docs/protocol.md`：同步载荷字段说明；确认头部消息计数无需改动
@@ -47,16 +48,19 @@
 
 ## 5. aidcp-automation — 样本表与落库
 
-- [ ] 5.1 新增迁移 `migrations/0115_blocking_overlay_samples.sql`（三仓并集下一号；属主 = automation）：表含平台、edge_id、account_id、kind、url、文案指纹、采集时间、结构化 JSONB 载荷、创建时间
-- [ ] 5.2 建索引：按平台 + 创建时间倒序；按文案指纹。满足 spec 的「可按平台 / 来源地址 / 文案指纹查询」
-- [ ] 5.3 新增样本写入端口（store），JSONB **原样存**采集结果，MUST NOT 在留存前拍平为供人阅读的文本
+- [ ] 5.1 新增迁移 `migrations/0115_blocking_overlay_samples.sql`（三仓并集下一号；属主 = automation）：表含 `capture_id`、平台、edge_id、account_id、kind、url、文案指纹、采集时间、结构化 JSONB 载荷、创建时间
+- [ ] 5.2 `capture_id` 建**唯一索引**（幂等：同一次上报重投 MUST NOT 写出第二条）；另建按平台 + 创建时间倒序、按文案指纹两个查询索引，满足 spec 的「可按平台 / 来源地址 / 文案指纹查询」
+- [ ] 5.3 新增样本写入端口（store），JSONB **原样存**采集结果，MUST NOT 在留存前拍平为供人阅读的文本；写入用 upsert-on-conflict 落幂等
 - [ ] 5.4 `src/comm/captcha-coordinator.ts`：在 `handleDetected` 的**冷却判定之前**写样本，使冷却窗内被抑制告警的上报同样留样本
 - [ ] 5.5 样本写入失败：记录且不静默吞，MUST NOT 阻断风控迁移 / 暂停下发 / 告警投递
 - [ ] 5.6 不叠第二道限流：上报本身已是 episode 级去重（边缘 `reportedBlockingKind` 保证一个 episode 只发一次 detected），MUST NOT 在样本侧再加冷却
 - [ ] 5.7 组合根接线（`src/server.ts` / 派生入口）：把样本 store 注入 coordinator；未注入时降级为不落样本且**响亮记录**，MUST NOT 静默无声
-- [ ] 5.8 补云端单测：冷却窗内被抑制告警的上报仍留下样本
-- [ ] 5.9 补云端单测：告警的类型 / 优先级 / 标题 / 正文 / 冷却行为与本 change 引入前逐字一致（告警面貌不变）
-- [ ] 5.10 补云端单测：样本写入抛错时风控迁移与告警投递照常完成
+- [ ] 5.8 `buildCaptchaAlertDetail()` / `formatOverlaySnapshotLines()`：告警正文新增一行展示 `captureId`。**其余正文行 MUST 逐字不变**；标题 / 类型 / 优先级 / 冷却行为一概不动
+- [ ] 5.9 样本写入失败时，告警正文 MUST 仍展示 `captureId` 并显式标注「样本未存住」——省略标识会使该次现场既查不到样本、也无从得知曾采到过（静默假失败）
+- [ ] 5.10 补云端单测：冷却窗内被抑制告警的上报仍留下样本
+- [ ] 5.11 补云端单测：告警的类型 / 优先级 / 标题 / 冷却行为与本 change 引入前一致，正文除 `captureId` 行外逐字不变
+- [ ] 5.12 补云端单测：样本写入抛错时风控迁移与告警投递照常完成，且告警正文带 `captureId` + 未存住标注
+- [ ] 5.13 补云端单测：同一 `captureId` 重复投递只落一条样本
 
 ## 6. 验证与部署
 
@@ -70,9 +74,10 @@
 ## 7. 真机验收（登记 backlog，不阻塞归档）
 
 - [ ] 7.1 真机取一次样：在 dev 上复现一次 FB 阻断弹窗，确认样本表落到了记录、且三层信息齐全
-- [ ] 7.2 **可用性验收（本 change 的实质验收）**：拿真实样本，人工确认「照着它能写出认出该弹窗的锚点 + 点中其中确认按钮的动作参数」。若字段够但写不出，说明采集规格有缺口，须回填而非记成已完成
-- [ ] 7.3 确认采集接入后阻断探针的耗时无可观测退化（无超时、无 `observation_probe_failed` 增量）
-- [ ] 7.4 按 `docs/real-machine-acceptance-backlog.md` 的簇归并登记以上真机项
+- [ ] 7.2 **回溯链路走通**：从飞书告警卡上的 `captureId` 直接查到唯一一条样本行。这条不走通等于本 change 的成果拿不到手上
+- [ ] 7.3 **可用性验收（本 change 的实质验收）**：拿真实样本，人工确认「照着它能写出认出该弹窗的锚点 + 点中其中确认按钮的动作参数」。若字段够但写不出，说明采集规格有缺口，须回填而非记成已完成
+- [ ] 7.4 确认采集接入后阻断探针的耗时无可观测退化（无超时、无 `observation_probe_failed` 增量）
+- [ ] 7.5 按 `docs/real-machine-acceptance-backlog.md` 的簇归并登记以上真机项
 
 ## 8. 递延项（本 change 具名不做，留给后续 change）
 
