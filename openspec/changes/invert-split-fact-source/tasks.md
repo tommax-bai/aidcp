@@ -133,7 +133,9 @@
      spawn-change / land-change / fleet-status / task-preflight）或 ECS 运行目录（deploy-target），
      不读 cloud src，翻转后语义不变；boundary-census 对 src-less cloud 实跑 exit 0（只审派生仓，
      五仓 禁止边 0）。sync-split-repos / task-preflight 本身即本 change 改造对象。无需改指。 -->
-- [ ] 6.3 memory 条目更新：`cloud-demoted-not-retired` 等涉及事实源方向的条目改写；本 change 结论入档。
+- [x] 6.3 memory 条目更新：`cloud-demoted-not-retired` 等涉及事实源方向的条目改写；本 change 结论入档。
+<!-- 新增 memory `fact-source-inverted-to-derived-repos`（翻转全貌 + 双重封死 + 迁移并集编号 +
+     双实例断言口径 + 5.7 递延清单），MEMORY.md 索引行已加并标注取代旧「cloud降级非退役」口径。 -->
 
 ## 7. 回滚路解绑（可与 5 并行准备，OL 演练等用户窗口）
 
