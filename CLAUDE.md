@@ -123,94 +123,52 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **完成即收口**：部署 + 验证通过 → archive 该 change → 删 worktree / 分支。有 worktree 却无对应活跃 change = 孤儿，清掉。
 - 操作手册（开流 / 集成 / fleet 状态命令、helper 脚本）见 `docs/parallel-dev-worktrees.md`。**该手册的命令序列 / 脚本经实战跑通验证后方视为定稿**；未验证前只把本节不变量当 OVERRIDE 法条。
 
-## 8. 云端拆仓不变量（Block④ · 四包七仓期间一律 OVERRIDE）
+## 8. 云端多仓事实源（2026-08-06 翻转后模式 · OVERRIDE）
 
-> **⚡ 2026-08-06 事实源已翻转（change `invert-split-fact-source` cutover，用户点火）**：
-> **派生仓从此各自是自己代码的唯一事实源**；`aidcp-cloud` 的 `src/` + `migrations/` 冻结于
-> `scripts/fact-source.json` 记录的 ref、正在瘦身为纯集成测试仓。**MUST NOT 再往 cloud 落任何
-> src / migrations 改动**（task-preflight 会拦）；`sync-split-repos --apply` 已退役；云端业务改动
-> 直接落对应派生仓（逐文件属主查 `aidcp-cloud/boundaries/module-ownership.json`，该文件转冻结史料）；
-> 新迁移直接落属主仓 `migrations/`，编号取**三仓并集**的下一号。共享包按 tag 版本引用（`#v0.1.0` 起）。
-> 本节下文与此冲突的表述（「cloud=事实源」「派生物勿手搬」等）**以本条为准**，§8 全文重写随该 change 6.1 落地。
+> **事实源已翻转**（change `invert-split-fact-source`，用户点火，冻结点 cloud@`2d34e06`）：
+> `aidcp-api` / `aidcp-automation` / `aidcp-content` / `aidcp-kernel` / `aidcp-transport`
+> **各自是自己代码的唯一事实源**；`aidcp-cloud` 已删除全部 `src/` 与 `migrations/`，
+> 身份＝**整图集成测试仓**。重放（`sync-split-repos --apply`）已双重封死
+> （翻转标记 `scripts/fact-source.json` + 「cloud 无 src 即拒绝」的硬封），
+> `task-preflight` 拦任何 cloud 侧源码回潮。
 
-> `aidcp-cloud` 正在拆成 `aidcp-api` / `aidcp-automation` / `aidcp-content` 三个业务仓 +
-> `aidcp-kernel`（零副作用契约）/ `aidcp-transport`（跨进程运行时原语）两个共享包。
-> **拆仓期间任何触碰 `aidcp-cloud/src/**` 或 `boundaries/**` 的改动都受本节约束**，与是否属于拆仓任务无关。
-> 执行清单见 `docs/cloud-cross-service-coupling-resolution.md`，上位方案见
-> `docs/cloud-composition-root-trisection.md` 与 `docs/cloud-service-decomposition-proposal.md`。
+### 8.0 身份与部署
 
-### 8.0 `aidcp-cloud` 永不部署（2026-08-05 定，OVERRIDE 级）
+- **cloud MUST NOT 部署到任何环境**（它已无可运行代码；两环境 systemd 单体 unit 均 disabled）。
+  回滚走**逐服务备份**（`docs/deployment-environments.md` 的 Rollback 节），MUST NOT 以单体为回滚路。
+- **cloud 仓 MUST NOT 再进任何业务源码**。它只收：跨属主 / 整图测试（`test/`）、测试基础设施、冻结史料。
+- `boundaries/` 是**冻结史料**（见其 `FROZEN.md`）：测试仍按原路径读它做属主查表，但它不再驱动任何同步。
 
-- **dev 与 OL 都已切到 api / automation / content 三个派生服务，单体 `aidcp-cloud.service` 停并 disable。
-  从此 `aidcp-cloud` MUST NOT 被部署到任何环境**——不 rsync 到 `/opt/aidcp/cloud`、不 `systemctl enable`、
-  不 `start`。它保留的唯一身份是**事实源 + 整图验证仓**（见下条），不是一个可运行的服务。
-  例外只有一个：**回滚**。回滚是用户显式决定的动作，MUST NOT 由任何任务顺手触发。
-- **它不退役、只降级**：134 个只活在 cloud 的用例里真正搬得动的只有 7 个，其余 90% 的本质就是**跨属主**
-  （97 个跨 2+ 业务属主、24 个要整张图或全部 108 条迁移在一处）。论证见
-  `docs/cloud-retirement-blockers-2026-08-05.md`。**MUST NOT 再按「把测试分家就能退役」立项。**
-- **为什么要写成规则**：在此之前这只是「两个环境都 disabled」这个**事实状态**。
-  事实状态挡不住任何人——重新 enable 一次不会撞到任何东西，而单体一起来就会去抢
-  按 target 单实例的自动化写者锁与 8787，把在跑的派生服务顶掉（前科见
-  `[[monolith-unit-still-enabled-steals-lock]]`）。
+### 8.1 日常改动怎么落
 
-### 8.1 事实源与派生物（弄反了就会静默漂）
+- **业务代码 → 属主派生仓**。逐文件属主查 cloud `boundaries/module-ownership.json`（冻结快照）或
+  控制仓 `docs/cloud-service-decomposition-proposal.md` §4.7；常见：`comm/ orchestrator/ agents/` →
+  automation，`panel/ client-auth/ feishu/` → api，生成 / 发布管线 → content。
+- **新迁移 → 属主仓 `migrations/`，编号取三仓并集的下一号**（集成仓的并集编号测试兜底撞号；
+  同名副本必须逐字节一致——校验和断言会拦分叉）。已应用迁移字节不可改，规则不变。
+- **跨属主 / 整图测试 → cloud `test/`**。编译期用别名 `@api/* @automation/* @content/* @kernel/*`；
+  运行时数据读取走 `test/helpers/sibling-repos.ts`（找不到兄弟仓响亮失败）；迁移并集走
+  `test/helpers/migration-union.ts`。**硬前置：四个兄弟仓已 clone 且各自 `npm ci`。**
+- **协议 v2 两份一致**的边云配对现在是 **edge ↔ automation**（`AC-PROTO-*` 在集成仓跑）。
+- 各派生仓的组装根（`src/server.ts` / `src/index.ts` / `src/<svc>-*.ts`）是手写主交付物，无同步、无重放。
 
-- **归属的唯一事实源＝控制仓 `docs/cloud-service-decomposition-proposal.md` §4.7 / §4.6.x**；
-  `aidcp-cloud/boundaries/ownership-rules.json` 是它的机械转写，`module-ownership.json` /
-  `import-exemptions.json` / `table-write-exemptions.json` 是 `npm run boundaries:refresh` 的**生成物**。
-  **MUST NOT 手改生成物**；认为某行判错，走控制仓 change 改 §4.x 再回写规则表。
-- **四个新仓 / 两个包的 `src/` 是派生物，MUST NOT 手工搬文件**：一律用控制仓
-  `scripts/sync-split-repos`（**不带参数即 dry-run 对账**——`--check` 这个参数并不存在、写了直接报错 /
-  `--apply` 同步（**只写文件、绝不代你提交**）/ `--prune` 才删 / `--repo <仓名>` 限定单仓）。
-  手工切一次是搬家，手工切第二次就是猜。
-- **kernel 版本 pin 是派生事实**：三仓 `package.json` 里那条 sha MUST 恒等于 `aidcp-kernel` master 头。
-  **这条漂移尤其阴——npm 装到旧 sha 不报错、编译照过，跑的却是过期契约**；已纳入 `sync-split-repos` 对账。
-- **组装根 `src/server.ts` / `src/index.ts` 永不自动同步进新仓**（那是各仓要手写的 `main()`，
-  自动覆盖等于把主交付物悄悄删掉）。`sync-split-repos` 对它只报不改，改了也不接受。
+### 8.2 共享包版本化（kernel / transport）
 
-### 8.2 编辑纪律
+- 派生仓钉 **annotated tag**（`git+ssh://…#v<x.y.z>`，自 `v0.1.0` 起）；kernel / transport 一有改动就出新 tag。
+- 检查器（`sync-split-repos` 只读模式）认 `git+ssh://` 与 `github:` 两种写法，认不出＝报错；
+  落后最新 tag **只报告不拦**——升级是各仓自己的节奏。
+- **kernel 准入原则不变**：零副作用（无模块级活状态 / 定时器 / 连接池）、MUST NOT import 业务层、
+  不放行为类；**transport 准入＝三家都可能调 + 零属主表 SQL**。
+  ⚠ 机器闸换家未完成：原 `KERNEL_ADMISSION_CHECKS`（在已退役的 cloud 整图边界测试里）尚无新家，
+  再收 kernel 成员前先在 kernel 仓补准入测试（登记于 change 5.7 递延项）。
 
-- **`boundaries/ownership-rules.json` 与 `kernel-non-members.json` MUST 手工 Edit 追加，绝不脚本整体重序列化。**
-  它们是一行一条的紧凑风格且分组顺序有意义；重序列化会把「语义改 3 处」变成「diff 一千行」，
-  今后每次 review 都看不见真正的改动（`aidcp-cloud@ff7fddf` 已为此回滚过一次）。
-- **新增 kernel 成员必须同时改两处**：`ownership-rules.json` 的 `fileOverrides` + `kernel-non-members.json`
-  的 `kernelRoster.members`（`AC-BOUND-03` 对两者 deepEqual）。`src/kernel/` **没有目录规则**，
-  漏加 fileOverride 会让 `boundaries:refresh` 直接抛错。
-- **定位一律按符号名，行号只作导航。** 段落定位用函数边界，不用内容特征串（撞同名会把整块插错段）。
-- **判「块尾」的判据是「括号配平**且**该行以 `;` 或 `}` 结尾」**——只判配平会被多行泛型骗过。
+### 8.3 红线的多仓形态（防「静默假成功」，全部仍然有效）
 
-### 8.3 消边判据（做了不算数的那些）
-
-- **只把属主文件改成 shim / 原位再导出、不 repoint 消费方 ＝ 假消边。** 那条边原样留着，只是换了个马甲；
-  扫描器认的是 import 说明符。**真消边 MUST 把跨属主消费方改指新落点。**
-- **豁免清单是单调棘轮：只许下降。** 新增违规 MUST 当场修掉；确需冻结走 `--raise=<change>:<数量>:<日期>`
-  问责通道并逐条写消除动作。**削减 MUST 在同一提交里删条目并下调 `frozenTotal`**，不留空位给新违规回填。
-- **别抄任何写死的数字**（豁免总数 / kernel 成员数 / 文件计数）：以当场跑一次门禁读到的为准，文档里的都是快照。
-
-### 8.4 kernel / transport 准入
-
-- **kernel 准入的真判据在 `test/acceptance/module-boundary.test.ts` 的 `KERNEL_ADMISSION_CHECKS`**，
-  MUST 抄真正则实跑，不凭记忆用「四条硬禁」。已知坑：`setTimeout(` / `setInterval(` / `new Pool(`
-  **不锚行首**；`const X: ReadonlySet<string> = new Set([...])` 的类型标注**救不了它**；
-  检查只剥注释、**不剥字符串字面量**（错误文案里的 `LlmClient`、带引号的 `https://` 都会命中）；
-  `export * from` 在模块图里就是一条 import 边。
-- **还有第五条不在正则里、无豁免通道：kernel MUST NOT import 任何业务层文件。**
-- **判据是「哪一段能进」，不是「整文件能不能进」**：属主文件在拒入名册上时，只析出纯段、
-  残壳留原处保持原属主并具名再导出（拒入路径 MUST 仍存在，`AC-BOUND-03` 会查）。
-- **kernel 里不放行为类**：现有导出类全是错误类型，判例明写「路由客户端类留 content」。
-  真要共用一个类的能力，把里面**无状态的那段提成函数**，类留原处当薄壳——既不进 kernel，也不复制第二份实现。
-- **`aidcp-transport` 准入＝「三家都可能调用 + 不含任何属主表的 SQL」**（比 kernel 宽、比复制三份严）。
-  它存在的直接理由：那些「服务端注册 + 客户端 + 路径常量」三件套的文件，**复制成两份两端路径会悄悄对不上，
-  且两侧各自编译通过、各自测试通过，只有真跑起来才 404**。
-
-### 8.5 红线的拆仓形态（都属「静默假成功」）
-
-- **跨段前向引用 MUST 经响亮取用闸**（`crossSegment`），MUST NOT 写成裸 `ctx.X?.doSomething()`——
-  单体里恒有、拆完读到 `undefined` 就被 `?.` 静默吞掉，调用方照拿「成功」。
-  `AC-SPLIT-CROSSSEG` 会当场拦；确属「缺席无后果」的，进白名单并写明理由。
-- **一个域绝不直连另一个域的数据库。** 本进程只对本属主库开池，启动期断言两个方向都拦。
-- **跨进程后 `instanceof` 恒 false**：跨边界的错误识别 MUST 改结构化守卫（按 `name` + 具名字段判），
-  否则会静默退化成兜底原因、吞掉真实失败。
-- **依赖 / 引用类审计 MUST 把动态 `import()` 算进去。** 只匹配 `from` 说明符会漏——
-  实例：文字卡渲染的两个依赖是懒加载的，而那条链路**工厂返回 null 即降级**，装漏了不崩不报、
-  只是封面悄悄退回生成式（同类漏检还有耦合清单「103 vs 实测 104」那条内联动态 import）。
+- **跨段前向引用走响亮取用闸**（`crossSegment`），MUST NOT 裸 `ctx.X?.…` 把缺席吞成成功。
+- **一个域绝不直连另一个域的数据库**；本进程只对本属主库开池，启动期断言两个方向都拦。
+- **跨进程 `instanceof` 恒 false**：错误识别用结构化守卫（`name` + 具名字段）。
+- **依赖 / 引用审计必须算动态 `import()`**。
+- **同一契约类跨仓有两份运行时拷贝是常态**（别名读 src、包依赖读 dist）：测试的身份断言
+  MUST 对准被测方真正解析到的那份拷贝（先例见集成仓 5.3 各桶提交）。
+- **边界执法在各仓自己的扫描器**（automation 侧实现为准，双仓 parity 闸护漂移至 5.7 结构性收口）；
+  跨仓边看控制仓 `scripts/boundary-census`。

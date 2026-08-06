@@ -89,16 +89,50 @@
      --apply 拒绝 exit 2、task-preflight exit 0。cloud 侧基建随后落地（cloud 412b1d6：tsconfig 属主别名
      双布局回退 + 撤 rootDir/outDir/declaration + 退役 build script + test/helpers/sibling-repos.ts +
      scripts/codemod-repoint.mjs），未触碰冻结目录。 -->
-- [ ] 5.3 按 pilot codemod 分桶并行改写 cloud test 全量引用，整图套件全绿。（pilot 定稿的执行序：**先删后搬**——先删 ~239 个派生仓已复制的单属主用例并对账，再 codemod 改写 232 文件 / 1021 说明符；23 个动态数据读取文件人工处理、13 个组装根数据读取用例逐条裁决；tsconfig paths + 撤 rootDir 同一提交；数字以当天重测为准。）
-- [ ] 5.4 删除 cloud `src/` 与 `migrations/`；`boundaries/` 归属清单转冻结历史记录（README 注明）；仓 README 自述改「集成测试仓」；整图套件在删除后的状态下再跑一遍全绿。
-- [ ] 5.5 `sync-split-repos` 退役收尾：census 模式只剩冻结校验与 pin 报告；`--apply` 路径删除或永久封死。（pin 报告那半已随 2.3 预做——翻转早退路径里已有宽松版 pin 报告；本条剩「删/封 --apply 代码路径」与收掉重放专用逻辑。）
-- [ ] 5.6 「只测单体组装」的 5 个用例随单体死掉：删除并在本条注释记档。
-- [ ] 5.7 边界扫描器结构性收口（3.2 递延项，细节见 scanner-merge-report.md）：cloud src 删除后 automation 侧副本成为唯一实现，撤下两仓 parity 闸；若 api / content 届时需要该闸，先把 REPO_ROOT 改成可注入再进 transport。同时裁决报告记录的 record 层不对称（派生侧 census 只拦 forbidden、不带棘轮）与三条既存 `--tests` 多出条目。
+- [x] 5.3 按 pilot codemod 分桶并行改写 cloud test 全量引用，整图套件全绿。（pilot 定稿的执行序：**先删后搬**——先删 ~239 个派生仓已复制的单属主用例并对账，再 codemod 改写 232 文件 / 1021 说明符；23 个动态数据读取文件人工处理、13 个组装根数据读取用例逐条裁决；tsconfig paths + 撤 rootDir 同一提交；数字以当天重测为准。）
+<!-- 7 个并行 agent（P + B1–B5 + D）+ 1 个收尾 agent 完成。当天重测口径：508 test 文件 / 引 src 478 /
+     裁剪 233 / 改写 245（含数据读 38）。裁剪：224 逐字节同删 + 1 先把当天新断言搬回 automation 正本再删
+     （cloud 14e2ec7/e790165/a221cfa + automation e1be035）。分桶改写：B1 f8e8865(54文件246处) /
+     B2 205a139(40/145，9 个双实例断言按「对准被测方真正解析的那份拷贝」修) / B3 611d632(37/189，1 个
+     双实例) / B4 82ed5b4(45/185，AC-PUB 全绿) / B5 d3e0b2e(47/233，抓住迁移加载器静默退化成单仓子集的
+     险情) / D 3d6b4ee+180de68(38 数据读改经 helper + 组装根裁决) / 收尾 1f350e5+d86fa66(末 13 件：迁移
+     并集切换 + sync-read 库存 / contact-fallback / persona 单源重锚 + segc 对与 4a census 退役)。
+     删除前基线：npm test exit 0，2491 用例 / 0 败 / 9 PG 自跳。 -->
+- [x] 5.4 删除 cloud `src/` 与 `migrations/`；`boundaries/` 归属清单转冻结历史记录（README 注明）；仓 README 自述改「集成测试仓」；整图套件在删除后的状态下再跑一遍全绿。
+<!-- cloud aa31a66：690 路径删除（src 566 + migrations 115 + 单体运维脚本 + start/migrate 等 npm 入口）；
+     boundaries/FROZEN.md + README 身份重写。真验收＝删除前后全量套件逐字同数：2453 用例 / 0 败 /
+     9 PG 自跳、tsc --noEmit exit 0——证明零用例还在暗吃本仓副本。两道冻结闸已先行学会「整目录
+     删除=完成态」语义（aidcp 提交，变异验证：现态过、注入漂移仍红）。 -->
+- [x] 5.5 `sync-split-repos` 退役收尾：census 模式只剩冻结校验与 pin 报告；`--apply` 路径删除或永久封死。（pin 报告那半已随 2.3 预做——翻转早退路径里已有宽松版 pin 报告；本条剩「删/封 --apply 代码路径」与收掉重放专用逻辑。）
+<!-- 封死采用双保险而非删代码：① 翻转标记拒绝；② 与标记无关的硬封——cloud@ref 无 src/ 即拒绝
+     --apply/--prune（把标记翻回 false 实测仍拦，防「对着空树同步出空」）。重放代码留作 inert 历史，
+     翻转态下不可达；census 现输出=冻结校验（完成态语义）+ pin 宽松报告。 -->
+- [x] 5.6 「只测单体组装」的 5 个用例随单体死掉：删除并在本条注释记档。
+<!-- 实际规模大于立项估计（5 个）。三批：① agent D 裁决组装根数据读 13 件（cloud 180de68）：
+     composition-cross-segment / composition-root-3b / composition-root-4a-inventory /
+     composition-root-4a-mode-wiring / sync-read-composition-root 判死（归宿=api 4a/4b +
+     served-route-inventory、automation-main、content 内部鉴权等，逐条记在提交与 agent 报告）；
+     另 8 件重锚到派生组装根并集（helper 新增 derivedCompositionRoots()）。② 收尾 agent（d86fa66）：
+     segc-export-face 对（归宿=automation-segc-export-disposition 及其 42-handle 自洽闸）与
+     4a census helper + 3 个 npm 脚本退役、api-direct-inventory 重锚保活（4 条跨仓活主张 + 变异验证）。
+     ③ 整图边界闸家族 7 件（cloud 6363699）：module-boundary(AC-BOUND) / table-ownership /
+     row-lock-ownership / cross-owner-schema-probe / advisory-lock-ownership / config/module-boundary /
+     boundary-record 生成器——被测对象（单体并集 import/SQL 图）随源码消失；归宿=各仓自己的扫描器与
+     census + 控制仓 boundary-census（删除后实跑全绿：五仓 禁止边 0/未裁定 0/悬空 0）+ 运行时属主池断言。
+     ⚠ 随之无家可归的一件记入 5.7：KERNEL_ADMISSION_CHECKS（kernel 准入机器闸）。 -->
+- [ ] 5.7 边界扫描器结构性收口（3.2 递延项，细节见 scanner-merge-report.md）：cloud src 删除后 automation 侧副本成为唯一实现，撤下两仓 parity 闸；若 api / content 届时需要该闸，先把 REPO_ROOT 改成可注入再进 transport。同时裁决报告记录的 record 层不对称（派生侧 census 只拦 forbidden、不带棘轮）与三条既存 `--tests` 多出条目。**新增递延项（5.6 产生）**：给 kernel 准入机器闸找新家——原 `KERNEL_ADMISSION_CHECKS` 活在已退役的 cloud 整图边界测试里，现无 live 执行点；再收 kernel 成员前先在 aidcp-kernel 仓补准入测试。**注**：cloud 侧 boundary-scan.ts 本体暂保留（migration-executability 的 scanSqlSource 与 sync-read-inventory 的 readJson 仍引用它），parity 闸两侧继续护漂移，结构收口时一并处置。
 
 ## 6. 文档与脚本改指（cutover 后）
 
-- [ ] 6.1 CLAUDE.md §8 整节重写为翻转后的模式（派生仓各自为政、cloud=集成测试仓、共享包版本化、新服务接入路径）。
-- [ ] 6.2 控制仓引用 aidcp-cloud 的脚本逐一核对改指（08-05 盘点为 9 个，执行时重扫）：`protocol-parity` / `boundary-census` / `land-change` / `operation-registry-parity` 等。**其中 parity 两个已由并行 change `drop-dead-cloud-edge-commands` 先行处理**（着陆被挡，按 1.2 的标记感知模式落地：读 `scripts/fact-source.json`，flipped=true ⇒ cloud 冻结副本退出比对、flipped=false 行为逐字不变；两脚本实测 OK）。本条剩余 7 个脚本仍归本 change。
+- [x] 6.1 CLAUDE.md §8 整节重写为翻转后的模式（派生仓各自为政、cloud=集成测试仓、共享包版本化、新服务接入路径）。
+<!-- 旧 8.0–8.5（重放时代口径）整体替换为新 8.0–8.3：身份与部署 / 日常改动怎么落（属主查表、迁移
+     并集编号、集成仓测试约定、协议配对 edge↔automation）/ 共享包版本化与准入原则（含 kernel 机器闸
+     无家可归的 ⚠）/ 红线的多仓形态（新增「双实例常态：身份断言对准被测方真正解析的拷贝」条）。 -->
+- [x] 6.2 控制仓引用 aidcp-cloud 的脚本逐一核对改指（08-05 盘点为 9 个，执行时重扫）：`protocol-parity` / `boundary-census` / `land-change` / `operation-registry-parity` 等。**其中 parity 两个已由并行 change `drop-dead-cloud-edge-commands` 先行处理**（着陆被挡，按 1.2 的标记感知模式落地：读 `scripts/fact-source.json`，flipped=true ⇒ cloud 冻结副本退出比对、flipped=false 行为逐字不变；两脚本实测 OK）。本条剩余 7 个脚本仍归本 change。
+<!-- 重扫结论：剩余脚本对 cloud 的引用全是「仓库存在性 / 分支检查」级（lib.sh / new-change /
+     spawn-change / land-change / fleet-status / task-preflight）或 ECS 运行目录（deploy-target），
+     不读 cloud src，翻转后语义不变；boundary-census 对 src-less cloud 实跑 exit 0（只审派生仓，
+     五仓 禁止边 0）。sync-split-repos / task-preflight 本身即本 change 改造对象。无需改指。 -->
 - [ ] 6.3 memory 条目更新：`cloud-demoted-not-retired` 等涉及事实源方向的条目改写；本 change 结论入档。
 
 ## 7. 回滚路解绑（可与 5 并行准备，OL 演练等用户窗口）
