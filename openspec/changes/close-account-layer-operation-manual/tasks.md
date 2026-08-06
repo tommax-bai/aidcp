@@ -70,5 +70,5 @@
 
 ## 9. 实装期发现（不属于本 change，但别忘了登记）
 
-- [ ] 9.0 **七条命令的类别是错的，救援清单是这个错误的补丁**（2026-08-06 用户指出后重查坐实，详见 design 决策一的「修正」节）：`identity.read_*`（翻译层）/ `captcha.assist.*`（环境层）/ `edge.task.acquire` `edge.task.release` `session.end`（执行权与编排）今天全登记为 `page_automation` / `page_account`，唯一共同点是**都需要浏览器**——分类被「怎么执行」污染了。**本 change 只止血不根治**（重新归类会改变身份闸实际拦什么，属行为变更）。根治 MUST 等「新增页面命令按什么维度编址」的规则立起来之后再做，否则改完仍无判据挡住下一次归错。本任务只负责**登记**，MUST NOT 在本 change 内动类别。
+- [ ] 9.0 **七条命令的类别是错的，救援清单是这个错误的补丁**（2026-08-06 用户指出后重查坐实，详见 design 决策一的「修正」节）：`identity.read_*`（翻译层）/ `captcha.assist.*`（环境层）/ `edge.task.acquire` `edge.task.release` `session.end`（执行权与编排）今天全登记为 `page_automation` / `page_account`，唯一共同点是**都需要浏览器**——分类被「怎么执行」污染了。**本 change 只止血不根治**（重新归类会改变身份闸实际拦什么，属行为变更）。根治 MUST 等「新增页面命令按什么维度编址」的规则立起来之后再做，否则改完仍无判据挡住下一次归错。**该规则已立**：change `establish-edge-command-grammar`（判据 `docs/edge-command-grammar.md`），根治即其蓝图批 2（7 条改类 + 类别词汇扩容 + 身份闸摘救援补丁）。本任务只负责**登记**，MUST NOT 在本 change 内动类别。
 - [ ] 9.1 **视频号 API 写入路径不经过页面身份闸**：`interaction.reply.send`（真发私信）是 `platform_api_automation` / `bound_account`，而身份闸只拦 `page_account`。即身份未落定时页面动作被拦、API 私信照发。本 change 只登记不修（修它属行为变更，与「零运行时变更」的边界冲突）。**实装 1.4 时若确认该条判为 `account_visible`，这个缺口的严重度就被本 change 的数据坐实了**——届时 MUST 单独提 change 或登记 backlog，不得只留在本文件里。
