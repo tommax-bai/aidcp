@@ -248,12 +248,35 @@
      的归属登记（该仓 `boundaries:refresh` 对 17 个派生私有组装根 fail-closed、跑不动，属既有状态），
      按同族条目形态手工补一条。 -->
 - [x] 7.5 在控制仓跑 `openspec validate restore-derived-migration-executability --strict`，回写本文件进度与 commit sha（格式 `<!-- <repo> <commit-sha> 备注 -->`）。
-- [ ] 7.6 部署 dev 前 MUST 先跑一次迁移状态查询自证零 pending 异常；**本 change 不产生任何需要在既有库上执行的 DDL**，若状态查询报出待应用迁移以外的任何异常，MUST 停手排查而非继续部署。
-<!-- 待办，且**任务原文的前提需要就地更正**：本 change 确实产生了两条需要在既有库上执行的迁移
-     （0112 / 0113）。它们是幂等建索引、dev / ol 上索引早已存在 ⇒ 执行时空转、零 DDL 变化，
-     但**账本上必须补两行**，否则那两个环境的账本最高版本停在 0111，而代码的 KNOWN_MAX 已是 0113。
-     故部署 dev 的正确序列是：先 `migrate status` 自证只有这两条 pending、无其它异常 →
-     `migrate up` → 复核 → 再 restart。REQUIRED 未抬，所以在跑 up 之前契约门也不会判 behind。 -->
+- [x] 7.6 部署 dev 前 MUST 先跑一次迁移状态查询自证零 pending 异常；**本 change 不产生任何需要在既有库上执行的 DDL**，若状态查询报出待应用迁移以外的任何异常，MUST 停手排查而非继续部署。
+<!-- 2026-08-06 已部署 dev（api 7a4c6f3 / automation 7791de9 / content 838603a），三服务 active、
+     NRestarts=0、8787/8090/8091/8092 全在监听、近 3 分钟零 error、isales 两服务未受影响。
+     备份：/opt/aidcp/{content,api,automation}.bak.20260806-15*.tar.gz + 各自 .env.bak。
+
+     **任务原文的两处前提就地更正（都是实测推翻的）：**
+     ① 「本 change 不产生任何需要在既有库上执行的 DDL」**不成立**：0112 / 0113 是两条新迁移，
+        必须入账。它们是幂等建索引、索引早已存在 ⇒ 执行时空转，但账本要补两行，否则账本最高版本
+        停在 0110/0111 而代码 KNOWN_MAX 已是 0113。REQUIRED 未抬，故 up 之前契约门也不判 behind。
+     ② 「部署前先跑状态查询」**在旧构建上物理做不到**：实测部署前在 dev 的 /opt/aidcp/api 上跑
+        `migrate status`，报的是 `ERR_MODULE_NOT_FOUND: /opt/aidcp/api/src/kernel/pg-owner-connection-resolver.js`
+        ——**这正是本 change 修的那个缺陷在真机上的原样复现**。故实际序列只能是
+        送代码 → status → up → restart，本次即按此走。
+
+     **两条部署机制，此前没有任何文档写过，下次照做：**
+     · **ECS 拉不动共享包**：`git ls-remote git@github.com:tommax-bai/aidcp-transport.git` 在 dev 上
+       是 `Permission denied (publickey)`，即那台机器没有 GitHub 私钥。⇒ kernel / transport 的 pin 一变，
+       **MUST 把本机 node_modules 里那两个包的目录一起 rsync 上去**（`rsync -az --delete` 到同名目录），
+       否则服务起来跑的是旧契约。本次三个服务各送了一份；automation 虽然 package.json 里没 pin
+       aidcp-transport，node_modules 里却有一份且被 scripts/migrate.ts 用到，漏送即 ERR_MODULE_NOT_FOUND。
+     · **dev 的库已经物理拆开，`migrate` MUST 带 `--owner=<本服务属主>`**：不带的话另外两个属主
+       会回落到一个并不存在的库（实测报 `database "aidcp" does not exist`），看着像故障、其实是范围没收窄。
+
+     **本机制在真库上的第一份证据（三个库各自表现不同，正是它该有的样子）：**
+       · content 库：`record-only 0112`（未发出任何 SQL）+ `applied 0113 (2ms)`；
+       · api 库：`record-only 0112` + `record-only 0113`（两条都不归它执行）；
+       · automation 库：`applied 0112 (3ms)` + `record-only 0113`。
+     三个库的账本最高版本随后都是 0113，三条 enforce 契约门全部通过，
+     启动日志里新的「记账不执行 1 条：0030_panel_hardening_indexes」逐条打出。 -->
 - [x] 7.7 把「空库 → migrate up → 启动服务」这条真验收挂回 change `cloud-schema-migration-executor` 的 5.9 与 backlog 簇 111.6，并注明本 change 是它的前置。**本 change MUST NOT 自称已验证空库拉起**——它只负责让那件事第一次可执行。
 <!-- aidcp ca7413d2 之后一批。两处都写了，且都**没有勾选对方的项**（本 change 只解除前置，不代验）：
      · `cloud-schema-migration-executor` 5.9：记录前置已解除 + 为什么仍不勾 + 一条重要更正——
