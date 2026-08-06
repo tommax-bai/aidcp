@@ -36,17 +36,19 @@
 | `/opt/aidcp/console` | console static files served by nginx |
 | `/opt/aidcp/downloads` | optional edge installer download fallback |
 
-### dev 与 ol 的运行形态**已经不一样了**（2026-08-04 起）
+### dev 与 ol 的运行形态（2026-08-05 起已重新一致：都是派生三服务）
 
-| | dev | ol |
+| | dev（2026-08-04 切） | ol（2026-08-05 切） |
 | --- | --- | --- |
-| 现役进程 | **派生三服务**：`aidcp-api` / `aidcp-automation` / `aidcp-content` | 单体 `aidcp-cloud` |
-| 单体 `aidcp-cloud.service` | **已停**（保留为回滚路，且已带最新修复） | 现役 |
-| 端口 | 8787 边-云（automation）/ 8090 面板 + 8091 客户鉴权（api）/ 8092 内容 / 8093 接口 / 8094 自动化 | 8787 / 8090 / 8091 全在单体 |
+| 现役进程 | **派生三服务**：`aidcp-api` / `aidcp-automation` / `aidcp-content` | 同左 |
+| 单体 `aidcp-cloud.service` | **disabled + inactive**（2026-08-06 实测） | disabled |
+| 端口 | 8787 边-云（automation）/ 8090 面板 + 8091 客户鉴权（api）/ 8092 内容 / 8093 接口 / 8094 自动化 | 同左 |
 
-**这条差异会咬人**：dev 上「重启云端」不再是 `systemctl restart aidcp-cloud`，
-而是三个 unit；「改 .env」也要分清改的是哪个服务那份。ol 不受影响、口径照旧。
-dev 的回滚路见 `docs/handoff-2026-08-04-derived-services-cutover.md` §9（今天真走过两次）。
+**口径**：任何环境上「重启云端」都是三个 unit，不再是 `systemctl restart aidcp-cloud`；
+「改 `.env`」要分清改的是哪个服务那份。回滚见下方「Rollback（逐服务）」——
+单体回滚路只作为用户显式决定的最后手段（CLAUDE §8.0），并将随 change
+`invert-split-fact-source` 的 cutover 正式日落。历史切流过程见
+`docs/handoff-2026-08-04-derived-services-cutover.md`（其 §9 的「回滚=拉起单体」已被本页取代）。
 
 ## Invariants
 
@@ -235,6 +237,19 @@ or a future ol domain. Packaged edge releases intended for ol must not silently 
 7. Restart only ol `aidcp-cloud.service` and reload ol nginx when needed.
 8. Health-check cloud, panel, console, database, and Feishu if enabled.
 9. Record the release branch, deployed SHAs, database mode, and validation notes in the OpenSpec task.
+
+### Rollback（逐服务；2026-08-06 起的标准路，取代「拉起单体」）
+
+适用 dev 与 ol。回滚单位是**单个派生服务**，不是整机：
+
+1. 定位备份：部署序列的备份产物为 `/opt/aidcp/<svc>.bak.<ts>.tar.gz`（2026-08-06 实测 dev 上 api 19 / automation 16 / content 8 个），`.env` 另有独立备份 `<svc>.env.bak.<date>`。
+2. `systemctl stop aidcp-<svc>.service`。automation 是风控单写者：**必须 stop-then-start，绝不滚动 / 蓝绿**（见 Invariants）。
+3. 先把现行 `.env` 拷到一旁，解包备份覆盖 `/opt/aidcp/<svc>/`，再放回现行 `.env` 并核对——`rsync` 部署一直 `--exclude .env`，但 tar 备份是全目录打包、可能带旧 `.env`，以放回的现行版为准。
+4. `systemctl start aidcp-<svc>.service` + 完整 healthcheck（`active`、该服务端口、启动日志里 schema 契约门**通过行**）。
+5. **账本超前陷阱**：回退到旧构建后若迁移账本超前，服务会 fail-closed 拒启——这是预期行为，放行必须走 `AIDCP_ALLOW_SCHEMA_AHEAD=<具体版本id>` 逐次显式放行并记录（见 Schema Contract Gate）。
+6. 只动这一个服务，其余两个不碰；绝不碰 dev 同机 `isales`。
+
+单体 `aidcp-cloud.service` 两环境均已 disabled；重新 enable 是**用户显式决定的最后手段**（CLAUDE §8.0），并将随 change `invert-split-fact-source` 的 cutover 正式日落（届时 cloud 仓已无源码，此路彻底关闭；最后一份单体备份包留档至日落日期）。截至 2026-08-06 逐服务回滚未做整链演练（登记在该 change 任务 7.1，等 cutover 窗口一并做，避免在 fleet 活跃时段重启 dev 服务）。
 
 ### Schema Contract Gate
 

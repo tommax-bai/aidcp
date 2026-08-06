@@ -24,10 +24,21 @@
 
 ## 2. 共享包版本化（并行流 A，本批落）
 
-- [ ] 2.1 `aidcp-kernel` / `aidcp-transport` 各打 annotated tag `v0.1.0` 于当前 master head（kernel 2fcbfdd / transport 416db19，执行时以当时 head 为准），push tag。
-- [ ] 2.2 三个派生仓 `package.json` 钉子改为 `git+ssh://…#v0.1.0` 单一写法（**automation 的 transport 钉子现为 `github:` 简写且落后一位 sha——这就是要消灭的漂移实例**），重装依赖刷新 lockfile，`npm run typecheck` 三仓全绿。装完按 memory 法条核实 node_modules 里的 kernel 确为新引用（装到旧 sha 不报错）。
-- [ ] 2.3 `sync-split-repos` 的 pin 检查改造：① 同时识别 `git+ssh://` 与 `github:` 两种写法，不认识的写法报错而非报「未 pin」；② 接受 tag 引用，经本地兄弟 checkout `git rev-parse <tag>^{}` 解析成 sha 比对；③ 翻转前要求解析到最新 tag（强度等价现行），翻转后落后只报告不报错。
-- [ ] 2.4 登记：本项不部署（钉子解析到相同内容，零行为变化），随各服务下次正常部署自然生效。
+- [x] 2.1 `aidcp-kernel` / `aidcp-transport` 各打 annotated tag `v0.1.0` 于当前 master head（kernel 2fcbfdd / transport 416db19，执行时以当时 head 为准），push tag。
+<!-- kernel v0.1.0 → 2fcbfdd5a919 / transport v0.1.0 → 416db19b9fe5，均 annotated 且已 push。 -->
+- [x] 2.2 三个派生仓 `package.json` 钉子改为 `git+ssh://…#v0.1.0` 单一写法（**automation 的 transport 钉子现为 `github:` 简写且落后一位 sha——这就是要消灭的漂移实例**），重装依赖刷新 lockfile，`npm run typecheck` 三仓全绿。装完按 memory 法条核实 node_modules 里的 kernel 确为新引用（装到旧 sha 不报错）。
+<!-- api d32e7ea / automation 596c2c0 / content 5a8ea52。memory 警告的坑真踩到了：automation 首次
+     npm install 把 transport 的 resolved 静默留在旧 761b9bd，npm update 后复核才落到 v0.1.0；
+     三仓 lockfile resolved 均 = tag 目标 sha，node_modules 内容 byte-match tag 内容，typecheck 3/3。
+     偏离（api 内合理扩围）：两个守卫测试原样断言「40 位 sha 钉子」字面形态、在 tag 钉子下假红，
+     改为断言下一层不变量（canonical git+ssh#v<semver> 形态 + lockfile 解析 sha 相等 + 共享包全仓唯一实例）。 -->
+- [x] 2.3 `sync-split-repos` 的 pin 检查改造：① 同时识别 `git+ssh://` 与 `github:` 两种写法，不认识的写法报错而非报「未 pin」；② 接受 tag 引用，经本地兄弟 checkout `git rev-parse <tag>^{}` 解析成 sha 比对；③ 翻转前要求解析到最新 tag（强度等价现行），翻转后落后只报告不报错。
+<!-- aidcp 83eb9671。变异三连全响：file: 写法→点名仓+行报错；过期 sha→「pin 过期」；解析不了的
+     tag→指引 fetch --tags。超计划完成一块：翻转态的宽松报告（pin=存在的 tag、落后只列名）已随本条
+     实装在翻转早退路径里（report_flipped_pins），5.5 的这部分等于预做。census 复跑：三仓两包
+     pin 全部「对齐（v0.1.0 → sha）」，automation 不再报「未 pin」。 -->
+- [x] 2.4 登记：本项不部署（钉子解析到相同内容，零行为变化），随各服务下次正常部署自然生效。
+<!-- 确认未部署。census 仍 exit 1 来自既有的「组装根不同 2」（只报不改的常态），与 pin 无关。 -->
 
 ## 3. 边界扫描器合并（并行流 B，本批落）
 
@@ -48,16 +59,28 @@
 
 ## 4. 整图测试搬家 pilot（并行流 C，本批只产报告，cloud 零提交）
 
-- [ ] 4.1 在 scratch worktree 里选 ≥6 个代表用例证明「兄弟仓直引」跑法，四类形态各至少一个：普通跨属主 / 把别属主源文件当数据读 / 迁移对齐（读三仓 migrations）/ 整图扫描。确定机制（tsconfig paths vs 相对路径）并跑绿。
-- [ ] 4.2 产出 `openspec/changes/invert-split-fact-source/pilot-report.md`：跑法结论、codemod 草稿（可直接给 cutover 分桶执行）、已知坑清单、预计工作量修正。
+- [x] 4.1 在 scratch worktree 里选 ≥6 个代表用例证明「兄弟仓直引」跑法，四类形态各至少一个：普通跨属主 / 把别属主源文件当数据读 / 迁移对齐（读三仓 migrations）/ 整图扫描。确定机制（tsconfig paths vs 相对路径）并跑绿。
+<!-- 7 个代表用例覆盖全部四类形态，合跑 139/139 绿 + tsc --noEmit exit 0。机制定夺：tsconfig paths
+     双布局 fallback 数组（"@api/*": ["../aidcp-api/src/*","../../aidcp-api/src/*"]），canonical 与
+     .wt worktree 零文件差异各自可解析；相对路径方案实证出局（一种写法编码不了两种布局深度）。
+     运行时数据读取走新 helper（AIDCP_CODES_ROOT → ../ → ../../，找不到响亮失败）。
+     cloud 零提交，worktree 与分支已拆净，canonical 干净停 master。 -->
+- [x] 4.2 产出 `openspec/changes/invert-split-fact-source/pilot-report.md`：跑法结论、codemod 草稿（可直接给 cutover 分桶执行）、已知坑清单、预计工作量修正。
+<!-- aidcp e11ac106。改写 cutover 计划的关键发现：① 先删后搬——cloud 里 ~239 个单属主用例在派生仓
+     已有复制（411 个复制测试文件），该删不该搬，砍掉一半改写量（剩 232 文件 / 1021 说明符，全可
+     codemod）；② 迁移并集干净精确（cloud 112 = 72+60+22 去重，复制件全 byte-identical；配方=按文件名
+     去重 + 断言校验和一致）；③ 23 个动态数据读取文件 codemod 够不着、只能点名人工；13 个组装根
+     数据读取用例须裁决「死或重锚」；AC-BOUND 整图边界闸不搬（并集 import 图随单体消失）；
+     ④ tsconfig 撤 rootDir/outDir 须与 paths 同一提交，验证命令不得管到 tail（吃掉 tsc 退出码）。
+     工作量修正：≈1 个车队并行工作日（6 个目录桶 + 1 个整图收口），硬前置=兄弟仓全部 npm ci 就绪。 -->
 
 ## 5. CUTOVER（串行；前置＝触碰 cloud src 的在飞 change 全部 land ＋ 用户点火）
 
 - [ ] 5.1 前置确认：`openspec list` 里无触碰 cloud `src/` 的在飞 change；`sync-split-repos` census 零漂移；重测头部基线数字。
 - [ ] 5.2 置位 `fact-source.json`（frozenCloudRef=当时 cloud master sha）+ CLAUDE.md §8 头部加翻转声明（整节重写在 6.1）。此提交即点火。
-- [ ] 5.3 按 pilot codemod 分桶并行改写 cloud test 全量引用，整图套件全绿。
+- [ ] 5.3 按 pilot codemod 分桶并行改写 cloud test 全量引用，整图套件全绿。（pilot 定稿的执行序：**先删后搬**——先删 ~239 个派生仓已复制的单属主用例并对账，再 codemod 改写 232 文件 / 1021 说明符；23 个动态数据读取文件人工处理、13 个组装根数据读取用例逐条裁决；tsconfig paths + 撤 rootDir 同一提交；数字以当天重测为准。）
 - [ ] 5.4 删除 cloud `src/` 与 `migrations/`；`boundaries/` 归属清单转冻结历史记录（README 注明）；仓 README 自述改「集成测试仓」；整图套件在删除后的状态下再跑一遍全绿。
-- [ ] 5.5 `sync-split-repos` 退役收尾：census 模式只剩冻结校验与 pin 报告；`--apply` 路径删除或永久封死。
+- [ ] 5.5 `sync-split-repos` 退役收尾：census 模式只剩冻结校验与 pin 报告；`--apply` 路径删除或永久封死。（pin 报告那半已随 2.3 预做——翻转早退路径里已有宽松版 pin 报告；本条剩「删/封 --apply 代码路径」与收掉重放专用逻辑。）
 - [ ] 5.6 「只测单体组装」的 5 个用例随单体死掉：删除并在本条注释记档。
 - [ ] 5.7 边界扫描器结构性收口（3.2 递延项，细节见 scanner-merge-report.md）：cloud src 删除后 automation 侧副本成为唯一实现，撤下两仓 parity 闸；若 api / content 届时需要该闸，先把 REPO_ROOT 改成可注入再进 transport。同时裁决报告记录的 record 层不对称（派生侧 census 只拦 forbidden、不带棘轮）与三条既存 `--tests` 多出条目。
 
@@ -70,4 +93,10 @@
 ## 7. 回滚路解绑（可与 5 并行准备，OL 演练等用户窗口）
 
 - [ ] 7.1 写单服务回滚流程（解包上一版备份 + 重启该服务）进 `docs/deployment-environments.md`，在 dev 演练一次并记录。
+<!-- 文档半已落（本仓，与本批 tasks 同提交）：新增「Rollback（逐服务）」节（备份定位 / 单写者
+     stop-then-start / .env 放回 / 契约门通过行 / 账本超前放行），并顺手把 08-04 的 dev/ol 形态表
+     修正到 08-05 之后的现实（两环境都是派生三服务、单体 disabled+inactive 于 dev 实测）。
+     dev 演练待 cutover 窗口一并做——fleet 活跃时段重启 dev 服务会打断在跑的边缘会话。 -->
 - [ ] 7.2 单体最后备份包（dev / OL 各一）确认存在、写明日落日期；到期删除写进 backlog。
+<!-- dev 侧已核：/opt/aidcp/ 下单体 tar 备份 165 个、aidcp-cloud.service disabled+inactive（2026-08-06
+     实测）。OL 侧确认与日落日期定夺留待 cutover。 -->
