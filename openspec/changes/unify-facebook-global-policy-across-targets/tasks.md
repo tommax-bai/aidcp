@@ -178,5 +178,5 @@
 
 ## 9. 收尾：把中间态收掉（**独立 change，本 change 不做，但必须立项**）
 
-- [ ] 9.1 切读稳定后立一个独立的 contract change：删掉 `dev` / `ol` 两行与三张主表的 `execution_target` 列，策略表改单行约束、完成表主键改 `env_key`
-- [ ] 9.2 该 change 落地前，`'all'` 哨兵值是**中间态不是终点** —— 一个还留着的分行维度迟早会被重新用起来。本条 MUST NOT 因为"现在能跑"而无限期挂起；本 change archive 时若 9.1 尚未立项，MUST 在 backlog 里留具名条目
+- [x] 9.1 切读稳定后立一个独立的 contract change：删掉 `dev` / `ol` 两行与三张主表的 `execution_target` 列，策略表改单行约束、完成表主键改 `env_key` <!-- 2026-08-06 已立项：`collapse-facebook-global-policy-target-column`（proposal / design / specs / tasks 齐备，strict 通过）。设计上的两点与本条原文有出入，均为实测所致：① 策略表删列后主键会一起消失，故改用取值集合只有一个元素的单例主键，而不是「单行约束」这个说法；② **审计表整个不动**——原以为 revision 已成一条序列、唯一约束可收紧成只按 revision，实测 `facebook_operation_global_policy_audit` 9 行只有 6 个不同 revision（1/2/3 各两次，dev 与 ol 各一），收紧会在现有数据上直接失败；而保留原约束对新行同样成立（新行作用域恒为 all）。 -->
+- [x] 9.2 该 change 落地前，`'all'` 哨兵值是**中间态不是终点** —— 一个还留着的分行维度迟早会被重新用起来。本条 MUST NOT 因为"现在能跑"而无限期挂起；本 change archive 时若 9.1 尚未立项，MUST 在 backlog 里留具名条目 <!-- 2026-08-06 已立项，故无需再往 backlog 留具名条目。新 change 的归档前置写明：MUST 在本 change 归档之后才归档（它的 delta 是 ADDED 到本 change 引入的能力上，顺序反了会写出一份悬空规格，而 validate 与 archive 都不报错）。 -->
