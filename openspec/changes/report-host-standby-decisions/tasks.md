@@ -95,7 +95,21 @@
 
 - [x] 6.1 **上线顺序不可反：云端先上，边缘后到。** 边缘先发而云端不认，消息会被当未知类型丢弃。
   <!-- cloud 先 land（322472a）再 edge（000f970）；派生服务先部署 dev，边缘要到客户端重新编译装机后才开始上报，顺序天然满足。 -->
-- [ ] 6.2 云端部署走 §5 安全序列（先 `scripts/deploy-target dev --check` → 备份 → rsync → 重启 → 健康检查 → 失败即回滚）；**绝不碰同机 isales**。
+- [x] 6.2 云端部署走 §5 安全序列（先 `scripts/deploy-target dev --check` → 备份 → rsync → 重启 → 健康检查 → 失败即回滚）；**绝不碰同机 isales**。
+  <!-- 2026-08-06 deployed dev。部署的是**派生两服务**（automation + api），不是单体——`aidcp-cloud` 已定为永不部署。
+       序列：deploy-target dev --check → 备份 api/automation.bak.20260806-151721.tar.gz + .env.bak → `git archive HEAD` 干净快照 rsync（不从工作区推）
+       → ECS 两槽 typecheck 全 CLEAN → restart automation → restart api → 健康检查。isales 未碰（仍 inactive）。
+       部署 sha：aidcp-api 7a4c6f3 / aidcp-automation 7791de9。本批无迁移文件新增。 -->
+  <!-- ⚠️ **ECS 装不了私有 git 依赖**：机器上没有 GitHub deploy key，`npm install` 直接「无法读取远程仓库」。
+       共享包（kernel / transport）的既有装机方式是**把本机 node_modules 里那两个目录 rsync 过去**（dist + package.json）。
+       本次照办；`npm ls` 复核两条 pin 与本地一致。这一条不写下来，下一个人会在 ECS 上白等一次 npm。 -->
+  <!-- 验收（可当场核的部分）：三服务 active、NRestarts=0、六端口全在（8787/8090/8091/8092/8093/8094）、
+       单体仍 inactive+disabled、同步读就绪 ready blockers=[]、两服务近 6 分钟日志 error/fatal 计数 0。
+       **新通道两端实证**：automation 内部只读路由 `POST /host-standby-decision/list` → `{"ok":true,"result":[]}`（非 404）；
+       面板 `GET /api/host-standby-decisions` → 200 `{"decisions":[],"asOf":…}`，同 token 打一个不存在的路径回 404 ⇒ 那个 200 是真路由、不是兜底。
+       空列表是正确的当前事实：还没有装了新构建的边缘客户端连上来。 -->
+  <!-- 本批顺带带上了并行 change `restore-derived-migration-executability` 已合入 master 的提交（api 943882c / automation 39502c8 等）——
+       dev 部署的是默认分支目标提交，那些提交本就已 land 且各仓全量绿；此处如实记一笔，不是本 change 的改动。 -->
 - [x] 6.3 本 change **不含**桌面安装包出包（默认不打包）。收尾说明写清：**边缘侧要到客户端重新编译装机后才开始上报**，且**不得用版本号判断装的是哪份代码**。
 - [x] 6.4 回滚口径：云端停止消费即可；协议消息保留无害（边缘发、云端忽略）。**MUST NOT 靠删字段回滚**——删字段会让全部在跑客户端停止让位。
   <!-- 具体做法：把自动化进程那条只读路由注册摘掉即可——消费方一缺席，握手就不再协商该能力位，边缘随之静默停发，全链零报错。MUST NOT 动 `UiBrowserStandbyPayload` 的任何字段。 -->
@@ -133,6 +147,15 @@
 - 面板侧注入只读 HTTP 客户端 + `GET /api/host-standby-decisions`；面板能力名册新增一项（未装即启动失败，不会静默少一条端点）
   <!-- aidcp-api 7a4c6f3 已推 master；typecheck 0 / acceptance 26 pass / npm test 578（0 fail） -->
   <!-- 依赖 pin：kernel 2fcbfdd + transport 416db19，两条 spec 串统一 git+ssh 写法——`npm install <pkg>` 会改写成 github: 简写，而本仓「kernel 只能有一份、两处 spec 串逐字相同」那道守卫认字符串，简写即当场红。**别用 `npm install <pkg>` 升 pin**：它按默认分支头重解析、顺手改写 package.json；要改 pin 就手改 package.json 再跑裸 `npm install`。 -->
+
+## 7b. 真机验收（解耦，已登记 backlog）
+
+云端两端已在部署当天实证（内部只读路由与面板端点都回真值、非 404、非兜底），
+**缺的是「真有边缘在发」那一段**——它要到客户端从源码重新编译装机之后才发生。
+登记为 `docs/real-machine-acceptance-backlog.md` **簇 146**，五条（含两条负向：
+上报失败不影响让位、旧客户端静默共存）。
+
+**MUST NOT 把「已归档」读成「已在真机上验过」**；也 MUST NOT 用客户端版本号判断装的是哪份代码。
 
 ## 8. 为什么范围比 tasks.md 原写的大
 
