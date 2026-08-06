@@ -1,5 +1,15 @@
 > 实装前先读同目录 `oracle.md`：本 change 多数条目在退役 TypeScript 实现里有可直接对照的正确写法与真机经验。
 
+> **⚡ 2026-08-06 事实源已翻转（`invert-split-fact-source` cutover，用户裁定不等在飞 change）**：
+> `aidcp-cloud` 的 `src/` + `migrations/` 已冻结（task-preflight 会拦任何 cloud 侧源码改动），
+> `sync-split-repos --apply` 已退役。**本 change 剩余的「cloud 侧」任务改为直接落对应派生仓**
+> （aidcp-api / aidcp-automation / aidcp-content；逐文件属主查 `aidcp-cloud/boundaries/module-ownership.json`，
+> 常见：`src/comm/**`、`src/orchestrator/**` → automation，`src/panel/**`、`src/client-auth/**` → api）。
+> 已写但未推的 cloud src 改动请在派生仓重落，**勿再推 cloud**（推了会让全 fleet 任务准入变红）。
+> 新迁移直接落属主仓 `migrations/`，编号取三仓并集的下一号。跨仓测试（整图/跨属主）落 cloud `test/`
+> （它现在是纯集成测试仓，test/ 不冻结）。协议红线不变：edge ↔ aidcp-automation 两份 `src/comm/protocol.ts` 逐字一致。
+
+
 ## 1. aidcp-edge — Facebook 互动热度取数
 
 > **1.3 / 1.4 显式弃守（2026-08-05，用户裁定；不是待办，也不是遗漏）。** §7 整节随之弃守。

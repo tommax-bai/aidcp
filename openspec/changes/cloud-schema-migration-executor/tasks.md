@@ -1,5 +1,15 @@
 ## 1. aidcp-cloud — 迁移执行器与账本
 
+> **⚡ 2026-08-06 事实源已翻转（`invert-split-fact-source` cutover，用户裁定不等在飞 change）**：
+> `aidcp-cloud` 的 `src/` + `migrations/` 已冻结（task-preflight 会拦任何 cloud 侧源码改动），
+> `sync-split-repos --apply` 已退役。**本 change 剩余的「cloud 侧」任务改为直接落对应派生仓**
+> （aidcp-api / aidcp-automation / aidcp-content；逐文件属主查 `aidcp-cloud/boundaries/module-ownership.json`，
+> 常见：`src/comm/**`、`src/orchestrator/**` → automation，`src/panel/**`、`src/client-auth/**` → api）。
+> 已写但未推的 cloud src 改动请在派生仓重落，**勿再推 cloud**（推了会让全 fleet 任务准入变红）。
+> 新迁移直接落属主仓 `migrations/`，编号取三仓并集的下一号。跨仓测试（整图/跨属主）落 cloud `test/`
+> （它现在是纯集成测试仓，test/ 不冻结）。协议红线不变：edge ↔ aidcp-automation 两份 `src/comm/protocol.ts` 逐字一致。
+
+
 - [x] 1.1 新增 `migrations/0057_schema_migrations_ledger.sql`（`kind=expand`）：建 `schema_migrations` 表，列为 `version TEXT PRIMARY KEY`、`name TEXT NOT NULL`、`checksum TEXT NOT NULL`、`kind TEXT NOT NULL CHECK (kind IN ('expand','contract'))`、`applied_at TIMESTAMPTZ NOT NULL DEFAULT now()`、`applied_by TEXT`、`applied_from_target TEXT`、`duration_ms INTEGER`、`baseline BOOLEAN NOT NULL DEFAULT false`。`applied_from_target` 无索引、无唯一约束、不参与任何查询谓词——它只是审计列。
 <!-- aidcp-cloud aef34a0 偏离：文件名为 migrations/0064_schema_migrations_ledger.sql。0057 在写 tasks 时还没被占用，实施时 0057-0063 已被 publish-draft-refinement / risk-state-cross-process-integrity / config-mirror-cross-process-invalidation / publish-approval-signal-to-database 四个 change 占走，故顺延到 0064。列定义逐条按 tasks 落地。 -->
 - [x] 1.2 新增 `src/schema/migration-plan.ts`：纯函数层，输入「文件名 + 内容」列表与账本行列表，输出 `{ pending, skipped, errors }`。排序键为 `(数字前缀数值升序, 完整文件名字典序升序)`。可判定的错误只有三类：`migration_checksum_mismatch`、`migration_out_of_order`、`migration_kind_missing`。此文件不 import `pg`，可脱库单测。

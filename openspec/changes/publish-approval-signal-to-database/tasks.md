@@ -1,5 +1,15 @@
 ## 1. aidcp — 控制仓文档与盘点范围
 
+> **⚡ 2026-08-06 事实源已翻转（`invert-split-fact-source` cutover，用户裁定不等在飞 change）**：
+> `aidcp-cloud` 的 `src/` + `migrations/` 已冻结（task-preflight 会拦任何 cloud 侧源码改动），
+> `sync-split-repos --apply` 已退役。**本 change 剩余的「cloud 侧」任务改为直接落对应派生仓**
+> （aidcp-api / aidcp-automation / aidcp-content；逐文件属主查 `aidcp-cloud/boundaries/module-ownership.json`，
+> 常见：`src/comm/**`、`src/orchestrator/**` → automation，`src/panel/**`、`src/client-auth/**` → api）。
+> 已写但未推的 cloud src 改动请在派生仓重落，**勿再推 cloud**（推了会让全 fleet 任务准入变红）。
+> 新迁移直接落属主仓 `migrations/`，编号取三仓并集的下一号。跨仓测试（整图/跨属主）落 cloud `test/`
+> （它现在是纯集成测试仓，test/ 不冻结）。协议红线不变：edge ↔ aidcp-automation 两份 `src/comm/protocol.ts` 逐字一致。
+
+
 > 本节全部落在控制仓文档上。5 个并行 change 都要改 `docs/cloud-service-decomposition-proposal.md`，
 > 为避免互相冲突，本 session **未直接修改**该文件，改为把精确编辑写成 docpatch 交主控 session 串行套用：
 > `/private/tmp/claude-501/-Users-baitianxing-codes-aidcp/f0ef76c1-69d8-483a-8df8-115c38a2f9d0/scratchpad/docpatch-publish-approval-signal-to-database.md`

@@ -125,6 +125,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 8. 云端拆仓不变量（Block④ · 四包七仓期间一律 OVERRIDE）
 
+> **⚡ 2026-08-06 事实源已翻转（change `invert-split-fact-source` cutover，用户点火）**：
+> **派生仓从此各自是自己代码的唯一事实源**；`aidcp-cloud` 的 `src/` + `migrations/` 冻结于
+> `scripts/fact-source.json` 记录的 ref、正在瘦身为纯集成测试仓。**MUST NOT 再往 cloud 落任何
+> src / migrations 改动**（task-preflight 会拦）；`sync-split-repos --apply` 已退役；云端业务改动
+> 直接落对应派生仓（逐文件属主查 `aidcp-cloud/boundaries/module-ownership.json`，该文件转冻结史料）；
+> 新迁移直接落属主仓 `migrations/`，编号取**三仓并集**的下一号。共享包按 tag 版本引用（`#v0.1.0` 起）。
+> 本节下文与此冲突的表述（「cloud=事实源」「派生物勿手搬」等）**以本条为准**，§8 全文重写随该 change 6.1 落地。
+
 > `aidcp-cloud` 正在拆成 `aidcp-api` / `aidcp-automation` / `aidcp-content` 三个业务仓 +
 > `aidcp-kernel`（零副作用契约）/ `aidcp-transport`（跨进程运行时原语）两个共享包。
 > **拆仓期间任何触碰 `aidcp-cloud/src/**` 或 `boundaries/**` 的改动都受本节约束**，与是否属于拆仓任务无关。

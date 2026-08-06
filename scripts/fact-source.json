@@ -1,6 +1,6 @@
 {
   "note": "Split fact-source flip marker (openspec change invert-split-fact-source). While flipped=false the cloud->derived replay model is fully in effect. Flipping to true retires sync-split-repos --apply/--prune, freezes aidcp-cloud src/ + migrations/ at frozenCloudRef, and makes task-preflight reject any cloud-side source drift. Flip only at the coordinated cutover (tasks.md section 5).",
-  "flipped": false,
-  "frozenCloudRef": null,
-  "flippedAt": null
+  "flipped": true,
+  "frozenCloudRef": "2d34e06027bcca91072aab767ac09a2bed0cba27",
+  "flippedAt": "2026-08-06"
 }
