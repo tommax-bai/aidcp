@@ -272,8 +272,26 @@ src/ 与 migrations/ 零改动（`git status --porcelain src/ migrations/` 为�
 <!-- 阈值再修正 aidcp-cloud 89c286d（2026-07-23，cloud-schema-migration-executor land 后）：import frozenTotal 阈值 **162 → 178**（=295-117）。**这次 involvingContent 变了**（112 → 117）：新增 21 条里有 5 条一端是 content（src/cache/concept-store.ts / curated-content-store.ts ×2 / src/metrics/token-usage-store.ts / src/publish-agent/facebook-publish-media-store.ts → src/schema/），故与上一轮「新增全在 api↔automation、involvingContent 不变」的情形不同。另两条判据形态不变：involvingContent==0 仍是阶段 3 的硬门，表侧阈值仍按 S1 的 12 计。套用 docpatch P10 时 MUST 按本条对齐，R0 的 162 已被取代 -->
 - [x] 6.4 在 §14 验收红线里加一条：跨边界 import 与跨边界表写入的豁免条数 MUST 有机械门禁把守且只减不增；并在红线 6（不存在跨服务源码导入与表写入）旁注明「阶段 1 起由本门禁把守，阶段 2 之后由 Git 边界与数据库授权接管」。
 <!-- 2026-07-23 主控套用 docpatch P11：docs/cloud-service-decomposition-proposal.md §14.1 尾部追加红线 AC-DECOMP-33（边界执行·豁免只减不增）+ 红线 6（AC-DECOMP-06）验收方式加旁注。原稿拟 31，因三条并行新增红线按套用顺序排号，本 change 末位取 33（config-mirror=31、publish-approval=32）。 -->
-- [ ] 6.5 **改为登记依赖，MUST NOT 在本 change 内直接改 `CLAUDE.md` §7**：该清单的改动属控制仓法条变更（定稿 §12 已写死「走独立 change，不在本方案文档内」），且定稿 §17 第 1 项已把它登记为一个**合并后共 8 项**的独立控制仓 change（定稿点名五处 `server.ts` / `role-dispatcher.ts` / `publish-agent/` / `panel/` / `agents/` + 本 change 需要的三项 `aidcp-cloud/src/kernel/**` / `boundaries/module-ownership.json` / `boundaries/table-ownership.json`）。本项的义务是：本 change 的门禁生效前，该控制仓 change MUST 已合入。两处各改一半 MUST NOT 发生。
+- [x] 6.5 **改为登记依赖，MUST NOT 在本 change 内直接改 `CLAUDE.md` §7**：该清单的改动属控制仓法条变更（定稿 §12 已写死「走独立 change，不在本方案文档内」），且定稿 §17 第 1 项已把它登记为一个**合并后共 8 项**的独立控制仓 change（定稿点名五处 `server.ts` / `role-dispatcher.ts` / `publish-agent/` / `panel/` / `agents/` + 本 change 需要的三项 `aidcp-cloud/src/kernel/**` / `boundaries/module-ownership.json` / `boundaries/table-ownership.json`）。本项的义务是：本 change 的门禁生效前，该控制仓 change MUST 已合入。两处各改一半 MUST NOT 发生。
 <!-- BLOCKED: 依赖未满足——§17 第 1 项那个控制仓 change 尚未立项、更未合入，而本 change 的门禁代码已就绪。CLAUDE.md §7 未被本 session 触碰（符合 MUST NOT）。另有一处口径需改：该 change 列的 `aidcp-cloud/src/kernel/**` 路径**不存在**，本 change 按 §4.7 判定不建 src/kernel/ 目录（见 2.6）；应改为列 kernel 花名册的四个现有路径。已写成 docpatch P14。2026-07-23 主控复核（严守 rule 6）：CLAUDE.md §7 未改；§17 第 1 项本身未改（P14 明写「无需改动 §17 第 1 项本身」）；P14 的「src/kernel/** 路径不存在→应改列 kernel 花名册四个现有路径」作为 caveat 记入主控报告，交那个独立控制仓 change 落地。依赖（该独立 change 合入）仍未满足，本项保持未勾选。 -->
+<!-- 2026-08-06 用户裁定：**销案——那条守卫已失去对象，不再立那个独立 change。**
+
+     **它守的是什么**：定稿 §12 要求把 `aidcp-cloud` 的 `src/server.ts` / `src/orchestrator/role-dispatcher.ts`
+     / `src/publish-agent/` / `src/panel/` / `src/agents/` 五处列入 `CLAUDE.md` §7 的「热点文件单写者」清单，
+     理由写在 §5.4.7「中间窗口」：从迁移目录归属完成、到数据库按服务分角色生效之间，
+     **跨服务写表没有任何数据库层强制**，那段窗口靠两件东西承担——表所有权门禁 + 「这几个文件串行改」的人工纪律。
+
+     **为什么现在没有对象**：那个中间窗口已经走完了。① 五处路径全在 `aidcp-cloud` 下，而该仓已按 §8.0
+     定为**永不部署**（事实源 + 整图验证仓），「多个 change 并行改它、撞坏线上」这条风险路径不存在了；
+     ② 三个业务仓的 `src/` 是 `scripts/sync-split-repos` 的**派生物**，本来就 MUST NOT 手工改，
+     真正的串行约束由「改事实源 + 跑同步」这条路径本身给出，不靠花名册；
+     ③ 门禁侧的承担已归零并锁死：两份豁免清单 `frozenTotal=0 / 条目 0`，seed 窗口已于本次归档关闭。
+
+     ⇒ 本条的义务（「门禁生效前该 change MUST 已合入」）随被守对象一起消失。**「两处各改一半 MUST NOT 发生」
+     这条仍然成立且已满足**：`CLAUDE.md` §7 全程未被本 change 触碰，另一半也不会再来。
+     docpatch P14 那条 caveat（清单里 `aidcp-cloud/src/kernel/**` 路径不存在）连同本条一并作废——
+     该目录如今真实存在（109 文件 / 名册 112 条），但已无人需要那份清单。
+     §12 与 §5.4.7 的条文不删：它们描述的是拆仓过程中曾真实存在的一段窗口，是史实不是待办。 -->
 - [x] 6.6 在 `docs/cloud-service-decomposition-review.md` 的「如果只做三件事」第三件旁标注本 change 名，便于后续对账。
 <!-- 2026-07-23 主控套用 docpatch P12：docs/cloud-service-decomposition-review.md §四 第三件标注承接 change 名，三个作废数字改为实测终值（295 条跨边界 import + 12 条跨层表写入，role-dispatcher 簇 4 条）。 -->
 
@@ -300,10 +318,30 @@ src/ 与 migrations/ 零改动（`git status --porcelain src/ migrations/` 为�
 <!-- 实测已做、已撤销。新建 src/zz-boundary-probe.ts（两行）→ AC-BOUND-01 红，报「新增源文件未登记归属，先跑 boundary-record ownership 再提交：src/zz-boundary-probe.ts」 -->
 <!-- 缺陷修复 aidcp-cloud 620c0db（2026-07-23 第二轮审计坐实）：「归属表 MUST 是规则表的机械展开」这条断言此前**把生成物 module-ownership.json 自己回喂当「已裁决集」**，于是「是否被裁决过」退化成「是否已经在生成物里」。实测洗白路径：新建 src/publish-agent/zz-handedited-probe.ts（§4.7 里三分、标 adjudicate 的目录），手工往 module-ownership.json 加一条 {path, layer:'content'}（目录默认层）、**不**加任何 fileOverrides 裁定 → module-boundary.test.ts 11/11 全绿，随后 `boundaries:refresh` 退出 0 并把它重新写回生成物，洗白后不可逆。现把「已裁决文件集」挪进新的**人工文件** boundaries/adjudicated-files.json（登记 seed 当天已存在于逐文件切分目录里的 147 个文件，**只减不增**：此后这类目录的新文件一律进 ownership-rules.json 的 fileOverrides 并写明 §4.7 判据，源文件删除时由 refresh 同步剔除）；生成物只作输出、不再充当准入依据。同批加两条名册自检（名册里不得有已不存在的路径、不得与 fileOverrides 重叠）与一条机械回归「手工往生成物里塞一条新文件 MUST NOT 让它被当成已裁决」。注入验证：同样的手工塞入现在让 AC-BOUND-01 当场红 -->
 <!-- 补充实测 aidcp-cloud e8c0e04（2026-07-23，四条注入均已撤销）：① 同时在 src/publish-agent/（§4.7 逐文件切分）与 src/risk/（§4.7 单层）各建一个空文件 → `npm run boundaries:refresh` 退出码 1，只报 publish-agent 那个「待人工裁决」，risk 那个正常继承 automation——证明「逐文件切分目录不替人判、单层目录才继承」这条判据两侧都成立；未裁决时 AC-BOUND-01 同步变红。② 在 src/llm/qwen.ts（content）注入 import '../risk/risk-controller.js'（automation）→ refresh 拒绝并列出该条、给出三条处置（先查归属是否填错 / 修掉 / 走 raises 通道）。③ 带 `--raise=<change>:1:2026-09-30` 才放行，frozenTotal 274→275 且 raises[] 落三字段；`--raise=<change>:1`（缺日期）当场拒绝。④ 只 --raise 不给消除 change 时 AC-BOUND-06 仍红（「未挂消除 change 的条目数 275 高于 seed 值 274」）——即上调通道也堵不住「加豁免却不挂消除动作」 -->
-- [ ] 7.6 在控制仓跑 `openspec validate cloud-service-boundary-gates --strict`，回写 tasks 进度与 commit sha（格式 `<!-- <repo> <commit-sha> 备注 -->`）。
+- [x] 7.6 在控制仓跑 `openspec validate cloud-service-boundary-gates --strict`，回写 tasks 进度与 commit sha（格式 `<!-- <repo> <commit-sha> 备注 -->`）。
 <!-- PARTIAL：`openspec validate cloud-service-boundary-gates --strict` 已跑，输出「Change 'cloud-service-boundary-gates' is valid」，退出码 0。tasks 进度与 sha 已回写（本文件）。 -->
 <!-- BLOCKED（未完成的一半）：071252c / af05b3c / 8224c82 / 31dfab2 四个 sha 均尚未 push（本 session 按编排约定不推送、不集成），主控 rebase 到最新 master 后 sha 会变，**MUST 在集成后按实际 sha 复核回写本文件**。原注只列了前两个，8224c82 与 31dfab2 已在本文件头部与各条注释里补齐。 -->
 <!-- 2026-07-23 更新：rebase 已由主控做完，四个 sha 实际变为 071252c / af05b3c / 8224c82 / 31dfab2，另加重新基线提交 e8c0e04，共五个（见本文件头部）。五个仍**未 push**，集成后 sha 可能再变，**MUST 再复核一次**。`openspec validate cloud-service-boundary-gates --strict` 于本次改动后重跑仍输出「Change 'cloud-service-boundary-gates' is valid」、退出码 0。 -->
 <!-- 2026-07-23 第二轮审计修复后更新：新增第六个提交 620c0db（同样**未 push**）。本条仍保持未勾选——`openspec validate` 这一半已做（见上），但六个 sha 集成后仍可能再变、MUST 复核，且第 6 节的 docpatch 尚未套用。 -->
 <!-- 归档前的强制动作（本轮新增）：把 aidcp-cloud 的 boundaries/ownership-rules.json 里 seedWindow.open 改成 false —— 关掉 seed 窗口后 `--reseed` 一律拒绝，与 §12「棘轮自本 change 归档起开始计数」对齐。 -->
 <!-- 主控接手须知（可重跑收敛）：change `cloud-schema-migration-executor` 落地后 MUST 在 aidcp-cloud 跑一次 `npm run boundaries:refresh` 并把结果一起提交。预期它会先**报错**——src/schema/ 是 §4.7 里不存在的目录、生成器不替人判层，需先在 boundaries/ownership-rules.json 加规则或 fileOverride（判据引 §4.7，拿不准同样标「待定稿裁决」）；同时它把运行时 DDL 从各 store 删干净后，表全集与建表点口径会大幅下降，refresh 会自动删掉失效条目并同步下调 frozenTotal（棘轮下调恒允许、不需要任何标志）。 -->
+<!-- 2026-08-06 两半均已完成，勾选。
+
+     **第一半（sha 复核）**：七个 sha 逐条实测**全部已在 `aidcp-cloud` 的 origin/master 上**
+     （`git merge-base --is-ancestor <sha> origin/master` 逐个通过）：
+     071252c / af05b3c / 8224c82 / 31dfab2 / e8c0e04 / 620c0db / 89c286d。
+     「集成后 sha 可能再变、MUST 再复核一次」这条义务到此终结——它们已是 master 历史的一部分。
+     `openspec validate cloud-service-boundary-gates --strict` 本轮重跑仍输出 valid、退出码 0。
+
+     **第二半（归档前的强制动作）**：`boundaries/ownership-rules.json` 的 `seedWindow.open`
+     已改 true→false（aidcp-cloud cbb90d2，已 push origin/master）。
+     **负向实测证明这道闸不是装饰**：带齐全部三个标志
+     （`--reseed --seed-note=… --i-am-reseeding-the-ratchet`）跑 `npm run boundaries:refresh`
+     仍被拒绝并打出理由，工作区**零写入**（`git status --porcelain` 只剩本次那一个改动文件）。
+     改动后 `npm run test:acceptance` 189 tests / 189 pass / 0 fail。
+     此后豁免上调只剩 `--raise` 例外通道（amount / approvedByChange / eliminateBy 三字段齐备），
+     下调恒允许、无需任何标志。
+
+     **本 change 归档时的门禁终值**（两族均已清零，非「冻结待削」）：
+     import 侧 frozenTotal=0 / 条目 0（seedTotal 173，seedBasis 记 209→173 的那次下调）；
+     表写入侧 frozenTotal=0 / 条目 0。kernel 花名册 112 条，拒入名册含 protocol.ts 与 base-role.ts。 -->
