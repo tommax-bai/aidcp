@@ -8,10 +8,19 @@
 
 ## 1. 控制仓 — 换向闸（armed，本批落）
 
-- [ ] 1.1 新增 `scripts/fact-source.json`：`{"flipped": false, "frozenCloudRef": null, "flippedAt": null}`，附一行注释性字段说明它由本 change 的 cutover 置位。
-- [ ] 1.2 `scripts/sync-split-repos` 读标记：`flipped=true` 时 ① `--apply` / `--prune` 直接报错退出（指引到本 change）；② 默认模式转为冻结校验——`git -C ../aidcp-cloud diff --name-only <frozenCloudRef>..origin/master -- src/ migrations/` 非空即 exit 1 并列出文件。`flipped=false` 时行为逐字不变（在飞 change 还在用它）。
-- [ ] 1.3 `scripts/task-preflight` 读标记：`flipped=true` 时新增检查——cloud 本地 checkout 的 `src/` `migrations/` 相对 frozenCloudRef 有 diff（含未提交）即 exit 1，输出「事实源已翻转，改到派生仓」。
-- [ ] 1.4 变异验证两道闸（scratch 里翻开标记 + 故意改一个 cloud src 文件 → 两道闸都必须真的红；翻回确认绿；把验证过程记在本条注释里）。法条：闸恒真＝闸不在。
+- [x] 1.1 新增 `scripts/fact-source.json`：`{"flipped": false, "frozenCloudRef": null, "flippedAt": null}`，附一行注释性字段说明它由本 change 的 cutover 置位。
+<!-- aidcp 2e476740 -->
+- [x] 1.2 `scripts/sync-split-repos` 读标记：`flipped=true` 时 ① `--apply` / `--prune` 直接报错退出（指引到本 change）；② 默认模式转为冻结校验——`git -C ../aidcp-cloud diff --name-only <frozenCloudRef>..origin/master -- src/ migrations/` 非空即 exit 1 并列出文件。`flipped=false` 时行为逐字不变（在飞 change 还在用它）。
+<!-- aidcp 2e476740。标记从脚本自身目录读、不受 AIDCP_CODES_ROOT 影响（标记与读它的代码必须同版本）；
+     frozenCloudRef 先 rev-parse 验存在，不存在时响亮失败而非静默通过。 -->
+- [x] 1.3 `scripts/task-preflight` 读标记：`flipped=true` 时新增检查——cloud 本地 checkout 的 `src/` `migrations/` 相对 frozenCloudRef 有 diff（含未提交）即 exit 1，输出「事实源已翻转，改到派生仓」。
+<!-- aidcp 2e476740。覆盖三种漂移：已提交（diff ref）、未提交（diff 工作区）、未跟踪（ls-files --others）。
+     cloud 未 clone 时 SKIP（与本闸其余检查同待遇）。 -->
+- [x] 1.4 变异验证两道闸（scratch 里翻开标记 + 故意改一个 cloud src 文件 → 两道闸都必须真的红；翻回确认绿；把验证过程记在本条注释里）。法条：闸恒真＝闸不在。
+<!-- 2026-08-06 实测四个变异全部按预期响：① flipped + 落后 30 提交的 frozenCloudRef → census exit 1、
+     列出 54 个受冻结文件；② flipped + --apply → 拒绝 exit 2；③ flipped + frozenCloudRef=当前头 →
+     census exit 0「冻结校验通过」；④ 本地给 cloud src/server.ts 追加一行 → task-preflight exit 1
+     并点名文件，revert 后 exit 0。翻回 flipped=false 后 census / preflight 行为与基线逐字一致。 -->
 
 ## 2. 共享包版本化（并行流 A，本批落）
 
