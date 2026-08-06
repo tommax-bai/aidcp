@@ -67,7 +67,11 @@
 - [x] 2.4 自证幂等：`--apply` 后立刻再跑一次对账，MUST 报零差异；三个派生仓 `git status --porcelain` 在第二次 apply 后 MUST 为空。
 <!-- 实测：`--apply` 后复跑对账，三仓均报「新增 0 · 内容不同 0 · 多出 0 · 有意不纳管 9」；
      三仓 `git status --porcelain` 均为空。 -->
-- [ ] 2.5 在 `docs/cloud-cross-service-coupling-resolution.md`（或同批执行清单）里记一句：`scripts/` 自本 change 起是派生物，MUST NOT 手工改派生仓里的它。
+- [x] 2.5 在 `docs/cloud-cross-service-coupling-resolution.md`（或同批执行清单）里记一句：`scripts/` 自本 change 起是派生物，MUST NOT 手工改派生仓里的它。
+<!-- 落点改为 `docs/cloud-composition-root-trisection.md` 新增 §0.0.4，与它已有的 §0.0.3
+     「迁移文件不在同步脚本范围内」同族同形——同一份文档、同一类缺陷（某个目录没人管），
+     放一起才能被同一个人一眼读到。一并写进该节的还有那条更危险的第二层：路径默认值指向包内、
+     漏传的后果是读到零条迁移而非报错，而契约门会把「零条」判成通过。 -->
 
 ## 3. aidcp-cloud — 执行范围与账本范围拆开
 

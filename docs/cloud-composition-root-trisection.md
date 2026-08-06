@@ -205,6 +205,27 @@ enforce 但没注入读口时**降级为无谓词 upsert 并在组装根与 stor
 >
 > 下面保留原始记录供追溯。
 
+### 0.0.4 ✅ 已补：`scripts/` 不在同步脚本范围内（迁移命令因此三仓全断）
+
+> **2026-08-06 已补**（change `restore-derived-migration-executability`）。
+> 同步脚本此前覆盖 `src/` 与 `test/`、对 `migrations/` 只报不改，**完全不覆盖 `scripts/`**。
+> 三仓的 `scripts/` 是拆仓当日手工搬过去的，之后再没有任何工具看过它。
+>
+> **代价**：三仓 10 个脚本里 **9 个**的相对 import 指向本仓不存在的路径
+> （`../src/kernel/**` 已搬进包、`../src/schema/**` 判归 automation 独占）。其中
+> `scripts/migrate.ts` 是唯一被 `package.json` 引用的（`npm run migrate`），
+> **它断掉意味着三个正在跑的服务谁都执行不了数据库迁移，唯一能跑的是按 §8.0 永不部署的
+> `aidcp-cloud`** ——即部署流程里「restart 之前跑迁移状态检查」那一步在派生形态下做不到。
+>
+> **自本 change 起，派生仓的 `scripts/` 是派生物，MUST NOT 手工修改**：改事实源
+> `aidcp-cloud/scripts/`，再跑同步。点名清单为 `SCRIPT_MEMBERS`（起手只有 `migrate.ts`）；
+> `SCRIPT_UNMANAGED`（`db-split/` 与字体子集脚本）有意留着、永不 `--prune`，与「多出」分开报。
+>
+> 顺带坐实的第二层，**比 import 那层更危险**：`migrationsDir()` / `tableOwnershipPath()`
+> 的默认值按「模块文件往上两级」解析，装进共享包后指向包自己的目录。
+> import 断了是响亮失败，路径默认值错了是**读到零条迁移**，而契约门会把「零条」判成通过。
+> 消费方 MUST 显式传入自己的目录——现已改为取自脚本自己的仓根，四仓逐字同解。
+
 `scripts/sync-split-repos` 明确「只管 `src/` + package.json 的 kernel pin」，
 所以每加一条迁移，都要**按表属主手工放进对应的 sub-repo**（本次 `0079` 手工放进了 `aidcp-automation/migrations/`）。
 
