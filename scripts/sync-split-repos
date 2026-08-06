@@ -78,6 +78,12 @@ TRANSPORT_MEMBERS = [
     'src/schema/pg-catalog.ts',
     'src/schema/ddl-scan.ts',
     'src/schema/ddl-objects.ts',
+    # 2026-08-06 追加（change restore-derived-migration-executability）：`migrate verify` 的对象探测器。
+    # 准入逐条复核过：零属主表 SQL（只查 pg_indexes / pg_constraint 两个系统目录），
+    # 且它的两个依赖 migration-plan.ts / pg-catalog.ts 本来就在本清单里。
+    # 漏掉它的后果不是编译错，而是 **api 与 content 的迁移 CLI 整个起不来**——它俩没有本地
+    # src/schema/（该目录判归 automation 独占），migrate.ts 却要 import 它。
+    'src/schema/schema-inspect.ts',
     'src/transport/internal-http.ts',
     'src/transport/image-model-selection-http.ts',
     'src/transport/account-platform-http.ts',
@@ -220,6 +226,45 @@ TRANSPORT_MEMBERS = [
 # 它们是 automation 的私有实现（outbox 表是 automation 属主、账号投影写 automation 库），
 # 进包会让另外两家能直接 import 别人的表。**「在 src/transport/ 目录下」不是准入判据。**
 TRANSPORT_REPO = 'aidcp-transport'
+
+# 三个业务仓的 `scripts/` —— **逐文件点名**，范式同 TRANSPORT_MEMBERS。
+#
+# 为什么需要它（change restore-derived-migration-executability，2026-08-06）：
+# 本脚本此前覆盖 src/ 与 test/、对 migrations/ 只报不改，**完全不覆盖 scripts/**。
+# 三仓的 scripts/ 是拆仓当日手工搬过去的，之后再没有任何工具看过它——实测三仓 10 个脚本里
+# **9 个的相对 import 指向本仓根本不存在的路径**（`../src/kernel/**` 已搬进 aidcp-kernel 包，
+# `../src/schema/**` 判归 automation 独占故 api / content 无本地副本）。其中 `migrate.ts`
+# 是唯一被 package.json 引用的（`npm run migrate`），**它断掉的直接后果是：三个正在跑的服务
+# 谁都执行不了数据库迁移，今天唯一能跑迁移的是按 §8.0 永不部署的 aidcp-cloud。**
+#
+# 只点 migrate.ts 一个：其余 9 个（generate-* / run-migration / verify-* / schema-table-census /
+# build-font-subset）零 package.json 引用、且当前全部处于断裂状态——它们不是「派生仓要用的工具」，
+# 是搬家时顺手拷过去的残留。清单外的文件由 --prune 删除；日后确需某个，往本清单加一行即可。
+SCRIPT_MEMBERS = ['scripts/migrate.ts']
+
+# 清单外但**有意留着、永不 --prune**的（前缀匹配）。与「多出」分开报，否则每次运行都刷一屏
+# 噪声，真正该删的那几条会被淹掉。
+SCRIPT_UNMANAGED = (
+    # 一次性运维脚本：Block③ 物理拆库当时的库间拷贝与核验 runbook。已执行完毕，留作追溯。
+    'scripts/db-split/',
+    # 字体子集生成器（content 的文字卡用）。不读 migrations/、不连库，留着无害。
+    'scripts/build-font-subset.py',
+)
+
+# 清单外且**不在 SCRIPT_UNMANAGED 里**的，一律判「多出」并由 --prune 删除。今天落在这一类的
+# 7 个 .ts 脚本不是「暂时没纳管」，是**留着有害**：
+#   · generate-migration-headers.ts —— 它 `writeFile(migrationsDir()/...)` **写回迁移文件**，
+#     而派生仓的 migrations/ 只有本属主那一份子集（实测 api 70 / automation 58 / content 20，
+#     事实源 110）。在派生仓跑一次，就会按不完整的集合重算头声明并**改写已应用的迁移**——
+#     改字节即校验和不符，那个库的迁移命令当场全停。
+#   · generate-ddl-allowlist / generate-db-scope-inventory / schema-table-census —— 同样按
+#     migrations/ 与 src/ 的子集产出清单，结论必然与事实源不同，而两边都不会报错。
+#   · run-migration.ts —— 无账本的迁移旁路（事实源仓保留是有意为之，见 CLAUDE.md）；
+#     派生仓多一份等于多一条能绕开账本的路。
+#   · verify-bot-chats / verify-pg-connection —— 诊断工具，当前 import 已断。
+# 这 7 个今天**全部处于断裂状态且零 package.json 引用**，删除不损失任何可用能力。
+# 日后确需其中某个，往 SCRIPT_MEMBERS 加一行即可（届时须先解决「只有子集」这个前提）。
+
 # 组装根：三个业务仓今天各有一份逐字节副本；批次 2/3/4 会各自改写成自己的 main()。只报不改。
 COMPOSITION = {'src/server.ts', 'src/index.ts'}
 # 派生仓可把手写入口再拆成仓私有的 composition helper；它没有 Cloud fact-source
@@ -490,6 +535,41 @@ def rewrite_kernel_imports(text: str, kernel_paths: set[str], src_file: str) -> 
         rel = as_ts[len('src/'):]
         rel = rel[: -len('.ts')] + '.js'
         return f'{m.group("kw")}{quote}aidcp-kernel/{rel}{quote}'
+
+    return re.sub(
+        r'(?P<kw>\bfrom\s+|\bimport\s+)(?P<q>[\'"])(?P<spec>[^\'"]+)(?P=q)', repl, text
+    )
+
+
+def rewrite_shared_imports(text: str, kernel_paths: set[str], src_file: str) -> str:
+    """kernel + transport 两个共享包的相对 import 一起改写成包说明符。
+
+    只给 `scripts/` 用。`src/` 那边**不用**这条：三个业务仓的 src 各自持有自己属主层的
+    文件，跨属主的相对 import 正是要留着让编译器报出来的断裂（见 rewrite_kernel_imports）。
+    而 `scripts/migrate.ts` 三家一模一样、且要用的东西全在两个共享包里，没有「留着报错」的余地。
+
+        `../src/kernel/pg-owner-connection-resolver.js` → `aidcp-kernel/kernel/pg-owner-connection-resolver.js`
+        `../src/schema/migration-files.js`              → `aidcp-transport/schema/migration-files.js`
+
+    **automation 也走包说明符**，尽管它本地有一份 `src/schema/`：三仓产出同一份文件，
+    差异化改写等于给同一个脚本留两种形态，而两种形态的漂移没有任何工具会报。
+    """
+    transport_paths = set(TRANSPORT_MEMBERS)
+
+    def repl(m: re.Match[str]) -> str:
+        quote, spec = m.group('q'), m.group('spec')
+        if not spec.startswith('.'):
+            return m.group(0)
+        target = os.path.normpath(os.path.join(os.path.dirname(src_file), spec))
+        as_ts = target[: -len('.js')] + '.ts' if target.endswith('.js') else target
+        if as_ts in kernel_paths:
+            pkg = 'aidcp-kernel'
+        elif as_ts in transport_paths:
+            pkg = 'aidcp-transport'
+        else:
+            return m.group(0)
+        rel = as_ts[len('src/'):][: -len('.ts')] + '.js'
+        return f'{m.group("kw")}{quote}{pkg}/{rel}{quote}'
 
     return re.sub(
         r'(?P<kw>\bfrom\s+|\bimport\s+)(?P<q>[\'"])(?P<spec>[^\'"]+)(?P=q)', repl, text
@@ -933,6 +1013,12 @@ def main() -> int:
     if (not args.repo) or TRANSPORT_REPO in (args.repo or []):
         exit_code = sync_transport(args, own, kernel_paths, shared_heads) or exit_code
 
+    selected_script_repos = set(REPOS) - {KERNEL_REPO} if not args.repo else (
+        set(args.repo) & (set(REPOS) - {KERNEL_REPO})
+    )
+    if selected_script_repos:
+        exit_code = sync_scripts(args, kernel_paths, selected_script_repos) or exit_code
+
     if args.tests:
         selected_test_repos = set(REPOS) if not args.repo else set(args.repo) & set(REPOS)
         exit_code = sync_tests(
@@ -942,6 +1028,62 @@ def main() -> int:
     if exit_code and not args.apply:
         print('存在差异。--apply 可同步（组装根除外）；组装根的差异须人工判断。')
     return 0 if args.apply else exit_code
+
+
+def sync_scripts(args, kernel_paths, selected_repos: set[str]) -> int:
+    """三个业务仓 `scripts/` 的对账 / 同步：逐文件点名（SCRIPT_MEMBERS），三仓产出同一份。
+
+    与 src/ 段的两处**有意不同**：
+      ① 改写用 rewrite_shared_imports（kernel + transport 一起），不是只改 kernel ——
+         `scripts/migrate.ts` 要用的东西全在两个共享包里，留一条断裂就等于命令起不来；
+      ② 三仓不做差异化：automation 本地虽有 src/schema/，也照样走包说明符（理由见改写器注释）。
+    """
+    exit_code = 0
+    print(f'=== scripts/（逐文件点名 {len(SCRIPT_MEMBERS)} 个）===')
+    for repo in sorted(selected_repos):
+        path = os.path.join(CODES, repo)
+        if not os.path.isdir(path):
+            print(f'  {repo}: SKIP（本机未 clone）')
+            continue
+        tracked = {f for f in git(path, 'ls-files').split() if f.startswith('scripts/')}
+        unmanaged = sorted(f for f in tracked if f.startswith(SCRIPT_UNMANAGED))
+        actual = tracked - set(unmanaged)
+        expected = set(SCRIPT_MEMBERS)
+        add, remove, changed = sorted(expected - actual), sorted(actual - expected), []
+        for rel in sorted(expected & actual):
+            want = rewrite_shared_imports(git(CLOUD, 'show', f'{args.ref}:{rel}'), kernel_paths, rel)
+            with open(os.path.join(path, rel), encoding='utf8') as fh:
+                if fh.read() != want:
+                    changed.append(rel)
+        print(
+            f'  {repo}: 新增 {len(add)} · 内容不同 {len(changed)} · 多出 {len(remove)}'
+            f' · 有意不纳管 {len(unmanaged)}'
+        )
+        for rel in add + changed:
+            print(f'   {"+" if rel in add else "~"} {rel}')
+        for rel in remove:
+            print(f'   ! {rel}（不在点名清单；--prune 才会删）')
+        if add or changed or remove:
+            exit_code = 1
+        if args.apply:
+            for rel in add + changed:
+                want = rewrite_shared_imports(git(CLOUD, 'show', f'{args.ref}:{rel}'), kernel_paths, rel)
+                dst = os.path.join(path, rel)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                with open(dst, 'w', encoding='utf8') as fh:
+                    fh.write(want)
+            pruned = 0
+            if args.prune:
+                for rel in remove:
+                    # 同 src/ 段：判据是「文件是否还在」，不是「这一次是不是我删的」。
+                    try:
+                        os.remove(os.path.join(path, rel))
+                        pruned += 1
+                    except FileNotFoundError:
+                        pass
+            print(f'  → 写入 {len(add) + len(changed)} 个文件' + (f'，删除 {pruned} 个' if args.prune else ''))
+    print()
+    return exit_code
 
 
 def sync_transport(args, own, kernel_paths, shared_heads) -> int:
