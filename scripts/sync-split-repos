@@ -1044,6 +1044,13 @@ def main() -> int:
         print(f'ERROR: aidcp-cloud 里没有 ref {args.ref}（先 git fetch？）', file=sys.stderr)
         return 2
 
+    # 与标记无关的硬封（5.5）：cloud 在该 ref 上已无 src/ ＝ 重放时代结束。就算有人把
+    # fact-source.json 翻回 false，也绝不允许对着空源码树跑写入——那会把「空」当成事实同步出去。
+    if (args.apply or args.prune) and not git(CLOUD, 'ls-tree', '--name-only', args.ref, '--', 'src').strip():
+        print(f'ERROR: aidcp-cloud@{args.ref} 已无 src/（cutover 完成态）：重放已永久退役，'
+              '--apply / --prune 不再可用。改动请直接落对应派生仓。', file=sys.stderr)
+        return 2
+
     fact = load_fact_source()
     if fact.get('flipped'):
         if args.apply or args.prune:
