@@ -4344,3 +4344,18 @@ OL 在跑构建 `KNOWN_MAX < 0116`，账本一旦出现 0116，OL 下次重启�
 - [ ] **手动通道即时性**：客户端「解除受限」在满窗前照常立即生效，不等 N 小时
 - [ ] 后台改 recoveryHours（如 72→24）后,已受限账号的剩余等待与扫描判窗即刻按新窗口走（无需重启）
 - [ ] 手动受限（manual_restrict,无信号时间戳）的账号不被秒恢复——从进入受限时刻起足额等满窗口
+
+## 簇 150 · 词汇批 4 平台段命令真机验收（platformize-browse-vocabulary，2026-08-07）
+
+> **前置环境**：出包装机后的新客户端 + dev 云端（automation `feeab71` 已部署）。
+> **与簇 148/149 同一次出包**：批 1–3 + 身份闸换血 + 问现状 + 本批 22 条新名全在同一个待出的包里。
+> ⚠️ **出包装机前 dev 车队浏览停摆**（云端已发新名、旧客户端 fail-closed 拒收，属预期切换窗口）——本簇优先级高于常规。
+
+- [ ] 新客户端连 dev 后浏览闭环恢复：`xiaohongshu.feed.scroll` / `xiaohongshu.note.open` 正常执行有回执，无 `operation_unclassified`。
+- [ ] FB 会话浏览恢复：`facebook.feed.scroll` / `facebook.note.open`；Reels 会话走 `facebook.reels.scroll`（进入 + 逐条推进）。
+- [ ] 平台段闸真机命中一次拒收路径（如向 xhs 会话手发 facebook.* 观察 `platform_mismatch` 诊断），确认拒因精确、不落 unclassified。
+- [ ] 跨面诚实失败：FB 会话在 feed 上收 `facebook.reels.scroll` 推进型（或反向）回 `surface_mismatch_*` 而非静默滚另一面。
+- [ ] 通知巡视整链在新名下走通（`xiaohongshu.notification.*` 五条 + excursion 恢复链收敛）。
+- [ ] FB 群评论链（首帖探测内部分解路径）不受 `browse_next` 删除影响：`facebook.note.open{selection:'first_commentable_group_post'}` 正常出首帖。
+- [ ] 搜索链两平台各一次（`{p}.search.execute` + `{p}.search.scroll` 回执关联正常）。
+- [ ] mirror-unknown 窗自然收尾不被扣（kernel v0.1.2 豁免名单）：难以主动制造，日常观察 `client_environment_automation_gate` 拒绝计数不含 note.close 即可。
