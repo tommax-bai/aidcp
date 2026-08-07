@@ -22,6 +22,6 @@
 
 ## 4. 收尾
 
-- [ ] 4.1 各仓 commit / push；本文件回写 sha
-- [ ] 4.2 探明 dev ECS 现状（AIDCP_SCHEMA_GATE 模式、三服务运行形态）后按派生服务部署机制部署 dev 并健康检查
-- [ ] 4.3 `openspec validate schema-gate-expand-ahead-pass --strict` 通过
+- [x] 4.1 各仓 commit / push；本文件回写 sha <!-- aidcp-transport 6b4be41(+tag v0.1.5) / aidcp-automation 6301f3d / aidcp-api fa4b903 / aidcp-content 9cf92aa，全部已推 origin/master -->
+- [x] 4.2 dev 部署完成并逐服务健康检查 <!-- 2026-08-07 deployed。探明现状：三派生服务 active、AIDCP_SCHEMA_GATE=enforce（三份 .env 均显式 enforce）。逐服务：备份 tar（automation.bak.20260807-105159 / api.bak.20260807-105333 / content.bak.20260807-105447）→ rsync（--exclude .env/node_modules/.git；api、content 另随包送 node_modules/aidcp-transport@0.1.5，ECS 装不了私有 git 依赖）→ automation stop-then-start、api/content restart → 三服务 active + 启动日志契约门通过行 + 8787/8090 在听。无新迁移，未动账本。文档同步：docs/deployment-environments.md 的 Schema Contract Gate 节与 Rollback 第 5 步已改为分类判定口径 -->
+- [x] 4.3 `openspec validate schema-gate-expand-ahead-pass --strict` 通过

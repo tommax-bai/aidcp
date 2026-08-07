@@ -246,7 +246,7 @@ or a future ol domain. Packaged edge releases intended for ol must not silently 
 2. `systemctl stop aidcp-<svc>.service`。automation 是风控单写者：**必须 stop-then-start，绝不滚动 / 蓝绿**（见 Invariants）。
 3. 先把现行 `.env` 拷到一旁，解包备份覆盖 `/opt/aidcp/<svc>/`，再放回现行 `.env` 并核对——`rsync` 部署一直 `--exclude .env`，但 tar 备份是全目录打包、可能带旧 `.env`，以放回的现行版为准。
 4. `systemctl start aidcp-<svc>.service` + 完整 healthcheck（`active`、该服务端口、启动日志里 schema 契约门**通过行**）。
-5. **账本超前陷阱**：回退到旧构建后若迁移账本超前，服务会 fail-closed 拒启——这是预期行为，放行必须走 `AIDCP_ALLOW_SCHEMA_AHEAD=<具体版本id>` 逐次显式放行并记录（见 Schema Contract Gate）。
+5. **账本超前陷阱**：回退到旧构建后若迁移账本超前，处置分两档（change `schema-gate-expand-ahead-pass`，2026-08-07 起）：超前条目**全部为 expand** 时门自动放行并打告警，无需人工干预；**含 contract 或类别不明**时 fail-closed 拒启，放行必须走 `AIDCP_ALLOW_SCHEMA_AHEAD=<具体版本id>` 逐次显式放行并记录（见 Schema Contract Gate）。⚠ 回退目标构建若**早于该 change**（transport < v0.1.5 / automation < 6301f3d），它仍是旧行为：任何超前一律拒启、一律要人工放行。
 6. 只动这一个服务，其余两个不碰；绝不碰 dev 同机 `isales`。
 
 单体 `aidcp-cloud.service` 两环境均已 disabled；重新 enable 是**用户显式决定的最后手段**（CLAUDE §8.0），并将随 change `invert-split-fact-source` 的 cutover 正式日落（届时 cloud 仓已无源码，此路彻底关闭；最后一份单体备份包留档至日落日期）。截至 2026-08-06 逐服务回滚未做整链演练（登记在该 change 任务 7.1，等 cutover 窗口一并做，避免在 fleet 活跃时段重启 dev 服务）。
@@ -257,7 +257,7 @@ or a future ol domain. Packaged edge releases intended for ol must not silently 
 
 - 模式由 `AIDCP_SCHEMA_GATE=warn|enforce` 控制，**当前默认 `warn`**：判定照做、结论照打，暂不拒绝启动。跑满一个发布周期并覆盖一次 ol 部署后切 `enforce` 并把默认值改为 `enforce`。
 - **`enforce` 之后，账本落后于代码会直接表现为服务启动失败。这是预期行为**，处置是**补跑迁移**；MUST NOT 关闭契约门、MUST NOT 回滚代码来掩盖。
-- 账本**超前**于代码（回滚到旧构建的典型场景）同样拒绝启动。放行通道 `AIDCP_ALLOW_SCHEMA_AHEAD` **必须填具体版本 id**，布尔值 / 空串 / 通配值一律视为未放行；不存在「一次开启即永久生效」的形态。共库期 dev 应用一条新 expand 迁移后，ol 上的旧构建会观察到超前——这不是误报，是必须逐次显式放行并记录的事实。
+- 账本**超前**于代码时**按迁移类别分类判定**（change `schema-gate-expand-ahead-pass`，2026-08-07 起；此前一律拒绝）：门从账本读每条超前迁移的 `kind`——**全部为 expand ⇒ 放行启动**，结论明说「扩张类超前放行」并进启动期告警（放行 ≠ 没事，该构建已落后于库、应尽快部署新构建）；**含 contract、或 kind 缺失/非法/读不到 ⇒ 拒绝启动**（分类失败绝不成为放行理由）。共库期 dev 应用一条新 expand 迁移后，ol 上带新门的旧构建重启会自动放行并告警，不再需要逐条人工放行；**尚未带上新门的更旧构建仍是旧行为**。人工放行通道 `AIDCP_ALLOW_SCHEMA_AHEAD` 语义不变，作含 contract 超前时的兜底：**必须填具体版本 id**，布尔值 / 空串 / 通配值一律视为未放行；不存在「一次开启即永久生效」的形态。收缩迁移对**运行中**旧进程的破坏不经过启动、门管不到，其安全仍靠共库收缩流程（先让全部环境代码不再碰目标对象，再收缩）。
 - **部署验收信号新增一条**：restart 之后除服务状态、`8787`、panel `8090`、PostgreSQL、飞书之外，还 MUST 在启动日志里确认出现 schema 契约门的**通过行**（含账本最高版本 id，形如 `[aidcp-cloud] schema 契约门（warn） schema 契约门通过：账本最高版本 <version>`）。仅确认进程 `active (running)` MUST NOT 被视为通过。
 
 ## Automation Writer Lock
