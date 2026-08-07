@@ -55,12 +55,12 @@
 
 - [x] 5.1 部署 `dev`（§5 安全序列：备份 `automation.bak.<ts>.<tag>.tar.gz` → rsync → restart → healthcheck active/NRestarts=0/8787/零 error）。**绝不碰 aidcp-cloud 单体与 isales。**
 - [x] 5.2 部署后观察日志：新名命令 `platform_mismatch`/`operation_unclassified` 拒收计（旧客户端 fail-closed 属预期）；无其他新增 error。
-- [ ] 5.3 **提请用户出包装机**（切换窗口连续完成的另一半；打包动作用户显式触发，不自动执行）；真机验收项登记 `docs/real-machine-acceptance-backlog.md`（并入现有边缘出包簇）。
+- [x] 5.3 **提请用户出包装机**（切换窗口连续完成的另一半；打包动作用户显式触发，不自动执行）；真机验收项登记 `docs/real-machine-acceptance-backlog.md`（并入现有边缘出包簇）。
 
 ## 6. spec delta 机械批
 
-- [ ] 6.1 脚本化生成纯名字改名 delta，覆盖（以归档时 grep 实测为准）：command-pacing、native-facebook-behavior-parity、facebook-scheduled-comment、browse-loop-resilience、edge-companion-ui、concept-pool-search、author-profile-visit、note-extraction-fidelity、interaction-risk-gating、session-auto-resume、platform-search-activity、platform-runtime-abstraction、native-xiaohongshu-behavior-parity、native-facebook-view-activity、interaction-cooldown、facebook-reels-navigation、facebook-group-membership、edge-task-execution-coordination、comment-interaction、accounts-master-data、account-identity-resolution、native-page-engine、facebook-identity、facebook-group-join-resilience、curated-note-actions、console-panel-api、comment-search-command、captcha-incident-handling、facebook-scheduled-comment 等；逐条人审「机械改名 vs 语义变化」，语义变化升级为手写 delta。
-- [ ] 6.2 归档前对当时最新 spec 文本重生成一遍（防并行 change 的 delta 撞车），`openspec validate platformize-browse-vocabulary --strict` 过。
+- [x] 6.1 脚本化生成纯名字改名 delta，覆盖（以归档时 grep 实测为准）：command-pacing、native-facebook-behavior-parity、facebook-scheduled-comment、browse-loop-resilience、edge-companion-ui、concept-pool-search、author-profile-visit、note-extraction-fidelity、interaction-risk-gating、session-auto-resume、platform-search-activity、platform-runtime-abstraction、native-xiaohongshu-behavior-parity、native-facebook-view-activity、interaction-cooldown、facebook-reels-navigation、facebook-group-membership、edge-task-execution-coordination、comment-interaction、accounts-master-data、account-identity-resolution、native-page-engine、facebook-identity、facebook-group-join-resilience、curated-note-actions、console-panel-api、comment-search-command、captcha-incident-handling、facebook-scheduled-comment 等；逐条人审「机械改名 vs 语义变化」，语义变化升级为手写 delta。
+- [x] 6.2 归档前对当时最新 spec 文本重生成一遍（防并行 change 的 delta 撞车），`openspec validate platformize-browse-vocabulary --strict` 过。
 
 ## 7. 归档
 
@@ -85,4 +85,9 @@
 - **变异验证实录**：白名单删 `facebook.reels.scroll` 首轮未被抓住 → 补 22 条逐条路由断言后红/绿循环闭合；
   manifest 删一条 edgeTypes 即红。全量最终口径：edge 3217/0 + acceptance 40/0 + gate:native；automation 2357/0 + acceptance 297/0。
 - **AC-PROTO-02 计数 95→103**（交接文档「改名计数不变」预判有误：平台变体展开净 +8）。
-- **切换窗口现状**：dev 云端已发新名，旧客户端 fail-closed 拒收（预期）；**dev 车队浏览停摆直至出包装机**（5.3 待用户触发）。
+- **切换窗口现状**：dev 云端已发新名，旧客户端 fail-closed 拒收（预期）；**dev 车队浏览停摆直至出包装机**——已提请用户，打包待用户显式触发（真机簇 150 已登记 backlog）。
+- **spec delta 批实录（2026-08-07 归档前生成）**：30 个 capability delta（4 手写语义 + 26 机械改名，三路 agent 并行生成、各自反向改名 diff 自检）；
+  三查校验（头行逐字存在 / 覆盖完备 / 旧名残留审阅）零问题；两处有意保留的历史注记（browse-loop-resilience 旧点号形态说明、
+  edge-companion-ui 历史 profile.open 注记）。两处升级为语义修订并人工定稿：platform-runtime-abstraction「协议语义平台无关」
+  按平台段编法翻转措辞；browse-loop-resilience「Legacy dotted completion」场景对象换成新名误报形态（旧键随直接切换删除，
+  旧点号回执结构性不再出现）；edge-companion-ui 的 FB 就地读场景前提改为现役 `identity.read_current`。
