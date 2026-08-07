@@ -31,7 +31,7 @@ The repository is independent from AIDCP Edge, Cloud, Console, databases, and de
 - Falling back automatically from an official API to Chromium, or retrying an ambiguous write through another transport.
 - Supporting media replies, proactive outbound marketing, bulk actions, historical-message auto-replies, or accounts other than those explicitly authorized by the operator.
 - Sharing runtime state or credentials with AIDCP services.
-- Deploying the service, using a real Douyin account, or asserting real-platform acceptance as part of this change.
+- Deploying `private_web`, using a real Douyin account, or asserting real-platform acceptance as part of this change. A separately authorized DEV deployment MAY expose only the offline Fixture with its platform boundary visible.
 
 ## Decisions
 
@@ -142,7 +142,13 @@ Selecting an experimental real adapter is an explicit startup choice. Real write
 
 Alternative considered: make the real adapter default when credentials exist. This risks an imported environment variable turning a source-validation run into a platform action.
 
-### 11. Project state through a compact operations UI
+### 11. Deploy a separately authorized Fixture without sharing AIDCP runtime
+
+The follow-up DEV deployment uses an independent system user, release directory, Node.js 24 runtime, environment file, SQLite database, loopback port, systemd unit, and exact Nginx path prefix. It reuses only the existing DEV TLS hostname and MUST NOT replace the host root route, expose the application port publicly, import AIDCP state, or enable a real Douyin adapter. The public page and readiness response continue to identify Fixture mode and `REAL_WRITES_ENABLED=false`.
+
+The deployment release and sensitive configuration are backed up before the Nginx change. A failed service, route, readiness, origin, SSE, persistence, or existing-service check requires restoring the prior Nginx file and stopping the new unit; it does not justify touching the video demo, AIDCP, or isales services.
+
+### 12. Project state through a compact operations UI
 
 The UI exposes account identity, authorization/reauthorization state, direct-message WS health, comment-read health and cursor time, configured comment capability, automation stop/run state, inbound timeline, generated draft, and terminal delivery outcome. It uses domain projections rather than raw adapter responses. `submitted_unknown`, `auth_required`, schema drift, and `unavailable` remain distinct visible states.
 
@@ -171,7 +177,7 @@ This is a greenfield repository, so there is no existing production state to mig
 4. Add `chat-llm` through its adapter and test it with a local deterministic fake before any external model call.
 5. Add experimental Douyin authentication, direct-message WS, comment read, direct-message send, official comment, and bounded Chromium comment adapters behind explicit configuration. No unlicensed source is copied.
 6. Run focused tests, full tests, typecheck, build, dependency/license checks, and strict OpenSpec validation. These gates prove source consistency only.
-7. Stop after producing the local repository and documented acceptance runbook. Do not deploy, scan a real QR code, log into a real account, or issue a platform write without a separate authorization naming the account, environment, and allowed actions.
+7. Stop after producing the local repository and documented acceptance runbook. A later deployment requires separate authorization naming the environment and public boundary; real QR login or platform writes additionally require a named account and allowed actions.
 
 Rollback during development is deletion or disabling of the newly added adapter behind its port while retaining fixture mode and compatible schema migrations. Once real-account testing is separately authorized, rollback must first stop account runtimes and Chromium workers; ambiguous attempts remain `submitted_unknown` and are never replayed as part of rollback.
 
@@ -179,5 +185,5 @@ Rollback during development is deletion or disabling of the newly added adapter 
 
 - Which official Douyin application, account type, and permissions, if any, will be available for a later `official_api` acceptance run? This does not block fixture implementation; absent proof, the mode remains `unavailable`.
 - Which exact private-web request fields and WebSocket schema are currently required by Douyin? They must be captured through an authorized read-only compatibility probe before the real adapter is declared ready and must not be derived by copying unlicensed code.
-- What deployment target and attended-browser arrangement would be used if deployment is later requested? The current change intentionally makes no deployment choice.
+- Fixture deployment target is resolved as DEV under `https://dev.yytt.com.cn/douyin/`; it has no attended-browser capability. Any future real-mode deployment still requires a separately reviewed desktop/browser arrangement.
 - Which real account and bounded DM/comment targets may be used for acceptance? No account or real write is authorized by this proposal.

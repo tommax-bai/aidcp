@@ -33,5 +33,5 @@ None.
 - New local repository: `/Users/baitianxing/codes/douyin-ai-demo`; no runtime dependency on AIDCP Edge, Cloud, Console, databases, or deployment services.
 - New Node.js 24, TypeScript, Fastify, SQLite, WebSocket, Playwright, and OpenAI-compatible chat dependencies isolated to the standalone repository.
 - Real mode touches undocumented Douyin web interfaces and therefore remains experimental, schema-checked, and fail-closed. The default fixture mode performs no platform login or write.
-- Comment writes require either operator-provided official application permission or a local headed Chromium executable. No deployment or real-account write is included in source validation.
+- Comment writes require either operator-provided official application permission or a local headed Chromium executable. Source validation includes no real-account write; a separately authorized follow-up deployed only the offline Fixture to DEV.
 - Community repositories without a clear license are used only as architectural evidence; no source is copied from them.

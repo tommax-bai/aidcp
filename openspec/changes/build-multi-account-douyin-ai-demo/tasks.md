@@ -45,13 +45,17 @@
 - [x] 6.4 Add isolated systemd and reverse-proxy examples without assigning a production hostname or touching AIDCP/isales services.
 - [x] 6.5 Run `npm run check`, high-severity dependency audit, Docker build when available, and `openspec validate build-multi-account-douyin-ai-demo --strict`.
 - [x] 6.6 Commit the standalone repository, fast-forward it to local `main`, and record the repository SHA and validation evidence here; do not create a remote or deploy without an explicit owner, visibility, hostname, and target.
+- [x] 6.7 After explicit DEV authorization, deploy only the offline Fixture as an isolated service at an HTTPS subpath, verify authentication, Origin enforcement, SSE, restart persistence, and existing-service isolation, and record rollback evidence.
 
 ## Validation evidence
 
-- Standalone source: `/Users/baitianxing/codes/douyin-ai-demo.wt/build-multi-account-douyin-ai-demo` on `codex/build-multi-account-douyin-ai-demo`; commit `57f67084ab36509ee52eaaeb7a413d529ef7bef4`, fast-forwarded to local `main`.
-- `npm run check`: passed on 2026-08-07 with 9 test files and 85 tests, followed by a successful TypeScript build.
+- Standalone source: `/Users/baitianxing/codes/douyin-ai-demo.wt/build-multi-account-douyin-ai-demo` on `codex/build-multi-account-douyin-ai-demo`; current local `main` is `8fd215a0a7ea90cb5ca24a0c3c7b24a110474457`. The DEV runtime release uses code commit `edc87ec4cd0b3d3fbd00f7257231b670a49e898d`; the later commit is deployment documentation only.
+- `npm run check`: passed on 2026-08-07 with 10 test files and 87 tests, followed by a successful TypeScript build.
 - `npm audit --omit=dev --audit-level=high`: passed with 0 vulnerabilities.
 - Fixture HTTP smoke: `health=200`, `ready=200`, unauthorized snapshot `401`, stale mutation `409`, simulated login and two-source baseline healthy, one held/resumed DM and one comment reached Fixture `confirmed` exactly once.
 - Docker image build: not run because the current host has no `docker` executable; Compose, Dockerfile, paths, and permissions were source-reviewed without claiming runtime proof.
-- `openspec validate build-multi-account-douyin-ai-demo --strict`: passed. No real Douyin account, remote repository, host deployment, or platform write was used.
+- DEV Fixture deployment: `https://dev.yytt.com.cn/douyin/`, `douyin-ai-demo.service`, Node.js `v24.19.0`, loopback `127.0.0.1:4320`, release `/opt/douyin-ai-demo/releases/edc87ec`, and backup `/opt/douyin-ai-demo/backups/20260807-151956-before-public`.
+- Deployment checks: public shell/assets/health/readiness `200`; unauthenticated API `401`; wrong Origin mutation `403`; authenticated Fixture account reached `active`; comment and DM baselines were healthy; one DM reached Fixture `confirmed`; authenticated SSE published a snapshot; state and timeline survived a service restart; service and Nginx remained active with zero unexpected restarts or warning/error logs.
+- Browser validation: deployed static resources resolved under `/douyin/`, the operator gate and Fixture copy rendered without horizontal overflow, and browser warning/error logs were empty. The existing video demo root, AIDCP services, isales services, and their routes were not restarted or replaced.
+- `openspec validate build-multi-account-douyin-ai-demo --strict`: passed. No real Douyin account, standalone remote repository, or platform write was used.
 - Remaining real-platform work is intentionally visible in 4.2-4.4: the shipped `private_web` runtime gate is hard-disabled until an independently sourced current DM codec, comment reader, exact DM sender, and authorized real-account validation exist.
