@@ -196,21 +196,21 @@
 
 | type | 方向 | 关联响应 | 用途 |
 | --- | --- | --- | --- |
-| `interaction.auth.status` | edge → cloud | — | 上报视频号 auth/browser/capability/identity 真态 |
-| `interaction.sync.batch` | edge → cloud | `interaction.sync.ack` | 按账号、渠道、scope 上报可重放批次 |
-| `interaction.sync.ack` | cloud → edge | — | 确认整批 accepted/duplicate/rejected；只有前两者可推进 checkpoint |
-| `interaction.reply.result` | edge → cloud | `interaction.reply.result.ack`（协商 recovery 时） | 先 durable 落盘，再回 confirmed/failed/ambiguous 真态 |
-| `interaction.reply.result.ack` | cloud → edge | — | exact accepted/duplicate 后 Edge 才清 result outbox |
-| `interaction.reply.reconcile` | cloud → edge | `interaction.reply.reconcile.result` | 启动/重连后仅核验已有 attempt，不得触发平台写 |
-| `interaction.reply.reconcile.result` | edge → cloud | — | 逐 attempt 回 result_replayed/not_found/binding_conflict |
-| `interaction.sync.request` | cloud → edge | 后续 `interaction.sync.batch` | 触发用户请求、恢复、定时或回查同步 |
-| `interaction.reply.send` | cloud → edge | `interaction.reply.result` | 下发带稳定幂等键的 text 回复指令 |
-| `interaction.auth.reopen` | cloud → edge | 后续 `interaction.auth.status` | 请求在原 Edge 打开所属登录/挑战现场 |
-| `interaction.browser.control` | cloud → edge | 后续 `interaction.auth.status` | active 会话打开可见浏览器或转回 API-only 后台；投递不等于已显隐 |
-| `interaction.runtime.controls` | cloud → edge | 后续 `interaction.auth.status` | 只向匹配账号下发单调版本的有效开关快照；投递不等于应用 |
-| `interaction.offboard.command` | cloud → edge | `interaction.offboard.result` | 撤权后停同步/写、drain、清 scope 密文并关 sidecar |
-| `interaction.offboard.result` | edge → cloud | `interaction.offboard.ack` | durable cleared/already_cleared/failed 结果，可重连补发 |
-| `interaction.offboard.ack` | cloud → edge | — | exact accepted/duplicate 后 Edge 才清 offboard outbox |
+| `wechat_channels.inbox.auth.status` | edge → cloud | — | 上报视频号 auth/browser/capability/identity 真态 |
+| `wechat_channels.inbox.sync.batch` | edge → cloud | `wechat_channels.inbox.sync.ack` | 按账号、渠道、scope 上报可重放批次 |
+| `wechat_channels.inbox.sync.ack` | cloud → edge | — | 确认整批 accepted/duplicate/rejected；只有前两者可推进 checkpoint |
+| `wechat_channels.inbox.reply.result` | edge → cloud | `wechat_channels.inbox.reply.result.ack`（协商 recovery 时） | 先 durable 落盘，再回 confirmed/failed/ambiguous 真态 |
+| `wechat_channels.inbox.reply.result.ack` | cloud → edge | — | exact accepted/duplicate 后 Edge 才清 result outbox |
+| `wechat_channels.inbox.reply.reconcile` | cloud → edge | `wechat_channels.inbox.reply.reconcile.result` | 启动/重连后仅核验已有 attempt，不得触发平台写 |
+| `wechat_channels.inbox.reply.reconcile.result` | edge → cloud | — | 逐 attempt 回 result_replayed/not_found/binding_conflict |
+| `wechat_channels.inbox.sync.request` | cloud → edge | 后续 `wechat_channels.inbox.sync.batch` | 触发用户请求、恢复、定时或回查同步 |
+| `wechat_channels.inbox.reply.send` | cloud → edge | `wechat_channels.inbox.reply.result` | 下发带稳定幂等键的 text 回复指令 |
+| `wechat_channels.inbox.auth.reopen` | cloud → edge | 后续 `wechat_channels.inbox.auth.status` | 请求在原 Edge 打开所属登录/挑战现场 |
+| `wechat_channels.inbox.browser.control` | cloud → edge | 后续 `wechat_channels.inbox.auth.status` | active 会话打开可见浏览器或转回 API-only 后台；投递不等于已显隐 |
+| `wechat_channels.inbox.runtime.controls` | cloud → edge | 后续 `wechat_channels.inbox.auth.status` | 只向匹配账号下发单调版本的有效开关快照；投递不等于应用 |
+| `wechat_channels.inbox.offboard.command` | cloud → edge | `wechat_channels.inbox.offboard.result` | 撤权后停同步/写、drain、清 scope 密文并关 sidecar |
+| `wechat_channels.inbox.offboard.result` | edge → cloud | `wechat_channels.inbox.offboard.ack` | durable cleared/already_cleared/failed 结果，可重连补发 |
+| `wechat_channels.inbox.offboard.ack` | cloud → edge | — | exact accepted/duplicate 后 Edge 才清 offboard outbox |
 
 ### 2.9 观察命令「问现状」（v2 新增，change add-state-observation-command，蓝图批 3）
 
@@ -1169,7 +1169,7 @@ first-writer-wins 审批信号。动作成功只表示审批决定已受理：`a
 本节只给出 wire 语义；字段、required、枚举、上限与条件约束的唯一机器合同是
 `docs/contracts/wechat-channels-interaction/v1/schemas/ws-v2.schema.json`，对应正常和降级样例在同目录 `fixtures/ws/`。所有时间均为 epoch milliseconds，payload 不重复 envelope 的 `type`。
 
-**`interaction.auth.status`**（edge → cloud）
+**`wechat_channels.inbox.auth.status`**（edge → cloud）
 
 ```jsonc
 {
@@ -1187,13 +1187,13 @@ first-writer-wins 审批信号。动作成功只表示审批决定已受理：`a
 
 `active + closed` 是合法组合。已有加密会话通过身份校验和已启用读取探针时，Edge 必须直接进入该 API-only 状态，不得为例行启动打开浏览器。capability 表示该账号此刻有效可用，不是 build 可能支持；`runtimeControlsVersion` 是 Edge 已接受的账号开关版本，未收到/未应用时为 `null`。身份错配、挑战、schema 漂移、scope/version 不匹配或开关关闭时必须降级且 fail closed。凭证、二维码和调试地址不得进入 payload。
 
-若加密会话不能复用、Edge 确需重新授权，且 AdsPower `browser-profile/start` 返回已核实的 profile 占用签名，Edge 必须结束 `authenticating` 并上报 `status=reauth_required`、`browserState=unavailable`、`reasonCode=INTERACTION_BROWSER_PROFILE_IN_USE`。Cloud 按普通文本 reason code 持久化并原样投影；历史读取仍可见，所有写能力保持关闭。原始占用者标识只能以掩码写入本机日志，不得进入 WS、Cloud 存储或客户 API。用户释放占用后可显式触发 `interaction.auth.reopen`；命令受理不代表恢复成功，只有后续 `active` 快照才算恢复。机器样例见 `fixtures/ws/auth-status-profile-in-use.json`。
+若加密会话不能复用、Edge 确需重新授权，且 AdsPower `browser-profile/start` 返回已核实的 profile 占用签名，Edge 必须结束 `authenticating` 并上报 `status=reauth_required`、`browserState=unavailable`、`reasonCode=INTERACTION_BROWSER_PROFILE_IN_USE`。Cloud 按普通文本 reason code 持久化并原样投影；历史读取仍可见，所有写能力保持关闭。原始占用者标识只能以掩码写入本机日志，不得进入 WS、Cloud 存储或客户 API。用户释放占用后可显式触发 `wechat_channels.inbox.auth.reopen`；命令受理不代表恢复成功，只有后续 `active` 快照才算恢复。机器样例见 `fixtures/ws/auth-status-profile-in-use.json`。
 
-**`interaction.runtime.controls`**（cloud → edge）
+**`wechat_channels.inbox.runtime.controls`**（cloud → edge）
 
-payload 与 `welcome.interactionRuntime` 相同。Cloud 只定向到 `accountId` 匹配且协商 `interaction_runtime_controls_v1` 的在线 Edge；保存成功但无在线目标时内部 API 返回 `edgeDelivery=deferred`，不得声称 Edge 已应用。Edge 断线先清快照，重连只接受 scope 完全匹配且版本不倒退的 welcome/在线更新，并用后续 `interaction.auth.status.runtimeControlsVersion` 回报已应用证据。
+payload 与 `welcome.interactionRuntime` 相同。Cloud 只定向到 `accountId` 匹配且协商 `interaction_runtime_controls_v1` 的在线 Edge；保存成功但无在线目标时内部 API 返回 `edgeDelivery=deferred`，不得声称 Edge 已应用。Edge 断线先清快照，重连只接受 scope 完全匹配且版本不倒退的 welcome/在线更新，并用后续 `wechat_channels.inbox.auth.status.runtimeControlsVersion` 回报已应用证据。
 
-**`interaction.sync.batch` / `interaction.sync.ack`**
+**`wechat_channels.inbox.sync.batch` / `wechat_channels.inbox.sync.ack`**
 
 ```jsonc
 // edge -> cloud
@@ -1218,7 +1218,7 @@ payload 与 `welcome.interactionRuntime` 相同。Cloud 只定向到 `accountId`
 
 一个 batch 只能含一个 account/env/channel/scope。Cloud 在同一事务完成 scope 校验、batch/thread/message 幂等写和 cursor 推进后才回 `accepted`；已落库重放回 `duplicate`。`rejected`、断连、部分失败或 ack cursor 不一致都不能推进 Edge checkpoint。
 
-**`interaction.sync.request`**（cloud → edge）
+**`wechat_channels.inbox.sync.request`**（cloud → edge）
 
 ```jsonc
 {
@@ -1231,7 +1231,7 @@ payload 与 `welcome.interactionRuntime` 相同。Cloud 只定向到 `accountId`
 
 后续 batch 以 payload `requestId` 关联该请求；不使用 envelope id 作为跨多个 batch 的唯一关联键。
 
-**`interaction.reply.send` / `interaction.reply.result`**
+**`wechat_channels.inbox.reply.send` / `wechat_channels.inbox.reply.result`**
 
 ```jsonc
 // cloud -> edge
@@ -1261,7 +1261,7 @@ payload 与 `welcome.interactionRuntime` 相同。Cloud 只定向到 `accountId`
 
 `confirmed` 只允许来自平台 ack 或回查证据；超时、断连、解析失败或落地无法确认必须回 `ambiguous`，不能回 `failed` 触发盲重试。v1 只允许 text，`dmSendImage` 恒 false。
 
-**`interaction.reply.result.ack` / `interaction.reply.reconcile*`**
+**`wechat_channels.inbox.reply.result.ack` / `wechat_channels.inbox.reply.reconcile*`**
 
 ```jsonc
 // cloud -> edge，envelope id 原样回填 result 的 id
@@ -1298,7 +1298,7 @@ payload 与 `welcome.interactionRuntime` 相同。Cloud 只定向到 `accountId`
 
 Edge 必须在发送 result 前写入 durable outbox，只在 ack 为 `accepted|duplicate` 且 job/attempt/idempotency/env/account/platform 全部一致时清除。断线、Cloud 崩溃、超时、`rejected` 或错绑 ack 均保留并在重连后补发。reconcile 只能读取 durable execution/result 或做平台历史核验：本地 `not_found` 绝不能转成新的平台写。Cloud 对 `created + not_found` 可明确失败；对 `dispatched|ambiguous + not_found` 必须保持 `ambiguous`；`result_replayed` 仍由正常 durable result 推进终态。
 
-**`interaction.offboard.command` / `interaction.offboard.result` / `interaction.offboard.ack`**
+**`wechat_channels.inbox.offboard.command` / `wechat_channels.inbox.offboard.result` / `wechat_channels.inbox.offboard.ack`**
 
 ```jsonc
 // cloud -> edge
@@ -1325,9 +1325,9 @@ Edge 必须在发送 result 前写入 durable outbox，只在 ack 为 `accepted|
 
 执行顺序固定为：Cloud 事务撤权/停同步写并创建 durable offboard → 为新版客户端签发短期单用途 cleanup grant → 受限 browserless core durable claim → connector stop + drain → 清 scope-bound encrypted session → 关 sidecar → durable result → Cloud exact ack → Cloud tombstone → `requestedAt + 30 days` 内 purge。`failed` 必须保留任务并重试；Edge 离线时 Cloud 只保留 pending cleanup，不得跳过凭证清理。普通 pause/close/standby/logout 不是 offboard，不得删除密文。Cloud/Edge 审计与日志都不得记录消息正文、模板最终文本或凭证。
 
-cleanup grant 由 customer-auth `DELETE /environments/:envKey` 在客户端同时提交稳定 `edgeId` 时签发，绑定 `offboardId/envKey/accountId/edgeId/userId`，默认 10 分钟有效。Electron main 可持久化 bearer，但不得投影给 renderer；恢复时经 `POST /offboarding/:offboardId/cleanup-bootstrap` 原子核验并作废。Cloud 只保存 `jti` 哈希、有效期、使用时间和审计事件。受限 core 只声明 `interaction_inbox_v1 + interaction_offboarding_v1 + browser_absent_v1`，只接受绑定的 `interaction.offboard.command/ack`。过期、复用或任一 scope 不匹配必须转人工，绝不降级到普通 `queueStartEnv` 或打开浏览器。
+cleanup grant 由 customer-auth `DELETE /environments/:envKey` 在客户端同时提交稳定 `edgeId` 时签发，绑定 `offboardId/envKey/accountId/edgeId/userId`，默认 10 分钟有效。Electron main 可持久化 bearer，但不得投影给 renderer；恢复时经 `POST /offboarding/:offboardId/cleanup-bootstrap` 原子核验并作废。Cloud 只保存 `jti` 哈希、有效期、使用时间和审计事件。受限 core 只声明 `interaction_inbox_v1 + interaction_offboarding_v1 + browser_absent_v1`，只接受绑定的 `wechat_channels.inbox.offboard.command/ack`。过期、复用或任一 scope 不匹配必须转人工，绝不降级到普通 `queueStartEnv` 或打开浏览器。
 
-**`interaction.auth.reopen`**（cloud → edge）
+**`wechat_channels.inbox.auth.reopen`**（cloud → edge）
 
 ```jsonc
 {
@@ -1337,9 +1337,9 @@ cleanup grant 由 customer-auth `DELETE /environments/:envKey` 在客户端同�
 }
 ```
 
-Edge 必须只打开该 env/account 所属 sidecar，并用后续 `interaction.auth.status` 报 `authenticating`、`active` 或挑战真态；不得把“已打开浏览器”当登录成功。
+Edge 必须只打开该 env/account 所属 sidecar，并用后续 `wechat_channels.inbox.auth.status` 报 `authenticating`、`active` 或挑战真态；不得把“已打开浏览器”当登录成功。
 
-**`interaction.browser.control`**（cloud → edge）
+**`wechat_channels.inbox.browser.control`**（cloud → edge）
 
 ```jsonc
 {
@@ -1349,7 +1349,7 @@ Edge 必须只打开该 env/account 所属 sidecar，并用后续 `interaction.a
 }
 ```
 
-该控制只服务于已经 `active` 的视频号环境：`open` 启动或保留所属 AdsPower sidecar，并尽力把页面带到前台；`close` 只关闭 sidecar、回到加密会话驱动的 API-only 后台，不删除会话，也不触发客户登出/offboard。Edge 必须校验 env/account/platform 精确匹配，并串行执行重复请求。HTTP/WS 投递成功只表示 accepted；客户端只有读回 `interaction.auth.status.browserState=open|closed` 后才能显示“已打开/已转入后台”。旧 Edge 或未协商 `interaction_browser_control_v1` 时 Cloud 必须 fail closed，不得假装已执行。
+该控制只服务于已经 `active` 的视频号环境：`open` 启动或保留所属 AdsPower sidecar，并尽力把页面带到前台；`close` 只关闭 sidecar、回到加密会话驱动的 API-only 后台，不删除会话，也不触发客户登出/offboard。Edge 必须校验 env/account/platform 精确匹配，并串行执行重复请求。HTTP/WS 投递成功只表示 accepted；客户端只有读回 `wechat_channels.inbox.auth.status.browserState=open|closed` 后才能显示“已打开/已转入后台”。旧 Edge 或未协商 `interaction_browser_control_v1` 时 Cloud 必须 fail closed，不得假装已执行。
 
 ### 3.14 观察命令「问现状」（change add-state-observation-command）
 
@@ -1475,7 +1475,7 @@ cloud（Publish Agent）          edge                         飞书（云端 B
 
 ### 4.5 视频号开发测试数据重置
 
-`interaction.sync.request.reason` 在既有 `user_requested | resume | scheduled | recovery` 基础上增加 `test_reset`。该原因只允许 Cloud 在显式 `dev` 测试开关开启、当前账号写入暂停、所选渠道没有任何发送记录，且唯一在线 Edge 同时协商 `interaction_inbox_v1` 与 `interaction_test_data_reset_v1` 后下发。
+`wechat_channels.inbox.sync.request.reason` 在既有 `user_requested | resume | scheduled | recovery` 基础上增加 `test_reset`。该原因只允许 Cloud 在显式 `dev` 测试开关开启、当前账号写入暂停、所选渠道没有任何发送记录，且唯一在线 Edge 同时协商 `interaction_inbox_v1` 与 `interaction_test_data_reset_v1` 后下发。
 
 收到 `test_reset` 后，Edge 必须在该渠道既有同步锁内先清除本地 checkpoint 与 thread-source 缓存，再从空 cursor 执行正常只读同步。Cloud 必须先清除同账号、同环境、同渠道的 inbox 副本、sync batch 与 cursor，否则稳定 batch id 会被当成 duplicate。该流程只重置 aidcp 的测试读取状态，不删除微信平台评论/私信，不触发回复发送，也不复用会清授权与配置的 offboarding。
 

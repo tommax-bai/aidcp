@@ -1,6 +1,6 @@
 {
   "v": 2,
-  "type": "interaction.reply.result.ack",
+  "type": "wechat_channels.inbox.reply.result.ack",
   "id": "reply-comment-envelope-001",
   "ts": 1784044811100,
   "payload": {

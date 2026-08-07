@@ -658,91 +658,91 @@
     "RuntimeControlsEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.runtime.controls" }, "payload": { "$ref": "#/$defs/RuntimeControlsPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.runtime.controls" }, "payload": { "$ref": "#/$defs/RuntimeControlsPayload" } } }
       ]
     },
     "AuthStatusEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.auth.status" }, "payload": { "$ref": "#/$defs/AuthStatusPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.auth.status" }, "payload": { "$ref": "#/$defs/AuthStatusPayload" } } }
       ]
     },
     "SyncBatchEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.sync.batch" }, "payload": { "$ref": "#/$defs/SyncBatchPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.sync.batch" }, "payload": { "$ref": "#/$defs/SyncBatchPayload" } } }
       ]
     },
     "SyncAckEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.sync.ack" }, "payload": { "$ref": "#/$defs/SyncAckPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.sync.ack" }, "payload": { "$ref": "#/$defs/SyncAckPayload" } } }
       ]
     },
     "ReplyResultEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.reply.result" }, "payload": { "$ref": "#/$defs/ReplyResultPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.reply.result" }, "payload": { "$ref": "#/$defs/ReplyResultPayload" } } }
       ]
     },
     "ReplyResultAckEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.reply.result.ack" }, "payload": { "$ref": "#/$defs/ReplyResultAckPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.reply.result.ack" }, "payload": { "$ref": "#/$defs/ReplyResultAckPayload" } } }
       ]
     },
     "ReplyReconcileEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.reply.reconcile" }, "payload": { "$ref": "#/$defs/ReplyReconcilePayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.reply.reconcile" }, "payload": { "$ref": "#/$defs/ReplyReconcilePayload" } } }
       ]
     },
     "ReplyReconcileResultEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.reply.reconcile.result" }, "payload": { "$ref": "#/$defs/ReplyReconcileResultPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.reply.reconcile.result" }, "payload": { "$ref": "#/$defs/ReplyReconcileResultPayload" } } }
       ]
     },
     "SyncRequestEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.sync.request" }, "payload": { "$ref": "#/$defs/SyncRequestPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.sync.request" }, "payload": { "$ref": "#/$defs/SyncRequestPayload" } } }
       ]
     },
     "ReplySendEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.reply.send" }, "payload": { "$ref": "#/$defs/ReplySendPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.reply.send" }, "payload": { "$ref": "#/$defs/ReplySendPayload" } } }
       ]
     },
     "AuthReopenEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.auth.reopen" }, "payload": { "$ref": "#/$defs/AuthReopenPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.auth.reopen" }, "payload": { "$ref": "#/$defs/AuthReopenPayload" } } }
       ]
     },
     "BrowserControlEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.browser.control" }, "payload": { "$ref": "#/$defs/BrowserControlPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.browser.control" }, "payload": { "$ref": "#/$defs/BrowserControlPayload" } } }
       ]
     },
     "OffboardCommandEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.offboard.command" }, "payload": { "$ref": "#/$defs/OffboardCommandPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.offboard.command" }, "payload": { "$ref": "#/$defs/OffboardCommandPayload" } } }
       ]
     },
     "OffboardResultEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.offboard.result" }, "payload": { "$ref": "#/$defs/OffboardResultPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.offboard.result" }, "payload": { "$ref": "#/$defs/OffboardResultPayload" } } }
       ]
     },
     "OffboardAckEnvelope": {
       "allOf": [
         { "$ref": "common.schema.json#/$defs/Envelope" },
-        { "properties": { "type": { "const": "interaction.offboard.ack" }, "payload": { "$ref": "#/$defs/OffboardAckPayload" } } }
+        { "properties": { "type": { "const": "wechat_channels.inbox.offboard.ack" }, "payload": { "$ref": "#/$defs/OffboardAckPayload" } } }
       ]
     }
   }

@@ -42,27 +42,27 @@
 
 | type | 方向 | 关联语义 |
 | --- | --- | --- |
-| `interaction.auth.status` | Edge → Cloud | 主动状态推送 |
-| `interaction.sync.batch` | Edge → Cloud | Cloud 用同 envelope `id` 回 ack |
-| `interaction.sync.ack` | Cloud → Edge | 整批 accepted/duplicate/rejected |
-| `interaction.reply.result` | Edge → Cloud | 回填 send 的 envelope `id` |
-| `interaction.reply.result.ack` | Cloud → Edge | 使用 result envelope `id`；仅 exact accepted/duplicate 可清 durable outbox |
-| `interaction.reply.reconcile` | Cloud → Edge | 启动/重连后仅核验既有 attempt，不得触发平台写 |
-| `interaction.reply.reconcile.result` | Edge → Cloud | 回填 reconcile envelope `id`，逐 attempt 报 result_replayed/not_found/binding_conflict |
-| `interaction.sync.request` | Cloud → Edge | 后续 batch 用 payload `requestId` 关联 |
-| `interaction.reply.send` | Cloud → Edge | Edge 回 reply.result |
-| `interaction.auth.reopen` | Cloud → Edge | Edge 后续以 auth.status 报阶段 |
-| `interaction.browser.control` | Cloud → Edge | active 会话的浏览器显隐控制；受理不等于已打开/关闭，Edge 后续以 auth.status.browserState 报真态 |
-| `interaction.runtime.controls` | Cloud → Edge | 仅向 scope 匹配且已协商能力的 Edge 下发版本化账号开关；enqueue 不等于应用 |
-| `interaction.offboard.command` | Cloud → Edge | scope-bound 撤权清理命令；先停同步/写并 drain，再删密文、关 sidecar |
-| `interaction.offboard.result` | Edge → Cloud | 可跨重启重放的 cleared/already_cleared/failed 结果 |
-| `interaction.offboard.ack` | Cloud → Edge | 使用 result envelope `id`；仅 exact accepted/duplicate 可清 durable outbox |
+| `wechat_channels.inbox.auth.status` | Edge → Cloud | 主动状态推送 |
+| `wechat_channels.inbox.sync.batch` | Edge → Cloud | Cloud 用同 envelope `id` 回 ack |
+| `wechat_channels.inbox.sync.ack` | Cloud → Edge | 整批 accepted/duplicate/rejected |
+| `wechat_channels.inbox.reply.result` | Edge → Cloud | 回填 send 的 envelope `id` |
+| `wechat_channels.inbox.reply.result.ack` | Cloud → Edge | 使用 result envelope `id`；仅 exact accepted/duplicate 可清 durable outbox |
+| `wechat_channels.inbox.reply.reconcile` | Cloud → Edge | 启动/重连后仅核验既有 attempt，不得触发平台写 |
+| `wechat_channels.inbox.reply.reconcile.result` | Edge → Cloud | 回填 reconcile envelope `id`，逐 attempt 报 result_replayed/not_found/binding_conflict |
+| `wechat_channels.inbox.sync.request` | Cloud → Edge | 后续 batch 用 payload `requestId` 关联 |
+| `wechat_channels.inbox.reply.send` | Cloud → Edge | Edge 回 reply.result |
+| `wechat_channels.inbox.auth.reopen` | Cloud → Edge | Edge 后续以 auth.status 报阶段 |
+| `wechat_channels.inbox.browser.control` | Cloud → Edge | active 会话的浏览器显隐控制；受理不等于已打开/关闭，Edge 后续以 auth.status.browserState 报真态 |
+| `wechat_channels.inbox.runtime.controls` | Cloud → Edge | 仅向 scope 匹配且已协商能力的 Edge 下发版本化账号开关；enqueue 不等于应用 |
+| `wechat_channels.inbox.offboard.command` | Cloud → Edge | scope-bound 撤权清理命令；先停同步/写并 drain，再删密文、关 sidecar |
+| `wechat_channels.inbox.offboard.result` | Edge → Cloud | 可跨重启重放的 cleared/already_cleared/failed 结果 |
+| `wechat_channels.inbox.offboard.ack` | Cloud → Edge | 使用 result envelope `id`；仅 exact accepted/duplicate 可清 durable outbox |
 
-基础协商标识固定为 `interaction_inbox_v1`；结果恢复另用 `interaction_reply_recovery_v1`，offboard 另用 `interaction_offboarding_v1`，账号开关另用 `interaction_runtime_controls_v1`，浏览器前后台控制另用 `interaction_browser_control_v1`。Edge 在 optional `hello.capabilities` 声明，Cloud 只在双方支持时于 optional `welcome.capabilities` 回显。Cloud 回显 offboard capability 时必须同时给 account-bound `welcome.interactionRecovery.offboardPending`；Edge 仅在它明确为 false 时恢复 connector，缺失或 true 均 fail closed。回显 runtime-controls capability 时必须同时给 scope-bound `welcome.interactionRuntime`；缺失、畸形或错误 scope 时 Edge 的互动能力全关。恢复/offboard/runtime-controls/browser-control capability 依赖基础 inbox，未回显时不得发送对应扩展 type。旧 Cloud 仍可接收基础 `interaction.reply.result`，但 Edge 不得把 fire-and-forget 当确认并清 outbox；旧 Edge 不支持 offboard 时 Cloud 必须先撤权停写并保留 pending cleanup，等待可用的新 Edge，不能提前 tombstone 或谎报清理完成。
+基础协商标识固定为 `interaction_inbox_v1`；结果恢复另用 `interaction_reply_recovery_v1`，offboard 另用 `interaction_offboarding_v1`，账号开关另用 `interaction_runtime_controls_v1`，浏览器前后台控制另用 `interaction_browser_control_v1`。Edge 在 optional `hello.capabilities` 声明，Cloud 只在双方支持时于 optional `welcome.capabilities` 回显。Cloud 回显 offboard capability 时必须同时给 account-bound `welcome.interactionRecovery.offboardPending`；Edge 仅在它明确为 false 时恢复 connector，缺失或 true 均 fail closed。回显 runtime-controls capability 时必须同时给 scope-bound `welcome.interactionRuntime`；缺失、畸形或错误 scope 时 Edge 的互动能力全关。恢复/offboard/runtime-controls/browser-control capability 依赖基础 inbox，未回显时不得发送对应扩展 type。旧 Cloud 仍可接收基础 `wechat_channels.inbox.reply.result`，但 Edge 不得把 fire-and-forget 当确认并清 outbox；旧 Edge 不支持 offboard 时 Cloud 必须先撤权停写并保留 pending cleanup，等待可用的新 Edge，不能提前 tombstone 或谎报清理完成。
 
 同步是整批事务。只有 Cloud 持久化 batch/thread/message/cursor 成功后才能 ack `accepted`；已持久化批次回 `duplicate`；拒绝或部分失败回 `rejected`。Edge 只有在 `accepted|duplicate` 且 ack `cursorAfter` 与本批一致时推进本地 checkpoint。
 
-回复结果先在 Edge durable outbox 落盘，再发送 `interaction.reply.result`。Cloud 在同一事务完成 attempt/job CAS 后返回 scope、attempt、idempotency identity 全匹配的 ack；Edge 只在 `accepted|duplicate` 且全部绑定字段一致时清除。超时、断线、Cloud 崩溃、rejected 或错绑 ack 均保留并在重连后补发。Cloud 启动和 Edge 重连时对 `created|dispatched|ambiguous` 发 reconcile；Edge 只能检查 durable execution/result 和平台历史，绝不能因本地缺失而重新调用平台写。`created + not_found` 可明确 failed；`dispatched|ambiguous + not_found` 保持 ambiguous；`result_replayed` 由正常 durable result 再推进终态。
+回复结果先在 Edge durable outbox 落盘，再发送 `wechat_channels.inbox.reply.result`。Cloud 在同一事务完成 attempt/job CAS 后返回 scope、attempt、idempotency identity 全匹配的 ack；Edge 只在 `accepted|duplicate` 且全部绑定字段一致时清除。超时、断线、Cloud 崩溃、rejected 或错绑 ack 均保留并在重连后补发。Cloud 启动和 Edge 重连时对 `created|dispatched|ambiguous` 发 reconcile；Edge 只能检查 durable execution/result 和平台历史，绝不能因本地缺失而重新调用平台写。`created + not_found` 可明确 failed；`dispatched|ambiguous + not_found` 保持 ambiguous；`result_replayed` 由正常 durable result 再推进终态。
 
 offboard 顺序固定为：Cloud 事务撤销 customer scope 与读写能力 → 创建 durable offboard → Edge durable claim → connector stop 并 drain 在途同步/写 → 删除 scope-bound encrypted session → 关闭 sidecar → durable result/outbox → Cloud exact ack → Cloud tombstone → 最迟 requestedAt 后 30 天内 purge。`failed` 结果回到 pending 并重试；Edge 离线不改变顺序。普通 pause/close/standby/logout 不得映射成 offboard 或删除密文。审计只允许 offboardId、envKey、accountId、userId、event、status、timestamp，不得记录消息正文、回复/模板最终文本或凭证。
 
