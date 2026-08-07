@@ -4366,8 +4366,26 @@ release/20260807-ol-restricted-policy 部署（automation d298762 / api 50f514f 
 > dev 云端已发批 5 的 9 条对象名与批 7 的 5 条改名；旧客户端 fail-closed 拒收属预期切换窗口。
 
 - [ ] 互动闭环在新名下走通：xhs 会话 `xiaohongshu.note.like` / `.note.collect` / `.user.follow` / `.note.comment` / `.comment.like` 各至少一次真实回执（`action.completed` 关联键仍是 `like`/`collect`/`follow`/`comment`/`comment_like`，风控记账正常累加）。
-- [ ] FB 帖级点赞 `facebook.note.like`（消费/规则模式）与视频点赞 `facebook.video.like`（Reels 节奏赞或 feed 视频概率赞命中一次）各一次真实回执。
-- [ ] 对象核对诚实失败路径一次：Reels 在场时收 `facebook.note.like`（可手发）回 `object_mismatch_observed_reels`，绝不静默转视频执行器。
+- [x] FB 视频点赞 `facebook.video.like` 真实回执：Reels 节奏赞（`facebook_reel_persona_cadence_hit` / `_slow_start_`）2026-08-07 一小时 21 条 `ok=true`；消费链在 Reels 上的点赞 2026-08-07 17:29 修复部署后 `confirmed_new_like`，边缘侧 `ok=true effectPhase=confirmed`。
+- [x] 对象核对诚实失败路径：**不用手发就自己撞上了**——见下方「153.1 本条验收当场抓出的缺陷」。
+- [ ] FB 帖级点赞 `facebook.note.like` 一次真实回执：目标是**普通帖**（消费/规则模式在 Feed 主浏览入口的账号上，或详情页点赞）。注意本条**不能**拿 Reels 主入口的账号验——那种账号消费链选中的目标就是 Reel，正确命令是 `facebook.video.like`。
+- [ ] 规则模式批次点赞（`facebook_rule_batch_like`）在 Reels 主入口账号上一次真实回执为 `facebook.video.like`：与消费链同一处缺陷、已被同一出口一并修好，但登记时 24h 内没有 rule batch 跑过 ⇒ 代码级已覆盖、真机未验。
+
+### 153.1 —— 本条验收当场抓出的缺陷（2026-08-07 已修并部署 dev）
+
+批 5 设计文写明「FB 消费/规则模式点赞与 xhs 点赞不标对象（缺省 note）」，依据是「消费/规则模式点赞恒在 feed」。
+这条假设对**主浏览入口钉为 Reels 的账号**不成立：消费链选中的目标本身就是 `/reel/<id>`。于是它们的点赞全部
+以 `facebook.note.like` 发出，撞上边缘按 `facebook-reels-browse` 规格做的对象核对，被整条诚实拒收
+（`object_mismatch_observed_reels`）——dev 实测三小时 **75 条全灭、零成功**；同期成功的 21 条全部来自显式
+标了 `video` 的 Reels 节奏路径。边缘侧本机 14 条 like 收到、14 条拒收，成功率 0。
+
+修法不是「再去两个发送点补标」，而是把对象维补空收口到下发唯一出口 `withResolvedLikeObject`：规范 Reel 身份
+⇒ `video`，其余 ⇒ `note`，显式声明恒优先。**对象是目标自身的属性，不是对现场的猜测**——非 Reel 目标即便此刻
+页面停在 Reels 面也仍标 `note`，那是真的目标/面不符，MUST 由边缘诚实拒收，MUST NOT 在云端改口掩盖。
+automation `b456af4`（含消费链 Reel 目标 + 普通帖目标两条回归断言，两处变异均被抓住）。<!-- 2026-08-07 deployed dev -->
+
+**教训**：给命令新增「声明维」时，MUST NOT 靠「其余发送点沿用缺省值」收尾——缺省会把「没声明」翻译成
+「声明了缺省那一档」，漏标就此变成静默错标，且 typecheck 与全量测试都抓不到。
 - [ ] FB 结构性不支持已换轨：向 FB 会话手发 `xiaohongshu.note.collect` / `xiaohongshu.comment.like` 观察 `platform_mismatch`（手抄拒集已删，拒收来自平台段闸）。
 - [ ] FB Reels 关注 `facebook.user.follow`（noteId 绑定当前 Reel）一次真实回执。
 - [ ] 批 7：验证码链路在新名下走通（真机触发或注入一次 `captcha.detected` → 云端暂停 + 告警卡 → 清除后 `captcha.cleared` 解除暂停）。
