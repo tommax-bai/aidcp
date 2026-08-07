@@ -42,7 +42,7 @@ TBD - created by archiving change alert-resolution-by-id. Update Purpose after a
 
 #### Scenario: 手动解决后边缘配对清除命中 0 行
 
-- **WHEN** 一条 `block` 告警已被人工按 id 解决，随后该 edge 才送来配对的 `risk.captcha_cleared`
+- **WHEN** 一条 `block` 告警已被人工按 id 解决，随后该 edge 才送来配对的 `captcha.cleared`
 - **THEN** 按 edge 自动清除对该行命中 0 行、不二次解决、不报错（按 edge 恢复 edge 下发的既有语义照常）
 
 #### Scenario: 两入口共用同一未解决守卫

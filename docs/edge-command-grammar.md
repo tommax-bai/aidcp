@@ -279,12 +279,18 @@
 ——**该判断已推翻**：只有 `pacing.update` 真的符合。复核（2026-08-07）发现非平台域这 14 条内部有四类不齐，
 其中两类有真实代价、两类只是不好看。**按「不改的代价」排序，不按「改起来便不便宜」排序**（规则见 §5 加闸准入同源纪律）。
 
-| 问题 | 具体 | 处置 | 不改的代价 |
-| --- | --- | --- | --- |
-| **同一主题两个家** | 验证码检测在 `risk.captcha_detected` / `risk.captcha_cleared`（edge→cloud），协助在 `captcha.assist.*`（4 条） | 归一到 `captcha.*`：`captcha.detected` / `captcha.cleared` + `captcha.assist.*` 保留三段（assist 是有自己请求/应答对的真子族） | **高**：新增验证码消息无依据可循、grep 一个词得到两族两属主；名字不该编码「消费方拿它干什么」（当初进 `risk.` 正是这个错） |
-| **应答命名三套约定** | `state.read→state.report`、`identity.read_current→identity.observed`、`edge.task.acquire→edge.task.acquired` | 定**一套**并写进本文档族约定；存量按新约定归一（改动面小、全是内部关联） | **高**：下一对请求/应答三选一凭手感，正是语法要消灭的漂移 |
-| **方向靠名字判不出** | `ui.snapshot` 是名词、读起来像上报，实际 cloud→edge | 改动词形（如 `ui.push_snapshot`）或随应答约定一并定 | **中**：读协议表时方向要额外查一次 |
-| **前缀冗余 / 第二段不平行** | `edge.task.*` 的 `edge.` 零信息量；`identity.read_current` 与 `identity.read_self_profile` 一个「动词+状语」一个「动词+目标」 | `task.*`（批 6 已列）；identity 两条改平行形 | **低**：纯可读性，顺手做、不单独立批 |
+✅ **已实装（2026-08-07，change `normalize-nonplatform-vocabulary`）**：5 条改名、总数 103→（经批 5）107 不变本批份额。
+
+| 问题 | 落地 | 不改的代价（立项依据） |
+| --- | --- | --- |
+| **同一主题两个家** | `risk.captcha_detected`→`captcha.detected`、`risk.captcha_cleared`→`captcha.cleared`；`captcha.assist.*` 保留三段（真子族） | **高**：名字不该编码「消费方拿它干什么」（当初进 `risk.` 正是这个错） |
+| **应答命名三套约定** | **族约定定案：请求＝祈使动词，edge→cloud 应答与自发事实上报＝过去分词/过去式事实形**（observed / acquired / released / detected / cleared）。存量唯一孤例 `state.report`→`state.observed`（向 `identity.observed` 靠齐）；`identity.observed`、`edge.task.acquired/released` 本就合规不动。显式豁免：`ping`/`pong`（传输惯例）、`.result`/`.ack` 族（留痕写外发 durable-outbox 应答，IM/发布域、批 6 定夺）、`captcha.assist.click_result`/`.snapshot`（assist 子族整体保留） | **高**：下一对请求/应答三选一凭手感 |
+| **方向靠名字判不出** | `ui.snapshot`→`ui.push_snapshot`（前置核实：单向推送、无应答无配对，四子项里最干净） | **中** |
+| **第二段不平行** | `identity.read_current`→`identity.read_current_page`（动词＋地点宾语，与 `read_self_profile` 平行）；能力串 `identity_read_current_v1` 刻意不改（握手协商串与消息名脱钩，已加注释坐实）；`edge.task.*`→`task.*` 仍归批 6 | **低** |
+
+**实装修正（前置核实结论的据实更新）**：「批 7 不需要出 kernel 新版本」只对传输豁免名单成立、
+**对类型面不成立**——kernel `platform-types` 的 `IdentityCaptureCommand` 钉着旧字面量，已出
+**kernel v0.1.3** 收编（automation pin 随升）。
 
 **明确不做（记录理由，防后人重开）**：
 
@@ -306,7 +312,7 @@
 | **4** | ✅ **已实装（2026-08-06）**：14 → 22 平台段名（协议 95→103、登记表 44→52）；`page.scroll` 拆三面、`targetSurface` 字段删；两道休眠平台段闸转正；`FACEBOOK_UNSUPPORTED_COMMANDS` 收缩到两条共享名互动命令（批 5 归零）；manifest `edgeTypes[]` 取代手抄排除清单；跨面到达诚实失败 `surface_mismatch_*` | 协议改名最大的一批（change `platformize-browse-vocabulary`） |
 | **5** | ✅ **已实装（2026-08-07）**：5 → 9 平台段对象名（协议 103→107、登记表 52→56）；like 按对象拆（video=Reels+feed 视频帖）、执行点核对对象；**关联键只换键值不动**（据实修正：值＝风控动作名是设计，脱钩坐实）；`FACEBOOK_UNSUPPORTED_COMMANDS` 归零删除；新增 `scripts/action-key-parity` 三表对账闸 | 协议第 5 处同步点所在批（change `objectify-interaction-vocabulary`） |
 | **6** | IM 族 `wechat.inbox.*`、发布平台段化（`{p}.publish.command` + 原子 kind 表分平台、删载荷 `platform` 字段）、`navigation.back` 与 `note.close` 定分工后平台段化、`edge.task.*` → `task.*` | 收尾清账 |
-| **7** | 非平台域词汇收口：验证码归一家、应答命名定一套约定、`ui.snapshot` 方向消歧、identity 两条平行化；`ping`/`pong` 与 `plan.response` 明确不动 | 纯内部词汇，无平台语义、不碰浏览热区（可与批 5/6 并行） |
+| **7** | ✅ **已实装（2026-08-07）**：`captcha.detected`/`captcha.cleared` 归一家、应答族约定定案（过去分词事实形，`state.report`→`state.observed` 唯一归一）、`ui.push_snapshot`、`identity.read_current_page`；`ping`/`pong` 与 `plan.response` 明确不动；kernel v0.1.3（类型面收编） | 纯内部词汇（change `normalize-nonplatform-vocabulary`，与批 5 并行开发、串行集成实证可行） |
 
 ---
 

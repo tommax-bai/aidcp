@@ -44,28 +44,34 @@
 
 ## 4. 集成（双仓锁步）
 
-- [ ] 4.1 两 worktree 各自 rebase 最新 master → 全量测试 + gate:native 绿。
-- [ ] 4.2 成对 ff push（`git push origin <branch>:master` ×2，中间不跑闸）→ 立即 `python3 scripts/protocol-parity` + `python3 scripts/operation-registry-parity`（各 56 条）+ `python3 scripts/action-key-parity` 复验全绿。
-- [ ] 4.3 清 worktree。
+- [x] 4.1 两 worktree 各自 rebase 最新 master → 全量测试 + gate:native 绿。<!-- edge rebase 到 dad4017 后四件套全 0 -->
+- [x] 4.2 成对 ff push（`git push origin <branch>:master` ×2，中间不跑闸）→ 立即 `python3 scripts/protocol-parity` + `python3 scripts/operation-registry-parity`（各 56 条）+ `python3 scripts/action-key-parity` 复验全绿。
+- [x] 4.3 清 worktree。
 
 ## 5. 部署与切换窗口
 
-- [ ] 5.1 部署 `dev`（§5 安全序列：备份 → rsync → restart → healthcheck）。**绝不碰 aidcp-cloud 单体与 isales。**
-- [ ] 5.2 部署后观察日志：新名命令拒收计（旧客户端 fail-closed 属预期，车队本就停摆待出包）；无其他新增 error。
-- [ ] 5.3 批 5 并入既有出包提请（打包动作用户显式触发）；真机验收项登记 `docs/real-machine-acceptance-backlog.md` 簇 153（登记前先 grep 最大簇号防撞）。
+- [x] 5.1 部署 `dev`（§5 安全序列：备份 → rsync → restart → healthcheck）。**绝不碰 aidcp-cloud 单体与 isales。**
+- [x] 5.2 部署后观察日志：新名命令拒收计（旧客户端 fail-closed 属预期，车队本就停摆待出包）；无其他新增 error。
+- [x] 5.3 批 5 并入既有出包提请（打包动作用户显式触发）；真机验收项登记 `docs/real-machine-acceptance-backlog.md` 簇 153（登记前先 grep 最大簇号防撞）。
 
 ## 6. spec delta
 
-- [ ] 6.1 手写 2 个语义 delta（native-facebook-behavior-parity、facebook-reels-browse）；机械改名 delta 覆盖 grep 实测 12 个 capability，逐条人审「机械 vs 语义」，同形异义按 design §7 红线。
-- [ ] 6.2 归档前对当时最新 spec 文本重生成一遍（防并行 change delta 撞车），`openspec validate objectify-interaction-vocabulary --strict` 过。
+- [x] 6.1 手写 2 个语义 delta（native-facebook-behavior-parity、facebook-reels-browse）；机械改名 delta 覆盖 grep 实测 12 个 capability，逐条人审「机械 vs 语义」，同形异义按 design §7 红线。
+- [x] 6.2 归档前对当时最新 spec 文本重生成一遍（防并行 change delta 撞车），`openspec validate objectify-interaction-vocabulary --strict` 过。
 
 ## 7. 归档
 
-- [ ] 7.1 全部 task 勾完 → validate --strict → archive；蓝图 §6.3 批 5 行终态回写。
+- [x] 7.1 全部 task 勾完 → validate --strict → archive；蓝图 §6.3 批 5 行终态回写。
 
 ## 8. 实装偏离与实录（2026-08-07）
 
-<!-- edge 9fabff6 / automation d3e520e（worktree 提交，集成 sha 待 pair push 后回写） -->
+<!-- 集成落点：edge master 8b4b6f9 / automation master d3e520e；成对 ff push 后
+protocol-parity 逐字一致、operation-registry-parity 各 56、action-key-parity 三表一致（36/25/33，豁免 3）。
+部署 dev：automation.bak.20260807-142737.vocab-batch5-7.tar.gz 备份 → rsync（与批 7 合并一次部署，
+kernel v0.1.3 随包送 node_modules）→ restart → healthcheck 全过（active / NRestarts=0 / 8787 / 零 error /
+unclassified·mismatch 计数 0，dev 车队旧客户端本就停摆待出包）。真机簇 153 已登记（与 148/149/152 同一次出包）。
+spec delta：2 手写 + 9 机械 + comment-interaction 标题 RENAMED + command-pacing interaction.* 通配清理；
+wechat-channels-interaction 全命中为红线同形异义、正确跳过。 -->
 
 - **落点**：edge worktree 提交 `9fabff6`（改名主提交，rebase 到 `dad4017` 之上）、automation `d3e520e`；
   控制仓 `18b91ddd`（立案）+ 本次 docs/脚本提交。协议 103→107、登记表 52→56、别名表 22→26；

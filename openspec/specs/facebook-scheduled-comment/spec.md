@@ -230,7 +230,7 @@ Contact-info comments SHALL keep the template/generated body separate from the a
 
 Facebook 定向评论（手动 `/comment` / `--join` 与自动排期两条触发路径同等生效）SHALL 在**一个持续持有的边端租约**内完成「站内搜索 → 打开目标帖 → 撰写 → 飞书人审 → 提交」整段，**贯穿人审等待窗口不释放边端**，直至提交或诚实终止。租约 `kind` MUST 为 `comment_prepare`，`leaseMs` MUST 覆盖搜索 + 读正文 + 人审超时 + 提交的最坏耗时。审批期间边端 MUST 停留在目标帖、MUST NOT 被同一会话并发的自治浏览闭环夺走浏览器或导航离开。
 
-系统 MUST 给该路径下发给边端的**每一条评论命令**（`facebook.search.execute` / `facebook.note.open` / `interaction.comment`）透传该租约的 `taskId`。这是硬性要求而非可选：边端 FB 命令入口按 `canExecute(payload.taskId)` 无差别门控——持租约期内**无 taskId 的命令一律被挡**，故评论自身的命令若不带匹配 taskId 会被自己持有的租约一起挡死（自锁死锁）。透传后：本任务的评论命令（taskId 匹配）放行、并发自治浏览闭环的无标识命令（`facebook.feed.scroll` / 返回等）被挡 → 页面钉死在目标帖。
+系统 MUST 给该路径下发给边端的**每一条评论命令**（`facebook.search.execute` / `facebook.note.open` / `facebook.note.comment`）透传该租约的 `taskId`。这是硬性要求而非可选：边端 FB 命令入口按 `canExecute(payload.taskId)` 无差别门控——持租约期内**无 taskId 的命令一律被挡**，故评论自身的命令若不带匹配 taskId 会被自己持有的租约一起挡死（自锁死锁）。透传后：本任务的评论命令（taskId 匹配）放行、并发自治浏览闭环的无标识命令（`facebook.feed.scroll` / 返回等）被挡 → 页面钉死在目标帖。
 
 租约 `priority` MUST 反映触发来源：手动操作员命令为 `'human'`、自动排期为 `'automatic'`（与小红书 keep-open 同口径）。
 

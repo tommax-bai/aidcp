@@ -166,7 +166,7 @@ Before locating the reaction control, the edge MUST bring the target's unique po
 
 ### Requirement: Reel follow commands carry and enforce canonical note identity
 
-`interaction.follow` MAY carry an optional `noteId` for Reel execution. When the Facebook session is in Reels mode, `noteId` MUST be present and MUST resolve to the canonical `https://www.facebook.com/reel/<id>` identity currently reported by the active Reel reader. The Edge MUST re-check this identity immediately before acting and MUST NOT treat `authorId`, current DOM order, or a generic Follow label as a substitute. Existing non-Reel follow callers that use `authorId` remain wire-compatible.
+`facebook.user.follow` MAY carry an optional `noteId` for Reel execution. When the Facebook session is in Reels mode, `noteId` MUST be present and MUST resolve to the canonical `https://www.facebook.com/reel/<id>` identity currently reported by the active Reel reader. The Edge MUST re-check this identity immediately before acting and MUST NOT treat `authorId`, current DOM order, or a generic Follow label as a substitute. Existing non-Reel follow callers that use `authorId` remain wire-compatible.
 
 #### Scenario: Delayed follow command cannot hit the next Reel
 - **WHEN** Cloud sends a follow command for Reel A but Reel B is active when Edge reaches the command
@@ -174,7 +174,7 @@ Before locating the reaction control, the edge MUST bring the target's unique po
 - **AND** Reel B's author is not followed
 
 #### Scenario: Existing profile follow payload remains compatible
-- **WHEN** a non-Facebook-Reels caller sends the existing `interaction.follow` payload with `authorId` and no `noteId`
+- **WHEN** a non-Facebook-Reels caller sends the existing `{platform}.user.follow` payload with `authorId` and no `noteId`
 - **THEN** protocol decoding remains valid
 - **AND** the existing non-Reel execution path is unchanged
 
@@ -202,6 +202,7 @@ If the requested target resolves to zero or multiple cards, or content extractio
 - **AND** the editor's rendered center is covered by exactly one physical post card whose canonical identity is the requested target
 - **THEN** Edge MAY bind that unique editor to the target
 - **AND** any overlap with another card, multiple candidate editors, or missing canonical target MUST return an explicit non-success without submitting
+
 ### Requirement: Reel like commit uses per-control event semantics and remains bound to the active Reel
 
 For a Facebook like command targeting a canonical `/reel/<id>` identity, Edge MUST freshly resolve exactly one supported primary reaction control associated with the uniquely active video immediately before the write and MUST confirm that the current canonical Reel still equals the commanded identity. The primary React control SHALL be activated against the freshly resolved in-page element rather than by consuming a stale saved coordinate. Edge MUST then verify a positive selected-state witness on the same Reel.
@@ -292,3 +293,4 @@ For every Native Facebook action receipt, Edge MUST retain a local bounded diagn
 - **WHEN** a Reel like or follow command terminates before actuation because its exact target or supported control cannot be resolved
 - **THEN** the local Edge log records the action, `not_started` effect phase, and bounded reason token
 - **AND** Cloud still receives the existing honest `action.completed{ok:false,reason}` payload
+

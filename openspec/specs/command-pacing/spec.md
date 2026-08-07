@@ -10,8 +10,8 @@
 ### Requirement: 决策指令携带可选时间指令
 
 云端 → 边缘的决策指令 SHALL 支持可选的时间字段：`navigation.back` / `{platform}.note.close` 携带
-`dwellMs`（离开当前页前应达到的总停留时间），`interaction.like` / `interaction.collect` /
-`interaction.follow` / `{platform}.note.open` 携带 `thinkMs`（执行动作前的犹豫 / 感知时间）。时间字段
+`dwellMs`（离开当前页前应达到的总停留时间），`{platform}.note.like` / `xiaohongshu.note.collect` /
+`{platform}.user.follow` / `{platform}.note.open` 携带 `thinkMs`（执行动作前的犹豫 / 感知时间）。时间字段
 全部可选，缺失视为合法，边缘按内置默认兜底。云端 MUST NOT 在 `session.budget` 下发整套时间
 系数要求边缘自行套公式计算内容相关时长。
 
@@ -245,7 +245,7 @@ MUST 对相同的云端中心值产生**带随机性**的实际时序（避免�
 
 ### Requirement: 操作间隔按最小间隔 gating，等待与兜底不累加
 
-边缘在执行「操作类」命令（`{platform}.note.open` / `xiaohongshu.profile.open` / `interaction.*` / `xiaohongshu.note.browse_images` / `xiaohongshu.note.scroll_comments`）前 SHALL 采用**最小间隔**语义而非无条件附加固定等待：维护**单一锚点**记录上次操作完成时刻（`lastActionEndAt`，取自**单调时钟**），收到下一个操作时计算 `elapsed = monoNow() − lastActionEndAt`、`remaining = max(0, floor − elapsed)`，仅补足 `remaining` 后执行。云端决策/网络往返耗时 MUST 计入 `elapsed`——已达兜底则立即执行、**MUST NOT** 在其之上再叠加兜底（不累加）。动作前犹豫 `thinkMs`（若下发）与最小间隔测同一「now→执行本动作」跨度，两者取 `max`、**MUST NOT** 相加。锚点在进程启动 / 断连重连 / CDP 重连时重置为空（首操作跳过间隔，由会话起点扫描延迟兜底）。详情页停留（`ensureDetailDwell`）与 feed 停留（`ensureFeedDwell`）测另一跨度，保留各自锚点，MUST NOT 与操作间隔叠闸（防双计）。
+边缘在执行「操作类」命令（`{platform}.note.open` / `xiaohongshu.profile.open` / 互动写命令（`{platform}.note.like`、`facebook.video.like`、`xiaohongshu.note.collect`、`{platform}.user.follow`、`{platform}.note.comment`、`xiaohongshu.comment.like`）/ `xiaohongshu.note.browse_images` / `xiaohongshu.note.scroll_comments`）前 SHALL 采用**最小间隔**语义而非无条件附加固定等待：维护**单一锚点**记录上次操作完成时刻（`lastActionEndAt`，取自**单调时钟**），收到下一个操作时计算 `elapsed = monoNow() − lastActionEndAt`、`remaining = max(0, floor − elapsed)`，仅补足 `remaining` 后执行。云端决策/网络往返耗时 MUST 计入 `elapsed`——已达兜底则立即执行、**MUST NOT** 在其之上再叠加兜底（不累加）。动作前犹豫 `thinkMs`（若下发）与最小间隔测同一「now→执行本动作」跨度，两者取 `max`、**MUST NOT** 相加。锚点在进程启动 / 断连重连 / CDP 重连时重置为空（首操作跳过间隔，由会话起点扫描延迟兜底）。详情页停留（`ensureDetailDwell`）与 feed 停留（`ensureFeedDwell`）测另一跨度，保留各自锚点，MUST NOT 与操作间隔叠闸（防双计）。
 
 #### Scenario: 云端返回慢则立即执行、不再叠加
 

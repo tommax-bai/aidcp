@@ -61,7 +61,7 @@
 #### Scenario: 被冷却抑制不下发不扣预算
 
 - **WHEN** 某 `collect` 意图被冷却闸判定未到点
-- **THEN** 系统 MUST NOT 下发 `interaction.collect`、MUST NOT 扣减 collect 预算、MUST NOT 计数，并以原因 `cooldown` 如实记录
+- **THEN** 系统 MUST NOT 下发 `xiaohongshu.note.collect`、MUST NOT 扣减 collect 预算、MUST NOT 计数，并以原因 `cooldown` 如实记录
 
 #### Scenario: 红线反例——被冷却却假报成功（禁止）
 
@@ -94,7 +94,7 @@
 
 ### Requirement: 冷却闸只拦四类互动、不拦推进、不写风控终态
 
-冷却闸 SHALL 只作用于 `interaction.like` / `interaction.collect` / `interaction.follow` / `interaction.comment` 的下发判定；`{platform}.feed.scroll` / `navigation.back` / `{platform}.note.open` / `xiaohongshu.profile.open` 等推进 / 导航指令 MUST NOT 被冷却闸拦截（避免浏览循环死锁，与既有「推进指令不被风控闸拦」同口径）。冷却闸为**附加只读兜底闸**（只防意外爆发，不表达数量策略——数量由 `RiskController` 主闸单独负责）：MUST NOT 写 `risk_state`、MUST NOT 调用 `RiskController.setQuotaLevel` / `applySignal`、MUST NOT 改变账号风控终态或档位；账号风控终态仍仅由 `RiskController` 单写。
+冷却闸 SHALL 只作用于 `{platform}.note.like` / `xiaohongshu.note.collect` / `{platform}.user.follow` / `{platform}.note.comment` 的下发判定；`{platform}.feed.scroll` / `navigation.back` / `{platform}.note.open` / `xiaohongshu.profile.open` 等推进 / 导航指令 MUST NOT 被冷却闸拦截（避免浏览循环死锁，与既有「推进指令不被风控闸拦」同口径）。冷却闸为**附加只读兜底闸**（只防意外爆发，不表达数量策略——数量由 `RiskController` 主闸单独负责）：MUST NOT 写 `risk_state`、MUST NOT 调用 `RiskController.setQuotaLevel` / `applySignal`、MUST NOT 改变账号风控终态或档位；账号风控终态仍仅由 `RiskController` 单写。
 
 #### Scenario: 推进指令不被冷却拦
 

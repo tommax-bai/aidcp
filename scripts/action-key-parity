@@ -49,10 +49,8 @@ TABLES = [
 
 # 边缘 actionNames 独有、云端别名表按设计不收的键（不产 action.completed 常规回执）。
 # 新出现的不对称键必须在这里登记理由，否则判失败——「豁免」必须是显式决定，不是默认。
-# ⚠️ 词汇批 7（normalize-nonplatform-vocabulary）会把 identity.read_current 改名
-#    identity.read_current_page——该批集成时本名单同步改名。
 EDGE_ONLY_EXEMPT = {
-    "identity.read_current",       # 应答走 identity.observed（按 captureId 关联），值只用于失败回执
+    "identity.read_current_page",  # 应答走 identity.observed（按 captureId 关联），值只用于失败回执（批 7 改名后形）
     "identity.read_self_profile",  # 同上
     "session.end",                 # 编排收尾，无 action.completed
 }

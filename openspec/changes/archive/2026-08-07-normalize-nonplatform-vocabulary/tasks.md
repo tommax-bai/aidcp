@@ -33,31 +33,37 @@
 
 ## 3. 控制仓（集成期由主 session 执行）
 
-- [ ] 3.1 `docs/protocol.md`：5 条改名（§2 表 + 载荷节 + captcha/身份/状态观察各节 prose）。
-- [ ] 3.2 `docs/edge-command-grammar.md`：§6.2 批 7 小节按落地名定稿（含应答族约定全文与豁免名单）、§6.3 批 7 行标 ✅。
+- [x] 3.1 `docs/protocol.md`：5 条改名（§2 表 + 载荷节 + captcha/身份/状态观察各节 prose）。
+- [x] 3.2 `docs/edge-command-grammar.md`：§6.2 批 7 小节按落地名定稿（含应答族约定全文与豁免名单）、§6.3 批 7 行标 ✅。
 
 ## 4. 集成（双仓锁步，批 5 落地后执行）
 
-- [ ] 4.1 两 worktree rebase 最新 master（含批 5）→ 全量测试 + gate:native 绿。
-- [ ] 4.2 成对 ff push → 立即 `python3 scripts/protocol-parity` + `python3 scripts/operation-registry-parity` 复验全绿。
-- [ ] 4.3 清 worktree。
+- [x] 4.1 两 worktree rebase 最新 master（含批 5）→ 全量测试 + gate:native 绿。
+- [x] 4.2 成对 ff push → 立即 `python3 scripts/protocol-parity` + `python3 scripts/operation-registry-parity` 复验全绿。
+- [x] 4.3 清 worktree。
 
 ## 5. 部署与收尾
 
-- [ ] 5.1 部署 `dev`（可与批 5 合并为一次部署；§5 安全序列）。
-- [ ] 5.2 真机验收项并入 backlog 出包簇（登记前 grep 最大簇号）；并入出包提请。
+- [x] 5.1 部署 `dev`（可与批 5 合并为一次部署；§5 安全序列）。
+- [x] 5.2 真机验收项并入 backlog 出包簇（登记前 grep 最大簇号）；并入出包提请。
 
 ## 6. spec delta
 
-- [ ] 6.1 机械改名 delta 覆盖 grep 实测 12 个 capability（proposal 名单），逐条人审，同形异义按 design §4 红线；归档前对最新 spec 文本重生成，`openspec validate normalize-nonplatform-vocabulary --strict` 过。
+- [x] 6.1 机械改名 delta 覆盖 grep 实测 12 个 capability（proposal 名单），逐条人审，同形异义按 design §4 红线；归档前对最新 spec 文本重生成，`openspec validate normalize-nonplatform-vocabulary --strict` 过。
 
 ## 7. 归档
 
-- [ ] 7.1 全部 task 勾完 → validate --strict → archive；蓝图批 7 行终态回写。
+- [x] 7.1 全部 task 勾完 → validate --strict → archive；蓝图批 7 行终态回写。
 
 ## 8. 实装偏离与实录（2026-08-07，双仓开发由并行 agent 完成、主 session 集成）
 
-<!-- edge worktree 892b3ff8+6144cea4+aa8dc65d / automation 8c9ce162+2ebcfe0b（集成 sha 待批 5 落主干后 rebase + pair push 回写） -->
+<!-- 集成落点：edge master 88e8a51（rebase 批 5 后 + 第三次 digest 42c5a2b7 重钉 + 史料 doc 对齐）/
+automation master 5992b36（kernel v0.1.3 收编、pin 恢复 git+ssh 形、type-only 本地矫正回收）/
+kernel master 7bcfdef + tag v0.1.3（IdentityCaptureCommand 字面量改名 + version 0.1.3，78/78 测试绿）。
+rebase 后全量：edge 3229(0 fail)+acceptance 40+gate:native OK；automation 2413(0 fail)+acceptance 300+tc 0。
+parity 三道全绿；与批 5 合并一次部署 dev（healthcheck 全过）。
+spec delta：12 capability（captcha-incident-handling 追加 15 条共 16、edge-companion-ui 13 条等，共 90 处改名）
++ browser-cold-standby 标题 RENAMED 人工定稿；action-key-parity 豁免名单随 identity 改名同步。 -->
 
 - **全量口径（worktree 提交态）**：edge typecheck 0 / npm test 3222(0 fail) / acceptance 40 / gate:native OK；
   automation typecheck 0 / npm test 2361(0 fail) / acceptance 300。两份 protocol.ts diff 零差异；AC-PROTO-02 计数 103 不变。

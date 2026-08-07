@@ -10,7 +10,7 @@ TBD - created by archiving change browser-slot-cloud-presence. Update Purpose af
 #### Scenario: 槽位外环境仍连接 Cloud
 - **WHEN** 客户启动的环境已归属且有无冲突的账号绑定，但当前浏览器槽位已满
 - **THEN** 该环境核心以 browser-absent standby 状态启动并完成 Cloud 握手
-- **AND** Cloud 可向其发送 `ui.snapshot`、人设真态与唤醒信号
+- **AND** Cloud 可向其发送 `ui.push_snapshot`、人设真态与唤醒信号
 
 #### Scenario: 不能可信解析时绝不猜账号
 - **WHEN** 环境未归属、未绑定、绑定冲突或绑定存储不可用
@@ -61,3 +61,4 @@ Edge SHALL 仅在 hello 请求收到 `type='welcome'` 且 payload 包含非空 `
 - **WHEN** browser-absent edge 收到需要浏览器的任务但未在死线内取得槽位并完成身份复核
 - **THEN** 调用方收到明确、可恢复的 browser wake failure
 - **AND** MUST NOT 将其误报为 edge offline 或静默等待到超时
+

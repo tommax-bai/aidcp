@@ -160,7 +160,7 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 - **AND** when either field is unavailable, the text MUST degrade to an honest generic description and MUST NOT show a permalink or raw note ID
 
 #### Scenario: Facebook 就地读的日志不得被叙述成跳转作者主页
-- **WHEN** Facebook 就地身份读取（`identity.read_current`，不离开当前页）产生核心日志（词汇批 4 后 FB 会话结构上收不到任何作者主页命令，历史 `profile.open` 就地读形态由此取代）
+- **WHEN** Facebook 就地身份读取（`identity.read_current_page`，不离开当前页）产生核心日志（词汇批 4 后 FB 会话结构上收不到任何作者主页命令，历史 `profile.open` 就地读形态由此取代）
 - **THEN** 该核心日志 MUST NOT 命中中文兜底表中描述「顺路去作者主页看看」的跳转规则
 - **AND** 客户端 MUST NOT 呈现任何声称已跳转作者主页的在场感文案
 
@@ -177,17 +177,17 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 
 ### Requirement: Electron Daily Summary Uses Account-Scoped Cloud Usage
 
-The Electron companion SHALL prefer cloud-supplied account-scoped daily usage over locally accumulated log counters for the "today" summary when `ui.snapshot.dailyUsage` is available.
+The Electron companion SHALL prefer cloud-supplied account-scoped daily usage over locally accumulated log counters for the "today" summary when `ui.push_snapshot.dailyUsage` is available.
 
 #### Scenario: Hello snapshot replaces local counters with account today totals
 
-- **WHEN** cloud sends `ui.snapshot.dailyUsage` for the account bound to the edge
+- **WHEN** cloud sends `ui.push_snapshot.dailyUsage` for the account bound to the edge
 - **THEN** Electron renders the supplied account daily totals for exactly the actions the cloud supplied, instead of treating the local process's current-session deltas as authoritative
 - **AND** it renders no metric for an action the cloud did not supply
 
 #### Scenario: Local counters remain a fallback before cloud usage arrives
 
-- **WHEN** Electron has not yet received `ui.snapshot.dailyUsage`
+- **WHEN** Electron has not yet received `ui.push_snapshot.dailyUsage`
 - **THEN** it MAY continue to show local log-derived deltas for available actions, and MUST NOT present quota caps or saturation as if they were authoritative
 
 ### Requirement: Electron Daily Summary Shows Current Daily Quota Saturation
@@ -195,7 +195,7 @@ The Electron companion SHALL show daily plan progress for each supplied action w
 
 #### Scenario: Action reaches the current level's daily plan
 
-- **WHEN** `ui.snapshot.dailyUsage.saturated` includes an action, or the supplied total is greater than or equal to the supplied cap for that action
+- **WHEN** `ui.push_snapshot.dailyUsage.saturated` includes an action, or the supplied total is greater than or equal to the supplied cap for that action
 - **THEN** Electron marks that metric as complete with success styling and presents the action's daily plan as completed
 - **AND** it MUST NOT use red warning styling or user-facing limit terminology for that normal completion
 
@@ -212,11 +212,11 @@ The Electron companion SHALL show daily plan progress for each supplied action w
 
 ### Requirement: Daily Usage Snapshot Remains Backward Compatible
 
-Cloud and edge SHALL keep `ui.snapshot.dailyUsage` optional and backward compatible with older peers.
+Cloud and edge SHALL keep `ui.push_snapshot.dailyUsage` optional and backward compatible with older peers.
 
 #### Scenario: Old edge ignores the field
 
-- **WHEN** an older edge receives `ui.snapshot` with unknown daily usage fields
+- **WHEN** an older edge receives `ui.push_snapshot` with unknown daily usage fields
 - **THEN** the message remains a valid snapshot and the old edge can ignore the extra field without breaking identity, last publish, or publish-card rendering
 
 ### Requirement: Electron Daily Summary Shows Multi-Window Quota Status
@@ -245,7 +245,7 @@ The Electron companion SHALL show plan progress for each cloud-supplied quota wi
 
 #### Scenario: Cloud supplies all quota windows
 
-- **WHEN** `ui.snapshot.dailyUsage.windows` includes `session`, `minute`, `hour`, and `day`
+- **WHEN** `ui.push_snapshot.dailyUsage.windows` includes `session`, `minute`, `hour`, and `day`
 - **THEN** Electron renders those windows as peer detail groups ordered session, minute, hour, and day
 - **AND** the groups use a 2×2 grid at the normal companion width and a one-column grid at the existing narrow breakpoint
 - **AND** it marks completed actions distinctly from near-complete actions without relying on a single worst-action summary as the only visible data
@@ -278,17 +278,17 @@ The Electron companion SHALL show plan progress for each cloud-supplied quota wi
 
 ### Requirement: Windowed Usage Snapshot Remains Backward Compatible
 
-Cloud and edge SHALL preserve the existing `ui.snapshot.dailyUsage` daily aliases while adding optional windowed quota data.
+Cloud and edge SHALL preserve the existing `ui.push_snapshot.dailyUsage` daily aliases while adding optional windowed quota data.
 
 #### Scenario: New cloud sends windowed usage to an old edge
 
-- **WHEN** cloud includes `ui.snapshot.dailyUsage.windows`
+- **WHEN** cloud includes `ui.push_snapshot.dailyUsage.windows`
 - **THEN** the existing `dailyUsage.totals`, `dailyUsage.quotas`, and `dailyUsage.saturated` fields still describe the day window
 - **AND** an older edge can ignore `windows` without losing the existing daily summary behavior
 
 #### Scenario: New edge receives old daily-only usage
 
-- **WHEN** Electron receives `ui.snapshot.dailyUsage` without `windows`
+- **WHEN** Electron receives `ui.push_snapshot.dailyUsage` without `windows`
 - **THEN** it SHALL continue to render daily totals and daily quota saturation as before
 - **AND** it SHALL omit the expanded multi-window detail rather than inventing minute, hour, or session state
 
@@ -309,7 +309,7 @@ The Electron companion SHALL distinguish pacing-driven waiting from generic stal
 
 #### Scenario: Current pacing window is complete
 
-- **WHEN** Electron is in a running or resting session, the latest presence event is stale, and `ui.snapshot.dailyUsage.windows` shows a current session, minute, hour, or day window with at least one saturated capped action
+- **WHEN** Electron is in a running or resting session, the latest presence event is stale, and `ui.push_snapshot.dailyUsage.windows` shows a current session, minute, hour, or day window with at least one saturated capped action
 - **THEN** the presence strip SHALL render a completion message naming the action or its user-facing activity
 - **AND** it SHALL state that the platform is being given time to learn from the current activity
 - **AND** it SHALL include the estimated remaining wait until `releaseAt` when that timestamp is available and in the future
@@ -544,7 +544,7 @@ The Electron companion window permission policy SHALL allow the client's own not
 
 ### Requirement: Daily Usage Windows Expose Refresh And Release Timing
 
-Cloud SHALL include optional timing hints on `ui.snapshot.dailyUsage.windows`
+Cloud SHALL include optional timing hints on `ui.push_snapshot.dailyUsage.windows`
 when it can compute them without guessing. `refreshAt` SHALL mean the epoch-ms
 time when cloud plans or recommends the next usage-window snapshot refresh.
 `releaseAt` SHALL mean the epoch-ms time when a saturated quota in that window
@@ -598,13 +598,13 @@ current fallback wording when timing is absent.
 
 #### Scenario: Old snapshots still render
 
-- **WHEN** Electron receives `ui.snapshot.dailyUsage.windows` without `refreshAt` or `releaseAt`
+- **WHEN** Electron receives `ui.push_snapshot.dailyUsage.windows` without `refreshAt` or `releaseAt`
 - **THEN** it SHALL render the existing window state, totals, quotas, and stale fallback text as before
 
 ### Requirement: Cloud Refreshes Online Daily Usage Snapshots Best-Effort
 
 After sending account-scoped daily usage to an online edge, cloud SHALL schedule
-a best-effort daily-usage-only `ui.snapshot` refresh for that same account and
+a best-effort daily-usage-only `ui.push_snapshot` refresh for that same account and
 edge when a finite future `refreshAt` is available. The scheduled refresh MUST
 be targeted to the same edge, MUST NOT broadcast to unrelated edges, and MUST
 stop retrying when the edge is no longer online or the targeted push is not
@@ -613,7 +613,7 @@ delivered.
 #### Scenario: Online edge receives a scheduled usage refresh
 
 - **WHEN** cloud has sent daily usage with a future `refreshAt` to an online edge
-- **THEN** cloud SHALL attempt a targeted `ui.snapshot` containing fresh `dailyUsage` at or after that time
+- **THEN** cloud SHALL attempt a targeted `ui.push_snapshot` containing fresh `dailyUsage` at or after that time
 - **AND** the refreshed snapshot MAY schedule the next refresh using its new timing metadata
 
 #### Scenario: Offline edge does not cause retry storm
@@ -707,7 +707,7 @@ The Electron companion SHALL present browser cold standby as standby even when t
 
 ### Requirement: 人设绑定态为三态，未知绝不等同未绑
 
-The `personaBound` signal on the `ui.snapshot` stream SHALL carry three states: `true` (cloud confirms bound), `false` (cloud confirms unbound), and **absent** (unknown — the cloud has not said yet). Cloud is the single writer of persona state and therefore SHALL send both `true` and `false`. Edge MUST NOT treat "unknown" as "unbound": no timer, grace window, or timeout may promote unknown into unbound.
+The `personaBound` signal on the `ui.push_snapshot` stream SHALL carry three states: `true` (cloud confirms bound), `false` (cloud confirms unbound), and **absent** (unknown — the cloud has not said yet). Cloud is the single writer of persona state and therefore SHALL send both `true` and `false`. Edge MUST NOT treat "unknown" as "unbound": no timer, grace window, or timeout may promote unknown into unbound.
 
 #### Scenario: 云端确认未绑才算未绑
 - **WHEN** cloud has determined the account has no persona
@@ -1079,7 +1079,7 @@ renderer SHALL 将通用可写门禁与 channel send capability 分离。保存�
 
 该行 MUST NOT 置于自定义标题栏内。标题栏空间与窄窗约束不变，环境级配置也不需要挤入标题区域。
 
-`ui.snapshot` 或 env-scoped 读取的慢启动字段 SHALL 为权威环境配置；字段整体缺省仍表示未知。客户端 MUST NOT 把未知渲染为“未开启”。当投影同时包含 `binding_unknown` 与明确 `state` 时，`state` 表达环境配置，`binding_unknown` 表达当前没有账号执行对象；两者 MUST NOT 互相覆盖或被压成一个禁用态。
+`ui.push_snapshot` 或 env-scoped 读取的慢启动字段 SHALL 为权威环境配置；字段整体缺省仍表示未知。客户端 MUST NOT 把未知渲染为“未开启”。当投影同时包含 `binding_unknown` 与明确 `state` 时，`state` 表达环境配置，`binding_unknown` 表达当前没有账号执行对象；两者 MUST NOT 互相覆盖或被压成一个禁用态。
 
 客户端 MUST NOT 把当前账号称为“新账号”或推断平台年龄，也 MUST NOT 暗示慢启动会使动作变慢、更像真人或改变节奏。慢启动只改变当前环境账号的每日额度上限，不进节奏系数。
 
@@ -2357,7 +2357,7 @@ After an accepted reset the workspace SHALL clear only the selected channel from
 
 客户端 SHALL 在用户拨动账号级慢启动开关后立即显示与目标动作一致的提交中样式，并在云端返回前明确说明正在等待确认。该临时态 MUST 只表达请求在途，MUST NOT 冒充慢启动已经生效，MUST NOT 本地推算天数、绑定状态或计划量。
 
-写入在途期间，客户端 MUST 禁止同一环境重复提交，且 MUST NOT 让旧的 `ui.snapshot` 把目标开关或提交中样式拨回。临时态及错误 MUST 按环境隔离。
+写入在途期间，客户端 MUST 禁止同一环境重复提交，且 MUST NOT 让旧的 `ui.push_snapshot` 把目标开关或提交中样式拨回。临时态及错误 MUST 按环境隔离。
 
 #### Scenario: 开启请求立即进入等待确认样式
 
@@ -2374,7 +2374,7 @@ After an accepted reset the workspace SHALL clear only the selected channel from
 
 #### Scenario: 在途旧快照不得覆盖目标样式
 
-- **WHEN** 慢启动写入仍在途，客户端收到该环境写入前的旧 `ui.snapshot`
+- **WHEN** 慢启动写入仍在途，客户端收到该环境写入前的旧 `ui.push_snapshot`
 - **THEN** 客户端 MUST 保留当前目标开关与提交中样式
 - **AND** 权威快照数据本身 MUST NOT 被本地临时态篡改
 

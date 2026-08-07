@@ -4345,6 +4345,20 @@ release/20260807-ol-restricted-policy 部署（automation d298762 / api 50f514f 
 - [ ] 后台改 recoveryHours（如 72→24）后,已受限账号的剩余等待与扫描判窗即刻按新窗口走（无需重启）
 - [ ] 手动受限（manual_restrict,无信号时间戳）的账号不被秒恢复——从进入受限时刻起足额等满窗口
 
+## 簇 153 · 词汇批 5+7 改名真机验收（objectify-interaction-vocabulary + normalize-nonplatform-vocabulary，2026-08-07）
+
+> **前置环境**：与簇 148/149/152 **同一次出包**（累计：批 1–5+7 全部新名 + 身份闸换血 + 问现状）。
+> dev 云端已发批 5 的 9 条对象名与批 7 的 5 条改名；旧客户端 fail-closed 拒收属预期切换窗口。
+
+- [ ] 互动闭环在新名下走通：xhs 会话 `xiaohongshu.note.like` / `.note.collect` / `.user.follow` / `.note.comment` / `.comment.like` 各至少一次真实回执（`action.completed` 关联键仍是 `like`/`collect`/`follow`/`comment`/`comment_like`，风控记账正常累加）。
+- [ ] FB 帖级点赞 `facebook.note.like`（消费/规则模式）与视频点赞 `facebook.video.like`（Reels 节奏赞或 feed 视频概率赞命中一次）各一次真实回执。
+- [ ] 对象核对诚实失败路径一次：Reels 在场时收 `facebook.note.like`（可手发）回 `object_mismatch_observed_reels`，绝不静默转视频执行器。
+- [ ] FB 结构性不支持已换轨：向 FB 会话手发 `xiaohongshu.note.collect` / `xiaohongshu.comment.like` 观察 `platform_mismatch`（手抄拒集已删，拒收来自平台段闸）。
+- [ ] FB Reels 关注 `facebook.user.follow`（noteId 绑定当前 Reel）一次真实回执。
+- [ ] 批 7：验证码链路在新名下走通（真机触发或注入一次 `captcha.detected` → 云端暂停 + 告警卡 → 清除后 `captcha.cleared` 解除暂停）。
+- [ ] 批 7：`ui.push_snapshot` 正常到达桌面壳（左栏运行态刷新）；`identity.read_current_page`（FB 就地身份读取）与 `state.read`→`state.observed` 应答链各一次。
+- [ ] 评论供线（手动 /comment）在新名下走通：xhs `xiaohongshu.note.comment` 与 FB `facebook.note.comment` 各发布一条（含审批流），回执三态正常。
+
 ## 簇 152 · 词汇批 4 平台段命令真机验收（platformize-browse-vocabulary，2026-08-07）
 
 > **前置环境**：出包装机后的新客户端 + dev 云端（automation `feeab71` 已部署）。

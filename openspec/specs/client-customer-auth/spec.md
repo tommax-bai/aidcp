@@ -1068,7 +1068,7 @@ customer-auth SHALL 提供 env-scoped `PUT /environments/:envKey/slow-start`。�
 
 customer-auth SHALL 提供 env-scoped `GET /environments/:envKey/slow-start`，在该环境边缘不在线（含从未启动）或尚未绑定账号时也返回该环境的慢启动配置真态。
 
-该读 SHALL 先按 ownership 读取环境自己的 `slow_start_since`。有唯一有效当前账号绑定时，SHALL 复用与 `ui.snapshot` 慢启动投影同一个 controller 产出（同一环境 anchor 解析、同一次 clock），MUST NOT 另行推算绑定性或上限。回包 MUST NOT 包含 accountId 或任何其它账号身份标识。
+该读 SHALL 先按 ownership 读取环境自己的 `slow_start_since`。有唯一有效当前账号绑定时，SHALL 复用与 `ui.push_snapshot` 慢启动投影同一个 controller 产出（同一环境 anchor 解析、同一次 clock），MUST NOT 另行推算绑定性或上限。回包 MUST NOT 包含 accountId 或任何其它账号身份标识。
 
 环境未绑定账号或绑定账号不存在时，该读 SHALL 保留环境配置态：关闭返回 `state=off`；开启返回 `state=active`、`since`、`day` 与 `totalDays`，同时返回 `eligible=false`、`ineligibleReason=binding_unknown`。此时 MUST NOT 编造 `binding`、`dayQuotas` 或“配额已被压低”。ownership/配置读失败 MUST 返回 `503`，MUST NOT 降级为 `binding_unknown`，MUST NOT 返回看起来正常的空投影。
 

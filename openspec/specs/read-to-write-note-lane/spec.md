@@ -27,7 +27,7 @@ Electron 客户端 SHALL 将阅读页进入发布评论的过程投影为 `评�
 
 #### Scenario: 评论命令进入评论创作状态
 
-- **WHEN** edge 接收到 `interaction.comment`
+- **WHEN** edge 接收到 `xiaohongshu.note.comment`
 - **THEN** Electron 客户端当前 loop stage SHALL 切换为 `评论创作`
 
 #### Scenario: 评论真实成功后仍处于评论创作状态并计数

@@ -5,13 +5,13 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 ## Requirements
 ### Requirement: 云端必须接收并解析验证码上报，不得静默丢弃
 
-云端 SHALL 在 `protocol.ts` 镜像 `risk.captcha_detected` / `risk.captcha_cleared` 两个消息类型与对应 payload，并在 `DefaultMessageHandler` 路由它们到验证码协调器；MUST NOT 让这两类上报落到 switch 的 `unsupported_type` default 被静默丢弃。两份 `protocol.ts` MUST 逐字一致、消息总数同步、`docs/protocol.md` 计数与表同步。
+云端 SHALL 在 `protocol.ts` 镜像 `captcha.detected` / `captcha.cleared` 两个消息类型与对应 payload（验证码检测与协助自本 change 起同属 `captcha.*` 顶层域，一族一属主；历史 `risk.` 前缀因把「消费方拿它干什么」编码进名字而废止），并在 `DefaultMessageHandler` 路由它们到验证码协调器；MUST NOT 让这两类上报落到 switch 的 `unsupported_type` default 被静默丢弃。两份 `protocol.ts` MUST 逐字一致、消息总数同步、`docs/protocol.md` 计数与表同步。
 
 **`MessageType` 穷举守卫只护消息类型、不护 payload 字段。** 当协助能力以「扩既有载荷的可选字段」而非「新增消息类型」的方式演进时，字段级漂移（一侧加了字段、另一侧没加）**typecheck 与消息数断言都抓不到**。因此协助命令与回执的 payload MUST 有逐字段的两侧往返断言，且 panel HTTP 边界（从 `unknown` 手写解构处）MUST 有透传断言——在那里漏一个字段是静默丢弃且全绿。
 
 #### Scenario: 验证码上报被正确路由
 
-- **WHEN** 云端收到一帧 `risk.captcha_detected{edgeId,kind,url}`
+- **WHEN** 云端收到一帧 `captcha.detected{edgeId,kind,url}`
 - **THEN** 云端将其交给验证码协调器处理（迁移状态 / 暂停 / 通知），而非返回 `error{code:'unsupported_type'}`
 
 #### Scenario: 协议两侧不漂移
@@ -26,21 +26,21 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 
 ### Requirement: 验证码上报必须迁移账号风控状态（云端单写）
 
-云端收到 `risk.captcha_detected` SHALL 依 `kind` 经 `RiskController.applySignal` 迁移**归属账号**的风控状态：`kind:'captcha'` 提交 `confirmed` 信号（`normal`→`restricted`），`kind:'unknown'` 提交 `light` 信号（`normal`→`warned`）。账号风控终态 MUST 仅由云端 `RiskController` / `RiskStateMachine` 单写，迁移结果 MUST 持久化。
+云端收到 `captcha.detected` SHALL 依 `kind` 经 `RiskController.applySignal` 迁移**归属账号**的风控状态：`kind:'captcha'` 提交 `confirmed` 信号（`normal`→`restricted`），`kind:'unknown'` 提交 `light` 信号（`normal`→`warned`）。账号风控终态 MUST 仅由云端 `RiskController` / `RiskStateMachine` 单写，迁移结果 MUST 持久化。
 
 #### Scenario: 验证码置账号为 restricted
 
-- **WHEN** 云端收到 `risk.captcha_detected{kind:'captcha'}` 且归属账号当前为 `normal`
+- **WHEN** 云端收到 `captcha.detected{kind:'captcha'}` 且归属账号当前为 `normal`
 - **THEN** 该账号迁移为 `restricted`，且该状态经 `PgRiskStore` 持久化、跨进程重启仍生效
 
 #### Scenario: 未知弹窗温和降级
 
-- **WHEN** 云端收到 `risk.captcha_detected{kind:'unknown'}` 且归属账号当前为 `normal`
+- **WHEN** 云端收到 `captcha.detected{kind:'unknown'}` 且归属账号当前为 `normal`
 - **THEN** 该账号迁移为 `warned`（而非 `restricted`），保留互动但整体放慢
 
 ### Requirement: 验证码期间必须按 edge 暂停指令下发且不死锁
 
-云端 SHALL 在传输层（`EdgeCloudServer.pushToEdges`）维护按 `edgeId` 的暂停集合；收到 `risk.captcha_detected` 即暂停向**该 edge** 下发浏览 / 互动指令，对其它 edge 无影响。暂停 MUST 在 `RoleDispatcher.restartSession`（每次 `edge.hello` 重连）后仍然生效（持于传输层而非会话态）。`session.end` MUST 仍可送达被暂停的 edge；MUST NOT 通过结束共享会话 / 丢弃 `SessionContext` 来实现暂停（会冻结所有 edge 并被重连清除）。
+云端 SHALL 在传输层（`EdgeCloudServer.pushToEdges`）维护按 `edgeId` 的暂停集合；收到 `captcha.detected` 即暂停向**该 edge** 下发浏览 / 互动指令，对其它 edge 无影响。暂停 MUST 在 `RoleDispatcher.restartSession`（每次 `edge.hello` 重连）后仍然生效（持于传输层而非会话态）。`session.end` MUST 仍可送达被暂停的 edge；MUST NOT 通过结束共享会话 / 丢弃 `SessionContext` 来实现暂停（会冻结所有 edge 并被重连清除）。
 
 #### Scenario: 暂停只影响出问题的 edge
 
@@ -54,11 +54,11 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 
 ### Requirement: 必须去重冷却后发飞书通知，且失败不得静默
 
-云端收到 `risk.captcha_detected` SHALL 通过既有 `FeishuMessenger` 发一张 notify-only 告警卡（复用 `buildAlertCard`），内容含归属账号、机器定位（`machineLabel` / `edgeId`），便于人工前往处置；该卡 MUST NOT 带审批按钮、MUST NOT 写 `/tmp` 信号文件（与发布审批不同）、MUST NOT 展示远程桌面入口或远程地址文案（该入口已随本 change 移除）。云端 SHALL 对同一 edge 的重复验证码上报施加冷却窗（默认约 10 分钟、可配）以防刷屏。告警发送失败 MUST 被记录，MUST NOT 被静默吞掉。
+云端收到 `captcha.detected` SHALL 通过既有 `FeishuMessenger` 发一张 notify-only 告警卡（复用 `buildAlertCard`），内容含归属账号、机器定位（`machineLabel` / `edgeId`），便于人工前往处置；该卡 MUST NOT 带审批按钮、MUST NOT 写 `/tmp` 信号文件（与发布审批不同）、MUST NOT 展示远程桌面入口或远程地址文案（该入口已随本 change 移除）。云端 SHALL 对同一 edge 的重复验证码上报施加冷却窗（默认约 10 分钟、可配）以防刷屏。告警发送失败 MUST 被记录，MUST NOT 被静默吞掉。
 
 #### Scenario: 首次验证码发卡
 
-- **WHEN** 某 edge 首次报 `risk.captcha_detected`
+- **WHEN** 某 edge 首次报 `captcha.detected`
 - **THEN** 云端向飞书群发一张含"账号 / 机器 / Edge"的告警卡
 
 #### Scenario: 冷却窗内不重复刷屏
@@ -73,16 +73,16 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 
 ### Requirement: 收到验证码清除必须恢复该 edge 下发
 
-云端收到 `risk.captcha_cleared` SHALL 解除对该 `edgeId` 的传输层暂停，使浏览循环可继续（边缘清除弹窗后自行重扫并重报 `page.cards`，云端据此续刷）。风控状态 MUST NOT 因清除即自动回滚——降级由状态机恢复窗口或人工恢复命令驱动，避免一清除就解除安全姿态。
+云端收到 `captcha.cleared` SHALL 解除对该 `edgeId` 的传输层暂停，使浏览循环可继续（边缘清除弹窗后自行重扫并重报 `page.cards`，云端据此续刷）。风控状态 MUST NOT 因清除即自动回滚——降级由状态机恢复窗口或人工恢复命令驱动，避免一清除就解除安全姿态。
 
 #### Scenario: 清除后恢复下发
 
-- **WHEN** 某 edge 报 `risk.captcha_cleared`
+- **WHEN** 某 edge 报 `captcha.cleared`
 - **THEN** 云端解除该 edge 的暂停，后续 `page.cards` 能再次触发决策与下发
 
 #### Scenario: 清除不自动解除 restricted
 
-- **WHEN** 一个被验证码置为 `restricted` 的账号随后报 `risk.captcha_cleared`
+- **WHEN** 一个被验证码置为 `restricted` 的账号随后报 `captcha.cleared`
 - **THEN** 该账号风控状态仍为 `restricted`（不自动回 `normal`），由恢复窗口或人工命令决定何时降级
 
 ### Requirement: 边缘 hello 必须声明账号与机器定位以供归属
@@ -101,21 +101,21 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 
 ### Requirement: 低置信未知遮罩的云端上报必须经一轮持续性确认
 
-边缘对**最低置信的 `unknown` 阻断遮罩**（旁路监测按形状 / 尺寸 / iframe 启发式归类、无语义文案命中的那类）向云端上报 `risk.captcha_detected` 前 MUST 经**一轮持续性确认**：翻转进 `unknown` 时 MUST NOT 第一轮探测差异即上报，须延后约一个监测轮询周期后**复核遮罩仍在**才发。**单轮即消失的瞬时 `unknown`**（如离页返回途中一闪即被自愈掉的坏页）MUST NOT 上报 `risk.captcha_detected`、MUST NOT 触发账号风控状态迁移、MUST NOT 使云端暂停该 edge 下发。
+边缘对**最低置信的 `unknown` 阻断遮罩**（旁路监测按形状 / 尺寸 / iframe 启发式归类、无语义文案命中的那类）向云端上报 `captcha.detected` 前 MUST 经**一轮持续性确认**：翻转进 `unknown` 时 MUST NOT 第一轮探测差异即上报，须延后约一个监测轮询周期后**复核遮罩仍在**才发。**单轮即消失的瞬时 `unknown`**（如离页返回途中一闪即被自愈掉的坏页）MUST NOT 上报 `captcha.detected`、MUST NOT 触发账号风控状态迁移、MUST NOT 使云端暂停该 edge 下发。
 
 `kind:'captcha'`（验证码厂商指纹命中）与登录墙类 MUST 保持**即时 fail-CLOSED**：MUST NOT 因本确认闸而延后，一经检出立即本地停手并即时上报 / 升级。本确认闸只作用于最低置信的 `unknown` 桶。
 
-本要求约束的是**边缘何时上报**（上游），云端收到 `risk.captcha_detected` 后的 `kind→signal→state` 映射（`unknown→light→warned`、`captcha→confirmed→restricted`）、传输层暂停、告警、恢复语义**全部不变**。**不新增 / 改动任何消息类型，两份 `protocol.ts` 消息总数不变**（AC-PROTO-02 断言值不因本 change 变动）。
+本要求约束的是**边缘何时上报**（上游），云端收到 `captcha.detected` 后的 `kind→signal→state` 映射（`unknown→light→warned`、`captcha→confirmed→restricted`）、传输层暂停、告警、恢复语义**全部不变**。**不新增 / 改动任何消息类型，两份 `protocol.ts` 消息总数不变**（AC-PROTO-02 断言值不因本 change 变动）。
 
 #### Scenario: 一闪而过的未知遮罩不惊动云端
 
 - **WHEN** 边缘旁路监测某一轮把页面判成 `unknown` 阻断遮罩，但在确认窗内（约一个轮询周期）遮罩已消失、页面回到非阻断态
-- **THEN** 边缘 MUST NOT 发 `risk.captcha_detected`，归属账号维持 `normal`、会话不被暂停；且因从未发过 `detected`，MUST NOT 发出无配对的孤儿 `risk.captcha_cleared`
+- **THEN** 边缘 MUST NOT 发 `captcha.detected`，归属账号维持 `normal`、会话不被暂停；且因从未发过 `detected`，MUST NOT 发出无配对的孤儿 `captcha.cleared`
 
 #### Scenario: 持续存在的未知遮罩照常上报
 
 - **WHEN** 一堵真实持续的未知阻断遮罩在确认窗后复核仍在
-- **THEN** 边缘照常发一次 `risk.captcha_detected{kind:'unknown'}`，云端按既有映射迁移该账号 `normal→warned` 并暂停该 edge（行为不变）
+- **THEN** 边缘照常发一次 `captcha.detected{kind:'unknown'}`，云端按既有映射迁移该账号 `normal→warned` 并暂停该 edge（行为不变）
 
 #### Scenario: 验证码指纹类不被确认闸延后
 
@@ -124,17 +124,17 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 
 ### Requirement: 瞬时阻断自愈时边缘自动上报清除且不留孤儿
 
-边缘旁路监测从阻断态翻回非阻断态时 MUST 自动发 `risk.captcha_cleared`（现役行为，保留）。结合上条确认闸，边缘 MUST 保证 `detected` 与 `cleared` **配对**：只有真正发过 `risk.captcha_detected` 的阻断态，其自愈才发对应 `risk.captcha_cleared`；被确认闸抑制、从未上报过的瞬时 `unknown`，其消失 MUST NOT 触发孤儿 `cleared`，也 MUST NOT 遗留一条已发但永不清除的 `detected`。
+边缘旁路监测从阻断态翻回非阻断态时 MUST 自动发 `captcha.cleared`（现役行为，保留）。结合上条确认闸，边缘 MUST 保证 `detected` 与 `cleared` **配对**：只有真正发过 `captcha.detected` 的阻断态，其自愈才发对应 `captcha.cleared`；被确认闸抑制、从未上报过的瞬时 `unknown`，其消失 MUST NOT 触发孤儿 `cleared`，也 MUST NOT 遗留一条已发但永不清除的 `detected`。
 
 #### Scenario: 上报过的阻断自愈后发配对 cleared
 
-- **WHEN** 边缘曾就一堵持续遮罩发过 `risk.captcha_detected`，该遮罩随后自行消失
-- **THEN** 边缘发一次 `risk.captcha_cleared`，云端解除该 edge 暂停、恢复下发（风控状态按既有语义不自动回滚）
+- **WHEN** 边缘曾就一堵持续遮罩发过 `captcha.detected`，该遮罩随后自行消失
+- **THEN** 边缘发一次 `captcha.cleared`，云端解除该 edge 暂停、恢复下发（风控状态按既有语义不自动回滚）
 
 #### Scenario: 被抑制的瞬时遮罩消失不发孤儿 cleared
 
 - **WHEN** 一次被确认闸抑制、从未上报的瞬时 `unknown` 遮罩消失
-- **THEN** 边缘 MUST NOT 发 `risk.captcha_cleared`（无配对 `detected`），云端侧无任何暂停 / 恢复扰动
+- **THEN** 边缘 MUST NOT 发 `captcha.cleared`（无配对 `detected`），云端侧无任何暂停 / 恢复扰动
 
 ### Requirement: 阻断告警卡片账号展示必须昵称优先
 
@@ -142,7 +142,7 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 
 #### Scenario: 未知阻断告警标题展示昵称
 
-- **WHEN** 账号 `acc-1` 已捕获昵称 `工程师大白` 且该账号上报 `risk.captcha_detected{kind:'unknown'}`
+- **WHEN** 账号 `acc-1` 已捕获昵称 `工程师大白` 且该账号上报 `captcha.detected{kind:'unknown'}`
 - **THEN** Feishu P1 告警卡标题中的账号后缀 SHALL 展示 `工程师大白`
 - **AND** 告警落库与风控迁移仍 SHALL 使用 `acc-1`
 
@@ -179,14 +179,14 @@ Facebook comment submit or other account-scoped actions SHALL perform a fresh bl
 
 ### Requirement: 验证码告警必须创建可远程协助的 incident
 
-云端收到 `risk.captcha_detected` 后，除既有风控迁移、edge 暂停和 Feishu 告警外，还 SHALL 为该次阻断创建或更新一个远程协助 incident。incident MUST 绑定真实 `edgeId`、`accountId`、`kind`、首次检测 URL、创建时间、过期时间和当前处理状态；若缺少 `edgeId` 或无法定位在线 edge，系统 MUST 诚实标记该 incident 不可远程协助。incident MUST NOT 让 cloud 新开浏览器处理平台验证码。
+云端收到 `captcha.detected` 后，除既有风控迁移、edge 暂停和 Feishu 告警外，还 SHALL 为该次阻断创建或更新一个远程协助 incident。incident MUST 绑定真实 `edgeId`、`accountId`、`kind`、首次检测 URL、创建时间、过期时间和当前处理状态；若缺少 `edgeId` 或无法定位在线 edge，系统 MUST 诚实标记该 incident 不可远程协助。incident MUST NOT 让 cloud 新开浏览器处理平台验证码。
 
 系统 MUST NOT 声称存在「远程桌面处置」这一后路：本系统不提供任何远程桌面能力，incident 与告警 MUST NOT 展示远程桌面入口或远程地址文案。不可远程协助时的诚实表述是**「本次无法远程协助」**，MUST NOT 暗示存在另一条已就绪的处置通道。
 
 > **移除背景（原「远程桌面处置文案」条款）**：远程地址是边缘启动时从环境变量读取的自陈自由文本，全仓仅两行源码读取它，无示例配置、无文档、无界面入口，从未被填写过；控制台把该字符串直接当链接、Feishu 卡把它当一行文字打印。系统**不提供任何远程桌面能力**，其真机验证自 2026-06-21 起一直 DEFERRED。保留一个背后什么都没有的处置入口，会让「协助不了就走远程桌面」成为一条不存在的推诿路径——这与「MUST NOT 静默假成功」同源。故本 change 移除远程桌面入口与远程地址文案（控制台按钮、Feishu 卡片行、边缘环境变量读取、两份 `protocol.ts` 的 hello 载荷 `remoteAddr` 字段、云端 session / incident / panel 类型的连带字段），**无外部消费方、风险为零**。若将来确需远程桌面，前置是先决定运营机上部署何种第三方工具（采购与运维决策），届时另行立项。
 
 #### Scenario: 验证码创建远程协助 incident
-- **WHEN** cloud 收到 `risk.captcha_detected{edgeId:'edge-1', accountId:'acc-1', kind:'captcha'}`
+- **WHEN** cloud 收到 `captcha.detected{edgeId:'edge-1', accountId:'acc-1', kind:'captcha'}`
 - **THEN** cloud 创建一个绑定 `edge-1` 与 `acc-1` 的 open incident，并继续执行既有 restricted、pause edge、Feishu 告警流程
 
 #### Scenario: 无 edge 归属时不可远程协助
@@ -235,33 +235,33 @@ Facebook comment submit or other account-scoped actions SHALL perform a fresh bl
 
 #### Scenario: edge 当前不在阻断态
 - **WHEN** edge 收到 assist 注入命令但注入前的 fresh probe 显示当前已无 captcha/unknown 阻断
-- **THEN** edge MUST 不执行注入，MUST 回 `not_blocked` 回执，且 MUST NOT 由这一次单次 probe 发出 `risk.captcha_cleared` —— 清除交由旁路监测体的翻转闸这条正常路径达成（见「远程协助后的恢复必须由 edge 复检清除驱动」的三条发出权划分）
+- **THEN** edge MUST 不执行注入，MUST 回 `not_blocked` 回执，且 MUST NOT 由这一次单次 probe 发出 `captcha.cleared` —— 清除交由旁路监测体的翻转闸这条正常路径达成（见「远程协助后的恢复必须由 edge 复检清除驱动」的三条发出权划分）
 
 ### Requirement: 远程协助后的恢复必须由 edge 复检清除驱动
 
-edge 执行远程协助点击后 SHALL 等待有界 settle 时间并重新探测阻断遮罩。仅当 fresh probe 确认 captcha/unknown 遮罩已消失时，edge SHALL 发送 `risk.captcha_cleared`，cloud 才 SHALL 解除该 edge 暂停；如果遮罩仍存在，系统 MUST 返回 still_blocked，并允许操作者刷新截图后重试。**实时抓帧循环 MUST NOT 用单次 probe 看不到遮罩就自主发 `risk.captcha_cleared`**：多步验证码在旧挑战消失、新挑战未绘出之间存在瞬时无遮罩窗口，自主判 cleared MUST 经连续 K 次确认 + 最小 settle 才成立。**实时循环的自主 probe 结果 MUST NOT 经 `click_result` 混入 `incident.lastResult`**，以免把非运营发起的探测记成一次复检、污染审计与前端"上次复检"。cloud MUST NOT 因点击命令成功送达、Feishu 链接被打开、协助页按钮被点击或告警被手动解决而恢复 edge。
+edge 执行远程协助点击后 SHALL 等待有界 settle 时间并重新探测阻断遮罩。仅当 fresh probe 确认 captcha/unknown 遮罩已消失时，edge SHALL 发送 `captcha.cleared`，cloud 才 SHALL 解除该 edge 暂停；如果遮罩仍存在，系统 MUST 返回 still_blocked，并允许操作者刷新截图后重试。**实时抓帧循环 MUST NOT 用单次 probe 看不到遮罩就自主发 `captcha.cleared`**：多步验证码在旧挑战消失、新挑战未绘出之间存在瞬时无遮罩窗口，自主判 cleared MUST 经连续 K 次确认 + 最小 settle 才成立。**实时循环的自主 probe 结果 MUST NOT 经 `click_result` 混入 `incident.lastResult`**，以免把非运营发起的探测记成一次复检、污染审计与前端"上次复检"。cloud MUST NOT 因点击命令成功送达、Feishu 链接被打开、协助页按钮被点击或告警被手动解决而恢复 edge。
 
-**`risk.captcha_cleared` 的发出权 MUST 限于三条路径**：① 运营发起的注入之后、经有界 settle 与 fresh probe 确认（本要求主句）；② 实时循环的连续 K 次确认；③ 旁路监测体的阻断态翻转闸。
+**`captcha.cleared` 的发出权 MUST 限于三条路径**：① 运营发起的注入之后、经有界 settle 与 fresh probe 确认（本要求主句）；② 实时循环的连续 K 次确认；③ 旁路监测体的阻断态翻转闸。
 
 **未经注入的单次 probe MUST NOT 发出该消息**，包括截图请求（手动刷新）与注入前的 stale 复检：它们与实时循环共用同一个「旧挑战已消失、新挑战未绘出」的瞬时无遮罩窗口，却既无 settle 也无连续确认——单次 probe 在这两处与在实时循环里同样不可信，据此上报即提前解 `restricted`（自残）。这两处发现当前无阻断时 MUST 只回 `not_blocked` 回执（cloud 的既有映射已据此更新 incident），恢复交由 ② / ③ 达成：旁路监测体本就在独立轮询，遮罩真的消失时它的翻转闸会发出配对的 `cleared`，故不发不会使该 edge 滞留暂停态。
 
-**`risk.captcha_cleared` 的发送 MUST 排在 `click_result` 之前，且二者 MUST 各自独立容错。** 前者承重（解除生产账号的下发暂停），后者只驱动界面；把承重的那条排在装饰性的那条之后，会让传输异常时"已解决的验证码"永远到不了云端、账号无限期处于暗停状态。
+**`captcha.cleared` 的发送 MUST 排在 `click_result` 之前，且二者 MUST 各自独立容错。** 前者承重（解除生产账号的下发暂停），后者只驱动界面；把承重的那条排在装饰性的那条之后，会让传输异常时"已解决的验证码"永远到不了云端、账号无限期处于暗停状态。
 
 #### Scenario: 点击后验证码清除
 - **WHEN** edge 执行 assist 点击序列后 fresh probe 显示阻断遮罩消失
-- **THEN** edge 发送 `risk.captcha_cleared`，cloud 通过既有 onCleared 路径恢复该 edge 下发并标记 incident cleared
+- **THEN** edge 发送 `captcha.cleared`，cloud 通过既有 onCleared 路径恢复该 edge 下发并标记 incident cleared
 
 #### Scenario: 实时循环瞬时无遮罩不误清除
 - **WHEN** 实时循环某一 tick 的单次 probe 未见遮罩，但下一挑战尚未绘出
-- **THEN** 系统 MUST 要求连续 K 次确认 + 最小 settle 后才判 cleared，单次未见 MUST NOT 触发 `risk.captcha_cleared` 或提前解 `restricted`
+- **THEN** 系统 MUST 要求连续 K 次确认 + 最小 settle 后才判 cleared，单次未见 MUST NOT 触发 `captcha.cleared` 或提前解 `restricted`
 
 #### Scenario: 手动刷新截图不得绕过 K 次确认
 - **WHEN** 运营在协助页点「刷新」，edge 的单次 probe 未见遮罩
-- **THEN** edge MUST 只回 `not_blocked` 回执，MUST NOT 发送 `risk.captcha_cleared`；恢复由旁路监测体的翻转闸达成
+- **THEN** edge MUST 只回 `not_blocked` 回执，MUST NOT 发送 `captcha.cleared`；恢复由旁路监测体的翻转闸达成
 
 #### Scenario: 注入前复检发现遮罩已消失
 - **WHEN** 运营提交了协助命令，但注入前的 stale 复检的单次 probe 未见遮罩
-- **THEN** edge MUST NOT 注入、MUST 只回 `not_blocked` 回执，MUST NOT 发送 `risk.captcha_cleared`（该 probe 未经 settle 与连续确认）
+- **THEN** edge MUST NOT 注入、MUST 只回 `not_blocked` 回执，MUST NOT 发送 `captcha.cleared`（该 probe 未经 settle 与连续确认）
 
 #### Scenario: 键入进行中不得抓帧
 - **WHEN** 某 incident 正在派发协助键入序列，此时收到截图请求
@@ -276,7 +276,7 @@ edge 执行远程协助点击后 SHALL 等待有界 settle 时间并重新探测
 - **THEN** edge 返回 still_blocked，cloud 保持该 edge 暂停并向协助页展示新的处理状态
 
 #### Scenario: 手动解决告警不恢复 edge
-- **WHEN** 操作者在告警列表中手动解决对应 captcha 告警但 edge 尚未发送 `risk.captcha_cleared`
+- **WHEN** 操作者在告警列表中手动解决对应 captcha 告警但 edge 尚未发送 `captcha.cleared`
 - **THEN** cloud MUST 只闭合告警日志行，MUST NOT 将 incident 标记 cleared，MUST NOT resume 该 edge
 
 ### Requirement: 暂停期间只允许 captcha assist 恢复命令穿透
@@ -341,7 +341,7 @@ edge 执行远程协助点击后 SHALL 等待有界 settle 时间并重新探测
 
 ### Requirement: 远程协助可复刻运营真实鼠标轨迹
 
-系统 SHALL 允许控制台采集运营在协助页画面上的真实鼠标轨迹，并把它随既有 `captcha.assist.click` 命令上送、由原边缘复刻到原浏览器。轨迹 MUST 作为既有命令的**可选附加字段**承载，MUST NOT 新增 MessageType。**离散落点始终是落点的权威来源**；轨迹仅贡献移动路径与按下时机。无轨迹或轨迹无效时，系统 MUST 诚实回落到合成拟人路径（见"协助注入点击必须达到不低于日常点击的合成拟人度"），MUST NOT 谎称使用了轨迹。风控语义（detected→restricted、cleared 不自动回 normal、只有真实清除才发 `risk.captcha_cleared`）MUST 保持不变。
+系统 SHALL 允许控制台采集运营在协助页画面上的真实鼠标轨迹，并把它随既有 `captcha.assist.click` 命令上送、由原边缘复刻到原浏览器。轨迹 MUST 作为既有命令的**可选附加字段**承载，MUST NOT 新增 MessageType。**离散落点始终是落点的权威来源**；轨迹仅贡献移动路径与按下时机。无轨迹或轨迹无效时，系统 MUST 诚实回落到合成拟人路径（见"协助注入点击必须达到不低于日常点击的合成拟人度"），MUST NOT 谎称使用了轨迹。风控语义（detected→restricted、cleared 不自动回 normal、只有真实清除才发 `captcha.cleared`）MUST 保持不变。
 
 #### Scenario: 控制台采集轨迹并与落点同基准
 - **WHEN** 运营在协助页画面上移动并点击
@@ -411,11 +411,11 @@ edge 执行远程协助点击后 SHALL 等待有界 settle 时间并重新探测
 
 #### Scenario: 拟人化不改变诚实回执
 - **WHEN** 注入后遮罩仍在或注入过程抛错
-- **THEN** MUST 沿用既有 `settle → reprobe → still_blocked / failed / 回传新截图` 回执，MUST NOT 因拟人化改动而静默假成功；只有真实清除才发 `risk.captcha_cleared`
+- **THEN** MUST 沿用既有 `settle → reprobe → still_blocked / failed / 回传新截图` 回执，MUST NOT 因拟人化改动而静默假成功；只有真实清除才发 `captcha.cleared`
 
 ### Requirement: 小红书笔记访问限制弹窗不得作为账号级验证码事故上报
 
-边缘 SHALL 识别小红书 Web 笔记访问限制弹窗（如 `access-modal`、`access-limit-app`、文案“当前笔记暂时无法浏览 / 请打开小红书App扫码查看”）为可恢复的笔记访问限制状态，而非账号登录墙、验证码或未知账号级阻断。该类弹窗出现时，边缘 MUST NOT 触发 `risk.captcha_detected`、MUST NOT 将浏览命令队列长期暂停为 captcha/unknown；它 MAY 通过关闭浮层或直接导航回健康来源列表恢复。若访问限制发生在正在打开的笔记上，边缘仍须诚实失败或返回列表，MUST NOT 冒充已成功读取该笔记。
+边缘 SHALL 识别小红书 Web 笔记访问限制弹窗（如 `access-modal`、`access-limit-app`、文案“当前笔记暂时无法浏览 / 请打开小红书App扫码查看”）为可恢复的笔记访问限制状态，而非账号登录墙、验证码或未知账号级阻断。该类弹窗出现时，边缘 MUST NOT 触发 `captcha.detected`、MUST NOT 将浏览命令队列长期暂停为 captcha/unknown；它 MAY 通过关闭浮层或直接导航回健康来源列表恢复。若访问限制发生在正在打开的笔记上，边缘仍须诚实失败或返回列表，MUST NOT 冒充已成功读取该笔记。
 
 #### Scenario: 失效详情路由弹出 access-limit-app
 - **WHEN** 小红书页面出现可见 `access-modal` / `access-limit-app`，并包含“当前笔记暂时无法浏览”或“请打开小红书App扫码查看”等文案
@@ -702,9 +702,9 @@ The edge's Native browse runtime MUST run a periodic blocking-state observation 
 
 For Xiaohongshu the observation MUST at minimum distinguish a captcha/verification challenge state and a login-wall state from a non-blocking state, and it MUST act on them:
 
-- Captcha state MUST fail closed immediately: the edge MUST stop ordinary browse locally and MUST send `risk.captcha_detected{kind:'captcha'}` carrying the edge id, the owning account id when known, and the observed location.
+- Captcha state MUST fail closed immediately: the edge MUST stop ordinary browse locally and MUST send `captcha.detected{kind:'captcha'}` carrying the edge id, the owning account id when known, and the observed location.
 - Login-wall state MUST stop ordinary browse locally. The edge MUST NOT report a login wall as an account-level captcha incident, and MUST NOT report any browse command that was suppressed by it as successful.
-- Returning to a non-blocking state MUST send exactly one paired `risk.captcha_cleared` when — and only when — a `risk.captcha_detected` was actually sent for that episode. A suppressed or never-reported episode MUST NOT produce an orphan `cleared`, and a reported episode MUST NOT be left with a `detected` that is never cleared.
+- Returning to a non-blocking state MUST send exactly one paired `captcha.cleared` when — and only when — a `captcha.detected` was actually sent for that episode. A suppressed or never-reported episode MUST NOT produce an orphan `cleared`, and a reported episode MUST NOT be left with a `detected` that is never cleared.
 
 While the edge is locally stopped for a blocking state, browse commands that arrive MUST receive a truthful not-started result; they MUST NOT be silently dropped and MUST NOT be answered as if the page action had happened.
 
@@ -713,26 +713,26 @@ This requirement MUST NOT add or remove protocol message types; the two `protoco
 #### Scenario: Xiaohongshu captcha reaches the cloud
 
 - **WHEN** a Xiaohongshu browse session's periodic observation classifies the current page as a captcha/verification challenge
-- **THEN** the edge stops ordinary browse locally and sends one `risk.captcha_detected{kind:'captcha'}` with the edge id and observed location
+- **THEN** the edge stops ordinary browse locally and sends one `captcha.detected{kind:'captcha'}` with the edge id and observed location
 - **AND** the cloud can migrate the owning account's risk state and offer remote assistance, exactly as it does for the Facebook path
 
 #### Scenario: Self-healed Xiaohongshu block sends one paired clear
 
-- **WHEN** a Xiaohongshu blocking state for which `risk.captcha_detected` was sent disappears and the page returns to a non-blocking state
-- **THEN** the edge sends exactly one `risk.captcha_cleared` and resumes ordinary browse
+- **WHEN** a Xiaohongshu blocking state for which `captcha.detected` was sent disappears and the page returns to a non-blocking state
+- **THEN** the edge sends exactly one `captcha.cleared` and resumes ordinary browse
 - **AND** it does not send a second `detected` for the same episode
 
 #### Scenario: Never-reported episode produces no orphan clear
 
-- **WHEN** a blocking observation never resulted in a `risk.captcha_detected` and the page returns to a non-blocking state
-- **THEN** the edge sends no `risk.captcha_cleared`
+- **WHEN** a blocking observation never resulted in a `captcha.detected` and the page returns to a non-blocking state
+- **THEN** the edge sends no `captcha.cleared`
 - **AND** the cloud sees no pause/resume disturbance for that edge
 
 #### Scenario: Login wall is not reported as an account-level captcha incident
 
 - **WHEN** a Xiaohongshu browse session observes a login wall
 - **THEN** the edge stops ordinary browse locally and waits for login
-- **AND** it does not send `risk.captcha_detected` for the login wall, and it does not report the suppressed browse commands as successful
+- **AND** it does not send `captcha.detected` for the login wall, and it does not report the suppressed browse commands as successful
 
 #### Scenario: A supported browse platform is never left unobserved
 
@@ -753,7 +753,7 @@ When the low-confidence bucket is absent for a platform, the delayed-confirmatio
 #### Scenario: Unrecognized page type is not a blocking report
 
 - **WHEN** a Xiaohongshu periodic observation returns a page whose type could not be recognized, with no captcha or login-wall classification
-- **THEN** the edge sends no `risk.captcha_detected`
+- **THEN** the edge sends no `captcha.detected`
 - **AND** the owning account's risk state is not migrated and the edge is not paused
 
 #### Scenario: Absent bucket does not weaken the fail-closed classes

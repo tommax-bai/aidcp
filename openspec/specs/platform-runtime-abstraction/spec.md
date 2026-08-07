@@ -48,11 +48,11 @@ cloud SHALL 提供按 `PlatformId` 索引的平台 profile registry，用于描�
 
 #### Scenario: 不同副作用拆成不同命令
 - **WHEN** 本人身份采集在 Facebook 必须留在当前页、在 Xiaohongshu 必须进入本人主页
-- **THEN** Cloud 分别选择 `identity.read_current` 与 `identity.read_self_profile`
+- **THEN** Cloud 分别选择 `identity.read_current_page` 与 `identity.read_self_profile`
 - **AND** MUST NOT 通过同一个 `xiaohongshu.profile.open` 的平台分支或 `direct` 字段表达差异
 
 #### Scenario: 新真实语义跨协议同步
-- **WHEN** 新增 `identity.read_current`、`identity.read_self_profile` 与 `identity.observed`
+- **WHEN** 新增 `identity.read_current_page`、`identity.read_self_profile` 与 `identity.observed`
 - **THEN** 两端协议枚举、命令映射、主动路由、协议文档、能力协商与验收测试同步更新
 
 #### Scenario: surface 与 purpose 是平台无关字段扩展

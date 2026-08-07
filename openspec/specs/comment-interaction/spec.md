@@ -143,20 +143,6 @@ TBD - created by archiving change comment-interaction. Update Purpose after arch
 - **WHEN** 有实现点击"发送"后不做后置校验即回 `ok:true`
 - **THEN** MUST 视为违规、不予合入；`ok:true` MUST 以"编辑器清空 且 自己的评论行出现"为前提
 
-### Requirement: 协议 v2 新增 interaction.comment 并三处同步
-
-系统 SHALL 新增 cloud→edge 消息 `interaction.comment`（payload `CommentPayload{noteId, text, thinkMs?}`）。
-两份 `src/comm/protocol.ts`（edge / cloud）MUST 逐字一致新增该 `MessageType` 与 payload；`command-bridge.ts` MUST 加 `comment → interaction.comment` 映射；
-`EdgeCommand.action` 并集 MUST 加 `comment`；`docs/protocol.md` 头部计数与 §2 表 MUST 同步；两份 `protocol-contract.test.ts` 的 `ALL_MESSAGE_TYPES` 与计数断言 MUST 由 54 改为 55。
-
-#### Scenario: 两份 protocol.ts 不漂移
-- **WHEN** 新增 `interaction.comment` 后运行 `npm run typecheck` 与 `npm run test:acceptance`
-- **THEN** `Record<MessageType,true>` 穷举与 `AC-PROTO-*`（计数 55）MUST 全过；任一处（两份 protocol.ts / command-bridge / docs / 两份 contract test）漏改 MUST 使构建失败
-
-#### Scenario: 红线反例——单边新增消息（禁止）
-- **WHEN** 仅在 cloud 侧 protocol.ts 新增 `interaction.comment` 而未同步 edge 侧 / contract test 计数
-- **THEN** MUST 视为违规、不予合入；协议三处 + 两份 contract test MUST 原子同步
-
 ### Requirement: 评论纳入风控闸与按账号配额、计数挂真实回执、终态单写
 
 系统 SHALL 把 `comment` 纳入下发前风控闸与会话预算：`role-dispatcher` 的 `canInteract`、`freshBudget()`、`consumeBudget` 并集 MUST 加 `comment`，
@@ -349,4 +335,18 @@ Cloud MUST 将小红书评论回执 `submitted_unconfirmed`、`submitted_editor_
 
 - **WHEN** 小红书评论在提交前被抢占，或返回不属于上述闭集的失败原因
 - **THEN** Cloud MUST NOT 将其归为 `submitted_unconfirmed`，MUST NOT 因本要求写评论去重账
+
+### Requirement: 协议 v2 新增 {platform}.note.comment 并三处同步
+
+系统 SHALL 新增 cloud→edge 消息 `{platform}.note.comment`（payload `CommentPayload{noteId, text, thinkMs?}`；词汇批 5 起评论命令带平台段＋对象段，`xiaohongshu.note.comment` / `facebook.note.comment` 两个变体）。
+两份 `src/comm/protocol.ts`（edge / cloud）MUST 逐字一致新增该 `MessageType` 与 payload；`command-bridge.ts` MUST 加 `comment → {platform}.note.comment` 映射；
+`EdgeCommand.action` 并集 MUST 加 `comment`；`docs/protocol.md` 头部计数与 §2 表 MUST 同步；两份 `protocol-contract.test.ts` 的 `ALL_MESSAGE_TYPES` 与计数断言 MUST 同步（历史立项时为 54 改 55，计数随后续词汇批演进）。
+
+#### Scenario: 两份 protocol.ts 不漂移
+- **WHEN** 新增 `{platform}.note.comment` 后运行 `npm run typecheck` 与 `npm run test:acceptance`
+- **THEN** `Record<MessageType,true>` 穷举与 `AC-PROTO-*` 计数断言 MUST 全过；任一处（两份 protocol.ts / command-bridge / docs / 两份 contract test）漏改 MUST 使构建失败
+
+#### Scenario: 红线反例——单边新增消息（禁止）
+- **WHEN** 仅在 cloud 侧 protocol.ts 新增 `{platform}.note.comment` 而未同步 edge 侧 / contract test 计数
+- **THEN** MUST 视为违规、不予合入；协议三处 + 两份 contract test MUST 原子同步
 

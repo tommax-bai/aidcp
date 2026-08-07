@@ -56,7 +56,7 @@
 | `welcome` | cloud → edge | — | 握手确认，下发 sessionId |
 | `browser.status` | edge → cloud | — | 同一连接内上报浏览器执行层 `absent | ready` 变化；只陈述事实，不请求页面动作 |
 | `standby.decision` | edge → cloud | — | 宿主层（桌面外壳）一次让位判决的只读回执；能力位 `host_standby_decision_telemetry_v1` 协商后启用。Cloud 只留存 / 呈现，**MUST NOT 据此否决宿主层** |
-| `ui.snapshot` | cloud → edge | — | 自动化控制投影；新能力客户端仅接收 `browserStandby` 等控制提示，旧客户端兼容接收昵称/发布/今日用量等历史字段 |
+| `ui.push_snapshot` | cloud → edge | — | 自动化控制投影；新能力客户端仅接收 `browserStandby` 等控制提示，旧客户端兼容接收昵称/发布/今日用量等历史字段 |
 | `plan.request` | edge → cloud | `plan.response` | 高层目标拆解为步骤 |
 | `plan.response` | cloud → edge | — | 返回有序步骤清单 |
 | `select.request` | edge → cloud | `select.response` | 元素清单 + 目标，请云端选一个 |
@@ -97,7 +97,7 @@
 | `xiaohongshu.note.browse_images` | cloud → edge | 浏览笔记图片（`count` 张；DeepReader 决策下发；仅小红书） |
 | `xiaohongshu.note.scroll_comments` | cloud → edge | 滚动评论区（CommentReviewer 决策下发；仅小红书） |
 | `xiaohongshu.profile.open` | cloud → edge | 进入普通作者主页（仅小红书；FB 结构性不访作者主页）；不得承载本人身份采集或 `direct` |
-| `identity.read_current` | cloud → edge | 就地读取会话绑定账号身份；禁止导航，payload 仅含 Cloud 生成的 `captureId` |
+| `identity.read_current_page` | cloud → edge | 就地读取会话绑定账号身份；禁止导航，payload 仅含 Cloud 生成的 `captureId` |
 | `identity.read_self_profile` | cloud → edge | 导航到 Edge 会话绑定账号本人主页读取身份；Cloud 不得提供目标账号 ID |
 | `xiaohongshu.notification.open` | cloud → edge | 导航到通知首页（仅小红书；仅导航，落地后边缘上报 `notification.home`） |
 | `xiaohongshu.notification.browse_comments` | cloud → edge | 进「评论和@」+ 滚动加载 + 抽取（→ `notification.items`） |
@@ -128,12 +128,12 @@
 | `risk.canDo.result` | cloud → edge | — | allow / deny + 原因 |
 | `risk.record` | edge → cloud | `risk.record.result` | 互动成功后记录 action |
 | `risk.record.result` | cloud → edge | — | 记录结果 |
-| `risk.captcha_detected` | edge → cloud | — | 检测到验证码/未知阻断弹窗（已本地暂停），通知云端置风控态 + 停发命令 + 通知人工 |
-| `risk.captcha_cleared` | edge → cloud | — | 验证码/未知阻断弹窗已清除，已恢复浏览 |
+| `captcha.detected` | edge → cloud | — | 检测到验证码/未知阻断弹窗（已本地暂停），通知云端置风控态 + 停发命令 + 通知人工 |
+| `captcha.cleared` | edge → cloud | — | 验证码/未知阻断弹窗已清除，已恢复浏览 |
 | `captcha.assist.capture` | cloud → edge | `captcha.assist.snapshot` | 请求原 edge 的原浏览器会话捕获当前验证码现场截图；captcha 暂停期间允许穿透 |
 | `captcha.assist.snapshot` | edge → cloud | — | 返回截图、snapshotId、crop/viewport 坐标映射和 fresh 遮罩元数据 |
 | `captcha.assist.click` | cloud → edge | `captcha.assist.click_result` | 将人工点位发送给原 edge，由 edge 映射并派发真实输入事件 |
-| `captcha.assist.click_result` | edge → cloud | — | 返回点击后 fresh 复检结果；只有清除时 edge 另发 `risk.captcha_cleared` |
+| `captcha.assist.click_result` | edge → cloud | — | 返回点击后 fresh 复检结果；只有清除时 edge 另发 `captcha.cleared` |
 
 ### Edge 页面写任务租约（同一 edge/CDP 单写）
 
@@ -223,8 +223,8 @@
 
 | type | 方向 | 关联响应 | 用途 |
 | --- | --- | --- | --- |
-| `state.read` | cloud → edge | `state.report` | 主动询问浏览器现场（当前面 + 登录身份 + 采集时刻）。**纯读**：MUST NOT 触发导航/点击/滚动，MUST NOT 为观察唤醒浏览器或抢占任务的引擎会话 |
-| `state.report` | edge → cloud | — | 按请求信封 id 关联的应答；面与身份**各自两态**（confirmed + 穷举取值 / unconfirmed + 具名原因），MUST NOT 把读不出来伪装成任何具体面或身份，也 MUST NOT 静默不答 |
+| `state.read` | cloud → edge | `state.observed` | 主动询问浏览器现场（当前面 + 登录身份 + 采集时刻）。**纯读**：MUST NOT 触发导航/点击/滚动，MUST NOT 为观察唤醒浏览器或抢占任务的引擎会话 |
+| `state.observed` | edge → cloud | — | 按请求信封 id 关联的应答；面与身份**各自两态**（confirmed + 穷举取值 / unconfirmed + 具名原因），MUST NOT 把读不出来伪装成任何具体面或身份，也 MUST NOT 静默不答 |
 
 ## 3. 各消息 payload 定义
 
@@ -324,9 +324,9 @@
 
 Cloud 切换通过 Electron→core 的本地 `lifecycle.cloud_rebind` 控制协议逐环境重绑 WS：先在安全边界排空当前页面写，停止旧 Cloud intake，再完成新 hello/welcome。该动作不得启停 provider、CDP、浏览器或变更槽位所有权；实际 Cloud、目标 Cloud 与失败原因分别投影。
 
-**`ui.snapshot`**（cloud → edge，主动推送；change edge-companion-ui 8.1）
+**`ui.push_snapshot`**（cloud → edge，主动推送；change edge-companion-ui 8.1）
 
-> 兼容边界：下列 `personaBound`、`personaWritingLanguage`、`lastPublish`、`publish`、`publishPreview`、`dailyUsage` 只对未协商 `client_data_plane_automation_engine_v1` 的旧客户端下发。新客户端的 `ui.snapshot` 仅保留 `browserStandby` 等自动化控制投影；今日进展、最近发布、人设、稿件和审批真态由客户端 customer-auth HTTP 主动拉取。Cloud 按 capability 过滤，Edge 同时丢弃旧 Cloud 夹带的数据字段，形成双向防线。
+> 兼容边界：下列 `personaBound`、`personaWritingLanguage`、`lastPublish`、`publish`、`publishPreview`、`dailyUsage` 只对未协商 `client_data_plane_automation_engine_v1` 的旧客户端下发。新客户端的 `ui.push_snapshot` 仅保留 `browserStandby` 等自动化控制投影；今日进展、最近发布、人设、稿件和审批真态由客户端 customer-auth HTTP 主动拉取。Cloud 按 capability 过滤，Edge 同时丢弃旧 Cloud 夹带的数据字段，形成双向防线。
 
 ```jsonc
 {
@@ -666,7 +666,7 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 { "noteId": "n123", "thinkMs": 700, "dwellMs": 2000 }
 // xiaohongshu.profile.open（普通作者主页；不得用于本人身份采集）
 { "authorId": "u456", "reason": "作者值得关注评估", "thinkMs": 800 }
-// identity.read_current（Facebook；只允许当前页读取，禁止导航）
+// identity.read_current_page（Facebook；只允许当前页读取，禁止导航）
 { "captureId": "capture-018f..." }
 // identity.read_self_profile（XHS；目标账号由 Edge 会话绑定值注入，Cloud 不传 accountId）
 { "captureId": "capture-0190..." }
@@ -677,7 +677,7 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 | 平台 | Cloud 选择 | Edge 握手能力 | 页面副作用 | 完成后恢复 |
 | --- | --- | --- | --- | --- |
 | Xiaohongshu | `identity.read_self_profile` | `identity_read_self_profile_v1` | 只导航到 Edge 当前会话绑定账号的规范本人主页 | `identity.observed.pageEffect=navigated_self_profile` 后返回 feed |
-| Facebook | `identity.read_current` | `identity_read_current_v1` | 当前页读取，Native 执行路径不得调用导航 | 无；Cloud 不发 back / refresh / scroll |
+| Facebook | `identity.read_current_page` | `identity_read_current_v1` | 当前页读取，Native 执行路径不得调用导航 | 无；Cloud 不发 back / refresh / scroll |
 | WeChat Channels | 不支持 | 无 | 无 | 无 |
 
 Edge 启动握手所需的身份读取是本地 `identity_bootstrap`，不属于 Cloud 可下发消息，也不能与上述运行期命令
@@ -723,7 +723,7 @@ Reels 执行器仅在会话确处于 Reels 模式、且 `noteId` 与立即重探
 `like→{platform}.note.like / facebook.video.like`（对象由 `EdgeCommand.likeObject` 声明：Reels 节奏赞与 feed 视频概率赞两类发送点标 `video`，缺省 `note`；不存在组合如 `xiaohongshu×video` 响亮 throw）、`collect→xiaohongshu.note.collect`、`follow→{platform}.user.follow`、`comment→{platform}.note.comment`、`comment_like→xiaohongshu.comment.like`、
 `search→{platform}.search.execute`、`back→navigation.back`、`browse_images→xiaohongshu.note.browse_images`、
 `scroll_comments→xiaohongshu.note.scroll_comments`、`profile_open→xiaohongshu.profile.open`、
-`identity_read_current→identity.read_current`、`identity_read_self_profile→identity.read_self_profile`、
+`identity_read_current→identity.read_current_page`、`identity_read_self_profile→identity.read_self_profile`、
 `session.end→session.end`。
 Facebook 加群不经 `EdgeCommand` 映射；join scheduler 直接下发 `facebook.group.join`，edge active-command 白名单必须放行。
 
@@ -885,7 +885,7 @@ search 回执的计数边界是 `actuated=true`，而不是 `ok=true`：`results
 
 **`risk.record.result`**（cloud → edge）：`{ "action": "like", "recorded": true, "reason": "..." }`
 
-**`risk.captcha_detected`**（edge → cloud，fire-and-forget）：检测到验证码/未知阻断弹窗
+**`captcha.detected`**（edge → cloud，fire-and-forget）：检测到验证码/未知阻断弹窗
 ```jsonc
 {
   "edgeId": "edge-1",            // string?  边缘标识
@@ -899,7 +899,7 @@ search 回执的计数边界是 `actuated=true`，而不是 `ok=true`：`results
 > 风控态（captcha→restricted / unknown→warned）、按 edge 暂停下发、(edgeId,account) 去重后通知飞书。
 > 检测/暂停/恢复全在 edge 本地完成，本消息只是通知，云端从不回查边缘动作。
 
-**`risk.captcha_cleared`**（edge → cloud，fire-and-forget）：`{ "edgeId": "edge-1", "url": "...", "accountId": "acc-01" }`（均可选）
+**`captcha.cleared`**（edge → cloud，fire-and-forget）：`{ "edgeId": "edge-1", "url": "...", "accountId": "acc-01" }`（均可选）
 > 边缘弹窗清除、已恢复浏览。云端解除该 edge 暂停；风控态不因清除自动回滚（由恢复窗口/人工恢复驱动）。
 
 **`captcha.assist.capture`**（cloud → edge）：请求原 edge 捕获验证码现场截图
@@ -921,7 +921,7 @@ search 回执的计数边界是 `actuated=true`，而不是 `ok=true`：`results
 > 该消息只允许定向发给 incident 绑定的 edge。captcha 暂停期间它可穿透传输层暂停闸；
 > 普通浏览、互动、发布页面动作仍必须被暂停闸拦截。
 > 带 `live` 时 edge 进入**有界、内容去重、自终止**的实时抓帧循环：只在挑战画面变化时才推新
-> `captcha.assist.snapshot`；自主判"已清除"须连续多次无遮罩确认后才发 `risk.captcha_cleared`（绝不单次误清）。
+> `captcha.assist.snapshot`；自主判"已清除"须连续多次无遮罩确认后才发 `captcha.cleared`（绝不单次误清）。
 > live 的 snapshotId 语义：edge 每 incident 保留最近 N 帧、云端亦保留最近 N 帧集，`submitClick` 允许提交
 > **最近集内的稍旧 snapshotId**（运营冻结选点用），edge 按被点帧自己的 crop 落点。无新增 MessageType。
 
@@ -1013,10 +1013,10 @@ search 回执的计数边界是 `actuated=true`，而不是 `ok=true`：`results
   }
 }
 ```
-> `status:'cleared'` 只是协助命令结果；恢复下发仍只由 edge 额外发送的 `risk.captcha_cleared`
+> `status:'cleared'` 只是协助命令结果；恢复下发仍只由 edge 额外发送的 `captcha.cleared`
 > 触发。cloud 不得因为点击命令送达、Feishu 链接打开、协助页按钮点击或告警手动解决而 `resumeEdge`。
 > 运行兜底：未配置远程协助、scoped token 过期、edge 离线或截图失败时，飞书告警只发 notify-only 提示、
-> 操作员到原机器处理，随后等待 edge fresh probe 上报 `risk.captcha_cleared`，cloud 不能手动伪造清除。
+> 操作员到原机器处理，随后等待 edge fresh probe 上报 `captcha.cleared`，cloud 不能手动伪造清除。
 > （change captcha-assist-text-answer：**已移除背后无任何能力的「远程桌面」入口**——`remoteAddr`、飞书卡「远程地址」行、
 > console 按钮全删；那从来只是个放第三方工具链接的空位、其真机验收自 2026-06-21 起一直 DEFERRED、从未填过，design D13。）
 
@@ -1138,7 +1138,7 @@ first-writer-wins 审批信号。动作成功只表示审批决定已受理：`a
 }
 ```
 `ok:true` 仅表示“该配图已从待审稿件移除”，**不代表已发布**。客户端 MUST 以本应答回带的真态
-刷新所持稿件（云端另会 best-effort 重推一帧 `ui.snapshot` 预览，但可能落空，不可作为唯一刷新手段）。
+刷新所持稿件（云端另会 best-effort 重推一帧 `ui.push_snapshot` 预览，但可能落空，不可作为唯一刷新手段）。
 
 **`publish.result`**（edge → cloud）
 ```jsonc
@@ -1357,11 +1357,11 @@ Edge 必须只打开该 env/account 所属 sidecar，并用后续 `interaction.a
 
 ```jsonc
 {
-  "captureId": "cap-7f3a"   // Cloud 生成、Edge 原样回传（照 identity.read_current 的关联模式）
+  "captureId": "cap-7f3a"   // Cloud 生成、Edge 原样回传（照 identity.read_current_page 的关联模式）
 }
 ```
 
-`state.report`（edge → cloud，envelope.id = 请求 envelope.id）：
+`state.observed`（edge → cloud，envelope.id = 请求 envelope.id）：
 
 ```jsonc
 {

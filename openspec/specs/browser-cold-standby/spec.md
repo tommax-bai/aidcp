@@ -88,18 +88,10 @@ by itself be grounds for refusing to act; only an identity condition may be.
 - **THEN** edge MUST NOT close the browser for cold standby and MUST expose a
   named skipped reason for diagnostics
 
-### Requirement: 协议兼容现有 ui.snapshot
-
-The `browserStandby` payload SHALL be optional and backward compatible on `ui.snapshot`. Existing edge builds that ignore unknown fields MUST continue to process other snapshot fields, and new edge builds MUST sanitize the payload before forwarding it as structured UI events.
-
-#### Scenario: 旧字段不受影响
-- **WHEN** a `ui.snapshot` contains `browserStandby` together with existing fields such as presence and daily usage
-- **THEN** daily usage, presence, and other existing UI behavior continue to work unchanged
-
 ### Requirement: 云端发布浏览器冷待机提示（判据＝解除阻塞是否需要浏览器）
 
 Cloud SHALL publish an optional `browserStandby` object on the existing
-`ui.snapshot` stream whenever it can determine that automated browser work is
+`ui.push_snapshot` stream whenever it can determine that automated browser work is
 blocked by a wait that **does not require the browser to stay open in order to
 be resolved**. The payload MUST include whether the feature is enabled, whether
 the current wait is eligible, a machine-readable reason, `waitMs`, `wakeAt`,
@@ -151,7 +143,7 @@ the current wait is eligible, a machine-readable reason, `waitMs`, `wakeAt`,
 - **WHEN** 边缘上报验证码 → 风控信号把账号迁到 `restricted` → 续场闸据此判停工
 - **AND** 该边缘正处于验证码暂停态
 - **THEN** 云端 MUST 置 `eligible=false`、`reason='hard_blocker'`——**绝不能关掉运维
-  正要去解验证码的那个浏览器**。注：`ui.snapshot` 有意豁免验证码暂停闸（它是界面数据、
+  正要去解验证码的那个浏览器**。注：`ui.push_snapshot` 有意豁免验证码暂停闸（它是界面数据、
   不是页面命令），故提示**会**送达该边缘；边缘侧的浮层标志会被「浏览循环结束」清掉，
   **MUST NOT 被当作这条的防线**。
 
@@ -179,7 +171,7 @@ the current wait is eligible, a machine-readable reason, `waitMs`, `wakeAt`,
 
 两条唤醒路径 SHALL 同时成立：
 
-1. **主路径 —— 待机提示的周期性重发**：`ui.snapshot` 已有一条约 60 秒的周期链，且冷待机期间核心进程与云端连接不断、该链继续。账号一旦恢复可工作，下一跳提示即 `eligible=false`，边缘据此唤醒。**因此本能力 MUST NOT 新建「状态变化即推送」的通道**（既有周期链已覆盖，最坏延迟约 60 秒）。
+1. **主路径 —— 待机提示的周期性重发**：`ui.push_snapshot` 已有一条约 60 秒的周期链，且冷待机期间核心进程与云端连接不断、该链继续。账号一旦恢复可工作，下一跳提示即 `eligible=false`，边缘据此唤醒。**因此本能力 MUST NOT 新建「状态变化即推送」的通道**（既有周期链已覆盖，最坏延迟约 60 秒）。
 2. **兜底路径 —— 回访时刻**：这类提示的 `wakeAt` SHALL 被赋予一个**回访时刻**（默认 6 小时后）。其语义 SHALL 是「**多久之后回来再问一次**」，**MUST NOT 被解读为「那时一定能恢复」**——`wakeAt` 在此表达的是边缘确实会在那时醒来这一事实，而非对恢复的承诺。**MUST NOT 用「最早可恢复时刻」之类推算值伪造 `wakeAt`**（那是假承诺：没有任何代码会在那时真的恢复它）。周期链健在时，每跳都会把回访时刻顺延，回访因而**只在周期链断掉时才真正触发**——它是一道死人开关，不是常规路径。
 
 **周期链 MUST NOT 因「今日用量为空」而断开**：重排下一跳的条件 SHALL 是「推送成功 **且**（今日用量 **或** 待机提示 任一存在）」。旧条件只看今日用量——待机提示还在、链却已死，唤醒路径便悬空。
@@ -406,10 +398,18 @@ MUST NOT 静默丢弃。该拒绝 SHALL 与「已执行」在本地呈现上可�
 
 ### Requirement: 受限账号恢复后经既有唤醒路径归队
 
-受限账号冷待机期间,恢复 SHALL 复用既有唤醒路径,MUST NOT 新增边缘侧机制:周期链健在时,扫描器把状态翻回 `warned` 后的下一跳提示不再 eligible,边缘据此唤醒;周期链断掉时按提示 `wakeAt`(= 恢复时刻)兜底唤醒。本 change 对 `ui.snapshot` 的待机载荷 MUST NOT 新增或删除字段。
+受限账号冷待机期间,恢复 SHALL 复用既有唤醒路径,MUST NOT 新增边缘侧机制:周期链健在时,扫描器把状态翻回 `warned` 后的下一跳提示不再 eligible,边缘据此唤醒;周期链断掉时按提示 `wakeAt`(= 恢复时刻)兜底唤醒。本 change 对 `ui.push_snapshot` 的待机载荷 MUST NOT 新增或删除字段。
 
 #### Scenario: 状态翻转经周期链唤醒
 
 - **WHEN** 冷待机中的受限账号被扫描器恢复为 `warned`
 - **THEN** 下一跳周期链提示不再 eligible,边缘唤醒浏览器并恢复浏览闭环
+
+### Requirement: 协议兼容现有 ui.push_snapshot
+
+The `browserStandby` payload SHALL be optional and backward compatible on `ui.push_snapshot`. Existing edge builds that ignore unknown fields MUST continue to process other snapshot fields, and new edge builds MUST sanitize the payload before forwarding it as structured UI events.
+
+#### Scenario: 旧字段不受影响
+- **WHEN** a `ui.push_snapshot` contains `browserStandby` together with existing fields such as presence and daily usage
+- **THEN** daily usage, presence, and other existing UI behavior continue to work unchanged
 
