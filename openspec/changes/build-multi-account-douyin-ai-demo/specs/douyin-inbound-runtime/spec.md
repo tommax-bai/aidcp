@@ -12,10 +12,10 @@ The inbound runtime SHALL select only the adapter for the process platform mode.
 - **THEN** the fixture adapter emits the documented deterministic record and performs no external request
 
 ### Requirement: Direct messages use an account-level WebSocket runtime
-Each active real account SHALL receive direct messages through one session-bound account-level WebSocket stream rather than requiring a continuously running Chromium instance or relying on polling as the primary source. The runtime MUST complete protocol authentication and subscription acknowledgement before marking the direct-message source healthy. Disconnects SHALL move that source to reconnecting or degraded, and bounded reconnect attempts MUST preserve account identity and deduplication state; transport open alone MUST NOT be presented as a healthy subscribed source.
+Each active real account SHALL receive direct messages through one session-bound account-level WebSocket stream rather than requiring a continuously running Chromium instance or relying on polling as the primary source. Before marking the direct-message source healthy, the runtime MUST establish an authenticated schema proof from current first-party behavior: an explicit protocol acknowledgement when one exists, or otherwise both a schema-valid session-bound DM bootstrap/history response and a WebSocket that remains owned and open for the bounded validation interval. Disconnects SHALL move that source to reconnecting or degraded, and bounded reconnect attempts MUST preserve account identity and deduplication state; transport open alone MUST NOT be presented as a healthy subscribed source, and the implementation MUST NOT invent an acknowledgement command absent observed evidence.
 
-#### Scenario: WebSocket opens but subscription is rejected
-- **WHEN** the direct-message transport opens but protocol authentication or subscription acknowledgement fails
+#### Scenario: WebSocket opens but the authenticated proof fails
+- **WHEN** the direct-message transport opens but an observed acknowledgement is rejected or the required session-bound bootstrap/history proof fails
 - **THEN** the source is not marked healthy and no unvalidated frame is normalized as an inbound message
 
 #### Scenario: Direct-message stream reconnects
@@ -23,7 +23,7 @@ Each active real account SHALL receive direct messages through one session-bound
 - **THEN** the runtime resubscribes for the same account and repeated platform events remain deduplicated
 
 ### Requirement: Automation begins after a historical baseline for each source
-For each account, each enabled inbound source SHALL complete and durably record its own initial historical baseline before any observed item from that source becomes eligible for automatic reply. The direct-message baseline MUST establish an acknowledged subscription plus a history cursor, server time boundary, or equivalent stable frontier; the comment baseline MUST include the platform cursor or equivalent stable frontier and the stable identities needed to protect the boundary. Subsequent frames and reads SHALL classify only records strictly beyond the applicable frontier as new. Service restart, session reauthorization, reconnect replay, poll overlap, or cursor replay MUST NOT convert baseline or previously observed items into new automation work.
+For each account, each enabled inbound source SHALL complete and durably record its own initial historical baseline before any observed item from that source becomes eligible for automatic reply. The direct-message baseline MUST establish the authenticated stream proof plus a history cursor, server time boundary, or equivalent stable frontier; the comment baseline MUST include the platform cursor or equivalent stable frontier and the stable identities needed to protect the boundary. Subsequent frames and reads SHALL classify only records strictly beyond the applicable frontier as new. Service restart, session reauthorization, reconnect replay, poll overlap, or cursor replay MUST NOT convert baseline or previously observed items into new automation work.
 
 #### Scenario: First successful comment read establishes baseline
 - **WHEN** an authorized account completes its first schema-valid comment read containing existing comments
@@ -73,3 +73,10 @@ The runtime SHALL maintain separate direct-message and comment source states for
 #### Scenario: Shared session becomes unauthorized
 - **WHEN** either source receives definitive evidence that the shared retained session is unauthorized
 - **THEN** both sources stop new work and the account enters reauthorization-required
+
+### Requirement: An unimplemented source is disabled without blocking an independent source
+The real runtime SHALL allow an explicitly unimplemented source to remain `disabled`. A disabled source MUST NOT issue platform requests, establish a synthetic baseline, or be reported healthy, and it MUST NOT prevent another configured source from establishing its own baseline and activating its independent runtime. Delivery and generation for the disabled source SHALL remain unavailable.
+
+#### Scenario: Private-message-only real runtime starts
+- **WHEN** the real runtime is configured with direct messages enabled and comments disabled
+- **THEN** it performs no comment request, exposes comments as disabled, and may activate the account after the direct-message baseline and acknowledged subscription complete

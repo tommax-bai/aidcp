@@ -54,3 +54,14 @@ The chat-llm endpoint, model selection, timeout, and credentials SHALL be server
 #### Scenario: Model output is empty
 - **WHEN** chat-llm returns an empty or schema-invalid candidate
 - **THEN** the candidate is rejected with an explicit generation reason and no platform send occurs
+
+### Requirement: The real demo can select Doubao through Volcengine Ark explicitly
+The demo SHALL support an explicit Doubao/Ark model mode using the official HTTPS Chat Completions API. Ark endpoint, model ID, timeout, and API key SHALL remain server configuration; the API key MUST NOT appear in UI projections or logs. A response is eligible for persistence only when its schema is valid, its finish reason proves normal completion, and its bounded text is non-empty. The UI MAY expose the non-secret provider and configured model label so the operator can distinguish Doubao from Fixture generation.
+
+#### Scenario: Doubao returns a normally completed reply
+- **WHEN** Ark returns a schema-valid Chat Completions response with a normal finish reason and bounded non-empty text
+- **THEN** the generation stores the text and non-secret model/request correlation before the separate delivery claim is evaluated
+
+#### Scenario: Doubao returns a truncated or abnormal completion
+- **WHEN** Ark returns a missing or non-normal finish reason, malformed body, oversized response, or empty text
+- **THEN** generation fails with a sanitized Ark error and no Douyin adapter is invoked

@@ -13,7 +13,7 @@ The repository is independent from AIDCP Edge, Cloud, Console, databases, and de
 **Goals:**
 
 - Provide a standalone TypeScript service and operations UI for multiple Douyin identities under one operator.
-- Use short-lived headed Chromium for QR authorization and reauthorization, then retain the minimum encrypted web session required for API/WS operation.
+- Use short-lived Chromium for QR authorization and reauthorization, then retain the minimum encrypted web session required for API/WS operation. DEV may use bounded headless capture as the WeChat Channels demo does; Chromium still closes before the account runtime starts.
 - Maintain one account-level direct-message WebSocket runtime per active identity and an independent incremental comment reader.
 - Normalize and durably deduplicate inbound direct messages and comments, establishing a historical baseline before automatic replies are eligible.
 - Generate replies behind an OpenAI-compatible `chat-llm` adapter that has no access to platform credentials or transport implementations.
@@ -21,6 +21,7 @@ The repository is independent from AIDCP Edge, Cloud, Console, databases, and de
 - Treat only an explicit, target-matching platform receipt or verified postcondition as `confirmed`; preserve ambiguous post-dispatch results as terminal `submitted_unknown` without automatic retry.
 - Make the deterministic fixture adapter the default and guarantee that the default configuration performs no real login, read, or write.
 - Protect all operator APIs and sensitive projections with an operator token and store retained platform state encrypted in SQLite.
+- Match the deployed WeChat Channels demo's operator loop for direct messages: render a scannable QR in the web UI, keep browser capture bounded to authorization, invoke Doubao through Ark, and deliver only to the exact originating conversation.
 
 **Non-Goals:**
 
@@ -31,7 +32,7 @@ The repository is independent from AIDCP Edge, Cloud, Console, databases, and de
 - Falling back automatically from an official API to Chromium, or retrying an ambiguous write through another transport.
 - Supporting media replies, proactive outbound marketing, bulk actions, historical-message auto-replies, or accounts other than those explicitly authorized by the operator.
 - Sharing runtime state or credentials with AIDCP services.
-- Deploying `private_web`, using a real Douyin account, or asserting real-platform acceptance as part of this change. A separately authorized DEV deployment MAY expose only the offline Fixture with its platform boundary visible.
+- Bulk replies, proactive outbound messages, or enabling automation for a real account before its read-only identity/history/stream acceptance completes.
 
 ## Decisions
 
@@ -57,9 +58,9 @@ The UI cannot display raw cookies, tokens, QR payloads, signing inputs, or full 
 
 Alternative considered: bind only to localhost without authentication. This is insufficient for Docker or a remotely proxied demo and makes an accidental bind-address change dangerous.
 
-### 3. Use short-lived headed Chromium for QR authorization
+### 3. Use short-lived Chromium for QR authorization
 
-Creating or reauthorizing an account starts one visible Chromium worker for that pending account. The worker navigates to the Douyin login surface, presents the platform QR page, observes the platform-owned scan/confirmation flow, and captures only the session material required by the selected adapter. Authorization is complete only after the adapter resolves a stable Douyin identity and passes a read-only identity/session probe. The transaction then:
+Creating or reauthorizing an account starts one bounded Chromium worker for that pending account. On DEV it uses the already installed Chrome in headless mode, matching the WeChat Channels demo's post-scan capture boundary; an attended environment may run the same capture headed. The operations UI receives only a bounded screenshot of the platform-owned QR element, never the browser debug endpoint or raw QR token. The worker navigates to the Douyin login surface, observes the platform-owned scan/confirmation flow, and captures only the session material required by the selected adapter. Authorization is complete only after the adapter resolves a stable Douyin identity and passes a read-only identity/session probe. The transaction then:
 
 1. binds the platform identity to one local account record;
 2. encrypts and persists the retained session;
@@ -68,7 +69,7 @@ Creating or reauthorizing an account starts one visible Chromium worker for that
 
 Only one authorization or reauthorization worker may own an account at a time. If the resolved identity is already bound, the new pending record is rejected rather than creating two runtimes. Platform `auth_required` transitions the account to visible reauthorization-required state, closes source runtimes, and blocks new sends. A timeout or ambiguous send is not interpreted as logout.
 
-Pure-HTTP SSO QR login remains a possible isolated research task, not an implementation assumption. The community evidence is useful for identifying protocol shape but does not prove reliable production authorization, request-context capture, identity binding, or risk behavior.
+Pure-HTTP SSO QR login remains an isolated research path rather than the deployed authority. Current MIT-licensed evidence proves the QR token/status shape but still uses browser context for first-party cookie establishment and final redirect capture; therefore this slice keeps the bounded Chromium capture and does not turn an undocumented signature algorithm into a login dependency.
 
 Alternative considered: pure-HTTP QR authorization with no Chromium at all. It is rejected for this change because it lacks direct evidence and would turn an undocumented authentication contract into a critical dependency.
 
@@ -84,7 +85,7 @@ Alternative considered: Playwright persistent-profile directories as the source 
 
 ### 5. Give each active account one direct-message WebSocket owner
 
-An active real account owns exactly one direct-message WebSocket runtime. It creates the handshake from that account's retained session, validates message schemas before normalization, emits source-health state, and reconnects only under the bounded transport policy for that same account. It never shares cookies, cursors, or connections between identities.
+An active real account owns exactly one direct-message WebSocket runtime. It creates the handshake from that account's retained session, validates message schemas before normalization, emits source-health state, and reconnects only under the bounded transport policy for that same account. It never shares cookies, cursors, or connections between identities. Current clean-room evidence does not show a stable application-level ACK command, so readiness uses an explicit ACK only if a first-party capture proves one; otherwise it requires a schema-valid session-bound bootstrap/history probe plus bounded ownership of the opened WebSocket. `onopen` alone is never healthy, and no guessed ACK frame is sent.
 
 On first activation, the runtime records a direct-message baseline before marking later text messages eligible for automation. Stable platform conversation/message identity is required for ingestion. The durable uniqueness key is `(account_id, source, platform_event_id)`; duplicate frames and reconnect replay update source observations but do not create new reply work. Unrecognized schemas stop the source visibly instead of guessing fields.
 
@@ -94,18 +95,20 @@ Alternative considered: poll direct messages. Polling is retained only as a poss
 
 ### 6. Read comments incrementally without a persistent browser
 
-The account runtime periodically reads comments through the selected experimental web read adapter, using the encrypted session and a validated request context. It first stores a high-water baseline for existing comments. Only observations beyond that baseline can become automatic-reply candidates. Pagination is bounded, and every response must pass adapter-specific schema and identity checks before the cursor advances.
+When comment reads are enabled, the account runtime periodically reads comments through the selected experimental web read adapter, using the encrypted session and a validated request context. It first stores a high-water baseline for existing comments. Only observations beyond that baseline can become automatic-reply candidates. Pagination is bounded, and every response must pass adapter-specific schema and identity checks before the cursor advances.
 
 Comments are deduplicated by stable comment identity and retain the exact video/comment/account target needed for a reply. Cursor changes and item inserts commit in one SQLite transaction so a crash cannot advance past an unstored item. `auth_required`, schema drift, rate limiting, and transport health are distinct source states; none are projected as an empty successful poll.
 
 Alternative considered: scrape comments continuously in Chromium. It increases resource cost and couples reads to page layout when the current evidence supports a session-based web read path. Chromium remains available only for the configured write capability.
+
+The requested real DEV Demo enables both sources. Comment reads use the retained authenticated session and a schema-checked incremental cursor. Comment replies use the configured account-level Chromium worker, which starts only for one exact target and closes after the result is classified. A comment-read or comment-write failure remains isolated and visible; it does not get replaced by a synthetic empty page and does not disable the independent private-message runtime.
 
 ### 7. Select one explicit comment-write capability per account
 
 Each account projects one of these modes and its current readiness:
 
 - `official_api`: enabled only when operator-provided application credentials, required permission, authorized account identity, and own-video target constraints validate. The official adapter sends once and confirms only the documented target-matching receipt.
-- `chromium_worker`: starts one account-scoped **headed** Chromium worker only for an eligible exact comment reply. The worker loads the retained identity, resolves a fresh target, dispatches through native user-like input, and verifies a platform response or fresh postcondition before closing. An account mutex prevents concurrent browser writes.
+- `chromium_worker`: starts one account-scoped Chromium worker only for an eligible exact comment reply. The worker loads the retained identity, resolves a fresh target, dispatches through the current creator UI or its observed first-party request, and verifies a platform response or fresh postcondition before closing. DEV may run the bounded worker headless because the operator does not interact with it; an account mutex prevents concurrent browser writes.
 - `unavailable`: reads and AI drafts may continue, but comment delivery is blocked with an explicit reason.
 
 Mode selection is configuration, not a fallback order. Failure or ambiguity in `official_api` never launches Chromium, and failure or ambiguity in Chromium never changes to another mechanism. This prevents duplicate comments and keeps capability claims honest.
@@ -128,7 +131,7 @@ Alternative considered: retry timeouts automatically. It is rejected because ret
 
 ### 9. Isolate `chat-llm` from platform credentials and delivery
 
-The `ChatLlmAdapter` is OpenAI-compatible and receives a normalized request containing source kind, sanitized inbound text, bounded conversation context, reply policy, and generation ID. It never receives platform cookies, access tokens, signing inputs, or transport clients, and it cannot send a reply itself. Model configuration is supplied separately from Douyin adapter configuration.
+The `ChatLlmAdapter` is OpenAI-compatible and receives a normalized request containing source kind, sanitized inbound text, bounded conversation context, reply policy, and generation ID. The real DEV slice configures it explicitly for Volcengine Ark/Doubao using the official HTTPS Chat Completions endpoint and a server-side API key. It validates finish reason and response shape, bounds response bytes and reply length, and exposes only a non-secret provider/model label. It never receives platform cookies, access tokens, signing inputs, or transport clients, and it cannot send a reply itself. Model configuration is supplied separately from Douyin adapter configuration.
 
 Automation claims one eligible new text item with a lease and generation revision. After generation, the coordinator rechecks account activity, source eligibility, target identity, generation ownership, and delivery capability before creating a delivery attempt. Stop prevents new claims; an in-progress generation may be stored as a draft but cannot bypass the final ownership check. Non-text, historical-baseline, duplicate, already-terminal, and operator-suppressed items are not auto-replied.
 
@@ -142,9 +145,11 @@ Selecting an experimental real adapter is an explicit startup choice. Real write
 
 Alternative considered: make the real adapter default when credentials exist. This risks an imported environment variable turning a source-validation run into a platform action.
 
-### 11. Deploy a separately authorized Fixture without sharing AIDCP runtime
+### 11. Deploy the separately authorized DEV service without sharing AIDCP runtime
 
-The follow-up DEV deployment uses an independent system user, release directory, Node.js 24 runtime, environment file, SQLite database, loopback port, systemd unit, and exact Nginx path prefix. It reuses only the existing DEV TLS hostname and MUST NOT replace the host root route, expose the application port publicly, import AIDCP state, or enable a real Douyin adapter. The public page and readiness response continue to identify Fixture mode and `REAL_WRITES_ENABLED=false`.
+The DEV deployment uses an independent system user, release directory, Node.js 24 runtime, environment file, SQLite database, loopback port, systemd unit, bounded headless-Chrome capture boundary, and exact Nginx path prefix. It reuses only the existing DEV TLS hostname and MUST NOT replace the host root route, expose the application port publicly, import AIDCP state, or touch the video demo, AIDCP, or isales services. The public page and readiness response identify the actual adapter, model provider, comment capability, and real-write gate.
+
+The transition from Fixture to experimental real mode keeps capability and account admission separate. DEV deploys with `REAL_WRITES_ENABLED=true` so the private-message and comment Demo paths are available without another service restart, while every newly scanned real account is persisted with `automationEnabled=false`. The operator first verifies the resolved identity, DM baseline, acknowledged stream, comment baseline, and zero platform writes, then explicitly starts only that exact account in the UI for new post-baseline reply/readback checks. A service restart or QR login alone cannot start automation or reply to accumulated items.
 
 The deployment release and sensitive configuration are backed up before the Nginx change. A failed service, route, readiness, origin, SSE, persistence, or existing-service check requires restoring the prior Nginx file and stopping the new unit; it does not justify touching the video demo, AIDCP, or isales services.
 
@@ -162,7 +167,7 @@ Mutations require exact account and inbound-item identifiers plus the current re
 - [Reconnect or process restart causes duplicate replies] → Use durable platform-event uniqueness, transactional claims, a recorded dispatch boundary, and terminal `submitted_unknown` suppression.
 - [Comment capability is overstated] → Expose `official_api`, `chromium_worker`, and `unavailable` explicitly; do not auto-fallback or treat a Chromium launch as success.
 - [Official permissions are unavailable for the test account] → Keep `unavailable` a first-class mode and allow fixture/read-only demonstrations without pretending a write path exists.
-- [Headed Chromium is inconvenient in server containers] → Treat authorization and Chromium comment writes as local/operator-attended capabilities; do not claim the initial source build is a headless server deployment.
+- [Chromium is inconvenient on the DEV server] → Reuse the installed Chrome only for a bounded headless authorization/context capture, project the platform QR into the authenticated UI, verify cleanup, and never keep Chromium alive as the DM receiver. A future Chromium comment write remains headed and is not enabled by this choice.
 - [LLM latency or unsafe content blocks source processing] → Persist normalized input before generation, separate source ingestion from generation workers, bound prompt/context size, and require a final ownership check before delivery.
 - [Encryption key loss makes retained sessions unrecoverable] → Fail closed and require reauthorization; do not add a plaintext or silent fallback.
 - [Fixture confidence is confused with production confidence] → Label adapter mode everywhere and maintain a separate, opt-in real-account acceptance checklist.
@@ -177,7 +182,7 @@ This is a greenfield repository, so there is no existing production state to mig
 4. Add `chat-llm` through its adapter and test it with a local deterministic fake before any external model call.
 5. Add experimental Douyin authentication, direct-message WS, comment read, direct-message send, official comment, and bounded Chromium comment adapters behind explicit configuration. No unlicensed source is copied.
 6. Run focused tests, full tests, typecheck, build, dependency/license checks, and strict OpenSpec validation. These gates prove source consistency only.
-7. Stop after producing the local repository and documented acceptance runbook. A later deployment requires separate authorization naming the environment and public boundary; real QR login or platform writes additionally require a named account and allowed actions.
+7. Deploy the requested real-capability follow-up to DEV with the process-level write capability enabled but no pre-authorized account. Keep every new real account's automation switch off through login and baseline, then let the operator explicitly start that exact account for new private-message and comment reply/readback acceptance.
 
 Rollback during development is deletion or disabling of the newly added adapter behind its port while retaining fixture mode and compatible schema migrations. Once real-account testing is separately authorized, rollback must first stop account runtimes and Chromium workers; ambiguous attempts remain `submitted_unknown` and are never replayed as part of rollback.
 
@@ -185,5 +190,5 @@ Rollback during development is deletion or disabling of the newly added adapter 
 
 - Which official Douyin application, account type, and permissions, if any, will be available for a later `official_api` acceptance run? This does not block fixture implementation; absent proof, the mode remains `unavailable`.
 - Which exact private-web request fields and WebSocket schema are currently required by Douyin? They must be captured through an authorized read-only compatibility probe before the real adapter is declared ready and must not be derived by copying unlicensed code.
-- Fixture deployment target is resolved as DEV under `https://dev.yytt.com.cn/douyin/`; it has no attended-browser capability. Any future real-mode deployment still requires a separately reviewed desktop/browser arrangement.
+- Fixture deployment target is resolved as DEV under `https://dev.yytt.com.cn/douyin/`. The real-mode follow-up uses the installed headless Chrome as a bounded process owned by the isolated demo service; it does not require or expose an interactive server desktop.
 - Which real account and bounded DM/comment targets may be used for acceptance? No account or real write is authorized by this proposal.
