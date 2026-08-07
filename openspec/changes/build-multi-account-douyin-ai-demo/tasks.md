@@ -1,0 +1,57 @@
+## 1. Standalone repository and runtime foundation
+
+- [x] 1.1 Initialize `/Users/baitianxing/codes/douyin-ai-demo` with `main`, an isolated `codex/build-multi-account-douyin-ai-demo` worktree, and no AIDCP runtime dependency.
+- [x] 1.2 Add Node.js 24, strict TypeScript, Fastify, SQLite, Playwright, lint, test, build, Docker, environment, and MIT license metadata.
+- [x] 1.3 Define platform-neutral account, source, inbound, exact-target, generation, delivery, and UI projection types.
+- [x] 1.4 Add validated configuration with offline fixture defaults, explicit real mode, explicit real-write gate, operator token, and redacted startup summary.
+
+## 2. Durable state and security
+
+- [x] 2.1 Create the SQLite WAL schema for accounts, independent source state, encrypted credentials/login/cursors/content, inbound deduplication, and durable reply jobs.
+- [x] 2.2 Add AES-256-GCM envelopes with record-bound AAD and HMAC identity/event indexes so credentials and customer content are not stored in plaintext.
+- [x] 2.3 Implement atomic baseline page ingestion, cursor advancement, one-reply-per-item admission, and account/session generation ownership.
+- [x] 2.4 Implement restart recovery so pre-dispatch generation can be reclaimed while any possibly dispatched send becomes terminal `submitted_unknown`.
+- [x] 2.5 Implement logout and pending-account cleanup without erasing sanitized terminal timeline evidence.
+
+## 3. Offline fixture and chat-llm boundary
+
+- [x] 3.1 Implement a deterministic fixture authorization, direct-message stream, comment reader, exact-target sender, and operator-triggered inbound injection without Douyin network access.
+- [x] 3.2 Implement fixture, unavailable, and OpenAI-compatible `chat-llm` adapters that receive only sanitized normalized content.
+- [x] 3.3 Add tests proving fixture mode performs no external platform action and model failures cannot dispatch a reply.
+
+## 4. Experimental Douyin adapters
+
+- [x] 4.1 Implement a bounded headed-Chromium authorization adapter that closes on success, expiry, cancellation, mismatch, or failure and never claims pure-HTTP QR production readiness.
+- [ ] 4.2 Implement the account-level direct-message WebSocket port with acknowledged readiness, exact event parsing, durable deduplication, bounded reconnect state, and no persistent Chromium dependency.
+- [ ] 4.3 Implement fail-closed incremental comment reads with stable event/video/comment identities and schema-drift reporting.
+- [ ] 4.4 Implement exact-target direct-message delivery behind the explicit real-write gate with typed accepted/rejected/unknown outcomes.
+- [x] 4.5 Implement official comment reply admission from documented permission, token, ownership, request, and response fields without fallback.
+- [x] 4.6 Implement the bounded per-account Chromium comment worker interface so one eligible write owns one headed browser lifecycle and exact-target postcondition.
+- [x] 4.7 Expose `official_api`, `chromium_worker`, and `unavailable` capability honestly; unverified protocol paths must fail closed rather than simulate success.
+
+## 5. Application runtime and web interface
+
+- [x] 5.1 Implement authentication, baseline, direct-message stream, comment poll, generation, delivery, reconnect, and cleanup coordination with one runtime and platform-I/O lock per account.
+- [x] 5.2 Implement operator-token-protected health/readiness, account, login, automation, logout, fixture injection, snapshot, and event-stream routes with origin and cache controls.
+- [x] 5.3 Build the static responsive operations UI for account selection, QR state, source health, platform mode, real-write state, comment capability, timeline, and stop/resume/logout actions.
+- [x] 5.4 Project `confirmed`, `rejected`, `failed_not_submitted`, `submitted_unknown`, and `blocked` distinctly; expose no retry control for unknown writes.
+- [x] 5.5 Add monotonic snapshot revisions and authenticated SSE with bounded authoritative polling fallback.
+
+## 6. Tests, documentation, and delivery evidence
+
+- [x] 6.1 Add repository, crypto, fixture, model, coordinator, API authorization, baseline/deduplication, stop-generation, exact-target, recovery, source-isolation, and UI-copy tests.
+- [x] 6.2 Add README, architecture, license provenance, configuration, local/Docker operation, and explicit private-protocol/official-permission limits.
+- [x] 6.3 Add a live-validation checklist that separates source checks from named-account read-only probes and separately authorized one-target write/readback acceptance.
+- [x] 6.4 Add isolated systemd and reverse-proxy examples without assigning a production hostname or touching AIDCP/isales services.
+- [x] 6.5 Run `npm run check`, high-severity dependency audit, Docker build when available, and `openspec validate build-multi-account-douyin-ai-demo --strict`.
+- [x] 6.6 Commit the standalone repository, fast-forward it to local `main`, and record the repository SHA and validation evidence here; do not create a remote or deploy without an explicit owner, visibility, hostname, and target.
+
+## Validation evidence
+
+- Standalone source: `/Users/baitianxing/codes/douyin-ai-demo.wt/build-multi-account-douyin-ai-demo` on `codex/build-multi-account-douyin-ai-demo`; commit `57f67084ab36509ee52eaaeb7a413d529ef7bef4`, fast-forwarded to local `main`.
+- `npm run check`: passed on 2026-08-07 with 9 test files and 85 tests, followed by a successful TypeScript build.
+- `npm audit --omit=dev --audit-level=high`: passed with 0 vulnerabilities.
+- Fixture HTTP smoke: `health=200`, `ready=200`, unauthorized snapshot `401`, stale mutation `409`, simulated login and two-source baseline healthy, one held/resumed DM and one comment reached Fixture `confirmed` exactly once.
+- Docker image build: not run because the current host has no `docker` executable; Compose, Dockerfile, paths, and permissions were source-reviewed without claiming runtime proof.
+- `openspec validate build-multi-account-douyin-ai-demo --strict`: passed. No real Douyin account, remote repository, host deployment, or platform write was used.
+- Remaining real-platform work is intentionally visible in 4.2-4.4: the shipped `private_web` runtime gate is hard-disabled until an independently sourced current DM codec, comment reader, exact DM sender, and authorized real-account validation exist.
