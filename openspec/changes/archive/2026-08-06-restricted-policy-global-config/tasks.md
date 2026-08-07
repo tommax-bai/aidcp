@@ -69,3 +69,20 @@
   <!-- 2026-08-06 deployed(dev):先探 ECS(三服务 active、近 1h 无写入、关键文件 md5 与改动前 master 逐字节一致)→ 备份 automation/api/console → rsync(kernel v0.1.1 / transport v0.1.4 随包送,ECS 拉不动私有 git 依赖)→ stop-then-start → healthcheck 全过(契约门通过、写者锁重获、8787/8090/8091 监听、飞书长连接、面板 /api/restricted-policy 登录态端到端 200 回默认真态、console 新 bundle 上 8088、双服务 0 error)。⚠️ 迁移 0116 刻意未执行(惰性态):共库账本上执行会武装 OL 停机(0115/簇150 同根因),已加「探测失败→响亮降级到写死默认」的启动守卫(d298762);缺表期间判定按 browse_only/72h 跑、面板写响亮失败,执行迁移后重启即满血。扫描器首扫实录:扫 38 账号,restricted→warned 11、warned→normal 14、非属主跳过 8、放弃 0——存量成批恢复如设计预告发生并有带数日志 -->
 - [x] 8.3 真机验收项登记 `docs/real-machine-acceptance-backlog.md`:full_pause 下受限账号让出槽位→到点唤醒→回警告档恢复浏览的端到端一趟
   <!-- 登记为簇 151(共享前置=迁移 0116 惰性态,与簇 150 同根因;含 full_pause 端到端/验证码一票否决/手动通道即时性/热改窗口/手动受限不秒恢复六项) -->
+
+<!-- 2026-08-07 deployed(ol)+迁移执行(用户明确授权「OL也可以部署了」):
+发布分支 release/20260807-ol-restricted-policy(三仓,精确切自本 change 验证过的 sha:
+automation d298762 / api 50f514f / console 76c299a——刻意不带 master 上并发新落的
+platformize-browse-vocabulary 与 transport v0.1.5,那些不在本次授权与验证范围)。
+切前对账:上批发布分支(automation/api release/20260806-ol-derived-services、
+console release/20260805-fb-global-policy-unify)对 master `git cherry` 零 + 提交,无待回流。
+序列:探 OL(三服务 active、无并发写入、树=改前 master)→ 备份三目录 → 从发布 worktree
+rsync(kernel v0.1.1/transport v0.1.4 按发布 lock 现装随包送)→ stop-then-start →
+惰性态 healthcheck 过(契约门 0113/认识 0116、写者锁 target=ol、OL 首扫:24 账号
+restricted→warned 1 / warned→normal 2 / 非属主跳过 6 / 放弃 0)→
+执行迁移 up --owner=automation(status 先核:账本 60 行校验和全一致,待应用恰 0115+0116
+均 kind=expand;applied 70ms/42ms;⚠️ 注意 migrate CLI 旗标是 --owner=xxx 带等号,
+空格分写会被静默忽略、探全部属主组)→ 两环境 automation 再重启 →
+满血 healthcheck:两侧账本 0116、探测警告消失、0 error、OL 面板端到端 200、
+OL console 新 bundle 200。0115 同批落地,簇 150 的前置①随之解除。
+发布分支保留(remote+local),发布 worktree 已清;分支内容=master 快照,无需回流。 -->

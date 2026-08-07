@@ -4310,10 +4310,10 @@ change `route-notification-items-by-category`（cloud master `9e5b000` / 派生 
 ## 簇 150 · 阻断弹窗现场采集（blocking-overlay-dom-capture，2026-08-06）
 
 共享前置**两条，缺一验不了**：
-① **迁移 0115 尚未执行**——执行它会武装一次 OL 停机（dev/ol 共库共账本、双方 `AIDCP_SCHEMA_GATE=enforce`、
-   OL 在跑的构建 `KNOWN_MAX=0113`，账本一旦出现 0115，OL 下次重启即拒启且重启前零症状）。
-   出路见该 change tasks.md §9.1：要么先把同一 automation 构建部署到 OL 再执行迁移，要么维持惰性态。
-   **在此之前样本表不存在，下列任何一条都验不了**（当前 dev 行为：store 按名退化、风控与告警零影响）。
+① ~~**迁移 0115 尚未执行**~~ **已解除（2026-08-07）**：随 change restricted-policy-global-config 的 OL
+   发布（release/20260807-ol-restricted-policy，automation 构建 KNOWN_MAX=0116 先上 OL），
+   0115+0116 已在共库账本执行（校验和全一致、均 kind=expand），两环境 automation 已重启、
+   契约门按账本 0116 通过。**样本表 blocking_overlay_samples 现已存在**，下列各条只再等②。
 ② 边缘 TS + 页面规则改动需**出安装包并装机**才到运营机（与既有出包等待项同簇）。
 
 - [ ] 真机复现一次 FB 阻断弹窗，`blocking_overlay_samples` 落到一条：三层信息齐全
@@ -4329,11 +4329,11 @@ change `route-notification-items-by-category`（cloud master `9e5b000` / 派生 
 
 ## 簇 151 · 受限账号的处置策略与自动恢复真跑一趟（restricted-policy-global-config，2026-08-06）
 
-共享前置：**迁移 0116 尚未执行（惰性态，与簇 150 的 0115 同一根因）**——dev/ol 共库共账本、
-OL 在跑构建 `KNOWN_MAX < 0116`，账本一旦出现 0116，OL 下次重启即拒启且重启前零症状。
-代码已按惰性态部署：缺表时判定层按写死默认跑（browse_only / 72h）、**自动恢复扫描器照常生效**；
-后台「受限处置策略」卡读写会失败（具名报错，非白屏）。执行迁移的两条出路同簇 150
-（先把 ≥0116 的 automation 构建部署到 OL 再迁移，或维持惰性态）；迁移执行后 dev 重启即满血。
+~~共享前置：迁移 0116 尚未执行（惰性态）~~ **前置已全部解除（2026-08-07）**：OL 已从
+release/20260807-ol-restricted-policy 部署（automation d298762 / api 50f514f / console 76c299a），
+迁移 0115+0116 已在共库账本执行，dev/ol automation 均已重启满血（账本 0116、探测警告消失、
+面板读写通）。两环境首扫已各自成批恢复存量（dev：38 账号中 11 restricted→warned +
+14 warned→normal；OL：24 账号中 1+2），下列各条随时可验。
 
 - [ ] **自动恢复端到端（默认 browse_only 也生效）**：找一个 restricted 已满 72h 的存量账号，
       观察扫描器日志出现带账号数的恢复行、状态翻到 warned、浏览闭环按 warned 档重新驱动；
