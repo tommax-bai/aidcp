@@ -12,7 +12,7 @@
 > **v1 → v2 演进**：v1 只覆盖"单线规划"链路（`hello/plan/select/anchor/action/ping`）。
 > v2 在保持这条链路向后兼容的同时，新增了三大块：
 > 1. **浏览会话编排**（`note.content`/`{platform}.note.open` 等）——云端逐条驱动边缘刷信息流；
-> 2. **角色驱动指令 + 结构化上报**（`page.cards`/`note.detail` 上报，`interaction.like`/`{platform}.feed.scroll` 等下发）——
+> 2. **角色驱动指令 + 结构化上报**（`page.cards`/`note.detail` 上报，`{platform}.note.like`/`{platform}.feed.scroll` 等下发）——
 >    对应云端从单体 Planner 重构为**事件驱动多 Agent**（`RoleDispatcher` + 多角色，覆盖浏览闭环、会话守护、评论、通知、概念和平台专题等职责；权威清单见 `event-bus/types.ts` 的 `RoleName` 与 `role-dispatcher.ts`）后的实时控制面；
 > 3. **风控预算与发布审批**（`session.budget`/`risk.canDo`/`publish.*`）——把"做多少、能不能做、发布前要不要人审"纳入协议。
 >
@@ -87,11 +87,11 @@
 | `xiaohongshu.feed.scroll` / `xiaohongshu.search.scroll` / `facebook.feed.scroll` / `facebook.search.scroll` / `facebook.reels.scroll` | cloud → edge | 页面滚动，**面进命令名**（词汇批 4）：`reason` 只承载意图/因由（idle_recover_nudge / resume_redrive / continue_after_* 等），不再兼职面；`targetSurface` 载荷字段已删。Facebook Native 仅 `idle_recover_nudge` 可将精确 target 置前；主动续场、主入口恢复与 Feed→Reels 降级统一使用 `resume_redrive`（面段=目标面）；`facebook.reels.scroll` 的进入型 reason（resume_redrive / facebook_reels_primary / empty_feed_reels_fallback）先导航进 Reels，推进型到达时观测不在 Reels 则诚实失败 `surface_mismatch_observed_list`（对称：feed/search 声明到达 Reels 现场失败 `surface_mismatch_observed_reels`，绝不静默改跑另一面执行器）；可选 `dwellMs` |
 | `xiaohongshu.feed.refresh` / `facebook.feed.refresh` | cloud → edge | 主 feed 浏览深度到阈值后换出全新一批（xhs=右下「刷新」按钮；FB=顶栏首页图标页内点击 + 显式回顶。`reason`: feed_refresh；可选 `thinkMs`；边缘诚实回执 `action.completed{action:'refresh'}`，非 feed 页 / 无按钮 / 点后未换新批均如实失败，绝不假成功） |
 | `pacing.update` | cloud → edge | 会话中途风控档位变化推送新 `tempo`（payload `{tempo}`）；边缘刷新兜底节奏（最小间隔 + 停留兜底）、**不重置**操作间隔锚点、不入队/不唤醒会话（change pacing-fallback-hardening） |
-| `interaction.like` | cloud → edge | 点赞指定笔记 |
-| `interaction.collect` | cloud → edge | 收藏指定笔记 |
-| `interaction.follow` | cloud → edge | 关注作者 |
-| `interaction.comment` | cloud → edge | 在当前笔记发评论（`text` 正文；云端已撰写/去AI味/人审通过）。可选 `groupChatCode`=账号「联系方式」，非空则 verbatim 追加到评论末尾（wire 名历史保留，概念=contact info，change generalize-contact-info）；可选 `fastReturnToFeed=true` 仅承载手工 `/comment --feed`：提交派发后不等平台确认，500ms 后直回平台首页，并诚实回 submitted-unconfirmed / verification_ambiguous（绝不冒充平台确认成功） |
-| `interaction.like_comment` | cloud → edge | 给详情页内某条评论点赞（`commentAnchorId` 稳定锚点定位，绝不按序号） |
+| `xiaohongshu.note.like` / `facebook.note.like` / `facebook.video.like` | cloud → edge | 点赞，**对象进命令名**（词汇批 5，按对象拆不按位置拆）：note=内容单元（xhs 视频笔记同为 note），video=Facebook 视频对象（Reels 的活动视频或 feed 里的视频帖，云端按自己的观测声明；Reels 节奏赞与 feed 视频 0.25 概率赞两类发送点标 video）。执行点核对现场：`facebook.note.like` 到达时观测在 Reels ⇒ 诚实失败 `object_mismatch_observed_reels`（Reels 上的对象只能是视频），绝不静默改跑视频执行器；video 对象两个位置都合法。回执关联键恒 `action:'like'`（值命名空间与协议名脱钩，＝风控动作名） |
+| `xiaohongshu.note.collect` | cloud → edge | 收藏指定笔记（仅小红书；Facebook 无收藏，改名后由平台段闸结构性拒收，批 4 的手抄拒集已归零删除） |
+| `xiaohongshu.user.follow` / `facebook.user.follow` | cloud → edge | 关注作者（对象＝用户）。Facebook 执行语义不变：Reels 绑定（`noteId`＝当前活动 Reel），Feed/主页关注仍 `capability_unsupported` |
+| `xiaohongshu.note.comment` / `facebook.note.comment` | cloud → edge | 在当前内容发评论（`text` 正文；云端已撰写/去AI味/人审通过）。可选 `groupChatCode`=账号「联系方式」，非空则 verbatim 追加到评论末尾（wire 名历史保留，概念=contact info，change generalize-contact-info）；可选 `fastReturnToFeed=true` 仅承载手工 `/comment --feed`：提交派发后不等平台确认，500ms 后直回平台首页，并诚实回 submitted-unconfirmed / verification_ambiguous（绝不冒充平台确认成功） |
+| `xiaohongshu.comment.like` | cloud → edge | 给详情页内某条评论点赞（`commentAnchorId` 稳定锚点定位，绝不按序号；仅小红书，回执关联键保留历史形 `comment_like`） |
 | `facebook.group.join` | cloud → edge | Facebook 加群原子指令：导航到群、回传结构化 observation；仅 `click:true` 时点击 Join 一次，必须走 Facebook `join` 能力，绝不复用 `browse`。（群内找首帖的滚动是引擎对 `facebook.note.open{selection}` 的内部分解，协议层无群滚动面） |
 | `navigation.back` | cloud → edge | 返回上一页（feed / search；无平台段，批 6 与 note.close 裁分工） |
 | `xiaohongshu.note.browse_images` | cloud → edge | 浏览笔记图片（`count` 张；DeepReader 决策下发；仅小红书） |
@@ -290,7 +290,7 @@
   "pacing": {                 // object?  可选节奏快照（change pacing-floor-config-min-interval）；旧端忽略
     "tempo": 1.0,             //   number  风控档全局节奏乘子（normal=1.0/warned=1.3/restricted=1.6），边缘乘算
     "opFloorsMs": {           //   object  每类操作兜底 floor 默认区间（已含云端读出口 clamp 护栏、非零）；逐字段可缺、边缘逐项回落内置默认
-      "action":       { "minMs": 1500, "maxMs": 4000 }, // {p}.note.open/xiaohongshu.profile.open/interaction.*
+      "action":       { "minMs": 1500, "maxMs": 4000 }, // {p}.note.open/xiaohongshu.profile.open/互动写命令
       "scroll":       { "minMs": 500,  "maxMs": 1500 }, // xiaohongshu.note.scroll_comments
       "card_gap":     { "minMs": 3000, "maxMs": 7000 }, // xiaohongshu.note.browse_images
       "detail_dwell": { "minMs": 2500, "maxMs": 5000 }  // ensureDetailDwell 兜底 floor
@@ -589,7 +589,7 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 //   而发下面的选择请求。Edge 打开群讨论流，选择第一条可唯一绑定的可评论帖子：
 //   有稳定群帖 permalink 时进入详情并以 permalink 回 note.detail.noteId；没有 permalink 时留在群讨论流，
 //   以严格的 aidcp:facebook-group-feed-post:v1:<sha256> targetRef 回 note.detail.noteId，并把后续
-//   interaction.comment 绑定到同一 live DOM 容器。targetRef 不是 Facebook post id/permalink，不得拼 URL。
+//   facebook.note.comment 绑定到同一 live DOM 容器。targetRef 不是 Facebook post id/permalink，不得拼 URL。
 //   首帖不合格或已去重时不得顺延第二帖、不得回退搜索；旧的 url/index/noteId 行为保持不变。
 {
   "selection": "first_commentable_group_post",
@@ -642,14 +642,14 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 { "reason": "resume_redrive", "targetSurface": "feed" }  // 统一主动重驱；Edge 把临时 group/search active-list 纠正回 Facebook 首页后继续 Feed
 // {platform}.feed.refresh（feed 浏览深度到阈值换新批：xhs=右下「刷新」，FB=顶栏首页图标；change feed-refresh-on-depth）
 { "reason": "feed_refresh", "thinkMs": 700 } // 边缘点后校验「回顶 + 首卡换新」才回 ok:true 并上报新一批 page.cards
-// interaction.like
+// {platform}.note.like / facebook.video.like（对象由命令名声明；video=Reels 活动视频或 feed 视频帖）
 { "noteId": "n123", "reason": "高质量内容", "thinkMs": 900 }
-// interaction.collect
+// xiaohongshu.note.collect
 { "noteId": "n123", "reason": "值得收藏", "thinkMs": 900 }
-// interaction.follow
+// {platform}.user.follow
 { "authorId": "u456", "reason": "持续优质", "thinkMs": 900 } // 既有主页关注：authorId 可选
 { "noteId": "https://www.facebook.com/reel/1964804494173822", "reason": "明确关注当前 Reel 作者", "thinkMs": 900 } // Facebook Reels：noteId 必填并绑定当前活动 Reel；不以 DOM 顺序或“当前页”兜底
-// interaction.comment（noteId 通常为 canonical id；Facebook 无 permalink 首帖可原样回传 Edge 签发的严格 targetRef）
+// {platform}.note.comment（noteId 通常为 canonical id；Facebook 无 permalink 首帖可原样回传 Edge 签发的严格 targetRef）
 { "noteId": "n123", "text": "今天的分享很有启发", "thinkMs": 900, "groupChatCode": "...", "fastReturnToFeed": true } // text 必填；groupChatCode 可选=账号「联系方式」；fastReturnToFeed 仅手工 --feed 置 true：提交后 500ms 直回首页、结果保持未确认
 // 注（change generalize-contact-info）：本字段承载的概念已正名为「联系方式」，内部变量为 contactInfo；wire 字段名保留 groupChatCode 作历史兼容（Method A），物理改名属后续协调步骤。
 // facebook.group.join（Facebook 加群；click 缺省/false=只观察不点击，true=cloud 已判定可点后才点击一次）
@@ -698,7 +698,7 @@ Cloud 只接受同时匹配当前连接 `accountId` 与在途 `captureId` 的结
 `xiaohongshu.profile.open{direct:...}` 必须在 CDP 前以 `legacy_profile_direct_unsupported` 拒绝。平台不支持的身份命令同样
 在 Native adapter 支持矩阵/CDP 前拒绝，不做跨平台 fallback。
 
-`interaction.follow.noteId` 是向后兼容的可选扩展：非 Reels 调用方仍可只携 `authorId`。Facebook
+`{platform}.user.follow` 的 `noteId` 是向后兼容的可选扩展：非 Reels 调用方仍可只携 `authorId`。Facebook
 Reels 执行器仅在会话确处于 Reels 模式、且 `noteId` 与立即重探的规范活动 Reel 完全一致时才允许定位作者区
 关注按钮；命令延迟后若已滑到下一条则回 `no_target`、零点击。该字段只接通执行能力，不等于云端已经选择了
 自动关注策略；普通 Facebook Feed / 作者主页关注在本 change 中仍为 `capability_unsupported`。
@@ -711,7 +711,7 @@ Reels 执行器仅在会话确处于 Reels 模式、且 `noteId` 与立即重探
 > **时间指令（timing directive，指令级节奏 Command Pacing）**：上列决策指令携带**可选**时间字段，
 > 由云端基于**已上报内容**（`note.detail.content` 长度）+ 风控状态（`tempo`：normal=1.0 /
 > warned=1.3 / restricted=1.6）+ 会话进度（疲劳曲线）算出的**中心值**：
-> - `thinkMs`：执行该动作**前**的犹豫 / 感知时间（`interaction.*` / `{platform}.note.open`）；
+> - `thinkMs`：执行该动作**前**的犹豫 / 感知时间（互动写命令 / `{platform}.note.open`）；
 > - `dwellMs`：离开当前页前应达到的**总停留时间**（`navigation.back` / `{platform}.note.close`），治详情页"秒退"。
 >
 > §3 时间系数收口在云端一处，**不下发系数**。边缘收到中心值后叠一层 lognormal 抖动（防确定性指纹）
@@ -720,7 +720,7 @@ Reels 执行器仅在会话确处于 Reels 模式、且 `noteId` 与立即重探
 
 `EdgeCommand.action` → 协议 `type` 映射（`command-bridge.ts`）：
 `scroll→{platform}.{surface}.scroll`（面由 `EdgeCommand.surface` 声明：sendScrollCommand 经单点解析器落面）、`open_note→{platform}.note.open`、`close_note→{platform}.note.close`、
-`like→interaction.like`、`collect→interaction.collect`、`follow→interaction.follow`、`comment→interaction.comment`、`comment_like→interaction.like_comment`、
+`like→{platform}.note.like / facebook.video.like`（对象由 `EdgeCommand.likeObject` 声明：Reels 节奏赞与 feed 视频概率赞两类发送点标 `video`，缺省 `note`；不存在组合如 `xiaohongshu×video` 响亮 throw）、`collect→xiaohongshu.note.collect`、`follow→{platform}.user.follow`、`comment→{platform}.note.comment`、`comment_like→xiaohongshu.comment.like`、
 `search→{platform}.search.execute`、`back→navigation.back`、`browse_images→xiaohongshu.note.browse_images`、
 `scroll_comments→xiaohongshu.note.scroll_comments`、`profile_open→xiaohongshu.profile.open`、
 `identity_read_current→identity.read_current`、`identity_read_self_profile→identity.read_self_profile`、
@@ -760,7 +760,7 @@ Facebook 首页空态的兼容握手：Edge 必须先确认顶层 Facebook 首�
 且在同一 URL + `performance.timeOrigin` generation、document age ≥8s、无真卡/loading 时，同一紧凑容器的显式空态
 语义连续命中 3 次并通过最终复检，才可上报 `cards:[], listKind:'feed', listState:'empty'`。仅 Cloud 将该观察翻译为
 `facebook.reels.scroll{reason:'resume_redrive'}`；普通 0 卡、加载中、未知布局及其它平台不得触发。Reels 卡仍以现有
-`page.cards → facebook.note.open{surface:'feed'} → note.detail → interaction.like/facebook.reels.scroll` 链运行，`feed/detail` Surface union 不新增 `reels`。
+`page.cards → facebook.note.open{surface:'feed'} → note.detail → facebook.note.like/facebook.reels.scroll` 链运行，`feed/detail` Surface union 不新增 `reels`。
 
 Facebook 首页有内容但不可可靠解析的兼容握手：Edge 先按既有规则连续滚动最多 8 轮；仍无可信卡片身份时，必须重新
 读取同一完整页面样本。仅在 canonical 首页、主壳就绪、无登录/checkpoint/consent/captcha/loading，且可见物理 Feed
@@ -1042,7 +1042,7 @@ search 回执的计数边界是 `actuated=true`，而不是 `ok=true`：`results
 }
 ```
 
-`acquired` 是唯一的 quiesced 事实：它表示当前浏览原子动作已到命令边界，尚未开始的普通浏览命令已取消，且该 `taskId` 已成为唯一页面写 owner。cloud 在此前不得发送该任务第一条业务命令。普通浏览不带 `taskId`；独占任务的 `publish.command`、评论 `{platform}.search.execute/{platform}.note.open/xiaohongshu.note.scroll_comments/interaction.comment`、`xiaohongshu.notification.*`、`facebook.group.join` 与验证码点击必须携当前 `taskId`。
+`acquired` 是唯一的 quiesced 事实：它表示当前浏览原子动作已到命令边界，尚未开始的普通浏览命令已取消，且该 `taskId` 已成为唯一页面写 owner。cloud 在此前不得发送该任务第一条业务命令。普通浏览不带 `taskId`；独占任务的 `publish.command`、评论 `{platform}.search.execute/{platform}.note.open/xiaohongshu.note.scroll_comments/{platform}.note.comment`、`xiaohongshu.notification.*`、`facebook.group.join` 与验证码点击必须携当前 `taskId`。
 
 释放与确认：
 
@@ -1413,7 +1413,7 @@ edge                                          cloud（RoleDispatcher + 多角色
  │ ◄───────────────────────────────────────────│
  │  note.detail {noteId,content,...}            │  ContentCurator 质量关卡 → InteractionAppraiser 决策
  │ ───────────────────────────────────────────►│
- │  interaction.like {noteId} | navigation.back │  （角色事件 → command-bridge → 协议消息）
+ │  {platform}.note.like {noteId} | navigation.back │  （角色事件 → command-bridge → 协议消息）
  │ ◄───────────────────────────────────────────│
  │  action.completed {action:"like",ok:true}    │  记录互动；BackToFeed 决定返回列表
  │ ───────────────────────────────────────────►│
@@ -1423,7 +1423,7 @@ edge                                          cloud（RoleDispatcher + 多角色
 ```
 
 > 互动前可选地穿插 `risk.canDo → risk.canDo.result` 询问许可、成功后 `risk.record`
-> 落账（边缘主动风控路径）；与"云端角色主动下发 `interaction.like`"两条路径并存。
+> 落账（边缘主动风控路径）；与"云端角色主动下发 `{platform}.note.like`"两条路径并存。
 
 ### 4.2 单步定位（规划 / 锚点 / 选择，v1 兼容链路）
 

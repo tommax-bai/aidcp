@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""动作关联键三表跨仓对账 —— 协议第 5 处同步点的机器闸（词汇批 5 立）。
+
+## 为什么必须在控制仓
+
+`action.completed.action` 是云端角色关联键（不是协议消息名），两端各自维护
+「信封名 → 关联键」的裸 string 映射表：
+
+  - `aidcp-edge/src/native-page-engine/command-mapper.ts` 的 `actionNames`（现役发端）
+  - `aidcp-edge/src/facebook/facebook-session.ts` 的 `FB_COMMAND_ACTION_NAMES`（退役但仍测试）
+  - `aidcp-automation/src/comm/handler.ts` 的 `LEGACY_ACTION_COMPLETION_ALIASES`（云端入口归一）
+
+字段两端都是裸 string，typecheck 全程无感。错一条的后果不是报错，是**角色永远等不到
+回执 + 调度器把它当未知失败动作、在详情页上下发 feed scroll**（CLAUDE.md §2 第 5 处同步点；
+实例：Facebook 会话，修于 edge 7b9b37e / cloud 25379e6）。任何单仓测试只能钉住自己那份表；
+两仓表之间的漂移只有同时打开两个仓才看得见——与 `protocol-parity` / `operation-registry-parity` 同形。
+
+## 它检查什么
+
+1. **同键同值**：三份表交集里的每个键，关联键值 MUST 逐字相同；
+2. **云端别名表键集 ⊆ 边缘 actionNames 键集**：云端归一一个边缘不产出的名字＝陈旧条目，
+   会掩盖下一次改名漂移；
+3. **边缘独有键必须在显式豁免名单里**：这些信封名不产 `action.completed` 常规回执
+   （identity 走 `identity.observed`、session.end 无回执），只用于诊断/失败回执——
+   新增不对称键 MUST 来这里登记理由，否则判失败；
+4. **FB 表 ⊆ actionNames 且同键同值**（该表覆盖 FB 子集 + 保留 xhs 专属名的规范失败回执防线）。
+
+**解析不了的行一律判失败，MUST NOT 跳过。**
+
+## 用法
+
+    scripts/action-key-parity          # 对账，不一致即 exit 1
+    scripts/action-key-parity --list   # 只列出参与对账的文件与条目数
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent.parent
+
+TABLES = [
+    ("aidcp-edge", "src/native-page-engine/command-mapper.ts", "actionNames", "edge-mapper"),
+    ("aidcp-edge", "src/facebook/facebook-session.ts", "FB_COMMAND_ACTION_NAMES", "edge-fb"),
+    ("aidcp-automation", "src/comm/handler.ts", "LEGACY_ACTION_COMPLETION_ALIASES", "cloud-aliases"),
+]
+
+# 边缘 actionNames 独有、云端别名表按设计不收的键（不产 action.completed 常规回执）。
+# 新出现的不对称键必须在这里登记理由，否则判失败——「豁免」必须是显式决定，不是默认。
+# ⚠️ 词汇批 7（normalize-nonplatform-vocabulary）会把 identity.read_current 改名
+#    identity.read_current_page——该批集成时本名单同步改名。
+EDGE_ONLY_EXEMPT = {
+    "identity.read_current",       # 应答走 identity.observed（按 captureId 关联），值只用于失败回执
+    "identity.read_self_profile",  # 同上
+    "session.end",                 # 编排收尾，无 action.completed
+}
+
+
+class ParseError(Exception):
+    pass
+
+
+def strip_comments(text: str) -> str:
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"//[^\n]*", "", text)
+
+
+def extract_block(source: str, var_name: str, path: Path) -> str:
+    m = re.search(rf"const\s+{re.escape(var_name)}\s*(?::[^=]*)?=\s*\{{", source)
+    if not m:
+        raise ParseError(f"{path}: 找不到 `const {var_name} = {{`")
+    i = m.end() - 1
+    depth = 0
+    for j in range(i, len(source)):
+        if source[j] == "{":
+            depth += 1
+        elif source[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[i + 1 : j]
+    raise ParseError(f"{path}: `{var_name}` 的对象字面量括号不配平")
+
+
+ENTRY = re.compile(r"['\"]([^'\"]+)['\"]\s*:\s*['\"]([^'\"]+)['\"]")
+
+
+def parse_table(path: Path, var_name: str) -> dict[str, str]:
+    text = strip_comments(path.read_text(encoding="utf-8"))
+    block = extract_block(text, var_name, path)
+    entries: dict[str, str] = {}
+    # 逐段校验：块里每个非空、非纯空白片段都必须解析成 `'k': 'v'`，解析不了判失败。
+    for chunk in block.split(","):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        m = ENTRY.fullmatch(chunk)
+        if not m:
+            raise ParseError(f"{path}: 解析不了表项 `{chunk[:60]}`（洞和一致在输出上同形，判失败）")
+        key, value = m.group(1), m.group(2)
+        if key in entries:
+            raise ParseError(f"{path}: 键 `{key}` 重复")
+        entries[key] = value
+    if not entries:
+        raise ParseError(f"{path}: `{var_name}` 解析出 0 条（表被移动或改名？）")
+    return entries
+
+
+def main() -> int:
+    list_only = "--list" in sys.argv[1:]
+    parsed: dict[str, dict[str, str]] = {}
+    for repo, rel, var, label in TABLES:
+        path = ROOT / repo / rel
+        if not path.exists():
+            print(f"FAIL: {path} 不存在（表被移动/仓未 clone 都不能读成「一致」）")
+            return 1
+        try:
+            parsed[label] = parse_table(path, var)
+        except ParseError as e:
+            print(f"FAIL: {e}")
+            return 1
+        if list_only:
+            print(f"{label}: {path}（{len(parsed[label])} 条）")
+    if list_only:
+        return 0
+
+    failures: list[str] = []
+    mapper = parsed["edge-mapper"]
+    fb = parsed["edge-fb"]
+    aliases = parsed["cloud-aliases"]
+
+    # 1) 交集同值
+    for label, table in (("edge-fb", fb), ("cloud-aliases", aliases)):
+        for key, value in table.items():
+            if key in mapper and mapper[key] != value:
+                failures.append(f"同键不同值: `{key}` edge-mapper={mapper[key]!r} vs {label}={value!r}")
+
+    # 2) 云端别名表键集 ⊆ actionNames
+    for key in aliases:
+        if key not in mapper:
+            failures.append(f"cloud-aliases 有陈旧/超集键（edge-mapper 不产出）: `{key}`")
+
+    # 3) 边缘独有键必须显式豁免
+    for key in mapper:
+        if key not in aliases and key not in EDGE_ONLY_EXEMPT:
+            failures.append(f"edge-mapper 键 `{key}` 不在 cloud-aliases 也不在豁免名单——不对称必须是显式决定")
+    for key in EDGE_ONLY_EXEMPT:
+        if key not in mapper:
+            failures.append(f"豁免名单点名了不存在的键 `{key}`（词汇演进后名单未同步）")
+        if key in aliases:
+            failures.append(f"豁免名单键 `{key}` 其实在 cloud-aliases 里——豁免理由已失效，删名单条目")
+
+    # 4) FB 表 ⊆ actionNames（值一致已在 1 查过）
+    for key in fb:
+        if key not in mapper:
+            failures.append(f"edge-fb 有 edge-mapper 之外的键: `{key}`")
+
+    if failures:
+        print(f"FAIL: 动作关联键三表对账不一致（{len(failures)} 处）")
+        for f in failures:
+            print(f"  - {f}")
+        return 1
+
+    print(
+        f"OK: 关联键三表一致（edge-mapper {len(mapper)} 条 / edge-fb {len(fb)} 条 / "
+        f"cloud-aliases {len(aliases)} 条；豁免 {len(EDGE_ONLY_EXEMPT)} 条）"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

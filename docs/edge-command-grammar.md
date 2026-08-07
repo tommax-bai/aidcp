@@ -237,17 +237,26 @@
 **顺手清账（据实修正批 1 遗留）**：`browse_next` 全链删除（真死）；`browse_scroll` **保留**——
 它是首帖探测的引擎内部载体（`facebook/runtime.rs` 构造），排除表理由与 postconditions 证据已改写。
 
-#### 互动平台化 + 按对象改名（5 条 → 批 5）
+#### 互动平台化 + 按对象改名（5 条 → 批 5）✅ 已实装（2026-08-07，change `objectify-interaction-vocabulary`）
 
-| 现名 | 目标名 | 说明 |
+**5 旧名 → 9 新名**（协议 103→107、登记表 52→56），落地名与实装核实结论：
+
+| 现名 | 落地名 | 核实结论 |
 | --- | --- | --- |
-| `interaction.like` | `{p}.note.like` + `facebook.video.like` | 按对象类型拆（视频已有独立概率策略），不按位置拆 |
-| `interaction.collect` | `xhs.note.collect` | 仅小红书（FB 无收藏） |
-| `interaction.follow` | `{p}.user.follow` | 对象＝用户，不是笔记 |
-| `interaction.comment` | `{p}.note.comment` | 对象＝内容单元 |
-| `interaction.like_comment` | `{p}.comment.like` | 对象＝评论——对象编址收益最直观的一条 |
+| `interaction.like` | `xiaohongshu.note.like` + `facebook.note.like` + `facebook.video.like` | 按对象拆不按位置拆：**video 对象两个位置都合法**（Reels 活动视频 + feed 视频帖，后者即 0.25 概率赞的对象）；xhs 视频笔记仍是 note。执行点核对：note 对象到达 Reels ⇒ `object_mismatch_observed_reels` 诚实失败（Reels 上的对象只能是视频）；video 声明由云端两类发送点（Reels 节奏赞 / feed 视频概率赞）经 `EdgeCommand.likeObject` 落 bridge 组合表 |
+| `interaction.collect` | `xiaohongshu.note.collect` | 仅小红书（FB 无收藏；平台段取代码枚举 `xiaohongshu`，蓝图行文 `xhs` 不采用） |
+| `interaction.follow` | `xiaohongshu.user.follow` + `facebook.user.follow` | 对象＝用户；FB 执行语义不变（Reels 绑定、Feed/主页关注 `capability_unsupported`） |
+| `interaction.comment` | `xiaohongshu.note.comment` + `facebook.note.comment` | 对象＝内容单元（FB 含群帖 keep-open 流） |
+| `interaction.like_comment` | `xiaohongshu.comment.like` | 对象＝评论；FB 无评论点赞。名序反转（like_comment→comment.like）随对象编址消失 |
 
-动作关联键口径随动（协议第 5 处同步点：两侧 21 条动作名映射表）。各条的实际支持平台以实装批核对为准。
+**关联键口径的据实修正（推翻交接文档「批 5 必须动值」预判）**：全量消费面探查坐实——关联键值与
+风控动作名 `RISK_ACTIONS` 逐字同名**是设计**（cloud `protocol.ts` 明写「可直读、零映射」，`handler` 直接
+强转入风控 outbox），被 kernel 跨仓枚举 + 9 张 DB CHECK 钉死。**批 5 只换键、值不动**：三张映射表
+（edge `actionNames` / 退役 `FB_COMMAND_ACTION_NAMES` / cloud `LEGACY_ACTION_COMPLETION_ALIASES`）键
+5→9、值原样映回既有五词（`facebook.video.like`→`like`）；~120 个值消费点 + kernel + DB 零改动。
+两个命名空间**本该脱钩**（CLAUDE.md §2 早已写明「该字段是角色关联键，不是协议消息名」），本批把脱钩
+坐实。机器闸：控制仓新增 `scripts/action-key-parity` 三表跨仓对账（键集 ⊆ / 同键同值 / 不对称须显式
+豁免）；两仓各有穷举断言杀 `?? type` 静默回落。`FACEBOOK_UNSUPPORTED_COMMANDS` 手抄拒集按批 4 注记归零删除。
 
 #### 新增（1 条 → 批 3，无平台段）
 
@@ -295,7 +304,7 @@
 | **2** | 7 条改类 + 说明书类别词汇扩容 + 身份闸摘救援补丁 + **出入闸的平台段校验落地** | 行为变更（闸的拦截范围），不动协议名 |
 | **3** | 新增「问现状」观察命令 | 协议新增，三段对账闭环 |
 | **4** | ✅ **已实装（2026-08-06）**：14 → 22 平台段名（协议 95→103、登记表 44→52）；`page.scroll` 拆三面、`targetSurface` 字段删；两道休眠平台段闸转正；`FACEBOOK_UNSUPPORTED_COMMANDS` 收缩到两条共享名互动命令（批 5 归零）；manifest `edgeTypes[]` 取代手抄排除清单；跨面到达诚实失败 `surface_mismatch_*` | 协议改名最大的一批（change `platformize-browse-vocabulary`） |
-| **5** | 互动平台化 + 按对象改名（5 条） | 协议改名，动作关联键口径随动（第 5 处同步点） |
+| **5** | ✅ **已实装（2026-08-07）**：5 → 9 平台段对象名（协议 103→107、登记表 52→56）；like 按对象拆（video=Reels+feed 视频帖）、执行点核对对象；**关联键只换键值不动**（据实修正：值＝风控动作名是设计，脱钩坐实）；`FACEBOOK_UNSUPPORTED_COMMANDS` 归零删除；新增 `scripts/action-key-parity` 三表对账闸 | 协议第 5 处同步点所在批（change `objectify-interaction-vocabulary`） |
 | **6** | IM 族 `wechat.inbox.*`、发布平台段化（`{p}.publish.command` + 原子 kind 表分平台、删载荷 `platform` 字段）、`navigation.back` 与 `note.close` 定分工后平台段化、`edge.task.*` → `task.*` | 收尾清账 |
 | **7** | 非平台域词汇收口：验证码归一家、应答命名定一套约定、`ui.snapshot` 方向消歧、identity 两条平行化；`ping`/`pong` 与 `plan.response` 明确不动 | 纯内部词汇，无平台语义、不碰浏览热区（可与批 5/6 并行） |
 
