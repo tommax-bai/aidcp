@@ -38,7 +38,7 @@
 
 - [x] 6.1 tasks.md 回写 commit-sha 与偏离说明 <!-- aidcp 本提交 -->
 - [x] 6.2 真机验收项登记到 `docs/real-machine-acceptance-backlog.md`（真机上制造一次链路瞬时不通，确认环境重排后自行起来；以及确认代理配错时不重排、当场报配置原因） <!-- aidcp 本提交 backlog 簇 154，8 项 -->
-- [ ] 6.3 `openspec validate bound-proxy-preflight-retry --strict` 通过后归档
+- [x] 6.3 `openspec validate bound-proxy-preflight-retry --strict` 通过后归档 <!-- aidcp 本提交 归档为 2026-08-07-bound-proxy-preflight-retry，spec delta 已并入主 spec（+3 新增 / ~1 修改） -->
 
 ## 偏离说明
 

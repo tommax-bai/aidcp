@@ -25,11 +25,13 @@ TBD - created by archiving change facebook-proxy-selection-preflight. Update Pur
 - **THEN** fleet 快照、renderer IPC、日志、本机 settings、子进程 argv 和环境变量均不包含代理密码
 
 ### Requirement: 启动与唤醒 SHALL 复用短时预检结果
-客户端 SHALL 仅为需要新启动浏览器的环境按环境在内存中短时复用最近一次确定的预检结果。环境选择预热、批量启动或自动冷待机唤醒遇新鲜确定结果 SHALL 沿用既有复用行为；结果缺失、过期或正在检测时 SHALL 复用同一在途检测或补做一次，不得建立轮询。AdsPower 已报告 Active 的 profile SHALL 直接进入接管路径，不消费、刷新或等待代理预检结果。
+客户端 SHALL 仅为需要新启动浏览器的环境按环境在内存中短时复用最近一次确定的预检结果。环境选择预热或批量启动遇新鲜确定结果 SHALL 沿用既有复用行为；结果缺失、过期或正在检测时 SHALL 复用同一在途检测或补做一次，不得建立轮询。AdsPower 已报告 Active 的 profile SHALL 直接进入接管路径，不消费、刷新或等待代理预检结果。
+
+**任何以重试为目的的重新探测 SHALL 先作废该环境已完成的确定结果**，包括代理失败后的重排重试与冷待机唤醒失败后的退避重试。复用一个正是被重试所针对的旧失败结论，会使该次重试不发出任何探测而立即以同样理由失败，等同于没有重试。作废后 SHALL 按新结果裁决该次启动或唤醒。
 
 当用户对单个 Inactive 环境明确点击“启动”时，客户端 SHALL 在进入普通启动或待机唤醒分支前作废该环境此前已经完成的确定成功或失败结果，并 SHALL 以本次点击触发的新检测结果裁决本次启动。若点击时该环境已有真实检测在途，客户端 SHALL 等待并复用该单飞结果，MUST NOT 取消旧请求后产生可被其他启动路径当作“无法确认”消费的 `superseded` 结果。同一次手动启动内部重复执行网络准备时 SHALL 复用该次首次取得或等待的结果，MUST NOT 因入口强制刷新而重复探测。
 
-新鲜确定失败 SHALL 停止本次新浏览器启动或唤醒并如实显示代理原因。无法读取 AdsPower 环境代理配置或检测设施自身异常 SHALL 表示“无法确认”，MUST NOT 冒充代理失效，也 MUST NOT 成为绕开既有新浏览器启动行为的新单点阻断。profile 明确配置为无代理时 SHALL 视为双跳不适用，跳过中继与代理预检并保持既有无代理启动行为。用户显式开启系统前置代理模式且 Inactive profile 已配置环境代理后，系统代理缺失、不受支持或中继无法建立 SHALL 表示确定的双跳配置不可用，并阻止本次新浏览器启动，MUST NOT 沿用单跳行为。客户端内修改代理配置或双跳开关后 SHALL 立即作废旧结果和旧链路。
+新鲜确定失败 SHALL 按失败原因是否可恢复分流：可恢复类进入有界重排重试通道，不可恢复类立即停止本次新浏览器启动或唤醒并如实显示代理原因。无法读取 AdsPower 环境代理配置或检测设施自身异常 SHALL 表示“无法确认”，MUST NOT 冒充代理失效，也 MUST NOT 成为绕开既有新浏览器启动行为的新单点阻断。profile 明确配置为无代理时 SHALL 视为双跳不适用，跳过中继与代理预检并保持既有无代理启动行为。用户显式开启系统前置代理模式且 Inactive profile 已配置环境代理后，系统代理缺失或不受支持 SHALL 表示确定的双跳配置不可用，并阻止本次新浏览器启动，MUST NOT 沿用单跳行为；受管中继因端口占用、启动过慢或提前退出而无法建立 SHALL 按可恢复类处置。客户端内修改代理配置或双跳开关后 SHALL 立即作废旧结果和旧链路。
 
 #### Scenario: 单环境手动启动绕过新鲜失败
 - **GIVEN** 一个 Inactive Facebook 环境最近一次确定预检失败仍在缓存有效期内
@@ -61,9 +63,21 @@ TBD - created by archiving change facebook-proxy-selection-preflight. Update Pur
 - **WHEN** 冷待机 Facebook 环境因系统任务自动唤醒、AdsPower profile 为 Inactive 且没有新鲜结果
 - **THEN** 客户端在申请浏览器槽位前检测一次，成功后继续既有唤醒流程
 
-#### Scenario: 确定失败不启动新浏览器
-- **WHEN** Inactive profile 的检测确认代理类型、认证或连通性失败
-- **THEN** 本次启动或唤醒失败，浏览器不被新建，并复用既有启动或冷待机失败处理，不新增代理专用重试定时器
+#### Scenario: 唤醒退避重试作废旧失败后重探
+- **GIVEN** 一个冷待机环境的上一次唤醒因代理预检确定失败而未起浏览器，且该失败结论仍在缓存有效期内
+- **WHEN** 退避定时器到点触发下一次唤醒尝试
+- **THEN** 客户端 SHALL 先作废该环境的旧失败结论并实际发起一次新的代理检测
+- **AND** MUST NOT 复用旧失败结论从而使该次退避重试不发出任何探测
+
+#### Scenario: 可恢复的确定失败不启动新浏览器但保留自愈
+- **WHEN** Inactive profile 的检测因连通性瞬时失败而确定失败，且重排预算未耗尽
+- **THEN** 本次浏览器不被新建，环境进入有界重排重试通道
+- **AND** MUST NOT 落终态失败，MUST NOT 记成「做不到」
+
+#### Scenario: 不可恢复的确定失败停止本次启动
+- **WHEN** Inactive profile 的检测确认代理类型配错或认证不通过
+- **THEN** 本次启动或唤醒失败，浏览器不被新建，并复用既有启动或冷待机失败处理
+- **AND** MUST NOT 进入重排通道
 
 #### Scenario: Active profile bypasses preflight
 - **WHEN** AdsPower 报告目标 profile 已经 Active
@@ -74,7 +88,7 @@ TBD - created by archiving change facebook-proxy-selection-preflight. Update Pur
 - **THEN** 客户端显示无法确认并沿用既有新浏览器启动行为，MUST NOT 显示代理无效
 
 #### Scenario: 显式双跳配置不可用时阻止新启动
-- **WHEN** 双跳已开启、Inactive profile 已配置环境代理，但系统代理无法解析或受管中继无法建立
+- **WHEN** 双跳已开启、Inactive profile 已配置环境代理，但系统代理无法解析或类型不受支持
 - **THEN** 客户端显示对应双跳原因并阻止新浏览器启动，MUST NOT 直接连接环境代理或目标网站
 
 #### Scenario: 无环境代理时不进入双跳检测
@@ -118,4 +132,58 @@ For an Inactive environment AdsPower reports as proxy-configured, Edge SHALL fet
 - **WHEN** Edge cannot resolve a required Cloud authority revision before a fresh start
 - **THEN** preflight and managed fresh startup SHALL fail closed with an authority-unavailable result
 - **AND** SHALL NOT reuse AdsPower's current proxy as the original
+
+### Requirement: 可恢复的预检失败 SHALL 走有界重排重试通道
+
+客户端 SHALL 把代理预检的确定失败按「同一次探测原样重来是否可能得到不同结果」分为两类，并分别处置：
+
+- **可恢复类**（链路瞬时不通：超时、连接被拒、主机暂时解析不了、代理连接建立失败、受管中继端口被占 / 启动过慢 / 提前退出等）：**MUST NOT** 终结本次启动，**SHALL** 安排该环境重新走一次既有启动入口，自然排到启动流队尾等待重试。
+- **不可恢复类**（重来必然同样结果：代理配置不完整、代理类型配错、认证不通过、系统前置代理未配置或类型不受支持、环境代理权威读不到）：**SHALL** 立即终结本次启动并如实显示原因，**MUST NOT** 进入重排通道。
+
+重排 **MUST** 带明确次数上限。**MUST NOT** 无限重排——串行启动队列会被反复占用，AdsPower 本地接口会被持续打。上限内的每一次重排 **MUST** 是一次真实的新探测，不得复用上一次的失败结论。
+
+任何新增或未识别的失败原因 **MUST** 默认归入可恢复类并消费重排预算，**MUST NOT** 折进不可恢复类。把没认出来的原因当成终局判决，正是本仓明令禁止的兜底桶。
+
+#### Scenario: 链路瞬时不通触发重排
+- **WHEN** Inactive Facebook 环境的代理预检因超时、连接被拒或主机解析失败而确定失败，且重排预算未耗尽
+- **THEN** 客户端 SHALL 安排该环境重新进入既有启动入口排队重试
+- **AND** 本次 MUST NOT 新建浏览器，MUST NOT 落终态失败
+
+#### Scenario: 配置类失败立即终结不重排
+- **WHEN** 预检确定失败的原因是代理配置不完整、代理类型配错或认证不通过
+- **THEN** 客户端 SHALL 立即终结本次启动并显示该原因
+- **AND** MUST NOT 消费重排预算或安排任何重试
+
+#### Scenario: 未识别的失败原因按可恢复处置
+- **WHEN** 预检返回一个当前分类表未覆盖的失败原因
+- **THEN** 客户端 SHALL 按可恢复类走重排通道
+- **AND** MUST NOT 把它归入不可恢复类而终结启动
+
+#### Scenario: 重排预算耗尽后终结并如实说明
+- **WHEN** 某环境的代理预检重排次数已达上限且最近一次仍确定失败
+- **THEN** 客户端 SHALL 终结本次启动，并在回执中写明这是重试预算耗尽
+- **AND** MUST NOT 表述成「已确认该代理不可用」——两者是不同结论
+
+### Requirement: 重排 SHALL 排队而非插队
+
+重排 **MUST** 复用既有启动入口，**MUST NOT** 新建旁路。重排后的环境 **SHALL** 与任何其他等待启动的环境一样接受启动并发计数闸的准入，并 **SHALL** 在浏览器槽位队列中按重新入队时刻排到队尾。**MUST NOT** 因为「它已经试过一次」而给予任何优先级、保留原有排队资历或绕过任一道闸。
+
+#### Scenario: 重排后排到队尾
+- **WHEN** 一个环境因可恢复的代理失败被重排，且此时另有环境正在等待浏览器槽位
+- **THEN** 被重排的环境 SHALL 排在这些环境之后
+- **AND** MUST NOT 保留它上一次的排队资历或插到队头
+
+#### Scenario: 重排仍受并发计数闸约束
+- **WHEN** 重排发生时启动排队已满
+- **THEN** 该次重排 SHALL 与普通启动请求一样被拒绝入场并如实告知
+- **AND** MUST NOT 因为是重排就获准超额入场
+
+### Requirement: 重排过程 SHALL 诚实呈现
+
+重排等待期间，客户端 **SHALL** 显示该环境正因代理不通而等待重试，并显示已重排次数。**MUST NOT** 显示成普通「启动中」（那会把一次已知的失败伪装成正常进展），也 **MUST NOT** 在预算耗尽前显示成终态失败（那会把一条仍在自愈的通道说成已经死了）。
+
+#### Scenario: 重排等待期间的呈现
+- **WHEN** 环境处于代理失败后的重排等待中且预算未耗尽
+- **THEN** 界面 SHALL 显示代理不通与已重排次数
+- **AND** MUST NOT 显示成普通启动中或终态失败
 
