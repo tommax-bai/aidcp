@@ -264,10 +264,28 @@
 | `navigation.back` | 与 `note.close` 定分工后平台段化 | 语义重叠则合并，不同则 back 带目标面 |
 | `edge.task.acquire` / `edge.task.release` | 可选顺带改 `task.*` | 非平台域，无平台段；`edge.` 前缀冗余 |
 
-#### 保留不动（4 条，非平台域控制 / 传输）
+#### 非平台域词汇收口（批 7 · 2026-08-07 据实立项）
 
-`ui.snapshot` · `pacing.update` · `ping` · `pong` ——域.动作已符、不编址平台。
-（`interaction.runtime.controls` 归入上面 IM 族批 6。）
+~~保留不动（4 条）：`ui.snapshot` · `pacing.update` · `ping` · `pong`——域.动作已符~~
+——**该判断已推翻**：只有 `pacing.update` 真的符合。复核（2026-08-07）发现非平台域这 14 条内部有四类不齐，
+其中两类有真实代价、两类只是不好看。**按「不改的代价」排序，不按「改起来便不便宜」排序**（规则见 §5 加闸准入同源纪律）。
+
+| 问题 | 具体 | 处置 | 不改的代价 |
+| --- | --- | --- | --- |
+| **同一主题两个家** | 验证码检测在 `risk.captcha_detected` / `risk.captcha_cleared`（edge→cloud），协助在 `captcha.assist.*`（4 条） | 归一到 `captcha.*`：`captcha.detected` / `captcha.cleared` + `captcha.assist.*` 保留三段（assist 是有自己请求/应答对的真子族） | **高**：新增验证码消息无依据可循、grep 一个词得到两族两属主；名字不该编码「消费方拿它干什么」（当初进 `risk.` 正是这个错） |
+| **应答命名三套约定** | `state.read→state.report`、`identity.read_current→identity.observed`、`edge.task.acquire→edge.task.acquired` | 定**一套**并写进本文档族约定；存量按新约定归一（改动面小、全是内部关联） | **高**：下一对请求/应答三选一凭手感，正是语法要消灭的漂移 |
+| **方向靠名字判不出** | `ui.snapshot` 是名词、读起来像上报，实际 cloud→edge | 改动词形（如 `ui.push_snapshot`）或随应答约定一并定 | **中**：读协议表时方向要额外查一次 |
+| **前缀冗余 / 第二段不平行** | `edge.task.*` 的 `edge.` 零信息量；`identity.read_current` 与 `identity.read_self_profile` 一个「动词+状语」一个「动词+目标」 | `task.*`（批 6 已列）；identity 两条改平行形 | **低**：纯可读性，顺手做、不单独立批 |
+
+**明确不做（记录理由，防后人重开）**：
+
+- **`ping` / `pong` 保持单段**。传输层通用惯例，零歧义、跨系统可识别；套 `域.动作` 只会让它更难认。
+  **本条是族约定的显式豁免**，不是遗漏——传输层惯例名 MUST NOT 被本语法强行规整。
+- **`plan.response` 不改**。v1 兼容路径，随 v1 整体退役一并消失；给一条将死的路径改名零收益。
+- `session.end` / `pacing.update` / `state.read` 三条**本就合规**，不动。
+
+**注**：`navigation.back` **不属于本组**——它是以账号名义在页面上产生的手势，批 6 定完与 `note.close` 的分工后
+按编法 A 平台段化（见上文批 6 行），此前误列入「非平台域」的说法作废。
 
 ### 6.3 迁移批次（一批一个 change，批次串行走协议热点）
 
@@ -278,7 +296,8 @@
 | **3** | 新增「问现状」观察命令 | 协议新增，三段对账闭环 |
 | **4** | ✅ **已实装（2026-08-06）**：14 → 22 平台段名（协议 95→103、登记表 44→52）；`page.scroll` 拆三面、`targetSurface` 字段删；两道休眠平台段闸转正；`FACEBOOK_UNSUPPORTED_COMMANDS` 收缩到两条共享名互动命令（批 5 归零）；manifest `edgeTypes[]` 取代手抄排除清单；跨面到达诚实失败 `surface_mismatch_*` | 协议改名最大的一批（change `platformize-browse-vocabulary`） |
 | **5** | 互动平台化 + 按对象改名（5 条） | 协议改名，动作关联键口径随动（第 5 处同步点） |
-| **6** | IM 族 `wechat.inbox.*`、发布平台段、`navigation.back` 分工、可选 `task.*` | 收尾清账 |
+| **6** | IM 族 `wechat.inbox.*`、发布平台段化（`{p}.publish.command` + 原子 kind 表分平台、删载荷 `platform` 字段）、`navigation.back` 与 `note.close` 定分工后平台段化、`edge.task.*` → `task.*` | 收尾清账 |
+| **7** | 非平台域词汇收口：验证码归一家、应答命名定一套约定、`ui.snapshot` 方向消歧、identity 两条平行化；`ping`/`pong` 与 `plan.response` 明确不动 | 纯内部词汇，无平台语义、不碰浏览热区（可与批 5/6 并行） |
 
 ---
 
