@@ -67,6 +67,8 @@ Creating or reauthorizing an account starts one bounded Chromium worker for that
 3. starts the account runtime; and
 4. closes the authorization browser and its temporary profile.
 
+The QR challenge expiry comes from the matching first-party `get_qrcode` response. The configured login timeout is only an upper safety bound; the service must never keep displaying or accepting an unscanned QR after Douyin's earlier `expire_time`. If a fresh authorization Profile already contains the platform session cookie, the attempt is treated as scanned and may finish its identity probe within the original configured authorization bound instead of being discarded by a polling-boundary race.
+
 Only one authorization or reauthorization worker may own an account at a time. If the resolved identity is already bound, the new pending record is rejected rather than creating two runtimes. Platform `auth_required` transitions the account to visible reauthorization-required state, closes source runtimes, and blocks new sends. A timeout or ambiguous send is not interpreted as logout.
 
 Pure-HTTP SSO QR login remains an isolated research path rather than the deployed authority. Current MIT-licensed evidence proves the QR token/status shape but still uses browser context for first-party cookie establishment and final redirect capture; therefore this slice keeps the bounded Chromium capture and does not turn an undocumented signature algorithm into a login dependency.
