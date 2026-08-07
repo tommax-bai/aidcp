@@ -51,7 +51,7 @@ When Cloud authorizes `interaction.like`, Edge SHALL require the command noteId 
 
 An account whose ordinary home feed produces nothing SHALL still be able to be re-authorized onto the Reels surface. Re-authorization MUST NOT depend solely on a non-empty ordinary feed returning, because an account is on Reels precisely when its ordinary feed produced nothing — that unlock can never fire for the accounts that need it.
 
-Cloud MUST NOT use a long-lived `confirmed` flag as evidence of the current page. It SHALL retain only a bounded in-flight Reels redrive attempt and per-session recovery count. Edge SHALL probe the live page for every `page.scroll{reason:'resume_redrive',targetSurface:'reels'}` and either report the canonical Reel already active or enter Reels through the verified entry path.
+Cloud MUST NOT use a long-lived `confirmed` flag as evidence of the current page. It SHALL retain only a bounded in-flight Reels redrive attempt and per-session recovery count. Edge SHALL probe the live page for every `facebook.reels.scroll{reason:'resume_redrive'}` and either report the canonical Reel already active or enter Reels through the verified entry path.
 
 Re-entry SHALL be bounded per session. Once the bound is spent, the browse loop MUST reach a terminal state rather than alternating between two surfaces that both yield nothing.
 
@@ -76,7 +76,7 @@ Re-entry SHALL be bounded per session. Once the bound is spent, the browse loop 
 - **AND** the session reaches a terminal state instead of alternating indefinitely
 
 ### Requirement: Configured Reels primary reuses the verified Reels entry path
-When a Facebook session pins Reels as its primary surface, Cloud SHALL authorize entry with `page.scroll{reason:'facebook_reels_primary'}` and Edge SHALL route that command to the existing Reels entry executor. Edge SHALL first use bounded observation to report a canonical active Reel without input when available. If the observation ends on an exact keyboard-safe Reels surface without a reportable card, Edge SHALL continue the same command through the one-key probe boundary; active-video or axis recognition MUST NOT terminate entry before that probe. Route navigation or input delivery alone MUST NOT count as entry success.
+When a Facebook session pins Reels as its primary surface, Cloud SHALL authorize entry with `facebook.reels.scroll{reason:'facebook_reels_primary'}` and Edge SHALL route that command to the existing Reels entry executor. Edge SHALL first use bounded observation to report a canonical active Reel without input when available. If the observation ends on an exact keyboard-safe Reels surface without a reportable card, Edge SHALL continue the same command through the one-key probe boundary; active-video or axis recognition MUST NOT terminate entry before that probe. Route navigation or input delivery alone MUST NOT count as entry success.
 
 #### Scenario: Configured primary reaches a reportable Reel without input
 - **WHEN** Cloud authorizes `facebook_reels_primary` and bounded entry observation verifies one canonical active Reel
@@ -93,7 +93,7 @@ When a Facebook session pins Reels as its primary surface, Cloud SHALL authorize
 
 ### Requirement: Ineffective Reels entry receives one exact-target foreground recovery
 
-For `page.scroll{reason:'facebook_reels_primary'}` and `page.scroll{reason:'empty_feed_reels_fallback'}`, Edge SHALL keep the first navigation to the Reels route background-first and SHALL prove that the exact bound page reached a ready Reels route/surface before deciding whether entry took effect. If bounded readback proves that the exact bound target remained outside a ready Reels surface, Edge MAY call `Page.bringToFront` on that same target at most once for the command, SHALL re-probe before another write, and MAY issue at most one fresh Reels navigation retry. Reaching the Reels surface MUST suppress foreground activation even when canonical video cards are still hydrating or unavailable; that later card condition SHALL terminate honestly without reclassifying the navigation as ineffective. A late successful entry observed after activation MUST suppress the retry. Target drift, blocker state, or `Page.bringToFront` acknowledgement alone MUST NOT count as entry success.
+For `facebook.reels.scroll{reason:'facebook_reels_primary'}` and `facebook.reels.scroll{reason:'empty_feed_reels_fallback'}`, Edge SHALL keep the first navigation to the Reels route background-first and SHALL prove that the exact bound page reached a ready Reels route/surface before deciding whether entry took effect. If bounded readback proves that the exact bound target remained outside a ready Reels surface, Edge MAY call `Page.bringToFront` on that same target at most once for the command, SHALL re-probe before another write, and MAY issue at most one fresh Reels navigation retry. Reaching the Reels surface MUST suppress foreground activation even when canonical video cards are still hydrating or unavailable; that later card condition SHALL terminate honestly without reclassifying the navigation as ineffective. A late successful entry observed after activation MUST suppress the retry. Target drift, blocker state, or `Page.bringToFront` acknowledgement alone MUST NOT count as entry success.
 
 #### Scenario: First background entry succeeds
 

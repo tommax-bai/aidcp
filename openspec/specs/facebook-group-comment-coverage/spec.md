@@ -109,7 +109,7 @@ The coverage loop and the join loop SHALL run on the same per-account single-fli
 
 ### Requirement: Joined-group coverage selector is the normal Facebook comment container source
 
-The Facebook comment pipeline SHALL use the joined-group coverage selector as the normal source of comment containers for unpinned Facebook comment attempts. The selector MUST only return groups the account itself has joined (`status='joined'`) and MUST return one concrete group URL for edge to use as `search.execute.container`. It MUST NOT return operator-configured container rows, random imported targets, or any whole-site search sentinel.
+The Facebook comment pipeline SHALL use the joined-group coverage selector as the normal source of comment containers for unpinned Facebook comment attempts. The selector MUST only return groups the account itself has joined (`status='joined'`) and MUST return one concrete group URL for edge to use as `facebook.search.execute.container`. It MUST NOT return operator-configured container rows, random imported targets, or any whole-site search sentinel.
 
 #### Scenario: Normal comment uses an account joined group
 - **WHEN** an unpinned Facebook comment attempt starts for account A

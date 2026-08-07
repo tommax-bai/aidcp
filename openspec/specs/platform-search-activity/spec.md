@@ -15,12 +15,12 @@ TBD - created by archiving change first-class-search-activity. Update Purpose af
 
 #### Scenario: 仅下发命令不计搜索事实
 
-- **WHEN** Cloud 下发 `search.execute`，但 Edge 未证明平台动作已经发生
+- **WHEN** Cloud 下发 `{platform}.search.execute`（两平台各自同构名），但 Edge 未证明平台动作已经发生
 - **THEN** 系统 MUST NOT 仅凭下发成功增加账号 `search` 风险计数
 
 ### Requirement: 搜索命令标注目的、范围与活动关联
 
-支持 `search_activity_receipt_v1` 的链路 SHALL 在 `search.execute` 中携带稳定 `activityId`、`purpose`（`discovery | task_targeting | operator`）和 `scope`（`global | container`）。自治概念池搜索 SHALL 标为 `discovery`，评论/任务定位搜索 SHALL 标为 `task_targeting`，人工运营命令 SHALL 标为 `operator`；容器内搜索 SHALL 标为 `container`，其余为 `global`。
+支持 `search_activity_receipt_v1` 的链路 SHALL 在 `{platform}.search.execute`（两平台各自同构名）中携带稳定 `activityId`、`purpose`（`discovery | task_targeting | operator`）和 `scope`（`global | container`）。自治概念池搜索 SHALL 标为 `discovery`，评论/任务定位搜索 SHALL 标为 `task_targeting`，人工运营命令 SHALL 标为 `operator`；容器内搜索 SHALL 标为 `container`，其余为 `global`。
 
 字段缺失的兼容命令 MAY 由 Edge 以命令 envelope ID 作为回执关联 ID，并按“有容器即 `task_targeting/container`，否则 `discovery/global`”归一化；系统 MUST NOT 因兼容默认值把任务搜索伪装成运营授权。
 
@@ -36,7 +36,7 @@ TBD - created by archiving change first-class-search-activity. Update Purpose af
 
 ### Requirement: Edge 对每条搜索命令至多回报一个诚实终态
 
-支持 `search_activity_receipt_v1` 的 Edge SHALL 对每条 `search.execute` 至多回报一个 `action.completed(action='search')` 终态，回显关联、目的和范围，并用 `actuated` 区分平台是否已经观察到搜索动作：
+支持 `search_activity_receipt_v1` 的 Edge SHALL 对每条 `{platform}.search.execute`（两平台各自同构名）至多回报一个 `action.completed(action='search')` 终态，回显关联、目的和范围，并用 `actuated` 区分平台是否已经观察到搜索动作：
 
 - 结果页验证成功且存在可见结果：`ok=true, actuated=true, searchOutcome=results_ready`；
 - 结果页验证成功但当前无可见结果：`ok=true, actuated=true, searchOutcome=no_results`；

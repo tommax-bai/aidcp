@@ -12,7 +12,6 @@
 **本能力的宪法：兜底必须比主闸松**（逐动作 / 逐档位 / 逐窗口，`c ≤ L_W ÷ q_W`）。等价的运营口径是**主闸的每一个旋钮都必须真的能拧动**——冷却若在某窗口比主闸紧，那个旋钮就被焊死了：面板改了数字行为却纹丝不动，且**无日志、无告警**。
 
 该定位是 change `cooldown-as-backstop-not-quota`（2026-07-17）对源 change `engagement-restraint` 原意（「压稀节奏、延缓配额触顶」）的**改判**。改判前四个动作全部违反上述不变量（`comment` 的 30 分钟冷却最大速率恰＝小时配额 2/h，把该旋钮焊死）。**本 Purpose 自归档日起逐字停留在 `TBD` 达数月——冷却在规范层面从未被定义过它是干什么的，这正是它漂移成主闸的制度原因。**
-
 ## Requirements
 ### Requirement: 每动作类型按账号的最小间隔冷却（云端、内存）
 
@@ -95,12 +94,12 @@
 
 ### Requirement: 冷却闸只拦四类互动、不拦推进、不写风控终态
 
-冷却闸 SHALL 只作用于 `interaction.like` / `interaction.collect` / `interaction.follow` / `interaction.comment` 的下发判定；`page.scroll` / `navigation.back` / `note.open` / `profile.open` 等推进 / 导航指令 MUST NOT 被冷却闸拦截（避免浏览循环死锁，与既有「推进指令不被风控闸拦」同口径）。冷却闸为**附加只读兜底闸**（只防意外爆发，不表达数量策略——数量由 `RiskController` 主闸单独负责）：MUST NOT 写 `risk_state`、MUST NOT 调用 `RiskController.setQuotaLevel` / `applySignal`、MUST NOT 改变账号风控终态或档位；账号风控终态仍仅由 `RiskController` 单写。
+冷却闸 SHALL 只作用于 `interaction.like` / `interaction.collect` / `interaction.follow` / `interaction.comment` 的下发判定；`{platform}.feed.scroll` / `navigation.back` / `{platform}.note.open` / `xiaohongshu.profile.open` 等推进 / 导航指令 MUST NOT 被冷却闸拦截（避免浏览循环死锁，与既有「推进指令不被风控闸拦」同口径）。冷却闸为**附加只读兜底闸**（只防意外爆发，不表达数量策略——数量由 `RiskController` 主闸单独负责）：MUST NOT 写 `risk_state`、MUST NOT 调用 `RiskController.setQuotaLevel` / `applySignal`、MUST NOT 改变账号风控终态或档位；账号风控终态仍仅由 `RiskController` 单写。
 
 #### Scenario: 推进指令不被冷却拦
 
 - **WHEN** 某账号多个互动类型都处于冷却中
-- **THEN** `page.scroll` / `navigation.back` / `note.open` / `profile.open` 仍正常下发，浏览循环继续，不死锁
+- **THEN** `{platform}.feed.scroll` / `navigation.back` / `{platform}.note.open` / `xiaohongshu.profile.open` 仍正常下发，浏览循环继续，不死锁
 
 #### Scenario: 冷却不触碰风控终态
 

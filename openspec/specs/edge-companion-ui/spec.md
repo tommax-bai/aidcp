@@ -40,7 +40,7 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 
 活动流 SHALL 覆盖**账号在该平台上真实做过的写动作**，MUST NOT 因某类动作由内部委托路径执行而使其对运营不可见。一个动作**做了但不显示**与**没做**在客户端上 MUST 可区分：凡执行器已对该动作作出终局判断（成功 / 待第三方批准 / 结构性失败），活动流 MUST 如实呈现该判断。
 
-当 Facebook Reel 已被 Edge 证明为新的活动卡片并上报为 `listKind:'reels'` 时，活动流 MUST 同步新增且仅新增一条“读”分类记录。该记录 SHALL 使用“看了/浏览了”的呈现事实措辞，MUST NOT 宣称看完或深度阅读；作者或摘要缺失时 MUST 使用通用人话回退，MUST NOT 暴露 URL 或原始 id。若同一 Reel 随后因 `note.open` 上报详情，客户端 MUST 保留详情数据流但 MUST NOT 再新增第二条“读”记录或第二次本地浏览增量。
+当 Facebook Reel 已被 Edge 证明为新的活动卡片并上报为 `listKind:'reels'` 时，活动流 MUST 同步新增且仅新增一条“读”分类记录。该记录 SHALL 使用“看了/浏览了”的呈现事实措辞，MUST NOT 宣称看完或深度阅读；作者或摘要缺失时 MUST 使用通用人话回退，MUST NOT 暴露 URL 或原始 id。若同一 Reel 随后因 `facebook.note.open` 上报详情，客户端 MUST 保留详情数据流但 MUST NOT 再新增第二条“读”记录或第二次本地浏览增量。
 
 #### Scenario: 核心事件映射为人话条目
 - **WHEN** 核心进程产生已映射的动作日志（如点赞成功 / 提取内容 / 评论发布成功）
@@ -160,7 +160,7 @@ Electron 主窗口 MUST 隐藏系统默认标题栏并以「账号身份 + 综�
 - **AND** when either field is unavailable, the text MUST degrade to an honest generic description and MUST NOT show a permalink or raw note ID
 
 #### Scenario: Facebook 就地读的日志不得被叙述成跳转作者主页
-- **WHEN** Facebook 执行 `profile.open` 的就地读（不离开当前页）
+- **WHEN** Facebook 就地身份读取（`identity.read_current`，不离开当前页）产生核心日志（词汇批 4 后 FB 会话结构上收不到任何作者主页命令，历史 `profile.open` 就地读形态由此取代）
 - **THEN** 该核心日志 MUST NOT 命中中文兜底表中描述「顺路去作者主页看看」的跳转规则
 - **AND** 客户端 MUST NOT 呈现任何声称已跳转作者主页的在场感文案
 
@@ -965,7 +965,7 @@ Electron 主窗口 SHALL 使用一致的表面、边框、圆角、排版和颜�
 
 ### Requirement: 同一条开帖在两条路径上的叙述必须一致
 
-`note.open` 经浏览路径与经评论路径（按 permalink 开帖）SHALL 产出**同一套**「读」叙述与同一次本地浏览兜底增量，MUST NOT 因执行路径不同而一路可见、一路隐形。
+`facebook.note.open` 经浏览路径与经评论路径（按 permalink 开帖）SHALL 产出**同一套**「读」叙述与同一次本地浏览兜底增量，MUST NOT 因执行路径不同而一路可见、一路隐形。
 
 当评论路径开帖成功读到内容、但评论框始终催不出来（回非成功以便云端换下一个候选）时，客户端 MUST NOT 产出「读失败」条目——帖子确实打开并读到了，该情形 SHALL 沉默，MUST NOT 把一次成功的阅读叙述成失败。
 
@@ -1945,7 +1945,7 @@ The client MUST deduplicate the activity by canonical post identity for the acti
 
 客户端 SHALL 在“开发者详情”中为当前环境展示 Cloud 主动下发到 Edge 的命令诊断。每条诊断 SHALL 包含接收时间、命令类型、当前可证明阶段、安全摘要和短关联标识，并 MUST 明确区分已收到、已拒绝、已交给执行器及 Edge 接收层能够直接观测的步骤结果。`received` 或 `dispatched` MUST NOT 被表述为命令已经执行成功、业务已经完成或平台已经确认。
 
-命令摘要 MUST 由逐命令字段白名单生成。`page.scroll{reason:'facebook_reels_primary'}` 与 `page.scroll{reason:'empty_feed_reels_fallback'}` SHALL 使用“进入 Reels”命令名称，并分别使用固定的主入口或 Feed 结束回退摘要；其它 `page.scroll` SHALL 保留“页面滚动 / 滚动当前页面”。正文、标题、评论、私信、搜索词、群聊码、Cookie、Token、二维码、截图内容、完整 URL、浏览器调试地址、账号身份字段、任务永久键和原始 payload MUST NOT 进入命令诊断事件、renderer 状态或可见诊断行。文本字段只可展示有界字符数，URL 只可展示是否存在，安全枚举和有界计数可按需展示。未知命令或新增 payload 字段 MUST 默认不展示内容。
+命令摘要 MUST 由逐命令字段白名单生成。`facebook.reels.scroll{reason:'facebook_reels_primary'}` 与 `facebook.reels.scroll{reason:'empty_feed_reels_fallback'}` SHALL 使用“进入 Reels”命令名称，并分别使用固定的主入口或 Feed 结束回退摘要；其它滚动命令（`{platform}.{feed|search}.scroll` 及不携 Reels 入口 reason 的 `facebook.reels.scroll`）SHALL 保留“页面滚动 / 滚动当前页面”。正文、标题、评论、私信、搜索词、群聊码、Cookie、Token、二维码、截图内容、完整 URL、浏览器调试地址、账号身份字段、任务永久键和原始 payload MUST NOT 进入命令诊断事件、renderer 状态或可见诊断行。文本字段只可展示有界字符数，URL 只可展示是否存在，安全枚举和有界计数可按需展示。未知命令或新增 payload 字段 MUST 默认不展示内容。
 
 诊断 SHALL 仅保存在 Edge 本机内存中，按环境隔离并具有数量与时间双重上限；它 MUST NOT 进入普通活动流、Cloud 数据库或自动化回执。旧客户端状态缺少诊断字段时界面 MUST null-safe 降级。
 
@@ -1957,19 +1957,19 @@ The client MUST deduplicate the activity by canonical post identity for the acti
 
 #### Scenario: Reels 主入口显示导航意图
 
-- **WHEN** Edge 收到 `page.scroll{reason:'facebook_reels_primary'}`
+- **WHEN** Edge 收到 `facebook.reels.scroll{reason:'facebook_reels_primary'}`
 - **THEN** 开发者详情显示“进入 Reels”及固定的主浏览入口摘要
 - **AND** 阶段仍只显示 Edge 已收到或已交付的事实，不宣称已经进入 Reels
 
 #### Scenario: Feed 结束回退显示导航意图
 
-- **WHEN** Edge 收到 `page.scroll{reason:'empty_feed_reels_fallback'}`
+- **WHEN** Edge 收到 `facebook.reels.scroll{reason:'empty_feed_reels_fallback'}`
 - **THEN** 开发者详情显示“进入 Reels”及固定的 Feed 结束回退摘要
 - **AND** 不把该命令显示为普通页面滚动
 
 #### Scenario: 普通页面滚动保留原文案
 
-- **WHEN** `page.scroll` 不携带任一 Reels 入口 reason
+- **WHEN** 滚动命令（`{platform}.{feed|search}.scroll` / `facebook.reels.scroll`）不携带任一 Reels 入口 reason
 - **THEN** 开发者详情继续显示“页面滚动 / 滚动当前页面”
 
 #### Scenario: 非法或未协商命令诚实显示拒绝

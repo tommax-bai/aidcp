@@ -61,7 +61,7 @@ TBD - created by archiving change curated-note-actions. Update Purpose after arc
 - **THEN** 发布链输入携带该精选行触发时的展示血缘，后续发布记录可据此展示来稿件，即使当前精选行之后被删除
 
 ### Requirement: 定向评论目标定位——搜索驱动精确匹配、绝不导航存量链接
-定向评论 SHALL 以该笔记标题（截断至有界长度以守单步时限）为搜索词发起平台搜索，并 SHALL NOT 在 `search.execute` 中下发 `sort` 或 `timeWindow` 参数；平台默认的综合排序与不限时间窗 SHALL 通过省略筛选参数获得，而不是通过驱动原生筛选面板获得。定向评论 SHALL 在返回卡片中按 noteId 精确匹配目标；命中后 SHALL 打开该卡片并以详情上报的 noteId 校验一致后方可评论。MUST NOT 导航存量 source_url（xsec_token 过期风险）。MUST NOT 由裸 noteId 伪造链接。MUST NOT 在未命中时退而评论“相似”笔记。搜索定位 SHALL 有界重试（不超过 2 次搜索尝试），用尽未命中 SHALL 以 note_not_found 诚实结束。
+定向评论 SHALL 以该笔记标题（截断至有界长度以守单步时限）为搜索词发起平台搜索，并 SHALL NOT 在 `xiaohongshu.search.execute` 中下发 `sort` 或 `timeWindow` 参数；平台默认的综合排序与不限时间窗 SHALL 通过省略筛选参数获得，而不是通过驱动原生筛选面板获得。定向评论 SHALL 在返回卡片中按 noteId 精确匹配目标；命中后 SHALL 打开该卡片并以详情上报的 noteId 校验一致后方可评论。MUST NOT 导航存量 source_url（xsec_token 过期风险）。MUST NOT 由裸 noteId 伪造链接。MUST NOT 在未命中时退而评论“相似”笔记。搜索定位 SHALL 有界重试（不超过 2 次搜索尝试），用尽未命中 SHALL 以 note_not_found 诚实结束。
 
 #### Scenario: 精确命中后才开笔记评论
 - **WHEN** 搜索结果卡片中存在与目标 noteId 精确相等的卡片

@@ -54,7 +54,7 @@ protocol v2 SHALL 提供 `edge.task.acquire`、`edge.task.acquired`、`edge.task
 - **THEN** 交接 MUST 立即收敛，MUST NOT 等停留跑满
 
 #### Scenario: 队列中旧滚动被取消
-- **WHEN** 当前动作执行中且队列还等待 `page.scroll`、`navigation.back`，此时发布申请租约
+- **WHEN** 当前动作执行中且队列还等待 `{platform}.feed.scroll`、`navigation.back`，此时发布申请租约
 - **THEN** 当前动作到安全边界后发布获租约，两个未开始命令被取消且释放后不重放
 
 #### Scenario: 释放后以新快照恢复
@@ -70,7 +70,7 @@ protocol v2 SHALL 提供 `edge.task.acquire`、`edge.task.acquired`、`edge.task
 - **THEN** edge 返回 `task_lease_mismatch` 且不执行该命令，B 的页面状态不被污染
 
 #### Scenario: 租约期间普通浏览命令被挡住
-- **WHEN** 发布租约有效时到达一个没有 `taskId` 的 `page.scroll`
+- **WHEN** 发布租约有效时到达一个没有 `taskId` 的 `{platform}.feed.scroll`
 - **THEN** edge 不执行、不入待重放队列并记录被租约抑制，发布序列继续独占
 
 ### Requirement: 发布完整序列持有同一租约

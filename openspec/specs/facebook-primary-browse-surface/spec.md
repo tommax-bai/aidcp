@@ -60,18 +60,18 @@ A later configuration write SHALL apply to the next session and MUST NOT redirec
 
 ### Requirement: Pinned primary surface targets every unified browse redrive
 
-Cloud SHALL use the Facebook surface currently pinned for the session as the `targetSurface` of `page.scroll{reason:'resume_redrive'}`. A task's temporary group/detail page and a later environment configuration write MUST NOT replace that pinned target. The pinned surface changes during a session only when an `unresolved` pin is corrected by the recheck channel.
+Cloud SHALL address every unified browse redrive to the Facebook surface currently pinned for the session by choosing the redrive command name: `facebook.reels.scroll{reason:'resume_redrive'}` for a Reels pin and `facebook.feed.scroll{reason:'resume_redrive'}` for a Feed pin (the former `targetSurface` payload field is removed — the surface rides the command name). A task's temporary group/detail page and a later environment configuration write MUST NOT replace that pinned target. The pinned surface changes during a session only when an `unresolved` pin is corrected by the recheck channel.
 
 #### Scenario: Reels-primary session finishes a group task
 
 - **WHEN** a Reels-primary session completes its final group/comment page task and the final lease release is acknowledged
-- **THEN** Cloud emits one `page.scroll{reason:'resume_redrive', targetSurface:'reels'}`
+- **THEN** Cloud emits one `facebook.reels.scroll{reason:'resume_redrive'}`
 - **AND** the temporary group page does not become the session's browse target
 
 #### Scenario: Feed-primary session finishes a group task
 
 - **WHEN** a Feed-primary session completes its final group/comment page task and the final lease release is acknowledged
-- **THEN** Cloud emits one `page.scroll{reason:'resume_redrive', targetSurface:'feed'}`
+- **THEN** Cloud emits one `facebook.feed.scroll{reason:'resume_redrive'}`
 - **AND** Edge restores Facebook home before continuing if a temporary group/search page replaced `active_list_url`
 
 #### Scenario: Configuration changes during a task
@@ -111,7 +111,7 @@ The channel SHALL be bounded by a maximum number of hops with backoff. On exhaus
 
 - **WHEN** a session pinned `unresolved` re-asks the baseline and it now resolves to `reels`
 - **THEN** Cloud re-pins `reels` as `authoritative`
-- **AND** Cloud issues one `page.scroll{reason:'resume_redrive', targetSurface:'reels'}`
+- **AND** Cloud issues one `facebook.reels.scroll{reason:'resume_redrive'}`
 - **AND** the recheck channel is disarmed
 
 #### Scenario: Corrected surface equals the surface already in use

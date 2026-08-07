@@ -57,7 +57,7 @@ TBD - created by archiving change comment-search-command. Update Purpose after a
 
 #### Scenario: 当前笔记触发 → 不搜索，直接评论当前笔记
 - **WHEN** 热帖线索由当前笔记 `noteId=N` 的 `note.detail` 与质量通过事件触发
-- **THEN** 任务 MUST 使用该 `note.detail` 作为评论目标，MUST NOT 下发 `search.execute` 或按标题搜索
+- **THEN** 任务 MUST 使用该 `note.detail` 作为评论目标，MUST NOT 下发 `xiaohongshu.search.execute` 或按标题搜索
 - **AND** 评论发布目标 MUST 仍为 `noteId=N`
 
 #### Scenario: 当前详情错配或丢失 → 不搜索兜底

@@ -159,7 +159,7 @@ The adapter SHALL positively resolve the target group's own heading/action regio
 
 Immediately before actuation, the adapter SHALL re-resolve exactly one enabled in-scope Join control and invoke that current React-owned element's in-page click behavior. It MUST NOT rely on coordinates captured by an earlier readiness probe as the join actuation.
 
-The join command SHALL permit the established bounded sequence of up to 30 seconds readiness polling, a 2-second pre-click hydration settle, a 1.5-second immediate post-click settle, and up to 45 seconds durable verification. This longer budget SHALL apply only to Native Facebook `group.join`; ordinary Native commands SHALL retain their existing deadline.
+The join command SHALL permit the established bounded sequence of up to 30 seconds readiness polling, a 2-second pre-click hydration settle, a 1.5-second immediate post-click settle, and up to 45 seconds durable verification. This longer budget SHALL apply only to Native Facebook `facebook.group.join`; ordinary Native commands SHALL retain their existing deadline.
 
 The Native join SHALL honor cancellation during readiness and hydration and immediately before actuation as a not-started result. Once the in-page click has been invoked, cancellation SHALL stop bounded verification with `clicked=true` and an ambiguous `preempted_by_task` result; it MUST NOT report joined or replay the click.
 

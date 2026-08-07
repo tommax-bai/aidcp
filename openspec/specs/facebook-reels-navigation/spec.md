@@ -4,7 +4,7 @@
 TBD - created by archiving change facebook-reels-navigation-fallbacks. Update Purpose after archive.
 ## Requirements
 ### Requirement: Ordered trusted-input navigation
-The Facebook Reels driver SHALL dispatch exactly one trusted forward key per admitted `page.scroll`, selected by a non-blocking session preference rather than DOM axis classification. A new session SHALL prefer ArrowRight. A delivered key without canonical progress SHALL make the next normally admitted command prefer ArrowDown or ArrowRight, whichever was not just tried; canonical progress SHALL retain the successful key. The driver MUST NOT require a unique active video or structural axis before the key, dispatch wheel input, click a next control, try the opposite key within the same command, or use the preference as an eligibility latch.
+The Facebook Reels driver SHALL dispatch exactly one trusted forward key per admitted `facebook.reels.scroll`, selected by a non-blocking session preference rather than DOM axis classification. A new session SHALL prefer ArrowRight. A delivered key without canonical progress SHALL make the next normally admitted command prefer ArrowDown or ArrowRight, whichever was not just tried; canonical progress SHALL retain the successful key. The driver MUST NOT require a unique active video or structural axis before the key, dispatch wheel input, click a next control, try the opposite key within the same command, or use the preference as an eligibility latch.
 
 #### Scenario: New session probes horizontal navigation
 - **WHEN** a new session receives an admitted, explicitly keyboard-safe Reels scroll

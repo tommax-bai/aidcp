@@ -122,7 +122,7 @@ Facebook 账号的启动期昵称刷新 SHALL 优先由**启动 `identity.bootst
 
 #### Scenario: 二次采集完成不发页面恢复
 - **WHEN** `identity.read_current` 就地采集完成并返回 `pageEffect=none`
-- **THEN** Cloud 不发送 `navigation.back`、`page.scroll` 或 Feed refresh
+- **THEN** Cloud 不发送 `navigation.back`、`facebook.feed.scroll` 或 Feed refresh
 
 ### Requirement: Facebook 启动昵称等待业务页面就绪而非空白文档 load 完成
 

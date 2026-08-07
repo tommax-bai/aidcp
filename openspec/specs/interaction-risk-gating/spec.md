@@ -5,7 +5,7 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 ## Requirements
 ### Requirement: 云端必须在下发互动前依 RiskController 判定
 
-云端 SHALL 在下发 `interaction.like` / `interaction.collect` / `interaction.follow` 之前调用 `RiskController.canDo(action)` 判定归属账号是否允许；判定为拒时 MUST NOT 下发该互动指令，并 MUST 以**真实的被拒结果**反映（不伪装成功）。被拒时 MUST NOT 扣减每会话 budget（budget 不得低于实际下发量而漂移）。`page.scroll` / `navigation.back` 等推进 / 返回指令 MUST NOT 受该闸拦截，以免浏览循环死锁。
+云端 SHALL 在下发 `interaction.like` / `interaction.collect` / `interaction.follow` 之前调用 `RiskController.canDo(action)` 判定归属账号是否允许；判定为拒时 MUST NOT 下发该互动指令，并 MUST 以**真实的被拒结果**反映（不伪装成功）。被拒时 MUST NOT 扣减每会话 budget（budget 不得低于实际下发量而漂移）。`{platform}.feed.scroll` / `navigation.back` 等推进 / 返回指令 MUST NOT 受该闸拦截，以免浏览循环死锁。
 
 #### Scenario: 允许时正常下发并计数
 
@@ -20,7 +20,7 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 #### Scenario: 推进指令不被风控闸拦
 
 - **WHEN** 归属账号为 `restricted`
-- **THEN** `page.scroll` / `navigation.back` 仍正常下发，浏览循环继续（仅互动被拦），不发生死锁
+- **THEN** `{platform}.feed.scroll` / `navigation.back` 仍正常下发，浏览循环继续（仅互动被拦），不发生死锁
 
 ### Requirement: 互动发生后必须按账号持久计数
 
@@ -291,7 +291,7 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 
 绝不 brick（never-brick）：当全局配置缺失、或某字段非有限非负整数（时长还需 `>= 1`）时，运行时 MUST 逐项回落代码写死默认（时长 `10` 分钟；互动预算 `likes:10` / `collects:5` / `follows:3` / `searches:5` / `comments:2` / `comment_likes:3` / `join_groups:1`），MUST NOT 抛错、MUST NOT 让浏览闭环崩溃。配置表为空（如迁移刚跑完）时行为 MUST 与回落默认逐位一致。会话内的「已发生计数 = 初始预算 − 当前剩余」比率闸 MUST 以会话开始时的预算快照为 `init`，会话中途的配置改动 MUST NOT 影响本场已在进行的比率闸（新值于下一场会话生效）。
 
-Facebook 加群调度在执行真实 `join_group` 前 MUST 同时检查每日/minute/hour 风控配额与单场 `join_groups` 剩余预算；当单场 `join_groups` 剩余为 0 时，MUST 不下发 edge `group.join`，MUST 记录可审计的非成功结果，MUST NOT 写入 membership `joined_at`，MUST NOT 记录 `join_group` 成功风控事件。单场 `join_groups` 只在 judgment-confirmed `joined` 且 edge 执行成功后扣减；`already_member`、`gated`、`pending`、shadow、登录/验证码阻断、导航失败、执行失败或不确定结果 MUST NOT 扣减。
+Facebook 加群调度在执行真实 `join_group` 前 MUST 同时检查每日/minute/hour 风控配额与单场 `join_groups` 剩余预算；当单场 `join_groups` 剩余为 0 时，MUST 不下发 edge `facebook.group.join`，MUST 记录可审计的非成功结果，MUST NOT 写入 membership `joined_at`，MUST NOT 记录 `join_group` 成功风控事件。单场 `join_groups` 只在 judgment-confirmed `joined` 且 edge 执行成功后扣减；`already_member`、`gated`、`pending`、shadow、登录/验证码阻断、导航失败、执行失败或不确定结果 MUST NOT 扣减。
 
 单场会话上限的存储与编辑 MUST 只写自己的单行表、MUST NOT 经由风控状态单写路径（`RiskController.setQuotaLevel` / `applySignal` / 状态机 / `risk_state` 表），MUST 仅作只读读取、MUST NOT 改写账号风控终态或档位。本能力 MUST NOT 经 WebSocket 协议 v2。
 
@@ -325,7 +325,7 @@ Facebook 加群调度在执行真实 `join_group` 前 MUST 同时检查每日/mi
 #### Scenario: 单场加群预算耗尽不下发真实加群
 
 - **WHEN** 某账号当前会话的 `join_groups` 剩余预算为 0，且每日/minute/hour `join_group` 配额仍未耗尽
-- **THEN** Facebook 加群调度 MUST 不下发 edge `group.join`，并返回/记录单场预算耗尽的非成功结果
+- **THEN** Facebook 加群调度 MUST 不下发 edge `facebook.group.join`，并返回/记录单场预算耗尽的非成功结果
 
 #### Scenario: 只有确认成功加群扣减单场加群预算
 
@@ -1070,7 +1070,7 @@ MUST NOT 把「本进程从来没接过这根线」与「运营显式关掉了�
 
 `RiskController.explain('view')` 在账号处于 `restricted` 时 SHALL 按全局受限处置策略判定:`full_pause` 模式下 MUST 拒绝并以 `state:restricted` 为原因、携带剩余等待时长(恢复时刻 − 当前时刻);`browse_only` 模式下 SHALL 保持既有豁免(放行 view)。两种模式下 restricted 对互动动作的拒绝与互动配额归零 SHALL 保持不变。策略模式 SHALL 每次判定现读(热生效),MUST NOT 进程内缓存过陈旧上限。
 
-`full_pause` 的拒绝 SHALL 经既有浏览前闸与会话启动闸生效(不开下一篇、进入浏览休眠);MUST NOT 为此对 `page.scroll` / `navigation.back` 等推进 / 返回指令新增拦截(既有反死锁约束不变)。
+`full_pause` 的拒绝 SHALL 经既有浏览前闸与会话启动闸生效(不开下一篇、进入浏览休眠);MUST NOT 为此对 `{platform}.feed.scroll` / `navigation.back` 等推进 / 返回指令新增拦截(既有反死锁约束不变)。
 
 #### Scenario: full_pause 下不开下一篇
 
