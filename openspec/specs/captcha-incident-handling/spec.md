@@ -419,7 +419,7 @@ edge 执行远程协助点击后 SHALL 等待有界 settle 时间并重新探测
 
 #### Scenario: 失效详情路由弹出 access-limit-app
 - **WHEN** 小红书页面出现可见 `access-modal` / `access-limit-app`，并包含“当前笔记暂时无法浏览”或“请打开小红书App扫码查看”等文案
-- **THEN** 边缘将其分类为非阻断可恢复弹窗，MUST NOT 上报为验证码或 unknown 阻断，后续 `navigation.back` / 返回来源列表命令仍可执行
+- **THEN** 边缘将其分类为非阻断可恢复弹窗，MUST NOT 上报为验证码或 unknown 阻断，后续 `{platform}.navigation.back` / 返回来源列表命令仍可执行
 
 #### Scenario: 真验证码仍按账号级风控处理
 - **WHEN** 页面出现验证码厂商 iframe、滑块/点选验证容器或“安全验证 / 滑动验证 / 请完成验证”等挑战文案

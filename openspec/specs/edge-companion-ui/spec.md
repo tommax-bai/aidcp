@@ -2313,7 +2313,7 @@ The Edge client SHALL explain first authorization, successful identity binding, 
 - **THEN** the workspace explains that the opened profile will bind the currently scanned video-channel account, names the selected environment, and offers one explicit action to open the login window
 
 #### Scenario: Reopen request is accepted
-- **WHEN** customer-auth accepts `interaction.auth.reopen` but no later active auth status has arrived
+- **WHEN** customer-auth accepts `wechat_channels.inbox.auth.reopen` but no later active auth status has arrived
 - **THEN** the workspace displays that the browser-open request was accepted and continues to show authorization pending rather than success
 
 #### Scenario: Finder identity mismatches the binding

@@ -33,7 +33,7 @@ Edge SHALL 将平台明确返回的认证失效、挑战、限流、权限拒绝
 
 ### Requirement: 失败语义修正不得扩展协议或写授权
 
-本变更 SHALL 复用现有 `interaction.reply.result` 的 `confirmed | failed | ambiguous`、durable outbox 与 exact Cloud ack，MUST NOT 新增 message type 或 payload 字段。尚未获得真实捕获证据的写端点与账号写开关 MUST 继续关闭，测试结果 MUST NOT 被表述为真实账号发送成功。
+本变更 SHALL 复用现有 `wechat_channels.inbox.reply.result` 的 `confirmed | failed | ambiguous`、durable outbox 与 exact Cloud ack，MUST NOT 新增 message type 或 payload 字段。尚未获得真实捕获证据的写端点与账号写开关 MUST 继续关闭，测试结果 MUST NOT 被表述为真实账号发送成功。
 
 #### Scenario: 新旧 peer 契约保持不变
 

@@ -5,7 +5,7 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 ## Requirements
 ### Requirement: 云端必须在下发互动前依 RiskController 判定
 
-云端 SHALL 在下发 `{platform}.note.like` / `xiaohongshu.note.collect` / `{platform}.user.follow` 之前调用 `RiskController.canDo(action)` 判定归属账号是否允许；判定为拒时 MUST NOT 下发该互动指令，并 MUST 以**真实的被拒结果**反映（不伪装成功）。被拒时 MUST NOT 扣减每会话 budget（budget 不得低于实际下发量而漂移）。`{platform}.feed.scroll` / `navigation.back` 等推进 / 返回指令 MUST NOT 受该闸拦截，以免浏览循环死锁。
+云端 SHALL 在下发 `{platform}.note.like` / `xiaohongshu.note.collect` / `{platform}.user.follow` 之前调用 `RiskController.canDo(action)` 判定归属账号是否允许；判定为拒时 MUST NOT 下发该互动指令，并 MUST 以**真实的被拒结果**反映（不伪装成功）。被拒时 MUST NOT 扣减每会话 budget（budget 不得低于实际下发量而漂移）。`{platform}.feed.scroll` / `{platform}.navigation.back` 等推进 / 返回指令 MUST NOT 受该闸拦截，以免浏览循环死锁。
 
 #### Scenario: 允许时正常下发并计数
 
@@ -20,7 +20,7 @@ TBD - created by archiving change captcha-restrict-and-interaction-gating. Updat
 #### Scenario: 推进指令不被风控闸拦
 
 - **WHEN** 归属账号为 `restricted`
-- **THEN** `{platform}.feed.scroll` / `navigation.back` 仍正常下发，浏览循环继续（仅互动被拦），不发生死锁
+- **THEN** `{platform}.feed.scroll` / `{platform}.navigation.back` 仍正常下发，浏览循环继续（仅互动被拦），不发生死锁
 
 ### Requirement: 互动发生后必须按账号持久计数
 
@@ -931,7 +931,7 @@ Cloud SHALL 在创建 send attempt 前再次校验 runtime/global/account/channe
 
 ### Requirement: 只有平台确认的回复才记录成功风险事件
 
-Cloud MUST 仅在 `interaction.reply.result.status='confirmed'` 且 scope/idempotency/attempt 匹配时调用 `RiskController.record('comment'|'dm_reply')`。failed、ambiguous、duplicate command、approval、queued、sending、shadow 或 gated 结果 MUST NOT 记录成功。最终风险 status/quotaLevel 仍只由 Cloud RiskController 单写；runtime controls/reply limiter/Edge MUST NOT 改写。
+Cloud MUST 仅在 `wechat_channels.inbox.reply.result.status='confirmed'` 且 scope/idempotency/attempt 匹配时调用 `RiskController.record('comment'|'dm_reply')`。failed、ambiguous、duplicate command、approval、queued、sending、shadow 或 gated 结果 MUST NOT 记录成功。最终风险 status/quotaLevel 仍只由 Cloud RiskController 单写；runtime controls/reply limiter/Edge MUST NOT 改写。
 
 #### Scenario: Ambiguous 不计成功
 - **WHEN** Edge 回报 reply result ambiguous
@@ -1070,7 +1070,7 @@ MUST NOT 把「本进程从来没接过这根线」与「运营显式关掉了�
 
 `RiskController.explain('view')` 在账号处于 `restricted` 时 SHALL 按全局受限处置策略判定:`full_pause` 模式下 MUST 拒绝并以 `state:restricted` 为原因、携带剩余等待时长(恢复时刻 − 当前时刻);`browse_only` 模式下 SHALL 保持既有豁免(放行 view)。两种模式下 restricted 对互动动作的拒绝与互动配额归零 SHALL 保持不变。策略模式 SHALL 每次判定现读(热生效),MUST NOT 进程内缓存过陈旧上限。
 
-`full_pause` 的拒绝 SHALL 经既有浏览前闸与会话启动闸生效(不开下一篇、进入浏览休眠);MUST NOT 为此对 `{platform}.feed.scroll` / `navigation.back` 等推进 / 返回指令新增拦截(既有反死锁约束不变)。
+`full_pause` 的拒绝 SHALL 经既有浏览前闸与会话启动闸生效(不开下一篇、进入浏览休眠);MUST NOT 为此对 `{platform}.feed.scroll` / `{platform}.navigation.back` 等推进 / 返回指令新增拦截(既有反死锁约束不变)。
 
 #### Scenario: full_pause 下不开下一篇
 

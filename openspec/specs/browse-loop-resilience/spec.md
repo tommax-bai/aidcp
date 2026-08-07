@@ -5,11 +5,11 @@ TBD - created by archiving change fix-browse-loop-resilience. Update Purpose aft
 ## Requirements
 ### Requirement: 返回 feed 后浏览循环必须续刷而非死锁
 
-返回 feed（`navigation.back`，`reason=back_to_feed`）之后，浏览循环 SHALL 继续评估并推进，MUST NOT 在「返回后首次扫描到 0 卡」时进入无限等待。无论 cloud 是否下发 `targetPage`，edge 的返回路径 MUST 优先前向导航到健康来源列表，并等待列表水合后再判定可见卡片，且 MUST 在仍为空时显式上报（而非静默吞掉），以保证 cloud 决策环始终能被触发。
+返回 feed（`{platform}.navigation.back`，`reason=back_to_feed`）之后，浏览循环 SHALL 继续评估并推进，MUST NOT 在「返回后首次扫描到 0 卡」时进入无限等待。`xiaohongshu.navigation.back` 的 `targetPage` MUST 必填（`'feed' | 'search'`）：目标列表是发令方意图的一部分，边缘 MUST NOT 替云端补空；云端在会话来源页型未知时 MUST 显式下发 `targetPage='feed'`。缺 `targetPage` 的 `xiaohongshu.navigation.back` MUST 按格式错误 fail-closed 拒收（与未登记命令同族），MUST NOT 以任何缺省执行。`facebook.navigation.back` 不携带 `targetPage`——FB 的来源列表（home / search / group）是引擎记录的会话事实而非云端选择项。edge 的返回路径 MUST 优先前向导航到健康来源列表，并等待列表水合后再判定可见卡片，且 MUST 在仍为空时显式上报（而非静默吞掉），以保证 cloud 决策环始终能被触发。
 
-#### Scenario: cloud 下发的 back 不带 targetPage
-- **WHEN** edge 收到 `navigation.back{reason:'back_to_feed'}` 且 payload 无 `targetPage`
-- **THEN** edge 按等同 `targetPage='feed'` 处理：优先 `Page.navigate(exploreUrl)` 返回 explore feed，并以 `waitForVisibleCards` 轮询（上限约 8s）等待卡片出现，而非依赖浏览器 `history.back()`
+#### Scenario: 缺 targetPage 的 XHS back 拒收
+- **WHEN** edge 收到 `xiaohongshu.navigation.back{reason:'back_to_feed'}` 且 payload 无 `targetPage`
+- **THEN** edge 按格式错误 fail-closed 拒收并如实回报，MUST NOT 按任何缺省列表执行；云端侧发送点在 `pageType` 缺席时已显式补 `targetPage='feed'`，正常运行不触发本路径
 
 #### Scenario: 前向导航后仍未水合则重试健康校验
 - **WHEN** 前向导航到来源列表后在轮询窗口内仍未出现可见卡片
@@ -68,14 +68,14 @@ cloud orchestration SHALL 运行一个 wall-clock 看门狗：当超过 idle-nud
 
 ### Requirement: 返回列表页须按来源页型(sourcePageType)返回正确的列表
 
-`back_to_feed` 返回 MUST 回到笔记**来源的列表页**：来自 explore feed 的会话回 explore，来自搜索结果的会话回**搜索结果**。云端 SHALL 把会话的 `sourcePageType` 经决策指令的 `targetPage` 透传到边缘；边缘 SHALL 在打开笔记前记录当前来源列表 URL，并据 `targetPage` 选择返回目标，MUST NOT 把搜索来源的会话一律拽回 explore。
+`back_to_feed` 返回 MUST 回到笔记**来源的列表页**：来自 explore feed 的会话回 explore，来自搜索结果的会话回**搜索结果**。云端 SHALL 把会话的 `sourcePageType` 经决策指令的必填 `targetPage` 透传到边缘（来源页型未知时显式下发 `'feed'`）；边缘 SHALL 在打开笔记前记录当前来源列表 URL，并据 `targetPage` 选择返回目标，MUST NOT 把搜索来源的会话一律拽回 explore。
 
 #### Scenario: 搜索来源会话返回搜索结果
 - **WHEN** 一条笔记经搜索结果打开、深读后云端决定 `back_to_feed`，且会话 `sourcePageType==='search'`
-- **THEN** 云端下发的 `navigation.back` 携带 `targetPage='search'`，边缘优先 `Page.navigate` 到打开笔记前记录的搜索结果 URL（而非 explore feed）
+- **THEN** 云端下发的 `xiaohongshu.navigation.back` 携带 `targetPage='search'`，边缘优先 `Page.navigate` 到打开笔记前记录的搜索结果 URL（而非 explore feed）
 
 #### Scenario: feed 来源会话返回 explore
-- **WHEN** 会话 `sourcePageType==='feed'`（或缺省）时决定 `back_to_feed`
+- **WHEN** 会话 `sourcePageType==='feed'`（或来源页型未知、云端显式补 `'feed'`）时决定 `back_to_feed`
 - **THEN** 边缘通过前向导航返回到 explore feed
 
 #### Scenario: 搜索来源 URL 缺失时诚实降级
@@ -151,7 +151,7 @@ CDP 重连 MUST NOT 触碰边-云会话连接、MUST NOT 重发 `edge.hello`（�
 
 #### Scenario: 看笔记→开通知→返回，直连 feed 不闪坏页
 
-- **WHEN** 会话在 explore feed 打开笔记（真实点击、URL 带 `xsec_token`）后离页进入通知巡视，随后收到 `navigation.back{reason:'back_to_feed'}`，当前在 `/notification`
+- **WHEN** 会话在 explore feed 打开笔记（真实点击、URL 带 `xsec_token`）后离页进入通知巡视，随后收到 `xiaohongshu.navigation.back{reason:'back_to_feed'}`，当前在 `/notification`
 - **THEN** 边缘直接 `Page.navigate` 回 explore feed，MUST NOT `history.back()` 回踩那条 token 已失效的笔记详情；返回过程中 `error_code=300031` 坏页 MUST NOT 被经过 / 闪现，地址栏直接落在 explore feed
 
 #### Scenario: 搜索来源的返回回到搜索结果
@@ -191,7 +191,7 @@ CDP 重连 MUST NOT 触碰边-云会话连接、MUST NOT 重发 `edge.hello`（�
 
 ### Requirement: 浏览循环因结束命令停止后须可被云端浏览类命令唤醒重启
 
-边端浏览循环在收到会话结束命令（`session.end`）停止后（循环退出、不再上报），若随后收到云端**浏览类推进命令**（如 `xiaohongshu.feed.scroll` / `facebook.feed.scroll`、`navigation.back` 等），MUST 能**重启浏览循环**并重新上报 `page.cards`，使云端决策环得以继续；MUST NOT 把这类命令静默堆进**无人消费**的命令队列致其永久堆积（既有缺陷：循环停止后命令被入队但无消费者）。重启 MUST 幂等（循环已在跑时为安全空操作），且重启语义 MUST 与自动续场配套——云端续场重开会话后下发的引导命令必须能让已停的边端循环复活。重启 MUST NOT 在边端**主动诚实下线/关闭**流程中误触（关闭中收到的迟到命令不得复活循环）。
+边端浏览循环在收到会话结束命令（`session.end`）停止后（循环退出、不再上报），若随后收到云端**浏览类推进命令**（如 `xiaohongshu.feed.scroll` / `facebook.feed.scroll`、`{platform}.navigation.back` 等），MUST 能**重启浏览循环**并重新上报 `page.cards`，使云端决策环得以继续；MUST NOT 把这类命令静默堆进**无人消费**的命令队列致其永久堆积（既有缺陷：循环停止后命令被入队但无消费者）。重启 MUST 幂等（循环已在跑时为安全空操作），且重启语义 MUST 与自动续场配套——云端续场重开会话后下发的引导命令必须能让已停的边端循环复活。重启 MUST NOT 在边端**主动诚实下线/关闭**流程中误触（关闭中收到的迟到命令不得复活循环）。
 
 #### Scenario: 结束后收到浏览类命令重启已停循环
 

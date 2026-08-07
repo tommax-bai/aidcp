@@ -65,7 +65,7 @@ Edge 平台驱动与 Native adapter SHALL 声明准确、版本化的页面命�
 #### Scenario: Facebook 就地读取完成
 - **WHEN** Facebook `identity.read_current_page` 返回匹配结果且 `pageEffect=none`
 - **THEN** Cloud 按非空昵称差异写规则处理结果
-- **AND** MUST NOT 下发 `navigation.back`、`facebook.feed.scroll` 或 Feed refresh
+- **AND** MUST NOT 下发 `facebook.navigation.back`、`facebook.feed.scroll` 或 Feed refresh
 
 #### Scenario: Xiaohongshu 本人主页读取完成
 - **WHEN** Xiaohongshu `identity.read_self_profile` 返回匹配结果且页面已进入本人主页

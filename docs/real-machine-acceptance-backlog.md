@@ -4406,3 +4406,16 @@ automation `b456af4`（含消费链 Reel 目标 + 普通帖目标两条回归断
 - [ ] FB 群评论链（首帖探测内部分解路径）不受 `browse_next` 删除影响：`facebook.note.open{selection:'first_commentable_group_post'}` 正常出首帖。
 - [ ] 搜索链两平台各一次（`{p}.search.execute` + `{p}.search.scroll` 回执关联正常）。
 - [ ] mirror-unknown 窗自然收尾不被扣（kernel v0.1.2 豁免名单）：难以主动制造，日常观察 `client_environment_automation_gate` 拒绝计数不含 note.close 即可。
+
+## 簇 155 · 词汇批 6 改名真机验收（platformize-inbox-vocabulary + platformize-publish-navigation-vocabulary，2026-08-07）
+
+> **前置环境**：与簇 148/149/152/153/154 **同一次出包**（累计：批 1–7 全部新名收官 + 身份闸换血 + 问现状）。
+> dev 云端已发批 6 全部新名（automation 部署 2026-08-07 19:01，kernel v0.1.4）；旧客户端 fail-closed 拒收属预期切换窗口。
+> **本批特有窗口效应**：`task.*` 改名令旧构建边缘的发布/评论租约链在装机前不可用（旧边缘只认 `edge.task.*`）；本地源码跑的 dev 边缘重启即好。
+
+- [ ] 视频号 IM 链新名端到端：sidecar 以 `wechat_channels.inbox.*` 15 条收发各至少一轮（auth.status 上报、sync 往返、reply.send→result→result.ack 链、offboard 链），durable outbox 清账正常。
+- [ ] XHS 发布链新名端到端：`xiaohongshu.publish.command` 12 kind 序列真发一篇（含 set_schedule 定时路径任一），`.result` 按 `recordId+seq` 关联，载荷无 platform 字段。
+- [ ] FB 发布链新名端到端：`facebook.publish.command` 6 kind 子集真发一帖；XHS-only kind 到 FB 边缘 fail-closed（`kind_not_supported_on_platform`）不误执行。
+- [ ] 返回命令新名：`xiaohongshu.navigation.back`（targetPage 必填，feed 与 search 两形各一次）与 `facebook.navigation.back` 真实回执；缺 targetPage 的 XHS back 被格式拒收（可用手工注入验证）。
+- [ ] 租约链新名：`task.acquire→acquired→release→released` 完整一轮（发布或评论任务），副本陈旧窗口下豁免放行仍有效（kernel v0.1.4 豁免表）。
+- [ ] 平台缺失 fail-closed：无 platform 的 draft 不下发、原因 `draft_platform_missing` 可见（后台/日志），不再静默按小红书。

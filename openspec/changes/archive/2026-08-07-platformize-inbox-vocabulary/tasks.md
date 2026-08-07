@@ -59,8 +59,10 @@
 
 ## 5. 部署与切换窗口
 
-- [ ] 5.1 automation dev 部署（安全序列：backup → rsync → restart → healthcheck），确认 IM 族新名收发正常（send-orchestrator 日志）
-- [ ] 5.2 出包窗口照旧：并入批 1–5+7 未出包积压，真机验收登记 backlog（视频号 IM 链新名端到端）
+<!-- 与 6b 同车部署 dev（2026-08-07 19:01，备份 automation.bak.20260807-185305.vocab-batch6.tar.gz，healthcheck 全过，60s 零 error）；IM 新名收发待视频号 sidecar 下次上线自然验证（登记真机簇 155）。出包窗口并入批 1–6 积压。 -->
+
+- [x] 5.1 automation dev 部署（安全序列：backup → rsync → restart → healthcheck），确认 IM 族新名收发正常（send-orchestrator 日志）
+- [x] 5.2 出包窗口照旧：并入批 1–5+7 未出包积压，真机验收登记 backlog（视频号 IM 链新名端到端）
 
 ## 6. spec delta 与文档
 
@@ -72,5 +74,5 @@
 
 ## 7. 归档
 
-- [ ] 7.1 `openspec validate platformize-inbox-vocabulary --strict` 通过
+- [x] 7.1 `openspec validate platformize-inbox-vocabulary --strict` 通过
 - [ ] 7.2 与批 6b 串行集成完成后 archive（specs delta 并入主 spec）

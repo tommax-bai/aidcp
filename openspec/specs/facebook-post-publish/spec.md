@@ -87,7 +87,7 @@ Facebook 发帖真实提交 SHALL 在 no-submit composer 和媒体探针通过�
 
 cloud SHALL 仅为 Facebook `select_mode` 下发 `timeoutMs=40_000`，edge SHALL 将该值作为“等待首页发帖入口 + 点击后等待 composer 编辑器”的总 deadline。edge MUST 在 deadline 内以有界轮询容忍入口渐进渲染，入口出现后 SHALL 立即继续，MUST NOT 使用一次性快照或固定长睡眠代替就绪判断。入口等待阶段 MUST 不超过 20 秒，点击后 SHALL 使用总 deadline 的剩余预算等待编辑器。
 
-cloud 等待 `publish.command.result` 的窗口 SHALL 为下发预算加既有结果余量，使 edge 必须先于 cloud 收敛。小红书 `select_mode` MUST NOT 因本要求携带 Facebook 预算，其既有等待语义 MUST 保持不变。
+cloud 等待 `facebook.publish.command.result` 的窗口 SHALL 为下发预算加既有结果余量，使 edge 必须先于 cloud 收敛。小红书 `select_mode` MUST NOT 因本要求携带 Facebook 预算，其既有等待语义 MUST 保持不变。
 
 deadline 内始终没有可点击入口时 edge MUST 诚实返回 `no_target`；入口已点击但编辑器未在剩余预算内出现时 MUST 诚实返回 `post_validate_failed`。两种情况均 MUST NOT 假成功、MUST NOT继续上传、填写或提交。
 

@@ -11,7 +11,7 @@ Electron 客户端 SHALL 将发布稿件过程投影为浏览循环中的 `写�
 
 #### Scenario: 原子发布指令进入写笔记状态
 
-- **WHEN** edge 接收到并执行 `publish.command`
+- **WHEN** edge 接收到并执行 `{platform}.publish.command`
 - **THEN** Electron 客户端当前 loop stage SHALL 切换为 `写笔记`
 - **AND** 该状态更新 SHALL NOT 产生活动流计数
 

@@ -21,11 +21,11 @@ TBD - created by archiving change edge-task-execution-coordinator. Update Purpos
 
 ### Requirement: cloud 必须等待 edge acquired/quiesced 再发首条业务命令
 
-protocol v2 SHALL 提供 `edge.task.acquire`、`edge.task.acquired`、`edge.task.release`、`edge.task.released`。cloud 发出 acquire 后 MUST 等 edge 回 `acquired`；该回执同时表示当前浏览原子动作已到安全边界、未开始的普通浏览命令已取消且租约已经生效。未收到 acquired 时 MUST NOT 下发该任务第一条业务命令。每个 acquire MUST 携可选的本地等待时长；edge MUST 从收到申请起在该时长内完成 quiesce 并授予租约，逾期仍未授予时 MUST 取消该排队申请，MUST NOT 在 cloud 已超时后再授予无主租约。
+protocol v2 SHALL 提供 `task.acquire`、`task.acquired`、`task.release`、`task.released`。cloud 发出 acquire 后 MUST 等 edge 回 `acquired`；该回执同时表示当前浏览原子动作已到安全边界、未开始的普通浏览命令已取消且租约已经生效。未收到 acquired 时 MUST NOT 下发该任务第一条业务命令。每个 acquire MUST 携可选的本地等待时长；edge MUST 从收到申请起在该时长内完成 quiesce 并授予租约，逾期仍未授予时 MUST 取消该排队申请，MUST NOT 在 cloud 已超时后再授予无主租约。
 
-#### Scenario: 在途 navigation.back 先收尾
-- **WHEN** `navigation.back` 已在 edge 执行中，cloud 申请发布租约
-- **THEN** edge 等该原子动作收敛到安全边界后才回 `edge.task.acquired`，cloud 随后才发 `navigate_entry`
+#### Scenario: 在途 {platform}.navigation.back 先收尾
+- **WHEN** `{platform}.navigation.back` 已在 edge 执行中，cloud 申请发布租约
+- **THEN** edge 等该原子动作收敛到安全边界后才回 `task.acquired`，cloud 随后才发 `navigate_entry`
 
 #### Scenario: acquire 超时不越权发布
 - **WHEN** 目标 edge 离线、协议过旧或在超时内未回 acquired
@@ -54,7 +54,7 @@ protocol v2 SHALL 提供 `edge.task.acquire`、`edge.task.acquired`、`edge.task
 - **THEN** 交接 MUST 立即收敛，MUST NOT 等停留跑满
 
 #### Scenario: 队列中旧滚动被取消
-- **WHEN** 当前动作执行中且队列还等待 `{platform}.feed.scroll`、`navigation.back`，此时发布申请租约
+- **WHEN** 当前动作执行中且队列还等待 `{platform}.feed.scroll`、`{platform}.navigation.back`，此时发布申请租约
 - **THEN** 当前动作到安全边界后发布获租约，两个未开始命令被取消且释放后不重放
 
 #### Scenario: 释放后以新快照恢复
@@ -66,7 +66,7 @@ protocol v2 SHALL 提供 `edge.task.acquire`、`edge.task.acquired`、`edge.task
 独占任务的每条页面写命令 SHALL 携 `taskId`。edge MUST 只执行 `taskId` 等于当前租约所有者的命令；无 `taskId`、错 `taskId`、已释放或已过期租约的命令 MUST 被拒绝或丢弃并留下可观测失败，MUST NOT 改写页面。发布原子命令 MUST 返回明确失败结果；无逐命令回执的浏览协议命令由 cloud 有界等待超时收敛为失败。
 
 #### Scenario: 迟到的发布命令不污染下一任务
-- **WHEN** 发布 A 已释放，发布 B 已获租约，随后到达 A 的迟到 `publish.command`
+- **WHEN** 发布 A 已释放，发布 B 已获租约，随后到达 A 的迟到 `{platform}.publish.command`
 - **THEN** edge 返回 `task_lease_mismatch` 且不执行该命令，B 的页面状态不被污染
 
 #### Scenario: 租约期间普通浏览命令被挡住
@@ -140,11 +140,11 @@ protocol v2 SHALL 提供 `edge.task.acquire`、`edge.task.acquired`、`edge.task
 
 ### Requirement: Browser-control-unavailable acquisition SHALL fail immediately and explicitly
 
-Before quiescing browse or granting a task lease, edge task coordination MUST check browser-control readiness. If control is recovering or unavailable, it MUST NOT acquire task ownership, MUST NOT dispatch a page-writing command, and MUST emit `edge.task.released` with reason `cdp_unhealthy` for the requested task id. This negative acknowledgement SHALL be idempotent and MUST NOT leave a queued or active lease behind.
+Before quiescing browse or granting a task lease, edge task coordination MUST check browser-control readiness. If control is recovering or unavailable, it MUST NOT acquire task ownership, MUST NOT dispatch a page-writing command, and MUST emit `task.released` with reason `cdp_unhealthy` for the requested task id. This negative acknowledgement SHALL be idempotent and MUST NOT leave a queued or active lease behind.
 
 #### Scenario: Human publish arrives during CDP recovery
 - **WHEN** a human-priority publish lease request arrives while browser control is recovering
-- **THEN** the edge immediately returns `edge.task.released{reason:'cdp_unhealthy'}` without calling browse quiescence and without waiting for the normal acquire timeout
+- **THEN** the edge immediately returns `task.released{reason:'cdp_unhealthy'}` without calling browse quiescence and without waiting for the normal acquire timeout
 
 #### Scenario: Duplicate release after unhealthy rejection
 - **WHEN** cloud later sends a release for a task already rejected as `cdp_unhealthy`

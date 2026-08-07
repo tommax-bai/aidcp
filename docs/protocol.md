@@ -76,7 +76,6 @@
 | `note.content` | edge → cloud | 上报一条笔记的标题/摘要/指标，供评估与概念抽取 |
 | `note.ack` | cloud → edge | 确认收到笔记，异步处理中 |
 | `xiaohongshu.note.open` / `facebook.note.open` | cloud → edge | 打开一条笔记/帖子（可选 `surface`:'feed'\|'detail'、`purpose`:'read'\|'navigate'；Facebook 变体还可用 `url` 直达，或用 `selection:'first_commentable_group_post'` + `container` 选择群讨论流首条可评论帖；无 permalink 时可保持同页容器绑定） |
-| `xiaohongshu.note.close` / `facebook.note.close` | cloud → edge | 关闭当前笔记/帖子（云端现役零发送点，与 `navigation.back` 的分工批 6 裁） |
 | `xiaohongshu.search.execute` / `facebook.search.execute` | cloud → edge | 执行一次关键词搜索（FB 变体支持全站/容器 `scope`）；协商 `search_activity_receipt_v1` 时携稳定 `activityId` 与 purpose/scope，Edge 回诚实提交边界和结果终态 |
 | `session.end` | cloud → edge | 结束本次浏览会话 |
 
@@ -93,7 +92,7 @@
 | `xiaohongshu.note.comment` / `facebook.note.comment` | cloud → edge | 在当前内容发评论（`text` 正文；云端已撰写/去AI味/人审通过）。可选 `groupChatCode`=账号「联系方式」，非空则 verbatim 追加到评论末尾（wire 名历史保留，概念=contact info，change generalize-contact-info）；可选 `fastReturnToFeed=true` 仅承载手工 `/comment --feed`：提交派发后不等平台确认，500ms 后直回平台首页，并诚实回 submitted-unconfirmed / verification_ambiguous（绝不冒充平台确认成功） |
 | `xiaohongshu.comment.like` | cloud → edge | 给详情页内某条评论点赞（`commentAnchorId` 稳定锚点定位，绝不按序号；仅小红书，回执关联键保留历史形 `comment_like`） |
 | `facebook.group.join` | cloud → edge | Facebook 加群原子指令：导航到群、回传结构化 observation；仅 `click:true` 时点击 Join 一次，必须走 Facebook `join` 能力，绝不复用 `browse`。（群内找首帖的滚动是引擎对 `facebook.note.open{selection}` 的内部分解，协议层无群滚动面） |
-| `navigation.back` | cloud → edge | 返回上一页（feed / search；无平台段，批 6 与 note.close 裁分工） |
+| `xiaohongshu.navigation.back` / `facebook.navigation.back` | cloud → edge | 返回来源列表（批 6b 平台段化；XHS 形 `targetPage: 'feed'\|'search'` **必填**、缺失格式 fail-closed 拒收；FB 形无 targetPage——来源列表是引擎记录的会话事实。原 `{p}.note.close` 已删除：零发送点、关弹层降回引擎内部子步骤） |
 | `xiaohongshu.note.browse_images` | cloud → edge | 浏览笔记图片（`count` 张；DeepReader 决策下发；仅小红书） |
 | `xiaohongshu.note.scroll_comments` | cloud → edge | 滚动评论区（CommentReviewer 决策下发；仅小红书） |
 | `xiaohongshu.profile.open` | cloud → edge | 进入普通作者主页（仅小红书；FB 结构性不访作者主页）；不得承载本人身份采集或 `direct` |
@@ -139,10 +138,10 @@
 
 | type | 方向 | 说明 |
 |---|---|---|
-| `edge.task.acquire` | cloud → edge | 申请任务级执行权，携 `taskId/kind/priority/leaseMs/acquireTimeoutMs?`；edge 在该等待上限内未 quiesce 时取消排队申请；这不是“已暂停”的事实 |
-| `edge.task.acquired` | edge → cloud | edge 已在命令安全边界 quiesced、已取消未开始的普通浏览命令并授予租约；cloud 收到后才可发首条业务命令 |
-| `edge.task.release` | cloud → edge | 幂等释放指定 `taskId`，携可选 `outcome` |
-| `edge.task.released` | edge → cloud | 释放/过期/非 owner 的收敛回执；`cdp_unhealthy`=在线但浏览器控制不可安全接管，`browser_wake_failed`=冷待机停靠的浏览器在唤醒死线内唤不醒（可恢复、别与 `cdp_unhealthy` 混淆），`preempted_by_task`=被严格更高档任务抢占（云端**不得判失败**，保持待审待抢占方释放后重投），`window_busy`=holder 处不可抢占的提交窗口（携 `windowRemainingMs` 剩余预算，供云端精确等待而非空转），`yield_timeout`=收到取消仍不停手→判控制面故障（需人工重启客户端，非自愈） |
+| `task.acquire` | cloud → edge | 申请任务级执行权，携 `taskId/kind/priority/leaseMs/acquireTimeoutMs?`；edge 在该等待上限内未 quiesce 时取消排队申请；这不是“已暂停”的事实 |
+| `task.acquired` | edge → cloud | edge 已在命令安全边界 quiesced、已取消未开始的普通浏览命令并授予租约；cloud 收到后才可发首条业务命令 |
+| `task.release` | cloud → edge | 幂等释放指定 `taskId`，携可选 `outcome` |
+| `task.released` | edge → cloud | 释放/过期/非 owner 的收敛回执；`cdp_unhealthy`=在线但浏览器控制不可安全接管，`browser_wake_failed`=冷待机停靠的浏览器在唤醒死线内唤不醒（可恢复、别与 `cdp_unhealthy` 混淆），`preempted_by_task`=被严格更高档任务抢占（云端**不得判失败**，保持待审待抢占方释放后重投），`window_busy`=holder 处不可抢占的提交窗口（携 `windowRemainingMs` 剩余预算，供云端精确等待而非空转），`yield_timeout`=收到取消仍不停手→判控制面故障（需人工重启客户端，非自愈） |
 
 ### 2.6 发布编排（v2 新增，Publish Agent 驱动）
 
@@ -154,8 +153,8 @@
 | `publish.draft_image_remove` | edge → cloud | 客户端稿件预览内删除待审稿件的某张配图，携稿件版本 |
 | `publish.draft_image_remove.result` | cloud → edge | 返回删配图结果（成功回带写后真态 images + 新版本）|
 | `publish.result` | edge → cloud | 发布结果回传（ok / postId / error；v1 整页路径） |
-| `publish.command` | cloud → edge | 下发一条参数化发布原子指令（`taskId` 为当前发布租约；`recordId+seq` 关联键；`kind` 复用通用 command 映射，含 `capture_scheduled` / `reconcile_scheduled`，不新增 `MessageType`） |
-| `publish.command.result` | edge → cloud | 单条发布指令执行结果回传（按 `recordId+seq` 关联；`ok/value/error/details`，红线不静默假成功；`submitDispatched`=提交「按下」事件已真正派发——`ok:false` 但该位为真时帖子可能已发出，云端按「已提交待确认」处置、绝不烧 failed、绝不自动重投） |
+| `{platform}.publish.command` | cloud → edge | 下发一条参数化发布原子指令（批 6b 平台段化：`xiaohongshu.` 形取 `PublishCommandKind` 12 词全集、`facebook.` 形只取 6 词合法子集（navigate_entry/select_mode/upload_image/fill_field/submit_publish/capture_postId）、非法组合云端类型面不可表示且边缘 fail-closed；**载荷不再携带 `platform` 字段**——平台维只由消息名承载；`taskId` 为当前发布租约；`recordId+seq` 关联键；视频号无发布名，kernel profile 结构性拒绝） |
+| `{platform}.publish.command.result` | edge → cloud | 单条发布指令执行结果回传（按 `recordId+seq` 关联；`ok/value/error/details`，红线不静默假成功；`submitDispatched`=提交「按下」事件已真正派发——`ok:false` 但该位为真时帖子可能已发出，云端按「已提交待确认」处置、绝不烧 failed、绝不自动重投） |
 
 ### 2.7 Persona 生成（v2 新增，建号关键词驱动，客户自助 onboarding）
 
@@ -597,7 +596,6 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 }
 ```
 
-**`{platform}.note.close`**（cloud → edge）：`{ "reason": "..." }`（可选；云端现役零发送点）
 
 **`xiaohongshu.search.execute` / `facebook.search.execute`**（cloud → edge）
 ```jsonc
@@ -654,12 +652,10 @@ sent=0」前科）回填全量快照；② 发布审批生命周期变化时增�
 // 注（change generalize-contact-info）：本字段承载的概念已正名为「联系方式」，内部变量为 contactInfo；wire 字段名保留 groupChatCode 作历史兼容（Method A），物理改名属后续协调步骤。
 // facebook.group.join（Facebook 加群；click 缺省/false=只观察不点击，true=cloud 已判定可点后才点击一次）
 { "groupUrl": "https://www.facebook.com/groups/123", "click": false, "thinkMs": 900 }
-// navigation.back
-{ "reason": "quality_rejected", "targetPage": "feed", "dwellMs": 2200 } // targetPage: feed | search
+// xiaohongshu.navigation.back（targetPage 必填：feed | search；facebook.navigation.back 无 targetPage）
+{ "reason": "quality_rejected", "targetPage": "feed", "dwellMs": 2200 }
 // {platform}.note.open
 { "index": 0, "noteId": "n123", "reason": "值得打开", "thinkMs": 800 }
-// {platform}.note.close
-{ "reason": "...", "dwellMs": 2200 }
 // xiaohongshu.note.browse_images（DeepReader 决策；count 为目标张数，边缘按实际可见数截断）
 { "noteId": "n123", "count": 3, "thinkMs": 700, "dwellMs": 2000 }
 // xiaohongshu.note.scroll_comments（CommentReviewer 决策）
@@ -712,16 +708,16 @@ Reels 执行器仅在会话确处于 Reels 模式、且 `noteId` 与立即重探
 > 由云端基于**已上报内容**（`note.detail.content` 长度）+ 风控状态（`tempo`：normal=1.0 /
 > warned=1.3 / restricted=1.6）+ 会话进度（疲劳曲线）算出的**中心值**：
 > - `thinkMs`：执行该动作**前**的犹豫 / 感知时间（互动写命令 / `{platform}.note.open`）；
-> - `dwellMs`：离开当前页前应达到的**总停留时间**（`navigation.back` / `{platform}.note.close`），治详情页"秒退"。
+> - `dwellMs`：离开当前页前应达到的**总停留时间**（`{platform}.navigation.back`，批 6b 起唯一离页载体），治详情页"秒退"。
 >
 > §3 时间系数收口在云端一处，**不下发系数**。边缘收到中心值后叠一层 lognormal 抖动（防确定性指纹）
 > 再执行：`thinkMs` → 动作前等待；`dwellMs` → 保证当前页实际停留达标（真实阅读已超过则不叠加）。
 > 字段缺失（旧云端 / 自主动作）→ 边缘走内置默认下限兜底，**绝不零延迟**。向后兼容（旧端忽略）。
 
 `EdgeCommand.action` → 协议 `type` 映射（`command-bridge.ts`）：
-`scroll→{platform}.{surface}.scroll`（面由 `EdgeCommand.surface` 声明：sendScrollCommand 经单点解析器落面）、`open_note→{platform}.note.open`、`close_note→{platform}.note.close`、
+`scroll→{platform}.{surface}.scroll`（面由 `EdgeCommand.surface` 声明：sendScrollCommand 经单点解析器落面）、`open_note→{platform}.note.open`、
 `like→{platform}.note.like / facebook.video.like`（对象由 `EdgeCommand.likeObject` 声明：Reels 节奏赞与 feed 视频概率赞两类发送点标 `video`，缺省 `note`；不存在组合如 `xiaohongshu×video` 响亮 throw）、`collect→xiaohongshu.note.collect`、`follow→{platform}.user.follow`、`comment→{platform}.note.comment`、`comment_like→xiaohongshu.comment.like`、
-`search→{platform}.search.execute`、`back→navigation.back`、`browse_images→xiaohongshu.note.browse_images`、
+`search→{platform}.search.execute`、`back→{platform}.navigation.back`、`browse_images→xiaohongshu.note.browse_images`、
 `scroll_comments→xiaohongshu.note.scroll_comments`、`profile_open→xiaohongshu.profile.open`、
 `identity_read_current→identity.read_current_page`、`identity_read_self_profile→identity.read_self_profile`、
 `session.end→session.end`。
@@ -1025,7 +1021,7 @@ search 回执的计数边界是 `actuated=true`，而不是 `ok=true`：`results
 申请与确认：
 
 ```jsonc
-// edge.task.acquire  cloud → edge
+// task.acquire  cloud → edge
 {
   "taskId": "task-01H...",
   "kind": "publish", // publish|comment_prepare|comment_commit|notification|group_join|system_recovery
@@ -1034,7 +1030,7 @@ search 回执的计数边界是 `actuated=true`，而不是 `ok=true`：`results
   "acquireTimeoutMs": 45000 // edge 本地等待 quiesce 的上限；届满不再授予该任务
 }
 
-// edge.task.acquired  edge → cloud
+// task.acquired  edge → cloud
 {
   "taskId": "task-01H...",
   "kind": "publish",
@@ -1042,15 +1038,15 @@ search 回执的计数边界是 `actuated=true`，而不是 `ok=true`：`results
 }
 ```
 
-`acquired` 是唯一的 quiesced 事实：它表示当前浏览原子动作已到命令边界，尚未开始的普通浏览命令已取消，且该 `taskId` 已成为唯一页面写 owner。cloud 在此前不得发送该任务第一条业务命令。普通浏览不带 `taskId`；独占任务的 `publish.command`、评论 `{platform}.search.execute/{platform}.note.open/xiaohongshu.note.scroll_comments/{platform}.note.comment`、`xiaohongshu.notification.*`、`facebook.group.join` 与验证码点击必须携当前 `taskId`。
+`acquired` 是唯一的 quiesced 事实：它表示当前浏览原子动作已到命令边界，尚未开始的普通浏览命令已取消，且该 `taskId` 已成为唯一页面写 owner。cloud 在此前不得发送该任务第一条业务命令。普通浏览不带 `taskId`；独占任务的 `{platform}.publish.command`、评论 `{platform}.search.execute/{platform}.note.open/xiaohongshu.note.scroll_comments/{platform}.note.comment`、`xiaohongshu.notification.*`、`facebook.group.join` 与验证码点击必须携当前 `taskId`。
 
 释放与确认：
 
 ```jsonc
-// edge.task.release  cloud → edge
+// task.release  cloud → edge
 { "taskId": "task-01H...", "outcome": "completed" }
 
-// edge.task.released  edge → cloud
+// task.released  edge → cloud
 { "taskId": "task-01H...", "reason": "released" } // released|expired|duplicate|not_owner|cdp_unhealthy|browser_wake_failed|preempted_by_task|window_busy|yield_timeout（window_busy 携 windowRemainingMs 剩余预算）
 ```
 
@@ -1059,7 +1055,7 @@ edge 按 `system_recovery > human > automatic` 授予；同级 FIFO。发布从 
 ### 3.11 发布编排
 
 > 旧整页发布消息 `publish.request` 已随 change `drop-dead-cloud-edge-commands` 从协议删除
-> （云端零发送点、边缘生产无处理器）；发布一律走 `publish.command` 原子指令。
+> （云端零发送点、边缘生产无处理器）；发布一律走 `{platform}.publish.command` 原子指令。
 
 **`publish.approval_request`**（edge → cloud）——请求云端发飞书审批卡片
 ```jsonc
@@ -1086,7 +1082,7 @@ edge 按 `system_recovery > human > automatic` 授予；同级 FIFO。发布从 
 ```
 云端按连接握手的真实 `accountId` 校验稿件归属，并复用飞书/控制台共用的
 first-writer-wins 审批信号。动作成功只表示审批决定已受理：`approved=true` 后仍由
-发布调度器异步下发，最终结果以 `publish.command.result` / `publish.result` 为准。
+发布调度器异步下发，最终结果以 `{platform}.publish.command.result` / `publish.result` 为准。
 
 - `publishMode` 与 `publishTime` 必须同时出现或同时省略；旧客户端同时省略时保持草稿现有发布计划。
 - `approved=false` 不得携带这两个字段。`immediate` 必须配 `publishTime:null`；`scheduled` 必须配有限 epoch ms，且仍由 Cloud 权威校验平台能力与未来 1 小时至 14 天窗口。
@@ -1413,7 +1409,7 @@ edge                                          cloud（RoleDispatcher + 多角色
  │ ◄───────────────────────────────────────────│
  │  note.detail {noteId,content,...}            │  ContentCurator 质量关卡 → InteractionAppraiser 决策
  │ ───────────────────────────────────────────►│
- │  {platform}.note.like {noteId} | navigation.back │  （角色事件 → command-bridge → 协议消息）
+ │  {platform}.note.like {noteId} | {platform}.navigation.back │  （角色事件 → command-bridge → 协议消息）
  │ ◄───────────────────────────────────────────│
  │  action.completed {action:"like",ok:true}    │  记录互动；BackToFeed 决定返回列表
  │ ───────────────────────────────────────────►│
@@ -1452,7 +1448,7 @@ edge                                cloud
 
 ```
 cloud（Publish Agent）          edge                         飞书（云端 Bot）
- │ publish.command {kind,...}    │                            │
+ │ {platform}.publish.command {kind,...}    │                            │
  │ ─────────────────────────────►│ 生成 requestId             │
  │                               │ publish.approval_request   │
  │                               │ ──────────────────────────►│ buildPublishApprovalCard()

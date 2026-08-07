@@ -9,7 +9,7 @@
 ## Requirements
 ### Requirement: 决策指令携带可选时间指令
 
-云端 → 边缘的决策指令 SHALL 支持可选的时间字段：`navigation.back` / `{platform}.note.close` 携带
+云端 → 边缘的决策指令 SHALL 支持可选的时间字段：`{platform}.navigation.back` 携带
 `dwellMs`（离开当前页前应达到的总停留时间），`{platform}.note.like` / `xiaohongshu.note.collect` /
 `{platform}.user.follow` / `{platform}.note.open` 携带 `thinkMs`（执行动作前的犹豫 / 感知时间）。时间字段
 全部可选，缺失视为合法，边缘按内置默认兜底。云端 MUST NOT 在 `session.budget` 下发整套时间
@@ -17,8 +17,8 @@
 
 #### Scenario: 返回指令带停留时长
 
-- **WHEN** 云端评估某详情页后决定 `navigation.back`
-- **THEN** 该 `navigation.back` 指令携带 `dwellMs`，其值由云端依据已上报内容与风控状态算出
+- **WHEN** 云端评估某详情页后决定 `{platform}.navigation.back`
+- **THEN** 该 `{platform}.navigation.back` 指令携带 `dwellMs`，其值由云端依据已上报内容与风控状态算出
 
 #### Scenario: 旧边缘忽略未知时间字段
 
@@ -35,7 +35,7 @@
 #### Scenario: 停留时长随内容量缩放
 
 - **WHEN** 云端先后评估一条短笔记与一条长图文笔记并均决定返回
-- **THEN** 长图文笔记 `navigation.back` 的 `dwellMs` 显著大于短笔记（时长与上报内容量正相关）
+- **THEN** 长图文笔记 `{platform}.navigation.back` 的 `dwellMs` 显著大于短笔记（时长与上报内容量正相关）
 
 #### Scenario: 风控降级整体放慢
 
@@ -61,16 +61,16 @@ MUST 对相同的云端中心值产生**带随机性**的实际时序（避免�
 
 ### Requirement: 详情页返回兜底，杜绝秒退
 
-边缘在**离开一条内容前** SHALL 确保该内容实际停留 ≥ `jitter(dwellMs ?? builtinFloor)`。「离开一条内容」既包括从详情页执行 `navigation.back` 返回，也包括在信息流就地读完一条后发出的**下一条 `{platform}.feed.scroll`**。无论指令是否携带 `dwellMs`，内容页 MUST NOT 出现快到不像人能完成感知判断的瞬时离开（零延迟秒退）。
+边缘在**离开一条内容前** SHALL 确保该内容实际停留 ≥ `jitter(dwellMs ?? builtinFloor)`。「离开一条内容」既包括从详情页执行 `{platform}.navigation.back` 返回，也包括在信息流就地读完一条后发出的**下一条 `{platform}.feed.scroll`**。无论指令是否携带 `dwellMs`，内容页 MUST NOT 出现快到不像人能完成感知判断的瞬时离开（零延迟秒退）。
 
 #### Scenario: 带时长的无价值详情页不秒退
 
-- **WHEN** 云端判无价值并下发带 `dwellMs` 的 `navigation.back`
+- **WHEN** 云端判无价值并下发带 `dwellMs` 的 `{platform}.navigation.back`
 - **THEN** 边缘把返回推迟到实际停留 ≥ `jitter(dwellMs)` 之后才执行
 
 #### Scenario: 缺时长仍不秒退
 
-- **WHEN** `navigation.back` 未携带 `dwellMs`（旧云端 / 断连）
+- **WHEN** `{platform}.navigation.back` 未携带 `dwellMs`（旧云端 / 断连）
 - **THEN** 边缘仍用内置 `builtinFloor` 保证详情页非零停留后才返回
 
 #### Scenario: feed 内联读完不秒滚离开
@@ -104,7 +104,7 @@ MUST 对相同的云端中心值产生**带随机性**的实际时序（避免�
 
 #### Scenario: 云端已下发 dwellMs 不再叠 tempo
 
-- **WHEN** 云端下发带 `dwellMs` 的 `navigation.back` / `{platform}.note.close`（该值已含云端烘入的 `tempo`）
+- **WHEN** 云端下发带 `dwellMs` 的 `{platform}.navigation.back`（该值已含云端烘入的 `tempo`）
 - **THEN** 边缘以该 `dwellMs` 为中心值、只叠抖动，MUST NOT 再乘 `this.tempo`（避免风控放慢被计两次）
 
 #### Scenario: 不经废弃通道下发
@@ -171,7 +171,7 @@ MUST 对相同的云端中心值产生**带随机性**的实际时序（避免�
 
 ### Requirement: 边缘保证 feed 翻页停留达标且不与详情页停留双算
 
-边缘收到带 `dwellMs` 的 `{platform}.feed.scroll` / `facebook.reels.scroll` SHALL 叠加一层 lognormal 抖动后，保证从**本次新卡到达时刻**起的停留不小于抖动后的值（未达标则补足等待后再翻页）；已过去的时间（如云端评估卡片的往返耗时）MUST 被计入、只补足**差额**，模型评估较慢时边缘 MAY 不再额外等待。该要求 MUST 同等适用于 Native-only Facebook Feed 与 Reels 路径；Native 命令映射或执行层 MUST NOT 接收字段后静默丢弃。收到无 `dwellMs` / `dwellMs ≤ 0` 的 `{platform}.feed.scroll` / `facebook.reels.scroll` 时边缘 MUST 立即翻页、不叠加额外延迟。feed 停留 MUST 独立于详情页停留：两者锚点（新卡到达 vs 打开笔记）与触发命令（`{platform}.feed.scroll` vs `navigation.back`/`{platform}.note.close`）不同，MUST NOT 相互叠加或重复计时。当本条内容是信息流就地读时，停留还引入第三锚点（内联读开始时刻 `inlineReadStartedAt` 起的边缘本地 read floor）；三个锚点（新卡到达、详情页打开、内联读开始）之间 MUST 取 max、MUST NOT 相加。
+边缘收到带 `dwellMs` 的 `{platform}.feed.scroll` / `facebook.reels.scroll` SHALL 叠加一层 lognormal 抖动后，保证从**本次新卡到达时刻**起的停留不小于抖动后的值（未达标则补足等待后再翻页）；已过去的时间（如云端评估卡片的往返耗时）MUST 被计入、只补足**差额**，模型评估较慢时边缘 MAY 不再额外等待。该要求 MUST 同等适用于 Native-only Facebook Feed 与 Reels 路径；Native 命令映射或执行层 MUST NOT 接收字段后静默丢弃。收到无 `dwellMs` / `dwellMs ≤ 0` 的 `{platform}.feed.scroll` / `facebook.reels.scroll` 时边缘 MUST 立即翻页、不叠加额外延迟。feed 停留 MUST 独立于详情页停留：两者锚点（新卡到达 vs 打开笔记）与触发命令（`{platform}.feed.scroll` vs `{platform}.navigation.back`）不同，MUST NOT 相互叠加或重复计时。当本条内容是信息流就地读时，停留还引入第三锚点（内联读开始时刻 `inlineReadStartedAt` 起的边缘本地 read floor）；三个锚点（新卡到达、详情页打开、内联读开始）之间 MUST 取 max、MUST NOT 相加。
 
 #### Scenario: 评估耗时被吸收进停留
 
@@ -191,7 +191,7 @@ MUST 对相同的云端中心值产生**带随机性**的实际时序（避免�
 #### Scenario: feed 停留与详情页停留互不叠加
 
 - **WHEN** 边缘在 feed 上因新卡叠了停留，随后打开一条笔记再返回
-- **THEN** 详情页返回停留只由 `navigation.back` 的 `dwellMs` 决定，与之前的 feed 停留互不影响、不重复计时
+- **THEN** 详情页返回停留只由 `{platform}.navigation.back` 的 `dwellMs` 决定，与之前的 feed 停留互不影响、不重复计时
 
 #### Scenario: 内联读停留与翻页停留取 max 不相加
 
@@ -216,7 +216,7 @@ MUST 对相同的云端中心值产生**带随机性**的实际时序（避免�
 
 #### Scenario: 折扣不波及笔记停留 dwell
 
-- **WHEN** 熟悉折扣对 `thinkMs` 生效的同时，云端为刚读过的笔记下发 `navigation.back` 的 `dwellMs`
+- **WHEN** 熟悉折扣对 `thinkMs` 生效的同时，云端为刚读过的笔记下发 `{platform}.navigation.back` 的 `dwellMs`
 - **THEN** 该 `dwellMs`（read 量级停留）不被折扣，详情页仍不秒退
 
 #### Scenario: 超出近期窗口不再享折扣
@@ -226,11 +226,11 @@ MUST 对相同的云端中心值产生**带随机性**的实际时序（避免�
 
 ### Requirement: 返回熟悉 feed 的手势与落地更快但不秒退
 
-边缘执行 `navigation.back` 且 `reason==='back_to_feed'`（必然返回到打开笔记前的同一批、刚刚看过的 feed）时，返回手势停顿与 `history.back` 之后的固定落地等待 SHALL 按折扣（约**常规的 1/3**）缩短，且 MUST 保留**非零下限**（仍带抖动、不出现零延迟瞬时返回）。该折扣 MUST NOT 缩减离开笔记前的停留下限（`ensureDetailDwell` / 笔记 `dwellMs` 不变），也 MUST NOT 削弱返回后的坏页 / 404 健康校验兜底。
+边缘执行 `{platform}.navigation.back` 且 `reason==='back_to_feed'`（必然返回到打开笔记前的同一批、刚刚看过的 feed）时，返回手势停顿与 `history.back` 之后的固定落地等待 SHALL 按折扣（约**常规的 1/3**）缩短，且 MUST 保留**非零下限**（仍带抖动、不出现零延迟瞬时返回）。该折扣 MUST NOT 缩减离开笔记前的停留下限（`ensureDetailDwell` / 笔记 `dwellMs` 不变），也 MUST NOT 削弱返回后的坏页 / 404 健康校验兜底。
 
 #### Scenario: 返回熟悉 feed 手势更快
 
-- **WHEN** 边缘执行 `navigation.back{reason:'back_to_feed'}`
+- **WHEN** 边缘执行 `{platform}.navigation.back{reason:'back_to_feed'}`
 - **THEN** 返回手势停顿与返回后固定落地等待约降至常规的 1/3（带非零下限），更快进入续刷
 
 #### Scenario: 返回手势仍非零、不秒退

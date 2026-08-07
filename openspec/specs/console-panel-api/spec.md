@@ -761,11 +761,11 @@ Panel 账号 API SHALL 为每个账号返回 Cloud 统一解析器产生的 `dis
 - **THEN** 前端只做兼容性账号 ID 回落并明确不可判断来源，MUST NOT 重新复制完整昵称优先级
 
 ### Requirement: Runtime-control updates drive account-scoped Edge delivery
-After a successful CAS update of `interaction_runtime_controls`, the internal API SHALL make the committed account/version available to the account's negotiated online Edge through `interaction.runtime.controls`. The database commit and audit record SHALL remain authoritative; delivery count or socket enqueue MUST NOT be reported as Edge application success.
+After a successful CAS update of `interaction_runtime_controls`, the internal API SHALL make the committed account/version available to the account's negotiated online Edge through `wechat_channels.inbox.runtime.controls`. The database commit and audit record SHALL remain authoritative; delivery count or socket enqueue MUST NOT be reported as Edge application success.
 
 #### Scenario: CAS update reaches one online Edge
 - **WHEN** an authorized operator updates runtime controls with the current expected version and exactly one negotiated Edge is online for the account
-- **THEN** Cloud commits and audits version `N+1`, pushes a scope-matching `interaction.runtime.controls` payload to that Edge, and returns the committed controls without claiming Edge application
+- **THEN** Cloud commits and audits version `N+1`, pushes a scope-matching `wechat_channels.inbox.runtime.controls` payload to that Edge, and returns the committed controls without claiming Edge application
 
 #### Scenario: Edge is offline during update
 - **WHEN** the runtime-control CAS succeeds while no negotiated Edge is online
@@ -955,7 +955,7 @@ preview SHALL 只运行规则、template、可选 AI 与 risk 链并返回 would
 
 #### Scenario: Preview 不触发 Edge
 - **WHEN** 管理员预览一条模拟私信
-- **THEN** Cloud 不向任何 Edge 发 interaction.reply.send，数据库无真实 inbound message/job/attempt
+- **THEN** Cloud 不向任何 Edge 发 wechat_channels.inbox.reply.send，数据库无真实 inbound message/job/attempt
 
 #### Scenario: Audit 可追溯但不含私信正文
 - **WHEN** 管理员发布配置或查看预览审计

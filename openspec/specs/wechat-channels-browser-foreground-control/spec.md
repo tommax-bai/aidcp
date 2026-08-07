@@ -31,7 +31,7 @@ Every browser control command MUST carry the exact `envKey + accountId + platfor
 - **THEN** Edge closes the owned sidecar before completing lifecycle cleanup and MUST NOT affect another environment's browser
 
 ### Requirement: Browser command acceptance is not execution success
-Cloud SHALL report browser control requests as accepted only after ownership and routing checks pass. The client MUST use a later Edge `interaction.auth.status.browserState` projection as execution truth and MUST NOT infer success from enqueue, socket delivery, or HTTP acceptance.
+Cloud SHALL report browser control requests as accepted only after ownership and routing checks pass. The client MUST use a later Edge `wechat_channels.inbox.auth.status.browserState` projection as execution truth and MUST NOT infer success from enqueue, socket delivery, or HTTP acceptance.
 
 #### Scenario: Open command is accepted but Edge has not confirmed state
 - **WHEN** Cloud accepts and routes an open action but no later `browserState=open` projection has arrived

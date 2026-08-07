@@ -12,8 +12,8 @@
 >
 > **本文与蓝图 MUST NOT 派生第二张运行时表**——运行时逐命令声明的唯一落点仍是操作说明书。
 
-> **快照声明**：本文行号、命令清单与判例结论为 **2026-08-06** 对代码的核对快照
-> （Cloud→Edge 登记表 46 条）。fleet 高度活跃，**引用前请自己重核**；
+> **快照声明**：本文行号、命令清单与判例结论为 **2026-08-07（词汇批 6 收官）** 对代码的核对快照
+> （协议消息 108 条 / Cloud→Edge 登记表 56 条；批 1–7 全部落地，词汇迁移收官——遗留：批 2 改类、批 3 问现状，均为行为变更独立 change）。fleet 高度活跃，**引用前请自己重核**；
 > 规则本身不随行号失效，失效的只是指路的坐标。
 
 ---
@@ -189,7 +189,7 @@
 | 互动 | `平台.对象.动作` | `xhs.note.like` · `facebook.comment.like` |
 | 导航 | `平台.目标.动作` | `xhs.note.open` · `facebook.profile.open` |
 | 观察 | `域.动作`（无平台段） | 「问现状」（翻译层） |
-| 非平台域 | `域.动作`（无平台段） | `edge.task.acquire` · `captcha.assist.capture` · `session.end` |
+| 非平台域 | `域.动作`（无平台段） | `task.acquire` · `captcha.assist.capture` · `session.end` |
 | **留痕写 durable-outbox 往返族**（批 6a 定案，批 7 豁免的到期裁决） | 请求 MAY 带历史名词尾段（`.request`/`.command`/`.batch`），应答＝`.result`，出箱确认＝`.ack`（cloud→edge，「exact accepted/duplicate 后才清 outbox」） | `wechat_channels.inbox.reply.send → .reply.result → .reply.result.ack` · `{p}.publish.command → .result` |
 
 **第三族为何不并入前两族**（2026-08-07 批 6a 裁定实录）：三条 `.ack` 全是 cloud→edge 方向，「edge→cloud 应答＝过去分词」规则语义不适用；`wechat_channels.inbox.reply.result` 一型两用（fire-and-forget 上报与等 ack 的 correlated request 共用）；嵌套尾段结构被 edge 侧前缀匹配依赖。豁免成员：IM 三条往返链、`{p}.publish.command.result`、`publish.approval_action.result` / `publish.draft_image_remove.result`、`captcha.assist.click_result`（assist 子族本就整体保留）。
@@ -218,7 +218,7 @@
 | --- | --- | --- |
 | `identity.read_current` / `identity.read_self_profile` | `page_automation` | 翻译层观察（需浏览器、不代表账号动作） |
 | `captcha.assist.capture` / `captcha.assist.click` | `page_automation` | 环境层处置 |
-| `edge.task.acquire` / `edge.task.release` | `page_automation` | 执行权编排 |
+| `task.acquire` / `task.release`（批 6b 已去 `edge.` 前缀） | `page_automation` | 执行权编排 |
 | `session.end` | `page_automation` | 编排收尾 |
 
 说明书的类别词汇大概率要扩（如「页面观察」「环境处置」），身份闸随之不再需要救援清单打洞——
@@ -232,7 +232,7 @@
 | 现名 | 落地名 | 核实结论 |
 | --- | --- | --- |
 | `page.scroll` | `xiaohongshu.{feed,search}.scroll` + `facebook.{feed,search,reels}.scroll` | 面=feed/search/reels 三个：Reels 是真面（原靠 `targetSurface`+reason 族区分，字段已删）；**群不是面**（群内找首帖的滚动是引擎对 `note.open{selection}` 的内部分解，协议层从不单独指挥）；FB search 成立（三搜索角色恒注册 + 真实执行器） |
-| `note.open` `note.close` `note.browse_images` `note.scroll_comments` | open/close 双平台、browse_images/scroll_comments 仅 xhs | `note.close` 云端零发送点（回列表走 `navigation.back`），仍改名保留、分工批 6 裁 |
+| `note.open` `note.close` `note.browse_images` `note.scroll_comments` | open/close 双平台、browse_images/scroll_comments 仅 xhs | `note.close` 云端零发送点（回列表走 `navigation.back`），仍改名保留、~~分工批 6 裁~~ **批 6b 已裁：删除**（见 §8 销账记录） |
 | `feed.refresh` `search.execute` `profile.open` | refresh/search 双平台、profile 仅 xhs | FB 结构性不访作者主页（C4） |
 | `group.join` | `facebook.group.join` | 引擎测试的手抄「FB 独有排除清单」已由 manifest `edgeTypes[]` 前缀推导取代 |
 | `notification.*` 五条 | `xiaohongshu.notification.*` | 结构性 xhs-only：12 巡视角色注册被平台能力表拦、FB 引擎无臂 |
@@ -272,9 +272,9 @@
 | 现名 | 目标 | 说明 |
 | --- | --- | --- |
 | ✅ IM 族全部 15 条（实核修正蓝图「10 条」旧计数：sync 3 + reply 5 + offboard 3 + auth.status/auth.reopen + browser.control + runtime.controls） | `wechat_channels.inbox.*`（**已落地 2026-08-07**，change `platformize-inbox-vocabulary`；平台段取值＝代码枚举 `wechat_channels`，非行文简写 `wechat`） | 纯前缀换名、尾段逐字保留；「interaction」一词从协议消息命名空间整体退役，一词一义恢复。`.result`/`.ack` 同批定案为第三族约定（见 §6.1 族约定表）。换名后 IM 族**首次**落入平台段出入闸辖区（旧名不过闸）——生产侧 sidecar hello 已声明 `wechat_channels`，行为正确。`reply.send` 仍是唯一不经页面身份闸的留痕写（豁免已结构化为说明书类别推导，无手抄清单；已登记待议） |
-| `publish.command` | 平台段化（`{p}.publish.command`，原子 kind 表分平台） | 发布是平台间差异最大的流程 |
-| `navigation.back` | 与 `note.close` 定分工后平台段化 | 语义重叠则合并，不同则 back 带目标面 |
-| `edge.task.acquire` / `edge.task.release` | 可选顺带改 `task.*` | 非平台域，无平台段；`edge.` 前缀冗余 |
+| ✅ `publish.command`(.result) | `xiaohongshu.publish.command`(.result) + `facebook.publish.command`(.result)（**已落地 2026-08-07 批 6b**；kind 分表 XHS 12 / FB 6、载荷 `platform?` 字段删除、automation 静默缺省清零；视频号无发布名） | 发布是平台间差异最大的流程 |
+| ✅ `navigation.back` + `{p}.note.close` | 裁决＝**合并**：`{p}.note.close` 删除、back 平台段化为 `xiaohongshu./facebook.navigation.back`（**已落地 2026-08-07 批 6b**；XHS 形 `targetPage` 必填＝「back 带目标面」的兑现） | 语义重叠则合并，不同则 back 带目标面 |
+| ✅ `edge.task.*` 4 条 | `task.acquire` / `task.acquired` / `task.release` / `task.released`（**已落地 2026-08-07 批 6b**） | 非平台域，无平台段；`edge.` 前缀冗余已清；kernel 豁免表同批换（v0.1.4） |
 
 #### 非平台域词汇收口（批 7 · 2026-08-07 据实立项）
 
@@ -314,7 +314,7 @@
 | **3** | 新增「问现状」观察命令 | 协议新增，三段对账闭环 |
 | **4** | ✅ **已实装（2026-08-06）**：14 → 22 平台段名（协议 95→103、登记表 44→52）；`page.scroll` 拆三面、`targetSurface` 字段删；两道休眠平台段闸转正；`FACEBOOK_UNSUPPORTED_COMMANDS` 收缩到两条共享名互动命令（批 5 归零）；manifest `edgeTypes[]` 取代手抄排除清单；跨面到达诚实失败 `surface_mismatch_*` | 协议改名最大的一批（change `platformize-browse-vocabulary`） |
 | **5** | ✅ **已实装（2026-08-07）**：5 → 9 平台段对象名（协议 103→107、登记表 52→56）；like 按对象拆（video=Reels+feed 视频帖）、执行点核对对象；**关联键只换键值不动**（据实修正：值＝风控动作名是设计，脱钩坐实）；`FACEBOOK_UNSUPPORTED_COMMANDS` 归零删除；新增 `scripts/action-key-parity` 三表对账闸 | 协议第 5 处同步点所在批（change `objectify-interaction-vocabulary`） |
-| **6** | 两 change 并行开发、串行集成：**6a ✅ 已实装（2026-08-07，change `platformize-inbox-vocabulary`）**——IM 族 15 条 → `wechat_channels.inbox.*`（计数不变 107）、`.result`/`.ack` 第三族约定定案；**6b 实装中（change `platformize-publish-navigation-vocabulary`）**——发布平台段化（XHS 12 / FB 6 kind 分表、删载荷 `platform` 字段、automation 静默缺省清零）、`{p}.note.close` 删除（分工裁决＝合并进 back，云端零发送点）、`navigation.back` 平台段化（XHS 形 `targetPage` 必填）、`edge.task.*` → `task.*`、kernel v0.1.4（107→108） | 收尾清账 |
+| **6** | 两 change 并行开发、串行集成：**6a ✅ 已实装（2026-08-07，change `platformize-inbox-vocabulary`）**——IM 族 15 条 → `wechat_channels.inbox.*`（计数不变 107）、`.result`/`.ack` 第三族约定定案；**6b ✅ 已实装（2026-08-07，change `platformize-publish-navigation-vocabulary`）**——发布平台段化（XHS 12 / FB 6 kind 分表、删载荷 `platform` 字段、automation 静默缺省清零）、`{p}.note.close` 删除（分工裁决＝合并进 back，云端零发送点）、`navigation.back` 平台段化（XHS 形 `targetPage` 必填）、`edge.task.*` → `task.*`、kernel v0.1.4（107→108） | 收尾清账 |
 | **7** | ✅ **已实装（2026-08-07）**：`captcha.detected`/`captcha.cleared` 归一家、应答族约定定案（过去分词事实形，`state.report`→`state.observed` 唯一归一）、`ui.push_snapshot`、`identity.read_current_page`；`ping`/`pong` 与 `plan.response` 明确不动；kernel v0.1.3（类型面收编） | 纯内部词汇（change `normalize-nonplatform-vocabulary`，与批 5 并行开发、串行集成实证可行） |
 
 ---
@@ -339,5 +339,5 @@
 
 - **观察命令的最终形态与命名**：独立「问在哪个面」vs 并进身份读取成「问现状」（倾向后者，一次往返拿全）。批 3 定。
 - **期望面进名字还是进必填参数**：报错能力上等价；规则三四条全同才允许参数形态。逐命令裁决。
-- **`navigation.back` 与 `note.close` 的分工**：批 6 按代码坐实。
+- ~~**`navigation.back` 与 `note.close` 的分工**：批 6 按代码坐实。~~ **已裁（2026-08-07 批 6b）**：合并——FB 侧两名同一条代码路径、XHS 侧 close 是 back 的严格子步骤、云端零发送点（策展 LLM 的 close_note 判决落地也是 back）；`{p}.note.close` 从协议删除，关弹层降回引擎内部，`{p}.navigation.back` 成唯一离页命令（XHS 形 targetPage 必填）。
 - **视频号 API 写路径不经页面身份闸**（`interaction.reply.send`）：已在 `close-account-layer-operation-manual` 登记，属身份闸判据范围，不在本语法内。
