@@ -2196,6 +2196,13 @@ t=2906ms  '… 1 分钟 赞 回复'        按钮=4  opacity=1   ← 上墙（�
 - [ ] 91.6 **冷却不跨类型吞没（真飞书验收）** — 同一 edge 10 分钟内先触发一次验证码告警、再触发限流：限流卡 MUST 照常发出且 `alerts` 表 MUST 落一行。（此前按 edge 不分类型冷却，且落库在冷却闸之后 → 卡与记录一起被吞）
 - [ ] 91.7 **评论回执诚实性未回归（红线双向）** — 限流下的评论回执 MUST 仍是「确认不了」（`verification_ambiguous`），MUST NOT 因发了告警就算成功；**也 MUST NOT** 因看到限流弹窗把已被服务器确认的评论改判失败。
 
+> **`fb-throttle-popup-fr-copy`（2026-08-09，edge `4ad96ee` + automation `1aebdc5`，automation 已部署 dev；edge 未打包）**：同一故障的**法语实例**。用户遇到法语软阻断弹窗「Cette fonctionnalité n'est pas disponible. / Un contrôle de sécurité est requis pour continuer. / Si vous pensez que ceci ne va pas à l'encontre des Standards de la communauté, dites-le nous.」——识别是纯文字匹配，两仓词库只有英文与中文，法语零命中 ⇒ 边缘判 `none`、连上报都不发 ⇒ 云端风控停 `normal` 继续按原节奏下发。**该弹窗的英文版今天已命中限流词库、一次刹车到 `restricted`**（已用现役模块实证），法语版零处置 = 覆盖面缺陷。已补两条法语长句片段 + 归一化补去变音符（消解 NFC/NFD、转录重音丢失、地区变体三条失配路径）。**刻意不动任何分级**：安全检查 / checkpoint 的两轮软信号升级是刻意设计（可能只是身份或设备确认），未触碰。**与 91.1–91.7 共用同一次真机 session。**
+
+- [ ] 91.8 **法语原文逐字取证 + 词条命中（本批的钉）** — 在法语界面账号上触发该弹窗后，用 CDP 抓 `document.body.innerText` **逐字记录原文**（存进本条目），比对两条词条 `controle de securite est requis` / `cette fonctionnalite nest pas disponible` 是否真命中。**若 FB 实际用词不同（例如 `vérification` 而非 `contrôle`），须按真实原文改词条并两仓同步**（两侧单测各锁一份集合，改一侧另一侧必失败）。失败方向安全：不命中 = 回落静默现状、不误伤，故此项不阻塞码级实装。
+- [ ] 91.9 **法语正常页面不误报（否定验收，与 91.8 同等重要）** — 浏览法语界面的 FB 安全设置页（含「Contrôle de sécurité」作为功能名）、群规则页、通知中心（含违规申诉话术「ne va pas à l'encontre des Standards de la communauté」）：账号风控态 MUST 维持 `normal`，MUST NOT 出现 `fb_throttle` 告警。**申诉话术是刻意排除项**——它附在一切违规告知之后、包括陈年内容删除通知，一条旧通知误命中即把在跑的号打进 `restricted`（钉住恢复窗、只能人工恢复）。
+- [ ] 91.10 **法语与英语处置等价（本批的疗效判据）** — 同一张弹窗分别在法语与英语界面下出现，MUST 得到相同的分类、相同信号强度、相同风控迁移（都到 `restricted`）。单测已锁等价性，真机验证的是「真实页面文字确实进得了这条判据」。
+- [ ] 91.11 **该环境为何是法语界面（顺带查清，不属本 change）** — 治本方案 `facebook-locale-pin-en-us` 只作用于**新建号的指纹层**；登录后 FB 界面语言由**账号服务端设置**决定，存量号那道闸管不到。真机确认这批号的界面语言来源，并判断是否需要独立立项做存量号语言归一（逐个登入改设置页，流程脆）。
+
 ## 簇 92
 
 **前置环境**：真实 AdsPower 桌面客户端（**三条均需自出安装包** —— 按 CLAUDE.md §6 打包默认不做，故三者均已 land 但未到运营机）。三条来源不同、可分头跑，聚在一簇是因为共享「本机跑 Electron 客户端 + 真 AdsPower」这一套环境。登记于 2026-07-17（归档 `use-preprovisioned-adspower-group` / `facebook-mandatory-recruitment-interaction` / `wechat-channels-client-self-service` 时解耦）。
