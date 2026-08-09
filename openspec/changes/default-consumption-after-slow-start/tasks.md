@@ -14,6 +14,7 @@
 - [x] 2.2 部署 dev（安全序列：target 检查 → 备份 → rsync → migrate `--owner=api` → restart → healthcheck）。 <!-- 2026-08-09 deployed；备份 api.bak.20260809-151909.tar.gz + api.env.bak.20260809；git archive c4e5cae 快照 rsync；migrate status 干净后 up 应用 0117（8ms）；重启后 aidcp-api active、NRestarts=0、8090/8091/8093 在、契约门通过（账本顶=0117）、飞书 onReady -->
 - [x] 2.3 部署验收：dev 上抽查冷启动中环境投影与镜像。 <!-- 库内实测：翻 50 行（audit 同 50）、base_mode 分布 consumption=111 / persona=56 / rule=5、facebook_operation_policy 镜像版本推进至 165；剩余「persona+有慢启动痕迹」14 行全部为按 totalDays=5 推导已毕业无完成行的存量（按设计排除，正按 persona 运行）；automation 近 10 分钟日志 stale/payload_drift/error 计 0 -->
 - [x] 2.4 OL 风险登记：共库，0117 入账后 OL api 旧构建重启会被契约门拦（重启前零症状）。OL 跟版等用户明确要求，届时走发布分支。 <!-- 已在 proposal 与对话总结中显式告知；0117 为 expand/DML，OL 旧构建运行期不受影响，只有 restart 才触发契约门 -->
+- [x] 2.5 OL 部署（2026-08-09 用户明确要求）。 <!-- 发布分支 release/20260809-ol-slow-start-consumption（=api master c4e5cae，纯建分支指针未动 canonical checkout）；上一发布分支 cherry 核查零独有提交。范围=api 单服务。探明 OL api 已被并行会话更过（认识 0114、kernel pin v0.1.1），真实内容差异仅 8 文件（transport pin 清单×2、server.ts ahead-gate 接线、本 change 源码×2 + 迁移 + 测试×2，rsync -c 校验和核定）。安全序列：备份 api.bak.20260809-153947.tar.gz + api.env.bak.20260809 → 快照 rsync → transport v0.1.5 包目录随包送（OL 拉不了私有 git 依赖；kernel v0.1.1 已在）→ migrate status 74/74 全应用 0 待应用（0117 经共库已在账）→ restart → 契约门通过（账本顶=0117，重启陷阱解除）、三服务 active、NRestarts=0、8787/8090/8091/8093 全在、飞书 onReady、panel 8090 与 capi 8091 均 200、automation 零 stale/drift/error、isales 未碰。发布分支 tip=master 提交本身，零回流欠账 -->
 
 ## 3. 控制仓收口
 
