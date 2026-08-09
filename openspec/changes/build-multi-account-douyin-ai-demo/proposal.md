@@ -14,6 +14,7 @@ Prospective users need an independently runnable Douyin demonstration that prove
 - Ship a deterministic fixture adapter so the complete UI and worker flow can be exercised without a real account, while keeping experimental private-web adapters fail-closed and clearly labeled.
 - Document license provenance, private-protocol drift, configuration, local operation, deployment isolation, and the separate real-account acceptance gates.
 - Extend the deployed DEV demo with the same operator-visible loop as the WeChat Channels demo: a web-presented Douyin QR, bounded Chromium session capture, encrypted retained login state, Doubao/Ark generation, exact-conversation direct-message delivery, incremental comment reads, and exact-target comment replies through a bounded account-level Chromium worker.
+- Keep the same bounded authorization Chromium context alive when Douyin returns the explicit secondary-verification response, and expose only an operator-authenticated, one-time screenshot/input surface for the official verification UI. No verification configuration, QR token, Cookie, browser endpoint, or temporary input is projected or persisted.
 
 ## Capabilities
 

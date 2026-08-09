@@ -37,6 +37,29 @@ In real mode, an operator-initiated QR authorization attempt SHALL launch at mos
 - **WHEN** the matching first-party QR status reports scanned or confirmed before the same browser context has completed identity and session proof
 - **THEN** the UI shows authorizing, the context remains bounded by the original authorization deadline, and no credential is persisted until both proofs complete
 
+### Requirement: Explicit secondary verification retains only the bounded official context
+The token-bound first-party `error_code=2046` response SHALL be treated as a bounded secondary-verification state, not authorization, generic schema drift, or the terminal challenge referenced by the QR cleanup rule. The service SHALL keep the same Chromium page, Profile, Cookie context, and QR tracker alive only within the original authorization deadline. It MUST NOT create a credential or begin identity proof while that state remains current. The official page SHALL own all verification configuration and request replay; the service MUST NOT parse, persist, project, log, or independently submit verification decision configuration, SMS keys, QR tokens, Cookies, or raw response bodies. The service MAY expose bounded input through the existing operator-authenticated HTTPS origin only when exactly one visible official Verify Center surface is admitted across two exact forms: the allowlisted Verify Center iframe origin and pathname, or the structurally verified same-document `#vc-second-valid` dialog under its fixed, high-z-index, viewport-covering official mask. The candidate MUST be fully inside the current Creator viewport. The service MUST screenshot only that surface element, MUST NOT fall back to the Creator viewport, and MUST bind each JPEG to the exact pending account, challenge, current snapshot revision, Creator document pathname, surface kind, surface-document digest, frame and element identity, and bounding box, plus a latest-only, one-use memory-only frame identity, absolute expiry, and bounded remaining lifetime no more than thirty seconds. The client MUST derive a conservative local deadline from the request start and that remaining lifetime, recheck it after JPEG decode and before every input, and disable and replace the frame before expiry; input MUST first consume the frame identity and revalidate every bound property. It may permit only normalized click, one-shot drag, bounded scroll, at-most-64-character control-free text, and an allowlisted key. Text and keys require an editable focus contained by the admitted surface; an iframe candidate additionally requires that iframe to own top-level focus. Escape is not allowlisted. Top-level navigation MUST be blocked while verification remains current; any newly observed popup MUST be closed immediately and MUST NOT be exposed as a control or image surface. The service MUST NOT expose CDP, a browser debug endpoint, clipboard, upload, download, arbitrary navigation, DevTools, or script execution. Frame identities, screenshots, coordinates, and temporary text MUST NOT be stored. A transiently missing, hidden, moved, malformed, replaced, or ambiguous verification surface SHALL yield no image or input while the attempt stays pending within its original deadline. Creator origin/path mismatch, closing, timeout, explicit expiry/refusal, QR schema failure, or cleanup failure SHALL terminate or quarantine the context without a credential. Official verification completion SHALL only resume the existing stable-identity, IM-bootstrap, and structurally valid Douyin-Cookie proofs.
+
+#### Scenario: Douyin requires official secondary verification
+- **WHEN** the token-bound QR status returns the explicit secondary-verification response
+- **THEN** the same bounded Chromium context remains alive, the account stays authorizing, only the sanitized verification flag and expiry are projected, and no identity probe or credential creation occurs until the official page replays a confirmed QR response
+
+#### Scenario: Secondary verification does not finish in time
+- **WHEN** the official secondary-verification UI remains incomplete at the original authorization deadline
+- **THEN** the attempt fails with a distinct sanitized timeout, closes its Chromium/Profile resources, and requires an explicit new QR attempt
+
+#### Scenario: Verification surface is missing, replaced, or ambiguous
+- **WHEN** neither exact official surface is currently valid because it is absent, hidden, outside the viewport, duplicated, malformed, replaced, or moved after capture
+- **THEN** the service returns no Creator-page fallback, applies no input, and keeps the authorization pending until a fresh valid surface exists or the original deadline expires
+
+#### Scenario: Creator authorization document changes during verification
+- **WHEN** the pending page leaves the exact Creator origin and pathname that issued the QR challenge
+- **THEN** the service applies no input, closes and cleans the attempt without a credential, and exposes a sanitized terminal error
+
+#### Scenario: Verification frame identity is stale or replayed
+- **WHEN** an input names an expired, already-consumed, or non-current frame identity
+- **THEN** the service applies no input and requires the operator to act on a newly fetched frame
+
 ### Requirement: Retained sessions are encrypted and identity bound
 The demo SHALL encrypt retained real-mode session material at rest with operator-provided key material and SHALL bind it to the resolved stable Douyin identity and local account id. Cookies, tokens, QR payloads, browser debug endpoints, encryption keys, and raw session values MUST NOT be returned by APIs or written to logs, timelines, fixtures, or error messages. A restored session MUST pass an identity and read-capability probe before its account runtime becomes active; an explicit authentication failure SHALL mark the account reauthorization-required and stop new inbound and outbound platform work.
 
