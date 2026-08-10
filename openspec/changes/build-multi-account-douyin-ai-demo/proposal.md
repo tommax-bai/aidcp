@@ -15,6 +15,7 @@ Prospective users need an independently runnable Douyin demonstration that prove
 - Document license provenance, private-protocol drift, configuration, local operation, deployment isolation, and the separate real-account acceptance gates.
 - Extend the deployed DEV demo with the same operator-visible loop as the WeChat Channels demo: a web-presented Douyin QR, bounded Chromium session capture, encrypted retained login state, Doubao/Ark generation, exact-conversation direct-message delivery, incremental comment reads, and exact-target comment replies through a bounded account-level Chromium worker.
 - Keep the same bounded authorization Chromium context alive when Douyin returns the explicit secondary-verification response, and expose only an operator-authenticated, one-time screenshot/input surface for the official verification UI. No verification configuration, QR token, Cookie, browser endpoint, or temporary input is projected or persisted.
+- Correct the observed secondary-verification frame loop by treating a verified nested official dialog/iframe hierarchy as one surface, distinguishing temporarily missing, ambiguous, UC-renderer-pending, and unsupported-UC surfaces from stale account revisions, and requiring an explicit token-bound confirmation after `error_code=2046` even when legacy session Cookies exist.
 
 ## Capabilities
 
