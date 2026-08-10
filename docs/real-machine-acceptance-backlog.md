@@ -4463,3 +4463,14 @@ automation `b456af4`（含消费链 Reel 目标 + 普通帖目标两条回归断
 - [ ] 模式切回「固定次数」,确认行为与本 change 之前逐字一致（零回归）。
 - [ ] 模式翻转后,继承全局的环境 policy_revision 前进、进行中的规则批次/消费进度按既有失配机制重置,不出现「旧计数+新判定」混跑。
 - [ ] 规则模式概率下「本轮含加群」在批创建时掷一次落 `facebook_rule_batch.includes_join`,同一批多次读取结果一致(不重掷)。
+
+## 簇 158 · 互动观测台账订阅回填真机验收（automation-interaction-ledger，2026-08-10）
+
+> **前置环境**：纯云端改动，automation 已部署 dev（`be2a6fd`，2026-08-10 20:03，启动日志已见「互动观测台账订阅已建立」）。**OL 尚未跟版**——OL 的 automation 同样缺这段订阅，跟版前 OL 的互动账本继续停摆。
+> 背景：单体组装根的四段观测订阅（interaction.occurred / search.occurred / note.detail / profile.detail）拆进程时整段漏搬，2026-08-04 dev 切派生服务后 `interaction_feed` / `liked_notes` / `risk_interactions`(like/collect) / `interaction_target_meta` / 精选语料 `markBotAction` 全部静默停更（最后数据停在 2026-07-29 浏览闭环停跑那天），后台「按笔记互动」冻结在旧数据。
+
+- [ ] 任一账号真实互动（FB 评论真发成功、或浏览闭环点赞）后，`aidcp_automation` 库 `interaction_feed` 出现 `occurred_at > 2026-08-10` 的新行，后台总览「按笔记互动」随之出现新条目。
+- [ ] 详情页观测后 `interaction_target_meta` 有新 upsert（标题/链接），后台互动行不再是裸 id。
+- [ ] 自有点赞/收藏经跨进程 `markBotAction` 真的写进 content 侧精选语料（content 服务日志或 `curated_content` 表核对；这条是只会少不会多的真写，失败会有具名 warn）。
+- [ ] 节奏饱和告警恢复：突发窗撞顶时 `alerts` 表出现 `pacing_saturation` P2 行（此前 alerter 未实例化、告警整体缺席）。
+- [ ] 产品决策待办（非验收）：FB 规则消费链的 like/join 台账（`facebook_consumption_action`）要不要并入「按笔记互动」卡片——若消费链动作不经 `action.completed` 回执路径，它们仍不进这张账本，卡片只反映浏览闭环互动。
