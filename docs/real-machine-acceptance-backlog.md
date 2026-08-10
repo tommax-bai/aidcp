@@ -4426,3 +4426,12 @@ automation `b456af4`（含消费链 Reel 目标 + 普通帖目标两条回归断
 - [ ] 返回命令新名：`xiaohongshu.navigation.back`（targetPage 必填，feed 与 search 两形各一次）与 `facebook.navigation.back` 真实回执；缺 targetPage 的 XHS back 被格式拒收（可用手工注入验证）。
 - [ ] 租约链新名：`task.acquire→acquired→release→released` 完整一轮（发布或评论任务），副本陈旧窗口下豁免放行仍有效（kernel v0.1.4 豁免表）。
 - [ ] 平台缺失 fail-closed：无 platform 的 draft 不下发、原因 `draft_platform_missing` 可见（后台/日志），不再静默按小红书。
+
+## 簇 156 · Reels 观看时长离散化真机观察（reels-watch-time-distribution，2026-08-10）
+
+> **前置环境**：纯云端改动，automation 已部署 dev（`0b64998`，2026-08-10），无需出包——任何现役边缘版本都直接消费新 `dwellMs`。
+> 机制：reels 面翻页 dwell 中心值改为重尾采样（55% 快划 10–20s / 35% 正常 20–45s / 10% 深看 45–90s，× tempo/fatigue，clamp [10s, 90s]），不再吃 11s 扫屏平地板;feed/search 面不变。
+
+- [ ] Facebook 真机跑一场 Reels 会话，确认逐条停留分布已离散(多数十几秒、少数 30–60s、偶见近 90s),不再集中在 9–13s。
+- [ ] 长停留(深看段 45–90s)期间无 idle 看门狗轻推/误杀(阈值 240s,应有充足余量)、无会话异常提前终结。
+- [ ] 与已知的 Reels 空转缺陷(簇 145.5,缓修)区分观察:翻页失败重发在长 dwell 下不叠加停留(边缘锚定上屏内容到达时刻),空转周期变长属预期、不算恶化。
